@@ -1,0 +1,56 @@
+#
+# 最小構成のGitLab
+#
+domain: labo.local
+cluster_name: infra
+
+## Hypervisor type
+hypervisor: kvm
+
+## 仮想マシンイメージの設定
+image_template_path: /home/images
+image_default_path:  /home/images
+
+qcow2_image: ubuntu20.04-amd.qcow2
+os_variant:  ubuntu20.04
+
+## Cluster Network
+private_ip_subnet: 172.16.0.0/16
+public_ip_subnet:  192.168.1.0/24
+
+### Network device and config
+net_dev_default: enp1s0
+net_dev_private: enp2s0
+net_dev_public:  enp3s0
+
+public_ip_gw:  192.168.1.1
+public_ip_dns: 192.168.1.8
+
+### Virtual Machine Spec
+vm_spec:
+  - name: "gitlab"
+    cpu: 2
+    memory: 8096
+    private_ip:  "172.16.0.222"
+    public_ip:   "192.168.1.222"
+    storage:
+    - name: repo_data1
+      size: 80
+      path: /stg2
+    vm_host: auto
+    playbook: install.yaml
+    comment: "GitLab Server"
+
+  - name: "gitlab2"
+    cpu: 2
+    memory: 8096
+    private_ip:  "172.16.0.223"
+    public_ip:   "192.168.1.223"
+    storage:
+    - name: repo_data1
+      size: 80
+      path: /stg2
+    vm_host: auto
+    playbook: install.yaml
+    comment: "GitLab Server"
+ 

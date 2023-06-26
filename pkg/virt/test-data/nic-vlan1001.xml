@@ -1,0 +1,5 @@
+<interface type='network'>
+    <source network='ovs-network' portgroup='vlan-1001'/>
+    <model type='virtio'/>
+    <address type='pci' domain='0x0000' bus='0x06' slot='0x00' function='0x0'/>
+</interface>

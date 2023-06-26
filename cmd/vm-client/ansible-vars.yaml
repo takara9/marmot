@@ -1,0 +1,9 @@
+[all:vars]
+
+work_dir         =  /nfs
+download_dir     = {{ work_dir }}/download
+ca_home2         = {{ work_dir }}/ca
+ca_etcd_home     = {{ work_dir }}/ca-etcd
+ca_front_proxy   = {{ work_dir }}/ca-front-proxy
+ca_kubeconfig    = {{ work_dir }}/kubeconfig
+cadmin_home      = {{ work_dir }}/yaml
