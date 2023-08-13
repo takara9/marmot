@@ -1,14 +1,15 @@
 package util
 
 import (
-	"fmt"
-	"os"
-	"io"
+	"bytes"
 	"encoding/json"
-        "log"
-        "bytes"
-	"net/http"
 	"errors"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"os"
+
 	cf "github.com/takara9/marmot/pkg/config"
 	db "github.com/takara9/marmot/pkg/db"
 	virt "github.com/takara9/marmot/pkg/virt"
@@ -18,7 +19,7 @@ import (
 // コンフィグからVMクラスタを作成する
 func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 
-	Conn,err := db.Connect(dbUrl)
+	Conn, err := db.Connect(dbUrl)
 	if err != nil {
 		log.Println("db.Connect()", " ", err)
 		return err
@@ -26,20 +27,20 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 
 	// クラスタ名とホスト名の重複チェック
 	/*
-	for _,spec := range cnf.VMSpec {
-		vmKey,_ := db.FindByHostAndClusteName(Conn, spec.Name, cnf.ClusterName)
-		if len(vmKey) > 0 {
-			return errors.New("ExistVM")
+		for _,spec := range cnf.VMSpec {
+			vmKey,_ := db.FindByHostAndClusteName(Conn, spec.Name, cnf.ClusterName)
+			if len(vmKey) > 0 {
+				return errors.New("ExistVM")
+			}
 		}
-	}
 	*/
 
 	var break_err bool = false
 	return_errors := errors.New("")
 	// 仮想マシンの設定と起動
-	for _,spec := range cnf.VMSpec {
+	for _, spec := range cnf.VMSpec {
 
-		vmKey,_ := db.FindByHostAndClusteName(Conn, spec.Name, cnf.ClusterName)
+		vmKey, _ := db.FindByHostAndClusteName(Conn, spec.Name, cnf.ClusterName)
 		if len(vmKey) > 0 {
 			continue
 		}
@@ -48,15 +49,15 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		var vm db.VirtualMachine
 		vm.ClusterName = cnf.ClusterName
 		vm.OsVariant = cnf.VMOsVariant
-		vm.Name      = spec.Name  // Os のhostname
-		vm.Cpu       = spec.CPU
-		vm.Memory    = spec.Memory
+		vm.Name = spec.Name // Os のhostname
+		vm.Cpu = spec.CPU
+		vm.Memory = spec.Memory
 		vm.PrivateIp = spec.PrivateIP
-		vm.PublicIp  = spec.PublicIP
-		vm.Playbook  = spec.AnsiblePB
-		vm.Comment   = spec.Comment
-		vm.Status    = db.INITALIZING
-		for _,stg := range spec.Storage {
+		vm.PublicIp = spec.PublicIP
+		vm.Playbook = spec.AnsiblePB
+		vm.Comment = spec.Comment
+		vm.Status = db.INITALIZING
+		for _, stg := range spec.Storage {
 			var vms db.Storage
 			vms.Name = stg.Name
 			vms.Size = stg.Size
@@ -65,7 +66,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		}
 
 		//スケジュールを実行
-		vm.HvNode,vm.Key,vm.Uuid,err = db.AssignHvforVm(Conn, vm)
+		vm.HvNode, vm.Key, vm.Uuid, err = db.AssignHvforVm(Conn, vm)
 		if err != nil {
 			log.Println("db.AssignHvforVm()", " ", err)
 			break_err = true
@@ -85,16 +86,16 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 
 		// VMのUUIDとKEYをコンフィグ情報へセット
 		spec.Uuid = vm.Uuid.String()
-		spec.Key  = vm.Key
+		spec.Key = vm.Key
 
 		// 問題発見処理
-		if len(vm.HvNode) == 0  {
+		if len(vm.HvNode) == 0 {
 			log.Println("len(vm.HvNode) == 0", " ")
 			break_err = true
 			return_errors = err
 			break
 		}
-		if len(vm.Name) == 0  {
+		if len(vm.Name) == 0 {
 			log.Println("len(vm.Name) == 0", " ")
 			break_err = true
 			return_errors = err
@@ -106,21 +107,21 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		// リモートHVでVMを作成するケースが発生する。
 
 		// vm.HvNode と node を比較してローカルへ
-		log.Println("vm.HvNode", " = ",vm.HvNode)
-		log.Println("hvNode",    " = ",hvNode)
-		log.Println("cmp vm.HvNode hvNode", " = ",vm.HvNode == hvNode)
+		log.Println("vm.HvNode", " = ", vm.HvNode)
+		log.Println("hvNode", " = ", hvNode)
+		log.Println("cmp vm.HvNode hvNode", " = ", vm.HvNode == hvNode)
 
 		// リモートとローカル関係なしに、マイクロサービスへリクエストする
-		db.UpdateVmState(Conn,vm.Key,db.PROVISIONING)
+		db.UpdateVmState(Conn, vm.Key, db.PROVISIONING)
 		err = RemoteCreateStartVM(vm.HvNode, spec)
 		if err != nil {
-			log.Println("RemoteCreateStartVM()", " ",err)
+			log.Println("RemoteCreateStartVM()", " ", err)
 			break_err = true
 			return_errors = err
-			db.UpdateVmState(Conn,vm.Key,db.ERROR )  // エラ状態へ
+			db.UpdateVmState(Conn, vm.Key, db.ERROR) // エラ状態へ
 			break
 		}
-		db.UpdateVmState(Conn,vm.Key,db.RUNNING)  // 実行中へ
+		db.UpdateVmState(Conn, vm.Key, db.RUNNING) // 実行中へ
 	} // END OF LOOP
 
 	if break_err == true {
@@ -132,7 +133,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 // リモートホストにリクエストを送信する
 func RemoteCreateStartVM(hvNode string, spec cf.VMSpec) error {
 
-	byteJSON,_ := json.MarshalIndent(spec,"","    ")
+	byteJSON, _ := json.MarshalIndent(spec, "", "    ")
 	fmt.Println(string(byteJSON))
 
 	// JSON形式でポストする
@@ -143,7 +144,7 @@ func RemoteCreateStartVM(hvNode string, spec cf.VMSpec) error {
 	client := &http.Client{}
 	response, err := client.Do(request)
 	if err != nil {
-		log.Println("err = ",err)
+		log.Println("err = ", err)
 		return err
 	}
 	defer response.Body.Close()
@@ -156,7 +157,6 @@ func RemoteCreateStartVM(hvNode string, spec cf.VMSpec) error {
 	return nil
 }
 
-
 // この部分は、ハイパーバイザーのホストで実行する
 // VMを生成する
 func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
@@ -166,7 +166,7 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	// Libvirtのテンプレートを読み込んで、設定を変更する
 	var dom virt.Domain
 	err := virt.ReadXml("temp.xml", &dom)
-	dom.Name = spec.Key  // VMを一意に識別するキーでありhostnameではない
+	dom.Name = spec.Key // VMを一意に識別するキーでありhostnameではない
 	dom.Uuid = spec.Uuid
 	dom.Vcpu.Value = spec.CPU
 	var mem = spec.Memory * 1024 //KiB
@@ -176,12 +176,12 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	log.Println("OSボリュームを作成")
 	//------------------------------------------------------------
 	// OSボリュームを作成  (N テンプレートを指定できると良い)
-	osLogicalVol, err := CreateOsLv(conn,spec.OsTempVg,spec.OsTempLv)
+	osLogicalVol, err := CreateOsLv(conn, spec.OsTempVg, spec.OsTempLv)
 	if err != nil {
 		log.Println("CreateOsLv()", err)
 		return err
 	}
-	dom.Devices.Disk[0].Source.Dev = fmt.Sprintf("/dev/%s/%s",spec.OsTempVg,osLogicalVol)
+	dom.Devices.Disk[0].Source.Dev = fmt.Sprintf("/dev/%s/%s", spec.OsTempVg, osLogicalVol)
 
 	log.Println("OSボリュームのLV名をetcdへ登録")
 	// OSボリュームのLV名をetcdへ登録
@@ -201,9 +201,9 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	}
 
 	// DATAボリュームを作成 (最大９個)
-	dev := []string{ "vdb", "vdc", "vde", "vdf", "vdg", "vdh", "vdj", "vdk", "vdl"}
-	bus := []string{"0x0a","0x0b","0x0c","0x0d","0x0e","0x0f","0x10","0x11","0x12"}
-	for i,disk := range spec.Storage {
+	dev := []string{"vdb", "vdc", "vde", "vdf", "vdg", "vdh", "vdj", "vdk", "vdl"}
+	bus := []string{"0x0a", "0x0b", "0x0c", "0x0d", "0x0e", "0x0f", "0x10", "0x11", "0x12"}
+	for i, disk := range spec.Storage {
 		var dk virt.Disk
 
 		// ボリュームグループが指定されていない時はvg1を指定
@@ -211,7 +211,7 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 		if len(disk.VolGrp) > 0 {
 			vg = disk.VolGrp
 		}
-		dlv, err := CreateDataLv(conn,uint64(disk.Size),vg)
+		dlv, err := CreateDataLv(conn, uint64(disk.Size), vg)
 		if err != nil {
 			log.Println("CreateDataLv()", err)
 			return err
@@ -223,7 +223,7 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 		dk.Driver.Type = "raw"
 		dk.Driver.Cache = "none"
 		dk.Driver.Io = "native"
-		dk.Source.Dev = fmt.Sprintf("/dev/%s/%s",vg,dlv)
+		dk.Source.Dev = fmt.Sprintf("/dev/%s/%s", vg, dlv)
 		dk.Target.Dev = dev[i]
 		dk.Target.Bus = "virtio"
 		dk.Address.Type = "pci"
@@ -245,7 +245,6 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	// ストレージの更新
 	CheckHvVG2(conn, hvNode, spec.OsTempVg)
 
-
 	//------------------------------------------------------------
 	// XMLへNICインターフェースの追加
 	if len(spec.PrivateIP) > 0 {
@@ -256,7 +255,6 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 		CreateNic("pub", &dom.Devices.Interface)
 	}
 
-
 	//------------------------------------------------------------
 	// 仮想マシン定義のXMLファイルを生成する
 	textXml := virt.CreateVirtXML(dom)
@@ -266,7 +264,7 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 		return err
 	}
 	defer file.Close()
-	_,err = file.Write([]byte(textXml))
+	_, err = file.Write([]byte(textXml))
 	if err != nil {
 		return err
 	}
@@ -274,7 +272,7 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	//------------------------------------------------------------
 	// 仮想マシンを起動する
 	url := "qemu:///system"
-	err = virt.CreateStartVM(url,xmlfileName)
+	err = virt.CreateStartVM(url, xmlfileName)
 	if err != nil {
 		log.Println("virt.StartVM()", err)
 		return err
@@ -289,8 +287,6 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 
 	// 仮想マシンの状態変更(未実装)
 
-
 	// 正常終了
 	return nil
 }
-
