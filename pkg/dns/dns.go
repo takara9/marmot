@@ -4,10 +4,10 @@ import (
 	"errors"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 
 	db "github.com/takara9/marmot/pkg/db"
-	x "github.com/takara9/marmot/pkg/dns"
 )
 
 func init() {
@@ -16,16 +16,16 @@ func init() {
 
 }
 
-func checkParam(rec x.DnsRecord) error {
+func checkParam(rec DnsRecord) error {
 	// check param
 	if len(rec.Hostdomain) == 0 {
-		return errors.New("Must set a server name ")
+		return errors.New("must set a server name ")
 	}
 	if len(rec.Ipaddr_v4) == 0 {
-		return errors.New("Must set a ipaddr")
+		return errors.New("must set a ipaddr")
 	}
 	if len(rec.RootPath) == 0 {
-		return errors.New("Must set a RootPath for Etcd")
+		return errors.New("must set a RootPath for Etcd")
 	}
 
 	// port no
@@ -62,14 +62,14 @@ func Add(rec DnsRecord, dbUrl string) error {
 		return err
 	}
 
-	path = "/" + rec.RootPath + "/" + path
+	path = "/" + rec.RootPath + path
 
 	log.Println("etcd path = ", path)
 
 	// Create JSON value
-	var ent DNSEntry
+	var ent db.DNSEntry
 	ent.Host = rec.Ipaddr_v4
-	ent.Port = rec.PortNo
+	ent.Port, _ = strconv.Atoi(rec.PortNo)
 
 	con, err := db.Connect(dbUrl)
 	if err != nil {
@@ -87,31 +87,33 @@ func Add(rec DnsRecord, dbUrl string) error {
 }
 
 // 取得
-func GetByKey(rec DnsRecord, dbUrl string) (DNSEntry, error) {
+func Get(rec DnsRecord, dbUrl string) (db.DNSEntry, error) {
+
+	var d db.DNSEntry
 	err := checkParam(rec)
 	if err != nil {
-		return nil, err
+		return d, err
 	}
 
 	path, err := convertEtcdPath(rec.Hostdomain)
 	if err != nil {
-		return nil, err
+		return d, err
 	}
-	path = "/" + rec.RootPath + "/" + path
+	path = "/" + rec.RootPath + path
 	log.Println("etcd path = ", path)
 
 	con, err := db.Connect(dbUrl)
 	if err != nil {
 		log.Println("db.Connect()", " ", err)
-		return nil, err
+		return d, err
 	}
 
 	// Add etcd
-	err = db.DelByKey(con, path)
+	rslt, err := db.GetEtcdByKey(con, path)
 	if err != nil {
-		return nil, err
+		return rslt, err
 	}
-	return
+	return rslt, err
 }
 
 // 削除
@@ -125,13 +127,13 @@ func Del(rec DnsRecord, dbUrl string) error {
 	if err != nil {
 		return err
 	}
-	path = "/" + rec.RootPath + "/" + path
+	path = "/" + rec.RootPath + path
 	log.Println("etcd path = ", path)
 
 	// Create JSON value
-	var ent DNSEntry
+	var ent db.DNSEntry
 	ent.Host = rec.Ipaddr_v4
-	ent.Port = rec.PortNo
+	ent.Port, _ = strconv.Atoi(rec.PortNo)
 
 	con, err := db.Connect(dbUrl)
 	if err != nil {

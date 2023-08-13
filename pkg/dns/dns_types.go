@@ -6,8 +6,3 @@ type DnsRecord struct {
 	PortNo     string
 	RootPath   string // Root Path in Etcd
 }
-
-type DNSEntry struct {
-	Host string
-	Port string
-}

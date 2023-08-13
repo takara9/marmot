@@ -1,12 +1,12 @@
 package virt
 
 import (
-	"testing"
 	"fmt"
+	"testing"
 	"time"
 )
 
-var in  string = "test-data/vm-1.xml"
+var in string = "test-data/vm-1.xml"
 var out string = "test-data/out-1.xml"
 var domain Domain
 
@@ -22,12 +22,10 @@ func TestSetVmParam(t *testing.T) {
 	SetVmParam(&domain)
 }
 
-
 func TestCreateVirtXML(t *testing.T) {
 	xmlText := CreateVirtXML(domain)
 	fmt.Println(xmlText)
 }
-
 
 func TestWriteXml(t *testing.T) {
 
@@ -36,7 +34,6 @@ func TestWriteXml(t *testing.T) {
 		t.Errorf("WriteXml(%v), err: %v", out, err)
 	}
 }
-
 
 func TestListAllVm(t *testing.T) {
 	url := "qemu:///system"
@@ -50,50 +47,45 @@ func TestListAllVm(t *testing.T) {
 	}
 }
 
-
 func TestCreateVm(t *testing.T) {
 	url := "qemu:///system"
-	fn  := "test-data/vm-test.xml"
+	fn := "test-data/vm-test.xml"
 
-	err := CreateVM(url,fn)
+	err := CreateStartVM(url, fn)
 	if err != nil {
-		t.Errorf("CreateVM(%v,%v), err: %v", url,fn,err)
+		t.Errorf("CreateVM(%v,%v), err: %v", url, fn, err)
 	}
 	time.Sleep(time.Second * 30)
 }
 
 func TestAttachDevStorage(t *testing.T) {
 	url := "qemu:///system"
-	vm  := "vm-test"
-	fn  := "test-data/storage-lv08.xml"
+	vm := "vm-test"
+	fn := "test-data/storage-lv08.xml"
 
 	err := AttachDev(url, fn, vm)
 	if err != nil {
-		t.Errorf("AttachDev(%v,%v,%v), err: %v", url,fn,vm,err)
+		t.Errorf("AttachDev(%v,%v,%v), err: %v", url, fn, vm, err)
 	}
 }
 
 func TestAttachDevNIC(t *testing.T) {
 	url := "qemu:///system"
-	vm  := "vm-test"
-	fn  := "test-data/nic-vlan1001.xml"
+	vm := "vm-test"
+	fn := "test-data/nic-vlan1001.xml"
 
 	err := AttachDev(url, fn, vm)
 	if err != nil {
-		t.Errorf("AttachDev(%v,%v,%v), err: %v", url,fn,vm,err)
+		t.Errorf("AttachDev(%v,%v,%v), err: %v", url, fn, vm, err)
 	}
 }
-
 
 func TestDestroyVM(t *testing.T) {
 	url := "qemu:///system"
-	vm  := "vm-test"
+	vm := "vm-test"
 
-	err := DestroyVM(url,vm)
+	err := DestroyVM(url, vm)
 	if err != nil {
-		t.Errorf("DestroyVM(%v,%v), err: %v", url,vm,err)
+		t.Errorf("DestroyVM(%v,%v), err: %v", url, vm, err)
 	}
 }
-
-
-

@@ -10,7 +10,7 @@ const dburl = "http://127.0.0.1:2379"
 func TestAdd(t *testing.T) {
 	fmt.Println("case 1")
 	var d DnsRecord
-	d.Hostdomain = "server1.labo.local"
+	d.Hostdomain = "server1.test.local"
 	d.Ipaddr_v4 = "192.168.10.1"
 	d.RootPath = "test"
 
@@ -20,10 +20,25 @@ func TestAdd(t *testing.T) {
 	}
 }
 
+func TestGet(t *testing.T) {
+	fmt.Println("case 1")
+	var d DnsRecord
+	d.Hostdomain = "server1.test.local"
+	d.Ipaddr_v4 = "0.0.0.0"
+	d.RootPath = "test"
+
+	r, err := Get(d, dburl)
+	fmt.Println("get result = ", r)
+
+	if err != nil {
+		t.Errorf("Add() %v", err)
+	}
+}
+
 func TestAdd_without_topdomain(t *testing.T) {
 	fmt.Println("case 2")
 	var d DnsRecord
-	d.Hostdomain = "server1.labo"
+	d.Hostdomain = "server1.test"
 	d.Ipaddr_v4 = "192.168.10.1"
 	d.RootPath = "test"
 
@@ -62,7 +77,7 @@ func TestAdd2(t *testing.T) {
 func TestAdd3(t *testing.T) {
 	fmt.Println("case 5")
 	var d DnsRecord
-	d.Hostdomain = "server1.labo.local"
+	d.Hostdomain = "server1.test.local"
 	d.Ipaddr_v4 = ""
 	d.RootPath = "test"
 
@@ -76,7 +91,7 @@ func TestDel(t *testing.T) {
 	fmt.Println("Case 5")
 
 	var d DnsRecord
-	d.Hostdomain = "server1.labo.local"
+	d.Hostdomain = "server1.test.local"
 	d.Ipaddr_v4 = "192.168.10.1"
 	d.RootPath = "test"
 

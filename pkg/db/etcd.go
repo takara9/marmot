@@ -104,6 +104,29 @@ func GetOsImgTempByKey(con *etcd.Client, osv string) (string, string, error) {
 	return oit.VolumeGroup, oit.LogicaVol, nil
 }
 
+func GetEtcdByKey(con *etcd.Client, path string) (DNSEntry, error) {
+
+	var entry DNSEntry
+	//key := fmt.Sprintf("OSI_%v", osv)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	resp, err := con.Get(ctx, path)
+	cancel()
+	if err != nil {
+		return entry, err
+	}
+
+	if resp.Count == 0 {
+		return entry, errors.New("not found")
+	}
+
+	//var oit OsImageTemplate
+	err = json.Unmarshal([]byte(resp.Kvs[0].Value), &entry)
+	if err != nil {
+		return entry, err
+	}
+	return entry, nil
+}
+
 // 削除 キーに一致したデータ
 func DelByKey(con *etcd.Client, key string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -242,8 +265,8 @@ func AssignHvforVm(con *etcd.Client, vm VirtualMachine) (string, string, uuid.UU
 		}
 	}
 	// リソースに空きが無い場合はエラーを返す
-	if assigned == false {
-		err := errors.New("Could't assign VM due to doesn't have enough a resouce on HV")
+	if !assigned {
+		err := errors.New("could't assign VM due to doesn't have enough a resouce on HV")
 		return "", "", txId, err
 	}
 	// ハイパーバイザーのリソース削減保存
