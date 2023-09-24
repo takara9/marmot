@@ -11,7 +11,10 @@ replace (
 
 require github.com/takara9/marmot/pkg/db v0.0.0-00010101000000-000000000000
 
-require github.com/takara9/marmot/pkg/config v0.0.0-20230813114040-5b6f7e56c137 // indirect
+require (
+	github.com/kr/pretty v0.3.1 // indirect
+	github.com/takara9/marmot/pkg/config v0.0.0-20230813114040-5b6f7e56c137
+)
 
 require (
 	github.com/coreos/go-semver v0.3.0 // indirect
