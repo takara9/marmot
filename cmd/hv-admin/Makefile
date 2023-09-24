@@ -11,3 +11,9 @@ $(PROGRAM):	$(%.go)
 .PHONY:	clean
 clean:
 		rm -f $(PROGRAM)
+
+.PHONY:	install
+install:
+		rm -f /usr/local/bin/$(PROGRAM)
+		install -m 0755 $(PROGRAM) /usr/local/bin
+		

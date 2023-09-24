@@ -37,3 +37,11 @@ $ etcdctl del hv1
 1
 ```
 
+## ビルド方法
+
+```console
+make clean
+make deps
+make
+make install
+```
