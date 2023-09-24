@@ -3,6 +3,11 @@ package main
 import (
 	"fmt"
 	"log"
+	"path/filepath"
+	"os"
+	"flag"
+
+	cf "github.com/takara9/marmot/pkg/config"
 	db "github.com/takara9/marmot/pkg/db"
 	etcd "go.etcd.io/etcd/client/v3"
 )
@@ -53,18 +58,34 @@ func SetImageTemplate(con *etcd.Client,v Image) error {
 }
 
 
+type DefaultConfig struct {
+	ApiServerUrl      string     `yaml:"api_server"`
+	EtcdServerUrl      string     `yaml:"etcd_server"`
+}
+
 
 func main() {
 
-	Conn,err := db.Connect("http://hv3:2379")
+	// コンフィグファイルの読み取り
+	var DefaultConfig DefaultConfig
+	cf.ReadConfig(filepath.Join(os.Getenv("HOME"),".config_marmot"), &DefaultConfig)
+
+	// パラメータの取得
+	config := flag.String("config", "hypervisor-config.yaml",  "Hypervisor config file")
+	flag.Parse()
+
+	//fmt.Println("config ", *config)
+
+	Conn,err := db.Connect(DefaultConfig.EtcdServerUrl)
 	if err != nil {
 		panic(err)
 	}
 	defer Conn.Close()
 
-	var fn string = "hypervisor-config.yaml"
+
+	//var fn string = "hypervisor-config.yaml"
 	var hvs Hypervisors
-	readYAML(fn, &hvs)
+	readYAML(*config, &hvs)
 
 	// ハイパーバイザー
 	for _, hv := range hvs.Hvs {

@@ -11,6 +11,8 @@ replace (
 
 require github.com/takara9/marmot/pkg/db v0.0.0-00010101000000-000000000000
 
+require github.com/takara9/marmot/pkg/config v0.0.0-20230813114040-5b6f7e56c137 // indirect
+
 require (
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
