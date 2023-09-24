@@ -1,15 +1,57 @@
-# ビルドと実行方法
+# marmot 仮想サーバーの管理システム
 
-~~~
-go mod init github.com/takara9/marmot
-go mod tidy
-~~~
+実験や学習のための、簡便で高速な仮想サーバーの構築環境
 
-サーバーの起動のために
+複数の仮想サーバーを数秒で起動することができる。
+1つから複数のハイパーバイザー上で、仮想サーバーのクラスタを起動できる。
 
-~~~
-# apt install libvirt-dev gcc
-~~~
+
+
+## ビルドとインストール
+
+### hv-admin
+
+etcdにハイパーバイザーのリソース情報をセットするコマンド
+
+```
+cd cmd/hv-admin
+make 
+make install
+```
+
+ホームディレクトリに`.config_marmot`が配置すること
+
+
+### vm-client　（mactl)
+
+marmotのコマンドインタフェース
+
+```
+cd cmd/vm-client
+make
+make install
+```
+
+ホームディレクトリに`.config_marmot`が配置すること
+
+
+
+### vm-server
+
+marmotのバックエンドサーバー
+
+```
+cd cmd/vm-server
+make
+make install
+systemctl start marmot
+```
+
+
+
+
+
+
 
 ## 参考資料
 * Call your code from another module, https://go.dev/doc/tutorial/call-module-code
