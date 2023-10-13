@@ -24,7 +24,7 @@ jobs:
     - uses: actions/checkout@v3
     - name: Install ca-certificates
       run: |
-        sudo apt update && apt install -y ca-certificates
+        sudo apt update && sudo apt install -y ca-certificates
         sudo update-ca-certificates
 
     - name: Set up Go
