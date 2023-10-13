@@ -28,6 +28,11 @@ jobs:
       with:
         go-version: '1.20'
 
+    - name: Install ca-certificates
+      run: |
+        apt update && apt install -y ca-certificates
+        update-ca-certificates
+
     - name: Build pkg/config
       run: | 
         cd pkg/config
