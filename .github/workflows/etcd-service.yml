@@ -8,22 +8,25 @@ jobs:
     runs-on: ubuntu-latest
 
     # Docker Hub image that `container-job` executes in
-    container: bitnami/etcd:3.5.9
+    #container: bitnami/etcd:3.5.9
     # Service containers to run with `runner-job`
-    services:
+    #services:
       # Label used to access the service container
-      etcd:
+    #  etcd:
         # Docker Hub image
-        image: bitnami/etcd
+    #    image: bitnami/etcd
         #
-        ports:
+    #    ports:
           # Opens tcp port 2379 on the host and service container
-          - 2379:2379
+    #      - 2379:2379
 
     steps:
     - uses: actions/checkout@v3
     - name: Install ca-certificates
-      run: sudo apt update 
+      run: |
+        sudo apt update 
+        sudo apt update && apt install -y ca-certificates
+        sudo update-ca-certificates
 
     - name: Set up Go
       uses: actions/setup-go@v4
