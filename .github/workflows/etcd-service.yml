@@ -20,3 +20,22 @@ jobs:
         ports:
           # Opens tcp port 2379 on the host and service container
           - 2379:2379
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.20'
+
+    - name: Build pkg/config
+      run: | 
+        cd pkg/config
+        go test -v 
+        cd ../..
+
+    - name: Build pkg/db
+      run: | 
+        cd pkg/db
+        go test -v 
+        cd ../..
