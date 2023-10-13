@@ -22,17 +22,30 @@ vm_spec:
   - name: log
     size: 10
     path: /stg2
+    vg: ""
+    type: ""
   - name: data1
     size: 100
     path: /stg2
+    vg: ""
+    type: ""
   - name: data2
     size: 100
     path: /stg2
+    vg: ""
+    type: ""
   - name: data3
     size: 100
     path: /stg3
+    vg: ""
+    type: ""
   playbook: install.yaml
   comment: 'Ceph storage node #1'
+  uuid: ""
+  key: ""
+  ostempvg: ""
+  ostemplv: ""
+  vmosvariant: ""
 - name: node2
   cpu: 1
   memory: 4096
@@ -42,17 +55,30 @@ vm_spec:
   - name: log
     size: 10
     path: /stg2
+    vg: ""
+    type: ""
   - name: data1
     size: 100
     path: /stg2
+    vg: ""
+    type: ""
   - name: data2
     size: 100
     path: /stg2
+    vg: ""
+    type: ""
   - name: data3
     size: 100
     path: /stg3
+    vg: ""
+    type: ""
   playbook: install.yaml
   comment: 'Ceph storage node #2'
+  uuid: ""
+  key: ""
+  ostempvg: ""
+  ostemplv: ""
+  vmosvariant: ""
 - name: node3
   cpu: 1
   memory: 4096
@@ -62,17 +88,30 @@ vm_spec:
   - name: log
     size: 10
     path: /stg2
+    vg: ""
+    type: ""
   - name: data1
     size: 100
     path: /stg2
+    vg: ""
+    type: ""
   - name: data2
     size: 100
     path: /stg2
+    vg: ""
+    type: ""
   - name: data3
     size: 100
     path: /stg3
+    vg: ""
+    type: ""
   playbook: install.yaml
   comment: 'Ceph storage node #3'
+  uuid: ""
+  key: ""
+  ostempvg: ""
+  ostemplv: ""
+  vmosvariant: ""
 - name: node4
   cpu: 1
   memory: 4096
@@ -82,17 +121,30 @@ vm_spec:
   - name: log
     size: 10
     path: /stg2
+    vg: ""
+    type: ""
   - name: data1
     size: 100
     path: /stg2
+    vg: ""
+    type: ""
   - name: data2
     size: 100
     path: /stg2
+    vg: ""
+    type: ""
   - name: data3
     size: 100
     path: /stg3
+    vg: ""
+    type: ""
   playbook: install.yaml
   comment: 'Ceph storage node #4'
+  uuid: ""
+  key: ""
+  ostempvg: ""
+  ostemplv: ""
+  vmosvariant: ""
 - name: mon3
   cpu: 1
   memory: 4096
@@ -102,8 +154,15 @@ vm_spec:
   - name: log
     size: 10
     path: /stg2
+    vg: ""
+    type: ""
   playbook: install.yaml
   comment: 'Ceph Management node #3'
+  uuid: ""
+  key: ""
+  ostempvg: ""
+  ostemplv: ""
+  vmosvariant: ""
 - name: mon2
   cpu: 1
   memory: 4096
@@ -113,8 +172,15 @@ vm_spec:
   - name: log
     size: 10
     path: /stg2
+    vg: ""
+    type: ""
   playbook: install.yaml
   comment: 'Ceph Management node #2'
+  uuid: ""
+  key: ""
+  ostempvg: ""
+  ostemplv: ""
+  vmosvariant: ""
 - name: mon1
   cpu: 1
   memory: 4096
@@ -124,5 +190,12 @@ vm_spec:
   - name: log
     size: 10
     path: /stg2
+    vg: ""
+    type: ""
   playbook: install.yaml
   comment: 'Ceph Management node #1'
+  uuid: ""
+  key: ""
+  ostempvg: ""
+  ostemplv: ""
+  vmosvariant: ""
