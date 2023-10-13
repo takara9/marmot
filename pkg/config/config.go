@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/go-yaml/yaml"
+	"gopkg.in/yaml.v3"
 	"os"
 	"io"
 )
@@ -10,7 +10,7 @@ import (
 type Storage struct {
 	Name              string     `yaml:"name"`
 	Size              int        `yaml:"size"`
-        Path              string     `yaml:"path"`
+    Path              string     `yaml:"path"`
 	VolGrp            string     `yaml:"vg"`
 	Type              string     `yaml:"type"`  // ストレージの種類　hdd, ssd, nvme
 }

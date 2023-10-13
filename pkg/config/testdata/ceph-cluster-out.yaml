@@ -13,189 +13,189 @@ net_dev_public: enp3s0
 public_ip_gw: 192.168.1.1
 public_ip_dns: 192.168.1.8
 vm_spec:
-- name: node1
-  cpu: 1
-  memory: 4096
-  private_ip: 172.16.0.31
-  public_ip: ""
-  storage:
-  - name: log
-    size: 10
-    path: /stg2
-    vg: ""
-    type: ""
-  - name: data1
-    size: 100
-    path: /stg2
-    vg: ""
-    type: ""
-  - name: data2
-    size: 100
-    path: /stg2
-    vg: ""
-    type: ""
-  - name: data3
-    size: 100
-    path: /stg3
-    vg: ""
-    type: ""
-  playbook: install.yaml
-  comment: 'Ceph storage node #1'
-  uuid: ""
-  key: ""
-  ostempvg: ""
-  ostemplv: ""
-  vmosvariant: ""
-- name: node2
-  cpu: 1
-  memory: 4096
-  private_ip: 172.16.0.32
-  public_ip: ""
-  storage:
-  - name: log
-    size: 10
-    path: /stg2
-    vg: ""
-    type: ""
-  - name: data1
-    size: 100
-    path: /stg2
-    vg: ""
-    type: ""
-  - name: data2
-    size: 100
-    path: /stg2
-    vg: ""
-    type: ""
-  - name: data3
-    size: 100
-    path: /stg3
-    vg: ""
-    type: ""
-  playbook: install.yaml
-  comment: 'Ceph storage node #2'
-  uuid: ""
-  key: ""
-  ostempvg: ""
-  ostemplv: ""
-  vmosvariant: ""
-- name: node3
-  cpu: 1
-  memory: 4096
-  private_ip: 172.16.0.33
-  public_ip: ""
-  storage:
-  - name: log
-    size: 10
-    path: /stg2
-    vg: ""
-    type: ""
-  - name: data1
-    size: 100
-    path: /stg2
-    vg: ""
-    type: ""
-  - name: data2
-    size: 100
-    path: /stg2
-    vg: ""
-    type: ""
-  - name: data3
-    size: 100
-    path: /stg3
-    vg: ""
-    type: ""
-  playbook: install.yaml
-  comment: 'Ceph storage node #3'
-  uuid: ""
-  key: ""
-  ostempvg: ""
-  ostemplv: ""
-  vmosvariant: ""
-- name: node4
-  cpu: 1
-  memory: 4096
-  private_ip: 172.16.0.34
-  public_ip: ""
-  storage:
-  - name: log
-    size: 10
-    path: /stg2
-    vg: ""
-    type: ""
-  - name: data1
-    size: 100
-    path: /stg2
-    vg: ""
-    type: ""
-  - name: data2
-    size: 100
-    path: /stg2
-    vg: ""
-    type: ""
-  - name: data3
-    size: 100
-    path: /stg3
-    vg: ""
-    type: ""
-  playbook: install.yaml
-  comment: 'Ceph storage node #4'
-  uuid: ""
-  key: ""
-  ostempvg: ""
-  ostemplv: ""
-  vmosvariant: ""
-- name: mon3
-  cpu: 1
-  memory: 4096
-  private_ip: 172.16.0.23
-  public_ip: 192.168.1.229
-  storage:
-  - name: log
-    size: 10
-    path: /stg2
-    vg: ""
-    type: ""
-  playbook: install.yaml
-  comment: 'Ceph Management node #3'
-  uuid: ""
-  key: ""
-  ostempvg: ""
-  ostemplv: ""
-  vmosvariant: ""
-- name: mon2
-  cpu: 1
-  memory: 4096
-  private_ip: 172.16.0.22
-  public_ip: 192.168.1.228
-  storage:
-  - name: log
-    size: 10
-    path: /stg2
-    vg: ""
-    type: ""
-  playbook: install.yaml
-  comment: 'Ceph Management node #2'
-  uuid: ""
-  key: ""
-  ostempvg: ""
-  ostemplv: ""
-  vmosvariant: ""
-- name: mon1
-  cpu: 1
-  memory: 4096
-  private_ip: 172.16.0.21
-  public_ip: 192.168.1.227
-  storage:
-  - name: log
-    size: 10
-    path: /stg2
-    vg: ""
-    type: ""
-  playbook: install.yaml
-  comment: 'Ceph Management node #1'
-  uuid: ""
-  key: ""
-  ostempvg: ""
-  ostemplv: ""
-  vmosvariant: ""
+    - name: node1
+      cpu: 1
+      memory: 4096
+      private_ip: 172.16.0.31
+      public_ip: ""
+      storage:
+        - name: log
+          size: 10
+          path: /stg2
+          vg: ""
+          type: ""
+        - name: data1
+          size: 100
+          path: /stg2
+          vg: ""
+          type: ""
+        - name: data2
+          size: 100
+          path: /stg2
+          vg: ""
+          type: ""
+        - name: data3
+          size: 100
+          path: /stg3
+          vg: ""
+          type: ""
+      playbook: install.yaml
+      comment: 'Ceph storage node #1'
+      uuid: ""
+      key: ""
+      ostempvg: ""
+      ostemplv: ""
+      vmosvariant: ""
+    - name: node2
+      cpu: 1
+      memory: 4096
+      private_ip: 172.16.0.32
+      public_ip: ""
+      storage:
+        - name: log
+          size: 10
+          path: /stg2
+          vg: ""
+          type: ""
+        - name: data1
+          size: 100
+          path: /stg2
+          vg: ""
+          type: ""
+        - name: data2
+          size: 100
+          path: /stg2
+          vg: ""
+          type: ""
+        - name: data3
+          size: 100
+          path: /stg3
+          vg: ""
+          type: ""
+      playbook: install.yaml
+      comment: 'Ceph storage node #2'
+      uuid: ""
+      key: ""
+      ostempvg: ""
+      ostemplv: ""
+      vmosvariant: ""
+    - name: node3
+      cpu: 1
+      memory: 4096
+      private_ip: 172.16.0.33
+      public_ip: ""
+      storage:
+        - name: log
+          size: 10
+          path: /stg2
+          vg: ""
+          type: ""
+        - name: data1
+          size: 100
+          path: /stg2
+          vg: ""
+          type: ""
+        - name: data2
+          size: 100
+          path: /stg2
+          vg: ""
+          type: ""
+        - name: data3
+          size: 100
+          path: /stg3
+          vg: ""
+          type: ""
+      playbook: install.yaml
+      comment: 'Ceph storage node #3'
+      uuid: ""
+      key: ""
+      ostempvg: ""
+      ostemplv: ""
+      vmosvariant: ""
+    - name: node4
+      cpu: 1
+      memory: 4096
+      private_ip: 172.16.0.34
+      public_ip: ""
+      storage:
+        - name: log
+          size: 10
+          path: /stg2
+          vg: ""
+          type: ""
+        - name: data1
+          size: 100
+          path: /stg2
+          vg: ""
+          type: ""
+        - name: data2
+          size: 100
+          path: /stg2
+          vg: ""
+          type: ""
+        - name: data3
+          size: 100
+          path: /stg3
+          vg: ""
+          type: ""
+      playbook: install.yaml
+      comment: 'Ceph storage node #4'
+      uuid: ""
+      key: ""
+      ostempvg: ""
+      ostemplv: ""
+      vmosvariant: ""
+    - name: mon3
+      cpu: 1
+      memory: 4096
+      private_ip: 172.16.0.23
+      public_ip: 192.168.1.229
+      storage:
+        - name: log
+          size: 10
+          path: /stg2
+          vg: ""
+          type: ""
+      playbook: install.yaml
+      comment: 'Ceph Management node #3'
+      uuid: ""
+      key: ""
+      ostempvg: ""
+      ostemplv: ""
+      vmosvariant: ""
+    - name: mon2
+      cpu: 1
+      memory: 4096
+      private_ip: 172.16.0.22
+      public_ip: 192.168.1.228
+      storage:
+        - name: log
+          size: 10
+          path: /stg2
+          vg: ""
+          type: ""
+      playbook: install.yaml
+      comment: 'Ceph Management node #2'
+      uuid: ""
+      key: ""
+      ostempvg: ""
+      ostemplv: ""
+      vmosvariant: ""
+    - name: mon1
+      cpu: 1
+      memory: 4096
+      private_ip: 172.16.0.21
+      public_ip: 192.168.1.227
+      storage:
+        - name: log
+          size: 10
+          path: /stg2
+          vg: ""
+          type: ""
+      playbook: install.yaml
+      comment: 'Ceph Management node #1'
+      uuid: ""
+      key: ""
+      ostempvg: ""
+      ostemplv: ""
+      vmosvariant: ""
