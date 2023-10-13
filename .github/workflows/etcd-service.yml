@@ -30,8 +30,8 @@ jobs:
 
     - name: Install ca-certificates
       run: |
-        sudo apt update && sudo apt install -y ca-certificates
-        sudo update-ca-certificates
+        apt update && apt install -y ca-certificates
+        update-ca-certificates
 
     - name: Build pkg/config
       run: | 
