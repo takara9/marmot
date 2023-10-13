@@ -30,7 +30,9 @@ jobs:
 
     - name: Install ca-certificates
       run: |
-        apt update && apt install -y ca-certificates
+        apt update
+        apt install -y ca-certificates
+        echo $?
         update-ca-certificates
 
     - name: Build pkg/config
