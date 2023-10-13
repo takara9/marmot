@@ -1,0 +1,19 @@
+name: Etcd Service Example
+on: push
+
+jobs:
+  # Label of the container job
+  runner-job:
+    # You must use a Linux environment when using service containers or container jobs
+    runs-on: ubuntu-latest
+
+    # Service containers to run with `runner-job`
+    services:
+      # Label used to access the service container
+      redis:
+        # Docker Hub image
+        image: bitnami/etcd
+        #
+        ports:
+          # Opens tcp port 2379 on the host and service container
+          - 2379:2379
