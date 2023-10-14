@@ -39,6 +39,7 @@ jobs:
 
     - name: Build pkg/db
       run: | 
+        docker ps -a
         cd pkg/db
         go test -v 
         cd ../..
