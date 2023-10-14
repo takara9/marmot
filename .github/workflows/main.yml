@@ -13,11 +13,19 @@ jobs:
       etcd:
         # Docker Hub image
         image: bitnami/etcd
-        #
+        # Provide Environment
+        env:
+          ALLOW_NONE_AUTHENTICATION: yes
+          ETCD_ADVERTISE_CLIENT_URLS: "http://etcd:2379"
+        options: >-
+          --name Etcd-server
+          --network default    
+          --publish 12379:2379     
+          --publish 12380:2380  
         ports:
           # Opens tcp port 2379 on the host and service container
           - 2379:2379
-
+          - 2380:2380
     steps:
     - uses: actions/checkout@v3
     - name: Install ca-certificates
