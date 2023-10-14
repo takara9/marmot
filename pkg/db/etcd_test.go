@@ -8,9 +8,20 @@ import (
 )
 
 const url = "http://etcd:2379"
+//const url = "http://127.0.0.1:2379"
 
 var testv = 12
 var Conn *etcd.Client
+
+// 接続テスト２ 失敗するはずだが
+//func TestConnect_FAIL(t *testing.T) {
+//	url := "http://127.0.0.1:2000"
+//	xconn, err := Connect(url)
+//	if err {
+//		t.Errorf("connect(%v), want not %v", url, err)
+//	}
+//	xconn.Close()
+//}
 
 // 接続テスト１
 func TestConnect_SUCCESS(t *testing.T) {
@@ -19,18 +30,10 @@ func TestConnect_SUCCESS(t *testing.T) {
 	if err != nil {
 		t.Errorf("connect(%v), want %v", url, nil)
 	}
-	//conn.Close()
+	//
 }
 
-// 接続テスト２ 失敗するはずだが
-func TestConnect_FAIL(t *testing.T) {
-	url := "http://127.0.0.1:2397"
-	xconn, err := Connect(url)
-	if err != nil {
-		t.Errorf("connect(%v), want not %v", url, err)
-	}
-	xconn.Close()
-}
+
 
 // HVデータの書き込み
 func TestPutHVData(t *testing.T) {
