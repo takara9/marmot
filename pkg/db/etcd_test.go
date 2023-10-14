@@ -7,8 +7,8 @@ import (
 	etcd "go.etcd.io/etcd/client/v3"
 )
 
-const url = "http://etcd:2379"
-//const url = "http://127.0.0.1:2379"
+//const url = "http://etcd:2379"
+const url = "http://127.0.0.1:2379"
 
 var testv = 12
 var Conn *etcd.Client
@@ -32,7 +32,6 @@ func TestConnect_SUCCESS(t *testing.T) {
 	}
 	//
 }
-
 
 
 // HVデータの書き込み
