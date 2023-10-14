@@ -3,22 +3,27 @@ on: push
 
 jobs:
   # Label of the container job
+  container-job:
+    # Containers must run in Linux based operating systems
+    runs-on: ubuntu-latest
+    # Docker Hub image that `container-job` executes in
+    container: bitnami/etcd:3.5.9
+    # Service containers to run with `runner-job`
+    services:
+      # Label used to access the service container
+      etcd:
+        # Docker Hub image
+        image: bitnami/etcd
+        #
+        ports:
+          # Opens tcp port 2379 on the host and service container
+          - 2379:2379
+
+
+  # Label of the job
   runner-job:
     # You must use a Linux environment when using service containers or container jobs
     runs-on: ubuntu-latest
-
-    # Docker Hub image that `container-job` executes in
-    #container: bitnami/etcd:3.5.9
-    # Service containers to run with `runner-job`
-    #services:
-      # Label used to access the service container
-    #  etcd:
-        # Docker Hub image
-    #    image: bitnami/etcd
-        #
-    #    ports:
-          # Opens tcp port 2379 on the host and service container
-    #      - 2379:2379
 
     steps:
     - uses: actions/checkout@v3
