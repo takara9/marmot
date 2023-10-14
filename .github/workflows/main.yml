@@ -24,6 +24,7 @@ jobs:
       run: |
         sudo apt update && sudo apt install -y ca-certificates
         sudo update-ca-certificates
+        docker ps
 
     - name: Set up Go
       uses: actions/setup-go@v4

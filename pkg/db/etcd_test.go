@@ -25,17 +25,18 @@ func TestConnect_SUCCESS(t *testing.T) {
 // 接続テスト２ 失敗するはずだが
 func TestConnect_FAIL(t *testing.T) {
 	url := "http://127.0.0.1:2397"
-	conn, err := Connect(url)
+	xconn, err := Connect(url)
 	if err != nil {
 		t.Errorf("connect(%v), want not %v", url, err)
 	}
-	conn.Close()
+	xconn.Close()
 }
 
 // HVデータの書き込み
 func TestPutHVData(t *testing.T) {
 	// PUT
 	hv1 := testHvData1()
+	fmt.Println(hv1)
 	err := PutDataEtcd(Conn, hv1.Key, hv1)
 	if err != nil {
 		t.Errorf("putDataEtcd(%v,%v,%v) want nil %v", Conn, hv1.Key, hv1, err)
