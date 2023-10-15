@@ -22,7 +22,7 @@ func TestReadConfig(t *testing.T) {
 // ハイパーバイザーのREST-APIによる稼働チェック
 func TestHypervisor(t *testing.T) {
 
-	var dburl string = "http://hv1:2379"
+	var dburl string = "http://127.0.0.1:2379"
 	var node string = "hv1"
 
 	x, err := CheckHypervisors(dburl, node)
@@ -37,7 +37,7 @@ func TestHypervisor(t *testing.T) {
 // ハイパーバイザーのREST-APIによる稼働チェック
 func TestCheckHvVG(t *testing.T) {
 
-	var dburl string = "http://hv1:2379"
+	var dburl string = "http://127.0.0.1:2379"
 	var node  string = "hv1"
 	var vg    string = "vg1"
 
