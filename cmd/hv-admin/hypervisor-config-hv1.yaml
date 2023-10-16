@@ -20,6 +20,9 @@ image_template:
   - name: "ubuntu18.04"
     volumegroup: "vg1"
     logicalvolume: "lv02"
+  - name: "ubuntu22.04"
+    volumegroup: "vg1"
+    logicalvolume: "lv03"
 
 #
 # シリアル番号管理
