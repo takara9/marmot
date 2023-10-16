@@ -40,5 +40,6 @@ require (
 	google.golang.org/grpc v1.41.0 // indirect
 	google.golang.org/protobuf v1.26.0 // indirect
 	gopkg.in/freddierice/go-losetup.v1 v1.0.0-20170407175016-fc9adea44124 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	libvirt.org/go/libvirt v1.9000.0 // indirect
 )
