@@ -1,0 +1,6 @@
+<network>
+  <name>ovs0</name>
+  <forward mode="bridge">
+    <interface dev="ovsbr0"/>
+  </forward>
+</network>
