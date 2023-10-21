@@ -23,7 +23,7 @@ func TestReadConfig(t *testing.T) {
 func TestHypervisor(t *testing.T) {
 
 	var dburl string = "http://127.0.0.1:2379"
-	var node string = "hv1"
+	var node string = "hv9"
 
 	x, err := CheckHypervisors(dburl, node)
 	if err != nil {
@@ -38,7 +38,7 @@ func TestHypervisor(t *testing.T) {
 func TestCheckHvVG(t *testing.T) {
 
 	var dburl string = "http://127.0.0.1:2379"
-	var node  string = "hv1"
+	var node  string = "hv9"
 	var vg    string = "vg1"
 
 	err := CheckHvVG(dburl, node, vg)

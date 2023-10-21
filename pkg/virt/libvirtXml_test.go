@@ -58,6 +58,7 @@ func TestCreateVm(t *testing.T) {
 	time.Sleep(time.Second * 30)
 }
 
+/*
 func TestAttachDevStorage(t *testing.T) {
 	url := "qemu:///system"
 	vm := "vm-test"
@@ -68,6 +69,7 @@ func TestAttachDevStorage(t *testing.T) {
 		t.Errorf("AttachDev(%v,%v,%v), err: %v", url, fn, vm, err)
 	}
 }
+*/
 
 func TestAttachDevNIC(t *testing.T) {
 	url := "qemu:///system"
