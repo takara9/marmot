@@ -42,8 +42,25 @@ jobs:
 
     - name: Test pkg/db
       run: | 
-        docker ps -a
         cd pkg/db
+        go test -v 
+        cd ../..
+
+    - name: Test pkg/lvm
+      run: | 
+        cd pkg/lvm
+        go test -v 
+        cd ../..
+
+    - name: Test pkg/util
+      run: | 
+        cd pkg/util
+        go test -v 
+        cd ../..
+
+    - name: Test pkg/virt
+      run: | 
+        cd pkg/virt
         go test -v 
         cd ../..
 
