@@ -50,8 +50,7 @@ jobs:
       run: | 
         cd pkg/lvm
         env
-	which go
-        test -v 
+        go test -v 
         cd ../..
 
     - name: Test pkg/util
