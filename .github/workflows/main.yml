@@ -49,7 +49,9 @@ jobs:
     - name: Test pkg/lvm
       run: | 
         cd pkg/lvm
-        sudo go test -v 
+        env
+	which go
+        test -v 
         cd ../..
 
     - name: Test pkg/util
