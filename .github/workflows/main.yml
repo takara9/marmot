@@ -49,20 +49,19 @@ jobs:
     - name: Test pkg/lvm
       run: | 
         cd pkg/lvm
-        env
-        go test -v 
+        sudo -s /usr/local/go/bin/go test
         cd ../..
 
     - name: Test pkg/util
       run: | 
         cd pkg/util
-        sudo go test -v 
+        sudo -s /usr/local/go/bin/go test
         cd ../..
 
     - name: Test pkg/virt
       run: | 
         cd pkg/virt
-        sudo go test -v 
+        sudo -s /usr/local/go/bin/go test
         cd ../..
 
         
