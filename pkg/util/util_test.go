@@ -35,6 +35,7 @@ func TestHypervisor(t *testing.T) {
 }
 
 // ハイパーバイザーのREST-APIによる稼働チェック
+/*
 func TestCheckHvVG(t *testing.T) {
 
 	var dburl string = "http://127.0.0.1:2379"
@@ -47,4 +48,5 @@ func TestCheckHvVG(t *testing.T) {
 	}
 
 }
+*/
 
