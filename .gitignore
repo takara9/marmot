@@ -19,3 +19,7 @@
 
 # Go workspace file
 go.work
+
+cmd/hv-admin/hv-admin
+cmd/vm-client/mactl
+cmd/vm-server/vm-server
