@@ -32,7 +32,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.19'
+        go-version: '1.21'
 
     - name: Test pkg/config
       run: | 
@@ -49,7 +49,8 @@ jobs:
     - name: Test pkg/lvm
       run: | 
         cd pkg/lvm
-        sudo -s /usr/local/go/bin/go test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+        sudo -s make test
+        #sudo -s /usr/local/go/bin/go test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
         cd ../..
 
     - name: Test pkg/util
