@@ -47,7 +47,6 @@ func GetHvByKey(con *etcd.Client, key string) (Hypervisor, error) {
 		return hv, err
 	}
 
-	// エラー処理として正しくない
 	if resp.Count == 0 {
 		return hv, errors.New("Not Found")
 	}
@@ -72,9 +71,8 @@ func GetVmByKey(con *etcd.Client, key string) (VirtualMachine, error) {
 		return vm, err
 	}
 
-	// エラー処理として正しくない
 	if resp.Count == 0 {
-		return vm, err
+		return hv, errors.New("Not Found")
 	}
 	err = json.Unmarshal([]byte(resp.Kvs[0].Value), &vm)
 

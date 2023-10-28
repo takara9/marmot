@@ -85,6 +85,10 @@ func TestSeqnoDel(t *testing.T) {
 	}
 }
 
+
+
+
+
 // シーケンス番号の初期化と番号の取出し
 func TestSeqnoInc(t *testing.T) {
 

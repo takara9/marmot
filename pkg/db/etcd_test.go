@@ -59,6 +59,26 @@ var _ = Describe("Etcd", func() {
 				err := DelByKey(Conn, "test-serial")
 				Expect(err).NotTo(HaveOccurred())
 			})
+
+
+			tests := []struct {
+				name string
+				want uint64
+			}{
+				{name: "Get Seq No inital", want: 1},
+				{name: "Get Seq No 2nd", want: 2},
+				{name: "Get Seq No 3rd", want: 3},
+				{name: "Get Seq No 4th", want: 4},
+			}
+
+			for _, tt := range tests {
+				It(tt.name, func(){
+					seqno, err := GetSeq(Conn, "test-serial")
+					Expect(err).To(HaveOccurred())
+					Expect(seq).To(Equal(tt.want))
+				})
+			}
+
 		})
 	})
 })
