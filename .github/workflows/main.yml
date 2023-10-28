@@ -49,7 +49,7 @@ jobs:
     - name: Test pkg/lvm
       run: | 
         cd pkg/lvm
-        sudo -s make test
+        sudo -s go test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
         cd ../..
 
     - name: Test pkg/util
