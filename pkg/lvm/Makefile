@@ -1,5 +1,4 @@
-#GO=/usr/local/go/bin/go
-GO=go
+GO=/usr/local/go/bin/go
 
 .PHONY: test
 test:
