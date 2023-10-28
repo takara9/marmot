@@ -37,20 +37,22 @@ jobs:
     - name: Test pkg/config
       run: | 
         cd pkg/config
-        go test -v 
+        go mod tidy
+        sudo -s make test
         cd ../..
 
     - name: Test pkg/db
       run: | 
         cd pkg/db
-        go test -v 
+        go mod tidy
+        sudo -s make test
         cd ../..
 
     - name: Test pkg/lvm
       run: | 
         cd pkg/lvm
+        go mod tidy
         sudo -s make test
-        #sudo -s /usr/local/go/bin/go test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
         cd ../..
 
     - name: Test pkg/util
