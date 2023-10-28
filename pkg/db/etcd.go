@@ -72,7 +72,7 @@ func GetVmByKey(con *etcd.Client, key string) (VirtualMachine, error) {
 	}
 
 	if resp.Count == 0 {
-		return hv, errors.New("Not Found")
+		return vm, errors.New("Not Found")
 	}
 	err = json.Unmarshal([]byte(resp.Kvs[0].Value), &vm)
 
@@ -203,6 +203,10 @@ func GetSeq(con *etcd.Client, key string) (uint64, error) {
 	}
 
 	err = json.Unmarshal(resp.Kvs[0].Value, &seq)
+	if err != nil {
+		return 0, err
+	}
+
 	seqno := seq.Serial
 	seq.Serial = seq.Serial + seq.Step
 

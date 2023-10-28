@@ -4,7 +4,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	etcd "go.etcd.io/etcd/client/v3"
-	//"errors"
+	//"fmt"
 )
 
 var _ = Describe("Etcd", func() {
@@ -55,8 +55,19 @@ var _ = Describe("Etcd", func() {
 		})
 
 		Context("Test Sequence number", func() {
+
+			It("Connection etcd", func() {
+				Conn, err = Connect(url)
+				Expect(err).NotTo(HaveOccurred())
+		  	})
+
 			It("Delete seqno key", func() {
-				err := DelByKey(Conn, "test-serial")
+				err := DelByKey(Conn, "TST")
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("Create seqno key", func() {
+				err := CreateSeq(Conn, "TST", 1, 1)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -66,18 +77,61 @@ var _ = Describe("Etcd", func() {
 				want uint64
 			}{
 				{name: "Get Seq No inital", want: 1},
-				{name: "Get Seq No 2nd", want: 2},
-				{name: "Get Seq No 3rd", want: 3},
-				{name: "Get Seq No 4th", want: 4},
+				{name: "Get Seq No 2nd",    want: 2},
+				{name: "Get Seq No 3rd",    want: 3},
+				{name: "Get Seq No 4th",    want: 4},
 			}
 
-			for _, tt := range tests {
-				It(tt.name, func(){
-					seqno, err := GetSeq(Conn, "test-serial")
-					Expect(err).To(HaveOccurred())
-					Expect(seq).To(Equal(tt.want))
+			/*
+			ループを入れることは許されないみたい
+			for i, tt := range tests {
+				fmt.Println(i, tt.name, tt.want)
+			
+				It(tt.name, func() {
+					seqno, err := GetSeq(Conn, "TST")
+					GinkgoWriter.Println("seqno ", seqno) 
+					Expect(err).NotTo(HaveOccurred())
+					Expect(seqno).To(Equal(uint64(tt.want)))
 				})
 			}
+			It("test loop", func() {
+				for i, tt := range tests {
+					fmt.Println(i, tt.name, tt.want)
+					seqno, err := GetSeq(Conn, "TST")
+					GinkgoWriter.Println("seqno ", seqno) 
+					Expect(err).NotTo(HaveOccurred())
+					Expect(seqno).To(Equal(uint64(tests[0].want)))
+				}
+			})
+			*/
+
+			It(tests[0].name, func() {
+				seqno, err := GetSeq(Conn, "TST")
+				GinkgoWriter.Println("seqno ", seqno) 
+				Expect(err).NotTo(HaveOccurred())
+				Expect(seqno).To(Equal(uint64(tests[0].want)))
+			})
+
+			It(tests[1].name, func() {
+				seqno, err := GetSeq(Conn, "TST")
+				GinkgoWriter.Println("seqno ", seqno) 
+				Expect(err).NotTo(HaveOccurred())
+				Expect(seqno).To(Equal(uint64(tests[1].want)))
+			})
+
+			It(tests[2].name, func() {
+				seqno, err := GetSeq(Conn, "TST")
+				GinkgoWriter.Println("seqno ", seqno) 
+				Expect(err).NotTo(HaveOccurred())
+				Expect(seqno).To(Equal(uint64(tests[2].want)))
+			})
+
+			It(tests[3].name, func() {
+				seqno, err := GetSeq(Conn, "TST")
+				GinkgoWriter.Println("seqno ", seqno) 
+				Expect(err).NotTo(HaveOccurred())
+				Expect(seqno).To(Equal(uint64(tests[3].want)))
+			})
 
 		})
 	})
