@@ -49,7 +49,7 @@ func GetHvByKey(con *etcd.Client, key string) (Hypervisor, error) {
 
 	// エラー処理として正しくない
 	if resp.Count == 0 {
-		return hv, err
+		return hv, errors.New("Not Found")
 	}
 	err = json.Unmarshal([]byte(resp.Kvs[0].Value), &hv)
 
