@@ -1,62 +1,72 @@
 package lvm
 
 import (
-	"testing"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"time"
 	"fmt"
-	//"time"
 )
 
-// テストボリューム
-var vg = "vg1"
-var lv = "lv20"
-var sz uint64 = 1024 * 1024 * 1024 * 4  // GB
+var _ = Describe("Lvm", func() {
 
-var ssz uint64 = 1024 * 1024 * 1024 * 1  // GB
-var lvt = "lv01"
-var slv = "lv21"
 
-/*
-func TestCreateLV(t *testing.T) {
+	Describe("Manipulation Logical Volume", func() {
 
-	err := CreateLV(vg, lv, sz)
-	if err != nil {
-		t.Errorf("CreateLV(%v,%v,%v), err: %v", vg,lv,sz,err)
-	}
-	time.Sleep(time.Second * 30)
-	err = IsExist(vg, lv)
-	if err != nil {
-		t.Errorf("IsExist(%v,%v), err: %v", vg,lv,err)
-	}
+		Context("Lifecycle of Logical Volume", func() {
 
-}
+			var vg = "vg1"
+			var lv = "test-lv01"
+			var sz uint64 = 1024 * 1024 * 1024 * 4  // GB
+		
+			It("Create Logical Volume", func() {
+				err := CreateLV(vg, lv, sz)
+				Expect(err).NotTo(HaveOccurred())
+		  	})
 
-func TestRemoveLV(t *testing.T) {
-	err := RemoveLV(vg, lv)
-	if err != nil {
-		t.Errorf("RemoveLV(%v,%v), err: %v", vg,lv,err)
-	}
-}
+		  	time.Sleep(time.Second * 30)
 
-func TestCreateSnapshot(t *testing.T) {
-	err := CreateSnapshot(vg, lvt, slv, ssz)
-	if err != nil {
-		t.Errorf("CreateSnapshot(%v,%v,%v,%v), err: %v", vg, lvt, slv, ssz, err)
-	}
-	time.Sleep(time.Second * 30)
-	err = RemoveLV(vg, slv)
-	if err != nil {
-		t.Errorf("RemoveLV(%v,%v), err: %v", vg,slv,err)
-	}
-}
-*/
+		  	It("Existing Check", func() {
+				err := IsExist(vg, lv)
+				Expect(err).NotTo(HaveOccurred())
+			})
 
-func TestCheckVG(t *testing.T) {
-	size,free, err := CheckVG(vg)
-	if err != nil {
-		t.Errorf("CheckVG(%v) %v,%v, err: %v", vg, size,free,err)
-	}
-	sizeg := size/1024/1024/1024
-	freeg := free/1024/1024/1024
-	fmt.Println("size = ",sizeg)
-	fmt.Println("free = ",freeg)
-}
+			time.Sleep(time.Second * 30)
+
+			It("Remove Logical Volume", func() {
+				err := RemoveLV(vg, lv)
+				Expect(err).NotTo(HaveOccurred())
+		  	})
+
+		  	It("Existing Check", func() {
+				err := IsExist(vg, lv)
+				Expect(err).To(HaveOccurred())
+		  	})
+		})
+
+		var vg = "vg1"
+		var lv_template = "lv01"
+		var lv_snapshot = "test-lv21"
+		var sz_snapshot uint64 = 1024 * 1024 * 1024 * 1  // GB
+
+		Context("Create Snapshot from Logical Volume", func() {
+			It("Create Snapshot Volume", func() {
+				Expect(CreateSnapshot(vg, lv_template, lv_snapshot, sz_snapshot)).NotTo(HaveOccurred())
+		  	})
+		  	It("Remove Snapshot Volume", func() {
+				err := RemoveLV(vg, lv_snapshot)
+				Expect(err).NotTo(HaveOccurred())
+		  	})
+		})
+
+		Context("Volume Group", func() {
+			It("Get Volume Group Info", func() {
+				size,free, err := CheckVG(vg)
+				Expect(err).NotTo(HaveOccurred())
+				sizeg := size/1024/1024/1024
+				freeg := free/1024/1024/1024
+				fmt.Println("size = ",sizeg)
+				fmt.Println("free = ",freeg)
+		  })
+		})
+	})
+})
