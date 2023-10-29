@@ -2,6 +2,7 @@
 
 package main
 
+/*
 type StgPool struct {
 	VolGroup string `yaml:"vg"`
 	Type     string `yaml:"type"`
@@ -37,3 +38,4 @@ type SeqNo struct {
 	Step  uint64 `yaml:"step"`
 	Key   string `yaml:"name"`
 }
+*/

@@ -6,6 +6,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/onsi/ginkgo/v2 v2.13.0
 	github.com/onsi/gomega v1.29.0
+	github.com/takara9/marmot/pkg/config v0.0.0-20231028131622-506aa699df46
 	go.etcd.io/etcd/client/v3 v3.5.7
 
 )
@@ -19,6 +20,7 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/pprof v0.0.0-20210407192527-94a9f03dee38 // indirect
+	github.com/kr/pretty v0.3.1 // indirect
 	go.etcd.io/etcd/api/v3 v3.5.7 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.7 // indirect
 	go.uber.org/atomic v1.7.0 // indirect

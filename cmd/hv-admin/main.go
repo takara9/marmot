@@ -2,18 +2,19 @@ package main
 
 import (
 	"fmt"
-	"log"
+	//"log"
 	"path/filepath"
 	"os"
 	"flag"
 
 	cf "github.com/takara9/marmot/pkg/config"
 	db "github.com/takara9/marmot/pkg/db"
-	etcd "go.etcd.io/etcd/client/v3"
+	//etcd "go.etcd.io/etcd/client/v3"
 )
 
 
 // ハイパーバイザーの設定
+/*
 func SetHypervisor(con *etcd.Client, v Hypervisor) error {
 
 	var hv db.Hypervisor
@@ -56,10 +57,10 @@ func SetImageTemplate(con *etcd.Client,v Image) error {
 	}
 	return nil
 }
-
+*/
 
 type DefaultConfig struct {
-	ApiServerUrl      string     `yaml:"api_server"`
+	ApiServerUrl       string     `yaml:"api_server"`
 	EtcdServerUrl      string     `yaml:"etcd_server"`
 }
 
@@ -73,29 +74,26 @@ func main() {
 	// パラメータの取得
 	config := flag.String("config", "hypervisor-config.yaml",  "Hypervisor config file")
 	flag.Parse()
+	var hvs db.Hypervisors_yaml
+	readYAML(*config, &hvs)
 
-	//fmt.Println("config ", *config)
-
+	// etcdへ接続
 	Conn,err := db.Connect(DefaultConfig.EtcdServerUrl)
 	if err != nil {
 		panic(err)
 	}
 	defer Conn.Close()
 
-
-	//var fn string = "hypervisor-config.yaml"
-	var hvs Hypervisors
-	readYAML(*config, &hvs)
-
+   
 	// ハイパーバイザー
 	for _, hv := range hvs.Hvs {
 		fmt.Println(hv)
-		SetHypervisor(Conn, hv)
+		db.SetHypervisor(Conn, hv)
 	}
 
 	// OSイメージテンプレート
 	for _, hd := range hvs.Imgs {
-		SetImageTemplate(Conn, hd)
+		db.SetImageTemplate(Conn, hd)
 	}
 
 	// シーケンス番号のリセット

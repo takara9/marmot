@@ -36,4 +36,41 @@ var _ = Describe("Config", func() {
 		  	})
 		})
 	})
+
+
+	Describe("Read Hypervisor Config file and Check", func() {
+		const hypervior_config string = "testdata/hypervisor-config.yaml"
+		var cnf Hypervisors_yaml
+
+		type hv struct {
+			name string
+			cpu  uint64
+			ram  uint64
+		}
+		tests := []struct {
+			name string
+			want hv
+		}{
+			{name: "1st", want: hv{name: "hv1", cpu: 10, ram: 64}},
+			{name: "2nd", want: hv{name: "hv2", cpu: 10, ram: 64}},
+		}
+
+		Context("Read a test hypervisor config file", func() {
+			It("Read existing file", func() {
+				err := ReadConfig(hypervior_config, &cnf)
+				Expect(err).NotTo(HaveOccurred())
+				for i, h := range cnf.Hvs {
+					GinkgoWriter.Println(i)
+					GinkgoWriter.Println(h.Name)
+					GinkgoWriter.Println(h.Cpu)
+					Expect(h.Name).To(Equal(tests[i].want.name))
+					Expect(h.Cpu).To(Equal(tests[i].want.cpu))
+					Expect(h.Ram).To(Equal(tests[i].want.ram))
+				}
+		  	})
+		})
+	})
 })
+
+
+

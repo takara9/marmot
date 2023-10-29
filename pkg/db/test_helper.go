@@ -101,6 +101,7 @@ func testHvCreate(name string, cpu int, ram int) Hypervisor {
 	hv.FreeCpu    = cpu
 	hv.FreeMemory = ram
 	hv.Key        = name
+	hv.Status     = 2
 	return hv
 }
 

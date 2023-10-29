@@ -1,0 +1,50 @@
+hv_spec:
+  - name:     "hv1"
+    cpu:      10
+    free_cpu: 10
+    ram:      64
+    free_ram: 64
+    ip_addr:  "10.0.0.1"
+    storage_pool:
+    - vg: "vg1"
+      type: "ssd"
+    - vg: "vg2"
+      type: "nvme"
+    - vg: "vg3"
+      type: "hdd"
+
+  - name:     "hv2"
+    cpu:      10
+    free_cpu: 10
+    ram:      64
+    free_ram: 64
+    ip_addr:  "10.0.0.2"
+    storage_pool:
+    - vg: "vg1"
+      type: "ssd"
+    - vg: "vg2"
+      type: "nvme"
+    - vg: "vg3"
+      type: "hdd"
+
+image_template:
+  - name: "ubuntu20.04"
+    volumegroup: "vg1"
+    logicalvolume: "lv01"
+  - name: "ubuntu18.04"
+    volumegroup: "vg1"
+    logicalvolume: "lv02"
+
+#
+# シリアル番号管理
+#
+seqno:
+  - name: "LVOS"
+    start: 1
+    step:  1
+  - name: "LVDATA"
+    start: 1
+    step:  1
+  - name: "VM"
+    start: 1
+    step:  1
