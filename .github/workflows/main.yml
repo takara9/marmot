@@ -65,6 +65,7 @@ jobs:
     - name: Test pkg/virt
       run: | 
         cd pkg/virt
+        go mod tidy
         sudo -s /usr/local/go/bin/go test
         cd ../..
 

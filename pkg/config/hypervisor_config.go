@@ -5,6 +5,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+/*
+
 type StgPool_yaml struct {
 	VolGroup string        `yaml:"vg"`
 	Type     string        `yaml:"type"`
@@ -41,7 +43,9 @@ type SeqNo_yaml struct {
 	Key   string `yaml:"name"`
 }
 
-func readYAML(fn string, yf interface{}) error {
+*/
+
+func ReadYAML(fn string, yf interface{}) error {
 	file, err := os.Open(fn)
 	if err != nil {
 		return err

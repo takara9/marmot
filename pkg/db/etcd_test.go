@@ -4,8 +4,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	etcd "go.etcd.io/etcd/client/v3"
-	"github.com/takara9/marmot/pkg/config"
-	//"fmt"
+	cf "github.com/takara9/marmot/pkg/config"
 )
 
 var _ = Describe("Etcd", func() {
@@ -169,7 +168,7 @@ var _ = Describe("Etcd", func() {
 
 	Describe("Read Hypervisor Config file and Check", func() {
 		const hypervior_config string = "testdata/hypervisor-config.yaml"
-		var cn config.Hypervisors_yaml
+		var cn cf.Hypervisors_yaml
 		
 		type hv struct {
 			name string
@@ -186,7 +185,7 @@ var _ = Describe("Etcd", func() {
 
 		Context("Read a test hypervisor config file", func() {
 			It("Read existing file", func() {
-				err := ReadConfig(hypervior_config, &cn)
+				err := cf.ReadConfig(hypervior_config, &cn)
 				Expect(err).NotTo(HaveOccurred())
 				for i, h := range cn.Hvs {
 					GinkgoWriter.Println(i)
@@ -202,8 +201,25 @@ var _ = Describe("Etcd", func() {
 
 
 
-	/*
+
 	Describe("HyperVisor Management Test", func() {
+		const hypervior_config string = "testdata/hypervisor-config.yaml"
+		var cnf cf.Hypervisors_yaml
+
+		type hv struct {
+			name string
+			cpu  uint64
+			ram  uint64
+		}
+		tests := []struct {
+			name string
+			want hv
+		}{
+			{name: "1st", want: hv{name: "hv1", cpu: 10, ram: 64}},
+			{name: "2nd", want: hv{name: "hv2", cpu: 10, ram: 64}},
+		}
+
+
 		Context("Test Connection to etcd", func() {
 			It("Connection etcd", func() {
 				Conn, err = Connect(url)
@@ -212,56 +228,40 @@ var _ = Describe("Etcd", func() {
 		})
 
 
-
 		// ハイパーバイザーのコンフィグを読んで、データベースを初期化
 		Context("Test of Hypervisor management : Set up", func() {
 
-			It("PUT Hypervisor node data #2", func() {
+			It("Read existing file", func() {
+				err := cf.ReadConfig(hypervior_config, &cnf)
+				Expect(err).NotTo(HaveOccurred())
+				for i, h := range cnf.Hvs {
+					GinkgoWriter.Println(i)
+					GinkgoWriter.Println(h.Name)
+					GinkgoWriter.Println(h.Cpu)
+					Expect(h.Name).To(Equal(tests[i].want.name))
+					Expect(h.Cpu).To(Equal(tests[i].want.cpu))
+					Expect(h.Ram).To(Equal(tests[i].want.ram))
+				}
+		  	})
 
-				type DefaultConfig struct {
-					ApiServerUrl       string     `yaml:"api_server"`
-					EtcdServerUrl      string     `yaml:"etcd_server"`
-				}
-			
-		
-				//func main() {
-			
-				// コンフィグファイルの読み取り
-				//var DefaultConfig DefaultConfig
-				//cf.ReadConfig(filepath.Join(os.Getenv("HOME"),".config_marmot"), &DefaultConfig)
-			
-				// パラメータの取得
-				//config := flag.String("config", "hypervisor-config.yaml",  "Hypervisor config file")
-				//flag.Parse()
-				var hvs db.Hypervisors_yaml
-				readYAML(*config, &hvs)
-			
-				// etcdへ接続
-				Conn,err := db.Connect(DefaultConfig.EtcdServerUrl)
-				if err != nil {
-					panic(err)
-				}
-				defer Conn.Close()
-			
-			   
+			It("PUT Hypervisor node data #2", func() {
 				// ハイパーバイザー
-				for _, hv := range hvs.Hvs {
-					fmt.Println(hv)
-					db.SetHypervisor(Conn, hv)
+				for _, hv := range cnf.Hvs {
+					GinkgoWriter.Println(hv)
+					SetHypervisor(Conn, hv)
 				}
 			
 				// OSイメージテンプレート
-				for _, hd := range hvs.Imgs {
-					db.SetImageTemplate(Conn, hd)
+				for _, hd := range cnf.Imgs {
+					SetImageTemplate(Conn, hd)
 				}
 			
 				// シーケンス番号のリセット
-				for _, sq := range hvs.Seq {
-					db.CreateSeq(Conn, sq.Key, sq.Start, sq.Step)
+				for _, sq := range cnf.Seq {
+					CreateSeq(Conn, sq.Key, sq.Start, sq.Step)
 				}
 
 			})
-
 
 
 			It("Get Hypervisors status", func() {
@@ -314,6 +314,7 @@ var _ = Describe("Etcd", func() {
 					GinkgoWriter.Println("  Memory     ", h.Memory) 
 					GinkgoWriter.Println("  FreeCpu    ", h.FreeCpu) 
 					GinkgoWriter.Println("  FreeMemory ", h.FreeMemory) 
+					GinkgoWriter.Println("  Status     ", h.Status) 
 				}
 			})
 
@@ -365,7 +366,7 @@ var _ = Describe("Etcd", func() {
 				td := tests[4]
 				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
 				hvName, key, txid, err := AssignHvforVm(Conn, vm)
-				Expect(err).NotTo(HaveOccurred())
+				Expect(err).To(HaveOccurred())
 				GinkgoWriter.Println("hvNam ", hvName) 
 				GinkgoWriter.Println("key   ", key) 
 				GinkgoWriter.Println("txid  ", txid) 
@@ -402,7 +403,6 @@ var _ = Describe("Etcd", func() {
 			})
 		})
 	})
-	*/
 })
 
 

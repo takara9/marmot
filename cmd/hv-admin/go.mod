@@ -11,23 +11,23 @@ replace (
 
 require github.com/takara9/marmot/pkg/db v0.0.0-00010101000000-000000000000
 
-require gopkg.in/yaml.v3 v3.0.1 // indirect
-
 require (
-	github.com/kr/pretty v0.3.1 // indirect
-	github.com/takara9/marmot/pkg/config v0.0.0-20230813114040-5b6f7e56c137
+	github.com/kr/text v0.2.0 // indirect
+	github.com/rogpeppe/go-internal v1.9.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+require github.com/takara9/marmot/pkg/config v0.0.0-20231028131622-506aa699df46
 
 require (
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
-	github.com/go-yaml/yaml v2.1.0+incompatible
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	go.etcd.io/etcd/api/v3 v3.5.7 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.7 // indirect
-	go.etcd.io/etcd/client/v3 v3.5.7
+	go.etcd.io/etcd/client/v3 v3.5.7 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.17.0 // indirect

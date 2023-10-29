@@ -2,14 +2,11 @@ package main
 
 import (
 	"fmt"
-	//"log"
 	"path/filepath"
 	"os"
 	"flag"
-
 	cf "github.com/takara9/marmot/pkg/config"
 	db "github.com/takara9/marmot/pkg/db"
-	//etcd "go.etcd.io/etcd/client/v3"
 )
 
 
@@ -74,8 +71,8 @@ func main() {
 	// パラメータの取得
 	config := flag.String("config", "hypervisor-config.yaml",  "Hypervisor config file")
 	flag.Parse()
-	var hvs db.Hypervisors_yaml
-	readYAML(*config, &hvs)
+	var hvs cf.Hypervisors_yaml
+	cf.ReadYAML(*config, &hvs)
 
 	// etcdへ接続
 	Conn,err := db.Connect(DefaultConfig.EtcdServerUrl)

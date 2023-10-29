@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"sort"
 	"time"
-//	"log"
-
+	"log"
 	"github.com/google/uuid"
 	etcd "go.etcd.io/etcd/client/v3"
+
+    cf  "github.com/takara9/marmot/pkg/config"
 )
 
 /*
@@ -402,18 +403,18 @@ func UpdateVmState(con *etcd.Client, vmkey string, state int) error {
 //////////////////////////////////////////////////////////////
 
 // ハイパーバイザーの設定
-/*
-func SetHypervisor(con *etcd.Client, v Hypervisor_yaml) error {
-
+func SetHypervisor(con *etcd.Client, v cf.Hypervisor_yaml) error {
 	var hv Hypervisor
+	
 	hv.Nodename    = v.Name
-	hv.Key         = v.Name         // Key
+	hv.Key         = v.Name         	// Key
 	hv.IpAddr      = v.IpAddr
 	hv.Cpu         = int(v.Cpu)
 	hv.FreeCpu     = int(v.Cpu)         // これで良いのか
 	hv.Memory      = int(v.Ram * 1024)  // MB
 	hv.FreeMemory  = int(v.Ram * 1024)
-	hv.Status      = 0
+	hv.Status      = 2  // テストのため暫定
+
 
 //	for _, val := range v.StgPool_yaml {
 //		var sp St
@@ -440,7 +441,7 @@ func SetHypervisor(con *etcd.Client, v Hypervisor_yaml) error {
 }
 
 // イメージテンプレート
-func SetImageTemplate(con *etcd.Client,v Image_yaml) error {
+func SetImageTemplate(con *etcd.Client,v cf.Image_yaml) error {
 	var osi OsImageTemplate
 	osi.LogicaVol   = v.LogicalVolume
 	osi.VolumeGroup = v.VolumeGroup
@@ -453,4 +454,3 @@ func SetImageTemplate(con *etcd.Client,v Image_yaml) error {
 	}
 	return nil
 }
-*/
