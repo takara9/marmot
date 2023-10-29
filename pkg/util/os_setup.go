@@ -21,7 +21,7 @@ import (
 	"strconv"
 
 	cf "github.com/takara9/marmot/pkg/config"
-	virt "github.com/takara9/marmot/pkg/virt"
+	"github.com/takara9/marmot/pkg/virt"
 )
 
 

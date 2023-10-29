@@ -16,8 +16,8 @@ import (
 	"strings"
 	"io"
 	"time"
-	db "github.com/takara9/marmot/pkg/db"
-	lvm "github.com/takara9/marmot/pkg/lvm"
+	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/lvm"
 	etcd "go.etcd.io/etcd/client/v3"
 )
 
@@ -63,9 +63,6 @@ func CheckHypervisors(dbUrl string, node string) ([]db.Hypervisor,error) {
 		log.Println("GetHypervisors()", err)
 		return nil,err
 	}
-
-
-
 
 	// 自ノードを含むハイパーバイザーの死活チェック、DBへ反映
 	for _,val := range hvs {

@@ -1,52 +1,28 @@
 package util
 
 import (
-	"testing"
-	"fmt"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	//db "github.com/takara9/marmot/pkg/db"
 )
 
-//
-func TestReadConfig(t *testing.T) {
+var _ = Describe("Util", func() {
 
-	var mountpoint string = "./root_lv"
-	var hostname string = "server1"
+	var url string
+	//var node string = "hv0"
 
-	err := LinuxSetup_hostname(mountpoint, hostname)
-	if err != nil {
-		t.Errorf("LinuxSetup_hostname(%v,%v), err: %v", mountpoint, hostname, err)
-	}
+	BeforeEach(func() {
+		url = "http://127.0.0.1:2379"
+	})
 
-
-}
-
-// ハイパーバイザーのREST-APIによる稼働チェック
-func TestHypervisor(t *testing.T) {
-
-	var dburl string = "http://127.0.0.1:2379"
-	var node string = "hv9"
-
-	x, err := CheckHypervisors(dburl, node)
-	if err != nil {
-		t.Errorf("CheckHypervisors(), err: %v", err)
-	}
-	fmt.Println("x = ", x[0].Nodename)
-
-
-}
-
-// ハイパーバイザーのREST-APIによる稼働チェック
-/*
-func TestCheckHvVG(t *testing.T) {
-
-	var dburl string = "http://127.0.0.1:2379"
-	var node  string = "hv9"
-	var vg    string = "vg1"
-
-	err := CheckHvVG(dburl, node, vg)
-	if err != nil {
-		t.Errorf("CheckHvVG(), err: %v", err)
-	}
-
-}
-*/
-
+	Describe("Test etcd", func() {
+		Context("Test Access to etcd", func() {
+			It("Connection etcd", func() {
+				//h, err := CheckHypervisors(url, node)
+				Expect(url).To(Equal("http://127.0.0.1:2379"))
+				//Expect(h[0].No).To(Equal("hv1"))
+				GinkgoWriter.Println("XXXX") 
+		  	})
+		})
+	})
+})

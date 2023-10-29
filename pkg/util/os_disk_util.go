@@ -17,10 +17,9 @@ import (
 	"os/exec"
 	"os"
 	"log"
-	db "github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/db"
 	lvm "github.com/takara9/marmot/pkg/lvm"
 	cf "github.com/takara9/marmot/pkg/config"
-	//virt "github.com/takara9/marmot/pkg/virt"
 	etcd "go.etcd.io/etcd/client/v3"
 	"errors"
 )

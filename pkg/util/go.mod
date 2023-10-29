@@ -1,4 +1,4 @@
-module github.com/takara9/marmot/pkg/util
+module util
 
 go 1.21.3
 
@@ -11,6 +11,8 @@ replace (
 )
 
 require (
+	github.com/onsi/ginkgo/v2 v2.13.0
+	github.com/onsi/gomega v1.29.0
 	github.com/takara9/marmot/pkg/config v0.0.0-20231029092358-6bbe00b9567a
 	github.com/takara9/marmot/pkg/db v0.0.0-00010101000000-000000000000
 	github.com/takara9/marmot/pkg/lvm v0.0.0-00010101000000-000000000000
@@ -21,12 +23,16 @@ require (
 require (
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
+	github.com/go-logr/logr v1.2.4 // indirect
+	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/gofrs/flock v0.7.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
+	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/google/pprof v0.0.0-20210407192527-94a9f03dee38 // indirect
 	github.com/google/uuid v1.4.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
-	github.com/rogpeppe/go-internal v1.9.0 // indirect
+	github.com/rogpeppe/go-internal v1.11.0 // indirect
 	github.com/takara9/lvm v0.0.0-20230311125634-cefe325205bd // indirect
 	go.etcd.io/etcd/api/v3 v3.5.10 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.10 // indirect
@@ -36,6 +42,7 @@ require (
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
+	golang.org/x/tools v0.12.0 // indirect
 	google.golang.org/genproto v0.0.0-20230711160842-782d3b101e98 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230711160842-782d3b101e98 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230711160842-782d3b101e98 // indirect
@@ -43,5 +50,5 @@ require (
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/freddierice/go-losetup.v1 v1.0.0-20170407175016-fc9adea44124 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	libvirt.org/go/libvirt v1.9000.0 // indirect
+	libvirt.org/go/libvirt v1.9007.0 // indirect
 )

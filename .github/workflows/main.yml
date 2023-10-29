@@ -59,7 +59,7 @@ jobs:
       run: | 
         cd pkg/util
         go mod tidy
-        sudo -s /usr/local/go/bin/go test
+        sudo -s make test
         cd ../..
 
     - name: Test pkg/virt
