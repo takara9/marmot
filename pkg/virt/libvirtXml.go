@@ -198,7 +198,7 @@ type STarget struct {
 }
 
 //
-type Serial struct {
+type Serial0 struct {
    Type      string   `xml:"type,attr"`
    Target    STarget  `xml:"target"`
 }
@@ -366,7 +366,7 @@ type Devices struct {
      Disk         []Disk         `xml:"disk"`
      Controller   []Controller   `xml:"controller"`
      Interface    []Interface    `xml:"interface"`
-     Serial       []Serial       `xml:"serial"`
+     Serial       []Serial0      `xml:"serial"`
      Console      []Console      `xml:"console"`
      Channel      []Channel      `xml:"channel"`
      Input        []Input        `xml:"input"`
