@@ -75,7 +75,7 @@ var _ = Describe("Virt", func() {
 
 		    time.Sleep(time.Second * 30)
 
-			It("Attache NIC the existing VM", func() {
+			It("Delete VM", func() {
 				url := "qemu:///system"
 				vm := "vm-test"
 				err := DestroyVM(url, vm)
