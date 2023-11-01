@@ -22,7 +22,10 @@ jobs:
         REPOSITORY_VAR: ${{ vars.REPOSITORY_VAR }}
         ORGANIZATION_VAR: ${{ vars.ORGANIZATION_VAR }}
         OVERRIDE_VAR: ${{ vars.OVERRIDE_VAR }}
-        
+    - name: show variables
+      run: |
+        env
+
     - name: ${{ vars.HELLO_WORLD_STEP }}
       if: ${{ vars.HELLO_WORLD_ENABLED == 'true' }}
       uses: actions/hello-world-javascript-action@main
