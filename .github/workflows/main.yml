@@ -1,13 +1,40 @@
-name: Etcd Service Example
+name: marmot CI on self-hosted hv1
 on: push
+env:
+  # Setting an environment variable with the value of a configuration variable
+  env_var: ${{ vars.ENV_CONTEXT_VAR }}
 
 jobs:
+  display-variables:
+    name: ${{ vars.JOB_NAME }}
+    # You can use configuration variables with the `vars` context for dynamic jobs
+    if: ${{ vars.USE_VARIABLES == 'true' }}
+    runs-on: ${{ vars.RUNNER }}
+    environment: ${{ vars.ENVIRONMENT_STAGE }}
+    steps:
+    - name: Use variables
+      run: |
+        echo "repository variable : $REPOSITORY_VAR"
+        echo "organization variable : $ORGANIZATION_VAR"
+        echo "overridden variable : $OVERRIDE_VAR"
+        echo "variable from shell environment : $env_var"
+      env:
+        REPOSITORY_VAR: ${{ vars.REPOSITORY_VAR }}
+        ORGANIZATION_VAR: ${{ vars.ORGANIZATION_VAR }}
+        OVERRIDE_VAR: ${{ vars.OVERRIDE_VAR }}
+        
+    - name: ${{ vars.HELLO_WORLD_STEP }}
+      if: ${{ vars.HELLO_WORLD_ENABLED == 'true' }}
+      uses: actions/hello-world-javascript-action@main
+      with:
+        who-to-greet: ${{ vars.GREET_NAME }}
+
+
   # Label of the job
-  test-job:
+  marmot-CI-job:
     # You must use a Linux environment when using service containers or container jobs
     #runs-on: ubuntu-latest
     runs-on: self-hosted
-
     # Service containers to run with `runner-job`
     services:
       # Label used to access the service container
@@ -21,6 +48,14 @@ jobs:
         ports:
           # Opens tcp port 2379 on the host and service container
           - 2379:2379
+      coredns:
+        image: coredns/coredns
+        ports: 1053:53
+        env:
+            TEST_ENV: true
+        #volumes:
+        #  - my_docker_volume:/coredns
+        options: --cpus 1
     steps:
     - uses: actions/checkout@v3
     - name: Install ca-certificates
