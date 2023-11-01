@@ -50,7 +50,8 @@ jobs:
           - 2379:2379
       coredns:
         image: coredns/coredns
-        ports: 1053:53
+        ports: 
+          - 53
         env:
             TEST_ENV: true
         #volumes:
