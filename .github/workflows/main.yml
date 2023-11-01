@@ -27,6 +27,7 @@ jobs:
       run: |
         env
         pwd
+        ls -lR
   
     - name: ${{ vars.HELLO_WORLD_STEP }}
       if: ${{ vars.HELLO_WORLD_ENABLED == 'true' }}
