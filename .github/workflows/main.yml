@@ -3,6 +3,7 @@ on: push
 env:
   # Setting an environment variable with the value of a configuration variable
   env_var: ${{ vars.ENV_CONTEXT_VAR }}
+  DEBUG: true
 
 jobs:
   display-variables:
@@ -25,6 +26,7 @@ jobs:
         OVERRIDE_VAR: ${{ vars.OVERRIDE_VAR }}
     - name: show variables
       run: |
+        echo ${DEBUG}
         env
         pwd
         ls -lR
