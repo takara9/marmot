@@ -49,15 +49,14 @@ jobs:
         ports:
           - 2379:2379
       coredns:
-        image: coredns/coredns
+        image: maho/coredns:1.11.1
         ports: 
-          - 1053:53
+          - 1053:53/udp
         volumes:
           - pkg/dns/testconf:/conf
-          #- ${{ vars.RUNNER_WORKSPACE }}/pkg/dns/testconf:/conf
-        args:
-          -dns.port 53:53/udp
-          -conf /conf/Corefile
+        env:
+          CONF: /conf/Corefile
+          PORT: 53:53/udp
     steps:
     - uses: actions/checkout@v3
     - name: Install ca-certificates
