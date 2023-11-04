@@ -55,9 +55,9 @@ jobs:
         volumes:
           - pkg/dns/testconf:/conf
           #- ${{ vars.RUNNER_WORKSPACE }}/pkg/dns/testconf:/conf
-        options: >-
-          --dns.port 53:53/udp
-          --conf /conf/Corefile
+        args:
+          -dns.port 53:53/udp
+          -conf /conf/Corefile
     steps:
     - uses: actions/checkout@v3
     - name: Install ca-certificates
