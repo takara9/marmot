@@ -28,6 +28,8 @@ jobs:
         env
         pwd
         ls -lR
+        echo "path1" ${{ var.RUNNER_WORKSPACE }}
+        echo "path2" $RUNNER_WORKSPACE
   
     - name: ${{ vars.HELLO_WORLD_STEP }}
       if: ${{ vars.HELLO_WORLD_ENABLED == 'true' }}
@@ -53,7 +55,7 @@ jobs:
         ports: 
           - 1053:53/udp
         volumes:
-          - pkg/dns/testconf:/conf
+          - ${{ RUNNER_WORKSPACE }}/pkg/dns/testconf:/conf
         env:
           CONF: /conf/Corefile
           PORT: 53:53/udp
