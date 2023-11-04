@@ -1,0 +1,64 @@
+labo.local.     3600 IN SOA ns1.labo.local. root.labo.local. (
+                                24         ; serial
+                                7200       ; refresh (4 hours)
+                                3600       ; retry (1 hour)
+                                604800     ; expire (1 week)
+                                1800       ; minimum (30 min)
+                                )
+
+; Hypervisors
+hmc             3600 IN  A     192.168.1.9  ; Hypervisor management console
+hv1             3600 IN  A     10.1.0.11
+hv2             3600 IN  A     10.1.0.12
+hv3             3600 IN  A     10.1.0.13
+hv4             3600 IN  A     10.1.0.14
+
+; Infra Servers
+gw0             3600 IN  A     192.168.1.1    ; Internet Router
+gw1             3600 IN  A     192.168.1.2    ; Wifi Router
+gw2             3600 IN  A     192.168.1.3    ; Internal Router 10.x, 172.16.x
+ns0             3600 IN  A     192.168.1.4    ; CoreDNS RasPi
+ext1            3600 IN  A     192.168.1.5    ; Buffalo WEX-1800XA4EA
+nas1            3600 IN  A     192.168.1.6    ; Buffalo Link Station LS720D
+nas2            3600 IN  A     192.168.1.7    ; Buffalo Link Station LS-WVL
+ns1             3600 IN  A     192.168.1.8    ; CoreDNS marmot-VM 
+hmc             3600 IN  A     192.168.1.9    ; HMC for Marmot HyperVisors
+prn1            3600 IN  A     192.168.1.10   ; EPSON Printer
+ns2             3600 IN  A     192.168.1.108
+
+ca              3600 IN  CNAME ns1
+ldap            3600 IN  CNAME ns1
+sso             3600 IN  CNAME ns1
+oauth           3600 IN  CNAME ns1
+tele            3600 IN  CNAME hmc
+
+;ca              3600 IN  CNAME ns2
+;ldap            3600 IN  CNAME ns2
+;sso             3600 IN  CNAME ns2
+;oauth           3600 IN  CNAME ns2
+
+;dex             3600 IN  CNAME ns2
+
+dex             3600 IN  A     192.168.1.80
+oauth2-proxy    3600 IN  A     192.168.1.89
+spa1            3600 IN  A     192.168.1.90
+spa             3600 IN  A     192.168.1.92
+
+;; Mail Servers
+mail            3600 IN  A     192.168.1.220 ; Mail server
+labo.local.          IN  MX    10 mail.labo.local.
+
+;; CICD Servers
+harbor          3600 IN  A     192.168.1.221 ; Container Image Registry
+gitlab          3600 IN  A     192.168.1.222 ; Code Repository
+jenkins         3600 IN  A     192.168.1.223 ; CICD Server
+ceph            3600 IN  A     192.168.1.227 ; Ceph dashboard
+mon             3600 IN  A     192.168.1.227 ; Ceph mon1..3
+                3600 IN  A     192.168.1.228 
+                3600 IN  A     192.168.1.229
+objectstorage   3600 IN  CNAME mon           ; Ceph Object Storage RADOSGW
+
+apl             3600 IN  A     192.168.1.78 
+keycloak        3600 IN  A     192.168.1.75 
+
+sw1             3600 IN  A     192.168.1.254 ; VLAN/L3 Switch

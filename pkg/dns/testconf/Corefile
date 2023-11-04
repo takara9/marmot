@@ -1,0 +1,39 @@
+.:53 {
+    log
+    errors
+    forward . 8.8.8.8 9.9.9.9
+}
+
+# インフラサーバーなど
+labo.local:53 {
+    file /conf/labo.db
+    log
+    errors
+}
+
+# k8sクラスタ #1 ミニ環境
+k8s1.labo.local:53 {
+    log
+    errors
+    forward . 172.16.1.31
+}
+
+# k8sクラスタ #2 シングルフル環境
+k8s2.labo.local:53 {
+    log
+    errors
+    forward . 172.16.2.31
+}
+
+# K8s
+k8s3.labo.local:53 {
+    log
+    errors
+    forward . 172.16.3.31
+}
+
+k8s4.labo.local:53 {
+    log
+    errors
+    forward . 172.16.4.31
+}

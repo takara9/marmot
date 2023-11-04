@@ -38,31 +38,23 @@ jobs:
 
   # Label of the job
   marmot-CI-job:
-    # You must use a Linux environment when using service containers or container jobs
-    #runs-on: ubuntu-latest
+    needs: isplay-variables
     runs-on: self-hosted
-    # Service containers to run with `runner-job`
     services:
-      # Label used to access the service container
       etcd:
-        # Docker Hub image
         image: bitnami/etcd
-        # Provide Environment
         env:
           ALLOW_NONE_AUTHENTICATION: yes
           ETCD_ADVERTISE_CLIENT_URLS: "http://127.0.0.1:2379"
         ports:
-          # Opens tcp port 2379 on the host and service container
           - 2379:2379
       coredns:
         image: coredns/coredns
         ports: 
-          - 53
-        env:
-            TEST_ENV: true
-        #volumes:
-        #  - my_docker_volume:/coredns
-        options: --cpus 1
+          - 1053:53
+        volumes:
+          - pkg/dns/testconf:/conf
+        options: -dns.port 53:53/udp -conf /conf/Corefile
     steps:
     - uses: actions/checkout@v3
     - name: Install ca-certificates
