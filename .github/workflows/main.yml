@@ -28,7 +28,6 @@ jobs:
         env
         pwd
         ls -lR
-        echo "path1" ${{ var.RUNNER_WORKSPACE }}
         echo "path2" $RUNNER_WORKSPACE
   
     - name: ${{ vars.HELLO_WORLD_STEP }}
