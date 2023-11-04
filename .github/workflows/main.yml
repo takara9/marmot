@@ -38,7 +38,7 @@ jobs:
 
   # Label of the job
   marmot-CI-job:
-    needs: isplay-variables
+    needs: display-variables
     runs-on: self-hosted
     services:
       etcd:
