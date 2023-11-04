@@ -54,7 +54,7 @@ jobs:
         ports: 
           - 1053:53/udp
         volumes:
-          - ${{ RUNNER_WORKSPACE }}/pkg/dns/testconf:/conf
+          - $RUNNER_WORKSPACE/pkg/dns/testconf:/conf
         env:
           CONF: /conf/Corefile
           PORT: 53:53/udp
