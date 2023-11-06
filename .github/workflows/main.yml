@@ -31,6 +31,7 @@ jobs:
         pwd
         ls -lR
         echo "path2" $RUNNER_WORKSPACE
+        dig @172.16.0.8 minio.labo.local
   
     - name: ${{ vars.HELLO_WORLD_STEP }}
       if: ${{ vars.HELLO_WORLD_ENABLED == 'true' }}
@@ -73,6 +74,12 @@ jobs:
       with:
         go-version: '1.21'
 
+    - name: show variables
+      run: |
+        echo ${DEBUG}
+        env
+        dig @172.16.0.8 minio.labo.local
+
     - name: Test pkg/config
       run: | 
         cd pkg/config
@@ -108,6 +115,10 @@ jobs:
         sudo -s make test
         cd ../..
 
-        
+    - name: Test pkg/dns
+      run: | 
+        cd pkg/dns
+        dig @172.16.0.8 minio.labo.local
+
 
 
