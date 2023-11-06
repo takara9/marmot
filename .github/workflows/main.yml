@@ -78,7 +78,7 @@ jobs:
         echo ${DEBUG}
         env
         dig @172.16.0.8 minio.labo.local
-        dig @127.0.0.1:1053 minio.labo.local
+        dig @127.0.0.1 -p 1053 minio.labo.local
 
     - name: Test pkg/config
       run: | 
