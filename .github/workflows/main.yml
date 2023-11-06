@@ -31,8 +31,6 @@ jobs:
         pwd
         ls -lR
         echo "path2" $RUNNER_WORKSPACE
-        dig @172.16.0.8 minio.labo.local
-        dig @localhost:1053 minio.labo.local
   
     - name: ${{ vars.HELLO_WORLD_STEP }}
       if: ${{ vars.HELLO_WORLD_ENABLED == 'true' }}
@@ -80,6 +78,7 @@ jobs:
         echo ${DEBUG}
         env
         dig @172.16.0.8 minio.labo.local
+        dig @127.0.0.1:1053 minio.labo.local
 
     - name: Test pkg/config
       run: | 
