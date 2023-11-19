@@ -4,6 +4,17 @@
     forward . 8.8.8.8 9.9.9.9
 }
 
+
+test {
+    etcd test {
+        path /skydns
+        endpoint http://localhost:2379
+    }
+    errors
+    log
+}
+
+
 # インフラサーバーなど
 labo.local:53 {
     file /coredns/labo.db

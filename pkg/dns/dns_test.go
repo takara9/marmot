@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-const dburl = "http://127.0.0.1:12379"
+const dburl = "http://127.0.0.1:2379"
 
 func TestAdd(t *testing.T) {
 	fmt.Println("case 1")
