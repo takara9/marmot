@@ -49,6 +49,9 @@ systemctl start marmot
 
 
 
+## To Do
+
+* CoreDNS と連携させて、起動したVMがDNSで引けるようにする。
 
 
 
