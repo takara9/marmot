@@ -2,9 +2,6 @@ PROGRAM	= vm-server
 DISTDIR = /usr/local/marmot
 all:	$(PROGRAM)
 
-.PHONY:	deps
-deps:
-	go mod tidy
 
 $(PROGRAM): $(%.go)
 	go build -o $@ $^
