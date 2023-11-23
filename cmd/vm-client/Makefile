@@ -1,9 +1,11 @@
 PROGRAM	= mactl
 all:	$(PROGRAM)
-
+BINDIR = ../../bin
 
 $(PROGRAM): $(%.go)
-	go build -o $@ $^
+	echo $(BINDIR)
+	mkdir -p $(BINDIR)
+	go build -o $(BINDIR)/$@ $^
 
 .PHONY:	clean
 clean:

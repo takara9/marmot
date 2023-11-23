@@ -1,10 +1,14 @@
 PROGRAM	= vm-server
 DISTDIR = /usr/local/marmot
 all:	$(PROGRAM)
-
+BINDIR = ../../bin
 
 $(PROGRAM): $(%.go)
-	go build -o $@ $^
+	echo $(BINDIR)
+	mkdir -p $(BINDIR)
+	go build -o $(BINDIR)/$@ $^
+	cp temp.xml $(BINDIR)/temp.xml
+	cp marmot.service $(BINDIR)/marmot.service
 
 .PHONY:	clean
 clean:
