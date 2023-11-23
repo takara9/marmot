@@ -1,4 +1,4 @@
-package tlvm
+package lvm
 
 import (
 	tlvm "github.com/takara9/lvm"  //独自機能拡張してあるので、go get ... を実行すること
@@ -43,7 +43,7 @@ func RemoveLV(vgx string, lvx string) error {
 		return err
 	}
 
-	lv, err := tvg.LookupLogicalVolume(lvx)
+	lv, err := vg.LookupLogicalVolume(lvx)
 	if err != nil {
 		return err
 	}
