@@ -1,4 +1,4 @@
-package lvm
+package lvm_test
 
 import (
 	. "github.com/onsi/ginkgo/v2"

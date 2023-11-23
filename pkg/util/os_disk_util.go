@@ -1,3 +1,5 @@
+package util
+
 /*
   LVM関連のユーテリティ関数群
 
@@ -11,14 +13,13 @@
 
  */
 
-package util
 import (
 	"fmt"
 	"os/exec"
 	"os"
 	"log"
 	"github.com/takara9/marmot/pkg/db"
-	lvm "github.com/takara9/marmot/pkg/lvm"
+	"github.com/takara9/marmot/pkg/lvm"
 	cf "github.com/takara9/marmot/pkg/config"
 	etcd "go.etcd.io/etcd/client/v3"
 	"errors"

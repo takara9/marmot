@@ -1,3 +1,5 @@
+package util
+
 /*
    Ubuntu Linux 設定の関数群
 
@@ -9,7 +11,6 @@
 
  */
 
-package util
 
 import (
 	"path/filepath"

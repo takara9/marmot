@@ -13,7 +13,6 @@ import (
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/virt"
-	//lvm "github.com/takara9/marmot/pkg/lvm"
 	etcd "go.etcd.io/etcd/client/v3"
 
 )
