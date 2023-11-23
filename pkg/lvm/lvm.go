@@ -81,7 +81,7 @@ func CreateSnapshot(vgx string, lvx string, svx string, size uint64) error {
 
 // ボリュームグループの総量量と空きチェック
 func CheckVG(vgx string) (uint64,uint64, error) {
-        vg,err := lvm.LookupVolumeGroup(vgx)
+        vg,err := tlvm.LookupVolumeGroup(vgx)
 	if err != nil {
 		return 0,0,err
 	}
