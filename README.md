@@ -6,7 +6,6 @@
 1つから複数のハイパーバイザー上で、仮想サーバーのクラスタを起動できる。
 
 
-
 ## ビルドとインストール
 
 ### hv-admin
@@ -58,3 +57,5 @@ systemctl start marmot
 
 ## 参考資料
 * Call your code from another module, https://go.dev/doc/tutorial/call-module-code
+
+CIが動か無いので調査
