@@ -1,12 +1,11 @@
 PROGRAM	= hv-admin
 all:	$(PROGRAM)
-
-.PHONY:	deps
-deps:
-	go mod tidy
+BINDIR = ../../bin
 
 $(PROGRAM): $(%.go)
-	go build -o $@ $^
+	echo $(BINDIR)
+	mkdir -p $(BINDIR)
+	go build -o $(BINDIR)/$@ $^
 
 .PHONY:	clean
 clean:

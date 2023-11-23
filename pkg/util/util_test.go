@@ -1,4 +1,4 @@
-package util
+package util_test
 
 import (
 	. "github.com/onsi/ginkgo/v2"

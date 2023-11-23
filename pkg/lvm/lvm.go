@@ -1,13 +1,13 @@
 package lvm
 
 import (
-	"github.com/takara9/lvm"  //独自機能拡張してあるので、go get ... を実行すること
+	tlvm "github.com/takara9/lvm"  //独自機能拡張してあるので、go get ... を実行すること
 )
 
 // 論理ボリュームの存在チェック
 func IsExist(vgx string, lvx string) error {
 
-	vg,err := lvm.LookupVolumeGroup(vgx)
+	vg,err := tlvm.LookupVolumeGroup(vgx)
 	if err != nil {
 		return err
 	}
@@ -23,7 +23,7 @@ func IsExist(vgx string, lvx string) error {
 // 論理ボリュームの作成
 func CreateLV(vgx string, lvx string, size uint64) error {
 
-	vg,err := lvm.LookupVolumeGroup(vgx)
+	vg,err := tlvm.LookupVolumeGroup(vgx)
 	if err != nil {
 		return err
 	}
@@ -38,7 +38,7 @@ func CreateLV(vgx string, lvx string, size uint64) error {
 // 論理ボリュームの削除
 func RemoveLV(vgx string, lvx string) error {
 
-	vg,err := lvm.LookupVolumeGroup(vgx)
+	vg,err := tlvm.LookupVolumeGroup(vgx)
 	if err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func RemoveLV(vgx string, lvx string) error {
 func CreateSnapshot(vgx string, lvx string, svx string, size uint64) error {
 
 	tags := []string{"snapshot","marmot"}
-	vg,err := lvm.LookupVolumeGroup(vgx)
+	vg,err := tlvm.LookupVolumeGroup(vgx)
 	if err != nil {
 		return err
 	}
@@ -81,7 +81,7 @@ func CreateSnapshot(vgx string, lvx string, svx string, size uint64) error {
 
 // ボリュームグループの総量量と空きチェック
 func CheckVG(vgx string) (uint64,uint64, error) {
-        vg,err := lvm.LookupVolumeGroup(vgx)
+        vg,err := tlvm.LookupVolumeGroup(vgx)
 	if err != nil {
 		return 0,0,err
 	}

@@ -1,4 +1,4 @@
-package lvm_test
+package lvm
 
 import (
 	"testing"
