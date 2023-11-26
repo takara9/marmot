@@ -2,7 +2,6 @@ package db
 
 import (
 	"time"
-
 	"github.com/google/uuid"
 )
 
@@ -92,6 +91,6 @@ const (
 
 type DNSEntry struct {
 	Host string `json:"host"`
-	Port int    `json:"port"`
+	Ttl  uint64 `json:"ttl"`
 }
 
