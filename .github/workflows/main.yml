@@ -68,7 +68,7 @@ jobs:
       run: |
         sudo apt update && sudo apt install -y ca-certificates dnsutils
         sudo update-ca-certificates
-        docker ps
+        env
 
     - name: Set up Go
       uses: actions/setup-go@v4
@@ -78,7 +78,7 @@ jobs:
     - name: show variables
       run: |
         echo ${DEBUG}
-        env
+        docker ps
         dig @localhost -p 1053 minio.labo.local
 
     - name: Test pkg/config
