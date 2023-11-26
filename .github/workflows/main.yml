@@ -79,7 +79,7 @@ jobs:
         echo ${DEBUG}
         docker ps
         env
-        dig @coredns -p 1053 minio.labo.local
+        dig @localhost -p 1053 minio.labo.local +short
 
     - name: Test pkg/config
       run: | 
