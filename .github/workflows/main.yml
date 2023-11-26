@@ -69,10 +69,10 @@ jobs:
         sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
         sudo update-ca-certificates
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.21'
+    #- name: Set up Go
+    #  uses: actions/setup-go@v4
+    #  with:
+    #    go-version: '1.21'
 
     - name: Check coredms
       run: |
