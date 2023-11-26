@@ -59,8 +59,8 @@ jobs:
         volumes:
           -  /home/ubuntu/actions-runner/_work/marmot/marmot/pkg/dns/testconf:/conf
         env:
-          CONF: /conf/Corefile
-          PORT: 53:53/udp
+          CONF: "/conf/Corefile"
+          PORT: "53"
 
     steps:
     - uses: actions/checkout@v3
