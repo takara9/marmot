@@ -79,7 +79,8 @@ jobs:
       run: |
         echo ${DEBUG}
         docker ps
-        dig @localhost -p 1053 minio.labo.local
+        env
+        #dig @localhost -p 1053 minio.labo.local
 
     - name: Test pkg/config
       run: | 
