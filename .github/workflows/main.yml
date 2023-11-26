@@ -51,6 +51,7 @@ jobs:
           ETCD_ADVERTISE_CLIENT_URLS: "http://127.0.0.1:2379"
         ports:
           - 2379:2379
+
       coredns:
         image: maho/coredns:1.11.1
         ports: 
@@ -60,6 +61,7 @@ jobs:
         env:
           CONF: /conf/Corefile
           PORT: 53:53/udp
+
     steps:
     - uses: actions/checkout@v3
     - name: Install ca-certificates
