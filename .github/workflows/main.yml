@@ -127,7 +127,7 @@ jobs:
     - name: Test pkg/dns
       run: | 
         cd pkg/dns
-        go test
+        sudo -s make test
 
 
 
