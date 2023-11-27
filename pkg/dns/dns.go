@@ -21,6 +21,14 @@ func checkParam(rec DnsRecord) error {
 	return nil
 }
 
+
+func checkParam2(rec DnsRecord) error {
+	if len(rec.Ipv4) == 0 {
+		return errors.New("must set IP address")
+	}
+	return nil
+}
+
 // Make etcd path
 func convertEtcdPath(Hostname string) (string, error) {
 
@@ -41,6 +49,10 @@ func convertEtcdPath(Hostname string) (string, error) {
 func Add(rec DnsRecord, dbUrl string) error {
 
 	err := checkParam(rec)
+	if err != nil {
+		return err
+	}
+	err = checkParam2(rec)
 	if err != nil {
 		return err
 	}
@@ -91,7 +103,7 @@ func Get(rec DnsRecord, dbUrl string) (db.DNSEntry, error) {
 		return d, err
 	}
 
-	// Add etcd
+	// Get etcd
 	path = "/skydns" + path
 	rslt, err := db.GetEtcdByKey(con, path)
 	if err != nil {
