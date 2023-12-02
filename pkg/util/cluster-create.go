@@ -118,10 +118,15 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 			log.Println("RemoteCreateStartVM()", " ", err)
 			break_err = true
 			return_errors = err
-			db.UpdateVmState(Conn, vm.Key, db.ERROR) // エラ状態へ
+			db.UpdateVmState(Conn, vm.Key, db.ERROR) // エラー状態へ
 			break
 		}
 		db.UpdateVmState(Conn, vm.Key, db.RUNNING) // 実行中へ
+
+		// CoreDNS登録
+
+
+
 	} // END OF LOOP
 
 	if break_err == true {

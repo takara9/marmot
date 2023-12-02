@@ -117,6 +117,12 @@ func DestroyVM(Conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	}
 
 
+	// DNSから削除
+	
+
+
+
+
 	// 仮想マシンの停止＆削除
 	url := "qemu:///system"
 	err = virt.DestroyVM(url, spec.Key)

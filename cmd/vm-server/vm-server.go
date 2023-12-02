@@ -7,13 +7,9 @@ import (
 	"net/http"
 	"github.com/gin-gonic/gin"
 
-	//"encoding/json"
-	//"errors"
-
 	cf  "github.com/takara9/marmot/pkg/config"
 	db  "github.com/takara9/marmot/pkg/db"
 	ut  "github.com/takara9/marmot/pkg/util"
-        //lvm "github.com/takara9/marmot/pkg/lvm"
 )
 
 // ローカルノード
@@ -247,7 +243,7 @@ func startCluster(c *gin.Context) {
 	}
 }
 
-// 仮想マシンの停止
+// 仮想マシンの開始
 func startVm(c *gin.Context) {
 	log.Println("startVm")
 
