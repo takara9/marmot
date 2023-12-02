@@ -59,68 +59,75 @@ jobs:
         volumes:
           -  /home/ubuntu/actions-runner/_work/marmot/marmot/pkg/dns/testconf:/conf
         env:
-          CONF: /conf/Corefile
-          PORT: 53:53/udp
+          CONF: "/conf/Corefile"
+          PORT: "53"
 
     steps:
     - uses: actions/checkout@v3
     - name: Install ca-certificates
       run: |
-        sudo apt update && sudo apt install -y ca-certificates
+        sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
         sudo update-ca-certificates
-        docker ps
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.21'
+    #- name: Set up Go
+    #  uses: actions/setup-go@v4
+    #  with:
+    #    go-version: '1.21'
 
-    - name: show variables
+    - name: Check coredms
       run: |
-        echo ${DEBUG}
-        env
-        #dig @127.0.0.1 -p 1053 minio.labo.local
+        docker ps
+        dig -p 1053 @localhost A minio.labo.local +noall +answer
 
+
+    - name: Check etcd put
+      run: |
+        export ETCDCTL_API=3 
+        etcdctl put --endpoints=127.0.0.1:2379 /skydns/local/labo/a/hoge '{"host":"192.168.1.5","ttl":60}'
+  
+    - name: Check etcd get
+      run: |
+        export ETCDCTL_API=3 
+        etcdctl get --endpoints=127.0.0.1:2379 /skydns/local/labo/a/hoge
+
+    - name: Check resolve by coredns and etcd 
+      run: |
+        dig -p 1053 @localhost A hoge.a.labo.local +noall +answer
+  
     - name: Test pkg/config
       run: | 
         cd pkg/config
-        go mod tidy
         sudo -s make test
         cd ../..
 
     - name: Test pkg/db
       run: | 
         cd pkg/db
-        go mod tidy
         sudo -s make test
         cd ../..
 
     - name: Test pkg/lvm
       run: | 
         cd pkg/lvm
-        go mod tidy
         sudo -s make test
         cd ../..
 
     - name: Test pkg/util
       run: | 
         cd pkg/util
-        go mod tidy
         sudo -s make test
         cd ../..
 
     - name: Test pkg/virt
       run: | 
         cd pkg/virt
-        go mod tidy
         sudo -s make test
         cd ../..
 
     - name: Test pkg/dns
       run: | 
         cd pkg/dns
-        go mod tidy
-        dig @172.16.0.8 minio.labo.local
+        sudo -s make test
 
 
 

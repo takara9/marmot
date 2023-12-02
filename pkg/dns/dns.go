@@ -3,40 +3,36 @@ package dns
 import (
 	"errors"
 	"log"
-	"os"
-	"strconv"
 	"strings"
-
 	db "github.com/takara9/marmot/pkg/db"
 )
 
-func init() {
-	logfile, _ := os.Create("error.log")
-	log.SetOutput(logfile)
-
+type DnsRecord struct {
+	Hostname   string
+	Ipv4       string
+	Ttl        uint64
 }
 
+// Check DNS record param
 func checkParam(rec DnsRecord) error {
-	// check param
-	if len(rec.Hostdomain) == 0 {
-		return errors.New("must set a server name ")
+	if len(rec.Hostname) == 0 {
+		return errors.New("must set server name ")
 	}
-	if len(rec.Ipaddr_v4) == 0 {
-		return errors.New("must set a ipaddr")
-	}
-	if len(rec.RootPath) == 0 {
-		return errors.New("must set a RootPath for Etcd")
-	}
+	return nil
+}
 
-	// port no
 
+func checkParam2(rec DnsRecord) error {
+	if len(rec.Ipv4) == 0 {
+		return errors.New("must set IP address")
+	}
 	return nil
 }
 
 // Make etcd path
-func convertEtcdPath(Hostdomain string) (string, error) {
+func convertEtcdPath(Hostname string) (string, error) {
 
-	h := strings.Split(Hostdomain, ".")
+	h := strings.Split(Hostname, ".")
 	if len(h) < 3 {
 		return "", errors.New("must set a hostname and domain")
 	}
@@ -56,20 +52,20 @@ func Add(rec DnsRecord, dbUrl string) error {
 	if err != nil {
 		return err
 	}
-
-	path, err := convertEtcdPath(rec.Hostdomain)
+	err = checkParam2(rec)
 	if err != nil {
 		return err
 	}
 
-	path = "/" + rec.RootPath + path
-
-	log.Println("etcd path = ", path)
+	path, err := convertEtcdPath(rec.Hostname)
+	if err != nil {
+		return err
+	}
 
 	// Create JSON value
 	var ent db.DNSEntry
-	ent.Host = rec.Ipaddr_v4
-	ent.Port, _ = strconv.Atoi(rec.PortNo)
+	ent.Host = rec.Ipv4
+	ent.Ttl  = rec.Ttl
 
 	con, err := db.Connect(dbUrl)
 	if err != nil {
@@ -78,6 +74,7 @@ func Add(rec DnsRecord, dbUrl string) error {
 	}
 
 	// Add etcd
+	path = "/skydns" + path
 	err = db.PutDataEtcd(con, path, &ent)
 	if err != nil {
 		return err
@@ -95,12 +92,10 @@ func Get(rec DnsRecord, dbUrl string) (db.DNSEntry, error) {
 		return d, err
 	}
 
-	path, err := convertEtcdPath(rec.Hostdomain)
+	path, err := convertEtcdPath(rec.Hostname)
 	if err != nil {
 		return d, err
 	}
-	path = "/" + rec.RootPath + path
-	log.Println("etcd path = ", path)
 
 	con, err := db.Connect(dbUrl)
 	if err != nil {
@@ -108,7 +103,8 @@ func Get(rec DnsRecord, dbUrl string) (db.DNSEntry, error) {
 		return d, err
 	}
 
-	// Add etcd
+	// Get etcd
+	path = "/skydns" + path
 	rslt, err := db.GetEtcdByKey(con, path)
 	if err != nil {
 		return rslt, err
@@ -123,17 +119,15 @@ func Del(rec DnsRecord, dbUrl string) error {
 		return err
 	}
 
-	path, err := convertEtcdPath(rec.Hostdomain)
+	path, err := convertEtcdPath(rec.Hostname)
 	if err != nil {
 		return err
 	}
-	path = "/" + rec.RootPath + path
-	log.Println("etcd path = ", path)
 
 	// Create JSON value
 	var ent db.DNSEntry
-	ent.Host = rec.Ipaddr_v4
-	ent.Port, _ = strconv.Atoi(rec.PortNo)
+	ent.Host = rec.Ipv4
+	ent.Ttl  = rec.Ttl
 
 	con, err := db.Connect(dbUrl)
 	if err != nil {
@@ -142,6 +136,7 @@ func Del(rec DnsRecord, dbUrl string) error {
 	}
 
 	// Add etcd
+	path = "/skydns" + path
 	err = db.DelByKey(con, path)
 	if err != nil {
 		return err

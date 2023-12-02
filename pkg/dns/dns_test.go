@@ -1,116 +1,148 @@
 package dns
 
 import (
-	"fmt"
-	"testing"
+	//db "github.com/takara9/marmot/pkg/db"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"net"
+	"context"
+	"time"
 )
 
-const dburl = "http://127.0.0.1:2379"
-
-func TestAdd(t *testing.T) {
-	fmt.Println("case 1")
-	var d DnsRecord
-	d.Hostdomain = "server1.test.local"
-	d.Ipaddr_v4 = "192.168.10.1"
-	d.RootPath = "test"
-
-	err := Add(d, dburl)
-	if err != nil {
-		t.Errorf("Add() %v", err)
+// ヘルパー関数 ローカルのCoreDNSでアドレス解決する
+func resolv_by_localdns(dn string) ([]string, error) {
+	// https://pkg.go.dev/net#Resolver
+	r := &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			d := net.Dialer{
+				Timeout: time.Millisecond * time.Duration(10000),
+			}
+			return d.DialContext(ctx, "udp", "127.0.0.1:1053")
+		},
 	}
+	return r.LookupHost(context.Background(), dn)
 }
 
-func TestGet(t *testing.T) {
-	fmt.Println("case 1")
-	var d DnsRecord
-	d.Hostdomain = "server1.test.local"
-	d.Ipaddr_v4 = "0.0.0.0"
-	d.RootPath = "test"
 
-	r, err := Get(d, dburl)
-	fmt.Println("get result = ", r)
+var _ = Describe("Etcd", func() {
 
-	if err != nil {
-		t.Errorf("Add() %v", err)
-	}
-}
+	var url string
+	var dn1,dn2,dn3 string
 
-func TestAdd_without_topdomain(t *testing.T) {
-	fmt.Println("case 2")
-	var d DnsRecord
-	d.Hostdomain = "server1.test"
-	d.Ipaddr_v4 = "192.168.10.1"
-	d.RootPath = "test"
+	BeforeEach(func() {
+		url = "http://127.0.0.1:2379"
+		dn1 = "server1.a.labo.local"
+		dn2 = "server2.a.labo.local"
+		dn3 = "server3.a.labo.local"
+	})
+	  
+	AfterEach(func() {
+		//err := os.Clearenv("WEIGHT_UNITS")
+	})
 
-	err := Add(d, dburl)
-	if err == nil {
-		t.Errorf("Add() %v", err)
-	}
-}
 
-func TestAdd_without_domain(t *testing.T) {
-	fmt.Println("case 3")
-	var d DnsRecord
-	d.Hostdomain = "server1"
-	d.Ipaddr_v4 = "192.168.10.1"
-	d.RootPath = "test"
+	Describe("ETCD and CoreDNS Test", func() {
+		Context("Access Test for ETCD", func() {
+			It("Add a record", func() {
+				err := Add(DnsRecord{
+					Hostname: dn1,
+					Ipv4:     "192.168.10.1",
+					Ttl:      60,
+				}, url)
+				Expect(err).NotTo(HaveOccurred())
+		  	})
+			It("Get a record by Key(FQDN)", func() {
+				dnsname := dn1
+				rec, err := Get(DnsRecord{Hostname: dnsname},url)
+				GinkgoWriter.Println("Get() = ", rec)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(rec.Host).To(Equal("192.168.10.1"))
+				Expect(rec.Ttl).To(Equal(uint64(60)))
+		  	})
+			It("Update a record by Key(FQDN)", func() {
+				err := Add(DnsRecord{
+					Hostname: dn1,
+					Ipv4:     "192.168.10.2",
+					Ttl:      90,
+				}, url)
+				Expect(err).NotTo(HaveOccurred())
+		  	})
+ 		    It("Verify updated a record by Key(FQDN)", func() {
+				rec, err := Get(DnsRecord{Hostname: dn1}, url)
+				GinkgoWriter.Println("Get() = ", rec)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(rec.Host).To(Equal("192.168.10.2"))
+				Expect(rec.Ttl).To(Equal(uint64(90)))
+			})
+			It("Add new record", func() {
+				err := Add(DnsRecord{
+					Hostname: dn2,
+					Ipv4:     "192.168.10.2",
+					Ttl:      90,
+				}, url)
+				Expect(err).NotTo(HaveOccurred())
+		  	})
+			It("Verify added the record", func() {
+				rec, err := Get(DnsRecord{Hostname: dn2}, url)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(rec.Host).To(Equal("192.168.10.2"))
+				Expect(rec.Ttl).To(Equal(uint64(90)))
+				GinkgoWriter.Println("Get() = ", rec)
+			})
 
-	err := Add(d, dburl)
-	if err == nil {
-		t.Errorf("Add() %v", err)
-	}
-}
+			It("Delete the record #1", func() {
+				err := Del(DnsRecord{Hostname: dn1},url)
+				Expect(err).NotTo(HaveOccurred())
+		  	})
+		    It("Verify deleted record #1", func() {
+				_,err := Get(DnsRecord{Hostname: dn1}, url)
+				Expect(err).To(HaveOccurred())
+			})
 
-func TestAdd2(t *testing.T) {
-	fmt.Println("case 4")
-	var d DnsRecord
-	d.Hostdomain = ""
-	d.Ipaddr_v4 = "192.168.10.1"
-	d.RootPath = "test"
+			It("Delete the record #2", func() {
+				err := Del(DnsRecord{Hostname: dn2},url)
+				Expect(err).NotTo(HaveOccurred())
+		  	})
+		    It("Verify deleted record #2", func() {
+				_,err := Get(DnsRecord{Hostname: dn2}, url)
+				Expect(err).To(HaveOccurred())
+			})
 
-	err := Add(d, dburl)
-	if err == nil {
-		t.Errorf("Add() %v", err)
-	}
-}
+			It("Delete a no-existing record #3", func() {
+				err := Del(DnsRecord{Hostname: dn3},url)
+				Expect(err).NotTo(HaveOccurred())
+		  	})
 
-func TestAdd3(t *testing.T) {
-	fmt.Println("case 5")
-	var d DnsRecord
-	d.Hostdomain = "server1.test.local"
-	d.Ipaddr_v4 = ""
-	d.RootPath = "test"
+		})
 
-	err := Add(d, dburl)
-	if err == nil {
-		t.Errorf("Add() %v", err)
-	}
-}
+		Context("CoreDNS access test", func() {
+			It("Resolve local existing entry", func() {
+				ip, err := resolv_by_localdns("minio.labo.local")
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println("ip = ", ip)
+			})
+			It("Resolve public web site", func() {
+				ip, err := resolv_by_localdns("www.google.com")
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println("ip = ", ip)
+			})
+		})
 
-func TestDel(t *testing.T) {
-	fmt.Println("Case 5")
-
-	var d DnsRecord
-	d.Hostdomain = "server1.test.local"
-	d.Ipaddr_v4 = "192.168.10.1"
-	d.RootPath = "test"
-
-	err := Del(d, dburl)
-	if err != nil {
-		t.Errorf("Del() %v", err)
-	}
-}
-
-func TestDel2(t *testing.T) {
-	fmt.Println("Case 6")
-
-	var d DnsRecord
-	d.Hostdomain = ""
-	d.Ipaddr_v4 = "192.168.10.1"
-	d.RootPath = "test"
-
-	err := Del(d, dburl)
-	if err == nil {
-		t.Errorf("Del() %v", err)
-	}
-}
+		Context("Relation test CoreDNS and ETCD", func() {
+			It("Add new record", func() {
+				err := Add(DnsRecord{
+					Hostname: dn1,
+					Ipv4:     "192.168.20.1",
+					Ttl:      30,
+				}, url)
+				Expect(err).NotTo(HaveOccurred())
+		  	})
+			It("Resolve added entry", func() {
+				ip, err := resolv_by_localdns(dn1)
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println("ip = ", ip[0])
+			})
+		})
+	})
+})
