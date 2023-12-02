@@ -12,6 +12,7 @@ $(PROGRAMS):
 .PHONY:	package
 package:
 	cp cmd/install.sh bin/install.sh
+	cp cmd/vm-client/config_marmot bin/config_marmot
 	cd $(BINDIR) && tar czvf marmot.tgz *
 
 
