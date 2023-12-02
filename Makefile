@@ -9,6 +9,12 @@ $(PROGRAMS):
 	cd cmd/$@ && $(MAKE)
 
 
+.PHONY:	package
+package:
+	cp cmd/install.sh bin/install.sh
+	cd $(BINDIR) && tar czvf marmot.tgz *
+
+
 .PHONY:	clean
 clean:
 	rm -fr $(BINDIR)

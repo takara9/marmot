@@ -80,7 +80,7 @@ func RemoteStartVM(hvNode string, spec cf.VMSpec) error {
 // VMの開始
 func StartVM(Conn *etcd.Client, spec cf.VMSpec) error {
 
-	// 仮想マシンの停止＆削除
+	// 仮想マシンの開始
 	url := "qemu:///system"
 	err := virt.StartVM(url, spec.Key)
 	if err != nil {
@@ -91,13 +91,14 @@ func StartVM(Conn *etcd.Client, spec cf.VMSpec) error {
 		log.Println("db.GetVmByKey()", err)
 	}
 
+	
 	if vm.Status == db.STOPPED {
-		// ハイパーバイザーのリソース削減保存
+
+		// ハイパーバイザーのリソースの減算と保存
 		hv,err := db.GetHvByKey(Conn, vm.HvNode)
 		if err != nil {
 			log.Println("db.GetHvByKey()", err)
 		}
-
 		hv.FreeCpu = hv.FreeCpu - vm.Cpu
 		hv.FreeMemory = hv.FreeMemory - vm.Memory
 
