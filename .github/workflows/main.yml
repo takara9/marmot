@@ -74,7 +74,7 @@ jobs:
     #  with:
     #    go-version: '1.21'
 
-    - name: Check coredms
+    - name: Check coredns
       run: |
         docker ps
         dig -p 1053 @localhost A minio.labo.local +noall +answer
