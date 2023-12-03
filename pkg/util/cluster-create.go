@@ -126,7 +126,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 
 		// CoreDNS登録
 		err = dns.Add(dns.DnsRecord{
-			Hostname: fmt.Sprintf("%s.%s", vm.Name, vm.ClusterName),
+			Hostname: fmt.Sprintf("%s.%s.%s", vm.Name, vm.ClusterName, "labo.local"),
 			Ipv4:     vm.PrivateIp,
 			Ttl:      60,
 		}, "http://ns1.labo.local:2379")
