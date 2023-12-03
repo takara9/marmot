@@ -119,7 +119,7 @@ func DestroyVM(Conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 
 
 	// DNSから削除
-	key := fmt.Sprintf("%s.%s", vm.Name, vm.ClusterName)
+	key := fmt.Sprintf("%s.%s.%s", vm.Name, vm.ClusterName,"labo.local")
 	err = dns.Del(dns.DnsRecord{Hostname: key},"http://ns1.labo.local:2379")
 	if err != nil {
 		log.Println("dns.Del()", err)
