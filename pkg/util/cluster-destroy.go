@@ -14,6 +14,7 @@ import (
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/virt"
 	"github.com/takara9/marmot/pkg/lvm"
+	"github.com/takara9/marmot/pkg/dns"
 	etcd "go.etcd.io/etcd/client/v3"
 
 )
