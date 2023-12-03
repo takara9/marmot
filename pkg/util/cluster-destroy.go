@@ -14,6 +14,7 @@ import (
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/virt"
 	"github.com/takara9/marmot/pkg/lvm"
+	"github.com/takara9/marmot/pkg/dns"
 	etcd "go.etcd.io/etcd/client/v3"
 
 )
@@ -118,10 +119,11 @@ func DestroyVM(Conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 
 
 	// DNSから削除
-	
-
-
-
+	key := fmt.Sprintf("%s.%s", vm.Name, vm.ClusterName)
+	err = dns.Del(dns.DnsRecord{Hostname: key},"http://ns1.labo.local:2379")
+	if err != nil {
+		log.Println("dns.Del()", err)
+	}
 
 	// 仮想マシンの停止＆削除
 	url := "qemu:///system"
