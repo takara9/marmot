@@ -22,6 +22,83 @@ mactlコマンドに、仮想マシンのクラスタ構成 YAML を添えて実
 ![Architecture](docs/architecture-2.png)
 
 
+## 使用例
+
+構成ファイル　cluster-config.yaml を準備します。
+
+```
+domain: labo.local
+os_variant:  ubuntu22.04
+cluster_name: test
+vm_spec:
+  - name: "srv1"
+    cpu: 1
+    memory: 1024
+    private_ip: "172.16.9.11"
+    storage:
+    - name: data
+      size: 10
+      vg:   vg2
+    comment: "test node #1"
+  - name: "srv2"
+    cpu: 1
+    memory: 1024
+    private_ip: "172.16.9.12"
+    storage:
+    - name: data
+      size: 10
+      vg:   vg2
+    comment: "test node #2"
+```
+
+構成ファイルが存在するディレクトリで、'mactl create'を実行することで、サーバーがデプロイされます。
+起動まで、約30秒程度です。
+
+```
+ubuntu@hv0:~/marmot-apl$ mactl create
+成功終了
+ubuntu@hv0:~/marmot-apl$ mactl status
+CLUSTER    VM-NAME          H-Visr STAT  VKEY                 VCPU  RAM    PubIP           PriIP           DATA STORAGE        
+test       srv1             hv0    RUN   vm_srv1_0110         1     1024   172.16.9.11                     10  
+test       srv2             hv0    RUN   vm_srv2_0111         1     1024   172.16.9.12                     10  
+```
+
+あとは、ログインして、追加の設定を実施できます。
+
+
+```
+ubuntu@hv0:~/marmot-apl$ ssh ubuntu@srv1.test.a.labo.local
+Warning: Permanently added 'srv1.test.a.labo.local' (ED25519) to the list of known hosts.
+Welcome to Ubuntu 22.04.1 LTS (GNU/Linux 5.15.0-86-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+
+```
+
+サーバーは、Ansibleを利用して、セットアップもできます。
+
+```
+ubuntu@hv0:~/marmot-apl$ ansible -i inventory all -m ping
+srv1 | SUCCESS => {
+    "ansible_facts": {
+        "discovered_interpreter_python": "/usr/bin/python3"
+    },
+    "changed": false,
+    "ping": "pong"
+}
+srv2 | SUCCESS => {
+    "ansible_facts": {
+        "discovered_interpreter_python": "/usr/bin/python3"
+    },
+    "changed": false,
+    "ping": "pong"
+}
+```
+
+
+
 ## セットアップ方法
 
 CoreDNS,etcd,Open vSwitch,LVM,KVM などのインストールと設定の後、以下の要領で、起動することができます。インストールなどのドキュメントは順次拡充していきます。
