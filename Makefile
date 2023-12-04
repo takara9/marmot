@@ -3,6 +3,7 @@ all:	$(PROGRAMS)
 MAKE = /usr/bin/make
 CURDIR := $(shell pwd)
 BINDIR = $(CURDIR)/bin
+TAG := $(shell cat TAG)
 
 $(PROGRAMS):
 	mkdir -p $(BINDIR)
@@ -11,9 +12,10 @@ $(PROGRAMS):
 
 .PHONY:	package
 package:
+	@echo $(TAG)
 	cp cmd/install.sh bin/install.sh
 	cp cmd/vm-client/config_marmot bin/config_marmot
-	cd $(BINDIR) && tar czvf marmot.tgz *
+	cd $(BINDIR) && tar czvf marmot-$(TAG).tgz *
 
 
 .PHONY:	clean

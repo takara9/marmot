@@ -1,7 +1,6 @@
 package dns
 
 import (
-	//db "github.com/takara9/marmot/pkg/db"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"net"
