@@ -57,7 +57,7 @@ func StopCluster(cnf cf.MarmotConfig, dbUrl string) error {
 
 func RemoteStopVM(hvNode string, spec cf.VMSpec) error {
 	byteJSON,_ := json.MarshalIndent(spec,"","    ")
-	fmt.Println(string(byteJSON))
+	//fmt.Println(string(byteJSON))
 
 	// JSON形式でポストする
 	reqURL := fmt.Sprintf("http://%s:8750/%s", hvNode, "stopVm")

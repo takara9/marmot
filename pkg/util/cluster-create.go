@@ -17,6 +17,16 @@ import (
 	etcd "go.etcd.io/etcd/client/v3"
 )
 
+
+
+/*
+以下の説明を作成して、テストを作成すること。
+
+	cnf	:
+	dbUrl
+	hvNode
+*/
+
 // コンフィグからVMクラスタを作成する
 func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 
@@ -108,9 +118,9 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		// リモートHVでVMを作成するケースが発生する。
 
 		// vm.HvNode と node を比較してローカルへ
-		log.Println("vm.HvNode", " = ", vm.HvNode)
-		log.Println("hvNode", " = ", hvNode)
-		log.Println("cmp vm.HvNode hvNode", " = ", vm.HvNode == hvNode)
+		//log.Println("vm.HvNode", " = ", vm.HvNode)
+		//log.Println("hvNode", " = ", hvNode)
+		//log.Println("cmp vm.HvNode hvNode", " = ", vm.HvNode == hvNode)
 
 		// リモートとローカル関係なしに、マイクロサービスへリクエストする
 		db.UpdateVmState(Conn, vm.Key, db.PROVISIONING)
@@ -147,7 +157,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 func RemoteCreateStartVM(hvNode string, spec cf.VMSpec) error {
 
 	byteJSON, _ := json.MarshalIndent(spec, "", "    ")
-	fmt.Println(string(byteJSON))
+	//fmt.Println(string(byteJSON))
 
 	// JSON形式でポストする
 	reqURL := fmt.Sprintf("http://%s:8750/%s", hvNode, "createVm")
@@ -174,7 +184,7 @@ func RemoteCreateStartVM(hvNode string, spec cf.VMSpec) error {
 // VMを生成する
 func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 
-	log.Println("Libvirtのテンプレートを読み込んで、設定を変更する")
+	//log.Println("Libvirtのテンプレートを読み込んで、設定を変更する")
 	//------------------------------------------------------------
 	// Libvirtのテンプレートを読み込んで、設定を変更する
 	var dom virt.Domain
@@ -186,7 +196,7 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	dom.Memory.Value = mem
 	dom.CurrentMemory.Value = mem
 
-	log.Println("OSボリュームを作成")
+	//log.Println("OSボリュームを作成")
 	//------------------------------------------------------------
 	// OSボリュームを作成  (N テンプレートを指定できると良い)
 	osLogicalVol, err := CreateOsLv(conn, spec.OsTempVg, spec.OsTempLv)
@@ -196,7 +206,7 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	}
 	dom.Devices.Disk[0].Source.Dev = fmt.Sprintf("/dev/%s/%s", spec.OsTempVg, osLogicalVol)
 
-	log.Println("OSボリュームのLV名をetcdへ登録")
+	//log.Println("OSボリュームのLV名をetcdへ登録")
 	// OSボリュームのLV名をetcdへ登録
 	err = db.UpdateOsLv(conn, spec.Key, spec.OsTempVg, osLogicalVol)
 	if err != nil {
@@ -204,7 +214,7 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 		return err
 	}
 
-	log.Println("OSボリュームをマウントして、 ホスト名、IPアドレスを設定する")
+	//log.Println("OSボリュームをマウントして、 ホスト名、IPアドレスを設定する")
 	// OSボリュームをマウントして、 ホスト名、IPアドレスを設定する
 	// 必要最小限として、詳細設定はAnsibleで実行する
 	err = ConfigRootVol(spec, spec.OsTempVg, osLogicalVol)

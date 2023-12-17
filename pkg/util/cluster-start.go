@@ -52,7 +52,7 @@ func StartCluster(cnf cf.MarmotConfig, dbUrl string) error {
 
 func RemoteStartVM(hvNode string, spec cf.VMSpec) error {
 	byteJSON,_ := json.MarshalIndent(spec,"","    ")
-	fmt.Println(string(byteJSON))
+	//fmt.Println(string(byteJSON))
 
 	// JSON形式でポストする
 	reqURL := fmt.Sprintf("http://%s:8750/%s", hvNode, "startVm")
