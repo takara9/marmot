@@ -14,7 +14,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"log"
-	"strings"
+	//"strings"
 	"io"
 	"time"
 	"github.com/takara9/marmot/pkg/db"
@@ -67,10 +67,13 @@ func CheckHypervisors(dbUrl string, node string) ([]db.Hypervisor,error) {
 
 	// 自ノードを含むハイパーバイザーの死活チェック、DBへ反映
 	for _,val := range hvs {
+
+
 		// ping を変更してデータを収集も可能
+		/*
 		_, body, err := ReqGetQuick("ping", fmt.Sprintf("http://%s:8750",val.IpAddr))
 		if err != nil {
-			log.Println("Communication failed", err)
+			log.Println("Communication failed", err, string(body))
 			val.Status = 0
 		} else {
 			dec := json.NewDecoder(strings.NewReader(string(body)))
@@ -82,6 +85,8 @@ func CheckHypervisors(dbUrl string, node string) ([]db.Hypervisor,error) {
 				val.Status = 1 // 異常発生中
 			}
 		}
+		*/
+		
 
 		// ハイパーバイザーの状態をDBへ書き込み
 		err = db.PutDataEtcd(Conn,val.Key,val)
@@ -105,8 +110,14 @@ func ReqGetQuick(apipath string, api string) (*http.Response, []byte, error) {
 		Timeout: 2 * time.Second,
 	}
 	// HTTP GET
+	xxx := fmt.Sprintf("%s/%s", api, apipath)
+	fmt.Println("xxxxxxxxxxxxxxxxxxxx = ",xxx)
+
+
 	res, err := client.Get(fmt.Sprintf("%s/%s", api, apipath))
+	res, err = client.Get(fmt.Sprintf("%s/%s", api, apipath))
 	if err != nil {
+		log.Printf("--------%v------------ %v",res,err)
 		return nil,nil,err
 	}
 	defer res.Body.Close()
@@ -115,7 +126,7 @@ func ReqGetQuick(apipath string, api string) (*http.Response, []byte, error) {
 	if err != nil {
 		return nil,nil,err
 	}
-	return res, byteBody, err
+	return res, byteBody,nil
 }
 
 func CheckHvVgAll(dbUrl string, node string) error {

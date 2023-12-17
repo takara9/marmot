@@ -32,8 +32,8 @@ func DestroyCluster(cnf cf.MarmotConfig, dbUrl string) error {
 	var NotFound bool = true
 	for _,spec := range cnf.VMSpec {
 
-		fmt.Println("spc.Name = ", spec.Name)
-		fmt.Println("cnf.ClusterName = ", cnf.ClusterName)
+		//fmt.Println("spc.Name = ", spec.Name)
+		//fmt.Println("cnf.ClusterName = ", cnf.ClusterName)
 
 		// クラスタ名とホスト名の重複チェック
 		vmKey,_ := db.FindByHostAndClusteName(Conn, spec.Name, cnf.ClusterName)
@@ -64,7 +64,7 @@ func DestroyCluster(cnf cf.MarmotConfig, dbUrl string) error {
 func RemoteDestroyVM(hvNode string, spec cf.VMSpec) error {
 
 	byteJSON,_ := json.MarshalIndent(spec,"","    ")
-	fmt.Println(string(byteJSON))
+	//fmt.Println(string(byteJSON))
 
 	// JSON形式でポストする
 	reqURL := fmt.Sprintf("http://%s:8750/%s", hvNode, "destroyVm")

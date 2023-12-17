@@ -88,10 +88,6 @@ type SeqNo_yaml struct {
 	Key   string `yaml:"name"`
 }
 
-
-
-
-
 func ReadConfig(fn string, yf interface{}) error {
 	file, err := os.Open(fn)
 	if err != nil {
