@@ -103,10 +103,16 @@ srv2 | SUCCESS => {
 
 CoreDNS,etcd,Open vSwitch,LVM,KVM などのインストールと設定の後、以下の要領で、起動することができます。インストールなどのドキュメントは順次拡充していきます。
 
-### 事前準備
+データベースサーバーに、etcdを使用しています。
+hvサーバー個別に、etcdをインストールするときは、以下の手順でインストールしてください。
 
-作成中
+```
+sudo apt update && sudo apt install etcd
+systemctl status etcd
+```
 
+- [ネットワークの設定方法](docs/network-setup.md)
+- [データベースの初期化方法](cmd/hv-admin/README.md)
 
 ### marmotのインストール
 
@@ -115,25 +121,17 @@ TAG=v0.8.2
 mkdir marmot
 cd marmot
 curl -OL https://github.com/takara9/marmot/releases/download/$TAG/marmot-$TAG.tgz
-tar zvf marmot-$TAG.tgz
+tar xzvf marmot-$TAG.tgz
 sudo ./install.sh
 ```
 
 
 ## 応用例
 
-### Kubernetesクラスタの実行
+- [設定用Ansibles集](https://github.com/takara9/marmot-servers)
+- [Kubernetesクラスタの実行](https://github.com/takara9/marmot-servers/tree/main/kubernetes)
+- [Cephストレージシステムの実行](https://github.com/takara9/marmot-servers/tree/main/ceph)
+- [メトリックスとログ分析基盤](https://github.com/takara9/docker_and_k8s/tree/main/4-10_Observability)
 
-作成中
-
-
-### Cephストレージシステムの実行
-
-作成中
-
-
-### メトリックスとログ分析基盤
-
-作成中
 
 
