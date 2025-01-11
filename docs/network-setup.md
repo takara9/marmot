@@ -199,3 +199,22 @@ root@hv0:/etc/netplan# virsh net-dumpxml ovs-network
 </network>
 ~~~
 
+
+## Flatcar用のPrivate-networkの作成
+
+ubuntu@hv2:~/marmot/docs$ sudo -s
+root@hv2:/home/ubuntu/marmot/docs# virsh net-define private-network.xml
+Network private-network defined from private-network.xml
+
+root@hv2:/home/ubuntu/marmot/docs# virsh net-start private-network
+Network private-network started
+
+root@hv2:/home/ubuntu/marmot/docs# virsh net-autostart private-network
+Network private-network marked as autostarted
+
+root@hv2:/home/ubuntu/marmot/docs# virsh net-list
+ Name              State    Autostart   Persistent
+----------------------------------------------------
+ default           active   yes         yes
+ ovs-network       active   yes         yes
+ private-network   active   yes         yes

@@ -1,0 +1,11 @@
+<network>
+  <name>private-network</name>
+  <forward mode='bridge'/>
+  <bridge name='ovsbr0'/>
+  <virtualport type='openvswitch'/>
+  <portgroup name='vlan-1001' default='yes'>
+    <vlan>
+      <tag id='1001'/>
+    </vlan>
+  </portgroup>
+</network>
