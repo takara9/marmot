@@ -41,5 +41,3 @@ install:
 	install -m 0755 $(BINDIR)/$(CLIENT_CMD) /usr/local/bin
 	rm -f /usr/local/bin/$(ADMIN_CMD)
 	install -m 0755 $(BINDIR)/$(ADMIN_CMD) /usr/local/bin
-	systemctl start marmot.service
-	systemctl enable marmot.service
