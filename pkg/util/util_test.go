@@ -35,14 +35,14 @@ var _ =	BeforeSuite(func() {
 	config_fn := "testdata/cluster-config.yaml"
 	ccf = &config_fn
 	fmt.Println("ccf  = ", *ccf)
-	hv_config = "testdata/hypervisor-config-hv0.yaml"
+	hv_config = "testdata/hypervisor-config-hvc.yaml"
 })
 
 
 var _ = AfterSuite(func() {
 	// データの削除
 	{
-		cmd := exec.Command(etcdctl_exe, "--endpoints=localhost:12379","del", "hv0")
+		cmd := exec.Command(etcdctl_exe, "--endpoints=localhost:12379","del", "hvc")
 		cmd.Env = append(os.Environ(), "ETCDCTL_API=3")
 		out, err := cmd.CombinedOutput()
 		fmt.Println("command = ",string(out))
@@ -154,7 +154,7 @@ var _ = Describe("Util", func() {
 		})
 
 		It("Check the config file to directly etcd", func() {
-			cmd := exec.Command(etcdctl_exe, "--endpoints=localhost:12379","get", "hv0")
+			cmd := exec.Command(etcdctl_exe, "--endpoints=localhost:12379","get", "hvc")
 			cmd.Env = append(os.Environ(), "ETCDCTL_API=3")
 			out, err := cmd.CombinedOutput()
 			fmt.Println("command = ",string(out))

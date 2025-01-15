@@ -68,6 +68,16 @@ f55a08ab-9ca3-495a-bbe2-7388e39e6df0
 </network>
 ~~~
 
+設定は、以下の手順で実施できる。
+
+~~~
+# virsh list
+# virsh shutdown <domain>
+# virsh edit <domain>
+# virsh start <domain>
+~~~
+
+
 virsh の仮想ネットワークに追加して、アクティブにする。そして、自動起動にする。
 
 ~~~
