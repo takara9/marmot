@@ -23,6 +23,9 @@ import (
 
 // クラスタ削除
 func DestroyCluster(cnf cf.MarmotConfig, dbUrl string) error {
+
+	fmt.Println("DEBUG Print in DestroyCluster dburl", dbUrl)
+
 	Conn,err := db.Connect(dbUrl)
 	if err != nil {
 		log.Println("db.Connect(dbUrl)", err)
@@ -37,6 +40,7 @@ func DestroyCluster(cnf cf.MarmotConfig, dbUrl string) error {
 
 		// クラスタ名とホスト名の重複チェック
 		vmKey,_ := db.FindByHostAndClusteName(Conn, spec.Name, cnf.ClusterName)
+		fmt.Println("DEBUG Print in DestroyCluster vmKey, specName", vmKey, spac.Name)
 		if len(vmKey) > 0 {
 			NotFound = false
 			spec.Key = vmKey
