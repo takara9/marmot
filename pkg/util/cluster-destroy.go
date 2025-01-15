@@ -40,7 +40,7 @@ func DestroyCluster(cnf cf.MarmotConfig, dbUrl string) error {
 
 		// クラスタ名とホスト名の重複チェック
 		vmKey,_ := db.FindByHostAndClusteName(Conn, spec.Name, cnf.ClusterName)
-		fmt.Println("DEBUG Print in DestroyCluster vmKey, specName", vmKey, spac.Name)
+		fmt.Println("DEBUG Print in DestroyCluster vmKey, specName", vmKey, spec.Name)
 		if len(vmKey) > 0 {
 			NotFound = false
 			spec.Key = vmKey
