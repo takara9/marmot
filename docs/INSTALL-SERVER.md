@@ -129,12 +129,18 @@ $ sudo -s
 # tar xvf ssh-key.tar
 # chown -R root:root .ssh
 # rm ssh-key.tar
-
 ```
 
-## 他環境
+## 仮想ネットワークの設定
 
-- ネットワークは、[ネットワーク設定](network-setup.md)
+ネットワークは、marmot開発のために、Nested VMを使用する際と、一般的なmarmotの使用では、設定が異なる。
+  
+- [ネットワーク設定](network-setup.md)
+- [Netsted VMの時のネットワーク設定](network-setup-nested-vm.md)
+
+
+## marmotビルドのための
+
 - marmotのビルドには、[Go言語をインストール](/home/ubuntu/marmot/docs)
 
 
