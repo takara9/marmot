@@ -131,6 +131,33 @@ $ sudo -s
 # rm ssh-key.tar
 ```
 
+## ホスト名の設定
+
+```
+# vi /etc/hostname
+# cat /etc/hostname
+hv1
+# systemctl reboot
+```
+
+## sudoerの設定
+
+ubuntuユーザーを パスワードなしで、sudo可能にする
+
+ubuntuファイル
+```
+Defaults:ubuntu !requiretty
+ubuntu ALL = (ALL) NOPASSWD:ALL
+```
+
+```
+cd /etc/sudoers.d
+vi ubuntu
+chmod 0440 ubuntu
+```
+
+
+
 ## 仮想ネットワークの設定
 
 ネットワークは、marmot開発のために、Nested VMを使用する際と、一般的なmarmotの使用では、設定が異なる。

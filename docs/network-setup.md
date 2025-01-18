@@ -9,7 +9,7 @@
 ~~~
 # ovs-vsctl add-br ovsbr0
 # ovs-vsctl add-port ovsbr0 enp4s0f0
-# ovs-vsctl add-port ovsbr0 enp4s0f1  　　⭐️⭐️ 後で確認
+# ovs-vsctl add-port ovsbr0 enp4s0f1  　　⭐️⭐️ 後で確認 設定でループが発生した。
 # ovs-vsctl set port enp4s0f0 trunk=1001,1002
 ~~~
 
