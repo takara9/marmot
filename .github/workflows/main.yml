@@ -99,12 +99,17 @@ jobs:
         cd pkg/config
         sudo -s make test
         cd ../..
-
+       
     - name: Test pkg/db
       run: | 
         cd pkg/db
         sudo -s make test
         cd ../..
+
+    - name: Test pkg/dns
+      run: | 
+        cd pkg/dns
+        sudo -s make test
 
     - name: Test pkg/lvm
       run: | 
@@ -124,10 +129,7 @@ jobs:
         sudo -s make test
         cd ../..
 
-    - name: Test pkg/dns
-      run: | 
-        cd pkg/dns
-        sudo -s make test
+
 
 
 
