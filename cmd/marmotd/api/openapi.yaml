@@ -1,0 +1,33 @@
+openapi: "3.0.3"
+info:
+  version: 0.0.1
+  title: REST API of Marmot Server
+servers:
+  - url: http://0.0.0.0:8750
+tags:
+  - name: user
+  - name: version
+paths:
+  /ping:
+    get:
+      summary: "Alive"
+      operationId: getPong
+      tags:
+        - alive
+      responses:
+        '200':
+          description: Check Marmot Server is Alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pong'
+components:
+  schemas:
+    Pong:
+      type: object
+      required:
+        - ping
+      properties:
+        ping:
+          type: string
+          example: pong
