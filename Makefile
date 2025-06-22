@@ -3,6 +3,7 @@ all:	$(PROGRAMS)
 MAKE = /usr/bin/make
 CURDIR := $(shell pwd)
 BINDIR = $(CURDIR)/bin
+
 TAG := $(shell cat TAG)
 
 $(PROGRAMS):
