@@ -33,7 +33,7 @@ func ListAllVm(url string) ([]string, error){
 	}
 	defer conn.Close()
 
-	doms, err := conn.ListAllDomains(libvirt.CONNECT_LIST_DOMAINS_ACTIVE)
+	doms, err := conn.ListAllDomains(libvirt.ConnectListAllDomainsFlags(libvirt.CONNECT_LIST_DOMAINS_ACTIVE))
 	if err != nil {
 		return nameList,err
 	}

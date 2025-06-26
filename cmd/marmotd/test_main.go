@@ -10,6 +10,11 @@ import (
 
 type Server struct {}
 
+// GetPong implements api.ServerInterface.
+func (s Server) GetPong(ctx echo.Context) error {
+	return ctx.String(200, "pong")
+}
+
 func main() {
 	e := echo.New()
 	server := Server{}
