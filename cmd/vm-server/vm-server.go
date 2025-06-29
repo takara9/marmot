@@ -3,10 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"os"
 	"log/slog"
 	"net/http"
+	"os"
+
+	"github.com/gin-gonic/gin"
 
 	cf "github.com/takara9/marmot/pkg/config"
 	db "github.com/takara9/marmot/pkg/db"
