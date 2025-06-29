@@ -3,9 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
+
+	"github.com/gin-gonic/gin"
 
 	cf "github.com/takara9/marmot/pkg/config"
 	db "github.com/takara9/marmot/pkg/db"
@@ -119,11 +121,6 @@ func listVirtualMachines(c *gin.Context) {
 	}
 	c.IndentedJSON(http.StatusOK, vms)
 }
-
-// JSONエラーメッセージ処理用
-//type msg struct {
-//	Msg string
-//}
 
 // コールバック VMクラスタの作成
 func createCluster(c *gin.Context) {

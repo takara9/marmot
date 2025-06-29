@@ -22,4 +22,3 @@ install:
 	install -m 0644 temp.xml $(DISTDIR)
 	rm -f /etc/systemd/system/marmot.service
 	install -m 0644 marmot.service /etc/systemd/system
-
