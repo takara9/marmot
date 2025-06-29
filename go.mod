@@ -1,17 +1,17 @@
 module github.com/takara9/marmot
 
-go 1.21.3
+go 1.24.4
 
 require (
-	github.com/gin-gonic/gin v1.8.2
-	github.com/google/uuid v1.4.0
-	github.com/onsi/ginkgo/v2 v2.13.0
-	github.com/onsi/gomega v1.29.0
-	github.com/povsister/scp v0.0.0-20210427074412-33febfd9f13e
+	github.com/gin-gonic/gin v1.10.1
+	github.com/google/uuid v1.6.0
+	github.com/onsi/ginkgo/v2 v2.23.4
+	github.com/onsi/gomega v1.37.0
+	github.com/povsister/scp v0.0.0-20250504051308-e467f71ea63c
 	github.com/takara9/lvm v0.0.0-20230311131147-efbdcda51732
-	go.etcd.io/etcd/client/v3 v3.5.10
-	gopkg.in/yaml.v3 v3.0.1
-	libvirt.org/go/libvirt v1.9008.0
+	go.etcd.io/etcd/client/v3 v3.6.1
+	gopkg.in/yaml.v3 v3.6.1
+	libvirt.org/go/libvirt v1.11004.0
 )
 
 require (
