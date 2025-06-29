@@ -1,15 +1,15 @@
 package main
 
 import (
-	"fmt"
-	"log"
 	"flag"
-	"net/http"
+	"fmt"
 	"github.com/gin-gonic/gin"
+	"log"
+	"net/http"
 
-	cf  "github.com/takara9/marmot/pkg/config"
-	db  "github.com/takara9/marmot/pkg/db"
-	ut  "github.com/takara9/marmot/pkg/util"
+	cf "github.com/takara9/marmot/pkg/config"
+	db "github.com/takara9/marmot/pkg/db"
+	ut "github.com/takara9/marmot/pkg/util"
 )
 
 // ローカルノード
@@ -19,8 +19,8 @@ var etcd *string
 func main() {
 
 	// 起動パラメータ
-	node = flag.String("node", "hv1",  "Hypervisor node name")
-	etcd = flag.String("etcd", "http://127.0.0.1:2379",  "etcd url")
+	node = flag.String("node", "hv1", "Hypervisor node name")
+	etcd = flag.String("etcd", "http://127.0.0.1:2379", "etcd url")
 
 	flag.Parse()
 
@@ -32,7 +32,6 @@ func main() {
 	if err != nil {
 		log.Println("ut.CheckHvVgAll()", err)
 	}
-
 
 	// REST-APIサーバー
 	router := gin.Default()
@@ -49,10 +48,10 @@ func main() {
 	router.POST("/destroyVm", destroyVm)
 
 	// リモート処理
-	router.POST("/stopCluster",  stopCluster)
-	router.POST("/stopVm",       stopVm)
+	router.POST("/stopCluster", stopCluster)
+	router.POST("/stopVm", stopVm)
 	router.POST("/startCluster", startCluster)
-	router.POST("/startVm",      startVm)
+	router.POST("/startVm", startVm)
 
 	// サーバー待機
 	router.Run("0.0.0.0:8750")
@@ -64,12 +63,11 @@ func accessTest(c *gin.Context) {
 	c.JSON(200, gin.H{"message": "ok"})
 }
 
-
 // コールバック ハイパーバイザーの状態取得
 func listHypervisor(c *gin.Context) {
 
 	// ハイパーバイザーの稼働チェック　結果はDBへ反映
-	_,err := ut.CheckHypervisors(*etcd, *node)
+	_, err := ut.CheckHypervisors(*etcd, *node)
 	if err != nil {
 		log.Println("ut.CheckHypervisors()", err)
 	}
@@ -81,33 +79,41 @@ func listHypervisor(c *gin.Context) {
 	}
 
 	// データベースから情報を取得
-	Conn,err := db.Connect(*etcd)
+	Conn, err := db.Connect(*etcd)
+	if err != nil {
+		log.Println("db.Connect()", " ", err)
+		return
+	}
+
 	var hvs []db.Hypervisor
 	err = db.GetHvsStatus(Conn, &hvs)
 	if err != nil {
-		log.Println("listHypervisor"," ", err)
+		log.Println("listHypervisor", " ", err)
 		return
 	}
 	c.IndentedJSON(http.StatusOK, hvs)
 }
 
-
 // コールバック 仮想マシンのリスト
 func listVirtualMachines(c *gin.Context) {
-	Conn,err := db.Connect(*etcd)
+	Conn, err := db.Connect(*etcd)
+	if err != nil {
+		log.Println("db.Connect()", " ", err)
+		return
+	}
 	var vms []db.VirtualMachine
 	err = db.GetVmsStatus(Conn, &vms)
 	if err != nil {
-		log.Println("listVirtualMachines"," ",err)
+		log.Println("listVirtualMachines", " ", err)
 		return
 	}
 	c.IndentedJSON(http.StatusOK, vms)
 }
 
 // JSONエラーメッセージ処理用
-type msg struct {
-	Msg string
-}
+//type msg struct {
+//	Msg string
+//}
 
 // コールバック VMクラスタの作成
 func createCluster(c *gin.Context) {
@@ -120,7 +126,7 @@ func createCluster(c *gin.Context) {
 	}
 
 	// ハイパーバイザーの稼働チェック　結果はDBへ反映
-	_,err := ut.CheckHypervisors(*etcd, *node)
+	_, err := ut.CheckHypervisors(*etcd, *node)
 	if err != nil {
 		log.Println("ut.CheckHypervisors()", err)
 	}
@@ -131,7 +137,6 @@ func createCluster(c *gin.Context) {
 		return
 	}
 }
-
 
 // コールバック VMクラスタの削除
 func destroyCluster(c *gin.Context) {
@@ -151,7 +156,6 @@ func destroyCluster(c *gin.Context) {
 	}
 }
 
-
 // VMの作成
 func createVm(c *gin.Context) {
 
@@ -165,7 +169,7 @@ func createVm(c *gin.Context) {
 		return
 	}
 
-	Conn,err := db.Connect(*etcd)
+	Conn, err := db.Connect(*etcd)
 	if err != nil {
 		log.Println("db.Connect(*etcd)", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
@@ -178,7 +182,7 @@ func createVm(c *gin.Context) {
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
-	return
+	//return
 }
 
 // VMの削除
@@ -188,12 +192,12 @@ func destroyVm(c *gin.Context) {
 
 	var spec cf.VMSpec
 	err := c.BindJSON(&spec)
-	if  err != nil {
+	if err != nil {
 		log.Println("c.BindJSON()", err)
 		return
 	}
 
-	Conn,err := db.Connect(*etcd)
+	Conn, err := db.Connect(*etcd)
 	if err != nil {
 		log.Println("db.Connect(*etcd)", "etcd = ", *etcd)
 		c.JSON(400, gin.H{"msg": err.Error()})
@@ -206,7 +210,7 @@ func destroyVm(c *gin.Context) {
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
-	return
+	//return
 }
 
 // クラスタの停止
@@ -223,7 +227,6 @@ func stopCluster(c *gin.Context) {
 		log.Println("ut.DestroyCluster()", err)
 		return
 	}
-
 }
 
 // クラスタの再スタート
@@ -249,12 +252,12 @@ func startVm(c *gin.Context) {
 
 	var spec cf.VMSpec
 	err := c.BindJSON(&spec)
-	if  err != nil {
+	if err != nil {
 		log.Println("c.BindJSON()", " ", err)
 		return
 	}
 
-	Conn,err := db.Connect(*etcd)
+	Conn, err := db.Connect(*etcd)
 	if err != nil {
 		log.Println("db.Connect(*etcd)", "etcd = ", *etcd)
 		c.JSON(400, gin.H{"msg": err.Error()})
@@ -267,21 +270,20 @@ func startVm(c *gin.Context) {
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
-	return
-
-
+	//return
 }
+
 // 仮想マシンの停止
 func stopVm(c *gin.Context) {
 	log.Println("stopVm")
 	var spec cf.VMSpec
 	err := c.BindJSON(&spec)
-	if  err != nil {
+	if err != nil {
 		log.Println("c.BindJSON()", " ", err)
 		return
 	}
 
-	Conn,err := db.Connect(*etcd)
+	Conn, err := db.Connect(*etcd)
 	if err != nil {
 		log.Println("db.Connect(*etcd)", "etcd = ", *etcd)
 		c.JSON(400, gin.H{"msg": err.Error()})
@@ -294,9 +296,5 @@ func stopVm(c *gin.Context) {
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
-	return
-
+	//return
 }
-
-
-

@@ -1,6 +1,5 @@
 /*
 Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-
 */
 package cmd
 
@@ -14,7 +13,7 @@ import (
 var destroyCmd = &cobra.Command{
 	Use:   "destroy",
 	Short: "Shutdown and delete VM",
-	Long: `Shutdown and delete virtual machine that created by marmot.`,
+	Long:  `Shutdown and delete virtual machine that created by marmot.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("destroy called")
 	},

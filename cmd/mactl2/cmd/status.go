@@ -1,6 +1,5 @@
 /*
 Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-
 */
 package cmd
 
@@ -14,7 +13,7 @@ import (
 var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show status VMs",
-	Long: `Show status of virtual machines.`,
+	Long:  `Show status of virtual machines.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("status called")
 	},

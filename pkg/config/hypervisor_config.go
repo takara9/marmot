@@ -1,8 +1,8 @@
 package config
 
 import (
-	"os"
 	"gopkg.in/yaml.v3"
+	"os"
 )
 
 func ReadYAML(fn string, yf interface{}) error {
@@ -12,10 +12,10 @@ func ReadYAML(fn string, yf interface{}) error {
 	}
 	defer file.Close()
 
-    decoder := yaml.NewDecoder(file)
+	decoder := yaml.NewDecoder(file)
 	err = decoder.Decode(yf)
 	if err != nil {
 		return err
 	}
-        return nil
+	return nil
 }

@@ -2,15 +2,15 @@ package dns
 
 import (
 	"errors"
+	db "github.com/takara9/marmot/pkg/db"
 	"log"
 	"strings"
-	db "github.com/takara9/marmot/pkg/db"
 )
 
 type DnsRecord struct {
-	Hostname   string
-	Ipv4       string
-	Ttl        uint64
+	Hostname string
+	Ipv4     string
+	Ttl      uint64
 }
 
 // Check DNS record param
@@ -20,7 +20,6 @@ func checkParam(rec DnsRecord) error {
 	}
 	return nil
 }
-
 
 func checkParam2(rec DnsRecord) error {
 	if len(rec.Ipv4) == 0 {
@@ -65,7 +64,7 @@ func Add(rec DnsRecord, dbUrl string) error {
 	// Create JSON value
 	var ent db.DNSEntry
 	ent.Host = rec.Ipv4
-	ent.Ttl  = rec.Ttl
+	ent.Ttl = rec.Ttl
 
 	con, err := db.Connect(dbUrl)
 	if err != nil {
@@ -127,7 +126,7 @@ func Del(rec DnsRecord, dbUrl string) error {
 	// Create JSON value
 	var ent db.DNSEntry
 	ent.Host = rec.Ipv4
-	ent.Ttl  = rec.Ttl
+	ent.Ttl = rec.Ttl
 
 	con, err := db.Connect(dbUrl)
 	if err != nil {

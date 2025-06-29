@@ -17,8 +17,6 @@ import (
 	etcd "go.etcd.io/etcd/client/v3"
 )
 
-
-
 /*
 以下の説明を作成して、テストを作成すること。
 
@@ -137,19 +135,19 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		// CoreDNS登録
 		fmt.Println("DNS登録をスキップ")
 		/*
-		err = dns.Add(dns.DnsRecord{
-			Hostname: fmt.Sprintf("%s.%s.%s", vm.Name, vm.ClusterName, "a.labo.local"),
-			Ipv4:     vm.PrivateIp,
-			Ttl:      60,
-		}, "http://ns1.labo.local:2379")
-		if err != nil {
-			log.Println("dns.Add()", err)
-		}
+			err = dns.Add(dns.DnsRecord{
+				Hostname: fmt.Sprintf("%s.%s.%s", vm.Name, vm.ClusterName, "a.labo.local"),
+				Ipv4:     vm.PrivateIp,
+				Ttl:      60,
+			}, "http://ns1.labo.local:2379")
+			if err != nil {
+				log.Println("dns.Add()", err)
+			}
 		*/
 
 	} // END OF LOOP
 
-	if break_err == true {
+	if break_err {
 		return return_errors
 	}
 	return nil
@@ -164,6 +162,11 @@ func RemoteCreateStartVM(hvNode string, spec cf.VMSpec) error {
 	// JSON形式でポストする
 	reqURL := fmt.Sprintf("http://%s:8750/%s", hvNode, "createVm")
 	request, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
+	if err != nil {
+		log.Println("err = ", err)
+		return err
+	}
+
 	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
 
 	client := &http.Client{}
@@ -191,6 +194,11 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	// Libvirtのテンプレートを読み込んで、設定を変更する
 	var dom virt.Domain
 	err := virt.ReadXml("temp.xml", &dom)
+	if err != nil {
+		log.Println("ReadXml(()", err)
+		return err
+	}
+
 	dom.Name = spec.Key // VMを一意に識別するキーでありhostnameではない
 	dom.Uuid = spec.Uuid
 	dom.Vcpu.Value = spec.CPU
