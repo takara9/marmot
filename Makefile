@@ -10,6 +10,13 @@ $(PROGRAMS):
 	mkdir -p $(BINDIR)
 	cd cmd/$@ && $(MAKE)
 
+setup:
+	env GOFLAGS= go install golang.org/x/tools/cmd/goimports@latest
+	env GOFLAGS= go install honnef.co/go/tools/cmd/staticcheck@latest
+
+test:
+	test -z "$$(gofmt -s -l . | tee /dev/stderr)"
+	staticcheck ./...
 
 .PHONY:	package
 package:

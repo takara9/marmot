@@ -3,43 +3,40 @@ package util
 import (
 	"fmt"
 	//"os"
-	"io"
-	"encoding/json"
-	"log"
 	"bytes"
-	"net/http"
+	"encoding/json"
 	"errors"
+	"io"
+	"log"
+	"net/http"
 
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/virt"
-	"github.com/takara9/marmot/pkg/lvm"
 	"github.com/takara9/marmot/pkg/dns"
+	"github.com/takara9/marmot/pkg/lvm"
+	"github.com/takara9/marmot/pkg/virt"
 	etcd "go.etcd.io/etcd/client/v3"
-
 )
-
-
 
 // クラスタ削除
 func DestroyCluster(cnf cf.MarmotConfig, dbUrl string) error {
 
 	fmt.Println("DEBUG Print in DestroyCluster dburl", dbUrl)
 
-	Conn,err := db.Connect(dbUrl)
+	Conn, err := db.Connect(dbUrl)
 	if err != nil {
 		log.Println("db.Connect(dbUrl)", err)
 		return err
 	}
 
 	var NotFound bool = true
-	for _,spec := range cnf.VMSpec {
+	for _, spec := range cnf.VMSpec {
 
 		//fmt.Println("spc.Name = ", spec.Name)
 		//fmt.Println("cnf.ClusterName = ", cnf.ClusterName)
 
 		// クラスタ名とホスト名の重複チェック
-		vmKey,_ := db.FindByHostAndClusteName(Conn, spec.Name, cnf.ClusterName)
+		vmKey, _ := db.FindByHostAndClusteName(Conn, spec.Name, cnf.ClusterName)
 		fmt.Println("DEBUG Print in DestroyCluster vmKey, specName", vmKey, spec.Name)
 		if len(vmKey) > 0 {
 			NotFound = false
@@ -51,7 +48,7 @@ func DestroyCluster(cnf cf.MarmotConfig, dbUrl string) error {
 			}
 			err = RemoteDestroyVM(vm.HvNode, spec)
 			if err != nil {
-				log.Println("RemoteCreateVM()", " ",err)
+				log.Println("RemoteCreateVM()", " ", err)
 				continue
 			}
 		}
@@ -67,14 +64,14 @@ func DestroyCluster(cnf cf.MarmotConfig, dbUrl string) error {
 // リモートとローカルHV上のVMを削除する
 func RemoteDestroyVM(hvNode string, spec cf.VMSpec) error {
 
-	byteJSON,_ := json.MarshalIndent(spec,"","    ")
+	byteJSON, _ := json.MarshalIndent(spec, "", "    ")
 	fmt.Println(string(byteJSON))
 
 	// JSON形式でポストする
 	reqURL := fmt.Sprintf("http://%s:8750/%s", hvNode, "destroyVm")
 	request, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
 	if err != nil {
-		log.Println("http.NewRequest(POST) ",err)
+		log.Println("http.NewRequest(POST) ", err)
 		return err
 	}
 
@@ -83,7 +80,7 @@ func RemoteDestroyVM(hvNode string, spec cf.VMSpec) error {
 	client := &http.Client{}
 	response, err := client.Do(request)
 	if err != nil {
-		log.Println("client.Do(request) ",err)
+		log.Println("client.Do(request) ", err)
 		return err
 	}
 	defer response.Body.Close()
@@ -96,7 +93,6 @@ func RemoteDestroyVM(hvNode string, spec cf.VMSpec) error {
 	return nil
 }
 
-
 // VMの削除
 func DestroyVM(Conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 
@@ -106,7 +102,7 @@ func DestroyVM(Conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	}
 
 	// ハイパーバイザーのリソース削減保存のため値を取得
-	hv,err := db.GetHvByKey(Conn, vm.HvNode)
+	hv, err := db.GetHvByKey(Conn, vm.HvNode)
 	if err != nil {
 		log.Println("db.GetHvByKey()", err)
 	}
@@ -121,15 +117,14 @@ func DestroyVM(Conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 		}
 	}
 	// データベースから削除
-	err = db.DelByKey(Conn,spec.Key)
+	err = db.DelByKey(Conn, spec.Key)
 	if err != nil {
 		log.Println("db.DelByKey()", err)
 	}
 
-
 	// DNSから削除
-	key := fmt.Sprintf("%s.%s.%s", vm.Name, vm.ClusterName,"a.labo.local")
-	err = dns.Del(dns.DnsRecord{Hostname: key},"http://ns1.labo.local:2379")
+	key := fmt.Sprintf("%s.%s.%s", vm.Name, vm.ClusterName, "a.labo.local")
+	err = dns.Del(dns.DnsRecord{Hostname: key}, "http://ns1.labo.local:2379")
 	if err != nil {
 		log.Println("dns.Del()", err)
 	}
@@ -150,7 +145,7 @@ func DestroyVM(Conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	CheckHvVG2(Conn, hvNode, vm.OsVg)
 
 	// データLVを削除
-	for _,d := range vm.Storage {
+	for _, d := range vm.Storage {
 		err = lvm.RemoveLV(d.Vg, d.Lv)
 		if err != nil {
 			log.Println("lvm.RemoveLV()", err)
@@ -161,4 +156,3 @@ func DestroyVM(Conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 
 	return nil
 }
-

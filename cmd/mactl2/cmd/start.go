@@ -1,6 +1,5 @@
 /*
 Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-
 */
 package cmd
 
@@ -14,7 +13,7 @@ import (
 var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start VMs",
-	Long: `Start a virtual machines that stopped by mactl stop command.`,
+	Long:  `Start a virtual machines that stopped by mactl stop command.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("start called")
 	},

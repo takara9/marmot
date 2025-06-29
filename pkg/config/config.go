@@ -49,12 +49,9 @@ type MarmotConfig struct {
 	VMSpec          []VMSpec `yaml:"vm_spec"`
 }
 
-
-
-
 type StgPool_yaml struct {
-	VolGroup string        `yaml:"vg"`
-	Type     string        `yaml:"type"`
+	VolGroup string `yaml:"vg"`
+	Type     string `yaml:"type"`
 }
 
 // ハイパーバイザー
@@ -76,9 +73,9 @@ type Hypervisors_yaml struct {
 
 // OSイメージ　テンプレート
 type Image_yaml struct {
-	Name          string   `yaml:"name"`
-	VolumeGroup   string   `yaml:"volumegroup"`
-	LogicalVolume string   `yaml:"logicalvolume"`
+	Name          string `yaml:"name"`
+	VolumeGroup   string `yaml:"volumegroup"`
+	LogicalVolume string `yaml:"logicalvolume"`
 }
 
 // シーケンス番号
@@ -124,4 +121,3 @@ func WriteConfig(fn string, yf interface{}) error {
 	}
 	return nil
 }
-

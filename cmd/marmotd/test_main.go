@@ -8,7 +8,7 @@ import (
 	api "example.com/m/api"
 )
 
-type Server struct {}
+type Server struct{}
 
 // GetPong implements api.ServerInterface.
 func (s Server) GetPong(ctx echo.Context) error {

@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
-	"time"
-	"log"
 	"github.com/google/uuid"
 	etcd "go.etcd.io/etcd/client/v3"
+	"log"
+	"sort"
+	"time"
 
-    cf  "github.com/takara9/marmot/pkg/config"
+	cf "github.com/takara9/marmot/pkg/config"
 )
 
 /*
@@ -399,39 +399,36 @@ func UpdateVmState(con *etcd.Client, vmkey string, state int) error {
 	return err
 }
 
-
 //////////////////////////////////////////////////////////////
 
 // ハイパーバイザーの設定
 func SetHypervisor(con *etcd.Client, v cf.Hypervisor_yaml) error {
 	var hv Hypervisor
-	
-	hv.Nodename    = v.Name
-	hv.Key         = v.Name         	// Key
-	hv.IpAddr      = v.IpAddr
-	hv.Cpu         = int(v.Cpu)
-	hv.FreeCpu     = int(v.Cpu)         // これで良いのか
-	hv.Memory      = int(v.Ram * 1024)  // MB
-	hv.FreeMemory  = int(v.Ram * 1024)
-	hv.Status      = 2  // テストのため暫定
 
+	hv.Nodename = v.Name
+	hv.Key = v.Name // Key
+	hv.IpAddr = v.IpAddr
+	hv.Cpu = int(v.Cpu)
+	hv.FreeCpu = int(v.Cpu)       // これで良いのか
+	hv.Memory = int(v.Ram * 1024) // MB
+	hv.FreeMemory = int(v.Ram * 1024)
+	hv.Status = 2 // テストのため暫定
 
-//	for _, val := range v.StgPool_yaml {
-//		var sp St
-//		sp.VolGroup = val.VolGroup
-//		sp.Type     = val.Type
-//		hv.StgPool  = append(hv.StgPool,sp)
-//	}
+	//	for _, val := range v.StgPool_yaml {
+	//		var sp St
+	//		sp.VolGroup = val.VolGroup
+	//		sp.Type     = val.Type
+	//		hv.StgPool  = append(hv.StgPool,sp)
+	//	}
 
 	for _, val := range v.Storage {
 		var sp StoragePool
 		sp.VolGroup = val.VolGroup
-		sp.Type     = val.Type
-		hv.StgPool = append(hv.StgPool,sp)
+		sp.Type = val.Type
+		hv.StgPool = append(hv.StgPool, sp)
 	}
 
-
-	err := PutDataEtcd(con, hv.Key , hv)
+	err := PutDataEtcd(con, hv.Key, hv)
 	if err != nil {
 		log.Println("PutDataEtcd()", err)
 		return err
@@ -441,11 +438,11 @@ func SetHypervisor(con *etcd.Client, v cf.Hypervisor_yaml) error {
 }
 
 // イメージテンプレート
-func SetImageTemplate(con *etcd.Client,v cf.Image_yaml) error {
+func SetImageTemplate(con *etcd.Client, v cf.Image_yaml) error {
 	var osi OsImageTemplate
-	osi.LogicaVol   = v.LogicalVolume
+	osi.LogicaVol = v.LogicalVolume
 	osi.VolumeGroup = v.VolumeGroup
-	osi.OsVariant   = v.Name
+	osi.OsVariant = v.Name
 	key := fmt.Sprintf("%v_%v", "OSI", osi.OsVariant)
 	err := PutDataEtcd(con, key, osi)
 	if err != nil {

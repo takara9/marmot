@@ -1,6 +1,5 @@
 /*
 Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-
 */
 package cmd
 
@@ -14,7 +13,7 @@ import (
 var stopCmd = &cobra.Command{
 	Use:   "stop",
 	Short: "Stop VMs",
-	Long: `Stop virtual machines that created by mactl create command.`,
+	Long:  `Stop virtual machines that created by mactl create command.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("stop called")
 	},

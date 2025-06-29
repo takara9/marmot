@@ -1,54 +1,51 @@
 package virt
 
 import (
-	"libvirt.org/go/libvirt"
-	"os"
 	"io"
-	"time"
+	"libvirt.org/go/libvirt"
 	"log"
+	"os"
+	"time"
 )
 
 func ReadFileOnMem(fn string) ([]byte, error) {
 	xmlFile, err := os.Open(fn)
 	if err != nil {
-		return nil,err
+		return nil, err
 	}
 	defer xmlFile.Close()
 
 	byteValue, err := io.ReadAll(xmlFile)
 	if err != nil {
-		return nil,err
+		return nil, err
 	}
 	return byteValue, err
 }
 
-
-
-func ListAllVm(url string) ([]string, error){
+func ListAllVm(url string) ([]string, error) {
 	var nameList []string
 
 	conn, err := libvirt.NewConnect(url)
 	if err != nil {
-		return nameList,err
+		return nameList, err
 	}
 	defer conn.Close()
 
 	doms, err := conn.ListAllDomains(libvirt.ConnectListAllDomainsFlags(libvirt.CONNECT_LIST_DOMAINS_ACTIVE))
 	if err != nil {
-		return nameList,err
+		return nameList, err
 	}
 
 	for _, dom := range doms {
 		name, err := dom.GetName()
 		if err != nil {
-			return nameList,err
+			return nameList, err
 		}
 		nameList = append(nameList, name)
 		dom.Free()
 	}
-	return nameList,nil
+	return nameList, nil
 }
-
 
 func CreateStartVM(url string, filename string) error {
 
@@ -74,7 +71,7 @@ func CreateStartVM(url string, filename string) error {
 		return err
 	}
 
-        //time.Sleep(2000 * time.Millisecond)
+	//time.Sleep(2000 * time.Millisecond)
 	//　オートスタートを設定しないと、HVの再起動からの復帰時、停止している。
 	err = dom.SetAutostart(true)
 	if err != nil {
@@ -84,23 +81,22 @@ func CreateStartVM(url string, filename string) error {
 	return nil
 }
 
-
 func DestroyVM(url string, vmname string) error {
 
 	conn, err := libvirt.NewConnect(url)
 	if err != nil {
-		log.Println("libvirt.NewConnect(url)",err)
+		log.Println("libvirt.NewConnect(url)", err)
 	}
 	defer conn.Close()
 
-	dom,err := conn.LookupDomainByName(vmname)
+	dom, err := conn.LookupDomainByName(vmname)
 	if err != nil {
-		log.Println("conn.LookupDomainByName(vmname)",err)
+		log.Println("conn.LookupDomainByName(vmname)", err)
 		// ドメインが存在しない場合は、エラーリターン
 		return err
 	}
 
-	_,_,err = dom.GetState()
+	_, _, err = dom.GetState()
 	if err != nil {
 		log.Println("dom.GetState()")
 	}
@@ -120,9 +116,8 @@ func DestroyVM(url string, vmname string) error {
 	return nil
 }
 
-
 /*
- デバイスの追加、VMが実行中でないと動作しない
+デバイスの追加、VMが実行中でないと動作しない
 */
 func AttachDev(url string, fn string, vmname string) error {
 
@@ -137,7 +132,7 @@ func AttachDev(url string, fn string, vmname string) error {
 		return err
 	}
 
-	dom,err := conn.LookupDomainByName(vmname)
+	dom, err := conn.LookupDomainByName(vmname)
 	if err != nil {
 		return err
 	}
@@ -151,8 +146,6 @@ func AttachDev(url string, fn string, vmname string) error {
 	return nil
 }
 
-
-
 // 仮想マシンの停止
 func StopVM(url string, vmname string) error {
 
@@ -163,14 +156,14 @@ func StopVM(url string, vmname string) error {
 	}
 	defer conn.Close()
 
-	dom,err := conn.LookupDomainByName(vmname)
+	dom, err := conn.LookupDomainByName(vmname)
 	if err != nil {
 		log.Println("conn.LookupDomainByName(vmname)", err)
 		return err
 	}
 
 	// 仮想マシンの停止
-	_,_,err = dom.GetState()
+	_, _, err = dom.GetState()
 	if err != nil {
 		log.Println("dom.GetState()", err)
 	}
@@ -186,7 +179,6 @@ func StopVM(url string, vmname string) error {
 	return nil
 }
 
-
 // 仮想マシンの停止
 func StartVM(url string, vmname string) error {
 
@@ -197,7 +189,7 @@ func StartVM(url string, vmname string) error {
 	}
 	defer conn.Close()
 
-	dom,err := conn.LookupDomainByName(vmname)
+	dom, err := conn.LookupDomainByName(vmname)
 	if err != nil {
 		log.Println("conn.LookupDomainByName(vmname)", err)
 		return err
@@ -214,4 +206,3 @@ func StartVM(url string, vmname string) error {
 	dom.Free()
 	return nil
 }
-

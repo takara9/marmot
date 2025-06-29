@@ -1,8 +1,8 @@
 package db
 
 import (
-	"time"
 	"github.com/google/uuid"
+	"time"
 )
 
 type StoragePool struct {
@@ -93,4 +93,3 @@ type DNSEntry struct {
 	Host string `json:"host"`
 	Ttl  uint64 `json:"ttl"`
 }
-

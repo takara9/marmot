@@ -3,32 +3,30 @@ package util
 import (
 	"fmt"
 	//"os"
-	"io"
-	"encoding/json"
-	"log"
 	"bytes"
-	"net/http"
+	"encoding/json"
 	"errors"
+	"io"
+	"log"
+	"net/http"
 
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/virt"
 	etcd "go.etcd.io/etcd/client/v3"
-
 )
-
 
 // クラスタ停止
 func StopCluster(cnf cf.MarmotConfig, dbUrl string) error {
-	Conn,err := db.Connect(dbUrl)
+	Conn, err := db.Connect(dbUrl)
 	if err != nil {
 		log.Println("db.Connect(dbUrl)", err)
 		return err
 	}
 
 	var NotFound bool = true
-	for _,spec := range cnf.VMSpec {
-		vmKey,_ := db.FindByHostAndClusteName(Conn, spec.Name, cnf.ClusterName)
+	for _, spec := range cnf.VMSpec {
+		vmKey, _ := db.FindByHostAndClusteName(Conn, spec.Name, cnf.ClusterName)
 		if len(vmKey) > 0 {
 			NotFound = false
 			spec.Key = vmKey
@@ -39,7 +37,7 @@ func StopCluster(cnf cf.MarmotConfig, dbUrl string) error {
 			}
 			err = RemoteStopVM(vm.HvNode, spec)
 			if err != nil {
-				log.Println("RemoteStopVM()", " ",err)
+				log.Println("RemoteStopVM()", " ", err)
 				continue
 			}
 		}
@@ -53,10 +51,8 @@ func StopCluster(cnf cf.MarmotConfig, dbUrl string) error {
 	return nil
 }
 
-
-
 func RemoteStopVM(hvNode string, spec cf.VMSpec) error {
-	byteJSON,_ := json.MarshalIndent(spec,"","    ")
+	byteJSON, _ := json.MarshalIndent(spec, "", "    ")
 	//fmt.Println(string(byteJSON))
 
 	// JSON形式でポストする
@@ -67,7 +63,7 @@ func RemoteStopVM(hvNode string, spec cf.VMSpec) error {
 	client := &http.Client{}
 	response, err := client.Do(request)
 	if err != nil {
-		log.Println("client.Do(request) ",err)
+		log.Println("client.Do(request) ", err)
 		return err
 	}
 	defer response.Body.Close()
@@ -77,7 +73,6 @@ func RemoteStopVM(hvNode string, spec cf.VMSpec) error {
 	}
 	return nil
 }
-
 
 // VMの停止
 func StopVM(Conn *etcd.Client, spec cf.VMSpec) error {
@@ -98,7 +93,7 @@ func StopVM(Conn *etcd.Client, spec cf.VMSpec) error {
 			log.Println("DestoryVM()", err)
 		}
 		// ハイパーバイザーのリソース削減保存
-		hv,err := db.GetHvByKey(Conn, vm.HvNode)
+		hv, err := db.GetHvByKey(Conn, vm.HvNode)
 		if err != nil {
 			log.Println("db.GetHvByKey()", err)
 		}
@@ -109,13 +104,10 @@ func StopVM(Conn *etcd.Client, spec cf.VMSpec) error {
 			log.Println("db.PutDataEtcd()", err)
 		}
 		// データベースの更新
-		err = db.UpdateVmState(Conn,spec.Key,db.STOPPED) ////////
+		err = db.UpdateVmState(Conn, spec.Key, db.STOPPED) ////////
 		if err != nil {
 			log.Println("db.UpdateVmState(Conn,vmkey,db.STOPPED)", err)
 		}
 	}
 	return nil
 }
-
-
-

@@ -17,8 +17,6 @@ import (
 	etcd "go.etcd.io/etcd/client/v3"
 )
 
-
-
 /*
 以下の説明を作成して、テストを作成すること。
 
@@ -137,14 +135,14 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		// CoreDNS登録
 		fmt.Println("DNS登録をスキップ")
 		/*
-		err = dns.Add(dns.DnsRecord{
-			Hostname: fmt.Sprintf("%s.%s.%s", vm.Name, vm.ClusterName, "a.labo.local"),
-			Ipv4:     vm.PrivateIp,
-			Ttl:      60,
-		}, "http://ns1.labo.local:2379")
-		if err != nil {
-			log.Println("dns.Add()", err)
-		}
+			err = dns.Add(dns.DnsRecord{
+				Hostname: fmt.Sprintf("%s.%s.%s", vm.Name, vm.ClusterName, "a.labo.local"),
+				Ipv4:     vm.PrivateIp,
+				Ttl:      60,
+			}, "http://ns1.labo.local:2379")
+			if err != nil {
+				log.Println("dns.Add()", err)
+			}
 		*/
 
 	} // END OF LOOP
