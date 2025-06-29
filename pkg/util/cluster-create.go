@@ -147,7 +147,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 
 	} // END OF LOOP
 
-	if break_err == true {
+	if break_err {
 		return return_errors
 	}
 	return nil
@@ -162,6 +162,11 @@ func RemoteCreateStartVM(hvNode string, spec cf.VMSpec) error {
 	// JSON形式でポストする
 	reqURL := fmt.Sprintf("http://%s:8750/%s", hvNode, "createVm")
 	request, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
+	if err != nil {
+		log.Println("err = ", err)
+		return err
+	}
+
 	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
 
 	client := &http.Client{}
@@ -189,6 +194,11 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	// Libvirtのテンプレートを読み込んで、設定を変更する
 	var dom virt.Domain
 	err := virt.ReadXml("temp.xml", &dom)
+	if err != nil {
+		log.Println("ReadXml(()", err)
+		return err
+	}
+
 	dom.Name = spec.Key // VMを一意に識別するキーでありhostnameではない
 	dom.Uuid = spec.Uuid
 	dom.Vcpu.Value = spec.CPU

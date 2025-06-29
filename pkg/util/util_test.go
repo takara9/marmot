@@ -20,7 +20,8 @@ const (
 var node *string
 var etcd *string
 var ccf *string
-var cnf cf.MarmotConfig
+
+//var cnf cf.MarmotConfig
 
 //var etcd_url string
 

@@ -1,5 +1,6 @@
 package db
 
+/*
 func testVmData() VirtualMachine {
 	var vm VirtualMachine
 	vm.Name = "server1"
@@ -27,10 +28,11 @@ func testVmData() VirtualMachine {
 	st.Size = 100
 	st.Path = "/stg2"
 	vm.Storage = append(vm.Storage, st)
-
 	return vm
 }
+*/
 
+/*
 func testCreateVm() VirtualMachine {
 	var vm VirtualMachine
 	vm.Name = "node1-k8s1"
@@ -58,9 +60,9 @@ func testCreateVm() VirtualMachine {
 	st.Size = 100
 	st.Path = "/stg"
 	vm.Storage = append(vm.Storage, st)
-
 	return vm
 }
+*/
 
 func testHvData1() Hypervisor {
 	var hv Hypervisor
@@ -71,10 +73,10 @@ func testHvData1() Hypervisor {
 	hv.FreeCpu = 10
 	hv.FreeMemory = 64
 	hv.Key = "hv01"
-
 	return hv
 }
 
+/*
 func testHvData2() Hypervisor {
 	var hv Hypervisor
 	hv.Nodename = "hv02"
@@ -84,10 +86,11 @@ func testHvData2() Hypervisor {
 	hv.FreeCpu = 10
 	hv.FreeMemory = 64
 	hv.Key = "hv02"
-
 	return hv
 }
+*/
 
+/*
 func testHvCreate(name string, cpu int, ram int) Hypervisor {
 	var hv Hypervisor
 	hv.Nodename = name
@@ -100,6 +103,7 @@ func testHvCreate(name string, cpu int, ram int) Hypervisor {
 	hv.Status = 2
 	return hv
 }
+*/
 
 func testVmCreate(hostname string, cpu int, ram int) VirtualMachine {
 	var vm VirtualMachine

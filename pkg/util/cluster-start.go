@@ -55,6 +55,11 @@ func RemoteStartVM(hvNode string, spec cf.VMSpec) error {
 	// JSON形式でポストする
 	reqURL := fmt.Sprintf("http://%s:8750/%s", hvNode, "startVm")
 	request, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
+	if err != nil {
+		log.Println("http.NewRequest()", err)
+		return err
+	}
+
 	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
 
 	client := &http.Client{}

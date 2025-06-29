@@ -80,6 +80,11 @@ func listHypervisor(c *gin.Context) {
 
 	// データベースから情報を取得
 	Conn, err := db.Connect(*etcd)
+	if err != nil {
+		log.Println("db.Connect()", " ", err)
+		return
+	}
+
 	var hvs []db.Hypervisor
 	err = db.GetHvsStatus(Conn, &hvs)
 	if err != nil {
@@ -92,6 +97,10 @@ func listHypervisor(c *gin.Context) {
 // コールバック 仮想マシンのリスト
 func listVirtualMachines(c *gin.Context) {
 	Conn, err := db.Connect(*etcd)
+	if err != nil {
+		log.Println("db.Connect()", " ", err)
+		return
+	}
 	var vms []db.VirtualMachine
 	err = db.GetVmsStatus(Conn, &vms)
 	if err != nil {
@@ -102,9 +111,9 @@ func listVirtualMachines(c *gin.Context) {
 }
 
 // JSONエラーメッセージ処理用
-type msg struct {
-	Msg string
-}
+//type msg struct {
+//	Msg string
+//}
 
 // コールバック VMクラスタの作成
 func createCluster(c *gin.Context) {
@@ -173,7 +182,7 @@ func createVm(c *gin.Context) {
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
-	return
+	//return
 }
 
 // VMの削除
@@ -201,7 +210,7 @@ func destroyVm(c *gin.Context) {
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
-	return
+	//return
 }
 
 // クラスタの停止
@@ -218,7 +227,6 @@ func stopCluster(c *gin.Context) {
 		log.Println("ut.DestroyCluster()", err)
 		return
 	}
-
 }
 
 // クラスタの再スタート
@@ -262,8 +270,7 @@ func startVm(c *gin.Context) {
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
-	return
-
+	//return
 }
 
 // 仮想マシンの停止
@@ -289,6 +296,5 @@ func stopVm(c *gin.Context) {
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
-	return
-
+	//return
 }

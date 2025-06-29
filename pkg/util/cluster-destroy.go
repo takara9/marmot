@@ -55,7 +55,7 @@ func DestroyCluster(cnf cf.MarmotConfig, dbUrl string) error {
 	}
 	Conn.Close()
 
-	if NotFound == true {
+	if NotFound {
 		return errors.New("NotExistVM")
 	}
 	return nil

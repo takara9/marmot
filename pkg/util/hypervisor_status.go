@@ -95,9 +95,9 @@ func CheckHypervisors(dbUrl string, node string) ([]db.Hypervisor, error) {
 }
 
 // ping の結果を受け取るための構造体、暫定的に配置
-type message struct {
-	Message string
-}
+//type message struct {
+//	Message string
+//}
 
 // 短いタイムアウトで、死活監視用
 func ReqGetQuick(apipath string, api string) (*http.Response, []byte, error) {
@@ -110,8 +110,12 @@ func ReqGetQuick(apipath string, api string) (*http.Response, []byte, error) {
 	xxx := fmt.Sprintf("%s/%s", api, apipath)
 	fmt.Println("xxxxxxxxxxxxxxxxxxxx = ", xxx)
 
+	//res, err := client.Get(fmt.Sprintf("%s/%s", api, apipath))
+	//if err != nil {
+	//	return nil, nil, err
+	//}
+
 	res, err := client.Get(fmt.Sprintf("%s/%s", api, apipath))
-	res, err = client.Get(fmt.Sprintf("%s/%s", api, apipath))
 	if err != nil {
 		log.Printf("--------%v------------ %v", res, err)
 		return nil, nil, err

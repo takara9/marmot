@@ -45,7 +45,7 @@ func MountLocal(vg string, lv string, uuid string) (string, error) {
 	mp := fmt.Sprintf("./%s", uuid)
 	err := os.Mkdir(mp, 0750)
 	if err != nil && !os.IsExist(err) {
-		err := errors.New("Failed mkdir to setup OS-Disk")
+		err := errors.New("failed mkdir to setup OS-Disk")
 		return "", err
 	}
 	cmd := exec.Command("mount", "-t", "ext4", dev, mp)

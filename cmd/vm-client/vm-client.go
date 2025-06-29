@@ -187,7 +187,7 @@ func ListVm(cnf cf.MarmotConfig, api string) error {
 			}
 		}
 		// 表示
-		if match == true {
+		if match {
 			fmt.Printf("%-10s %-16s %-6s %-5s %-20s %-4v  %-6v %-15v %-15v ",
 				vm.ClusterName, vm.Name, vm.HvNode, StateDsp[vm.Status],
 				vm.Key, vm.Cpu, vm.Memory, vm.PrivateIp, vm.PublicIp)
@@ -320,7 +320,7 @@ func DetailVm(cnf cf.MarmotConfig, api string, arg []string) error {
 		}
 	}
 	// 表示
-	if match == true {
+	if match {
 		fmt.Printf("\n*** Virtual Machine Detail Info ***\n")
 		fmt.Printf("\n")
 		fmt.Printf("Cluster Name : %s \n", vm.ClusterName)

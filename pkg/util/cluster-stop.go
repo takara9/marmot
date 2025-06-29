@@ -44,7 +44,7 @@ func StopCluster(cnf cf.MarmotConfig, dbUrl string) error {
 	}
 	Conn.Close()
 
-	if NotFound == true {
+	if NotFound {
 		return errors.New("NotExistVM")
 	}
 
@@ -58,6 +58,11 @@ func RemoteStopVM(hvNode string, spec cf.VMSpec) error {
 	// JSON形式でポストする
 	reqURL := fmt.Sprintf("http://%s:8750/%s", hvNode, "stopVm")
 	request, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
+	if err != nil {
+		log.Println("http.NewRequest()", err)
+		return err
+	}
+
 	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
 
 	client := &http.Client{}

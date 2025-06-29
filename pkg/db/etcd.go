@@ -50,7 +50,7 @@ func GetHvByKey(con *etcd.Client, key string) (Hypervisor, error) {
 	}
 
 	if resp.Count == 0 {
-		return hv, errors.New("Not Found")
+		return hv, errors.New("not found")
 	}
 	err = json.Unmarshal([]byte(resp.Kvs[0].Value), &hv)
 
@@ -62,7 +62,7 @@ func GetVmByKey(con *etcd.Client, key string) (VirtualMachine, error) {
 	var vm VirtualMachine
 
 	if len(key) == 0 {
-		return vm, errors.New("NotFound")
+		return vm, errors.New("not found")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -74,7 +74,7 @@ func GetVmByKey(con *etcd.Client, key string) (VirtualMachine, error) {
 	}
 
 	if resp.Count == 0 {
-		return vm, errors.New("Not Found")
+		return vm, errors.New("not found")
 	}
 	err = json.Unmarshal([]byte(resp.Kvs[0].Value), &vm)
 
@@ -175,6 +175,10 @@ func GetVmsStatus(con *etcd.Client, vms *[]VirtualMachine) error {
 // etcdへ保存
 func PutDataEtcd(con *etcd.Client, k string, v interface{}) error {
 	byteJSON, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
 	_, err = con.Put(context.TODO(), k, string(byteJSON))
 	if err != nil {
 		return err
