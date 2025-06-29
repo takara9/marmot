@@ -4,7 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"log"
+	"os"
+	"log/slog"
 	"net/http"
 
 	cf "github.com/takara9/marmot/pkg/config"
