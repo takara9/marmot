@@ -120,11 +120,6 @@ func listVirtualMachines(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, vms)
 }
 
-// JSONエラーメッセージ処理用
-//type msg struct {
-//	Msg string
-//}
-
 // コールバック VMクラスタの作成
 func createCluster(c *gin.Context) {
 
