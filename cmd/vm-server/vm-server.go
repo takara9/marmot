@@ -27,10 +27,18 @@ func main() {
 	fmt.Println("node = ", *node)
 	fmt.Println("etcd = ", *etcd)
 
+	// Setup slog
+	opts := &slog.HandlerOptions{
+		AddSource: true,
+	}
+	logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
+	slog.SetDefault(logger)
+
 	// 起動チェック ストレージの空き容量チェック
 	err := ut.CheckHvVgAll(*etcd, *node)
 	if err != nil {
-		log.Println("ut.CheckHvVgAll()", err)
+		slog.Error("Storage free space check", "err", err)
+		os.Exit(1)
 	}
 
 	// REST-APIサーバー
@@ -69,26 +77,28 @@ func listHypervisor(c *gin.Context) {
 	// ハイパーバイザーの稼働チェック　結果はDBへ反映
 	_, err := ut.CheckHypervisors(*etcd, *node)
 	if err != nil {
-		log.Println("ut.CheckHypervisors()", err)
+		slog.Error("Check if the hypervisor is up and running", "err", err)
+		return
 	}
 
 	// ストレージ容量の更新 結果はDBへ反映
 	err = ut.CheckHvVgAll(*etcd, *node)
 	if err != nil {
-		log.Println("ut.CheckHvVgAll()", err)
+		slog.Error("Update storage capacity", "err", err)
+		return
 	}
 
 	// データベースから情報を取得
 	Conn, err := db.Connect(*etcd)
 	if err != nil {
-		log.Println("db.Connect()", " ", err)
+		slog.Error("connect to database", "err", err)
 		return
 	}
 
 	var hvs []db.Hypervisor
 	err = db.GetHvsStatus(Conn, &hvs)
 	if err != nil {
-		log.Println("listHypervisor", " ", err)
+		slog.Error("get hypervisor status", "err", err)
 		return
 	}
 	c.IndentedJSON(http.StatusOK, hvs)
@@ -98,13 +108,13 @@ func listHypervisor(c *gin.Context) {
 func listVirtualMachines(c *gin.Context) {
 	Conn, err := db.Connect(*etcd)
 	if err != nil {
-		log.Println("db.Connect()", " ", err)
+		slog.Error("get list virtual machines", "err", err)
 		return
 	}
 	var vms []db.VirtualMachine
 	err = db.GetVmsStatus(Conn, &vms)
 	if err != nil {
-		log.Println("listVirtualMachines", " ", err)
+		slog.Error("get status of virtual machines", "err", err)
 		return
 	}
 	c.IndentedJSON(http.StatusOK, vms)
@@ -120,7 +130,7 @@ func createCluster(c *gin.Context) {
 
 	var cnf cf.MarmotConfig
 	if err := c.BindJSON(&cnf); err != nil {
-		log.Println("BindJSON", err)
+		slog.Error("create vm cluster", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
@@ -128,11 +138,12 @@ func createCluster(c *gin.Context) {
 	// ハイパーバイザーの稼働チェック　結果はDBへ反映
 	_, err := ut.CheckHypervisors(*etcd, *node)
 	if err != nil {
-		log.Println("ut.CheckHypervisors()", err)
+		slog.Error("check hypervisor status", "err", err)
+		return
 	}
 
 	if err := ut.CreateCluster(cnf, *etcd, *node); err != nil {
-		log.Println("CreateCluster", err)
+		slog.Error("create cluster", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
@@ -143,14 +154,14 @@ func destroyCluster(c *gin.Context) {
 
 	var cnf cf.MarmotConfig
 	if err := c.BindJSON(&cnf); err != nil {
-		log.Println("c.BindJSON()", err)
+		slog.Error("prepare to delete cluster", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
 	fmt.Println(cnf)
 
 	if err := ut.DestroyCluster(cnf, *etcd); err != nil {
-		log.Println("ut.DestroyCluster()", err)
+		slog.Error("delete cluster", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
@@ -158,89 +169,85 @@ func destroyCluster(c *gin.Context) {
 
 // VMの作成
 func createVm(c *gin.Context) {
-
-	log.Println("createVm()", "etcd = ", *etcd)
+	slog.Info("create vm", "etcd", *etcd)
 
 	var spec cf.VMSpec
 	err := c.BindJSON(&spec)
 	if err != nil {
-		log.Println("createVm", err)
+		slog.Error("create vm in action", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
 
 	Conn, err := db.Connect(*etcd)
 	if err != nil {
-		log.Println("db.Connect(*etcd)", err)
+		slog.Error("connectiong db", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
 
 	err = ut.CreateVM(Conn, spec, *node)
 	if err != nil {
-		log.Println("createVm", err)
+		slog.Error("creating vm", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
-	//return
 }
 
 // VMの削除
 func destroyVm(c *gin.Context) {
-
-	log.Println("destroyVm()", "etcd = ", *etcd)
+	slog.Info("destroy vm", "etcd", *etcd)
 
 	var spec cf.VMSpec
 	err := c.BindJSON(&spec)
 	if err != nil {
-		log.Println("c.BindJSON()", err)
+		slog.Error("setup spec", "err", err)
 		return
 	}
 
 	Conn, err := db.Connect(*etcd)
 	if err != nil {
-		log.Println("db.Connect(*etcd)", "etcd = ", *etcd)
+		slog.Error("connecting to Db", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 
 	}
 	err = ut.DestroyVM(Conn, spec, *node)
 	if err != nil {
-		log.Println("destroyVm", err)
+		slog.Error("delete vm", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
-	//return
 }
 
 // クラスタの停止
 func stopCluster(c *gin.Context) {
-	log.Println("stopCluster")
+	slog.Info("stop cluster", "etcd", *etcd)
 
 	var cnf cf.MarmotConfig
 	if err := c.BindJSON(&cnf); err != nil {
-		log.Println("c.BindJSON()", " ", err)
+		slog.Error("setup Json", "err", err)
 		c.JSON(400, gin.H{"msg": "Can't read JSON"})
 		return
 	}
 	if err := ut.StopCluster(cnf, *etcd); err != nil {
-		log.Println("ut.DestroyCluster()", err)
+		slog.Error("stop cluster", "err", err)
 		return
 	}
 }
 
 // クラスタの再スタート
 func startCluster(c *gin.Context) {
-	log.Println("startCluster")
+	slog.Info("start cluster", "etcd", *etcd)
 
 	var cnf cf.MarmotConfig
 	if err := c.BindJSON(&cnf); err != nil {
-		log.Println("c.BindJSON()", " ", err)
+		slog.Error("setup config", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
 	if err := ut.StartCluster(cnf, *etcd); err != nil {
-		log.Println("ut.StartCluster()", err)
+		slog.Error("start cluster", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
@@ -248,53 +255,50 @@ func startCluster(c *gin.Context) {
 
 // 仮想マシンの開始
 func startVm(c *gin.Context) {
-	log.Println("startVm")
+	slog.Info("start vm", "etcd", *etcd)
 
 	var spec cf.VMSpec
 	err := c.BindJSON(&spec)
 	if err != nil {
-		log.Println("c.BindJSON()", " ", err)
+		slog.Error("setup config", "err", err)
 		return
 	}
 
 	Conn, err := db.Connect(*etcd)
 	if err != nil {
-		log.Println("db.Connect(*etcd)", "etcd = ", *etcd)
+		slog.Error("setup config", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
-
 	}
 	err = ut.StartVM(Conn, spec)
 	if err != nil {
-		log.Println("ut.StartVM(Conn, spec)", " ", "FAILD!")
+		slog.Error("start vm", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
-	//return
 }
 
 // 仮想マシンの停止
 func stopVm(c *gin.Context) {
-	log.Println("stopVm")
+	slog.Info("stop vm", "etcd", *etcd)
 	var spec cf.VMSpec
 	err := c.BindJSON(&spec)
 	if err != nil {
-		log.Println("c.BindJSON()", " ", err)
+		slog.Error("setup config", "err", err)
 		return
 	}
 
 	Conn, err := db.Connect(*etcd)
 	if err != nil {
-		log.Println("db.Connect(*etcd)", "etcd = ", *etcd)
+		slog.Error("connecting db", "err", err, "etcd = ", *etcd)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 
 	}
 	err = ut.StopVM(Conn, spec)
 	if err != nil {
-		log.Println("ut.StopVM(Conn, spec)", "FAILD!")
+		slog.Error("stop vm", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
-	//return
 }
