@@ -73,6 +73,7 @@ func main() {
 	}
 
 	// サブコマンド
+	// Cobraで再実装するので、エラー処理は放置する
 	var cnf cf.MarmotConfig
 	err := cf.ReadConfig(*ccf, &cnf)
 	if err != nil {
@@ -83,7 +84,7 @@ func main() {
 		case "gen-inv":
 			generate_all(cnf)
 		case "get-kubeconf":
-			GetKubeconf(cnf) // 途上
+			GetKubeconf(cnf)
 		case "list":
 			ListVm(cnf, ApiUrl)
 		case "status":

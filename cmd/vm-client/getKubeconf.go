@@ -16,6 +16,7 @@ func GetKubeconf(cnf cf.MarmotConfig) error {
 		log.Println("err = ", err)
 		return err
 	}
+
 	for _, v := range cnf.VMSpec {
 		if r.MatchString(v.Name) {
 			master_node_ip = v.PrivateIP
