@@ -6,13 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/virt"
+
 	//"github.com/takara9/marmot/pkg/dns"
 	etcd "go.etcd.io/etcd/client/v3"
 )
@@ -30,7 +31,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 
 	Conn, err := db.Connect(dbUrl)
 	if err != nil {
-		log.Println("db.Connect()", " ", err)
+		slog.Error("", "err", err)
 		return err
 	}
 
@@ -77,7 +78,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		//スケジュールを実行
 		vm.HvNode, vm.Key, vm.Uuid, err = db.AssignHvforVm(Conn, vm)
 		if err != nil {
-			log.Println("db.AssignHvforVm()", " ", err)
+			slog.Error("", "err", err)
 			break_err = true
 			return_errors = err
 			break
@@ -87,7 +88,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		spec.VMOsVariant = cnf.VMOsVariant
 		spec.OsTempVg, spec.OsTempLv, err = db.GetOsImgTempByKey(Conn, cnf.VMOsVariant)
 		if err != nil {
-			log.Println("db.GetOsImgTempByKey()", err)
+			slog.Error("", "err", err)
 			break_err = true
 			return_errors = err
 			break
@@ -99,13 +100,11 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 
 		// 問題発見処理
 		if len(vm.HvNode) == 0 {
-			log.Println("len(vm.HvNode) == 0", " ")
 			break_err = true
 			return_errors = err
 			break
 		}
 		if len(vm.Name) == 0 {
-			log.Println("len(vm.Name) == 0", " ")
 			break_err = true
 			return_errors = err
 			break
@@ -116,15 +115,15 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		// リモートHVでVMを作成するケースが発生する。
 
 		// vm.HvNode と node を比較してローカルへ
-		//log.Println("vm.HvNode", " = ", vm.HvNode)
-		//log.Println("hvNode", " = ", hvNode)
-		//log.Println("cmp vm.HvNode hvNode", " = ", vm.HvNode == hvNode)
+		//slog.Error("", "err", err)vm.HvNode", " = ", vm.HvNode)
+		//slog.Error("", "err", err)hvNode", " = ", hvNode)
+		//slog.Error("", "err", err)cmp vm.HvNode hvNode", " = ", vm.HvNode == hvNode)
 
 		// リモートとローカル関係なしに、マイクロサービスへリクエストする
 		db.UpdateVmState(Conn, vm.Key, db.PROVISIONING)
 		err = RemoteCreateStartVM(vm.HvNode, spec)
 		if err != nil {
-			log.Println("RemoteCreateStartVM()", " ", err)
+			slog.Error("", "err", err)
 			break_err = true
 			return_errors = err
 			db.UpdateVmState(Conn, vm.Key, db.ERROR) // エラー状態へ
@@ -141,7 +140,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 				Ttl:      60,
 			}, "http://ns1.labo.local:2379")
 			if err != nil {
-				log.Println("dns.Add()", err)
+				slog.Error("", "err", err)dns.Add()", err)
 			}
 		*/
 
@@ -163,7 +162,7 @@ func RemoteCreateStartVM(hvNode string, spec cf.VMSpec) error {
 	reqURL := fmt.Sprintf("http://%s:8750/%s", hvNode, "createVm")
 	request, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
 	if err != nil {
-		log.Println("err = ", err)
+		slog.Error("", "err", err)
 		return err
 	}
 
@@ -172,7 +171,7 @@ func RemoteCreateStartVM(hvNode string, spec cf.VMSpec) error {
 	client := &http.Client{}
 	response, err := client.Do(request)
 	if err != nil {
-		log.Println("err = ", err)
+		slog.Error("", "err", err)
 		return err
 	}
 	defer response.Body.Close()
@@ -189,13 +188,13 @@ func RemoteCreateStartVM(hvNode string, spec cf.VMSpec) error {
 // VMを生成する
 func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 
-	//log.Println("Libvirtのテンプレートを読み込んで、設定を変更する")
+	//slog.Error("", "err", err)Libvirtのテンプレートを読み込んで、設定を変更する")
 	//------------------------------------------------------------
 	// Libvirtのテンプレートを読み込んで、設定を変更する
 	var dom virt.Domain
 	err := virt.ReadXml("temp.xml", &dom)
 	if err != nil {
-		log.Println("ReadXml(()", err)
+		slog.Error("", "err", err)
 		return err
 	}
 
@@ -206,30 +205,30 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	dom.Memory.Value = mem
 	dom.CurrentMemory.Value = mem
 
-	//log.Println("OSボリュームを作成")
+	//slog.Error("", "err", err)OSボリュームを作成")
 	//------------------------------------------------------------
 	// OSボリュームを作成  (N テンプレートを指定できると良い)
 	osLogicalVol, err := CreateOsLv(conn, spec.OsTempVg, spec.OsTempLv)
 	if err != nil {
-		log.Println("CreateOsLv()", err)
+		slog.Error("", "err", err)
 		return err
 	}
 	dom.Devices.Disk[0].Source.Dev = fmt.Sprintf("/dev/%s/%s", spec.OsTempVg, osLogicalVol)
 
-	//log.Println("OSボリュームのLV名をetcdへ登録")
+	//slog.Error("", "err", err)OSボリュームのLV名をetcdへ登録")
 	// OSボリュームのLV名をetcdへ登録
 	err = db.UpdateOsLv(conn, spec.Key, spec.OsTempVg, osLogicalVol)
 	if err != nil {
-		log.Println("db.UpdateOsLv()", err)
+		slog.Error("", "err", err)
 		return err
 	}
 
-	//log.Println("OSボリュームをマウントして、 ホスト名、IPアドレスを設定する")
+	//slog.Error("", "err", err)OSボリュームをマウントして、 ホスト名、IPアドレスを設定する")
 	// OSボリュームをマウントして、 ホスト名、IPアドレスを設定する
 	// 必要最小限として、詳細設定はAnsibleで実行する
 	err = ConfigRootVol(spec, spec.OsTempVg, osLogicalVol)
 	if err != nil {
-		log.Println("ConfigRootVol()", err)
+		slog.Error("", "err", err)
 		return err
 	}
 
@@ -246,7 +245,7 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 		}
 		dlv, err := CreateDataLv(conn, uint64(disk.Size), vg)
 		if err != nil {
-			log.Println("CreateDataLv()", err)
+			slog.Error("", "err", err)
 			return err
 		}
 		// LibVirtの設定を追加
@@ -269,7 +268,7 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 		// etcdデータベースにlvを登録
 		err = db.UpdateDataLv(conn, spec.Key, i, disk.VolGrp, dlv)
 		if err != nil {
-			log.Println("db.UpdateDataLv()", err)
+			slog.Error("", "err", err)
 			return err
 		}
 		// エラー発生時にロールバックが必要（未実装）
@@ -294,11 +293,13 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	xmlfileName := fmt.Sprintf("./%v.xml", dom.Uuid)
 	file, err := os.Create(xmlfileName)
 	if err != nil {
+		slog.Error("", "err", err)
 		return err
 	}
 	defer file.Close()
 	_, err = file.Write([]byte(textXml))
 	if err != nil {
+		slog.Error("", "err", err)
 		return err
 	}
 
@@ -307,14 +308,14 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	url := "qemu:///system"
 	err = virt.CreateStartVM(url, xmlfileName)
 	if err != nil {
-		log.Println("virt.StartVM()", err)
+		slog.Error("", "err", err)
 		return err
 	}
 
 	// 仮想マシンXMLファイルを削除する
 	err = os.Remove(xmlfileName)
 	if err != nil {
-		log.Println("os.Remove(xmlfileName)", err)
+		slog.Error("", "err", err)
 		return err
 	}
 

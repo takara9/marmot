@@ -2,10 +2,11 @@ package virt
 
 import (
 	"io"
-	"libvirt.org/go/libvirt"
-	"log"
+	"log/slog"
 	"os"
 	"time"
+
+	"libvirt.org/go/libvirt"
 )
 
 func ReadFileOnMem(fn string) ([]byte, error) {
@@ -85,31 +86,31 @@ func DestroyVM(url string, vmname string) error {
 
 	conn, err := libvirt.NewConnect(url)
 	if err != nil {
-		log.Println("libvirt.NewConnect(url)", err)
+		slog.Error("", "err", err)
 	}
 	defer conn.Close()
 
 	dom, err := conn.LookupDomainByName(vmname)
 	if err != nil {
-		log.Println("conn.LookupDomainByName(vmname)", err)
+		slog.Error("", "err", err)
 		// ドメインが存在しない場合は、エラーリターン
 		return err
 	}
 
 	_, _, err = dom.GetState()
 	if err != nil {
-		log.Println("dom.GetState()")
+		slog.Error("", "err", err)
 	}
 	err = dom.Destroy()
 	if err != nil {
-		log.Println("dom.Destroy()")
+		slog.Error("", "err", err)
 	}
 
 	time.Sleep(time.Second * 10)
 
 	dom.Undefine()
 	if err != nil {
-		log.Println("dom.Destroy()")
+		slog.Error("", "err", err)
 	}
 
 	dom.Free()
@@ -151,26 +152,26 @@ func StopVM(url string, vmname string) error {
 
 	conn, err := libvirt.NewConnect(url)
 	if err != nil {
-		log.Println("libvirt.NewConnect(url)", err)
+		slog.Error("", "err", err)
 		return err
 	}
 	defer conn.Close()
 
 	dom, err := conn.LookupDomainByName(vmname)
 	if err != nil {
-		log.Println("conn.LookupDomainByName(vmname)", err)
+		slog.Error("", "err", err)
 		return err
 	}
 
 	// 仮想マシンの停止
 	_, _, err = dom.GetState()
 	if err != nil {
-		log.Println("dom.GetState()", err)
+		slog.Error("", "err", err)
 	}
 
 	err = dom.Shutdown()
 	if err != nil {
-		log.Println("dom.Stop()", err)
+		slog.Error("", "err", err)
 	}
 
 	time.Sleep(time.Second * 10)
@@ -184,20 +185,20 @@ func StartVM(url string, vmname string) error {
 
 	conn, err := libvirt.NewConnect(url)
 	if err != nil {
-		log.Println("libvirt.NewConnect(url)", err)
+		slog.Error("", "err", err)
 		return err
 	}
 	defer conn.Close()
 
 	dom, err := conn.LookupDomainByName(vmname)
 	if err != nil {
-		log.Println("conn.LookupDomainByName(vmname)", err)
+		slog.Error("", "err", err)
 		return err
 	}
 
 	err = dom.Create()
 	if err != nil {
-		log.Println("dom.Create()", err)
+		slog.Error("", "err", err)
 		return err
 	}
 

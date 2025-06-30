@@ -2,12 +2,13 @@ package util
 
 import (
 	"fmt"
+	"log/slog"
+
 	//"os"
 	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
 	"net/http"
 
 	cf "github.com/takara9/marmot/pkg/config"
@@ -20,7 +21,7 @@ import (
 func StartCluster(cnf cf.MarmotConfig, dbUrl string) error {
 	Conn, err := db.Connect(dbUrl)
 	if err != nil {
-		log.Println("db.Connect(dbUrl)", err)
+		slog.Error("", "err", err)
 		return err
 	}
 
@@ -33,13 +34,13 @@ func StartCluster(cnf cf.MarmotConfig, dbUrl string) error {
 		spec.Key = vmKey
 		vm, err := db.GetVmByKey(Conn, vmKey)
 		if err != nil {
-			log.Println("db.GetVmByKey()", err)
+			slog.Error("", "err", err)
 			Conn.Close()
 			return err
 		}
 		err = RemoteStartVM(vm.HvNode, spec)
 		if err != nil {
-			log.Println("RemoteStartVM()", " ", err)
+			slog.Error("", "err", err)
 			Conn.Close()
 			return err
 		}
@@ -56,7 +57,7 @@ func RemoteStartVM(hvNode string, spec cf.VMSpec) error {
 	reqURL := fmt.Sprintf("http://%s:8750/%s", hvNode, "startVm")
 	request, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
 	if err != nil {
-		log.Println("http.NewRequest()", err)
+		slog.Error("", "err", err)
 		return err
 	}
 
@@ -65,7 +66,7 @@ func RemoteStartVM(hvNode string, spec cf.VMSpec) error {
 	client := &http.Client{}
 	response, err := client.Do(request)
 	if err != nil {
-		log.Println("client.Do(request) ", err)
+		slog.Error("", "err", err)
 		return err
 	}
 	defer response.Body.Close()
@@ -85,11 +86,11 @@ func StartVM(Conn *etcd.Client, spec cf.VMSpec) error {
 	url := "qemu:///system"
 	err := virt.StartVM(url, spec.Key)
 	if err != nil {
-		log.Println("StartVM()", err)
+		slog.Error("", "err", err)
 	}
 	vm, err := db.GetVmByKey(Conn, spec.Key)
 	if err != nil {
-		log.Println("db.GetVmByKey()", err)
+		slog.Error("", "err", err)
 	}
 
 	if vm.Status == db.STOPPED {
@@ -97,20 +98,20 @@ func StartVM(Conn *etcd.Client, spec cf.VMSpec) error {
 		// ハイパーバイザーのリソースの減算と保存
 		hv, err := db.GetHvByKey(Conn, vm.HvNode)
 		if err != nil {
-			log.Println("db.GetHvByKey()", err)
+			slog.Error("", "err", err)
 		}
 		hv.FreeCpu = hv.FreeCpu - vm.Cpu
 		hv.FreeMemory = hv.FreeMemory - vm.Memory
 
 		err = db.PutDataEtcd(Conn, hv.Key, hv)
 		if err != nil {
-			log.Println("db.PutDataEtcd()", err)
+			slog.Error("", "err", err)
 		}
 
 		// データベースの更新
 		err = db.UpdateVmState(Conn, spec.Key, db.RUNNING)
 		if err != nil {
-			log.Println("db.UpdateVmState(Conn,vmkey,2)", err)
+			slog.Error("", "err", err)
 		}
 	}
 	return nil
