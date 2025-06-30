@@ -12,20 +12,23 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
+
 	//"strings"
+	"io"
+	"time"
+
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/lvm"
 	etcd "go.etcd.io/etcd/client/v3"
-	"io"
-	"time"
 )
 
 // ハイパーバイザーのリストを取り出す
 func getHypervisors(dbUrl string) ([]db.Hypervisor, error) {
 	Conn, err := db.Connect(dbUrl)
 	if err != nil {
-		log.Println("db.Connect()", " ", err)
+		slog.Error("", "err", err)
 		return nil, err
 	}
 	// クローズが無い？
@@ -33,7 +36,7 @@ func getHypervisors(dbUrl string) ([]db.Hypervisor, error) {
 	// ハイパーバイザーのリストを取り出す
 	resp, err := db.GetEtcdByPrefix(Conn, "hv")
 	if err != nil {
-		log.Println("GetEtcdByPrefix()", err)
+		slog.Error("", "err", err)
 		return nil, err
 	}
 
@@ -53,14 +56,14 @@ func getHypervisors(dbUrl string) ([]db.Hypervisor, error) {
 func CheckHypervisors(dbUrl string, node string) ([]db.Hypervisor, error) {
 	Conn, err := db.Connect(dbUrl)
 	if err != nil {
-		log.Println("db.Connect()", " ", err)
+		slog.Error("", "err", err)
 		return nil, err
 	}
 	// クローズが無い？
 
 	hvs, err := getHypervisors(dbUrl)
 	if err != nil {
-		log.Println("GetHypervisors()", err)
+		slog.Error("", "err", err)
 		return nil, err
 	}
 
@@ -71,7 +74,7 @@ func CheckHypervisors(dbUrl string, node string) ([]db.Hypervisor, error) {
 		/*
 			_, body, err := ReqGetQuick("ping", fmt.Sprintf("http://%s:8750",val.IpAddr))
 			if err != nil {
-				log.Println("Communication failed", err, string(body))
+				slog.Error("", "err", err)Communication failed", err, string(body))
 				val.Status = 0
 			} else {
 				dec := json.NewDecoder(strings.NewReader(string(body)))
@@ -88,7 +91,7 @@ func CheckHypervisors(dbUrl string, node string) ([]db.Hypervisor, error) {
 		// ハイパーバイザーの状態をDBへ書き込み
 		err = db.PutDataEtcd(Conn, val.Key, val)
 		if err != nil {
-			log.Println("db.PutDataEtcd()", err)
+			slog.Error("", "err", err)
 		}
 	}
 	return hvs, nil
@@ -132,21 +135,21 @@ func ReqGetQuick(apipath string, api string) (*http.Response, []byte, error) {
 func CheckHvVgAll(dbUrl string, node string) error {
 	Conn, err := db.Connect(dbUrl)
 	if err != nil {
-		log.Println("db.Connect()", " ", err)
+		slog.Error("", "err", err)
 		return err
 	}
 	// クローズが無い？
 
 	hv, err := db.GetHvByKey(Conn, node)
 	if err != nil {
-		log.Println("db.GetHvByKey()", err)
+		slog.Error("", "err", err)
 		return err
 	}
 
 	for i := 0; i < len(hv.StgPool); i++ {
 		total_sz, free_sz, err := lvm.CheckVG(hv.StgPool[i].VolGroup)
 		if err != nil {
-			log.Println("LVM Operation Failed", err)
+			slog.Error("", "err", err)
 			return err
 		}
 		hv.StgPool[i].FreeCap = free_sz / 1024 / 1024 / 1024
@@ -156,7 +159,7 @@ func CheckHvVgAll(dbUrl string, node string) error {
 	// DBへ書き込み
 	err = db.PutDataEtcd(Conn, hv.Key, hv)
 	if err != nil {
-		log.Println("db.PutDataEtcd()", err)
+		slog.Error("", "err", err)
 		return err
 	}
 	return nil
@@ -169,13 +172,13 @@ func CheckHvVG(dbUrl string, node string, vg string) error {
 	// DBへのアクセス
 	Conn, err := db.Connect(dbUrl)
 	if err != nil {
-		log.Println("db.Connect()", err)
+		slog.Error("", "err", err)
 		return err
 	}
 
 	err = CheckHvVG2(Conn, node, vg)
 	if err != nil {
-		log.Println("CheckHvVG2()", err)
+		slog.Error("", "err", err)
 		return err
 	}
 
@@ -188,14 +191,14 @@ func CheckHvVG2(Conn *etcd.Client, node string, vg string) error {
 	// LVMへのアクセス
 	total_sz, free_sz, err := lvm.CheckVG(vg)
 	if err != nil {
-		log.Println("LVM Operation Failed", err)
+		slog.Error("", "err", err)
 		return err
 	}
 
 	// キーを取得
 	hv, err := db.GetHvByKey(Conn, node)
 	if err != nil {
-		log.Println("db.GetHvByKey()", err)
+		slog.Error("", "err", err)
 		return err
 	}
 
@@ -220,7 +223,7 @@ func CheckHvVG2(Conn *etcd.Client, node string, vg string) error {
 	// DBへ書き込み
 	err = db.PutDataEtcd(Conn, hv.Key, hv)
 	if err != nil {
-		log.Println("db.PutDataEtcd()", err)
+		slog.Error("", "err", err)
 		return err
 	}
 

@@ -2,9 +2,10 @@ package dns
 
 import (
 	"errors"
-	db "github.com/takara9/marmot/pkg/db"
-	"log"
+	"log/slog"
 	"strings"
+
+	db "github.com/takara9/marmot/pkg/db"
 )
 
 type DnsRecord struct {
@@ -30,7 +31,6 @@ func checkParam2(rec DnsRecord) error {
 
 // Make etcd path
 func convertEtcdPath(Hostname string) (string, error) {
-
 	h := strings.Split(Hostname, ".")
 	if len(h) < 3 {
 		return "", errors.New("must set a hostname and domain")
@@ -46,18 +46,21 @@ func convertEtcdPath(Hostname string) (string, error) {
 
 // 登録
 func Add(rec DnsRecord, dbUrl string) error {
-
 	err := checkParam(rec)
 	if err != nil {
+		slog.Error("", "err", err)
 		return err
 	}
+
 	err = checkParam2(rec)
 	if err != nil {
+		slog.Error("", "err", err)
 		return err
 	}
 
 	path, err := convertEtcdPath(rec.Hostname)
 	if err != nil {
+		slog.Error("", "err", err)
 		return err
 	}
 
@@ -68,7 +71,7 @@ func Add(rec DnsRecord, dbUrl string) error {
 
 	con, err := db.Connect(dbUrl)
 	if err != nil {
-		log.Println("db.Connect()", " ", err)
+		slog.Error("", "err", err)
 		return err
 	}
 
@@ -76,6 +79,7 @@ func Add(rec DnsRecord, dbUrl string) error {
 	path = "/skydns" + path
 	err = db.PutDataEtcd(con, path, &ent)
 	if err != nil {
+		slog.Error("", "err", err)
 		return err
 	}
 
@@ -84,21 +88,22 @@ func Add(rec DnsRecord, dbUrl string) error {
 
 // 取得
 func Get(rec DnsRecord, dbUrl string) (db.DNSEntry, error) {
-
 	var d db.DNSEntry
 	err := checkParam(rec)
 	if err != nil {
+		slog.Error("", "err", err)
 		return d, err
 	}
 
 	path, err := convertEtcdPath(rec.Hostname)
 	if err != nil {
+		slog.Error("", "err", err)
 		return d, err
 	}
 
 	con, err := db.Connect(dbUrl)
 	if err != nil {
-		log.Println("db.Connect()", " ", err)
+		slog.Error("", "err", err)
 		return d, err
 	}
 
@@ -106,8 +111,10 @@ func Get(rec DnsRecord, dbUrl string) (db.DNSEntry, error) {
 	path = "/skydns" + path
 	rslt, err := db.GetEtcdByKey(con, path)
 	if err != nil {
+		slog.Error("", "err", err)
 		return rslt, err
 	}
+
 	return rslt, err
 }
 
@@ -115,11 +122,13 @@ func Get(rec DnsRecord, dbUrl string) (db.DNSEntry, error) {
 func Del(rec DnsRecord, dbUrl string) error {
 	err := checkParam(rec)
 	if err != nil {
+		slog.Error("", "err", err)
 		return err
 	}
 
 	path, err := convertEtcdPath(rec.Hostname)
 	if err != nil {
+		slog.Error("", "err", err)
 		return err
 	}
 
@@ -130,7 +139,7 @@ func Del(rec DnsRecord, dbUrl string) error {
 
 	con, err := db.Connect(dbUrl)
 	if err != nil {
-		log.Println("db.Connect()", " ", err)
+		slog.Error("", "err", err)
 		return err
 	}
 
@@ -138,6 +147,7 @@ func Del(rec DnsRecord, dbUrl string) error {
 	path = "/skydns" + path
 	err = db.DelByKey(con, path)
 	if err != nil {
+		slog.Error("", "err", err)
 		return err
 	}
 

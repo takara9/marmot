@@ -5,16 +5,17 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	cf "github.com/takara9/marmot/pkg/config"
-	db "github.com/takara9/marmot/pkg/db"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	cf "github.com/takara9/marmot/pkg/config"
+	db "github.com/takara9/marmot/pkg/db"
 )
 
 // BODYのJSONエラーメッセージ処理用
@@ -28,6 +29,12 @@ type DefaultConfig struct {
 
 // メイン
 func main() {
+	// Setup slog
+	opts := &slog.HandlerOptions{
+		AddSource: true,
+	}
+	logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
+	slog.SetDefault(logger)
 
 	// コンフィグファイルの読み取り
 	var DefaultConfig DefaultConfig
@@ -66,17 +73,18 @@ func main() {
 	}
 
 	// サブコマンド
+	// Cobraで再実装するので、エラー処理は放置する
 	var cnf cf.MarmotConfig
 	err := cf.ReadConfig(*ccf, &cnf)
 	if err != nil {
-		log.Fatal(err)
-		return
+		slog.Error("Reading the config file", "err", err)
+		os.Exit(1)
 	} else {
 		switch arg[0] {
 		case "gen-inv":
 			generate_all(cnf)
 		case "get-kubeconf":
-			GetKubeconf(cnf) // 途上
+			GetKubeconf(cnf)
 		case "list":
 			ListVm(cnf, ApiUrl)
 		case "status":
@@ -100,17 +108,16 @@ func main() {
 
 // 共通関数 GET
 func ReqGet(apipath string, api string) (*http.Response, []byte, error) {
-
 	res, err := http.Get(fmt.Sprintf("%s/%s", api, apipath))
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("request by HTTP GET", "err", err)
 		return nil, nil, err
 	}
 	defer res.Body.Close()
 
 	byteBody, err := io.ReadAll(res.Body)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("reading body with HTTP-GET", "err", err)
 		return nil, nil, err
 	}
 	return res, byteBody, err
@@ -122,7 +129,7 @@ func ReqRest(cnf cf.MarmotConfig, apipath string, api string) (*http.Response, [
 	reqURL := fmt.Sprintf("%s/%s", api, apipath)
 	request, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
 	if err != nil {
-		log.Println(err)
+		slog.Error("request by HTTP-POST", "err", err)
 		return nil, nil, err
 	}
 
@@ -130,7 +137,7 @@ func ReqRest(cnf cf.MarmotConfig, apipath string, api string) (*http.Response, [
 	client := &http.Client{}
 	resp, err := client.Do(request)
 	if err != nil {
-		log.Println(err)
+		slog.Error("http client", "err", err)
 		return resp, nil, err
 	}
 	defer resp.Body.Close()
@@ -145,21 +152,15 @@ func ReqRest(cnf cf.MarmotConfig, apipath string, api string) (*http.Response, [
 	} else {
 		fmt.Println("成功終了")
 	}
-
-	//fmt.Println("response Status:", response.Status)
-	//fmt.Println("response Headers:", response.Header)
-	//fmt.Println("response Body:", string(body))
-
 	return resp, body, err
 }
 
 // 仮想マシンのリスト表示
 func ListVm(cnf cf.MarmotConfig, api string) error {
-
 	_, body, err := ReqGet("virtualMachines", api)
 	StateDsp := []string{"RGIST", "PROVI", "RUN", "STOP", "DELT", "Error"}
 	if err != nil {
-		log.Println(err)
+		slog.Error("list vms", "err", err)
 		return err
 	}
 
@@ -174,7 +175,7 @@ func ListVm(cnf cf.MarmotConfig, api string) error {
 		var vm db.VirtualMachine
 		err := dec.Decode(&vm)
 		if err != nil {
-			log.Fatal(err)
+			slog.Error("list vms in the cluster", "err", err)
 		}
 		// フィルター処理
 		match := false
@@ -206,7 +207,7 @@ func GlobalListVm(api string) error {
 	_, body, err := ReqGet("virtualMachines", api)
 	StateDsp := []string{"RGIST", "PROVI", "RUN", "STOP", "DELT", "Error"}
 	if err != nil {
-		log.Println(err)
+		slog.Error("global-status", "err", err)
 		return err
 	}
 
@@ -220,7 +221,7 @@ func GlobalListVm(api string) error {
 		var vm db.VirtualMachine
 		err := dec.Decode(&vm)
 		if err != nil {
-			log.Fatal(err)
+			slog.Error("getting vm status", "err", err)
 		}
 		fmt.Printf("%-10s %-16s %-6s %-5s %-20s %-4v  %-6v %-15v %-15v ",
 			vm.ClusterName, vm.Name, vm.HvNode, StateDsp[vm.Status],
@@ -238,7 +239,7 @@ func GlobalListVm(api string) error {
 func ListHv(api string) error {
 	_, body, err := ReqGet("hypervisors", api)
 	if err != nil {
-		log.Println(err)
+		slog.Error("listing hypervisors", "err", err)
 		return err
 	}
 	status := [3]string{"HLT", "ERR", "RUN"}
@@ -252,7 +253,7 @@ func ListHv(api string) error {
 		var hv db.Hypervisor
 		err := dec.Decode(&hv)
 		if err != nil {
-			log.Fatal(err)
+			slog.Error("reading hypervisors status", "err", err)
 		}
 		fmt.Printf("%-10s %-3v %-15v %4d/%-4d %6d/%-6d  ",
 			hv.Nodename, status[hv.Status], hv.IpAddr, hv.FreeCpu, hv.Cpu, hv.FreeMemory, hv.Memory)
@@ -267,7 +268,6 @@ func ListHv(api string) error {
 
 // Ansible Playbook の適用
 func apply_playbook(cnf cf.MarmotConfig) {
-
 	for {
 		out, err := exec.Command("ansible", "-i", "hosts_kvm", "-m", "ping", "all").Output()
 		if err != nil {
@@ -292,10 +292,9 @@ func apply_playbook(cnf cf.MarmotConfig) {
 
 // 仮想マシンの詳細表示
 func DetailVm(cnf cf.MarmotConfig, api string, arg []string) error {
-
 	_, body, err := ReqGet("virtualMachines", api)
 	if err != nil {
-		log.Println(err)
+		slog.Error("reading detail info of vm status", "err", err)
 		return err
 	}
 	StateDsp := []string{"RGIST", "PROVI", "RUN", "STOP", "DELT", "Error"}
@@ -309,7 +308,7 @@ func DetailVm(cnf cf.MarmotConfig, api string, arg []string) error {
 		// クラスタ名と仮想マシンが一致したものだけリスト
 		err := dec.Decode(&vm)
 		if err != nil {
-			log.Fatal(err)
+			slog.Error("listing vm status on cluster", "err", err)
 		}
 		// フィルター処理
 		if arg[1] == vm.ClusterName {

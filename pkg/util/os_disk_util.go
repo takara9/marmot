@@ -16,13 +16,14 @@ package util
 import (
 	"errors"
 	"fmt"
+	"log/slog"
+	"os"
+	"os/exec"
+
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/lvm"
 	etcd "go.etcd.io/etcd/client/v3"
-	"log"
-	"os"
-	"os/exec"
 )
 
 // LVのパーティションをマップ
@@ -104,47 +105,47 @@ func CreateDataLv(conn *etcd.Client, sz uint64, vg string) (string, error) {
 func ConfigRootVol(spec cf.VMSpec, vg string, oslv string) error {
 	err := KpartOn(vg, oslv)
 	if err != nil {
-		log.Println("KpartOn()", err)
+		slog.Error("", "err", err)
 		return err
 	}
 	// マウント
 	vm_root, err := MountLocal(vg, oslv, spec.Uuid)
 	if err != nil {
-		log.Println("MountLocal()", err)
+		slog.Error("", "err", err)
 		return err
 	}
 
 	// ホスト名の書き込み
 	err = LinuxSetup_hostname(vm_root, spec.Name)
 	if err != nil {
-		log.Println("LinuxSetup_hostname()", err)
+		slog.Error("", "err", err)
 		return err
 	}
 
 	// NetPlanの雛形へ書出す2
 	err = LinuxSetup_createNetplan(spec, vm_root)
 	if err != nil {
-		log.Println("LinuxSetup_createNetplan()", err)
+		slog.Error("", "err", err)
 		return err
 	}
 
 	// hostidの書き出し
 	err = LinuxSetup_hostid(spec, vm_root)
 	if err != nil {
-		log.Println("LinuxSetup_hostid()", err)
+		slog.Error("", "err", err)
 		return err
 	}
 
 	// 後始末
 	err = UnMountLocal(spec.Uuid)
 	if err != nil {
-		log.Println("UnMountLocal()", err)
+		slog.Error("", "err", err)
 		return err
 	}
 
 	err = KpartOff(vg, oslv)
 	if err != nil {
-		log.Println("KpartOff()", err)
+		slog.Error("", "err", err)
 		return err
 	}
 

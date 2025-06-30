@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"fmt"
 
 	"github.com/labstack/echo/v4"
 
@@ -21,5 +21,5 @@ func main() {
 	api.RegisterHandlers(e, server)
 
 	// And we serve HTTP until the world ends.
-	log.Fatal(e.Start("0.0.0.0:8080"))
+	fmt.Println(e.Start("0.0.0.0:8080"))
 }

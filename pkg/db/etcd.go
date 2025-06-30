@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
-	etcd "go.etcd.io/etcd/client/v3"
-	"log"
+	"log/slog"
 	"sort"
 	"time"
+
+	"github.com/google/uuid"
+	etcd "go.etcd.io/etcd/client/v3"
 
 	cf "github.com/takara9/marmot/pkg/config"
 )
@@ -434,7 +435,7 @@ func SetHypervisor(con *etcd.Client, v cf.Hypervisor_yaml) error {
 
 	err := PutDataEtcd(con, hv.Key, hv)
 	if err != nil {
-		log.Println("PutDataEtcd()", err)
+		slog.Error("PutDataEtcd()", "err", err)
 		return err
 	}
 	return nil
@@ -450,7 +451,7 @@ func SetImageTemplate(con *etcd.Client, v cf.Image_yaml) error {
 	key := fmt.Sprintf("%v_%v", "OSI", osi.OsVariant)
 	err := PutDataEtcd(con, key, osi)
 	if err != nil {
-		log.Println("PutDataEtcd()", err)
+		slog.Error("", "err", err)
 		return err
 	}
 	return nil

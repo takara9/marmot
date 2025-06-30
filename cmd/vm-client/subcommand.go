@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
-	cf "github.com/takara9/marmot/pkg/config"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"regexp"
+
+	cf "github.com/takara9/marmot/pkg/config"
 )
 
 func generate_all(cnf cf.MarmotConfig) {
@@ -26,7 +27,7 @@ func generate_vars(cnf cf.MarmotConfig, fn string) {
 
 	vars_file, err := os.Create(fn)
 	if err != nil {
-		log.Println(err)
+		slog.Error("", "err=", err)
 	}
 	defer vars_file.Close()
 
@@ -36,7 +37,7 @@ func generate_vars(cnf cf.MarmotConfig, fn string) {
 	var line string
 	re_node, err := regexp.Compile("^node[1-9]")
 	if err != nil {
-		log.Println(err)
+		slog.Error("", "err=", err)
 		return
 	}
 
@@ -55,7 +56,6 @@ func generate_vars(cnf cf.MarmotConfig, fn string) {
 
 // Ansible Playbook Template hostsファイルを作成する
 func generate_hosts(cnf cf.MarmotConfig, fn string) error {
-
 	_, err := os.Stat(fn)
 	if err != nil {
 		return err
@@ -63,7 +63,7 @@ func generate_hosts(cnf cf.MarmotConfig, fn string) error {
 
 	hosts_file, err := os.Create(fn)
 	if err != nil {
-		log.Println(err)
+		slog.Error("", "err=", err)
 		return err
 	}
 	defer hosts_file.Close()
@@ -75,15 +75,13 @@ func generate_hosts(cnf cf.MarmotConfig, fn string) error {
 		hosts_file.WriteString(line)
 	}
 	return nil
-
 }
 
 // Ansibleのインベントリファイルを作成する
 func generate_inventory(cnf cf.MarmotConfig) error {
-
 	inventory_file, err := os.Create("inventory")
 	if err != nil {
-		log.Println(err)
+		slog.Error("", "err=", err)
 		return err
 	}
 	defer inventory_file.Close()
@@ -93,25 +91,25 @@ func generate_inventory(cnf cf.MarmotConfig) error {
 
 	re_master, err := regexp.Compile("^master[1-9]")
 	if err != nil {
-		log.Println(err)
+		slog.Error("", "err=", err)
 		return err
 	}
 
 	re_node, err := regexp.Compile("^node[1-9]")
 	if err != nil {
-		log.Println(err)
+		slog.Error("", "err=", err)
 		return err
 	}
 
 	re_elb, err := regexp.Compile("^elb[1-9]")
 	if err != nil {
-		log.Println(err)
+		slog.Error("", "err=", err)
 		return err
 	}
 
 	re_mlb, err := regexp.Compile("^mlb[1-9]")
 	if err != nil {
-		log.Println(err)
+		slog.Error("", "err=", err)
 		return err
 	}
 
@@ -169,7 +167,7 @@ func generate_inventory(cnf cf.MarmotConfig) error {
 	// グローバル変数ファイルの結合
 	ansible_vars, err := os.Open(fn)
 	if err != nil {
-		log.Println(err)
+		slog.Error("", "err=", err)
 		return err
 	}
 	defer ansible_vars.Close()
@@ -177,7 +175,7 @@ func generate_inventory(cnf cf.MarmotConfig) error {
 	// インベントリファイルへ追記
 	byteData, err := io.ReadAll(ansible_vars)
 	if err != nil {
-		log.Println(err)
+		slog.Error("", "err=", err)
 		return err
 	}
 	inventory_file.Write(byteData)
