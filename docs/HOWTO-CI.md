@@ -23,4 +23,11 @@
 ## 仮想サーバーの起動とセットアップ
 
 
-## 
+## ランナーの起動方法
+
+```
+$ ssh hvc
+$ screen
+$ cd actions-runner/
+$ ./run.sh
+```
