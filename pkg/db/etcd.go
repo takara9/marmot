@@ -327,6 +327,19 @@ func RemoveVmFromHV(con *etcd.Client, vmKey string) error {
 	return nil
 }
 
+// パブリックIPアドレスが一致するインスタンスを探す
+func FindByPublicIPaddress() error {
+
+	return nil
+}
+
+// プライベートIPアドレスが一致するインスンスを探す
+func FindByPrivateIPaddress() error {
+
+	return nil
+}
+
+
 // ホスト名からVMキーを探す
 func FindByHostname(con *etcd.Client, hostname string) (string, error) {
 	resp, err := GetEtcdByPrefix(con, "vm")
