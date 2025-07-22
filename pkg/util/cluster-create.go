@@ -151,7 +151,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		db.UpdateVmState(Conn, vm.Key, db.PROVISIONING)
 		err = RemoteCreateStartVM(vm.HvNode, spec)
 		if err != nil {
-			slog.Error("", "err", err)
+			slog.Error("", "remote request err", err)
 			break_err = true
 			return_errors = err
 			db.UpdateVmState(Conn, vm.Key, db.ERROR) // エラー状態へ
