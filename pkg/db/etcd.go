@@ -337,7 +337,7 @@ func FindByPublicIPaddress(con *etcd.Client, ipAddress string) (bool, error) {
 		var vm VirtualMachine
 		err = json.Unmarshal([]byte(ev.Value), &vm)
 		if err != nil {
-			return false,err
+			return false,nil /// 例外的にエラーを無視
 		}
 		if ipAddress == vm.PublicIp {
 			return true, nil
@@ -356,7 +356,7 @@ func FindByPrivateIPaddress(con *etcd.Client,ipAddress string) (bool, error) {
 		var vm VirtualMachine
 		err = json.Unmarshal([]byte(ev.Value), &vm)
 		if err != nil {
-			return false,err
+			return false,nil /// データが存在しない時には、どうするか？
 		}
 		if ipAddress == vm.PrivateIp {
 			return true, nil
