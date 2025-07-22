@@ -45,24 +45,26 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		}
 	*/
 
-	// ここに、IPアドレスの重複チェックを入れる
-	if ret := db.FindByPublicIPaddress(); ret != nil {
-				return errors.New("same pubic IP address exist in the cluster")
-	} 
-
-	if ret := db.FindByPrivateIPaddress(); ret != nil {
-				return errors.New("same private IP address exist in the cluster")
-	} 
-	
 	var break_err bool = false
 	return_errors := errors.New("")
+
 	// 仮想マシンの設定と起動
 	for _, spec := range cnf.VMSpec {
 
+		// ホスト名とクラスタ名でVMキーを取得する
 		vmKey, _ := db.FindByHostAndClusteName(Conn, spec.Name, cnf.ClusterName)
 		if len(vmKey) > 0 {
 			continue
 		}
+
+		// ここに、IPアドレスの重複チェックを入れる
+		if ret := db.FindByPublicIPaddress(Conn, spec.PublicIP); ret != nil {
+			return errors.New("same pubic IP address exist in the cluster")
+		} 
+
+		if ret := db.FindByPrivateIPaddress(Conn, spec.PrivateIP); ret != nil {
+			return errors.New("same private IP address exist in the cluster")
+		} 
 
 		// HVへVMスケジュールするために db.VirtualMachineにセットする
 		var vm db.VirtualMachine
