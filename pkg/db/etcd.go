@@ -343,7 +343,7 @@ func FindByPublicIPaddress(con *etcd.Client, ipAddress string) (bool, error) {
 			return true, nil
 		}
 	}
-	return false, errors.New("NotFound")
+	return false, nil
 }
 
 // プライベートIPアドレスが一致するインスンスを探す
@@ -362,7 +362,7 @@ func FindByPrivateIPaddress(con *etcd.Client,ipAddress string) (bool, error) {
 			return true, nil
 		}
 	}
-	return false, errors.New("NotFound")
+	return false, nil
 }
 
 // ホスト名からVMキーを探す
