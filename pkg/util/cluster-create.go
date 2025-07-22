@@ -58,13 +58,21 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		}
 
 		// ここに、IPアドレスの重複チェックを入れる
-		if ret := db.FindByPublicIPaddress(Conn, spec.PublicIP); ret != nil {
-			return errors.New("same pubic IP address exist in the cluster")
-		} 
+		found, err := db.FindByPublicIPaddress(Conn, spec.PublicIP)
+		if err != nil {
+			return err
+		}
+		if found {
+			return fmt.Errorf("same pubic IP address exist in the cluster IP: %v", spec.PublicIP)
+		}
 
-		if ret := db.FindByPrivateIPaddress(Conn, spec.PrivateIP); ret != nil {
-			return errors.New("same private IP address exist in the cluster")
-		} 
+		found, err = db.FindByPrivateIPaddress(Conn, spec.PrivateIP)
+		if err != nil {
+			return err
+		}
+		if found {
+			return fmt.Errorf("same private IP address exist in the cluster IP: %v", spec.PrivateIP)
+		}
 
 		// HVへVMスケジュールするために db.VirtualMachineにセットする
 		var vm db.VirtualMachine
