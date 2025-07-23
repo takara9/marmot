@@ -327,6 +327,44 @@ func RemoveVmFromHV(con *etcd.Client, vmKey string) error {
 	return nil
 }
 
+// パブリックIPアドレスが一致するインスタンスを探す
+func FindByPublicIPaddress(con *etcd.Client, ipAddress string) (bool, error) {
+	resp, err := GetEtcdByPrefix(con, "vm")
+	if err != nil {
+		return false, err
+	}
+	for _, ev := range resp.Kvs {
+		var vm VirtualMachine
+		err = json.Unmarshal([]byte(ev.Value), &vm)
+		if err != nil {
+			return false,nil /// 例外的にエラーを無視
+		}
+		if ipAddress == vm.PublicIp {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// プライベートIPアドレスが一致するインスンスを探す
+func FindByPrivateIPaddress(con *etcd.Client,ipAddress string) (bool, error) {
+	resp, err := GetEtcdByPrefix(con, "vm")
+	if err != nil {
+		return false,err
+	}
+	for _, ev := range resp.Kvs {
+		var vm VirtualMachine
+		err = json.Unmarshal([]byte(ev.Value), &vm)
+		if err != nil {
+			return false,nil /// データが存在しない時には、どうするか？
+		}
+		if ipAddress == vm.PrivateIp {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // ホスト名からVMキーを探す
 func FindByHostname(con *etcd.Client, hostname string) (string, error) {
 	resp, err := GetEtcdByPrefix(con, "vm")

@@ -35,21 +35,44 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		return err
 	}
 
-	// クラスタ名とホスト名の重複チェック
-	/*
-		for _,spec := range cnf.VMSpec {
-			vmKey,_ := db.FindByHostAndClusteName(Conn, spec.Name, cnf.ClusterName)
-			if len(vmKey) > 0 {
-				return errors.New("ExistVM")
+	// リクエスト送信前にコンフィグのチェックを実施する
+	for _, spec := range cnf.VMSpec {
+
+		// クラスタ名とホスト名の重複チェック
+		vmKey, _ := db.FindByHostAndClusteName(Conn, spec.Name, cnf.ClusterName)
+		if len(vmKey) > 0 {
+			return fmt.Errorf("existing same name virttual machine : %v", spec.Name)
+		}
+
+		// ここに、IPアドレスの重複チェックを入れる
+		if len(spec.PublicIP) > 0 {
+			found, err := db.FindByPublicIPaddress(Conn, spec.PublicIP)
+			if err != nil {
+				return err
+			}
+			if found {
+				return fmt.Errorf("same pubic IP address exist in the cluster IP: %v", spec.PublicIP)
 			}
 		}
-	*/
+		if len(spec.PrivateIP) > 0 {
+			found, err := db.FindByPrivateIPaddress(Conn, spec.PrivateIP)
+			if err != nil {
+				return err
+			}
+			if found {
+				return fmt.Errorf("same private IP address exist in the cluster IP: %v", spec.PrivateIP)
+			}
+		}
+	} // END OF LOOP
 
 	var break_err bool = false
 	return_errors := errors.New("")
+
 	// 仮想マシンの設定と起動
 	for _, spec := range cnf.VMSpec {
 
+		fmt.Println("ホスト名とクラスタ名でVMキーを取得する")
+		// ホスト名とクラスタ名でVMキーを取得する
 		vmKey, _ := db.FindByHostAndClusteName(Conn, spec.Name, cnf.ClusterName)
 		if len(vmKey) > 0 {
 			continue
@@ -76,6 +99,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		}
 
 		//スケジュールを実行
+		fmt.Println("スケジュールを実行")
 		vm.HvNode, vm.Key, vm.Uuid, err = db.AssignHvforVm(Conn, vm)
 		if err != nil {
 			slog.Error("", "err", err)
@@ -85,6 +109,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		}
 
 		// OSのバージョン、テンプレートを設定
+		fmt.Println("OSのバージョン、テンプレートを設定")
 		spec.VMOsVariant = cnf.VMOsVariant
 		spec.OsTempVg, spec.OsTempLv, err = db.GetOsImgTempByKey(Conn, cnf.VMOsVariant)
 		if err != nil {
@@ -95,6 +120,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		}
 
 		// VMのUUIDとKEYをコンフィグ情報へセット
+		fmt.Println("VMのUUIDとKEYをコンフィグ情報へセット")
 		spec.Uuid = vm.Uuid.String()
 		spec.Key = vm.Key
 
@@ -119,16 +145,18 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		//slog.Error("", "err", err)hvNode", " = ", hvNode)
 		//slog.Error("", "err", err)cmp vm.HvNode hvNode", " = ", vm.HvNode == hvNode)
 
+		fmt.Println("リモートとローカル関係なしに、マイクロサービスへリクエストする")
 		// リモートとローカル関係なしに、マイクロサービスへリクエストする
 		db.UpdateVmState(Conn, vm.Key, db.PROVISIONING)
 		err = RemoteCreateStartVM(vm.HvNode, spec)
 		if err != nil {
-			slog.Error("", "err", err)
+			slog.Error("", "remote request err", err)
 			break_err = true
 			return_errors = err
 			db.UpdateVmState(Conn, vm.Key, db.ERROR) // エラー状態へ
 			break
 		}
+		fmt.Println("実行中へ")
 		db.UpdateVmState(Conn, vm.Key, db.RUNNING) // 実行中へ
 
 		// CoreDNS登録
