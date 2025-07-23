@@ -35,30 +35,15 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		return err
 	}
 
-	// クラスタ名とホスト名の重複チェック
-	/*
-		for _,spec := range cnf.VMSpec {
-			vmKey,_ := db.FindByHostAndClusteName(Conn, spec.Name, cnf.ClusterName)
-			if len(vmKey) > 0 {
-				return errors.New("ExistVM")
-			}
-		}
-	*/
-
-	var break_err bool = false
-	return_errors := errors.New("")
-
-	// 仮想マシンの設定と起動
+	// リクエスト送信前にコンフィグのチェックを実施する
 	for _, spec := range cnf.VMSpec {
 
-		fmt.Println("ホスト名とクラスタ名でVMキーを取得する")
-		// ホスト名とクラスタ名でVMキーを取得する
+		// クラスタ名とホスト名の重複チェック
 		vmKey, _ := db.FindByHostAndClusteName(Conn, spec.Name, cnf.ClusterName)
 		if len(vmKey) > 0 {
-			continue
+			return fmt.Errorf("existing same name virttual machine : %v", spec.Name)
 		}
 
-		fmt.Println("IPアドレスの重複チェック")
 		// ここに、IPアドレスの重複チェックを入れる
 		if len(spec.PublicIP) > 0 {
 			found, err := db.FindByPublicIPaddress(Conn, spec.PublicIP)
@@ -77,6 +62,20 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 			if found {
 				return fmt.Errorf("same private IP address exist in the cluster IP: %v", spec.PrivateIP)
 			}
+		}
+	} // END OF LOOP
+
+	var break_err bool = false
+	return_errors := errors.New("")
+
+	// 仮想マシンの設定と起動
+	for _, spec := range cnf.VMSpec {
+
+		fmt.Println("ホスト名とクラスタ名でVMキーを取得する")
+		// ホスト名とクラスタ名でVMキーを取得する
+		vmKey, _ := db.FindByHostAndClusteName(Conn, spec.Name, cnf.ClusterName)
+		if len(vmKey) > 0 {
+			continue
 		}
 
 		// HVへVMスケジュールするために db.VirtualMachineにセットする
