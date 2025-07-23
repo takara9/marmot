@@ -161,7 +161,7 @@ var _ = Describe("Util", func() {
 		})
 	})
 
-	Context("func test", func() {
+	Context("VMクラスタの生成と削除", func() {
 		var cnf cf.MarmotConfig
 		It("Load Config", func() {
 			fn := "testdata/cluster-config.yaml"
@@ -186,7 +186,7 @@ var _ = Describe("Util", func() {
 		})
 	})
 
-	Context("func test2", func() {
+	Context("VMクラスタの生成と一時停止と再開", func() {
 		var cnf cf.MarmotConfig
 
 		It("Load Config", func() {
@@ -210,12 +210,35 @@ var _ = Describe("Util", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		//It("Load Config for destroy", func() {
-		//	fn := "testdata/cluster-config.yaml"
-		//	ccf = &fn
-		//	err := cf.ReadConfig(*ccf, &cnf)
-		//	Expect(err).NotTo(HaveOccurred())
-		//})
+		It("Destroy Cluster()", func() {
+			err := ut.DestroyCluster(cnf, *etcd)
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
+	Context("VMクラスタの２重起動の防止", func() {
+		var cnf cf.MarmotConfig
+
+		It("Load Config", func() {
+			fn := "testdata/cluster-config.yaml"
+			ccf = &fn
+			err := cf.ReadConfig(*ccf, &cnf)
+			Expect(err).NotTo(HaveOccurred())
+		})
+		It("クラスターの起動", func() {
+			err := ut.CreateCluster(cnf, *etcd, *node)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("クラスターの２重起動 エラー発生が発生", func() {
+			err := ut.CreateCluster(cnf, *etcd, *node)
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("Start Cluster", func() {
+			err := ut.StartCluster(cnf, *etcd)
+			Expect(err).NotTo(HaveOccurred())
+		})
 
 		It("Destroy Cluster()", func() {
 			err := ut.DestroyCluster(cnf, *etcd)
