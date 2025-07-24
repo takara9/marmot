@@ -69,13 +69,6 @@ func main() {
 			GlobalListVm(ApiUrl)
 			fmt.Printf("\n")
 			return
-		default:
-			fmt.Printf("\n               *** SYSTEM STATUS ***\n")
-			ListHv(ApiUrl)
-			fmt.Printf("\n")
-			GlobalListVm(ApiUrl)
-			fmt.Printf("\n")
-			return
 		}
 	}
 
