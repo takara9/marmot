@@ -5,15 +5,34 @@ package cmd
 
 import (
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
+
+	cf "github.com/takara9/marmot/pkg/config"
+	//db "github.com/takara9/marmot/pkg/db"
 )
+
+type defaultConfig struct {
+	ApiServerUrl string `yaml:"api_server"`
+}
+
+var DefaultConfig defaultConfig
+var ApiUrl string
+var cnf cf.MarmotConfig
+var cfgFile string
+var apiEndpoint string
+
+// BODYのJSONエラーメッセージ処理用
+type msg struct {
+	Msg string
+}
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "mactl",
-	Short: "Marmot control command",
-	Long:  `mactl command use to control Marmot that is Virtual machine controller for experimental or learning`,
+	Use:   "mactl2",
+	Short: "Marmot コントロールコマンド",
+	Long:  `mactl は、ローカルPC上で QEMU, KVM、LVM, OpenSwitchを使用して実験や学習用の仮想マシン環境を提供します。`,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -26,6 +45,28 @@ func Execute() {
 }
 
 func init() {
+	cf.ReadConfig(filepath.Join(os.Getenv("HOME"), ".config_marmot"), &DefaultConfig)
+	// パラメーター > コンフィグ
+	if len(DefaultConfig.ApiServerUrl) > 0 {
+		ApiUrl += DefaultConfig.ApiServerUrl
+	}
+	rootCmd.PersistentFlags().StringVar(&apiEndpoint, "api", "", "API Endpoint URL (default is $HOME/.config_marmot)")
+	//fmt.Println("EP=", apiEndpoint)
+	//fmt.Println("ApiUrl=", ApiUrl)
+
+	//if len(apiEndpoint) > 0 {
+	//	ApiUrl = apiEndpoint
+	//DefaultConfig = apiEndpoint
+	//cf.ReadConfig(filepath.Join(os.Getenv("HOME"), ".config_marmot"), &DefaultConfig)
+	//}
+
+	/*
+		err := cf.ReadConfig("cluster-config.yaml", &cnf)
+		if err != nil {
+			fmt.Printf("Reading the config file", "err", err)
+			os.Exit(1)
+		}
+	*/
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
@@ -34,5 +75,5 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.Flags().BoolP("toggle", "t", false, "ヘルプメッセージの表示を切り替えます")
 }

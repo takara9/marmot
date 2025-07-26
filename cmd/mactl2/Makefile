@@ -1,6 +1,8 @@
 PROGRAM	= mactl2
 all:	$(PROGRAM)
-BINDIR = ../../bin
+
+TAG := $(shell cat ../../TAG)
+BINDIR = ../../marmot-v$(TAG)
 
 $(PROGRAM): $(%.go)
 	echo $(BINDIR)
@@ -9,9 +11,13 @@ $(PROGRAM): $(%.go)
 
 .PHONY:	clean
 clean:
-	rm -f $(PROGRAM)
+	rm -fr $(BINDIR)
 
 .PHONY:	install
 install:
 	rm -f /usr/local/bin/$(PROGRAM)
 	install -m 0755 $(PROGRAM) /usr/local/bin
+
+.PHONY:	set-version
+set-version:
+	sed s/MARMOT_VERSION/${TAG}/ cmd/version._ > cmd/version.go

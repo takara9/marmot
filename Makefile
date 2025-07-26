@@ -1,10 +1,10 @@
-PROGRAMS = vm-server vm-client hv-admin
+PROGRAMS = vm-server vm-client hv-admin mactl2
 all:	$(PROGRAMS)
 
 MAKE = /usr/bin/make
 CURDIR := $(shell pwd)
-BINDIR = $(CURDIR)/bin
 TAG := $(shell cat TAG)
+BINDIR = $(CURDIR)/marmot-v$(TAG)
 
 $(PROGRAMS):
 	mkdir -p $(BINDIR)
@@ -19,16 +19,17 @@ test:
 	staticcheck ./...
 
 .PHONY:	package
-package: all
+package: clean all
 	@echo $(TAG)
-	cp cmd/install.sh bin/install.sh
-	cp cmd/vm-client/config_marmot bin/config_marmot
-	cd $(BINDIR) && tar czvf marmot-v$(TAG).tgz *
-
+	cd cmd/mactl2 && $(MAKE) set-version && cd ../..
+	cp cmd/install.sh $(BINDIR)/install.sh
+	cp cmd/vm-client/config_marmot $(BINDIR)/config_marmot
+	tar czvf marmot-v$(TAG).tgz marmot-v$(TAG)
 
 .PHONY:	clean
 clean:
 	rm -fr $(BINDIR)
+	rm -f marmot-v$(TAG).tgz 
 
 DISTDIR = /usr/local/marmot
 SERVER_EXE = vm-server

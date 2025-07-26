@@ -7,15 +7,25 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	cf "github.com/takara9/marmot/pkg/config"
 )
 
 // destroyCmd represents the destroy command
 var destroyCmd = &cobra.Command{
 	Use:   "destroy",
-	Short: "Shutdown and delete VM",
-	Long:  `Shutdown and delete virtual machine that created by marmot.`,
+	Short: "仮想マシンをシャットダウンして定義を削除します",
+	Long: `管理下のハイパーバイザー上の仮想マシンのシャットダウンと定義の削除を実施します。
+	デフォルトで 仮想マシンのスペック等が記述されたカレントディレクトリの cluster-config.yaml を使用します。`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("destroy called")
+		err := cf.ReadConfig("cluster-config.yaml", &cnf)
+		if err != nil {
+			fmt.Printf("Reading the config file", "err", err)
+			return
+		}
+		if len(apiEndpoint) > 0 {
+			ApiUrl = apiEndpoint
+		}
+		ReqRest(cnf, "destroyCluster", ApiUrl)
 	},
 }
 

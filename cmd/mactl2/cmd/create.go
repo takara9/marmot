@@ -7,15 +7,28 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	cf "github.com/takara9/marmot/pkg/config"
 )
 
 // createCmd represents the create command
 var createCmd = &cobra.Command{
 	Use:   "create",
-	Short: "Create virtual machine",
-	Long:  `Create virtual machine and run under marmot control hypervisors.`,
+	Short: "仮想マシンの生成と起動",
+	Long:  `管理下のハイパーバイザーの一つに仮想マシンをスケジュールして生成と起動を実施します。
+	デフォルトで 仮想マシンのスペック等が記述されたカレントディレクトリの cluster-config.yaml を使用します。`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("create called")
+		err := cf.ReadConfig("cluster-config.yaml", &cnf)
+		if err != nil {
+			fmt.Printf("Reading the config file", "err", err)
+			return
+		}
+		if len(apiEndpoint) > 0 {
+			ApiUrl = apiEndpoint
+		}
+		ReqRest(cnf, "createCluster", ApiUrl)
+		//if *auto {
+		//	apply_playbook(cnf)
+		//}
 	},
 }
 

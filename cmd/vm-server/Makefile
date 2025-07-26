@@ -1,7 +1,9 @@
 PROGRAM	= vm-server
 DISTDIR = /usr/local/marmot
 all:	$(PROGRAM)
-BINDIR = ../../bin
+
+TAG := $(shell cat ../../TAG)
+BINDIR = ../../marmot-v$(TAG)
 
 $(PROGRAM): $(%.go)
 	echo $(BINDIR)
