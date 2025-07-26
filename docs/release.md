@@ -1,4 +1,3 @@
-
 $ VERSION=`cat TAG`
 $ echo $VERSION
 $ git checkout main
