@@ -4,10 +4,23 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
+
+	cf "github.com/takara9/marmot/pkg/config"
+	//db "github.com/takara9/marmot/pkg/db"
 )
+
+type defaultConfig struct {
+	ApiServerUrl string `yaml:"api_server"`
+}
+
+var DefaultConfig defaultConfig
+var ApiUrl string
+var cnf cf.MarmotConfig
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -26,6 +39,21 @@ func Execute() {
 }
 
 func init() {
+	cf.ReadConfig(filepath.Join(os.Getenv("HOME"), ".config_marmot"), &DefaultConfig)
+
+	fmt.Println("conf=", DefaultConfig)
+
+	// パラメーター > コンフィグ
+	if len(DefaultConfig.ApiServerUrl) > 0 {
+		ApiUrl += DefaultConfig.ApiServerUrl
+	}
+	ccf := "cluster-config.yaml"
+	err := cf.ReadConfig(ccf, &cnf)
+	if err != nil {
+		fmt.Printf("Reading the config file", "err", err)
+		os.Exit(1)
+	}
+
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
