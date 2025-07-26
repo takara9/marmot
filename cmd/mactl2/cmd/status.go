@@ -21,6 +21,9 @@ var statusCmd = &cobra.Command{
 			fmt.Printf("Reading the config file", "err", err)
 			return
 		}
+		if len(apiEndpoint) > 0 {
+			ApiUrl = apiEndpoint
+		}
 		ListVm(cnf, ApiUrl)
 	},
 }

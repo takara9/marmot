@@ -20,6 +20,8 @@ type defaultConfig struct {
 var DefaultConfig defaultConfig
 var ApiUrl string
 var cnf cf.MarmotConfig
+var cfgFile string
+var apiEndpoint string
 
 // BODYのJSONエラーメッセージ処理用
 type msg struct {
@@ -48,6 +50,15 @@ func init() {
 	if len(DefaultConfig.ApiServerUrl) > 0 {
 		ApiUrl += DefaultConfig.ApiServerUrl
 	}
+	rootCmd.PersistentFlags().StringVar(&apiEndpoint, "api", "", "API Endpoint URL (default is $HOME/.config_marmot)")
+	//fmt.Println("EP=", apiEndpoint)
+	//fmt.Println("ApiUrl=", ApiUrl)
+
+	//if len(apiEndpoint) > 0 {
+	//	ApiUrl = apiEndpoint
+	//DefaultConfig = apiEndpoint
+	//cf.ReadConfig(filepath.Join(os.Getenv("HOME"), ".config_marmot"), &DefaultConfig)
+	//}
 
 	/*
 		err := cf.ReadConfig("cluster-config.yaml", &cnf)
@@ -64,5 +75,6 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	//rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+
 }

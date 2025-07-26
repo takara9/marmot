@@ -21,6 +21,9 @@ var createCmd = &cobra.Command{
 			fmt.Printf("Reading the config file", "err", err)
 			return
 		}
+		if len(apiEndpoint) > 0 {
+			ApiUrl = apiEndpoint
+		}
 		ReqRest(cnf, "createCluster", ApiUrl)
 		//if *auto {
 		//	apply_playbook(cnf)
