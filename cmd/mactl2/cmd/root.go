@@ -30,9 +30,9 @@ type msg struct {
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "mactl",
-	Short: "Marmot control command",
-	Long:  `mactl command use to control Marmot that is Virtual machine controller for experimental or learning`,
+	Use:   "mactl2",
+	Short: "Marmot コントロールコマンド",
+	Long:  `mactl は、ローカルPC上で QEMU, KVM、LVM, OpenSwitchを使用して実験や学習用の仮想マシン環境を提供します。`,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -75,6 +75,5 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	//rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-
+	rootCmd.Flags().BoolP("toggle", "t", false, "ヘルプメッセージの表示を切り替えます")
 }

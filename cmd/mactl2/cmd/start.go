@@ -13,8 +13,9 @@ import (
 // startCmd represents the start command
 var startCmd = &cobra.Command{
 	Use:   "start",
-	Short: "Start VMs",
-	Long:  `Start a virtual machines that stopped by mactl stop command.`,
+	Short: "停止中の仮想マシンを開始します。",
+	Long:  `stop で停止された仮想マシンの活動を再開します。
+	デフォルトで 仮想マシンのスペック等が記述されたカレントディレクトリの cluster-config.yaml を使用します。`,
 	Run: func(cmd *cobra.Command, args []string) {
 		err := cf.ReadConfig("cluster-config.yaml", &cnf)
 		if err != nil {

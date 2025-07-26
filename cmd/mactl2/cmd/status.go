@@ -13,8 +13,9 @@ import (
 // statusCmd represents the status command
 var statusCmd = &cobra.Command{
 	Use:   "status",
-	Short: "Show status VMs",
-	Long:  `Show status of virtual machines.`,
+	Short: "管理下の仮想マシンをリストします。",
+	Long:  `管理下の仮想マシンをリストします。カレントディレクトリに cluster-config.yaml が存在しなければ動作しません。
+	デフォルトで 仮想マシンのスペック等が記述されたカレントディレクトリの cluster-config.yaml を使用します。`,
 	Run: func(cmd *cobra.Command, args []string) {
 		err := cf.ReadConfig("cluster-config.yaml", &cnf)
 		if err != nil {

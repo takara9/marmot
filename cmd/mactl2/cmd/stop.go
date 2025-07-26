@@ -13,8 +13,9 @@ import (
 // stopCmd represents the stop command
 var stopCmd = &cobra.Command{
 	Use:   "stop",
-	Short: "Stop VMs",
-	Long:  `Stop virtual machines that created by mactl create command.`,
+	Short: "管理下の仮想マシンをシャットダウンして、CPUとメモリ資源を開放します。しかし、仮想マシンの定義は存続します。",
+	Long: `管理下の仮想マシンをシャットダウンして、CPUとメモリ資源を開放しますが、仮想マシンの定義は存続し、startコマンドで再開できます。
+	デフォルトで 仮想マシンのスペック等が記述されたカレントディレクトリの cluster-config.yaml を使用します。`,
 	Run: func(cmd *cobra.Command, args []string) {
 		err := cf.ReadConfig("cluster-config.yaml", &cnf)
 		if err != nil {
