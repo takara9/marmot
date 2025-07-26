@@ -134,3 +134,67 @@ func apply_playbook(cnf cf.MarmotConfig) {
 		}
 	}
 }
+
+// 全体の仮想マシンのリスト表示
+func GlobalListVm(api string) error {
+	_, body, err := ReqGet("virtualMachines", api)
+	StateDsp := []string{"RGIST", "PROVI", "RUN", "STOP", "DELT", "Error"}
+	if err != nil {
+		slog.Error("global-status", "err", err)
+		return err
+	}
+
+	dec := json.NewDecoder(strings.NewReader(string(body)))
+	dec.Token()
+	fmt.Printf("%-10s %-16s %-6s %-5s %-20s %-4v  %-6v %-15v %-15v ",
+		"CLUSTER", "VM-NAME", "H-Visr", "STAT", "VKEY", "VCPU", "RAM", "PubIP", "PriIP")
+	fmt.Printf("%-20s", "DATA STORAGE")
+	fmt.Printf("\n")
+	for dec.More() {
+		var vm db.VirtualMachine
+		err := dec.Decode(&vm)
+		if err != nil {
+			slog.Error("getting vm status", "err", err)
+		}
+		fmt.Printf("%-10s %-16s %-6s %-5s %-20s %-4v  %-6v %-15v %-15v ",
+			vm.ClusterName, vm.Name, vm.HvNode, StateDsp[vm.Status],
+			vm.Key, vm.Cpu, vm.Memory, vm.PrivateIp, vm.PublicIp)
+		for _, dv := range vm.Storage {
+			fmt.Printf("%-4d", dv.Size)
+		}
+		fmt.Printf("\n")
+	}
+	dec.Token()
+	return nil
+}
+
+// ハイパーバイザーのリスト表示
+func ListHv(api string) error {
+	_, body, err := ReqGet("hypervisors", api)
+	if err != nil {
+		slog.Error("listing hypervisors", "err", err)
+		return err
+	}
+	status := [3]string{"HLT", "ERR", "RUN"}
+
+	// Bodyの処理
+	dec := json.NewDecoder(strings.NewReader(string(body)))
+	dec.Token()
+	fmt.Printf("%-10s %-3v %-15v %-8v  %-12v   %-12v", "HV-NAME", "ONL", "IPaddr", "VCPU", "RAM(MB)", "Storage(GB)")
+	fmt.Printf("\n")
+	for dec.More() {
+		var hv db.Hypervisor
+		err := dec.Decode(&hv)
+		if err != nil {
+			slog.Error("reading hypervisors status", "err", err)
+		}
+		fmt.Printf("%-10s %-3v %-15v %4d/%-4d %6d/%-6d  ",
+			hv.Nodename, status[hv.Status], hv.IpAddr, hv.FreeCpu, hv.Cpu, hv.FreeMemory, hv.Memory)
+		for _, v := range hv.StgPool {
+			fmt.Printf("%v(%v): %5d/%-5d ", v.VolGroup, v.Type, v.FreeCap, v.VgCap)
+		}
+		fmt.Printf("\n")
+	}
+	dec.Token()
+	return nil
+}
