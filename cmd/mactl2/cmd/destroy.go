@@ -4,7 +4,10 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
+	cf "github.com/takara9/marmot/pkg/config"
 )
 
 // destroyCmd represents the destroy command
@@ -13,7 +16,11 @@ var destroyCmd = &cobra.Command{
 	Short: "Shutdown and delete VM",
 	Long:  `Shutdown and delete virtual machine that created by marmot.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		//fmt.Println("destroy called")
+		err := cf.ReadConfig("cluster-config.yaml", &cnf)
+		if err != nil {
+			fmt.Printf("Reading the config file", "err", err)
+			return
+		}
 		ReqRest(cnf, "destroyCluster", ApiUrl)
 	},
 }

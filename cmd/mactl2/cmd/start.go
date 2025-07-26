@@ -4,7 +4,10 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
+	cf "github.com/takara9/marmot/pkg/config"
 )
 
 // startCmd represents the start command
@@ -13,6 +16,11 @@ var startCmd = &cobra.Command{
 	Short: "Start VMs",
 	Long:  `Start a virtual machines that stopped by mactl stop command.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		err := cf.ReadConfig("cluster-config.yaml", &cnf)
+		if err != nil {
+			fmt.Printf("Reading the config file", "err", err)
+			return
+		}
 		ReqRest(cnf, "startCluster", ApiUrl)
 	},
 }

@@ -4,7 +4,6 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -21,6 +20,7 @@ type defaultConfig struct {
 var DefaultConfig defaultConfig
 var ApiUrl string
 var cnf cf.MarmotConfig
+
 // BODYのJSONエラーメッセージ処理用
 type msg struct {
 	Msg string
@@ -44,20 +44,18 @@ func Execute() {
 
 func init() {
 	cf.ReadConfig(filepath.Join(os.Getenv("HOME"), ".config_marmot"), &DefaultConfig)
-
-	fmt.Println("conf=", DefaultConfig)
-
 	// パラメーター > コンフィグ
 	if len(DefaultConfig.ApiServerUrl) > 0 {
 		ApiUrl += DefaultConfig.ApiServerUrl
 	}
-	ccf := "cluster-config.yaml"
-	err := cf.ReadConfig(ccf, &cnf)
-	if err != nil {
-		fmt.Printf("Reading the config file", "err", err)
-		os.Exit(1)
-	}
 
+	/*
+		err := cf.ReadConfig("cluster-config.yaml", &cnf)
+		if err != nil {
+			fmt.Printf("Reading the config file", "err", err)
+			os.Exit(1)
+		}
+	*/
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.

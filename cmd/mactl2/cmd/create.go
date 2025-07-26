@@ -4,7 +4,10 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
+	cf "github.com/takara9/marmot/pkg/config"
 )
 
 // createCmd represents the create command
@@ -13,6 +16,11 @@ var createCmd = &cobra.Command{
 	Short: "Create virtual machine",
 	Long:  `Create virtual machine and run under marmot control hypervisors.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		err := cf.ReadConfig("cluster-config.yaml", &cnf)
+		if err != nil {
+			fmt.Printf("Reading the config file", "err", err)
+			return
+		}
 		ReqRest(cnf, "createCluster", ApiUrl)
 		//if *auto {
 		//	apply_playbook(cnf)
