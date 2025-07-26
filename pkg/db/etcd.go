@@ -339,6 +339,7 @@ func FindByPublicIPaddress(con *etcd.Client, ipAddress string) (bool, error) {
 		if err != nil {
 			return false,nil /// 例外的にエラーを無視
 		}
+		fmt.Println("===========- ipAddress=",ipAddress,"  vm.PublicIp=",vm.PublicIp)
 		if ipAddress == vm.PublicIp {
 			return true, nil
 		}
@@ -358,6 +359,7 @@ func FindByPrivateIPaddress(con *etcd.Client,ipAddress string) (bool, error) {
 		if err != nil {
 			return false,nil /// データが存在しない時には、どうするか？
 		}
+		fmt.Println("===========- ipAddress=",ipAddress,"  vm.PrivateIp=",vm.PrivateIp)
 		if ipAddress == vm.PrivateIp {
 			return true, nil
 		}

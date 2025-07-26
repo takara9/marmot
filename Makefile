@@ -19,18 +19,16 @@ test:
 	staticcheck ./...
 
 .PHONY:	package
-package:
+package: all
 	@echo $(TAG)
 	cp cmd/install.sh bin/install.sh
 	cp cmd/vm-client/config_marmot bin/config_marmot
-	cd $(BINDIR) && tar czvf marmot-$(TAG).tgz *
+	cd $(BINDIR) && tar czvf marmot-v$(TAG).tgz *
 
 
 .PHONY:	clean
 clean:
 	rm -fr $(BINDIR)
-
-
 
 DISTDIR = /usr/local/marmot
 SERVER_EXE = vm-server
