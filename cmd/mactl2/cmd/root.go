@@ -21,6 +21,10 @@ type defaultConfig struct {
 var DefaultConfig defaultConfig
 var ApiUrl string
 var cnf cf.MarmotConfig
+// BODYのJSONエラーメッセージ処理用
+type msg struct {
+	Msg string
+}
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{

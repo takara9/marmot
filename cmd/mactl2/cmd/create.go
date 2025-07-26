@@ -4,8 +4,6 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -15,7 +13,10 @@ var createCmd = &cobra.Command{
 	Short: "Create virtual machine",
 	Long:  `Create virtual machine and run under marmot control hypervisors.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("create called")
+		ReqRest(cnf, "createCluster", ApiUrl)
+		//if *auto {
+		//	apply_playbook(cnf)
+		//}
 	},
 }
 

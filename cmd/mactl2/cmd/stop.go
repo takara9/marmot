@@ -4,8 +4,6 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -15,7 +13,7 @@ var stopCmd = &cobra.Command{
 	Short: "Stop VMs",
 	Long:  `Stop virtual machines that created by mactl create command.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("stop called")
+		ReqRest(cnf, "stopCluster", ApiUrl)
 	},
 }
 
