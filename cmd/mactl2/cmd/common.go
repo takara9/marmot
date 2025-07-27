@@ -198,3 +198,69 @@ func ListHv(api string) error {
 	dec.Token()
 	return nil
 }
+// 仮想マシンの詳細表示
+func DetailVm(cnf cf.MarmotConfig, api string, cname string, vname string) error {
+	_, body, err := ReqGet("virtualMachines", api)
+	if err != nil {
+		slog.Error("reading detail info of vm status", "err", err)
+		return err
+	}
+	StateDsp := []string{"RGIST", "PROVI", "RUN", "STOP", "DELT", "Error"}
+
+	dec := json.NewDecoder(strings.NewReader(string(body)))
+	dec.Token()
+	match := false
+	var vm db.VirtualMachine
+
+	for dec.More() {
+		// クラスタ名と仮想マシンが一致したものだけリスト
+		err := dec.Decode(&vm)
+		if err != nil {
+			slog.Error("listing vm status on cluster", "err", err)
+		}
+		// フィルター処理
+		if cname == vm.ClusterName {
+			if vname == vm.Name {
+				match = true
+				break
+			}
+		}
+	}
+	// 表示
+	if match {
+		fmt.Printf("\n*** Virtual Machine Detail Info ***\n")
+		fmt.Printf("\n")
+		fmt.Printf("Cluster Name : %s \n", vm.ClusterName)
+		fmt.Printf("Virtual Machine Name : %s \n", vm.Name)
+		fmt.Printf("UUID : %s\n", vm.Uuid)
+		fmt.Printf("Hypervisor : %s\n", vm.HvNode)
+		fmt.Printf("Key: %s \n", vm.Key)
+		fmt.Printf("Create Time: %s\n", vm.Ctime)
+		fmt.Printf("Start  Time: %s\n", vm.Stime)
+		fmt.Printf("Status : %s \n", StateDsp[vm.Status])
+		fmt.Printf("CPU : %d \n", vm.Cpu)
+		fmt.Printf("Memory(MB) : %d\n", vm.Memory)
+		fmt.Printf("Private IP addr : %s\n", vm.PrivateIp)
+		fmt.Printf("Public  IP addr : %s\n", vm.PublicIp)
+		fmt.Printf("\n")
+		fmt.Printf("OS Storage\n")
+		fmt.Printf("    Volume Group Name : %s\n", vm.OsVg)
+		fmt.Printf("    Logical Volume Name : %s\n", vm.OsLv)
+		fmt.Printf("    OS Variant : %s\n", vm.OsVariant)
+		fmt.Printf("\n")
+		fmt.Printf("Data Storage\n")
+		for _, v := range vm.Storage {
+			fmt.Printf("    Storage Name : %s\n", v.Name)
+			fmt.Printf("    Size(GB) : %d\n", v.Size)
+			fmt.Printf("    Volume Group Name : %s\n", v.Vg)
+			fmt.Printf("    Logical Volume Name : %s\n", v.Lv)
+			fmt.Printf("    Path : %s\n", v.Path)
+		}
+		fmt.Printf("\n")
+		fmt.Printf("Comment: %s \n", vm.Comment)
+		fmt.Printf("Ansible Playbook: %s \n", vm.Playbook)
+		fmt.Printf("\n")
+	}
+	dec.Token()
+	return nil
+}
