@@ -14,14 +14,15 @@ import (
 var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "管理下の仮想マシンをリストします。",
-	Long:  `管理下の仮想マシンをリストします。カレントディレクトリに cluster-config.yaml が存在しなければ動作しません。
+	Long: `管理下の仮想マシンをリストします。カレントディレクトリに cluster-config.yaml が存在しなければ動作しません。
 	デフォルトで 仮想マシンのスペック等が記述されたカレントディレクトリの cluster-config.yaml を使用します。`,
 	Run: func(cmd *cobra.Command, args []string) {
-		err := cf.ReadConfig("cluster-config.yaml", &cnf)
+		err := cf.ReadConfig(ClusterConfig, &cnf)
 		if err != nil {
 			fmt.Printf("Reading the config file", "err", err)
 			return
 		}
+
 		if len(apiEndpoint) > 0 {
 			ApiUrl = apiEndpoint
 		}
@@ -31,4 +32,5 @@ var statusCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(statusCmd)
+	statusCmd.PersistentFlags().StringVarP(&ClusterConfig, "cluster-config", "c", "cluster-config.yaml", "仮想サーバークラスタの構成ファイル")
 }

@@ -22,6 +22,9 @@ var ApiUrl string
 var cnf cf.MarmotConfig
 var cfgFile string
 var apiEndpoint string
+var ClusterConfig string
+
+//var ClusterConfig string
 
 // BODYのJSONエラーメッセージ処理用
 type msg struct {
@@ -51,29 +54,5 @@ func init() {
 		ApiUrl += DefaultConfig.ApiServerUrl
 	}
 	rootCmd.PersistentFlags().StringVar(&apiEndpoint, "api", "", "API Endpoint URL (default is $HOME/.config_marmot)")
-	//fmt.Println("EP=", apiEndpoint)
-	//fmt.Println("ApiUrl=", ApiUrl)
-
-	//if len(apiEndpoint) > 0 {
-	//	ApiUrl = apiEndpoint
-	//DefaultConfig = apiEndpoint
-	//cf.ReadConfig(filepath.Join(os.Getenv("HOME"), ".config_marmot"), &DefaultConfig)
-	//}
-
-	/*
-		err := cf.ReadConfig("cluster-config.yaml", &cnf)
-		if err != nil {
-			fmt.Printf("Reading the config file", "err", err)
-			os.Exit(1)
-		}
-	*/
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.mactl.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "ヘルプメッセージの表示を切り替えます")
 }

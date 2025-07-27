@@ -14,14 +14,15 @@ import (
 var createCmd = &cobra.Command{
 	Use:   "create",
 	Short: "仮想マシンの生成と起動",
-	Long:  `管理下のハイパーバイザーの一つに仮想マシンをスケジュールして生成と起動を実施します。
+	Long: `管理下のハイパーバイザーの一つに仮想マシンをスケジュールして生成と起動を実施します。
 	デフォルトで 仮想マシンのスペック等が記述されたカレントディレクトリの cluster-config.yaml を使用します。`,
 	Run: func(cmd *cobra.Command, args []string) {
-		err := cf.ReadConfig("cluster-config.yaml", &cnf)
+		err := cf.ReadConfig(ClusterConfig, &cnf)
 		if err != nil {
 			fmt.Printf("Reading the config file", "err", err)
 			return
 		}
+
 		if len(apiEndpoint) > 0 {
 			ApiUrl = apiEndpoint
 		}
@@ -34,14 +35,5 @@ var createCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(createCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// createCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// createCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	createCmd.PersistentFlags().StringVarP(&ClusterConfig, "config", "c", "cluster-config.yaml", "")
 }
