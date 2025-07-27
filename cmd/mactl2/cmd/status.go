@@ -7,28 +7,30 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	cf "github.com/takara9/marmot/pkg/config"
 )
 
 // statusCmd represents the status command
 var statusCmd = &cobra.Command{
 	Use:   "status",
-	Short: "Show status VMs",
-	Long:  `Show status of virtual machines.`,
+	Short: "管理下の仮想マシンをリストします。",
+	Long: `管理下の仮想マシンをリストします。カレントディレクトリに cluster-config.yaml が存在しなければ動作しません。
+	デフォルトで 仮想マシンのスペック等が記述されたカレントディレクトリの cluster-config.yaml を使用します。`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("status called")
+		err := cf.ReadConfig(ClusterConfig, &cnf)
+		if err != nil {
+			fmt.Printf("Reading the config file", "err", err)
+			return
+		}
+
+		if len(apiEndpoint) > 0 {
+			ApiUrl = apiEndpoint
+		}
+		ListVm(cnf, ApiUrl)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(statusCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// statusCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// statusCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	statusCmd.PersistentFlags().StringVarP(&ClusterConfig, "cluster-config", "c", "cluster-config.yaml", "仮想サーバークラスタの構成ファイル")
 }
