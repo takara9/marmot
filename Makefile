@@ -1,4 +1,4 @@
-PROGRAMS = vm-server vm-client hv-admin mactl2
+PROGRAMS = vm-server vm-client hv-admin mactl2 marmotd
 all:	$(PROGRAMS)
 
 MAKE = /usr/bin/make
@@ -7,12 +7,17 @@ TAG := $(shell cat TAG)
 BINDIR = $(CURDIR)/marmot-v$(TAG)
 
 $(PROGRAMS):
+	cd api
+	oapi-codegen -config config-v1.yaml marmot-api-v1.yaml
+	cd ..
 	mkdir -p $(BINDIR)
 	cd cmd/$@ && $(MAKE)
+
 
 setup:
 	env GOFLAGS= go install golang.org/x/tools/cmd/goimports@latest
 	env GOFLAGS= go install honnef.co/go/tools/cmd/staticcheck@latest
+	env GOFLAGS= go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
 
 test:
 	test -z "$$(gofmt -s -l . | tee /dev/stderr)"

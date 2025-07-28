@@ -1,0 +1,539 @@
+openapi: "3.0.3"
+info:
+  version: 0.0.2
+  title: REST API of Marmot Server
+servers:
+  - url: http://0.0.0.0:{port}{basePath}
+    description: Marmot Server API
+    variables:
+      port:
+        enum:
+          - "8080"
+        default: "8080"
+      basePath:
+        default: /api/v1
+        description: Base path for the API
+tags:
+  - name: user
+  - name: version
+paths:
+  /version:
+    get:
+      summary: "Get Version"
+      operationId: getVersion
+      tags:
+        - version
+      responses:
+        "200":
+          description: Get Marmot Server Version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Version"
+  /ping:
+    get:
+      summary: "Alive"
+      operationId: replyPing
+      tags:
+        - alive
+      responses:
+        "200":
+          description: Check Marmot Server is Alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReplyMessage"
+  /hypervisors:
+    get:
+      summary: "List Hypervisors"
+      operationId: listHypervisors
+      tags:
+        - hypervisor
+      parameters:
+        - name: limit
+          in: query
+          description: How many items to return at one time (max 100)
+          required: false
+          schema:
+            type: integer
+            maximum: 10
+            format: int32
+      responses:
+        "200":
+          description: List of Hypervisors
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Hypervisors"
+  /virtualMachines:
+    get:
+      summary: "List Virtual Machines"
+      operationId: listVirtualMachines
+      tags:
+        - virtual-machine
+      responses:
+        "200":
+          description: List of Virtual Machines
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/virtualMachines"
+  /createCluster:
+    post:
+      summary: "Create Cluster of Virtual Machines"
+      operationId: createCluster
+      tags:
+        - virtual-machine
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarmotConfig"
+      responses:
+        "201":
+          description: Created the Cluster
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /destroyCluster:
+    post:
+      summary: "Destroy Cluster of Virtual Machines"
+      operationId: destroyCluster
+      tags:
+        - virtual-machine
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarmotConfig"
+      responses:
+        "200":
+          description: Destroyed the Virtual Machines
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /stopCluster:
+    post:
+      summary: "Stop Cluster of Virtual Machines"
+      operationId: stopCluster
+      tags:
+        - virtual-machine
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarmotConfig"
+      responses:
+        "200":
+          description: Stopped the Virtual Machines
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /startCluster:
+    post:
+      summary: "Start Cluster of Virtual Machines"
+      operationId: startCluster
+      tags:
+        - virtual-machine
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarmotConfig"
+      responses:
+        "200":
+          description: Started the Virtual Machines
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /createVm:
+    post:
+      summary: "Create Virtual Machine"
+      operationId: createVirtualMachine
+      tags:
+        - virtual-machine
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/vmSpec"
+      responses:
+        "200":
+          description: Started the Virtual Machines
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /destroyVm:
+    post:
+      summary: "Destroy Virtual Machines"
+      operationId: destroyVirtualMachine
+      tags:
+        - virtual-machine
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/vmSpec"
+      responses:
+        "200":
+          description: Destroyed the Virtual Machines
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /stopVm:
+    post:
+      summary: "Stop Virtual Machines"
+      operationId: stopVirtualMachine
+      tags:
+        - virtual-machine
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/vmSpec"
+      responses:
+        "200":
+          description: Stopped the Virtual Machines
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /startVm:
+    post:
+      summary: "Start Virtual Machine"
+      operationId: startVirtualMachine
+      tags:
+        - virtual-machine
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/vmSpec"
+      responses:
+        "200":
+          description: Stopped the Virtual Machines
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /hypervisor/{hypervisorId}:
+    get:
+      summary: "Info for a specific hypervisor"
+      operationId: showHypervisorById
+      tags:
+        - hypervisor
+      parameters:
+        - name: hypervisorId
+          in: path
+          required: true
+          description: The id of the pet to retrieve
+          schema:
+            type: string
+  /vm-clusters:
+    post:
+      summary: "Create VM Cluster"
+      operationId: createVmCluster
+      tags:
+        - vm-cluster
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Pong"
+      responses:
+        "201":
+          description: VM Cluster Created Successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pong"
+
+    delete:
+      summary: "Delete VM Cluster"
+      operationId: deleteVmCluster
+      tags:
+        - vm-cluster
+      responses:
+        "204":
+          description: VM Cluster Deleted Successfully
+
+    get:
+      summary: "List VM Clusters"
+      operationId: listVmClusters
+      tags:
+        - vm-cluster
+      responses:
+        "200":
+          description: List of VM Clusters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pong"
+
+    put:
+      summary: "Update VM Cluster"
+      operationId: updateVmCluster
+      tags:
+        - vm-cluster
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Pong"
+
+      responses:
+        "200":
+          description: VM Cluster Updated Successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pong"
+components:
+  schemas:
+    Pong:
+      type: object
+      required:
+        - ping
+      properties:
+        ping:
+          type: string
+          example: pong
+    Version:
+      type: object
+      required:
+        - version
+      properties:
+        version:
+          type: string
+    Hypervisor:
+      type: object
+      required:
+        - nodeName
+        - cpu
+      properties:
+        nodeName:
+          type: string
+        cpu:
+          type: integer
+          format: int32
+        memory:
+          type: integer
+          format: int64
+        ipAddr:
+          type: string
+        freeCpu:
+          type: integer
+          format: int32
+        freeMemory:
+          type: integer
+          format: int64
+        key:
+          type: string
+        status:
+          type: integer
+          format: int32
+        stgPool:
+          type: array
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/storagePool"
+    storagePool:
+      type: object
+      properties:
+        volGroup:
+          type: string
+        freeCap:
+          type: integer
+          format: int64
+        vgCap:
+          type: integer
+          format: int64
+        type:
+          type: string
+    Hypervisors:
+      type: array
+      maxItems: 100
+      items:
+        $ref: "#/components/schemas/Hypervisor"
+    virtualMachines:
+      type: array
+      maxItems: 100
+      items:
+        $ref: "#/components/schemas/virtualMachine"
+    virtualMachine:
+      type: object
+      required:
+        - name
+        - HvNode
+      properties:
+        name:
+          type: string
+        clusterName:
+          type: string
+        key:
+          type: string
+        uuid:
+          type: string
+        HvNode:
+          type: string
+        cTime:
+          type: string
+          format: date-time
+        sTime:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          format: int32
+        cpu:
+          type: integer
+          format: int32
+        memory:
+          type: integer
+          format: int64
+        privateIp:
+          type: string
+        publicIp:
+          type: string
+        storage:
+          type: array
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/storage"
+        playbook:
+          type: string
+        content:
+          type: string
+        osLv:
+          type: string
+        osVg:
+          type: string
+        osVariant:
+          type: string
+    storage:
+      type: object
+      properties:
+        name:
+          type: string
+        size:
+          type: integer
+          format: int64
+        path:
+          type: string
+        type:
+          type: string
+        vg:
+          type: string
+    MarmotConfig:
+      type: object
+      properties:
+        domain:
+          type: string
+        cluster_name:
+          type: string
+        hypervisor:
+          type: string
+        imgae_template_path:
+          type: string
+        image_default_path:
+          type: string
+        qcow2_image:
+          type: string
+        os_variant:
+          type: string
+        private_ip_subnet:
+          type: string
+        public_ip_subnet:
+          type: string
+        net_dev_default:
+          type: string
+        net_dev_private:
+          type: string
+        net_dev_public:
+          type: string
+        public_ip_gw:
+          type: string
+        public_ip_dns:
+          type: string
+        vm_spec:
+          type: array
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/vmSpec"
+    vmSpec:
+      type: object
+      properties:
+        name:
+          type: string
+        cpu:
+          type: integer
+          format: int32
+        memory:
+          type: integer
+          format: int64
+        private_ip:
+          type: string
+        public_ip:
+          type: string
+        playbook:
+          type: string
+        comment:
+          type: string
+        uuid:
+          type: string
+        key:
+          type: string
+        ostempvg:
+          type: string
+        ostemplv:
+          type: string
+        ostempvariant:
+          type: string
+        storage:
+          type: array
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/storage"
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          format: int32
+        message:
+          type: string
+    ReplyMessage:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "ok"
+      required:
+        - message

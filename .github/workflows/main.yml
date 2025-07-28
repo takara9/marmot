@@ -57,7 +57,7 @@ jobs:
         ports: 
           - 1053:53/udp
         volumes:
-          -  /home/ubuntu/actions-runner/_work/marmot/marmot/pkg/dns/testconf:/conf
+          -  /var/actions-runner/_work/marmot/marmot/pkg/dns/testconf:/conf
         env:
           CONF: "/conf/Corefile"
           PORT: "53"
@@ -78,8 +78,6 @@ jobs:
       run: |
         docker ps
         dig -p 1053 @localhost A minio.labo.local +noall +answer
-
-
     - name: Check etcd put
       run: |
         export ETCDCTL_API=3 
@@ -128,8 +126,7 @@ jobs:
         cd pkg/virt
         sudo -s make test
         cd ../..
-
-
-
-
-
+    - name: Test marmotd
+      run: | 
+        cd cmd/marmotd
+        sudo make test
