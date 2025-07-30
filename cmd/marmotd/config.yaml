@@ -1,5 +1,5 @@
 package: api
-output: openapi.go
+output: api/openapi.go
 generate:
   echo-server: true
   models: true
