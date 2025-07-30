@@ -1,0 +1,179 @@
+openapi: "3.0.3"
+info:
+  version: 0.0.1
+  title: REST API of Marmot Server
+servers:
+  - url: http://0.0.0.0:8750
+tags:
+  - name: user
+  - name: version
+paths:
+  /version:
+    get:
+      summary: "Get Version"
+      operationId: getVersion
+      tags:
+        - version
+      responses:
+        '200':
+          description: Get Marmot Server Version
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version:
+                    type: string
+                    example: "0.0.1"
+  /ping:
+    get:
+      summary: "Alive"
+      operationId: getPong
+      tags:
+        - alive
+      responses:
+        '200':
+          description: Check Marmot Server is Alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pong'
+  /hypervisors:
+    get:
+      summary: "List Hypervisors"
+      operationId: listHypervisors
+      tags:
+        - hypervisor
+      responses:
+        '200':
+          description: List of Hypervisors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      example: "hypervisor-1"
+                    name:
+                      type: string
+                      example: "Hypervisor One"
+  /vm-clusters:
+    post:
+      summary: "Create VM Cluster"
+      operationId: createVmCluster
+      tags:
+        - vm-cluster
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "New VM Cluster"
+      responses:
+        '201':
+          description: VM Cluster Created Successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: "new-cluster-id"
+    delete:
+      summary: "Delete VM Cluster"
+      operationId: deleteVmCluster
+      tags:
+        - vm-cluster
+      responses:
+        '204':
+          description: VM Cluster Deleted Successfully                
+    get:
+      summary: "List VM Clusters"
+      operationId: listVmClusters
+      tags:
+        - vm-cluster
+      responses:
+        '200':
+          description: List of VM Clusters
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      example: "cluster-1"
+                    name:
+                      type: string
+                      example: "VM Cluster One"
+    put:
+      summary: "Update VM Cluster"
+      operationId: updateVmCluster
+      tags:
+        - vm-cluster
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  example: "cluster-1"
+                name:
+                  type: string
+                  example: "Updated VM Cluster"
+      responses:
+        '200':
+          description: VM Cluster Updated Successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: "updated-cluster-id"
+  /virtual-machines:
+    get:
+      summary: "List Virtual Machines"
+      operationId: listVirtualMachines
+      tags:
+        - virtual-machine
+      responses:
+        '200':
+          description: List of Virtual Machines
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      example: "vm-1"
+                    name:
+                      type: string
+                      example: "Virtual Machine One"
+components:
+  schemas:
+    Pong:
+      type: object
+      required:
+        - ping
+      properties:
+        ping:
+          type: string
+          example: pong
