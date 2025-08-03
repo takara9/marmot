@@ -4,9 +4,15 @@ import (
 	"fmt"
 
 	"github.com/labstack/echo/v4"
-	//"github.com/takara9/marmot/api"
-	api "github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/api"
+
+	cf "github.com/takara9/marmot/pkg/config"
+	ut "github.com/takara9/marmot/pkg/util"
 )
+
+// ローカルノード
+var node *string
+var etcd *string
 
 type Server struct{}
 
@@ -20,8 +26,8 @@ func main() {
 	fmt.Println(e.Start("0.0.0.0:8080"))
 }
 
-func (s Server) GetPong(ctx echo.Context) error {
-	return ctx.JSON(200, api.Pong{Ping: "OK"})
+func (s Server) ReplyPing(ctx echo.Context) error {
+	return ctx.JSON(200, api.ReplyMessage{Message: "ok"})
 }
 
 func (s Server) GetVersion(ctx echo.Context) error {
@@ -31,19 +37,8 @@ func (s Server) GetVersion(ctx echo.Context) error {
 // ListHypervisors implements api.ServerInterface.
 func (s Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsParams) error {
 	//panic("unimplemented")
-	//fmt.Printf("ListHypervisors called with params: %+v\n", params)
 
-	//fmt.Println("ListHypervisors called with params:", *params.Limit)
-
-	//if params.Limit != nil && *params.Limit > 100 {
-	//	return ctx.JSON(http.StatusBadRequest, "Limit cannot exceed 100")
-	//}
-
-	// Example response with two hypervisors
-	// In a real application, this would likely come from a database or other data source.
-	// Here we just return a static list for demonstration purposes.
 	IpAddr1 := "127.0.0.1"
-	//IpAddr2 := "127.0.0.5"
 	var memory int64
 	memory = 1024 * 1024 * 1024 // 1 GB in bytes
 
@@ -69,21 +64,65 @@ func (s Server) ListVirtualMachines(ctx echo.Context) error {
 	return ctx.JSON(200, vms)
 }
 
-func (s Server) CreateCluster(ctx echo.Context) error {
-	var cluster api.MarmotConfig
-	if err := ctx.Bind(&cluster); err != nil {
-		return ctx.JSON(400, api.Error{Code: 400, Message: "Invalid request body"})
-	}
-	fmt.Printf("CreateCluster called with config: %s\n", *cluster.Domain)
-	fmt.Printf("OsVariant: %s\n", *cluster.OsVariant)
-	for k, v := range *cluster.VmSpec {
-		fmt.Printf("VM Name %d: %s\n", k, *v.Name)
-		fmt.Printf("VM CPU %d: %d\n", k, *v.Cpu)
-		fmt.Printf("VM Memory %d: %d\n", k, *v.Memory)
+func convertToMarmotConfig(apix api.MarmotConfig) cf.MarmotConfig {
+	var cnf cf.MarmotConfig
+	// OpenAPIの構造体から、内部の設定構造体に変換
+	cnf.Domain = *apix.Domain
+	cnf.ClusterName = *apix.ClusterName
+	cnf.Hypervisor = *apix.Hypervisor
+	cnf.VmImageTempPath = *apix.ImgaeTemplatePath
+	cnf.VMImageDfltPath = *apix.ImgaeTemplatePath
+	cnf.VMImageQCOW = *apix.Qcow2Image
+	cnf.VMOsVariant = *apix.OsVariant
+	cnf.NetDevDefault = *apix.NetDevDefault
+	cnf.NetDevPrivate = *apix.NetDevPrivate
+	cnf.NetDevPublic = *apix.NetDevPublic
+	cnf.PublicIPGw = *apix.PublicIpGw
+	cnf.PublicIPDns = *apix.PublicIpSubnet
+	cnf.PublicIPSubnet = *apix.PublicIpSubnet
+	cnf.PrivateIPSubnet = *apix.PrivateIpSubnet
+	cnf.VMSpec = make([]cf.VMSpec, len(*apix.VmSpec))
+	for k, v := range *apix.VmSpec {
+		cnf.VMSpec[k].Name = *v.Name
+		cnf.VMSpec[k].CPU = int(*v.Cpu)
+		cnf.VMSpec[k].Memory = int(*v.Memory)
+		cnf.VMSpec[k].PrivateIP = *v.PrivateIp
+		cnf.VMSpec[k].PublicIP = *v.PublicIp
+		cnf.VMSpec[k].Storage = make([]cf.Storage, len(*v.Storage))
 		for k2, v2 := range *v.Storage {
-			fmt.Printf("VM Storage %d: %s, Size: %d\n", k2, *v2.Name, *v2.Size)
+			cnf.VMSpec[k].Storage[k2].Name = *v2.Name
+			cnf.VMSpec[k].Storage[k2].Size = int(*v2.Size)
+			cnf.VMSpec[k].Storage[k2].Path = *v2.Path
+			cnf.VMSpec[k].Storage[k2].VolGrp = *v2.Vg
+			cnf.VMSpec[k].Storage[k2].Type = *v2.Type
 		}
 	}
+	return cnf
+}
+
+func (s Server) CreateCluster(ctx echo.Context) error {
+	var apix api.MarmotConfig
+
+	if err := ctx.Bind(&apix); err != nil {
+		return ctx.JSON(400, api.Error{Code: 400, Message: "Invalid request body"})
+	}
+	cnf := convertToMarmotConfig(apix)
+
+	// etcdの設定を取得
+	if node == nil || etcd == nil {
+		return ctx.JSON(400, api.Error{Code: 400, Message: "Node or etcd configuration is not set"})
+	}
+
+	// ハイパーバイザーの稼働チェック 結果はDBへ反映
+	_, err := ut.CheckHypervisors(*etcd, *node)
+	if err != nil {
+		return ctx.JSON(400, api.Error{Code: 400, Message: err.Error()})
+	}
+
+	if err := ut.CreateCluster(cnf, *etcd, *node); err != nil {
+		return ctx.JSON(400, api.Error{Code: 400, Message: err.Error()})
+	}
+
 	return ctx.JSON(201, "")
 }
 

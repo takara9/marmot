@@ -43,8 +43,10 @@ type MarmotConfig struct {
 	ImgaeTemplatePath *string   `json:"imgae_template_path,omitempty"`
 	NetDevDefault     *string   `json:"net_dev_default,omitempty"`
 	NetDevPrivate     *string   `json:"net_dev_private,omitempty"`
+	NetDevPublic      *string   `json:"net_dev_public,omitempty"`
 	OsVariant         *string   `json:"os_variant,omitempty"`
 	PrivateIpSubnet   *string   `json:"private_ip_subnet,omitempty"`
+	PublicIpDns       *string   `json:"public_ip_dns,omitempty"`
 	PublicIpGw        *string   `json:"public_ip_gw,omitempty"`
 	PublicIpSubnet    *string   `json:"public_ip_subnet,omitempty"`
 	Qcow2Image        *string   `json:"qcow2_image,omitempty"`
@@ -56,6 +58,11 @@ type Pong struct {
 	Ping string `json:"ping"`
 }
 
+// ReplyMessage defines model for ReplyMessage.
+type ReplyMessage struct {
+	Message string `json:"message"`
+}
+
 // Version defines model for Version.
 type Version struct {
 	Version string `json:"version"`
@@ -63,11 +70,11 @@ type Version struct {
 
 // Storage defines model for storage.
 type Storage struct {
-	Lv    *string `json:"lv,omitempty"`
-	Name  *string `json:"name,omitempty"`
-	Paths *string `json:"paths,omitempty"`
-	Size  *int64  `json:"size,omitempty"`
-	Vg    *string `json:"vg,omitempty"`
+	Name *string `json:"name,omitempty"`
+	Path *string `json:"path,omitempty"`
+	Size *int64  `json:"size,omitempty"`
+	Type *string `json:"type,omitempty"`
+	Vg   *string `json:"vg,omitempty"`
 }
 
 // StoragePool defines model for storagePool.
@@ -178,7 +185,7 @@ type ServerInterface interface {
 	ListHypervisors(ctx echo.Context, params ListHypervisorsParams) error
 	// Alive
 	// (GET /ping)
-	GetPong(ctx echo.Context) error
+	ReplyPing(ctx echo.Context) error
 	// Start Cluster of Virtual Machines
 	// (POST /startCluster)
 	StartCluster(ctx echo.Context) error
@@ -286,12 +293,12 @@ func (w *ServerInterfaceWrapper) ListHypervisors(ctx echo.Context) error {
 	return err
 }
 
-// GetPong converts echo context to params.
-func (w *ServerInterfaceWrapper) GetPong(ctx echo.Context) error {
+// ReplyPing converts echo context to params.
+func (w *ServerInterfaceWrapper) ReplyPing(ctx echo.Context) error {
 	var err error
 
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.GetPong(ctx)
+	err = w.Handler.ReplyPing(ctx)
 	return err
 }
 
@@ -419,7 +426,7 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.POST(baseURL+"/destroyVm", wrapper.DestroyVirtualMachine)
 	router.GET(baseURL+"/hypervisor/:hypervisorId", wrapper.ShowHypervisorById)
 	router.GET(baseURL+"/hypervisors", wrapper.ListHypervisors)
-	router.GET(baseURL+"/ping", wrapper.GetPong)
+	router.GET(baseURL+"/ping", wrapper.ReplyPing)
 	router.POST(baseURL+"/startCluster", wrapper.StartCluster)
 	router.POST(baseURL+"/startVm", wrapper.StartVirtualMachine)
 	router.POST(baseURL+"/stopCluster", wrapper.StopCluster)
