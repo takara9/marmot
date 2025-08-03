@@ -4,7 +4,8 @@ import (
 	"fmt"
 
 	"github.com/labstack/echo/v4"
-	"github.com/takara9/marmot/api"
+	//"github.com/takara9/marmot/api"
+	api "github.com/takara9/marmot/api"
 )
 
 type Server struct{}
