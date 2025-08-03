@@ -1,0 +1,7 @@
+package: api
+output: marmot-api-v1.go
+generate:
+  echo-server: true
+  models: true
+output-options:
+  skip-prune: true
