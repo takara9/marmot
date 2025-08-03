@@ -8,7 +8,7 @@ BINDIR = $(CURDIR)/marmot-v$(TAG)
 
 $(PROGRAMS):
 	cd api
-	oapi-codegen -config config.yaml marmot-api.yaml
+	oapi-codegen -config config-v1.yaml marmot-api-v1.yaml
 	cd ..
 	mkdir -p $(BINDIR)
 	cd cmd/$@ && $(MAKE)

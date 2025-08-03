@@ -1,5 +1,5 @@
 package: api
-output: api/marmot-api.go
+output: marmot-api-v1.go
 generate:
   echo-server: true
   models: true
