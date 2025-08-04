@@ -179,7 +179,7 @@ func (s Server) StopCluster(ctx echo.Context) error {
 	fmt.Printf("CreateCluster called with config: %s\n", *cluster.Domain)
 	fmt.Printf("OsVariant: %s\n", *cluster.OsVariant)
 	for k, v := range *cluster.VmSpec {
-		fmt.Printf("VM Name %d: %s\n", k, v.Name)
+		fmt.Printf("VM Name %d: %s\n", k, *v.Name)
 		fmt.Printf("VM CPU %d: %d\n", k, *v.Cpu)
 		fmt.Printf("VM Memory %d: %d\n", k, *v.Memory)
 		for k2, v2 := range *v.Storage {
@@ -212,7 +212,7 @@ func (s Server) StartCluster(ctx echo.Context) error {
 	fmt.Printf("CreateCluster called with config: %s\n", *cluster.Domain)
 	fmt.Printf("OsVariant: %s\n", *cluster.OsVariant)
 	for k, v := range *cluster.VmSpec {
-		fmt.Printf("VM Name %d: %s\n", k, v.Name)
+		fmt.Printf("VM Name %d: %s\n", k, *v.Name)
 		fmt.Printf("VM CPU %d: %d\n", k, *v.Cpu)
 		fmt.Printf("VM Memory %d: %d\n", k, *v.Memory)
 		for k2, v2 := range *v.Storage {
