@@ -129,4 +129,4 @@ jobs:
     - name: Test marmotd
       run: | 
         cd cmd/marmotd
-        make test
+        sudo make test
