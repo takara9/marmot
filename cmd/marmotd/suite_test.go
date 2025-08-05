@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestTsrTransporter(t *testing.T) {
+func TestMarmotd(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Marmot Test Suite")
 }

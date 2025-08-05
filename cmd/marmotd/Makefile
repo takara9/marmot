@@ -1,7 +1,7 @@
 GO=/usr/local/go/bin/go
-GINKGO=/home/ubuntu/go/bin/ginkgo
 
 .PHONY: test
 test:
-	$(GINKGO) -v --race --focus-file mock-server_test.go
+	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -coverprofile cover.out
+	#$(GINKGO) -v --race --focus-file mock-server_test.go
 	
