@@ -126,3 +126,7 @@ jobs:
         cd pkg/virt
         sudo -s make test
         cd ../..
+    - name: Test marmotd
+      run: | 
+        cd cmd/marmotd
+        sudo -s make test
