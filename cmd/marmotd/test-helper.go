@@ -90,4 +90,3 @@ func (m *MarmotEndpoint) GetVersion() (int, []byte, *url.URL, error) {
 	req.Header.Set("Accept", "application/json")
 	return m.httpRequest(req)
 }
-k
