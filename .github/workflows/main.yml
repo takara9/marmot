@@ -128,5 +128,8 @@ jobs:
         cd ../..
     - name: Test marmotd
       run: | 
+        GO=/usr/local/go/bin/go
+        GINKGO=/home/ubuntu/go/bin/ginkgo
+        export PATH=$PATH:$GO:$GINKGO
         cd cmd/marmotd
         sudo make test
