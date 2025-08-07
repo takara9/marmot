@@ -66,6 +66,7 @@ func (m *MarmotEndpoint) httpRequest(req *http.Request) (int, []byte, *url.URL, 
 	return resp.StatusCode, byteJSON, jobURL, nil
 }
 
+
 func (m *MarmotEndpoint) setUrl(apiPath string) string {
 	return fmt.Sprintf("%s://%s%s%s", m.Scheme, m.HostPort, m.BasePath, apiPath)
 }
@@ -88,5 +89,19 @@ func (m *MarmotEndpoint) GetVersion() (int, []byte, *url.URL, error) {
 	}
 	req.Header.Set("User-Agent", "MarmotdClient/1.0")
 	req.Header.Set("Accept", "application/json")
+	return m.httpRequest(req)
+}
+
+func (m *MarmotEndpoint) ListHypervisors(cluster *api.MarmotConfig) (int, []byte, *url.URL, error) {
+	url := m.setUrl("/hypervisors")
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	req.Header.Set("User-Agent", "MarmotdClient/1.0")
+	req.Header.Set("Accept", "application/json")
+	if cluster != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	return m.httpRequest(req)
 }
