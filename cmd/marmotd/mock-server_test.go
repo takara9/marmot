@@ -131,7 +131,7 @@ var _ = Describe("Mock Test", Ordered, func() {
 		It("テスト用データベースとの接続ができること", func() {
 			var node *string
 			var etcd *string
-			a := "hv1"
+			a := "hvc"
 			node = &a
 			b := "http://127.0.0.1:2379"
 			etcd = &b
