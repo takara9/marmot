@@ -11,8 +11,8 @@ import (
 )
 
 // ローカルノード
-var node *string
-var etcd *string
+var node string = "http://localhost:2379"
+var etcd string = "hvc"
 
 type Server struct{}
 
@@ -23,10 +23,11 @@ func main() {
 	api.RegisterHandlersWithBaseURL(e, server, "/api/v1")
 
 	// 起動パラメータから読み込むべき
-	a := "http://localhost:2379"
-	etcd = &a
-	b := "hvc"
-	node = &b
+	//a := "http://localhost:2379"
+	//etcd = &a
+	//etcd = "http://localhost:2379"
+	//b := "hvc"
+	//node = &b
 
 	// And we serve HTTP until the world ends.
 	fmt.Println(e.Start("0.0.0.0:8080"))
@@ -59,9 +60,9 @@ func (s Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPara
 	// ハイパーバイザーの稼働チェック　結果はDBへ反映
 	fmt.Println("========================================= 1")
 	fmt.Println("========  etcd=", etcd)
-	fmt.Println("======== *etcd=", *etcd)
+	fmt.Println("======== &etcd=", &etcd)
 	fmt.Println("========  node=", node)
-	fmt.Println("======== *node=", *node)
+	fmt.Println("======== &node=", &node)
 
 	/*
 		_, err := util.CheckHypervisors(*etcd, *node)
