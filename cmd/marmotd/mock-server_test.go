@@ -69,16 +69,13 @@ var _ = Describe("Mock Test", Ordered, func() {
 
 	Context("基本的なアクセステスト", func() {
 		const hypervior_config string = "testdata/hypervisor-config.yaml"
-		var cnf config.Hypervisors_yaml
+		var hvs config.Hypervisors_yaml
 
 		It("ハイパーバイザーのコンフィグファイルの読み取り", func() {
-			err := config.ReadConfig(hypervior_config, &cnf)
+			//config := flag.String("config", "hypervisor-config.yaml", "Hypervisor config file")
+			//flag.Parse()
+			err = config.ReadYAML("testdata/hypervisor-config.yaml", &hvs)
 			Expect(err).NotTo(HaveOccurred())
-			for i, h := range cnf.Hvs {
-				GinkgoWriter.Println(i)
-				GinkgoWriter.Println(h.Name)
-				GinkgoWriter.Println(h.Cpu)
-			}
 		})
 
 		It("データベースへの接続", func() {
@@ -86,24 +83,25 @@ var _ = Describe("Mock Test", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("ハイパーバイザー名の書き込み", func() {
-			// ハイパーバイザー
-			for i, hv := range cnf.Hvs {
-				fmt.Println("--- hv", hv.Name)
-				GinkgoWriter.Println(i, hv)
-				db.SetHypervisor(Conn, hv)
+		It("ハイパーバイザーの情報セット", func() {
+			for _, hv := range hvs.Hvs {
+				fmt.Println(hv)
+				err := db.SetHypervisor(Conn, hv)
+				Expect(err).NotTo(HaveOccurred())
 			}
+		})
 
-			// OSイメージテンプレート
-			for i, hd := range cnf.Imgs {
-				GinkgoWriter.Println(i, hd)
-				db.SetImageTemplate(Conn, hd)
+		It("OSイメージテンプレート", func() {
+			for _, hd := range hvs.Imgs {
+				err := db.SetImageTemplate(Conn, hd)
+				Expect(err).NotTo(HaveOccurred())
 			}
+		})
 
-			// シーケンス番号のリセット
-			for i, sq := range cnf.Seq {
-				GinkgoWriter.Println(i, sq)
-				db.CreateSeq(Conn, sq.Key, sq.Start, sq.Step)
+		It("シーケンス番号のリセット", func() {
+			for _, sq := range hvs.Seq {
+				err := db.CreateSeq(Conn, sq.Key, sq.Start, sq.Step)
+				Expect(err).NotTo(HaveOccurred())
 			}
 		})
 
