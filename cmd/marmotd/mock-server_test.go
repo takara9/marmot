@@ -72,8 +72,6 @@ var _ = Describe("Mock Test", Ordered, func() {
 		var hvs config.Hypervisors_yaml
 
 		It("ハイパーバイザーのコンフィグファイルの読み取り", func() {
-			//config := flag.String("config", "hypervisor-config.yaml", "Hypervisor config file")
-			//flag.Parse()
 			err = config.ReadYAML("testdata/hypervisor-config.yaml", &hvs)
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -128,17 +126,15 @@ var _ = Describe("Mock Test", Ordered, func() {
 			Expect(url).To(BeNil(), "Expected no URL from ping response")
 		})
 
-		It("テスト用データベースとの接続ができること", func() {
+		It("テスト用データベースでVGの確認ができること", func() {
 			var node *string
 			var etcd *string
 			a := "hvc"
 			node = &a
 			b := "http://127.0.0.1:2379"
 			etcd = &b
-
 			err := util.CheckHvVgAll(*etcd, *node)
 			Expect(err).To(BeNil(), "Expected no error")
-
 		})
 
 		It("管理下のハイパーバイザーがリストされること", func() {
