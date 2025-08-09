@@ -20,21 +20,11 @@ type Server struct{}
 func main() {
 	e := echo.New()
 	server := Server{}
-	//api.RegisterHandlers(e, server)
 	api.RegisterHandlersWithBaseURL(e, server, "/api/v1")
-
-	// 起動パラメータから読み込むべき
-	//a := "http://localhost:2379"
-	//etcd = &a
-	//etcd = "http://localhost:2379"
-	//b := "hvc"
-	//node = &b
-
 	// And we serve HTTP until the world ends.
 	fmt.Println(e.Start("0.0.0.0:8080"))
 }
 
-// /////////////////////////////////////////////////////////
 func (s Server) ReplyPing(ctx echo.Context) error {
 	return ctx.JSON(200, api.ReplyMessage{Message: "ok"})
 }
@@ -46,52 +36,30 @@ func (s Server) GetVersion(ctx echo.Context) error {
 // ListHypervisors implements api.ServerInterface.
 func (s Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsParams) error {
 	//panic("unimplemented")
-	// ここの中身を marmot の実態に置き換えること
-	/*
-		IpAddr1 := "127.0.0.1"
-		var memory int64
-		memory = 1024 * 1024 * 1024 // 1 GB in bytes
-
-		hvs := api.Hypervisors{
-			{NodeName: "hv1", Cpu: 64, IpAddr: &IpAddr1},
-			{NodeName: "hv2", Cpu: 64, Memory: &memory},
-		}
-		return ctx.JSON(200, hvs)
-	*/
 	// ハイパーバイザーの稼働チェック　結果はDBへ反映
-	fmt.Println("========================================= 1")
-	fmt.Println("========  etcd=", etcd)
-	fmt.Println("======== &etcd=", &etcd)
-	fmt.Println("========  node=", node)
-	fmt.Println("======== &node=", &node)
-
 	_, err := util.CheckHypervisors(etcd, node)
 	if err != nil {
 		return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
 	}
 
 	// ストレージ容量の更新 結果はDBへ反映
-	fmt.Println("========================================= 2")
 	err = util.CheckHvVgAll(etcd, node)
 	if err != nil {
 		return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
 	}
 
 	// データベースから情報を取得
-	fmt.Println("========================================= 3")
 	Conn, err := db.Connect(etcd)
 	if err != nil {
 		return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
 	}
 
-	fmt.Println("========================================= 4")
 	var hvs []db.Hypervisor
 	err = db.GetHvsStatus(Conn, &hvs)
 	if err != nil {
 		return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
 	}
 
-	//return ctx.JSON(500, api.Error{Code: 500, Message: "err"})
 	return ctx.JSON(200, hvs)
 }
 
@@ -148,29 +116,27 @@ func convertToMarmotConfig(apix api.MarmotConfig) cf.MarmotConfig {
 }
 
 func (s Server) CreateCluster(ctx echo.Context) error {
-	//var apix api.MarmotConfig
+	var apix api.MarmotConfig
 
-	/*
-		if err := ctx.Bind(&apix); err != nil {
-			return ctx.JSON(400, api.Error{Code: 400, Message: "Invalid request body"})
-		}
-		cnf := convertToMarmotConfig(apix)
+	if err := ctx.Bind(&apix); err != nil {
+		return ctx.JSON(400, api.Error{Code: 400, Message: "Invalid request body"})
+	}
+	cnf := convertToMarmotConfig(apix)
 
-		// etcdの設定を取得
-		if node == nil || etcd == nil {
-			return ctx.JSON(400, api.Error{Code: 400, Message: "Node or etcd configuration is not set"})
-		}
+	// etcdの設定を取得
+	if node == "" || etcd == "" {
+		return ctx.JSON(400, api.Error{Code: 400, Message: "Node or etcd configuration is not set"})
+	}
 
-		// ハイパーバイザーの稼働チェック 結果はDBへ反映
-		_, err := util.CheckHypervisors(*etcd, *node)
-		if err != nil {
-			return ctx.JSON(400, api.Error{Code: 400, Message: err.Error()})
-		}
+	// ハイパーバイザーの稼働チェック 結果はDBへ反映
+	_, err := util.CheckHypervisors(etcd, node)
+	if err != nil {
+		return ctx.JSON(400, api.Error{Code: 400, Message: err.Error()})
+	}
 
-		if err := util.CreateCluster(cnf, *etcd, *node); err != nil {
-			return ctx.JSON(400, api.Error{Code: 400, Message: err.Error()})
-		}
-	*/
+	if err := util.CreateCluster(cnf, etcd, node); err != nil {
+		return ctx.JSON(400, api.Error{Code: 400, Message: err.Error()})
+	}
 
 	return ctx.JSON(201, "")
 }

@@ -147,13 +147,13 @@ var _ = Describe("Mock Test", Ordered, func() {
 			Expect(err).To(BeNil(), "Expected no error unmarshalling hypervisors")
 			Expect(len(hypervisors)).To(BeNumerically(">", 0), "Expected at least one hypervisor")
 			for _, hv := range hypervisors {
-				GinkgoWriter.Printf("Hypervisor: %+v\n", hv.NodeName)
-				GinkgoWriter.Printf("    cpu: %+v¥n", hv.Cpu)
+				GinkgoWriter.Printf("Hypervisor: %+v", hv.NodeName)
+				GinkgoWriter.Printf("    cpu: %+v", hv.Cpu)
 				if hv.IpAddr != nil {
-					GinkgoWriter.Printf("    IP:  %+v¥n", *hv.IpAddr)
+					GinkgoWriter.Printf("    IP:  %+v", *hv.IpAddr)
 				}
 				if hv.Memory != nil {
-					GinkgoWriter.Printf("    Mem: %+v¥n", *hv.Memory)
+					GinkgoWriter.Printf("    Mem: %+v", *hv.Memory)
 				}
 				GinkgoWriter.Println()
 			}
