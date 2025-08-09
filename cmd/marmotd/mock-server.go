@@ -12,8 +12,8 @@ import (
 )
 
 // ローカルノード
-var node string = "http://localhost:2379"
-var etcd string = "hvc"
+var node string = "hvc"
+var etcd string = "http://localhost:2379"
 
 type Server struct{}
 
