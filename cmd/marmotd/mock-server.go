@@ -7,7 +7,6 @@ import (
 	"github.com/takara9/marmot/api"
 
 	cf "github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/util"
 )
 
 // ローカルノード
@@ -148,27 +147,29 @@ func convertToMarmotConfig(apix api.MarmotConfig) cf.MarmotConfig {
 }
 
 func (s Server) CreateCluster(ctx echo.Context) error {
-	var apix api.MarmotConfig
+	//var apix api.MarmotConfig
 
-	if err := ctx.Bind(&apix); err != nil {
-		return ctx.JSON(400, api.Error{Code: 400, Message: "Invalid request body"})
-	}
-	cnf := convertToMarmotConfig(apix)
+	/*
+		if err := ctx.Bind(&apix); err != nil {
+			return ctx.JSON(400, api.Error{Code: 400, Message: "Invalid request body"})
+		}
+		cnf := convertToMarmotConfig(apix)
 
-	// etcdの設定を取得
-	if node == nil || etcd == nil {
-		return ctx.JSON(400, api.Error{Code: 400, Message: "Node or etcd configuration is not set"})
-	}
+		// etcdの設定を取得
+		if node == nil || etcd == nil {
+			return ctx.JSON(400, api.Error{Code: 400, Message: "Node or etcd configuration is not set"})
+		}
 
-	// ハイパーバイザーの稼働チェック 結果はDBへ反映
-	_, err := util.CheckHypervisors(*etcd, *node)
-	if err != nil {
-		return ctx.JSON(400, api.Error{Code: 400, Message: err.Error()})
-	}
+		// ハイパーバイザーの稼働チェック 結果はDBへ反映
+		_, err := util.CheckHypervisors(*etcd, *node)
+		if err != nil {
+			return ctx.JSON(400, api.Error{Code: 400, Message: err.Error()})
+		}
 
-	if err := util.CreateCluster(cnf, *etcd, *node); err != nil {
-		return ctx.JSON(400, api.Error{Code: 400, Message: err.Error()})
-	}
+		if err := util.CreateCluster(cnf, *etcd, *node); err != nil {
+			return ctx.JSON(400, api.Error{Code: 400, Message: err.Error()})
+		}
+	*/
 
 	return ctx.JSON(201, "")
 }
