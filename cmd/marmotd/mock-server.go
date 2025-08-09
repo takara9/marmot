@@ -23,6 +23,12 @@ func main() {
 	//api.RegisterHandlers(e, server)
 	api.RegisterHandlersWithBaseURL(e, server, "/api/v1")
 
+	// 起動パラメータから読み込むべき
+	a := "http://localhost:2379"
+	etcd = &a
+	b := "hvc"
+	node = &b
+
 	// And we serve HTTP until the world ends.
 	fmt.Println(e.Start("0.0.0.0:8080"))
 }
