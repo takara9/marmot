@@ -94,19 +94,17 @@ var _ = Describe("Mock Test", Ordered, func() {
 				db.SetHypervisor(Conn, hv)
 			}
 
-			/*
-				// OSイメージテンプレート
-				for i, hd := range cnf.Imgs {
-					GinkgoWriter.Println(i, hd)
-					db.SetImageTemplate(Conn, hd)
-				}
+			// OSイメージテンプレート
+			for i, hd := range cnf.Imgs {
+				GinkgoWriter.Println(i, hd)
+				db.SetImageTemplate(Conn, hd)
+			}
 
-				// シーケンス番号のリセット
-				for i, sq := range cnf.Seq {
-					GinkgoWriter.Println(i, sq)
-					db.CreateSeq(Conn, sq.Key, sq.Start, sq.Step)
-				}
-			*/
+			// シーケンス番号のリセット
+			for i, sq := range cnf.Seq {
+				GinkgoWriter.Println(i, sq)
+				db.CreateSeq(Conn, sq.Key, sq.Start, sq.Step)
+			}
 		})
 
 		It("Marmotd の EPを確認", func() {
