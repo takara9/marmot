@@ -7,6 +7,8 @@ import (
 	"github.com/takara9/marmot/api"
 
 	cf "github.com/takara9/marmot/pkg/config"
+	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/util"
 )
 
 // ローカルノード
@@ -63,35 +65,34 @@ func (s Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPara
 	fmt.Println("========  node=", node)
 	fmt.Println("======== &node=", &node)
 
-	/*
-		_, err := util.CheckHypervisors(*etcd, *node)
-		if err != nil {
-			return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
-		}
+	_, err := util.CheckHypervisors(etcd, node)
+	if err != nil {
+		return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
+	}
 
-		// ストレージ容量の更新 結果はDBへ反映
-		fmt.Println("========================================= 2")
-		err = util.CheckHvVgAll(*etcd, *node)
-		if err != nil {
-			return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
-		}
+	// ストレージ容量の更新 結果はDBへ反映
+	fmt.Println("========================================= 2")
+	err = util.CheckHvVgAll(etcd, node)
+	if err != nil {
+		return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
+	}
 
-		// データベースから情報を取得
-		fmt.Println("========================================= 3")
-		Conn, err := db.Connect(*etcd)
-		if err != nil {
-			return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
-		}
+	// データベースから情報を取得
+	fmt.Println("========================================= 3")
+	Conn, err := db.Connect(etcd)
+	if err != nil {
+		return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
+	}
 
-		fmt.Println("========================================= 4")
-		var hvs []db.Hypervisor
-		err = db.GetHvsStatus(Conn, &hvs)
-		if err != nil {
-			return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
-		}
-	*/
-	return ctx.JSON(500, api.Error{Code: 500, Message: "err"})
-	//return ctx.JSON(200, hvs)
+	fmt.Println("========================================= 4")
+	var hvs []db.Hypervisor
+	err = db.GetHvsStatus(Conn, &hvs)
+	if err != nil {
+		return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
+	}
+
+	//return ctx.JSON(500, api.Error{Code: 500, Message: "err"})
+	return ctx.JSON(200, hvs)
 }
 
 func (s Server) ListVirtualMachines(ctx echo.Context) error {
