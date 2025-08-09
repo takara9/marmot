@@ -7,17 +7,17 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/util"
 )
 
 var _ = Describe("Mock Test", Ordered, func() {
+	var ep *MarmotEndpoint
+	var err error
 	BeforeAll(func(ctx SpecContext) {
 		GinkgoWriter.Println("Start marmot server mock")
-		startMockServer()
-	}, NodeTimeout(20*time.Second))
-
-	Context("Basic access test", func() {
+		startMockServer() // 戻り値なし
 		time.Sleep(5 * time.Second)
-		ep, err := NewMarmotdEp(
+		ep, err = NewMarmotdEp(
 			"http",
 			"127.0.0.1:8080",
 			"/api/v1",
@@ -27,12 +27,16 @@ var _ = Describe("Mock Test", Ordered, func() {
 		} else {
 			GinkgoWriter.Println("MarmotEndpoint created successfully:", ep)
 		}
+	}, NodeTimeout(20*time.Second))
 
-		It("Check endpoint", func() {
-			GinkgoWriter.Println("MarmotEndpoint created successfully:", ep)
+	Context("基本的なアクセステスト", func() {
+
+		It("Marmotd の EPを確認", func() {
+			GinkgoWriter.Println("epが作成され nil でないこと ep:", ep)
+			Expect(ep).ToNot(BeNil(), "作成に失敗している。")
 		})
 
-		It("Alive check Marmot server", func() {
+		It("Marmotd の生存確認", func() {
 			statusCode, body, url, err := ep.Ping()
 			GinkgoWriter.Printf("Status Code: %d, Body: %s, URL: %v, Error: %v\n", statusCode, body, url, err)
 			Expect(err).To(BeNil(), "Expected no error from ping")
@@ -41,7 +45,7 @@ var _ = Describe("Mock Test", Ordered, func() {
 			Expect(url).To(BeNil(), "Expected no URL from ping response")
 		})
 
-		It("Get version of marmotd server", func() {
+		It("Marmotd のバージョンを取得できること", func() {
 			statusCode, body, url, err := ep.GetVersion()
 			GinkgoWriter.Printf("Status Code: %d, Body: %s, URL: %v, Error: %v\n", statusCode, body, url, err)
 			Expect(err).To(BeNil(), "Expected no error")
@@ -50,8 +54,20 @@ var _ = Describe("Mock Test", Ordered, func() {
 			Expect(url).To(BeNil(), "Expected no URL from ping response")
 		})
 
-		It("Get list of marmod nodes", func() {
+		It("テスト用データベースとの接続ができること", func() {
+			var node *string
+			var etcd *string
+			a := "hv1"
+			node = &a
+			b := "http://127.0.0.1:2379"
+			etcd = &b
 
+			err := util.CheckHvVgAll(*etcd, *node)
+			Expect(err).To(BeNil(), "Expected no error")
+
+		})
+
+		It("管理下のハイパーバイザーがリストされること", func() {
 			statusCode, body, url, err := ep.ListHypervisors(nil)
 			GinkgoWriter.Printf("Status Code: %d, Body: %s, URL: %v, Error: %v\n", statusCode, body, url, err)
 			Expect(err).To(BeNil(), "Expected no error")
@@ -64,10 +80,10 @@ var _ = Describe("Mock Test", Ordered, func() {
 				GinkgoWriter.Printf("Hypervisor: %+v\n", hv.NodeName)
 				GinkgoWriter.Printf("    cpu: %+v¥n", hv.Cpu)
 				if hv.IpAddr != nil {
-					GinkgoWriter.Printf("    IP:  %+v¥n", *hv.IpAddr)	
+					GinkgoWriter.Printf("    IP:  %+v¥n", *hv.IpAddr)
 				}
 				if hv.Memory != nil {
-					GinkgoWriter.Printf("    Mem: %+v¥n",	*hv.Memory)
+					GinkgoWriter.Printf("    Mem: %+v¥n", *hv.Memory)
 				}
 				GinkgoWriter.Println()
 			}

@@ -26,7 +26,7 @@ func main() {
 	fmt.Println(e.Start("0.0.0.0:8080"))
 }
 
-///////////////////////////////////////////////////////////
+// /////////////////////////////////////////////////////////
 func (s Server) ReplyPing(ctx echo.Context) error {
 	return ctx.JSON(200, api.ReplyMessage{Message: "ok"})
 }
@@ -38,7 +38,7 @@ func (s Server) GetVersion(ctx echo.Context) error {
 // ListHypervisors implements api.ServerInterface.
 func (s Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsParams) error {
 	//panic("unimplemented")
-  // ここの中身を marmot の実態に置き換えること
+	// ここの中身を marmot の実態に置き換えること
 	IpAddr1 := "127.0.0.1"
 	var memory int64
 	memory = 1024 * 1024 * 1024 // 1 GB in bytes
@@ -48,6 +48,39 @@ func (s Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPara
 		{NodeName: "hv2", Cpu: 64, Memory: &memory},
 	}
 	return ctx.JSON(200, hvs)
+
+	/*
+		// ハイパーバイザーの稼働チェック　結果はDBへ反映
+		_, err := ut.CheckHypervisors(*etcd, *node)
+		if err != nil {
+			slog.Error("Check if the hypervisor is up and running", "err", err)
+			return
+		}
+
+		// ストレージ容量の更新 結果はDBへ反映
+		err = ut.CheckHvVgAll(*etcd, *node)
+		if err != nil {
+			slog.Error("Update storage capacity", "err", err)
+			return
+		}
+
+		// データベースから情報を取得
+		Conn, err := db.Connect(*etcd)
+		if err != nil {
+			slog.Error("connect to database", "err", err)
+			return
+		}
+
+		var hvs []db.Hypervisor
+		err = db.GetHvsStatus(Conn, &hvs)
+		if err != nil {
+			slog.Error("get hypervisor status", "err", err)
+			return
+		}
+		c.IndentedJSON(http.StatusOK, hvs)
+	*/
+
+
 }
 
 func (s Server) ListVirtualMachines(ctx echo.Context) error {
@@ -63,6 +96,7 @@ func (s Server) ListVirtualMachines(ctx echo.Context) error {
 		},
 	}
 	return ctx.JSON(200, vms)
+
 }
 
 func convertToMarmotConfig(apix api.MarmotConfig) cf.MarmotConfig {
