@@ -10,8 +10,6 @@ hv_spec:
         type: "ssd"
       - vg: "vg2"
         type: "nvme"
-      - vg: "vg3"
-        type: "hdd"
 
 image_template:
   - name: "ubuntu20.04"
