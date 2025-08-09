@@ -59,6 +59,8 @@ func (s Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPara
 	*/
 	// ハイパーバイザーの稼働チェック　結果はDBへ反映
 	fmt.Println("========================================= 1")
+	fmt.Println("======== etcd=", *etcd)
+	fmt.Println("======== node=", *node)
 	_, err := util.CheckHypervisors(*etcd, *node)
 	if err != nil {
 		return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
