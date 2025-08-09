@@ -54,25 +54,25 @@ func (s Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPara
 	// ハイパーバイザーの稼働チェック　結果はDBへ反映
 	_, err := util.CheckHypervisors(*etcd, *node)
 	if err != nil {
-		return err
+		return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
 	}
 
 	// ストレージ容量の更新 結果はDBへ反映
 	err = util.CheckHvVgAll(*etcd, *node)
 	if err != nil {
-		return err
+		return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
 	}
 
 	// データベースから情報を取得
 	Conn, err := db.Connect(*etcd)
 	if err != nil {
-		return err
+		return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
 	}
 
 	var hvs []db.Hypervisor
 	err = db.GetHvsStatus(Conn, &hvs)
 	if err != nil {
-		return err
+		return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
 	}
 	//c.IndentedJSON(http.StatusOK, hvs)
 	return ctx.JSON(200, hvs)
