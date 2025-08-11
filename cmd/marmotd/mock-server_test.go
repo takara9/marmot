@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"os/exec"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -18,7 +19,7 @@ import (
 var _ = Describe("Mock Test", Ordered, func() {
 	var ep *MarmotEndpoint
 	var err error
-	//var containerID string
+	var containerID string
 	var Conn *clientv3.Client
 
 	BeforeAll(func(ctx SpecContext) {
@@ -39,35 +40,32 @@ var _ = Describe("Mock Test", Ordered, func() {
 		}
 
 		// Dockerコンテナを起動
-		/*
-			cmd := exec.Command("docker", "run", "-d", "--name", "etcd0", "--network", "bridge", "-e", "ALLOW_NONE_AUTHENTICATION=yes", "-e", "ETCD_ADVERTISE_CLIENT_URLS=http://etcd:12379", "-p", "12739:2739", "-p", "12780:2780", "bitnami/etcd")
-			output, err := cmd.CombinedOutput()
-			if err != nil {
-				Fail(fmt.Sprintf("Failed to start container: %s, %v", string(output), err))
-			}
-			containerID = string(output[:12]) // 最初の12文字をIDとして取得
-			fmt.Printf("Container started with ID: %s\n", containerID)
-			time.Sleep(10 * time.Second) // コンテナが起動するまで待機
-		*/
+		cmd := exec.Command("docker", "run", "-d", "--name", "etcd0", "-p", "12739:2739", "-p", "12780:2780", "-e", "ALLOW_NONE_AUTHENTICATION=yes", "-e", "ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379", "bitnami/etcd")
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			Fail(fmt.Sprintf("Failed to start container: %s, %v", string(output), err))
+		}
+		containerID = string(output[:12]) // 最初の12文字をIDとして取得
+		fmt.Printf("Container started with ID: %s\n", containerID)
+		time.Sleep(10 * time.Second) // コンテナが起動するまで待機
 	}, NodeTimeout(20*time.Second))
 
-	/*
-		AfterAll(func(ctx SpecContext) {
+	AfterAll(func(ctx SpecContext) {
 
-			// Dockerコンテナを停止・削除
-			cmd := exec.Command("docker", "stop", containerID)
-			_, err := cmd.CombinedOutput()
-			if err != nil {
-				fmt.Printf("Failed to stop container: %v\n", err)
-			}
-			cmd = exec.Command("docker", "rm", containerID)
-			_, err = cmd.CombinedOutput()
-			if err != nil {
-				fmt.Printf("Failed to remove container: %v\n", err)
-			}
+		// Dockerコンテナを停止・削除
+		cmd := exec.Command("docker", "stop", containerID)
+		_, err := cmd.CombinedOutput()
+		if err != nil {
+			fmt.Printf("Failed to stop container: %v\n", err)
+		}
+		cmd = exec.Command("docker", "rm", containerID)
+		_, err = cmd.CombinedOutput()
+		if err != nil {
+			fmt.Printf("Failed to remove container: %v\n", err)
+		}
 
-		}, NodeTimeout(20*time.Second))
-	*/
+	}, NodeTimeout(20*time.Second))
+
 	Context("基本的なアクセステスト", func() {
 		const hypervior_config string = "testdata/hypervisor-config.yaml"
 		var hvs config.Hypervisors_yaml
@@ -78,7 +76,7 @@ var _ = Describe("Mock Test", Ordered, func() {
 		})
 
 		It("データベースへの接続", func() {
-			Conn, err = db.Connect("http://127.0.0.1:2379")
+			Conn, err = db.Connect("http://127.0.0.1:12379")
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -132,7 +130,7 @@ var _ = Describe("Mock Test", Ordered, func() {
 			var etcd *string
 			a := "hvc"
 			node = &a
-			b := "http://127.0.0.1:2379"
+			b := "http://127.0.0.1:12379"
 			etcd = &b
 			err := util.CheckHvVgAll(*etcd, *node)
 			Expect(err).To(BeNil(), "Expected no error")
