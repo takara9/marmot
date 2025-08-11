@@ -11,11 +11,10 @@ import (
 	"github.com/takara9/marmot/pkg/util"
 )
 
-// ローカルノード
-var node string = "hvc"
-var etcd string = "http://localhost:2379"
+var EtcdEndpoint string = "http://localhost:12379"
+var NodeName string = "hvc"
 
-type Server struct{}
+type Server struct {}
 
 func main() {
 	e := echo.New()
@@ -38,26 +37,30 @@ func (s Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPara
 	// リストの最大数の設定は、未実装
 	//panic("unimplemented")
 	// ハイパーバイザーの稼働チェック　結果はDBへ反映
-	_, err := util.CheckHypervisors(etcd, node)
+	_, err := util.CheckHypervisors(EtcdEndpoint, NodeName)
 	if err != nil {
+		println("#1")
 		return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
 	}
 
 	// ストレージ容量の更新 結果はDBへ反映
-	err = util.CheckHvVgAll(etcd, node)
+	err = util.CheckHvVgAll(EtcdEndpoint, NodeName)
 	if err != nil {
+		println("#2")
 		return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
 	}
 
 	// データベースから情報を取得
-	Conn, err := db.Connect(etcd)
+	Conn, err := db.Connect(EtcdEndpoint)
 	if err != nil {
+		println("#3")
 		return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
 	}
 
 	var hvs []db.Hypervisor
 	err = db.GetHvsStatus(Conn, &hvs)
 	if err != nil {
+		println("#4")
 		return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
 	}
 
@@ -65,24 +68,11 @@ func (s Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPara
 }
 
 func (s Server) ListVirtualMachines(ctx echo.Context) error {
-
-	/*
-		vms := api.VirtualMachines{
-			{
-				Name:   "vm1",
-				HvNode: "hv1",
-			},
-			{
-				Name:   "vm2",
-				HvNode: "hv1",
-			},
-		}
-		return ctx.JSON(200, vms)
-	*/
-	Conn, err := db.Connect(etcd)
+	Conn, err := db.Connect(EtcdEndpoint)
 	if err != nil {
 		return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
 	}
+
 	var vms []db.VirtualMachine
 	err = db.GetVmsStatus(Conn, &vms)
 	if err != nil {
@@ -137,17 +127,17 @@ func (s Server) CreateCluster(ctx echo.Context) error {
 	cnf := convertToMarmotConfig(apix)
 
 	// etcdの設定を取得
-	if node == "" || etcd == "" {
+	if EtcdEndpoint == "" || NodeName == "" {
 		return ctx.JSON(400, api.Error{Code: 400, Message: "Node or etcd configuration is not set"})
 	}
 
 	// ハイパーバイザーの稼働チェック 結果はDBへ反映
-	_, err := util.CheckHypervisors(etcd, node)
+	_, err := util.CheckHypervisors(EtcdEndpoint, NodeName)
 	if err != nil {
 		return ctx.JSON(400, api.Error{Code: 400, Message: err.Error()})
 	}
 
-	if err := util.CreateCluster(cnf, etcd, node); err != nil {
+	if err := util.CreateCluster(cnf, EtcdEndpoint, NodeName); err != nil {
 		return ctx.JSON(400, api.Error{Code: 400, Message: err.Error()})
 	}
 

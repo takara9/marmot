@@ -40,7 +40,7 @@ var _ = Describe("Mock Test", Ordered, func() {
 		}
 
 		// Dockerコンテナを起動
-		cmd := exec.Command("docker", "run", "-d", "--name", "etcd0", "-p", "12739:2739", "-p", "12780:2780", "-e", "ALLOW_NONE_AUTHENTICATION=yes", "-e", "ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379", "bitnami/etcd")
+		cmd := exec.Command("docker", "run", "-d", "--name", "etcd0", "-p", "12379:2379", "-p", "12380:2380", "-e", "ALLOW_NONE_AUTHENTICATION=yes", "-e", "ETCD_ADVERTISE_CLIENT_URLS=http://127.0.0.1:12379", "bitnami/etcd")
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to start container: %s, %v", string(output), err))
