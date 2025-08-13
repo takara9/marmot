@@ -112,7 +112,7 @@ type VirtualMachines = []VirtualMachine
 
 // VmSpec defines model for vmSpec.
 type VmSpec struct {
-	Content       *string    `json:"content,omitempty"`
+	Comment       *string    `json:"comment,omitempty"`
 	Cpu           *int32     `json:"cpu,omitempty"`
 	Key           *string    `json:"key,omitempty"`
 	Memory        *int64     `json:"memory,omitempty"`

@@ -501,7 +501,7 @@ components:
           type: string
         playbook:
           type: string
-        content:
+        comment:
           type: string
         uuid:
           type: string

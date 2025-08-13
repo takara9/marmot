@@ -173,7 +173,7 @@ var _ = Describe("Mock Test", Ordered, func() {
 			var cpu int32 = 1
 			var memory int64 = 1024
 			privateIP := "172.16.0.250"
-			comment := "test VM for CI"
+			//comment := "test VM for CI"
 			var x []api.Storage
 
 			name0 := "Data1"
