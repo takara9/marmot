@@ -193,7 +193,6 @@ var _ = Describe("Mock Test", Ordered, func() {
 				Memory:    &memory,
 				PrivateIp: &privateIP,
 				Storage:   &x,
-				Comment:   &comment,
 			}
 			statusCode, body, url, err := ep.CreateVirtualMachine(vm)
 			GinkgoWriter.Printf("Status Code: %d, Body: %s, URL: %v, Error: %v\n", statusCode, body, url, err)
