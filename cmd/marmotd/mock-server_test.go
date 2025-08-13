@@ -158,11 +158,55 @@ var _ = Describe("Mock Test", Ordered, func() {
 			}
 		})
 
-		It("管理下の仮想マシンがリストされること", func() {
-			statusCode, body, url, err := ep.ListVirtualMachines()
+		It("仮想マシンの生成", func() {
+			//var vm cf.VMSpec
+			/*
+				vm := cf.VMSpec{
+					Name:      "testvm1",
+					CPU:       1,
+					Memory:    1024,
+					PrivateIP: "172.16.0.250",
+					Comment:   "test in CI",
+				}
+			*/
+			name := "test_vm1"
+			var cpu int32 = 1
+			var memory int64 = 1024
+			privateIP := "172.16.0.250"
+			comment := "test VM for CI"
+			var x []api.Storage
+
+			name0 := "Data1"
+			size0 := int64(200)
+			vg0 := "vg2"
+			x0 := api.Storage{Name: &name0, Size: &size0, Vg: &vg0}
+			x = append(x, x0)
+
+			name1 := "Data2"
+			size1 := int64(200)
+			vg1 := "vg2"
+			x2 := api.Storage{Name: &name1, Size: &size1, Vg: &vg1}
+			x = append(x, x2)
+			vm := api.VmSpec{
+				Name:      &name,
+				Cpu:       &cpu,
+				Memory:    &memory,
+				PrivateIp: &privateIP,
+				Storage:   &x,
+				Comment:   &comment,
+			}
+			statusCode, body, url, err := ep.CreateVirtualMachine(vm)
 			GinkgoWriter.Printf("Status Code: %d, Body: %s, URL: %v, Error: %v\n", statusCode, body, url, err)
 			Expect(err).To(BeNil(), "Expected no error")
 			Expect(statusCode).To(Equal(200), "Expected status code")
 		})
 	})
+
+	It("管理下の仮想マシンがリストされること、仮想サーバーが作られてないので ", func() {
+		statusCode, body, url, err := ep.ListVirtualMachines()
+		GinkgoWriter.Printf("Status Code: %d, Body: %s, URL: %v, Error: %v\n", statusCode, body, url, err)
+		Expect(err).To(BeNil(), "Expected no error")
+		Expect(statusCode).To(Equal(200), "Expected status code")
+	})
+
 })

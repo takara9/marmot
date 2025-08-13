@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -66,7 +68,6 @@ func (m *MarmotEndpoint) httpRequest(req *http.Request) (int, []byte, *url.URL, 
 	return resp.StatusCode, byteJSON, jobURL, nil
 }
 
-
 func (m *MarmotEndpoint) setUrl(apiPath string) string {
 	return fmt.Sprintf("%s://%s%s%s", m.Scheme, m.HostPort, m.BasePath, apiPath)
 }
@@ -104,12 +105,30 @@ func (m *MarmotEndpoint) ListHypervisors() (int, []byte, *url.URL, error) {
 }
 
 func (m *MarmotEndpoint) ListVirtualMachines() (int, []byte, *url.URL, error) {
-	url := m.setUrl("virtualMachines")
+	url := m.setUrl("/virtualMachines")
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return 0, nil, nil, err
 	}
 	req.Header.Set("User-Agent", "MarmotdClient/1.0")
 	req.Header.Set("Accept", "application/json")
+	return m.httpRequest(req)
+}
+
+func (m *MarmotEndpoint) CreateVirtualMachine(vm api.VmSpec) (int, []byte, *url.URL, error) {
+	jsonBytes, err := json.Marshal(vm)
+	if err != nil {
+		fmt.Println("#1")
+		return 0, nil, nil, err
+	}
+	fmt.Println("jsonBytes=", string(jsonBytes))
+
+	req, err := http.NewRequest("POST", m.setUrl("/createVm"), bytes.NewBuffer(jsonBytes))
+	if err != nil {
+		fmt.Println("#2")
+		return 0, nil, nil, err
+	}
+	req.Header.Set("User-Agent", "MarmotdClient/1.0")
+	req.Header.Set("Content-Type", "application/json")
 	return m.httpRequest(req)
 }

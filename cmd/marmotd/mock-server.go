@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
@@ -14,7 +15,7 @@ import (
 var EtcdEndpoint string = "http://localhost:12379"
 var NodeName string = "hvc"
 
-type Server struct {}
+type Server struct{}
 
 func main() {
 	e := echo.New()
@@ -162,16 +163,55 @@ func (s Server) DestroyCluster(ctx echo.Context) error {
 	return ctx.JSON(200, "")
 }
 func (s Server) CreateVirtualMachine(ctx echo.Context) error {
-	var vm api.VirtualMachine
+	var sc cf.VMSpec
+	var vm api.VmSpec
 	if err := ctx.Bind(&vm); err != nil {
-		return ctx.JSON(400, api.Error{Code: 400, Message: "Invalid request body"})
+		return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
 	}
-	fmt.Printf("VM Name %s\n", vm.Name)
-	fmt.Printf("VM CPU %d\n", *vm.Cpu)
-	fmt.Printf("VM Memory %d\n", *vm.Memory)
-	for k, v := range *vm.Storage {
-		fmt.Printf("VM Storage %d: %s, Size: %d\n", k, *v.Name, *v.Size)
+
+	if vm.Name != nil {
+		sc.Name = *vm.Name
 	}
+
+	if vm.Cpu != nil {
+		sc.CPU = int(*vm.Cpu)
+	}
+
+	if vm.Memory != nil {
+		sc.Memory = int(*vm.Memory)
+	}
+	
+	fmt.Println("#104")
+	sc.PrivateIP = *vm.PrivateIp
+	fmt.Println("#105")
+	if vm.PublicIp != nil {
+		sc.PublicIP = *vm.PublicIp
+	}
+	fmt.Println("#106")
+	if vm.Storage != nil {
+		sc.Storage = make([]cf.Storage, len(*vm.Storage))
+		for k, v := range *vm.Storage {
+			fmt.Printf("VM Storage %s: 	%s, Size: %d\n", *v.Vg, *v.Name, *v.Size)
+			sc.Storage[k].Name = *v.Name
+			sc.Storage[k].Size = int(*v.Size)
+			//sc.Storage[k].Path = *v.Path
+			fmt.Println("VVVG Name=",*v.Vg)
+			sc.Storage[k].VolGrp = *v.Vg
+			//sc.Storage[k].Type = *v.Type
+		}
+	}
+	slog.Info("create vm", "etcd", EtcdEndpoint)
+
+	Conn, err := db.Connect(EtcdEndpoint)
+	if err != nil {
+		return ctx.JSON(500, api.Error{Code: 500, Message: "Connect DB"})
+	}
+
+	err = util.CreateVM(Conn, sc, NodeName)
+	if err != nil {
+		return ctx.JSON(500, api.Error{Code: 500, Message: "create virtual machine"})
+	}
+
 	return ctx.JSON(201, "")
 }
 
