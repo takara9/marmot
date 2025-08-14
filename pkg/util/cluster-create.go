@@ -233,30 +233,30 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	dom.Memory.Value = mem
 	dom.CurrentMemory.Value = mem
 
-	//slog.Error("", "err", err)OSボリュームを作成")
+	slog.Error("", "info", "OSボリュームを作成")
 	//------------------------------------------------------------
 	// OSボリュームを作成  (N テンプレートを指定できると良い)
 	osLogicalVol, err := CreateOsLv(conn, spec.OsTempVg, spec.OsTempLv)
 	if err != nil {
-		slog.Error("", "err", err)
+		slog.Error("create os lv", "err", err)
 		return err
 	}
 	dom.Devices.Disk[0].Source.Dev = fmt.Sprintf("/dev/%s/%s", spec.OsTempVg, osLogicalVol)
 
-	//slog.Error("", "err", err)OSボリュームのLV名をetcdへ登録")
+	slog.Error("", "info", "OSボリュームのLV名をetcdへ登録", "  key=",spec.Key, "  osTempVg=", spec.OsTempVg, "  osLogicalVol", osLogicalVol)
 	// OSボリュームのLV名をetcdへ登録
 	err = db.UpdateOsLv(conn, spec.Key, spec.OsTempVg, osLogicalVol)
 	if err != nil {
-		slog.Error("", "err", err)
+		slog.Error("update os lv", "err", err)
 		return err
 	}
 
-	//slog.Error("", "err", err)OSボリュームをマウントして、 ホスト名、IPアドレスを設定する")
+	slog.Error("", "info", "OSボリュームをマウントして、 ホスト名、IPアドレスを設定する")
 	// OSボリュームをマウントして、 ホスト名、IPアドレスを設定する
 	// 必要最小限として、詳細設定はAnsibleで実行する
 	err = ConfigRootVol(spec, spec.OsTempVg, osLogicalVol)
 	if err != nil {
-		slog.Error("", "err", err)
+		slog.Error("config root vol", "err", err)
 		return err
 	}
 
@@ -273,7 +273,7 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 		}
 		dlv, err := CreateDataLv(conn, uint64(disk.Size), vg)
 		if err != nil {
-			slog.Error("", "err", err)
+			slog.Error("create data lv", "err", err)
 			return err
 		}
 		// LibVirtの設定を追加
@@ -296,7 +296,7 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 		// etcdデータベースにlvを登録
 		err = db.UpdateDataLv(conn, spec.Key, i, disk.VolGrp, dlv)
 		if err != nil {
-			slog.Error("", "err", err)
+			slog.Error("update data lv", "err", err)
 			return err
 		}
 		// エラー発生時にロールバックが必要（未実装）

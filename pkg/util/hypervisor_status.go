@@ -135,22 +135,22 @@ func ReqGetQuick(apipath string, api string) (*http.Response, []byte, error) {
 func CheckHvVgAll(dbUrl string, node string) error {
 	Conn, err := db.Connect(dbUrl)
 	if err != nil {
-		slog.Error("", "err", err)
-		return err
+		slog.Error("Connect", "err", err)
+		return fmt.Errorf("Connect:  %s", err)
 	}
-	// クローズが無い？
+	defer Conn.Close()
 
 	hv, err := db.GetHvByKey(Conn, node)
 	if err != nil {
-		slog.Error("", "err", err)
-		return err
+		slog.Error("GetHvByKey", "err", err)
+		return fmt.Errorf("GetHvByKey:  %s", err)
 	}
 
 	for i := 0; i < len(hv.StgPool); i++ {
 		total_sz, free_sz, err := lvm.CheckVG(hv.StgPool[i].VolGroup)
 		if err != nil {
-			slog.Error("", "err", err)
-			return err
+			slog.Error("CheckVG", "err", err)
+			return fmt.Errorf("CheckVG:  %s", err)
 		}
 		hv.StgPool[i].FreeCap = free_sz / 1024 / 1024 / 1024
 		hv.StgPool[i].VgCap = total_sz / 1024 / 1024 / 1024
@@ -159,8 +159,8 @@ func CheckHvVgAll(dbUrl string, node string) error {
 	// DBへ書き込み
 	err = db.PutDataEtcd(Conn, hv.Key, hv)
 	if err != nil {
-		slog.Error("", "err", err)
-		return err
+		slog.Error("PutDataEtc", "err", err)
+		return fmt.Errorf("PutDataEtc:  %s", err)
 	}
 	return nil
 
