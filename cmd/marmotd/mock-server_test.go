@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/takara9/marmot/api"
+	//"github.com/takara9/marmot/pkg/cmd"
 	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/util"
@@ -158,46 +159,67 @@ var _ = Describe("Mock Test", Ordered, func() {
 			}
 		})
 
+		It("仮想マシンクラスタの生成", func() {
+			// コンフィグファイルを読んで、marmotdに送信する。
+			var cnf config.MarmotConfig
+			err := config.ReadConfig("testdata/cluster-config.yaml", &cnf)
+			Expect(err).To(BeNil())
+
+
+			// ここで、構造体の変換を実施して、リクエストを送信する
+
+			_,_, err = ReqRest(cnf, "createCluster", "http://localhost:8080")
+			Expect(err).To(BeNil())
+			GinkgoWriter.Println(err.Error())	
+		})
+
 		It("仮想マシンの生成", func() {
-			//var vm cf.VMSpec
+			GinkgoWriter.Println("これからテストするのは、断念して、create_clusterから先に実施する")
+			//Conn, err := db.Connect("http://127.0.0.1:12379")
+			// VMクラスタの生成からテストを実施した方が良さそう。
 			/*
-				vm := cf.VMSpec{
-					Name:      "testvm1",
-					CPU:       1,
-					Memory:    1024,
-					PrivateIP: "172.16.0.250",
-					Comment:   "test in CI",
+				name := "test_vm1"
+				var cpu int32 = 1
+				var memory int64 = 1024
+				privateIP := "172.16.0.250"
+
+				vmKey, err := db.FindByHostAndClusteName(Conn, name, "dev")
+				Expect(err).NotTo(HaveOccurred())
+
+				var ostvg string = "vg1"
+				var ostlv string = "lv01"
+				var osvar string = "ubuntu20.04"
+				//comment := "test VM for CI"
+				var x []api.Storage
+
+				name0 := "Data1"
+				size0 := int64(200)
+				vg0 := "vg2"
+				x0 := api.Storage{Name: &name0, Size: &size0, Vg: &vg0}
+				x = append(x, x0)
+
+
+				name1 := "Data2"
+				size1 := int64(200)
+				vg1 := "vg2"
+				x2 := api.Storage{Name: &name1, Size: &size1, Vg: &vg1}
+				x = append(x, x2)
+				vm := api.VmSpec{
+					Key: 			 &vmKey,
+					Name:      &name,
+					Ostempvariant: &osvar,
+					Cpu:       &cpu,
+					Memory:    &memory,
+					PrivateIp: &privateIP,
+					Storage:   &x,
+					Ostempvg:  &ostvg,
+					Ostemplv:  &ostlv,
 				}
+				statusCode, body, url, err := ep.CreateVirtualMachine(vm)
+				GinkgoWriter.Printf("Status Code: %d, Body: %s, URL: %v, Error: %v\n", statusCode, body, url, err)
+				Expect(err).To(BeNil(), "Expected no error")
+				Expect(statusCode).To(Equal(200), "Expected status code")
 			*/
-			name := "test_vm1"
-			var cpu int32 = 1
-			var memory int64 = 1024
-			privateIP := "172.16.0.250"
-			//comment := "test VM for CI"
-			var x []api.Storage
-
-			name0 := "Data1"
-			size0 := int64(200)
-			vg0 := "vg2"
-			x0 := api.Storage{Name: &name0, Size: &size0, Vg: &vg0}
-			x = append(x, x0)
-
-			name1 := "Data2"
-			size1 := int64(200)
-			vg1 := "vg2"
-			x2 := api.Storage{Name: &name1, Size: &size1, Vg: &vg1}
-			x = append(x, x2)
-			vm := api.VmSpec{
-				Name:      &name,
-				Cpu:       &cpu,
-				Memory:    &memory,
-				PrivateIp: &privateIP,
-				Storage:   &x,
-			}
-			statusCode, body, url, err := ep.CreateVirtualMachine(vm)
-			GinkgoWriter.Printf("Status Code: %d, Body: %s, URL: %v, Error: %v\n", statusCode, body, url, err)
-			Expect(err).To(BeNil(), "Expected no error")
-			Expect(statusCode).To(Equal(200), "Expected status code")
 		})
 	})
 

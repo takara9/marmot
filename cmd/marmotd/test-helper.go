@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/config"
 )
 
 type marmotdServer struct{}
@@ -131,4 +133,42 @@ func (m *MarmotEndpoint) CreateVirtualMachine(vm api.VmSpec) (int, []byte, *url.
 	req.Header.Set("User-Agent", "MarmotdClient/1.0")
 	req.Header.Set("Content-Type", "application/json")
 	return m.httpRequest(req)
+}
+
+type msg struct {
+	Msg string
+}
+
+func ReqRest(cnf config.MarmotConfig, apipath string, api string) (*http.Response, []byte, error) {
+	byteJSON, _ := json.MarshalIndent(cnf, "", "    ")
+	reqURL := fmt.Sprintf("%s/api/v1/%s", api, apipath)
+	fmt.Println("request URL = ", reqURL)
+	request, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
+	if err != nil {
+		slog.Error("request by HTTP-POST", "err", err)
+		return nil, nil, err
+	}
+
+	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
+	client := &http.Client{}
+	resp, err := client.Do(request)
+	if err != nil {
+		slog.Error("http client", "err", err)
+		return resp, nil, err
+	}
+	defer resp.Body.Close()
+
+	// レスポンスを取得する
+	body, err := io.ReadAll(resp.Body)
+	var ErrMsg msg
+	fmt.Println(" http Status Code =", resp.StatusCode)
+
+	if resp.StatusCode != 200 {
+		fmt.Println("失敗")
+		json.Unmarshal(body, &ErrMsg)
+		fmt.Println("エラーメッセージ:", ErrMsg.Msg)
+	} else {
+		fmt.Println("成功終了")
+	}
+	return resp, body, err
 }

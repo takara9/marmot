@@ -122,24 +122,45 @@ func convertToMarmotConfig(apix api.MarmotConfig) cf.MarmotConfig {
 func (s Server) CreateCluster(ctx echo.Context) error {
 	var apix api.MarmotConfig
 
+	fmt.Println("========== Create Cluster Accept Access ========")
 	if err := ctx.Bind(&apix); err != nil {
 		return ctx.JSON(400, api.Error{Code: 400, Message: "Invalid request body"})
 	}
 	cnf := convertToMarmotConfig(apix)
 
-	// etcdの設定を取得
-	if EtcdEndpoint == "" || NodeName == "" {
-		return ctx.JSON(400, api.Error{Code: 400, Message: "Node or etcd configuration is not set"})
-	}
+	/*	// etcdの設定を取得
+		if EtcdEndpoint == "" || NodeName == "" {
+			return ctx.JSON(400, api.Error{Code: 400, Message: "Node or etcd configuration is not set"})
+		}
 
-	// ハイパーバイザーの稼働チェック 結果はDBへ反映
+		// ハイパーバイザーの稼働チェック 結果はDBへ反映
+		_, err := util.CheckHypervisors(EtcdEndpoint, NodeName)
+		if err != nil {
+			return ctx.JSON(400, api.Error{Code: 400, Message: err.Error()})
+		}
+
+		if err := util.CreateCluster(cnf, EtcdEndpoint, NodeName); err != nil {
+			return ctx.JSON(400, api.Error{Code: 400, Message: err.Error()})
+		}
+
+		return ctx.JSON(201, "")
+	*/
+
+	//var cnf cf.MarmotConfig
+	//if err := c.BindJSON(&cnf); err != nil {
+	//	slog.Error("create vm cluster", "err", err)
+	//	c.JSON(400, gin.H{"msg": err.Error()})
+	//	return
+	//}
+
+	// ハイパーバイザーの稼働チェック　結果はDBへ反映
 	_, err := util.CheckHypervisors(EtcdEndpoint, NodeName)
 	if err != nil {
-		return ctx.JSON(400, api.Error{Code: 400, Message: err.Error()})
+		return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
 	}
 
 	if err := util.CreateCluster(cnf, EtcdEndpoint, NodeName); err != nil {
-		return ctx.JSON(400, api.Error{Code: 400, Message: err.Error()})
+		return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
 	}
 
 	return ctx.JSON(201, "")
@@ -165,6 +186,8 @@ func (s Server) DestroyCluster(ctx echo.Context) error {
 func (s Server) CreateVirtualMachine(ctx echo.Context) error {
 	var sc cf.VMSpec
 	var vm api.VmSpec
+	var NodeName string = "hvc"
+
 	if err := ctx.Bind(&vm); err != nil {
 		return ctx.JSON(500, api.Error{Code: 500, Message: err.Error()})
 	}
@@ -180,14 +203,27 @@ func (s Server) CreateVirtualMachine(ctx echo.Context) error {
 	if vm.Memory != nil {
 		sc.Memory = int(*vm.Memory)
 	}
-	
-	fmt.Println("#104")
-	sc.PrivateIP = *vm.PrivateIp
-	fmt.Println("#105")
+
+	if vm.PrivateIp != nil {
+		sc.PrivateIP = *vm.PrivateIp
+	}
+
 	if vm.PublicIp != nil {
 		sc.PublicIP = *vm.PublicIp
 	}
-	fmt.Println("#106")
+
+	if vm.Ostempvg != nil {
+		sc.OsTempVg = *vm.Ostempvg
+	}
+
+	if vm.Ostemplv != nil {
+		sc.OsTempLv = *vm.Ostemplv
+	}
+
+	if vm.Key != nil {
+		sc.Key = *vm.Key
+	}
+
 	if vm.Storage != nil {
 		sc.Storage = make([]cf.Storage, len(*vm.Storage))
 		for k, v := range *vm.Storage {
@@ -195,7 +231,7 @@ func (s Server) CreateVirtualMachine(ctx echo.Context) error {
 			sc.Storage[k].Name = *v.Name
 			sc.Storage[k].Size = int(*v.Size)
 			//sc.Storage[k].Path = *v.Path
-			fmt.Println("VVVG Name=",*v.Vg)
+			fmt.Println("VVVG Name=", *v.Vg)
 			sc.Storage[k].VolGrp = *v.Vg
 			//sc.Storage[k].Type = *v.Type
 		}
