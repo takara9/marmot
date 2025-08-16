@@ -268,6 +268,9 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	fmt.Println("OS TEMP VG =", spec.OsTempVg)
 	fmt.Println("IS TEMP LV =", spec.OsTempLv)
 
+	spec.OsTempVg = "vg1"
+	spec.OsTempLv = "lv01"
+
 	osLogicalVol, err := CreateOsLv(conn, spec.OsTempVg, spec.OsTempLv)
 	if err != nil {
 		slog.Error("create os lv", "err", err)
