@@ -135,6 +135,24 @@ func (m *MarmotEndpoint) CreateVirtualMachine(vm api.VmSpec) (int, []byte, *url.
 	return m.httpRequest(req)
 }
 
+func (m *MarmotEndpoint) CreateCluster(vmcluster api.MarmotConfig) (int, []byte, *url.URL, error) {
+	jsonBytes, err := json.Marshal(vmcluster)
+	if err != nil {
+		fmt.Println("#1")
+		return 0, nil, nil, err
+	}
+	fmt.Println("jsonBytes=", string(jsonBytes))
+
+	req, err := http.NewRequest("POST", m.setUrl("/createClustercreateVm"), bytes.NewBuffer(jsonBytes))
+	if err != nil {
+		fmt.Println("#2")
+		return 0, nil, nil, err
+	}
+	req.Header.Set("User-Agent", "MarmotdClient/1.0")
+	req.Header.Set("Content-Type", "application/json")
+	return m.httpRequest(req)
+}
+
 type msg struct {
 	Msg string
 }
@@ -171,4 +189,212 @@ func ReqRest(cnf config.MarmotConfig, apipath string, api string) (*http.Respons
 		fmt.Println("成功終了")
 	}
 	return resp, body, err
+}
+
+
+func convertVMSpec(v api.VmSpec) config.VMSpec {
+	var x config.VMSpec
+
+	x.Name = *v.Name
+	x.CPU = int(*v.Cpu)
+	x.Memory = int(*v.Memory)
+
+	if v.PrivateIp != nil {
+		x.PrivateIP = *v.PrivateIp
+	}
+
+	if v.PublicIp != nil {
+		x.PublicIP = *v.PublicIp
+	}
+	
+	if x.Storage != nil {
+		fmt.Println("================ *v.Storage =", len(*v.Storage))
+		x.Storage = make([]config.Storage, len(*v.Storage))
+		for k2, v2 := range *v.Storage {
+			x.Storage[k2].Name = *v2.Name
+			x.Storage[k2].Size = int(*v2.Size)
+			x.Storage[k2].Path = *v2.Path
+			x.Storage[k2].VolGrp = *v2.Vg
+			x.Storage[k2].Type = *v2.Type
+		}
+	}
+
+	return x
+}
+
+func convertToMarmotConfig(apix api.MarmotConfig) config.MarmotConfig {
+	var cnf config.MarmotConfig
+	// OpenAPIの構造体から、内部の設定構造体に変換
+
+	if apix.Domain != nil {
+		cnf.Domain = *apix.Domain
+	} else {
+		cnf.Domain = ""
+	}
+
+	if apix.Domain != nil {
+		cnf.Domain = *apix.Domain
+	} else {
+		cnf.Domain = ""
+	}
+
+	if apix.ClusterName != nil {
+		cnf.ClusterName = *apix.ClusterName
+	} else {
+		cnf.Domain = ""
+	}
+
+	if apix.Hypervisor != nil {
+		cnf.Hypervisor = *apix.Hypervisor
+	} else {
+		cnf.Hypervisor = ""
+	}
+
+	if apix.ImgaeTemplatePath != nil {
+		cnf.VmImageTempPath = *apix.ImgaeTemplatePath
+	} else {
+		cnf.VmImageTempPath = ""
+	}
+
+	if apix.ImgaeTemplatePath != nil {
+		cnf.VmImageTempPath = *apix.ImgaeTemplatePath
+	} else {
+		cnf.VmImageTempPath = ""
+	}
+
+	if apix.ImgaeTemplatePath != nil {
+		cnf.VMImageDfltPath = *apix.ImgaeTemplatePath
+	} else {
+		cnf.VMImageDfltPath = ""
+	}
+
+	if apix.Qcow2Image != nil {
+		cnf.VMImageQCOW = *apix.Qcow2Image
+	} else {
+		cnf.VMImageQCOW = ""
+	}
+
+	cnf.VMOsVariant = *apix.OsVariant
+	cnf.NetDevDefault = *apix.NetDevDefault
+	cnf.NetDevPrivate = *apix.NetDevPrivate
+	cnf.NetDevPublic = *apix.NetDevPublic
+	cnf.PublicIPGw = *apix.PublicIpGw
+	cnf.PublicIPDns = *apix.PublicIpSubnet
+	cnf.PublicIPSubnet = *apix.PublicIpSubnet
+	cnf.PrivateIPSubnet = *apix.PrivateIpSubnet
+	cnf.VMSpec = make([]config.VMSpec, len(*apix.VmSpec))
+	for k, v := range *apix.VmSpec {
+		cnf.VMSpec[k].Name = *v.Name
+		cnf.VMSpec[k].CPU = int(*v.Cpu)
+		cnf.VMSpec[k].Memory = int(*v.Memory)
+		cnf.VMSpec[k].PrivateIP = *v.PrivateIp
+		cnf.VMSpec[k].PublicIP = *v.PublicIp
+		if v.Storage != nil {
+			fmt.Println("================ *v.Storage =", len(*v.Storage))
+			cnf.VMSpec[k].Storage = make([]config.Storage, len(*v.Storage))
+			for k2, v2 := range *v.Storage {
+				cnf.VMSpec[k].Storage[k2].Name = *v2.Name
+				cnf.VMSpec[k].Storage[k2].Size = int(*v2.Size)
+				cnf.VMSpec[k].Storage[k2].Path = *v2.Path
+				cnf.VMSpec[k].Storage[k2].VolGrp = *v2.Vg
+				cnf.VMSpec[k].Storage[k2].Type = *v2.Type
+			}
+		}
+	}
+	return cnf
+}
+
+func convertToMarmotConfig2(cnf config.MarmotConfig) api.MarmotConfig {
+	var x api.MarmotConfig
+
+	x.Domain = &cnf.Domain
+	x.ClusterName = &cnf.ClusterName
+	x.Hypervisor = &cnf.Hypervisor
+	x.ImageDefaultPath = &cnf.VmImageTempPath
+	x.ImgaeTemplatePath = &cnf.VMImageDfltPath
+	x.Qcow2Image = &cnf.VMImageQCOW
+	x.OsVariant = &cnf.VMOsVariant
+	x.PrivateIpSubnet = &cnf.PrivateIPSubnet
+	x.PublicIpSubnet = &cnf.PublicIPSubnet
+	x.NetDevDefault = &cnf.NetDevDefault
+	x.NetDevPrivate = &cnf.NetDevPrivate
+	x.NetDevPublic = &cnf.NetDevPublic
+	x.PublicIpGw = &cnf.PublicIPGw
+	x.PublicIpSubnet = &cnf.PublicIPDns
+
+	var xa []api.VmSpec
+	for _, v := range cnf.VMSpec {
+		var x1 api.VmSpec
+		x1.Name = &v.Name
+		cpu := int32(v.CPU)
+		x1.Cpu = &cpu
+		mem := int64(v.Memory)
+		x1.Memory = &mem
+		x1.PrivateIp = &v.PrivateIP
+		x1.PublicIp = &v.PublicIP
+		x1.Playbook = &v.AnsiblePB
+		x1.Comment = &v.Comment
+		x1.Uuid = &v.Uuid
+		x1.Key = &v.Key
+		x1.Ostempvg = &v.OsTempVg
+		x1.Ostempvariant = &v.VMOsVariant
+
+		var sa []api.Storage
+		for _, v2 := range v.Storage {
+			var ss api.Storage
+			ss.Name = &v2.Name
+			size := int64(v2.Size)
+			ss.Size = &size
+			ss.Path = &v2.Path
+			ss.Vg = &v2.VolGrp
+			ss.Type = &v2.Type
+			sa = append(sa, ss)
+		}
+		x1.Storage = &sa
+		xa = append(xa, x1)
+	}
+	x.VmSpec = &xa
+	return x
+}
+
+func printMarmotConf(cnf config.MarmotConfig) {
+
+	// ここで、構造体の変換を実施して、リクエストを送信する
+	fmt.Println("Domain=", cnf.Domain)
+	fmt.Println("ClusterName=", cnf.ClusterName)
+
+	fmt.Println("Hypervisor=", cnf.Hypervisor)
+	fmt.Println("VmImageTempPath=", cnf.VmImageTempPath)
+	fmt.Println("VMImageDfltPath=", cnf.VMImageDfltPath)
+	fmt.Println("VMImageQCOW=", cnf.VMImageQCOW)
+	fmt.Println("VMOsVariant=", cnf.VMOsVariant)
+	fmt.Println("PrivateIPSubnet=", cnf.PrivateIPSubnet)
+	fmt.Println("PublicIPSubnet=", cnf.PublicIPSubnet)
+	fmt.Println("NetDevDefault=", cnf.NetDevDefault)
+	fmt.Println("NetDevPrivate=", cnf.NetDevPrivate)
+	fmt.Println("NetDevPublic=", cnf.NetDevPublic)
+	fmt.Println("PublicIPGw=", cnf.PublicIPGw)
+	fmt.Println("PublicIPDns=", cnf.PublicIPDns)
+	for i, v := range cnf.VMSpec {
+		fmt.Println("VM No=", i)
+		fmt.Println("  Name=", v.Name)
+		fmt.Println("  CPU=", v.CPU)
+		fmt.Println("  Memory=", v.Memory)
+		fmt.Println("  PrivateIP=", v.PrivateIP)
+		fmt.Println("  PublicIP=", v.PublicIP)
+		fmt.Println("  AnsiblePB=", v.AnsiblePB)
+		fmt.Println("  Comment=", v.Comment)
+		fmt.Println("  Uuid=", v.Uuid)
+		fmt.Println("  Key=", v.Key)
+		fmt.Println("  OsTempVg=", v.OsTempVg)
+		fmt.Println("  VMOsVariant=", v.VMOsVariant)
+		for i2, v2 := range v.Storage {
+			fmt.Println("Stg No=", i2)
+			fmt.Println("    Name=", v2.Name)
+			fmt.Println("    Size=", v2.Size)
+			fmt.Println("    Path=", v2.Path)
+			fmt.Println("    VolGrp=", v2.VolGrp)
+			fmt.Println("    Type=", v2.Type)
+		}
+	}
 }

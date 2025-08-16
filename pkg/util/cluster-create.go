@@ -71,7 +71,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 	// 仮想マシンの設定と起動
 	for _, spec := range cnf.VMSpec {
 
-		fmt.Println("ホスト名とクラスタ名でVMキーを取得する")
+		fmt.Println("1 ホスト名とクラスタ名でVMキーを取得する")
 		// ホスト名とクラスタ名でVMキーを取得する
 		vmKey, _ := db.FindByHostAndClusteName(Conn, spec.Name, cnf.ClusterName)
 		if len(vmKey) > 0 {
@@ -99,7 +99,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		}
 
 		//スケジュールを実行
-		fmt.Println("スケジュールを実行")
+		fmt.Println("2 スケジュールを実行")
 		vm.HvNode, vm.Key, vm.Uuid, err = db.AssignHvforVm(Conn, vm)
 		if err != nil {
 			slog.Error("", "err", err)
@@ -109,18 +109,18 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		}
 
 		// OSのバージョン、テンプレートを設定
-		fmt.Println("OSのバージョン、テンプレートを設定")
+		fmt.Println("3 OSのバージョン、テンプレートを設定")
 		spec.VMOsVariant = cnf.VMOsVariant
 		spec.OsTempVg, spec.OsTempLv, err = db.GetOsImgTempByKey(Conn, cnf.VMOsVariant)
 		if err != nil {
-			slog.Error("", "err", err)
+			slog.Error("db.GetOsImgTempByKey", "err", err, "OS Variant =", cnf.VMOsVariant)
 			break_err = true
 			return_errors = err
 			break
 		}
 
 		// VMのUUIDとKEYをコンフィグ情報へセット
-		fmt.Println("VMのUUIDとKEYをコンフィグ情報へセット")
+		fmt.Println("4 VMのUUIDとKEYをコンフィグ情報へセット")
 		spec.Uuid = vm.Uuid.String()
 		spec.Key = vm.Key
 
@@ -145,10 +145,12 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		//slog.Error("", "err", err)hvNode", " = ", hvNode)
 		//slog.Error("", "err", err)cmp vm.HvNode hvNode", " = ", vm.HvNode == hvNode)
 
-		fmt.Println("リモートとローカル関係なしに、マイクロサービスへリクエストする")
+		fmt.Println("5 リモートとローカル関係なしに、マイクロサービスへリクエストする")
 		// リモートとローカル関係なしに、マイクロサービスへリクエストする
 		db.UpdateVmState(Conn, vm.Key, db.PROVISIONING)
-		err = RemoteCreateStartVM(vm.HvNode, spec)
+
+		//err = RemoteCreateStartVM(vm.HvNode, spec)
+		err = RemoteCreateStartVM2(vm.HvNode, spec)
 		if err != nil {
 			slog.Error("", "remote request err", err)
 			break_err = true
@@ -156,11 +158,11 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 			db.UpdateVmState(Conn, vm.Key, db.ERROR) // エラー状態へ
 			break
 		}
-		fmt.Println("実行中へ")
+		fmt.Println("6 実行中へ")
 		db.UpdateVmState(Conn, vm.Key, db.RUNNING) // 実行中へ
 
 		// CoreDNS登録
-		fmt.Println("DNS登録をスキップ")
+		fmt.Println("7 DNS登録をスキップ")
 		/*
 			err = dns.Add(dns.DnsRecord{
 				Hostname: fmt.Sprintf("%s.%s.%s", vm.Name, vm.ClusterName, "a.labo.local"),
@@ -187,6 +189,7 @@ func RemoteCreateStartVM(hvNode string, spec cf.VMSpec) error {
 	//fmt.Println(string(byteJSON))
 
 	// JSON形式でポストする
+	// ローカルホストにアクセスできるようにする。また、パスを変更する
 	reqURL := fmt.Sprintf("http://%s:8750/%s", hvNode, "createVm")
 	request, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
 	if err != nil {
@@ -212,10 +215,35 @@ func RemoteCreateStartVM(hvNode string, spec cf.VMSpec) error {
 	return nil
 }
 
+func RemoteCreateStartVM2(hvNode string, spec cf.VMSpec) error {
+	byteJSON, _ := json.MarshalIndent(spec, "", "    ")
+	reqURL := fmt.Sprintf("http://127.0.0.1:8080/api/v1/%s", "createVm")
+	request, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
+	if err != nil {
+		slog.Error("", "err", err)
+		return err
+	}
+
+	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
+	client := &http.Client{}
+	response, err := client.Do(request)
+	if err != nil {
+		slog.Error("", "err", err)
+		return err
+	}
+	defer response.Body.Close()
+
+	// レスポンスを取得する
+	body, _ := io.ReadAll(response.Body)
+	if response.StatusCode != 200 {
+		return errors.New(string(body))
+	}
+	return nil
+}
+
 // この部分は、ハイパーバイザーのホストで実行する
 // VMを生成する
 func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
-
 	//slog.Error("", "err", err)Libvirtのテンプレートを読み込んで、設定を変更する")
 	//------------------------------------------------------------
 	// Libvirtのテンプレートを読み込んで、設定を変更する
@@ -236,6 +264,10 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	slog.Error("", "info", "OSボリュームを作成")
 	//------------------------------------------------------------
 	// OSボリュームを作成  (N テンプレートを指定できると良い)
+
+	fmt.Println("OS TEMP VG =", spec.OsTempVg)
+	fmt.Println("IS TEMP LV =", spec.OsTempLv)
+
 	osLogicalVol, err := CreateOsLv(conn, spec.OsTempVg, spec.OsTempLv)
 	if err != nil {
 		slog.Error("create os lv", "err", err)
@@ -243,7 +275,7 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	}
 	dom.Devices.Disk[0].Source.Dev = fmt.Sprintf("/dev/%s/%s", spec.OsTempVg, osLogicalVol)
 
-	slog.Error("", "info", "OSボリュームのLV名をetcdへ登録", "  key=",spec.Key, "  osTempVg=", spec.OsTempVg, "  osLogicalVol", osLogicalVol)
+	slog.Error("", "info", "OSボリュームのLV名をetcdへ登録", "  key=", spec.Key, "  osTempVg=", spec.OsTempVg, "  osLogicalVol", osLogicalVol)
 	// OSボリュームのLV名をetcdへ登録
 	err = db.UpdateOsLv(conn, spec.Key, spec.OsTempVg, osLogicalVol)
 	if err != nil {

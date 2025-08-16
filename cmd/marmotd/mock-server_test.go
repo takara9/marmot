@@ -164,13 +164,21 @@ var _ = Describe("Mock Test", Ordered, func() {
 			var cnf config.MarmotConfig
 			err := config.ReadConfig("testdata/cluster-config.yaml", &cnf)
 			Expect(err).To(BeNil())
+			var x api.MarmotConfig
+			x = convertToMarmotConfig2(cnf)
+			statusCode, body, url, err := ep.CreateCluster(x)
 
+			GinkgoWriter.Printf("Status Code: %d\n", statusCode)
+			GinkgoWriter.Printf("Error: %v\n", err)
+			GinkgoWriter.Printf("Body: %s\n", body)
+			GinkgoWriter.Printf("URL: %v\n", url)
+			Expect(err).To(BeNil(), "Expected no error")
+			Expect(statusCode).To(Equal(200), "Expected status code")
 
-			// ここで、構造体の変換を実施して、リクエストを送信する
-
-			_,_, err = ReqRest(cnf, "createCluster", "http://localhost:8080")
-			Expect(err).To(BeNil())
-			GinkgoWriter.Println(err.Error())	
+			// これで リクエストを送信する
+			//_, _, err = ReqRest(cnf, "createCluster", "http://localhost:8080")
+			//Expect(err).To(BeNil())
+			//GinkgoWriter.Println(err.Error())
 		})
 
 		It("仮想マシンの生成", func() {
