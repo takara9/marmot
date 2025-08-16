@@ -74,10 +74,10 @@ jobs:
     #  with:
     #    go-version: '1.21'
 
-    - name: Check coredns
+    - name: Check docker
       run: |
         docker ps
-        dig -p 1053 @localhost A minio.labo.local +noall +answer
+        #dig -p 1053 @localhost A minio.labo.local +noall +answer
 
 
     - name: Check etcd put
@@ -128,8 +128,3 @@ jobs:
         cd pkg/virt
         sudo -s make test
         cd ../..
-
-
-
-
-
