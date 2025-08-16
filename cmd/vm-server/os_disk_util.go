@@ -1,4 +1,4 @@
-package util
+package main
 
 /*
   LVM関連のユーテリティ関数群
@@ -21,9 +21,8 @@ import (
 	"os/exec"
 
 	cf "github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/lvm"
-	etcd "go.etcd.io/etcd/client/v3"
+	"github.com/takara9/marmot/pkg/util"
 )
 
 // LVのパーティションをマップ
@@ -70,8 +69,8 @@ func UnMountLocal(uuid string) error {
 
 // OSテンプVolのスナップショットを作成してデバイス名を返す
 // 　　サイズとテンプレートの選択が無い！？　　将来改良
-func CreateOsLv(conn *etcd.Client, tempVg string, tempLv string) (string, error) {
-	seq, err := db.GetSeq(conn, "LVOS")
+func (m *Marmotd) CreateOsLv(tempVg string, tempLv string) (string, error) {
+	seq, err := m.dbc.GetSeq("LVOS")
 	if err != nil {
 		return "", err
 	}
@@ -85,8 +84,8 @@ func CreateOsLv(conn *etcd.Client, tempVg string, tempLv string) (string, error)
 }
 
 // データボリュームの作成
-func CreateDataLv(conn *etcd.Client, sz uint64, vg string) (string, error) {
-	seq, err := db.GetSeq(conn, "LVDATA")
+func (m *Marmotd) createDataLv(sz uint64, vg string) (string, error) {
+	seq, err := m.dbc.GetSeq("LVDATA")
 	if err != nil {
 		return "", err
 	}
@@ -102,7 +101,7 @@ func CreateDataLv(conn *etcd.Client, sz uint64, vg string) (string, error) {
 // スナップショットボリュームをマウントして、 ホスト名とIPアドレスを設定
 //
 //	Ubuntu Linuxに限定
-func ConfigRootVol(spec cf.VMSpec, vg string, oslv string) error {
+func configRootVol(spec cf.VMSpec, vg string, oslv string) error {
 	err := KpartOn(vg, oslv)
 	if err != nil {
 		slog.Error("", "err", err)
@@ -116,21 +115,21 @@ func ConfigRootVol(spec cf.VMSpec, vg string, oslv string) error {
 	}
 
 	// ホスト名の書き込み
-	err = LinuxSetup_hostname(vm_root, spec.Name)
+	err = util.LinuxSetup_hostname(vm_root, spec.Name)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
 	}
 
 	// NetPlanの雛形へ書出す2
-	err = LinuxSetup_createNetplan(spec, vm_root)
+	err = util.LinuxSetup_createNetplan(spec, vm_root)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
 	}
 
 	// hostidの書き出し
-	err = LinuxSetup_hostid(spec, vm_root)
+	err = util.LinuxSetup_hostid(spec, vm_root)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err

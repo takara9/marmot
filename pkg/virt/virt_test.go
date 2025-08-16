@@ -8,9 +8,7 @@ import (
 )
 
 var _ = Describe("Virt", func() {
-
 	Describe("Manipulation LibVirt", func() {
-
 		Context("Lifecycle of LibVirt", func() {
 			var in string = "test-data/vm-1.xml"
 			var out string = "test-data/out-1.xml"
