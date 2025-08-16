@@ -143,7 +143,7 @@ func (m *MarmotEndpoint) CreateCluster(vmcluster api.MarmotConfig) (int, []byte,
 	}
 	fmt.Println("jsonBytes=", string(jsonBytes))
 
-	req, err := http.NewRequest("POST", m.setUrl("/createClustercreateVm"), bytes.NewBuffer(jsonBytes))
+	req, err := http.NewRequest("POST", m.setUrl("/createCluster"), bytes.NewBuffer(jsonBytes))
 	if err != nil {
 		fmt.Println("#2")
 		return 0, nil, nil, err

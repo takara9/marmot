@@ -159,7 +159,7 @@ var _ = Describe("Mock Test", Ordered, func() {
 			}
 		})
 
-		It("仮想マシンクラスタの生成", func() {
+		It("仮想マシン クラスタの生成", func() {
 			// コンフィグファイルを読んで、marmotdに送信する。
 			var cnf config.MarmotConfig
 			err := config.ReadConfig("testdata/cluster-config.yaml", &cnf)
@@ -170,7 +170,7 @@ var _ = Describe("Mock Test", Ordered, func() {
 
 			GinkgoWriter.Printf("Status Code: %d\n", statusCode)
 			GinkgoWriter.Printf("Error: %v\n", err)
-			GinkgoWriter.Printf("Body: %s\n", body)
+			GinkgoWriter.Printf("Body: %s", body)
 			GinkgoWriter.Printf("URL: %v\n", url)
 			Expect(err).To(BeNil(), "Expected no error")
 			Expect(statusCode).To(Equal(200), "Expected status code")
