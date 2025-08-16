@@ -10,32 +10,18 @@ import (
 var _ = Describe("Etcd", func() {
 
 	var url string
-	//var url_noexist string
 	var Conn *etcd.Client
 	var err error
 
 	BeforeEach(func() {
 		url = "http://127.0.0.1:2379"
-		//url_noexist = "http://127.0.0.1:2380"
-		//book = &books.Book{
-		//	Title: "Les Miserables",
-		//	Author: "Victor Hugo",
-		//	Pages: 2783,
-		//	Weight: 500,
-		//}
 	})
 
 	AfterEach(func() {
-		//err := os.Clearenv("WEIGHT_UNITS")
-		//Expect(err).NotTo(HaveOccurred())
 	})
 
 	Describe("Test etcd", func() {
 		Context("Test Connection to etcd", func() {
-			//It("Connection etcd not exist", func() {
-			//	conn, err: = Connect(url_noexist)
-			//	Expect(err).To(HaveOccurred())
-			//})
 			It("Connection etcd", func() {
 				Conn, err = Connect(url)
 				Expect(err).NotTo(HaveOccurred())
@@ -44,7 +30,6 @@ var _ = Describe("Etcd", func() {
 
 		Context("Test access etcd", func() {
 			var key_hv1 = "hv01"
-			//var data_get Hypervisor
 			data_hv1 := testHvData1()
 
 			It("Put", func() {
@@ -97,29 +82,6 @@ var _ = Describe("Etcd", func() {
 				{name: "Get Seq No 3rd", want: 3},
 				{name: "Get Seq No 4th", want: 4},
 			}
-
-			/*
-				ループを入れることは許されないみたい
-				for i, tt := range tests {
-					fmt.Println(i, td.name, td.want)
-
-					It(td.name, func() {
-						seqno, err := GetSeq(Conn, IDX)
-						GinkgoWriter.Println("seqno ", seqno)
-						Expect(err).NotTo(HaveOccurred())
-						Expect(seqno).To(Equal(uint64(td.want)))
-					})
-				}
-				It("test loop", func() {
-					for i, tt := range tests {
-						fmt.Println(i, td.name, td.want)
-						seqno, err := GetSeq(Conn, IDX)
-						GinkgoWriter.Println("seqno ", seqno)
-						Expect(err).NotTo(HaveOccurred())
-						Expect(seqno).To(Equal(uint64(tests[0].want)))
-					}
-				})
-			*/
 
 			It(tests[0].name, func() {
 				seqno, err := GetSeq(Conn, IDX)
@@ -390,43 +352,3 @@ var _ = Describe("Etcd", func() {
 		})
 	})
 })
-
-/*
-	type hvReq struct {
-		name string
-		cpu  int
-		ram  int
-	}
-
-	tests := []struct {
-		name string
-		req  hvReq
-		want *int
-	}{
-		{name: "1st", req: hvReq{name: "hv1", cpu: 10, ram: 64}, want: nil},
-		{name: "2nd", req: hvReq{name: "hv2", cpu: 10, ram: 64}, want: nil},
-	}
-
-	It("Delete existing data", func() {
-		DelByKey(Conn, tests[0].req.name)
-		DelByKey(Conn, tests[1].req.name)
-	})
-
-	It("PUT Hypervisor node data #1", func() {
-		td := tests[0]
-		GinkgoWriter.Println("testHvCreate ")
-		hv := testHvCreate(td.req.name, td.req.cpu, td.req.ram)
-		GinkgoWriter.Println("PutDataEtcd ")
-		err := PutDataEtcd(Conn, td.req.name, hv)
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	It("PUT Hypervisor node data #2", func() {
-		td := tests[1]
-		GinkgoWriter.Println("testHvCreate ")
-		hv := testHvCreate(td.req.name, td.req.cpu, td.req.ram)
-		GinkgoWriter.Println("PutDataEtcd ")
-		err := PutDataEtcd(Conn, td.req.name, hv)
-		Expect(err).NotTo(HaveOccurred())
-	})
-*/

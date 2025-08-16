@@ -15,7 +15,6 @@ import (
 	"log/slog"
 	"net/http"
 
-	//"strings"
 	"io"
 	"time"
 
@@ -69,25 +68,6 @@ func CheckHypervisors(dbUrl string, node string) ([]db.Hypervisor, error) {
 
 	// 自ノードを含むハイパーバイザーの死活チェック、DBへ反映
 	for _, val := range hvs {
-
-		// ping を変更してデータを収集も可能
-		/*
-			_, body, err := ReqGetQuick("ping", fmt.Sprintf("http://%s:8750",val.IpAddr))
-			if err != nil {
-				slog.Error("", "err", err)Communication failed", err, string(body))
-				val.Status = 0
-			} else {
-				dec := json.NewDecoder(strings.NewReader(string(body)))
-				var msg message
-				dec.Decode(&msg)
-				if msg.Message == "ok" {
-					val.Status = 2 // 正常稼働中
-				} else {
-					val.Status = 1 // 異常発生中
-				}
-			}
-		*/
-
 		// ハイパーバイザーの状態をDBへ書き込み
 		err = db.PutDataEtcd(Conn, val.Key, val)
 		if err != nil {
@@ -96,11 +76,6 @@ func CheckHypervisors(dbUrl string, node string) ([]db.Hypervisor, error) {
 	}
 	return hvs, nil
 }
-
-// ping の結果を受け取るための構造体、暫定的に配置
-//type message struct {
-//	Message string
-//}
 
 // 短いタイムアウトで、死活監視用
 func ReqGetQuick(apipath string, api string) (*http.Response, []byte, error) {
@@ -112,11 +87,6 @@ func ReqGetQuick(apipath string, api string) (*http.Response, []byte, error) {
 	// HTTP GET
 	xxx := fmt.Sprintf("%s/%s", api, apipath)
 	fmt.Println("xxxxxxxxxxxxxxxxxxxx = ", xxx)
-
-	//res, err := client.Get(fmt.Sprintf("%s/%s", api, apipath))
-	//if err != nil {
-	//	return nil, nil, err
-	//}
 
 	res, err := client.Get(fmt.Sprintf("%s/%s", api, apipath))
 	if err != nil {
@@ -210,15 +180,6 @@ func CheckHvVG2(Conn *etcd.Client, node string, vg string) error {
 		}
 
 	}
-
-	/* 注意 この書き方では、データがセットされない
-	for _,v := range hv.StgPool {
-		if v.VolGroup == vg {
-			v.FreeCap = free_sz/1024/1024/1024
-			v.VgCap   = total_sz/1024/1024/1024
-		}
-	}
-	*/
 
 	// DBへ書き込み
 	err = db.PutDataEtcd(Conn, hv.Key, hv)

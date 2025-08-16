@@ -21,10 +21,6 @@ var node *string
 var etcd *string
 var ccf *string
 
-//var cnf cf.MarmotConfig
-
-//var etcd_url string
-
 var hv_config string
 
 var _ = BeforeSuite(func() {

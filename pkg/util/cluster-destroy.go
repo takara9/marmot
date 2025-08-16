@@ -3,7 +3,6 @@ package util
 import (
 	"fmt"
 	"log/slog"
-	//"os"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -31,9 +30,6 @@ func DestroyCluster(cnf cf.MarmotConfig, dbUrl string) error {
 
 	var NotFound bool = true
 	for _, spec := range cnf.VMSpec {
-
-		//fmt.Println("spc.Name = ", spec.Name)
-		//fmt.Println("cnf.ClusterName = ", cnf.ClusterName)
 
 		// クラスタ名とホスト名の重複チェック
 		vmKey, _ := db.FindByHostAndClusteName(Conn, spec.Name, cnf.ClusterName)

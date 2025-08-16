@@ -14,6 +14,7 @@ type DefaultConfig struct {
 	EtcdServerUrl string `yaml:"etcd_server"`
 }
 
+
 func ReadHvConfig() (cf.Hypervisors_yaml, DefaultConfig, error) {
 	var hvs cf.Hypervisors_yaml
 	var cnf DefaultConfig
@@ -36,8 +37,8 @@ func ReadHvConfig() (cf.Hypervisors_yaml, DefaultConfig, error) {
 	return hvs, cnf, nil
 }
 
-func SetHvConfig(hvs cf.Hypervisors_yaml, cnf DefaultConfig) error {
 
+func SetHvConfig(hvs cf.Hypervisors_yaml, cnf DefaultConfig) error {
 	// etcdへ接続
 	Conn, err := db.Connect(cnf.EtcdServerUrl)
 	if err != nil {

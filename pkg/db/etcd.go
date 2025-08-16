@@ -15,12 +15,6 @@ import (
 	cf "github.com/takara9/marmot/pkg/config"
 )
 
-/*
-   タイムアウトを取る様に修正が必要
-   テスト
-   GoDoc
-*/
-
 // etcdへ接続
 func Connect(url1 string) (*etcd.Client, error) {
 	conn, err := etcd.New(etcd.Config{
@@ -160,8 +154,7 @@ func GetVmsStatus(con *etcd.Client, vms *[]VirtualMachine) error {
 	if err != nil {
 		return err
 	}
-	//var vm VirtualMachine  ここに書くと、ループ内で初期化されないで、
-	//                       上書きされるので、バグの原因になる。
+
 	for _, ev := range resp.Kvs {
 		var vm VirtualMachine // ここに宣言することで、ループ毎に初期化される
 		err = json.Unmarshal(ev.Value, &vm)
@@ -254,7 +247,6 @@ func AssignHvforVm(con *etcd.Client, vm VirtualMachine) (string, string, uuid.UU
 	for _, hv = range hvs {
 
 		// 停止中のHVの割り当てない
-		//fmt.Println("============= hv status ", hv.Status)
 		if hv.Status != 2 {
 			continue
 		}
@@ -444,8 +436,6 @@ func UpdateVmState(con *etcd.Client, vmkey string, state int) error {
 	return err
 }
 
-//////////////////////////////////////////////////////////////
-
 // ハイパーバイザーの設定
 func SetHypervisor(con *etcd.Client, v cf.Hypervisor_yaml) error {
 	var hv Hypervisor
@@ -458,13 +448,6 @@ func SetHypervisor(con *etcd.Client, v cf.Hypervisor_yaml) error {
 	hv.Memory = int(v.Ram * 1024) // MB
 	hv.FreeMemory = int(v.Ram * 1024)
 	hv.Status = 2 // テストのため暫定
-
-	//	for _, val := range v.StgPool_yaml {
-	//		var sp St
-	//		sp.VolGroup = val.VolGroup
-	//		sp.Type     = val.Type
-	//		hv.StgPool  = append(hv.StgPool,sp)
-	//	}
 
 	for _, val := range v.Storage {
 		var sp StoragePool

@@ -14,17 +14,9 @@ import (
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/virt"
 
-	//"github.com/takara9/marmot/pkg/dns"
 	etcd "go.etcd.io/etcd/client/v3"
 )
 
-/*
-以下の説明を作成して、テストを作成すること。
-
-	cnf	:
-	dbUrl
-	hvNode
-*/
 
 // コンフィグからVMクラスタを作成する
 func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
@@ -140,11 +132,6 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		// ローカルHVでVMを作成するケースと、
 		// リモートHVでVMを作成するケースが発生する。
 
-		// vm.HvNode と node を比較してローカルへ
-		//slog.Error("", "err", err)vm.HvNode", " = ", vm.HvNode)
-		//slog.Error("", "err", err)hvNode", " = ", hvNode)
-		//slog.Error("", "err", err)cmp vm.HvNode hvNode", " = ", vm.HvNode == hvNode)
-
 		fmt.Println("リモートとローカル関係なしに、マイクロサービスへリクエストする")
 		// リモートとローカル関係なしに、マイクロサービスへリクエストする
 		db.UpdateVmState(Conn, vm.Key, db.PROVISIONING)
@@ -216,8 +203,6 @@ func RemoteCreateStartVM(hvNode string, spec cf.VMSpec) error {
 // VMを生成する
 func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 
-	//slog.Error("", "err", err)Libvirtのテンプレートを読み込んで、設定を変更する")
-	//------------------------------------------------------------
 	// Libvirtのテンプレートを読み込んで、設定を変更する
 	var dom virt.Domain
 	err := virt.ReadXml("temp.xml", &dom)
@@ -233,8 +218,6 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	dom.Memory.Value = mem
 	dom.CurrentMemory.Value = mem
 
-	//slog.Error("", "err", err)OSボリュームを作成")
-	//------------------------------------------------------------
 	// OSボリュームを作成  (N テンプレートを指定できると良い)
 	osLogicalVol, err := CreateOsLv(conn, spec.OsTempVg, spec.OsTempLv)
 	if err != nil {
@@ -243,7 +226,6 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	}
 	dom.Devices.Disk[0].Source.Dev = fmt.Sprintf("/dev/%s/%s", spec.OsTempVg, osLogicalVol)
 
-	//slog.Error("", "err", err)OSボリュームのLV名をetcdへ登録")
 	// OSボリュームのLV名をetcdへ登録
 	err = db.UpdateOsLv(conn, spec.Key, spec.OsTempVg, osLogicalVol)
 	if err != nil {
@@ -251,7 +233,6 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 		return err
 	}
 
-	//slog.Error("", "err", err)OSボリュームをマウントして、 ホスト名、IPアドレスを設定する")
 	// OSボリュームをマウントして、 ホスト名、IPアドレスを設定する
 	// 必要最小限として、詳細設定はAnsibleで実行する
 	err = ConfigRootVol(spec, spec.OsTempVg, osLogicalVol)
@@ -305,7 +286,6 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	// ストレージの更新
 	CheckHvVG2(conn, hvNode, spec.OsTempVg)
 
-	//------------------------------------------------------------
 	// XMLへNICインターフェースの追加
 	if len(spec.PrivateIP) > 0 {
 		CreateNic("pri", &dom.Devices.Interface)
@@ -315,7 +295,6 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 		CreateNic("pub", &dom.Devices.Interface)
 	}
 
-	//------------------------------------------------------------
 	// 仮想マシン定義のXMLファイルを生成する
 	textXml := virt.CreateVirtXML(dom)
 	xmlfileName := fmt.Sprintf("./%v.xml", dom.Uuid)
@@ -331,7 +310,6 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 		return err
 	}
 
-	//------------------------------------------------------------
 	// 仮想マシンを起動する
 	url := "qemu:///system"
 	err = virt.CreateStartVM(url, xmlfileName)
