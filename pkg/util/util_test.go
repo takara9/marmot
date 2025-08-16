@@ -169,6 +169,7 @@ var _ = Describe("Util", func() {
 			err := cf.ReadConfig(*ccf, &cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
+
 		It("Create Cluster()", func() {
 			err := ut.CreateCluster(cnf, *etcd, *node)
 			Expect(err).NotTo(HaveOccurred())
@@ -180,6 +181,7 @@ var _ = Describe("Util", func() {
 			err := cf.ReadConfig(*ccf, &cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
+
 		It("Destroy Cluster()", func() {
 			err := ut.DestroyCluster(cnf, *etcd)
 			Expect(err).NotTo(HaveOccurred())
