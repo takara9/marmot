@@ -132,3 +132,5 @@ sudo ./install.sh
 - [Kubernetesクラスタの実行](https://github.com/takara9/marmot-servers/tree/main/kubernetes)
 - [Cephストレージシステムの実行](https://github.com/takara9/marmot-servers/tree/main/ceph)
 - [メトリックスとログ分析基盤](https://github.com/takara9/docker_and_k8s/tree/main/4-10_Observability)
+
+CIのテストのため
