@@ -1,4 +1,4 @@
-package util
+package main
 
 /*
    ハイパーバイザーの状態取得して、DBへ反映させる
@@ -11,30 +11,20 @@ package util
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
 	"net/http"
-
-	//"strings"
-	"io"
 	"time"
 
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/lvm"
-	etcd "go.etcd.io/etcd/client/v3"
 )
 
 // ハイパーバイザーのリストを取り出す
-func getHypervisors(dbUrl string) ([]db.Hypervisor, error) {
-	Conn, err := db.Connect(dbUrl)
-	if err != nil {
-		slog.Error("", "err", err)
-		return nil, err
-	}
-	// クローズが無い？
-
+func (m *Marmotd) getHypervisors() ([]db.Hypervisor, error) {
 	// ハイパーバイザーのリストを取り出す
-	resp, err := db.GetEtcdByPrefix(Conn, "hv")
+	resp, err := m.dbc.GetEtcdByPrefix("hv")
 	if err != nil {
 		slog.Error("", "err", err)
 		return nil, err
@@ -53,15 +43,8 @@ func getHypervisors(dbUrl string) ([]db.Hypervisor, error) {
 }
 
 // ハイパーバイザーをREST-APIでアクセスして疎通を確認、DBへ反映させる
-func CheckHypervisors(dbUrl string, node string) ([]db.Hypervisor, error) {
-	Conn, err := db.Connect(dbUrl)
-	if err != nil {
-		slog.Error("", "err", err)
-		return nil, err
-	}
-	// クローズが無い？
-
-	hvs, err := getHypervisors(dbUrl)
+func (m *Marmotd) CheckHypervisors() ([]db.Hypervisor, error) {
+	hvs, err := m.getHypervisors()
 	if err != nil {
 		slog.Error("", "err", err)
 		return nil, err
@@ -89,18 +72,13 @@ func CheckHypervisors(dbUrl string, node string) ([]db.Hypervisor, error) {
 		*/
 
 		// ハイパーバイザーの状態をDBへ書き込み
-		err = db.PutDataEtcd(Conn, val.Key, val)
+		err = m.dbc.PutDataEtcd(val.Key, val)
 		if err != nil {
 			slog.Error("", "err", err)
 		}
 	}
 	return hvs, nil
 }
-
-// ping の結果を受け取るための構造体、暫定的に配置
-//type message struct {
-//	Message string
-//}
 
 // 短いタイムアウトで、死活監視用
 func ReqGetQuick(apipath string, api string) (*http.Response, []byte, error) {
@@ -112,12 +90,6 @@ func ReqGetQuick(apipath string, api string) (*http.Response, []byte, error) {
 	// HTTP GET
 	xxx := fmt.Sprintf("%s/%s", api, apipath)
 	fmt.Println("xxxxxxxxxxxxxxxxxxxx = ", xxx)
-
-	//res, err := client.Get(fmt.Sprintf("%s/%s", api, apipath))
-	//if err != nil {
-	//	return nil, nil, err
-	//}
-
 	res, err := client.Get(fmt.Sprintf("%s/%s", api, apipath))
 	if err != nil {
 		log.Printf("--------%v------------ %v", res, err)
@@ -132,15 +104,8 @@ func ReqGetQuick(apipath string, api string) (*http.Response, []byte, error) {
 	return res, byteBody, nil
 }
 
-func CheckHvVgAll(dbUrl string, node string) error {
-	Conn, err := db.Connect(dbUrl)
-	if err != nil {
-		slog.Error("", "err", err)
-		return err
-	}
-	// クローズが無い？
-
-	hv, err := db.GetHvByKey(Conn, node)
+func (m *Marmotd) CheckHvVgAll() error {
+	hv, err := m.dbc.GetHvByKey(m.NodeName)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
@@ -157,7 +122,7 @@ func CheckHvVgAll(dbUrl string, node string) error {
 	}
 
 	// DBへ書き込み
-	err = db.PutDataEtcd(Conn, hv.Key, hv)
+	err = m.dbc.PutDataEtcd(hv.Key, hv)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
@@ -167,16 +132,8 @@ func CheckHvVgAll(dbUrl string, node string) error {
 }
 
 // ボリュームグループの容量を取得して、DBへセットする
-func CheckHvVG(dbUrl string, node string, vg string) error {
-
-	// DBへのアクセス
-	Conn, err := db.Connect(dbUrl)
-	if err != nil {
-		slog.Error("", "err", err)
-		return err
-	}
-
-	err = CheckHvVG2(Conn, node, vg)
+func (m *Marmotd) CheckHvVG(dbUrl string, node string, vg string) error {
+	err := m.CheckHvVG2(node, vg)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
@@ -186,8 +143,7 @@ func CheckHvVG(dbUrl string, node string, vg string) error {
 }
 
 // ボリュームグループの容量を取得して、DBへセットする
-func CheckHvVG2(Conn *etcd.Client, node string, vg string) error {
-
+func (m *Marmotd) CheckHvVG2(node string, vg string) error {
 	// LVMへのアクセス
 	total_sz, free_sz, err := lvm.CheckVG(vg)
 	if err != nil {
@@ -196,7 +152,7 @@ func CheckHvVG2(Conn *etcd.Client, node string, vg string) error {
 	}
 
 	// キーを取得
-	hv, err := db.GetHvByKey(Conn, node)
+	hv, err := m.dbc.GetHvByKey(node)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
@@ -221,7 +177,7 @@ func CheckHvVG2(Conn *etcd.Client, node string, vg string) error {
 	*/
 
 	// DBへ書き込み
-	err = db.PutDataEtcd(Conn, hv.Key, hv)
+	err = m.dbc.PutDataEtcd(hv.Key, hv)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err

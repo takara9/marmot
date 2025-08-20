@@ -6,7 +6,6 @@ import (
 
 // 論理ボリュームの存在チェック
 func IsExist(vgx string, lvx string) error {
-
 	vg, err := tlvm.LookupVolumeGroup(vgx)
 	if err != nil {
 		return err
@@ -22,7 +21,6 @@ func IsExist(vgx string, lvx string) error {
 
 // 論理ボリュームの作成
 func CreateLV(vgx string, lvx string, size uint64) error {
-
 	vg, err := tlvm.LookupVolumeGroup(vgx)
 	if err != nil {
 		return err
@@ -32,12 +30,12 @@ func CreateLV(vgx string, lvx string, size uint64) error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
 // 論理ボリュームの削除
 func RemoveLV(vgx string, lvx string) error {
-
 	vg, err := tlvm.LookupVolumeGroup(vgx)
 	if err != nil {
 		return err
@@ -52,12 +50,12 @@ func RemoveLV(vgx string, lvx string) error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
 // スナップショットの作成、OSボリューム作成用
 func CreateSnapshot(vgx string, lvx string, svx string, size uint64) error {
-
 	tags := []string{"snapshot", "marmot"}
 	vg, err := tlvm.LookupVolumeGroup(vgx)
 	if err != nil {
@@ -88,5 +86,6 @@ func CheckVG(vgx string) (uint64, uint64, error) {
 	if err != nil {
 		return 0, 0, err
 	}
+
 	return total_sz, free_sz, err
 }
