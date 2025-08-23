@@ -1,4 +1,4 @@
-package util_test
+package main
 
 import (
 	"fmt"
@@ -18,8 +18,8 @@ const (
 	etcdctl_exe   = "/usr/bin/etcdctl"
 )
 
-var node *string
-var etcd *string
+//var node *string
+//var etcd *string
 var ccf *string
 
 //var cnf cf.MarmotConfig
@@ -173,7 +173,7 @@ var _ = Describe("Util", func() {
 		})
 
 		It("Create Cluster()", func() {
-			err := ut.CreateCluster(cnf, *etcd, *node)
+			err := CreateCluster(cnf, *etcd, *node)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -185,7 +185,7 @@ var _ = Describe("Util", func() {
 		})
 
 		It("Destroy Cluster()", func() {
-			err := ut.DestroyCluster(cnf, *etcd)
+			err := DestroyCluster(cnf, *etcd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
@@ -200,22 +200,22 @@ var _ = Describe("Util", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 		It("Create Cluster()", func() {
-			err := ut.CreateCluster(cnf, *etcd, *node)
+			err := CreateCluster(cnf, *etcd, *node)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Stop Cluster", func() {
-			err := ut.StopCluster(cnf, *etcd)
+			err := StopCluster(cnf, *etcd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Start Cluster", func() {
-			err := ut.StartCluster(cnf, *etcd)
+			err := StartCluster(cnf, *etcd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Destroy Cluster()", func() {
-			err := ut.DestroyCluster(cnf, *etcd)
+			err := DestroyCluster(cnf, *etcd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
@@ -230,22 +230,22 @@ var _ = Describe("Util", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 		It("クラスターの起動", func() {
-			err := ut.CreateCluster(cnf, *etcd, *node)
+			err := CreateCluster(cnf, *etcd, *node)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("クラスターの２重起動 エラー発生が発生", func() {
-			err := ut.CreateCluster(cnf, *etcd, *node)
+			err := CreateCluster(cnf, *etcd, *node)
 			Expect(err).To(HaveOccurred())
 		})
 
 		It("Start Cluster", func() {
-			err := ut.StartCluster(cnf, *etcd)
+			err := StartCluster(cnf, *etcd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Destroy Cluster()", func() {
-			err := ut.DestroyCluster(cnf, *etcd)
+			err := DestroyCluster(cnf, *etcd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})

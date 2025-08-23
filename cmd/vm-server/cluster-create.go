@@ -1,4 +1,4 @@
-package util
+package main
 
 import (
 	"bytes"
@@ -12,6 +12,7 @@ import (
 
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/util"
 	"github.com/takara9/marmot/pkg/virt"
 	//"github.com/takara9/marmot/pkg/dns"
 )
@@ -240,7 +241,7 @@ func CreateVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
 	//slog.Error("", "err", err)OSボリュームを作成")
 	//------------------------------------------------------------
 	// OSボリュームを作成  (N テンプレートを指定できると良い)
-	osLogicalVol, err := CreateOsLv(dbUrl, spec.OsTempVg, spec.OsTempLv)
+	osLogicalVol, err := util.CreateOsLv(dbUrl, spec.OsTempVg, spec.OsTempLv)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
@@ -258,7 +259,7 @@ func CreateVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
 	//slog.Error("", "err", err)OSボリュームをマウントして、 ホスト名、IPアドレスを設定する")
 	// OSボリュームをマウントして、 ホスト名、IPアドレスを設定する
 	// 必要最小限として、詳細設定はAnsibleで実行する
-	err = ConfigRootVol(spec, spec.OsTempVg, osLogicalVol)
+	err = util.ConfigRootVol(spec, spec.OsTempVg, osLogicalVol)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
@@ -275,7 +276,7 @@ func CreateVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
 		if len(disk.VolGrp) > 0 {
 			vg = disk.VolGrp
 		}
-		dlv, err := CreateDataLv(dbUrl, uint64(disk.Size), vg)
+		dlv, err := util.CreateDataLv(dbUrl, uint64(disk.Size), vg)
 		if err != nil {
 			slog.Error("", "err", err)
 			return err
@@ -307,16 +308,16 @@ func CreateVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
 	}
 
 	// ストレージの更新
-	CheckHvVG2(dbUrl, hvNode, spec.OsTempVg)
+	util.CheckHvVG2(dbUrl, hvNode, spec.OsTempVg)
 
 	//------------------------------------------------------------
 	// XMLへNICインターフェースの追加
 	if len(spec.PrivateIP) > 0 {
-		CreateNic("pri", &dom.Devices.Interface)
+		util.CreateNic("pri", &dom.Devices.Interface)
 	}
 
 	if len(spec.PublicIP) > 0 {
-		CreateNic("pub", &dom.Devices.Interface)
+		util.CreateNic("pub", &dom.Devices.Interface)
 	}
 
 	//------------------------------------------------------------
