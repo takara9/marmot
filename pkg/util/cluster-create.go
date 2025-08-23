@@ -13,9 +13,7 @@ import (
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/virt"
-
 	//"github.com/takara9/marmot/pkg/dns"
-	etcd "go.etcd.io/etcd/client/v3"
 )
 
 /*
@@ -28,8 +26,8 @@ import (
 
 // コンフィグからVMクラスタを作成する
 func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
-
-	Conn, err := db.Connect(dbUrl)
+	//Conn, err := db.Connect(dbUrl)
+	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
@@ -39,14 +37,14 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 	for _, spec := range cnf.VMSpec {
 
 		// クラスタ名とホスト名の重複チェック
-		vmKey, _ := db.FindByHostAndClusteName(Conn, spec.Name, cnf.ClusterName)
+		vmKey, _ := d.FindByHostAndClusteName(spec.Name, cnf.ClusterName)
 		if len(vmKey) > 0 {
 			return fmt.Errorf("existing same name virttual machine : %v", spec.Name)
 		}
 
 		// ここに、IPアドレスの重複チェックを入れる
 		if len(spec.PublicIP) > 0 {
-			found, err := db.FindByPublicIPaddress(Conn, spec.PublicIP)
+			found, err := d.FindByPublicIPaddress(spec.PublicIP)
 			if err != nil {
 				return err
 			}
@@ -55,7 +53,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 			}
 		}
 		if len(spec.PrivateIP) > 0 {
-			found, err := db.FindByPrivateIPaddress(Conn, spec.PrivateIP)
+			found, err := d.FindByPrivateIPaddress(spec.PrivateIP)
 			if err != nil {
 				return err
 			}
@@ -73,7 +71,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 
 		fmt.Println("ホスト名とクラスタ名でVMキーを取得する")
 		// ホスト名とクラスタ名でVMキーを取得する
-		vmKey, _ := db.FindByHostAndClusteName(Conn, spec.Name, cnf.ClusterName)
+		vmKey, _ := d.FindByHostAndClusteName(spec.Name, cnf.ClusterName)
 		if len(vmKey) > 0 {
 			continue
 		}
@@ -100,7 +98,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 
 		//スケジュールを実行
 		fmt.Println("スケジュールを実行")
-		vm.HvNode, vm.Key, vm.Uuid, err = db.AssignHvforVm(Conn, vm)
+		vm.HvNode, vm.Key, vm.Uuid, err = d.AssignHvforVm(vm)
 		if err != nil {
 			slog.Error("", "err", err)
 			break_err = true
@@ -111,7 +109,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		// OSのバージョン、テンプレートを設定
 		fmt.Println("OSのバージョン、テンプレートを設定")
 		spec.VMOsVariant = cnf.VMOsVariant
-		spec.OsTempVg, spec.OsTempLv, err = db.GetOsImgTempByKey(Conn, cnf.VMOsVariant)
+		spec.OsTempVg, spec.OsTempLv, err = d.GetOsImgTempByKey(cnf.VMOsVariant)
 		if err != nil {
 			slog.Error("", "err", err)
 			break_err = true
@@ -147,17 +145,17 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 
 		fmt.Println("リモートとローカル関係なしに、マイクロサービスへリクエストする")
 		// リモートとローカル関係なしに、マイクロサービスへリクエストする
-		db.UpdateVmState(Conn, vm.Key, db.PROVISIONING)
+		d.UpdateVmState(vm.Key, db.PROVISIONING)
 		err = RemoteCreateStartVM(vm.HvNode, spec)
 		if err != nil {
 			slog.Error("", "remote request err", err)
 			break_err = true
 			return_errors = err
-			db.UpdateVmState(Conn, vm.Key, db.ERROR) // エラー状態へ
+			d.UpdateVmState(vm.Key, db.ERROR) // エラー状態へ
 			break
 		}
 		fmt.Println("実行中へ")
-		db.UpdateVmState(Conn, vm.Key, db.RUNNING) // 実行中へ
+		d.UpdateVmState(vm.Key, db.RUNNING) // 実行中へ
 
 		// CoreDNS登録
 		fmt.Println("DNS登録をスキップ")
@@ -214,13 +212,19 @@ func RemoteCreateStartVM(hvNode string, spec cf.VMSpec) error {
 
 // この部分は、ハイパーバイザーのホストで実行する
 // VMを生成する
-func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
+// func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
+func CreateVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
+	d, err := db.NewDatabase(dbUrl)
+	if err != nil {
+		slog.Error("", "err", err)
+		return err
+	}
 
 	//slog.Error("", "err", err)Libvirtのテンプレートを読み込んで、設定を変更する")
 	//------------------------------------------------------------
 	// Libvirtのテンプレートを読み込んで、設定を変更する
 	var dom virt.Domain
-	err := virt.ReadXml("temp.xml", &dom)
+	err = virt.ReadXml("temp.xml", &dom)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
@@ -236,7 +240,7 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	//slog.Error("", "err", err)OSボリュームを作成")
 	//------------------------------------------------------------
 	// OSボリュームを作成  (N テンプレートを指定できると良い)
-	osLogicalVol, err := CreateOsLv(conn, spec.OsTempVg, spec.OsTempLv)
+	osLogicalVol, err := CreateOsLv(dbUrl, spec.OsTempVg, spec.OsTempLv)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
@@ -245,7 +249,7 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 
 	//slog.Error("", "err", err)OSボリュームのLV名をetcdへ登録")
 	// OSボリュームのLV名をetcdへ登録
-	err = db.UpdateOsLv(conn, spec.Key, spec.OsTempVg, osLogicalVol)
+	err = d.UpdateOsLv(spec.Key, spec.OsTempVg, osLogicalVol)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
@@ -271,7 +275,7 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 		if len(disk.VolGrp) > 0 {
 			vg = disk.VolGrp
 		}
-		dlv, err := CreateDataLv(conn, uint64(disk.Size), vg)
+		dlv, err := CreateDataLv(dbUrl, uint64(disk.Size), vg)
 		if err != nil {
 			slog.Error("", "err", err)
 			return err
@@ -294,7 +298,7 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 		// 配列に追加
 		dom.Devices.Disk = append(dom.Devices.Disk, dk)
 		// etcdデータベースにlvを登録
-		err = db.UpdateDataLv(conn, spec.Key, i, disk.VolGrp, dlv)
+		err = d.UpdateDataLv(spec.Key, i, disk.VolGrp, dlv)
 		if err != nil {
 			slog.Error("", "err", err)
 			return err
@@ -303,7 +307,7 @@ func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	}
 
 	// ストレージの更新
-	CheckHvVG2(conn, hvNode, spec.OsTempVg)
+	CheckHvVG2(dbUrl, hvNode, spec.OsTempVg)
 
 	//------------------------------------------------------------
 	// XMLへNICインターフェースの追加

@@ -3,6 +3,7 @@ package util
 import (
 	"fmt"
 	"log/slog"
+
 	//"os"
 	"bytes"
 	"encoding/json"
@@ -15,7 +16,7 @@ import (
 	"github.com/takara9/marmot/pkg/dns"
 	"github.com/takara9/marmot/pkg/lvm"
 	"github.com/takara9/marmot/pkg/virt"
-	etcd "go.etcd.io/etcd/client/v3"
+	//etcd "go.etcd.io/etcd/client/v3"
 )
 
 // クラスタ削除
@@ -23,7 +24,8 @@ func DestroyCluster(cnf cf.MarmotConfig, dbUrl string) error {
 
 	fmt.Println("DEBUG Print in DestroyCluster dburl", dbUrl)
 
-	Conn, err := db.Connect(dbUrl)
+	//Conn, err := db.Connect(dbUrl)
+	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
@@ -36,12 +38,12 @@ func DestroyCluster(cnf cf.MarmotConfig, dbUrl string) error {
 		//fmt.Println("cnf.ClusterName = ", cnf.ClusterName)
 
 		// クラスタ名とホスト名の重複チェック
-		vmKey, _ := db.FindByHostAndClusteName(Conn, spec.Name, cnf.ClusterName)
+		vmKey, _ := d.FindByHostAndClusteName(spec.Name, cnf.ClusterName)
 		fmt.Println("DEBUG Print in DestroyCluster vmKey, specName", vmKey, spec.Name)
 		if len(vmKey) > 0 {
 			NotFound = false
 			spec.Key = vmKey
-			vm, err := db.GetVmByKey(Conn, vmKey)
+			vm, err := d.GetVmByKey(vmKey)
 			if err != nil {
 				slog.Error("", "err", err)
 				continue
@@ -53,7 +55,7 @@ func DestroyCluster(cnf cf.MarmotConfig, dbUrl string) error {
 			}
 		}
 	}
-	Conn.Close()
+	//Conn.Close()
 
 	if NotFound {
 		return errors.New("NotExistVM")
@@ -94,15 +96,21 @@ func RemoteDestroyVM(hvNode string, spec cf.VMSpec) error {
 }
 
 // VMの削除
-func DestroyVM(Conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
+func DestroyVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
 
-	vm, err := db.GetVmByKey(Conn, spec.Key)
+	d, err := db.NewDatabase(dbUrl)
+	if err != nil {
+		slog.Error("get list virtual machines", "err", err)
+		return err
+	}
+
+	vm, err := d.GetVmByKey(spec.Key)
 	if err != nil {
 		slog.Error("", "err", err)
 	}
 
 	// ハイパーバイザーのリソース削減保存のため値を取得
-	hv, err := db.GetHvByKey(Conn, vm.HvNode)
+	hv, err := d.GetHvByKey(vm.HvNode)
 	if err != nil {
 		slog.Error("", "err", err)
 	}
@@ -111,13 +119,13 @@ func DestroyVM(Conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 	if vm.Status != db.STOPPED || vm.Status == db.ERROR {
 		hv.FreeCpu = hv.FreeCpu + vm.Cpu
 		hv.FreeMemory = hv.FreeMemory + vm.Memory
-		err = db.PutDataEtcd(Conn, hv.Key, hv)
+		err = d.PutDataEtcd(hv.Key, hv)
 		if err != nil {
 			slog.Error("", "err", err)
 		}
 	}
 	// データベースから削除
-	err = db.DelByKey(Conn, spec.Key)
+	err = d.DelByKey(spec.Key)
 	if err != nil {
 		slog.Error("", "err", err)
 	}
@@ -142,16 +150,16 @@ func DestroyVM(Conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 		slog.Error("", "err", err)
 	}
 	// ストレージの更新
-	CheckHvVG2(Conn, hvNode, vm.OsVg)
+	CheckHvVG2(dbUrl, hvNode, vm.OsVg)
 
 	// データLVを削除
-	for _, d := range vm.Storage {
-		err = lvm.RemoveLV(d.Vg, d.Lv)
+	for _, dd := range vm.Storage {
+		err = lvm.RemoveLV(dd.Vg, dd.Lv)
 		if err != nil {
 			slog.Error("", "err", err)
 		}
 		// ストレージの更新
-		CheckHvVG2(Conn, hvNode, d.Vg)
+		CheckHvVG2(dbUrl, hvNode, dd.Vg)
 	}
 
 	return nil

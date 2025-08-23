@@ -91,14 +91,15 @@ func listHypervisor(c *gin.Context) {
 	}
 
 	// データベースから情報を取得
-	Conn, err := db.Connect(*etcd)
+	//Conn, err := db.Connect(*etcd)
+	d, err := db.NewDatabase(*etcd)
 	if err != nil {
 		slog.Error("connect to database", "err", err)
 		return
 	}
 
 	var hvs []db.Hypervisor
-	err = db.GetHvsStatus(Conn, &hvs)
+	err = d.GetHvsStatus(&hvs)
 	if err != nil {
 		slog.Error("get hypervisor status", "err", err)
 		return
@@ -108,13 +109,14 @@ func listHypervisor(c *gin.Context) {
 
 // コールバック 仮想マシンのリスト
 func listVirtualMachines(c *gin.Context) {
-	Conn, err := db.Connect(*etcd)
+	//Conn, err := db.Connect(*etcd)
+	d, err := db.NewDatabase(*etcd)
 	if err != nil {
 		slog.Error("get list virtual machines", "err", err)
 		return
 	}
 	var vms []db.VirtualMachine
-	err = db.GetVmsStatus(Conn, &vms)
+	err = d.GetVmsStatus(&vms)
 	if err != nil {
 		slog.Error("get status of virtual machines", "err", err)
 		return
@@ -176,14 +178,16 @@ func createVm(c *gin.Context) {
 		return
 	}
 
-	Conn, err := db.Connect(*etcd)
-	if err != nil {
-		slog.Error("connectiong db", "err", err)
-		c.JSON(400, gin.H{"msg": err.Error()})
-		return
-	}
+	//Conn, err := db.Connect(*etcd)
+	//d, err := db.NewDatabase(*etcd)
+	//if err != nil {
+	//	slog.Error("connectiong db", "err", err)
+	//	c.JSON(400, gin.H{"msg": err.Error()})
+	//	return
+	//}
 
-	err = ut.CreateVM(Conn, spec, *node)
+	//err = ut.CreateVM(Conn, spec, *node)
+	err = ut.CreateVM(*etcd, spec, *node)
 	if err != nil {
 		slog.Error("creating vm", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
@@ -202,14 +206,15 @@ func destroyVm(c *gin.Context) {
 		return
 	}
 
-	Conn, err := db.Connect(*etcd)
-	if err != nil {
-		slog.Error("connecting to Db", "err", err)
-		c.JSON(400, gin.H{"msg": err.Error()})
-		return
+	//Conn, err := db.Connect(*etcd)
+	//d, err := db.NewDatabase(*etcd)
+	//if err != nil {
+	//	slog.Error("connecting to Db", "err", err)
+	//	c.JSON(400, gin.H{"msg": err.Error()})
+	//	return
+	//}
 
-	}
-	err = ut.DestroyVM(Conn, spec, *node)
+	err = ut.DestroyVM(*etcd, spec, *node)
 	if err != nil {
 		slog.Error("delete vm", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
@@ -261,13 +266,14 @@ func startVm(c *gin.Context) {
 		return
 	}
 
-	Conn, err := db.Connect(*etcd)
-	if err != nil {
-		slog.Error("setup config", "err", err)
-		c.JSON(400, gin.H{"msg": err.Error()})
-		return
-	}
-	err = ut.StartVM(Conn, spec)
+	//Conn, err := db.Connect(*etcd)
+	//d, err := db.NewDatabase(*etcd)
+	//if err != nil {
+	//	slog.Error("setup config", "err", err)
+	//	c.JSON(400, gin.H{"msg": err.Error()})
+	//	return
+	//}
+	err = ut.StartVM(*etcd, spec)
 	if err != nil {
 		slog.Error("start vm", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
@@ -285,14 +291,15 @@ func stopVm(c *gin.Context) {
 		return
 	}
 
-	Conn, err := db.Connect(*etcd)
-	if err != nil {
-		slog.Error("connecting db", "err", err, "etcd = ", *etcd)
-		c.JSON(400, gin.H{"msg": err.Error()})
-		return
+	//Conn, err := db.Connect(*etcd)
+	//d, err := db.NewDatabase(*etcd)
+	//if err != nil {
+	//	slog.Error("connecting db", "err", err, "etcd = ", *etcd)
+	//	c.JSON(400, gin.H{"msg": err.Error()})
+	//	return
+	//}
 
-	}
-	err = ut.StopVM(Conn, spec)
+	err = ut.StopVM(*etcd, spec)
 	if err != nil {
 		slog.Error("stop vm", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})

@@ -69,7 +69,8 @@ func Add(rec DnsRecord, dbUrl string) error {
 	ent.Host = rec.Ipv4
 	ent.Ttl = rec.Ttl
 
-	con, err := db.Connect(dbUrl)
+	//con, err := db.Connect(dbUrl)
+	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
@@ -77,7 +78,7 @@ func Add(rec DnsRecord, dbUrl string) error {
 
 	// Add etcd
 	path = "/skydns" + path
-	err = db.PutDataEtcd(con, path, &ent)
+	err = d.PutDataEtcd(path, &ent)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
@@ -88,28 +89,29 @@ func Add(rec DnsRecord, dbUrl string) error {
 
 // 取得
 func Get(rec DnsRecord, dbUrl string) (db.DNSEntry, error) {
-	var d db.DNSEntry
+	var dd db.DNSEntry
 	err := checkParam(rec)
 	if err != nil {
 		slog.Error("", "err", err)
-		return d, err
+		return dd, err
 	}
 
 	path, err := convertEtcdPath(rec.Hostname)
 	if err != nil {
 		slog.Error("", "err", err)
-		return d, err
+		return dd, err
 	}
 
-	con, err := db.Connect(dbUrl)
+	//con, err := db.Connect(dbUrl)
+	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
 		slog.Error("", "err", err)
-		return d, err
+		return dd, err
 	}
 
 	// Get etcd
 	path = "/skydns" + path
-	rslt, err := db.GetEtcdByKey(con, path)
+	rslt, err := d.GetEtcdByKey(path)
 	if err != nil {
 		slog.Error("", "err", err)
 		return rslt, err
@@ -137,7 +139,8 @@ func Del(rec DnsRecord, dbUrl string) error {
 	ent.Host = rec.Ipv4
 	ent.Ttl = rec.Ttl
 
-	con, err := db.Connect(dbUrl)
+	//con, err := db.Connect(dbUrl)
+	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
@@ -145,7 +148,7 @@ func Del(rec DnsRecord, dbUrl string) error {
 
 	// Add etcd
 	path = "/skydns" + path
-	err = db.DelByKey(con, path)
+	err = d.DelByKey(path)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err

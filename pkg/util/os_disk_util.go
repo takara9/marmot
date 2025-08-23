@@ -23,7 +23,7 @@ import (
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/lvm"
-	etcd "go.etcd.io/etcd/client/v3"
+	//etcd "go.etcd.io/etcd/client/v3"
 )
 
 // LVのパーティションをマップ
@@ -70,8 +70,14 @@ func UnMountLocal(uuid string) error {
 
 // OSテンプVolのスナップショットを作成してデバイス名を返す
 // 　　サイズとテンプレートの選択が無い！？　　将来改良
-func CreateOsLv(conn *etcd.Client, tempVg string, tempLv string) (string, error) {
-	seq, err := db.GetSeq(conn, "LVOS")
+func CreateOsLv(dbUrl string, tempVg string, tempLv string) (string, error) {
+	d, err := db.NewDatabase(dbUrl)
+	if err != nil {
+		slog.Error("connect to database", "err", err)
+		return "", err
+	}
+
+	seq, err := d.GetSeq("LVOS")
 	if err != nil {
 		return "", err
 	}
@@ -85,8 +91,15 @@ func CreateOsLv(conn *etcd.Client, tempVg string, tempLv string) (string, error)
 }
 
 // データボリュームの作成
-func CreateDataLv(conn *etcd.Client, sz uint64, vg string) (string, error) {
-	seq, err := db.GetSeq(conn, "LVDATA")
+// func CreateDataLv(conn *etcd.Client, sz uint64, vg string) (string, error) {
+func CreateDataLv(dbUrl string, sz uint64, vg string) (string, error) {
+	d, err := db.NewDatabase(dbUrl)
+	if err != nil {
+		slog.Error("connect to database", "err", err)
+		return "", err
+	}
+
+	seq, err := d.GetSeq("LVDATA")
 	if err != nil {
 		return "", err
 	}

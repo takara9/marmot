@@ -4,15 +4,16 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	cf "github.com/takara9/marmot/pkg/config"
-	etcd "go.etcd.io/etcd/client/v3"
+	//etcd "go.etcd.io/etcd/client/v3"
 )
 
 var _ = Describe("Etcd", func() {
 
 	var url string
 	//var url_noexist string
-	var Conn *etcd.Client
+	//var Conn *etcd.Client
 	var err error
+	var d *Database
 
 	BeforeEach(func() {
 		url = "http://127.0.0.1:2379"
@@ -37,7 +38,8 @@ var _ = Describe("Etcd", func() {
 			//	Expect(err).To(HaveOccurred())
 			//})
 			It("Connection etcd", func() {
-				Conn, err = Connect(url)
+				//Conn, err = Connect(url)
+				d, err = NewDatabase(url)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
@@ -48,23 +50,23 @@ var _ = Describe("Etcd", func() {
 			data_hv1 := testHvData1()
 
 			It("Put", func() {
-				err := PutDataEtcd(Conn, key_hv1, data_hv1)
+				err := d.PutDataEtcd(key_hv1, data_hv1)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("Get", func() {
-				data_get, err := GetHvByKey(Conn, key_hv1)
+				data_get, err := d.GetHvByKey(key_hv1)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(data_get.Cpu).To(Equal(data_hv1.Cpu))
 			})
 
 			It("Del", func() {
-				err = DelByKey(Conn, key_hv1)
+				err = d.DelByKey(key_hv1)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("Check delete data", func() {
-				_, err := GetHvByKey(Conn, key_hv1)
+				_, err := d.GetHvByKey(key_hv1)
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -73,18 +75,18 @@ var _ = Describe("Etcd", func() {
 
 			var IDX = "TST"
 
-			It("Connection etcd", func() {
-				Conn, err = Connect(url)
-				Expect(err).NotTo(HaveOccurred())
-			})
+			//It("Connection etcd", func() {
+			//	//Conn, err = Connect(url)
+			//	Expect(err).NotTo(HaveOccurred())
+			//})
 
 			It("Delete seqno key", func() {
-				err := DelByKey(Conn, IDX)
+				err := d.DelByKey(IDX)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("Create seqno key", func() {
-				err := CreateSeq(Conn, IDX, 1, 1)
+				err := d.CreateSeq(IDX, 1, 1)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -122,21 +124,21 @@ var _ = Describe("Etcd", func() {
 			*/
 
 			It(tests[0].name, func() {
-				seqno, err := GetSeq(Conn, IDX)
+				seqno, err := d.GetSeq(IDX)
 				GinkgoWriter.Println("seqno ", seqno)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(seqno).To(Equal(uint64(tests[0].want)))
 			})
 
 			It(tests[1].name, func() {
-				seqno, err := GetSeq(Conn, IDX)
+				seqno, err := d.GetSeq(IDX)
 				GinkgoWriter.Println("seqno ", seqno)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(seqno).To(Equal(uint64(tests[1].want)))
 			})
 
 			It(tests[2].name, func() {
-				seqno, err := GetSeq(Conn, IDX)
+				seqno, err := d.GetSeq(IDX)
 				GinkgoWriter.Println("seqno ", seqno)
 
 				Expect(err).NotTo(HaveOccurred())
@@ -144,7 +146,7 @@ var _ = Describe("Etcd", func() {
 			})
 
 			It(tests[3].name, func() {
-				seqno, err := GetSeq(Conn, IDX)
+				seqno, err := d.GetSeq(IDX)
 				GinkgoWriter.Println("seqno ", seqno)
 
 				Expect(err).NotTo(HaveOccurred())
@@ -152,7 +154,7 @@ var _ = Describe("Etcd", func() {
 			})
 
 			It("Delete seqno key", func() {
-				err := DelByKey(Conn, IDX)
+				err := d.DelByKey(IDX)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
@@ -209,12 +211,12 @@ var _ = Describe("Etcd", func() {
 			{name: "2nd", want: hv{name: "hv2", cpu: 10, ram: 64}},
 		}
 
-		Context("Test Connection to etcd", func() {
-			It("Connection etcd", func() {
-				Conn, err = Connect(url)
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
+		//Context("Test Connection to etcd", func() {
+		//	It("Connection etcd", func() {
+		//		Conn, err = Connect(url)
+		//		Expect(err).NotTo(HaveOccurred())
+		//	})
+		//})
 
 		// ハイパーバイザーのコンフィグを読んで、データベースを初期化
 		Context("Test of Hypervisor management : Set up", func() {
@@ -236,24 +238,24 @@ var _ = Describe("Etcd", func() {
 				// ハイパーバイザー
 				for _, hv := range cnf.Hvs {
 					GinkgoWriter.Println(hv)
-					SetHypervisor(Conn, hv)
+					d.SetHypervisor(hv)
 				}
 
 				// OSイメージテンプレート
 				for _, hd := range cnf.Imgs {
-					SetImageTemplate(Conn, hd)
+					d.SetImageTemplate(hd)
 				}
 
 				// シーケンス番号のリセット
 				for _, sq := range cnf.Seq {
-					CreateSeq(Conn, sq.Key, sq.Start, sq.Step)
+					d.CreateSeq(sq.Key, sq.Start, sq.Step)
 				}
 
 			})
 
 			It("Get Hypervisors status", func() {
 				var hvs []Hypervisor
-				err = GetHvsStatus(Conn, &hvs)
+				err = d.GetHvsStatus(&hvs)
 				Expect(err).NotTo(HaveOccurred())
 
 				for _, h := range hvs {
@@ -291,7 +293,7 @@ var _ = Describe("Etcd", func() {
 
 			It("Get Hypervisors status", func() {
 				var hvs []Hypervisor
-				err = GetHvsStatus(Conn, &hvs)
+				err = d.GetHvsStatus(&hvs)
 				Expect(err).NotTo(HaveOccurred())
 
 				for _, h := range hvs {
@@ -310,7 +312,7 @@ var _ = Describe("Etcd", func() {
 				GinkgoWriter.Println("test-2 ")
 				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
 				GinkgoWriter.Println("test-3 ")
-				hvName, key, txid, err := AssignHvforVm(Conn, vm)
+				hvName, key, txid, err := d.AssignHvforVm(vm)
 				GinkgoWriter.Println("test-4 ")
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("hvNam ", hvName)
@@ -321,7 +323,7 @@ var _ = Describe("Etcd", func() {
 			It("Scheduling a virtual machine to Hypervisor #2", func() {
 				td := tests[1]
 				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
-				hvName, key, txid, err := AssignHvforVm(Conn, vm)
+				hvName, key, txid, err := d.AssignHvforVm(vm)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("hvNam ", hvName)
 				GinkgoWriter.Println("key   ", key)
@@ -331,7 +333,7 @@ var _ = Describe("Etcd", func() {
 			It("Scheduling a virtual machine to Hypervisor #3", func() {
 				td := tests[2]
 				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
-				hvName, key, txid, err := AssignHvforVm(Conn, vm)
+				hvName, key, txid, err := d.AssignHvforVm(vm)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("hvNam ", hvName)
 				GinkgoWriter.Println("key   ", key)
@@ -341,7 +343,7 @@ var _ = Describe("Etcd", func() {
 			It("Scheduling a virtual machine to Hypervisor #4", func() {
 				td := tests[3]
 				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
-				hvName, key, txid, err := AssignHvforVm(Conn, vm)
+				hvName, key, txid, err := d.AssignHvforVm(vm)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("hvNam ", hvName)
 				GinkgoWriter.Println("key   ", key)
@@ -351,7 +353,7 @@ var _ = Describe("Etcd", func() {
 			It("Scheduling a virtual machine to Hypervisor #5", func() {
 				td := tests[4]
 				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
-				hvName, key, txid, err := AssignHvforVm(Conn, vm)
+				hvName, key, txid, err := d.AssignHvforVm(vm)
 				Expect(err).To(HaveOccurred())
 				GinkgoWriter.Println("hvNam ", hvName)
 				GinkgoWriter.Println("key   ", key)
@@ -361,7 +363,7 @@ var _ = Describe("Etcd", func() {
 			It("Scheduling a virtual machine to Hypervisor #6", func() {
 				td := tests[5]
 				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
-				hvName, key, txid, err := AssignHvforVm(Conn, vm)
+				hvName, key, txid, err := d.AssignHvforVm(vm)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("hvNam ", hvName)
 				GinkgoWriter.Println("key   ", key)
@@ -371,7 +373,7 @@ var _ = Describe("Etcd", func() {
 			It("Scheduling a virtual machine to Hypervisor #7", func() {
 				td := tests[6]
 				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
-				hvName, key, txid, err := AssignHvforVm(Conn, vm)
+				hvName, key, txid, err := d.AssignHvforVm(vm)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("hvNam ", hvName)
 				GinkgoWriter.Println("key   ", key)
@@ -381,7 +383,7 @@ var _ = Describe("Etcd", func() {
 			It("Scheduling a virtual machine to Hypervisor #8", func() {
 				td := tests[7]
 				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
-				hvName, key, txid, err := AssignHvforVm(Conn, vm)
+				hvName, key, txid, err := d.AssignHvforVm(vm)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("hvNam ", hvName)
 				GinkgoWriter.Println("key   ", key)
