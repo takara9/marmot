@@ -1,14 +1,14 @@
-package main
+package util_test
 
 import (
 	"fmt"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"os"
 	"os/exec"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
 	cf "github.com/takara9/marmot/pkg/config"
+	ut "github.com/takara9/marmot/pkg/util"
 )
 
 const (
@@ -17,9 +17,15 @@ const (
 	etcdctl_exe   = "/usr/bin/etcdctl"
 )
 
+var node *string
+var etcd *string
 var ccf *string
+
+//var cnf cf.MarmotConfig
+
+//var etcd_url string
+
 var hv_config string
-var marmot Marmotd
 
 var _ = BeforeSuite(func() {
 	etcd_url := "http://127.0.0.1:12379"
@@ -64,12 +70,6 @@ var _ = AfterSuite(func() {
 })
 
 var _ = Describe("Util", func() {
-
-	BeforeAll(func() {
-		marmot, err := NewMarmotd(*etcd, *node)
-		Expect(err).To(HaveOccurred())
-		Expect(marmot).ToNot(BeNil())
-	})
 
 	BeforeEach(func() {
 		/* HV設定ファイルをロードするコードを適正化して必要なコードを組み込む */
@@ -140,7 +140,7 @@ var _ = Describe("Util", func() {
 
 		It("Check Hypervisors data", func() {
 			GinkgoWriter.Println(*node)
-			hv, err := marmot.CheckHypervisors()
+			hv, err := ut.CheckHypervisors(*etcd, *node)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("xxxxxx array size == ", len(hv))
 			for i, v := range hv {
@@ -171,7 +171,7 @@ var _ = Describe("Util", func() {
 		})
 
 		It("Create Cluster()", func() {
-			err := marmot.CreateCluster(cnf, *etcd, *node)
+			err := ut.CreateCluster(cnf, *etcd, *node)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -183,7 +183,7 @@ var _ = Describe("Util", func() {
 		})
 
 		It("Destroy Cluster()", func() {
-			err := marmot.DestroyCluster(cnf, *etcd)
+			err := ut.DestroyCluster(cnf, *etcd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
@@ -198,22 +198,22 @@ var _ = Describe("Util", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 		It("Create Cluster()", func() {
-			err := marmot.CreateCluster(cnf, *etcd, *node)
+			err := ut.CreateCluster(cnf, *etcd, *node)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Stop Cluster", func() {
-			err := marmot.StopCluster(cnf, *etcd)
+			err := ut.StopCluster(cnf, *etcd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Start Cluster", func() {
-			err := marmot.StartCluster(cnf, *etcd)
+			err := ut.StartCluster(cnf, *etcd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Destroy Cluster()", func() {
-			err := marmot.DestroyCluster(cnf, *etcd)
+			err := ut.DestroyCluster(cnf, *etcd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
@@ -228,22 +228,22 @@ var _ = Describe("Util", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 		It("クラスターの起動", func() {
-			err := marmot.CreateCluster(cnf, *etcd, *node)
+			err := ut.CreateCluster(cnf, *etcd, *node)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("クラスターの２重起動 エラー発生が発生", func() {
-			err := marmot.CreateCluster(cnf, *etcd, *node)
+			err := ut.CreateCluster(cnf, *etcd, *node)
 			Expect(err).To(HaveOccurred())
 		})
 
 		It("Start Cluster", func() {
-			err := marmot.StartCluster(cnf, *etcd)
+			err := ut.StartCluster(cnf, *etcd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Destroy Cluster()", func() {
-			err := marmot.DestroyCluster(cnf, *etcd)
+			err := ut.DestroyCluster(cnf, *etcd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})

@@ -23,67 +23,65 @@ func resolv_by_localdns(dn string) ([]string, error) {
 	return r.LookupHost(context.Background(), dn)
 }
 
-var _ = Describe("Etcd", Ordered, func() {
+var _ = Describe("Etcd", func() {
 
 	var url string
 	var dn1, dn2, dn3 string
-	var cc *CoreDNSClient
 
-	BeforeAll(func() {
+	BeforeEach(func() {
 		url = "http://127.0.0.1:2379"
 		dn1 = "server1.a.labo.local"
 		dn2 = "server2.a.labo.local"
 		dn3 = "server3.a.labo.local"
-		cc, _ = NewCdnsEp(url)
 	})
 
-	AfterAll(func() {
+	AfterEach(func() {
 		//err := os.Clearenv("WEIGHT_UNITS")
 	})
 
 	Describe("ETCD and CoreDNS Test", func() {
 		Context("Access Test for ETCD", func() {
 			It("Add a record", func() {
-				err := cc.Add(DnsRecord{
+				err := Add(DnsRecord{
 					Hostname: dn1,
 					Ipv4:     "192.168.10.1",
 					Ttl:      60,
-				})
+				}, url)
 				Expect(err).NotTo(HaveOccurred())
 			})
 			It("Get a record by Key(FQDN)", func() {
 				dnsname := dn1
-				rec, err := cc.Get(DnsRecord{Hostname: dnsname})
+				rec, err := Get(DnsRecord{Hostname: dnsname}, url)
 				GinkgoWriter.Println("Get() = ", rec)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(rec.Host).To(Equal("192.168.10.1"))
 				Expect(rec.Ttl).To(Equal(uint64(60)))
 			})
 			It("Update a record by Key(FQDN)", func() {
-				err := cc.Add(DnsRecord{
+				err := Add(DnsRecord{
 					Hostname: dn1,
 					Ipv4:     "192.168.10.2",
 					Ttl:      90,
-				})
+				}, url)
 				Expect(err).NotTo(HaveOccurred())
 			})
 			It("Verify updated a record by Key(FQDN)", func() {
-				rec, err := cc.Get(DnsRecord{Hostname: dn1})
+				rec, err := Get(DnsRecord{Hostname: dn1}, url)
 				GinkgoWriter.Println("Get() = ", rec)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(rec.Host).To(Equal("192.168.10.2"))
 				Expect(rec.Ttl).To(Equal(uint64(90)))
 			})
 			It("Add new record", func() {
-				err := cc.Add(DnsRecord{
+				err := Add(DnsRecord{
 					Hostname: dn2,
 					Ipv4:     "192.168.10.2",
 					Ttl:      90,
-				})
+				}, url)
 				Expect(err).NotTo(HaveOccurred())
 			})
 			It("Verify added the record", func() {
-				rec, err := cc.Get(DnsRecord{Hostname: dn2})
+				rec, err := Get(DnsRecord{Hostname: dn2}, url)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(rec.Host).To(Equal("192.168.10.2"))
 				Expect(rec.Ttl).To(Equal(uint64(90)))
@@ -91,25 +89,25 @@ var _ = Describe("Etcd", Ordered, func() {
 			})
 
 			It("Delete the record #1", func() {
-				err := cc.Del(DnsRecord{Hostname: dn1})
+				err := Del(DnsRecord{Hostname: dn1}, url)
 				Expect(err).NotTo(HaveOccurred())
 			})
 			It("Verify deleted record #1", func() {
-				_, err := cc.Get(DnsRecord{Hostname: dn1})
+				_, err := Get(DnsRecord{Hostname: dn1}, url)
 				Expect(err).To(HaveOccurred())
 			})
 
 			It("Delete the record #2", func() {
-				err := cc.Del(DnsRecord{Hostname: dn2})
+				err := Del(DnsRecord{Hostname: dn2}, url)
 				Expect(err).NotTo(HaveOccurred())
 			})
 			It("Verify deleted record #2", func() {
-				_, err := cc.Get(DnsRecord{Hostname: dn2})
+				_, err := Get(DnsRecord{Hostname: dn2}, url)
 				Expect(err).To(HaveOccurred())
 			})
 
 			It("Delete a no-existing record #3", func() {
-				err := cc.Del(DnsRecord{Hostname: dn3})
+				err := Del(DnsRecord{Hostname: dn3}, url)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -130,11 +128,11 @@ var _ = Describe("Etcd", Ordered, func() {
 
 		Context("Relation test CoreDNS and ETCD", func() {
 			It("Add new record", func() {
-				err := cc.Add(DnsRecord{
+				err := Add(DnsRecord{
 					Hostname: dn1,
 					Ipv4:     "192.168.20.1",
 					Ttl:      30,
-				})
+				}, url)
 				Expect(err).NotTo(HaveOccurred())
 			})
 			It("Resolve added entry", func() {

@@ -1,92 +1,90 @@
 package db
 
 import (
-	"fmt"
-	"os/exec"
-	"time"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	cf "github.com/takara9/marmot/pkg/config"
+	etcd "go.etcd.io/etcd/client/v3"
 )
 
-var _ = Describe("データベースのテスト", Ordered, func() {
+var _ = Describe("Etcd", func() {
+
+	var url string
+	//var url_noexist string
+	var Conn *etcd.Client
 	var err error
-	var containerID string
-	url := "http://localhost:12379"
-	var dbcon Db
 
-	BeforeAll(func(ctx SpecContext) {
-		// Dockerコンテナを起動
-		cmd := exec.Command("docker", "run", "-d", "--name", "etcd0", "-p", "12379:2379", "-p", "12380:2380", "-e", "ALLOW_NONE_AUTHENTICATION=yes", "-e", "ETCD_ADVERTISE_CLIENT_URLS=http://127.0.0.1:12379", "bitnami/etcd")
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			Fail(fmt.Sprintf("Failed to start container: %s, %v", string(output), err))
-		}
-		containerID = string(output[:12]) // 最初の12文字をIDとして取得
-		fmt.Printf("Container started with ID: %s\n", containerID)
-		time.Sleep(10 * time.Second) // コンテナが起動するまで待機
-	}, NodeTimeout(20*time.Second))
+	BeforeEach(func() {
+		url = "http://127.0.0.1:2379"
+		//url_noexist = "http://127.0.0.1:2380"
+		//book = &books.Book{
+		//	Title: "Les Miserables",
+		//	Author: "Victor Hugo",
+		//	Pages: 2783,
+		//	Weight: 500,
+		//}
+	})
 
-	AfterAll(func(ctx SpecContext) {
-		// Dockerコンテナを停止・削除
-		cmd := exec.Command("docker", "stop", containerID)
-		_, err := cmd.CombinedOutput()
-		if err != nil {
-			fmt.Printf("Failed to stop container: %v\n", err)
-		}
-		cmd = exec.Command("docker", "rm", containerID)
-		_, err = cmd.CombinedOutput()
-		if err != nil {
-			fmt.Printf("Failed to remove container: %v\n", err)
-		}
-	}, NodeTimeout(20*time.Second))
+	AfterEach(func() {
+		//err := os.Clearenv("WEIGHT_UNITS")
+		//Expect(err).NotTo(HaveOccurred())
+	})
 
 	Describe("Test etcd", func() {
 		Context("Test Connection to etcd", func() {
+			//It("Connection etcd not exist", func() {
+			//	conn, err: = Connect(url_noexist)
+			//	Expect(err).To(HaveOccurred())
+			//})
 			It("Connection etcd", func() {
-				dbcon, err = NewEtcdEp(url)
-				Expect(err).To(BeNil())
-				Expect(dbcon).ToNot(BeNil())
+				Conn, err = Connect(url)
+				Expect(err).NotTo(HaveOccurred())
 			})
-
 		})
 
 		Context("Test access etcd", func() {
 			var key_hv1 = "hv01"
+			//var data_get Hypervisor
 			data_hv1 := testHvData1()
 
 			It("Put", func() {
-				err := dbcon.PutDataEtcd(key_hv1, data_hv1)
+				err := PutDataEtcd(Conn, key_hv1, data_hv1)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("Get", func() {
-				data_get, err := dbcon.GetHvByKey(key_hv1)
+				data_get, err := GetHvByKey(Conn, key_hv1)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(data_get.Cpu).To(Equal(data_hv1.Cpu))
 			})
 
 			It("Del", func() {
-				err = dbcon.DelByKey(key_hv1)
+				err = DelByKey(Conn, key_hv1)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("Check delete data", func() {
-				_, err := dbcon.GetHvByKey(key_hv1)
+				_, err := GetHvByKey(Conn, key_hv1)
 				Expect(err).To(HaveOccurred())
 			})
 		})
 
 		Context("Test Sequence number", func() {
+
 			var IDX = "TST"
+
+			It("Connection etcd", func() {
+				Conn, err = Connect(url)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
 			It("Delete seqno key", func() {
-				err := dbcon.DelByKey(IDX)
+				err := DelByKey(Conn, IDX)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("Create seqno key", func() {
-				err := dbcon.CreateSeq(IDX, 1, 1)
+				err := CreateSeq(Conn, IDX, 1, 1)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -100,22 +98,45 @@ var _ = Describe("データベースのテスト", Ordered, func() {
 				{name: "Get Seq No 4th", want: 4},
 			}
 
+			/*
+				ループを入れることは許されないみたい
+				for i, tt := range tests {
+					fmt.Println(i, td.name, td.want)
+
+					It(td.name, func() {
+						seqno, err := GetSeq(Conn, IDX)
+						GinkgoWriter.Println("seqno ", seqno)
+						Expect(err).NotTo(HaveOccurred())
+						Expect(seqno).To(Equal(uint64(td.want)))
+					})
+				}
+				It("test loop", func() {
+					for i, tt := range tests {
+						fmt.Println(i, td.name, td.want)
+						seqno, err := GetSeq(Conn, IDX)
+						GinkgoWriter.Println("seqno ", seqno)
+						Expect(err).NotTo(HaveOccurred())
+						Expect(seqno).To(Equal(uint64(tests[0].want)))
+					}
+				})
+			*/
+
 			It(tests[0].name, func() {
-				seqno, err := dbcon.GetSeq(IDX)
+				seqno, err := GetSeq(Conn, IDX)
 				GinkgoWriter.Println("seqno ", seqno)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(seqno).To(Equal(uint64(tests[0].want)))
 			})
 
 			It(tests[1].name, func() {
-				seqno, err := dbcon.GetSeq(IDX)
+				seqno, err := GetSeq(Conn, IDX)
 				GinkgoWriter.Println("seqno ", seqno)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(seqno).To(Equal(uint64(tests[1].want)))
 			})
 
 			It(tests[2].name, func() {
-				seqno, err := dbcon.GetSeq(IDX)
+				seqno, err := GetSeq(Conn, IDX)
 				GinkgoWriter.Println("seqno ", seqno)
 
 				Expect(err).NotTo(HaveOccurred())
@@ -123,7 +144,7 @@ var _ = Describe("データベースのテスト", Ordered, func() {
 			})
 
 			It(tests[3].name, func() {
-				seqno, err := dbcon.GetSeq(IDX)
+				seqno, err := GetSeq(Conn, IDX)
 				GinkgoWriter.Println("seqno ", seqno)
 
 				Expect(err).NotTo(HaveOccurred())
@@ -131,7 +152,7 @@ var _ = Describe("データベースのテスト", Ordered, func() {
 			})
 
 			It("Delete seqno key", func() {
-				err := dbcon.DelByKey(IDX)
+				err := DelByKey(Conn, IDX)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
@@ -188,6 +209,13 @@ var _ = Describe("データベースのテスト", Ordered, func() {
 			{name: "2nd", want: hv{name: "hv2", cpu: 10, ram: 64}},
 		}
 
+		Context("Test Connection to etcd", func() {
+			It("Connection etcd", func() {
+				Conn, err = Connect(url)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+
 		// ハイパーバイザーのコンフィグを読んで、データベースを初期化
 		Context("Test of Hypervisor management : Set up", func() {
 
@@ -208,24 +236,24 @@ var _ = Describe("データベースのテスト", Ordered, func() {
 				// ハイパーバイザー
 				for _, hv := range cnf.Hvs {
 					GinkgoWriter.Println(hv)
-					dbcon.SetHypervisor(hv)
+					SetHypervisor(Conn, hv)
 				}
 
 				// OSイメージテンプレート
 				for _, hd := range cnf.Imgs {
-					dbcon.SetImageTemplate(hd)
+					SetImageTemplate(Conn, hd)
 				}
 
 				// シーケンス番号のリセット
 				for _, sq := range cnf.Seq {
-					dbcon.CreateSeq(sq.Key, sq.Start, sq.Step)
+					CreateSeq(Conn, sq.Key, sq.Start, sq.Step)
 				}
 
 			})
 
 			It("Get Hypervisors status", func() {
 				var hvs []Hypervisor
-				err = dbcon.GetHvsStatus(&hvs)
+				err = GetHvsStatus(Conn, &hvs)
 				Expect(err).NotTo(HaveOccurred())
 
 				for _, h := range hvs {
@@ -263,7 +291,7 @@ var _ = Describe("データベースのテスト", Ordered, func() {
 
 			It("Get Hypervisors status", func() {
 				var hvs []Hypervisor
-				err = dbcon.GetHvsStatus(&hvs)
+				err = GetHvsStatus(Conn, &hvs)
 				Expect(err).NotTo(HaveOccurred())
 
 				for _, h := range hvs {
@@ -282,7 +310,7 @@ var _ = Describe("データベースのテスト", Ordered, func() {
 				GinkgoWriter.Println("test-2 ")
 				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
 				GinkgoWriter.Println("test-3 ")
-				hvName, key, txid, err := dbcon.AssignHvforVm(vm)
+				hvName, key, txid, err := AssignHvforVm(Conn, vm)
 				GinkgoWriter.Println("test-4 ")
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("hvNam ", hvName)
@@ -293,7 +321,7 @@ var _ = Describe("データベースのテスト", Ordered, func() {
 			It("Scheduling a virtual machine to Hypervisor #2", func() {
 				td := tests[1]
 				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
-				hvName, key, txid, err := dbcon.AssignHvforVm(vm)
+				hvName, key, txid, err := AssignHvforVm(Conn, vm)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("hvNam ", hvName)
 				GinkgoWriter.Println("key   ", key)
@@ -303,7 +331,7 @@ var _ = Describe("データベースのテスト", Ordered, func() {
 			It("Scheduling a virtual machine to Hypervisor #3", func() {
 				td := tests[2]
 				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
-				hvName, key, txid, err := dbcon.AssignHvforVm(vm)
+				hvName, key, txid, err := AssignHvforVm(Conn, vm)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("hvNam ", hvName)
 				GinkgoWriter.Println("key   ", key)
@@ -313,7 +341,7 @@ var _ = Describe("データベースのテスト", Ordered, func() {
 			It("Scheduling a virtual machine to Hypervisor #4", func() {
 				td := tests[3]
 				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
-				hvName, key, txid, err := dbcon.AssignHvforVm(vm)
+				hvName, key, txid, err := AssignHvforVm(Conn, vm)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("hvNam ", hvName)
 				GinkgoWriter.Println("key   ", key)
@@ -323,7 +351,7 @@ var _ = Describe("データベースのテスト", Ordered, func() {
 			It("Scheduling a virtual machine to Hypervisor #5", func() {
 				td := tests[4]
 				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
-				hvName, key, txid, err := dbcon.AssignHvforVm(vm)
+				hvName, key, txid, err := AssignHvforVm(Conn, vm)
 				Expect(err).To(HaveOccurred())
 				GinkgoWriter.Println("hvNam ", hvName)
 				GinkgoWriter.Println("key   ", key)
@@ -333,7 +361,7 @@ var _ = Describe("データベースのテスト", Ordered, func() {
 			It("Scheduling a virtual machine to Hypervisor #6", func() {
 				td := tests[5]
 				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
-				hvName, key, txid, err := dbcon.AssignHvforVm(vm)
+				hvName, key, txid, err := AssignHvforVm(Conn, vm)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("hvNam ", hvName)
 				GinkgoWriter.Println("key   ", key)
@@ -343,7 +371,7 @@ var _ = Describe("データベースのテスト", Ordered, func() {
 			It("Scheduling a virtual machine to Hypervisor #7", func() {
 				td := tests[6]
 				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
-				hvName, key, txid, err := dbcon.AssignHvforVm(vm)
+				hvName, key, txid, err := AssignHvforVm(Conn, vm)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("hvNam ", hvName)
 				GinkgoWriter.Println("key   ", key)
@@ -353,7 +381,7 @@ var _ = Describe("データベースのテスト", Ordered, func() {
 			It("Scheduling a virtual machine to Hypervisor #8", func() {
 				td := tests[7]
 				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
-				hvName, key, txid, err := dbcon.AssignHvforVm(vm)
+				hvName, key, txid, err := AssignHvforVm(Conn, vm)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("hvNam ", hvName)
 				GinkgoWriter.Println("key   ", key)
@@ -362,3 +390,43 @@ var _ = Describe("データベースのテスト", Ordered, func() {
 		})
 	})
 })
+
+/*
+	type hvReq struct {
+		name string
+		cpu  int
+		ram  int
+	}
+
+	tests := []struct {
+		name string
+		req  hvReq
+		want *int
+	}{
+		{name: "1st", req: hvReq{name: "hv1", cpu: 10, ram: 64}, want: nil},
+		{name: "2nd", req: hvReq{name: "hv2", cpu: 10, ram: 64}, want: nil},
+	}
+
+	It("Delete existing data", func() {
+		DelByKey(Conn, tests[0].req.name)
+		DelByKey(Conn, tests[1].req.name)
+	})
+
+	It("PUT Hypervisor node data #1", func() {
+		td := tests[0]
+		GinkgoWriter.Println("testHvCreate ")
+		hv := testHvCreate(td.req.name, td.req.cpu, td.req.ram)
+		GinkgoWriter.Println("PutDataEtcd ")
+		err := PutDataEtcd(Conn, td.req.name, hv)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("PUT Hypervisor node data #2", func() {
+		td := tests[1]
+		GinkgoWriter.Println("testHvCreate ")
+		hv := testHvCreate(td.req.name, td.req.cpu, td.req.ram)
+		GinkgoWriter.Println("PutDataEtcd ")
+		err := PutDataEtcd(Conn, td.req.name, hv)
+		Expect(err).NotTo(HaveOccurred())
+	})
+*/

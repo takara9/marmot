@@ -20,12 +20,12 @@ func ReadFileOnMem(fn string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return byteValue, err
 }
 
 func ListAllVm(url string) ([]string, error) {
 	var nameList []string
+
 	conn, err := libvirt.NewConnect(url)
 	if err != nil {
 		return nameList, err
@@ -45,11 +45,11 @@ func ListAllVm(url string) ([]string, error) {
 		nameList = append(nameList, name)
 		dom.Free()
 	}
-
 	return nameList, nil
 }
 
 func CreateStartVM(url string, filename string) error {
+
 	byteValue, err := ReadFileOnMem(filename)
 	if err != nil {
 		return err
@@ -83,6 +83,7 @@ func CreateStartVM(url string, filename string) error {
 }
 
 func DestroyVM(url string, vmname string) error {
+
 	conn, err := libvirt.NewConnect(url)
 	if err != nil {
 		slog.Error("", "err", err)
@@ -111,8 +112,8 @@ func DestroyVM(url string, vmname string) error {
 	if err != nil {
 		slog.Error("", "err", err)
 	}
-	dom.Free()
 
+	dom.Free()
 	return nil
 }
 
@@ -120,6 +121,7 @@ func DestroyVM(url string, vmname string) error {
 デバイスの追加、VMが実行中でないと動作しない
 */
 func AttachDev(url string, fn string, vmname string) error {
+
 	conn, err := libvirt.NewConnect(url)
 	if err != nil {
 		return err
@@ -147,6 +149,7 @@ func AttachDev(url string, fn string, vmname string) error {
 
 // 仮想マシンの停止
 func StopVM(url string, vmname string) error {
+
 	conn, err := libvirt.NewConnect(url)
 	if err != nil {
 		slog.Error("", "err", err)
@@ -172,13 +175,14 @@ func StopVM(url string, vmname string) error {
 	}
 
 	time.Sleep(time.Second * 10)
-	dom.Free()
 
+	dom.Free()
 	return nil
 }
 
 // 仮想マシンの停止
 func StartVM(url string, vmname string) error {
+
 	conn, err := libvirt.NewConnect(url)
 	if err != nil {
 		slog.Error("", "err", err)
@@ -199,7 +203,7 @@ func StartVM(url string, vmname string) error {
 	}
 
 	time.Sleep(time.Second * 10)
-	dom.Free()
 
+	dom.Free()
 	return nil
 }

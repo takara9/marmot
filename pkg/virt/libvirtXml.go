@@ -360,7 +360,6 @@ func ReadXml(fn string, xf interface{}) error {
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -376,7 +375,6 @@ func WriteXml(fn string, xf interface{}) error {
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -419,6 +417,7 @@ func CreateVirtXML(domain Domain) string {
 }
 
 func SetVmParam(domain *Domain) {
+
 	/***  構造体の値についての変更 ***/
 	fmt.Println("VM Name: ", domain.Name)
 	domain.Name = "VMMMMMMMMMMMMMMMMMMMMMMMMMMM"
@@ -431,4 +430,5 @@ func SetVmParam(domain *Domain) {
 			fmt.Println(s.Target.Dev)
 		}
 	}
+
 }

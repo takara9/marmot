@@ -1,12 +1,12 @@
-package main
+package util
 
 import (
 	"flag"
 	"fmt"
+	cf "github.com/takara9/marmot/pkg/config"
+	db "github.com/takara9/marmot/pkg/db"
 	"os"
 	"path/filepath"
-
-	cf "github.com/takara9/marmot/pkg/config"
 )
 
 type DefaultConfig struct {
@@ -14,12 +14,13 @@ type DefaultConfig struct {
 	EtcdServerUrl string `yaml:"etcd_server"`
 }
 
-func (m *Marmotd) ReadHvConfig() (cf.Hypervisors_yaml, DefaultConfig, error) {
+func ReadHvConfig() (cf.Hypervisors_yaml, DefaultConfig, error) {
 	var hvs cf.Hypervisors_yaml
 	var cnf DefaultConfig
 
 	err := cf.ReadConfig(filepath.Join(os.Getenv("HOME"), ".config_marmot"), &cnf)
 	if err != nil {
+		//return nil, nil, err
 		return hvs, cnf, err
 	}
 
@@ -28,18 +29,26 @@ func (m *Marmotd) ReadHvConfig() (cf.Hypervisors_yaml, DefaultConfig, error) {
 	flag.Parse()
 	err = cf.ReadYAML(*config, &hvs)
 	if err != nil {
+		//return nil, nil, err
 		return hvs, cnf, err
 	}
 
 	return hvs, cnf, nil
 }
 
-func (m *Marmotd) SetHvConfig(hvs cf.Hypervisors_yaml, cnf DefaultConfig) error {
+func SetHvConfig(hvs cf.Hypervisors_yaml, cnf DefaultConfig) error {
+
+	// etcdへ接続
+	Conn, err := db.Connect(cnf.EtcdServerUrl)
+	if err != nil {
+		return err
+	}
+	defer Conn.Close()
 
 	// ハイパーバイザー
 	for _, hv := range hvs.Hvs {
 		fmt.Println(hv)
-		err := m.dbc.SetHypervisor(hv)
+		err := db.SetHypervisor(Conn, hv)
 		if err != nil {
 			return err
 		}
@@ -47,7 +56,7 @@ func (m *Marmotd) SetHvConfig(hvs cf.Hypervisors_yaml, cnf DefaultConfig) error 
 
 	// OSイメージテンプレート
 	for _, hd := range hvs.Imgs {
-		err := m.dbc.SetImageTemplate(hd)
+		err := db.SetImageTemplate(Conn, hd)
 		if err != nil {
 			return err
 		}
@@ -55,7 +64,7 @@ func (m *Marmotd) SetHvConfig(hvs cf.Hypervisors_yaml, cnf DefaultConfig) error 
 
 	// シーケンス番号のリセット
 	for _, sq := range hvs.Seq {
-		err := m.dbc.CreateSeq(sq.Key, sq.Start, sq.Step)
+		err := db.CreateSeq(Conn, sq.Key, sq.Start, sq.Step)
 		if err != nil {
 			return err
 		}

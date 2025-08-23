@@ -10,46 +10,47 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	clientv3 "go.etcd.io/etcd/client/v3"
+	etcd "go.etcd.io/etcd/client/v3"
 
 	cf "github.com/takara9/marmot/pkg/config"
 )
 
-type Db struct {
-	EndpointUrl string
-	Cli         *clientv3.Client
-	Ctx         context.Context
-	Cancel      context.CancelFunc
-}
+/*
+   タイムアウトを取る様に修正が必要
+   テスト
+   GoDoc
+*/
 
 // etcdへ接続
-func NewEtcdEp(url string) (Db, error) {
-	var con Db
-	var err error
-	con.EndpointUrl = url
-	con.Cli, err = clientv3.New(clientv3.Config{
-		Endpoints:   []string{url},
+func Connect(url1 string) (*etcd.Client, error) {
+	conn, err := etcd.New(etcd.Config{
+		Endpoints:   []string{url1},
 		DialTimeout: 2 * time.Second,
 	})
-	con.Ctx, con.Cancel = context.WithTimeout(context.Background(), 2*time.Second)
-
-	return con, err
+	return conn, err
 }
 
 // 前方一致のサーチ
-func (d *Db) GetEtcdByPrefix(key string) (*clientv3.GetResponse, error) {
-	resp, err := d.Cli.Get(d.Ctx, key, clientv3.WithPrefix())
-
+func GetEtcdByPrefix(con *etcd.Client, key string) (*etcd.GetResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	resp, err := con.Get(ctx, key, etcd.WithPrefix())
+	cancel()
 	return resp, err
 }
 
 // Keyに一致したHVデータの取り出し
-func (d *Db) GetHvByKey(key string) (Hypervisor, error) {
+func GetHvByKey(con *etcd.Client, key string) (Hypervisor, error) {
 	var hv Hypervisor
-	resp, err := d.Cli.Get(d.Ctx, key)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	resp, err := con.Get(ctx, key)
+	cancel()
+
 	if err != nil {
 		return hv, err
-	} else if resp.Count == 0 {
+	}
+
+	if resp.Count == 0 {
 		return hv, errors.New("not found")
 	}
 	err = json.Unmarshal([]byte(resp.Kvs[0].Value), &hv)
@@ -58,16 +59,21 @@ func (d *Db) GetHvByKey(key string) (Hypervisor, error) {
 }
 
 // Keyに一致したVMデータの取り出し
-func (d *Db) GetVmByKey(key string) (VirtualMachine, error) {
+func GetVmByKey(con *etcd.Client, key string) (VirtualMachine, error) {
 	var vm VirtualMachine
+
 	if len(key) == 0 {
 		return vm, errors.New("not found")
 	}
 
-	resp, err := d.Cli.Get(d.Ctx, key)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	resp, err := con.Get(ctx, key)
+	cancel()
+
 	if err != nil {
 		return vm, err
 	}
+
 	if resp.Count == 0 {
 		return vm, errors.New("not found")
 	}
@@ -77,9 +83,12 @@ func (d *Db) GetVmByKey(key string) (VirtualMachine, error) {
 }
 
 // Keyに一致したOSイメージテンプレートを返す
-func (d *Db) GetOsImgTempByKey(osv string) (string, string, error) {
+func GetOsImgTempByKey(con *etcd.Client, osv string) (string, string, error) {
+
 	key := fmt.Sprintf("OSI_%v", osv)
-	resp, err := d.Cli.Get(d.Ctx, key)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	resp, err := con.Get(ctx, key)
+	cancel()
 	if err != nil {
 		return "", "", err
 	}
@@ -93,13 +102,16 @@ func (d *Db) GetOsImgTempByKey(osv string) (string, string, error) {
 	if err != nil {
 		return "", "", err
 	}
-
 	return oit.VolumeGroup, oit.LogicaVol, nil
 }
 
-func (d *Db) GetEtcdByKey(path string) (DNSEntry, error) {
+func GetEtcdByKey(con *etcd.Client, path string) (DNSEntry, error) {
+
 	var entry DNSEntry
-	resp, err := d.Cli.Get(d.Ctx, path)
+	//key := fmt.Sprintf("OSI_%v", osv)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	resp, err := con.Get(ctx, path)
+	cancel()
 	if err != nil {
 		return entry, err
 	}
@@ -108,27 +120,29 @@ func (d *Db) GetEtcdByKey(path string) (DNSEntry, error) {
 		return entry, errors.New("not found")
 	}
 
+	//var oit OsImageTemplate
 	err = json.Unmarshal([]byte(resp.Kvs[0].Value), &entry)
 	if err != nil {
 		return entry, err
 	}
-
 	return entry, nil
 }
 
 // 削除 キーに一致したデータ
-func (d *Db) DelByKey(key string) error {
-	_, err := d.Cli.Delete(d.Ctx, key)
-
+func DelByKey(con *etcd.Client, key string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	_, err := con.Delete(ctx, key)
+	cancel()
 	return err
 }
 
 // ハイパーバイザーのデータを取得
-func (d *Db) GetHvsStatus(hvs *[]Hypervisor) error {
-	resp, err := d.GetEtcdByPrefix("hv")
+func GetHvsStatus(con *etcd.Client, hvs *[]Hypervisor) error {
+	resp, err := GetEtcdByPrefix(con, "hv")
 	if err != nil {
 		return err
 	}
+	//var hv Hypervisor
 	for _, ev := range resp.Kvs {
 		var hv Hypervisor
 		err = json.Unmarshal([]byte(ev.Value), &hv)
@@ -137,16 +151,17 @@ func (d *Db) GetHvsStatus(hvs *[]Hypervisor) error {
 		}
 		*hvs = append(*hvs, hv)
 	}
-
 	return nil
 }
 
 // 仮想マシンのデータを取得
-func (d *Db) GetVmsStatus(vms *[]VirtualMachine) error {
-	resp, err := d.GetEtcdByPrefix("vm")
+func GetVmsStatus(con *etcd.Client, vms *[]VirtualMachine) error {
+	resp, err := GetEtcdByPrefix(con, "vm")
 	if err != nil {
 		return err
 	}
+	//var vm VirtualMachine  ここに書くと、ループ内で初期化されないで、
+	//                       上書きされるので、バグの原因になる。
 	for _, ev := range resp.Kvs {
 		var vm VirtualMachine // ここに宣言することで、ループ毎に初期化される
 		err = json.Unmarshal(ev.Value, &vm)
@@ -155,39 +170,41 @@ func (d *Db) GetVmsStatus(vms *[]VirtualMachine) error {
 		}
 		*vms = append(*vms, vm)
 	}
-
 	return nil
 }
 
 // etcdへ保存
-func (d *Db) PutDataEtcd(k string, v interface{}) error {
+func PutDataEtcd(con *etcd.Client, k string, v interface{}) error {
 	byteJSON, err := json.Marshal(v)
 	if err != nil {
 		return err
 	}
-	_, err = d.Cli.Put(d.Ctx, k, string(byteJSON))
 
-	return err
+	_, err = con.Put(context.TODO(), k, string(byteJSON))
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // シリアル番号
-func (d *Db) CreateSeq(key string, start uint64, step uint64) error {
+func CreateSeq(con *etcd.Client, key string, start uint64, step uint64) error {
 	etcd_key := fmt.Sprintf("SEQNO_%v", key)
 	var seq VmSerial
 	seq.Serial = start
 	seq.Start = start
 	seq.Step = step
 	seq.Key = key
-	err := d.PutDataEtcd(etcd_key, seq)
-
+	err := PutDataEtcd(con, etcd_key, seq)
 	return err
 }
 
 // シリアル番号の取得
-func (d *Db) GetSeq(key string) (uint64, error) {
+func GetSeq(con *etcd.Client, key string) (uint64, error) {
 	var seq VmSerial
+
 	etcdKey := fmt.Sprintf("SEQNO_%v", key)
-	resp, err := d.Cli.Get(d.Ctx, etcdKey)
+	resp, err := con.Get(context.TODO(), etcdKey)
 	if err != nil {
 		return 0, err
 	}
@@ -200,18 +217,16 @@ func (d *Db) GetSeq(key string) (uint64, error) {
 	seqno := seq.Serial
 	seq.Serial = seq.Serial + seq.Step
 
-	err = d.PutDataEtcd(etcdKey, seq)
+	err = PutDataEtcd(con, etcdKey, seq)
 	if err != nil {
 		return 0, err
 	}
-
 	return seqno, nil
 }
 
-func (d *Db) DelSeq(key string) error {
+func DelSeq(con *etcd.Client, key string) error {
 	etcdKey := fmt.Sprintf("SEQNO_%v", key)
-	err := d.DelByKey(etcdKey)
-
+	err := DelByKey(con, etcdKey)
 	return err
 }
 
@@ -219,12 +234,13 @@ func (d *Db) DelSeq(key string) error {
 // 割り当てたハイパーバイザーのリソースを減らす
 // 仮想マシンのデータをセットする
 // 仮想マシンの状態をプロビジョニング中にする
-func (d *Db) AssignHvforVm(vm VirtualMachine) (string, string, uuid.UUID, error) {
+func AssignHvforVm(con *etcd.Client, vm VirtualMachine) (string, string, uuid.UUID, error) {
+
 	var txId = uuid.New()
 	//トランザクション開始、他更新ロック
 	// 仮想マシンをデータベースに登録、状態は「データ登録中」
 	var hvs []Hypervisor
-	err := d.GetHvsStatus(&hvs) // HVのステータス取得
+	err := GetHvsStatus(con, &hvs) // HVのステータス取得
 	if err != nil {
 		return "", "", txId, err
 	}
@@ -263,12 +279,12 @@ func (d *Db) AssignHvforVm(vm VirtualMachine) (string, string, uuid.UUID, error)
 		return "", "", txId, err
 	}
 	// ハイパーバイザーのリソース削減保存
-	err = d.PutDataEtcd(hv.Key, hv)
+	err = PutDataEtcd(con, hv.Key, hv)
 	if err != nil {
 		return "", "", txId, err
 	}
-	// VM名登録 シリアル番号取得
-	seqno, err := d.GetSeq("VM")
+	// VM名登録　シリアル番号取得
+	seqno, err := GetSeq(con, "VM")
 	if err != nil {
 		return "", "", txId, err
 	}
@@ -279,42 +295,41 @@ func (d *Db) AssignHvforVm(vm VirtualMachine) (string, string, uuid.UUID, error)
 	vm.Ctime = time.Now()
 	vm.Stime = time.Now()
 	//vm.Status = 1  // 状態プロビ中
-	err = d.PutDataEtcd(vm.Key, vm) // 仮想マシンのデータ登録
-
+	err = PutDataEtcd(con, vm.Key, vm) // 仮想マシンのデータ登録
 	return vm.HvNode, vm.Key, vm.Uuid, err
 }
 
 // VMの終了とリソースの開放
-func (d *Db) RemoveVmFromHV(vmKey string) error {
+func RemoveVmFromHV(con *etcd.Client, vmKey string) error {
+
 	// トランザクションであるべき？
 	// VMをキーで取得して、ハイパーバイザーを取得
-	vm, err := d.GetVmByKey(vmKey)
+	vm, err := GetVmByKey(con, vmKey)
 	if err != nil {
 		return err
 	}
-	hv, err := d.GetHvByKey(vm.HvNode)
+	hv, err := GetHvByKey(con, vm.HvNode)
 	if err != nil {
 		return err
 	}
 	// HVからリソースを削除
 	hv.FreeCpu = hv.FreeCpu + vm.Cpu
 	hv.FreeMemory = hv.FreeMemory + vm.Memory
-	err = d.PutDataEtcd(vm.HvNode, &hv)
+	err = PutDataEtcd(con, vm.HvNode, &hv)
 	if err != nil {
 		return err
 	}
 	// VMを削除
-	err = d.DelByKey(vm.Key)
+	err = DelByKey(con, vm.Key)
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
 // パブリックIPアドレスが一致するインスタンスを探す
-func (d *Db) FindByPublicIPaddress(ipAddress string) (bool, error) {
-	resp, err := d.GetEtcdByPrefix("vm")
+func FindByPublicIPaddress(con *etcd.Client, ipAddress string) (bool, error) {
+	resp, err := GetEtcdByPrefix(con, "vm")
 	if err != nil {
 		return false, err
 	}
@@ -322,44 +337,43 @@ func (d *Db) FindByPublicIPaddress(ipAddress string) (bool, error) {
 		var vm VirtualMachine
 		err = json.Unmarshal([]byte(ev.Value), &vm)
 		if err != nil {
-			return false, nil /// 例外的にエラーを無視
+			return false,nil /// 例外的にエラーを無視
 		}
-		fmt.Println("===========- ipAddress=", ipAddress, "  vm.PublicIp=", vm.PublicIp)
+		fmt.Println("===========- ipAddress=",ipAddress,"  vm.PublicIp=",vm.PublicIp)
 		if ipAddress == vm.PublicIp {
 			return true, nil
 		}
 	}
-
 	return false, nil
 }
 
 // プライベートIPアドレスが一致するインスンスを探す
-func (d *Db) FindByPrivateIPaddress(ipAddress string) (bool, error) {
-	resp, err := d.GetEtcdByPrefix("vm")
+func FindByPrivateIPaddress(con *etcd.Client,ipAddress string) (bool, error) {
+	resp, err := GetEtcdByPrefix(con, "vm")
 	if err != nil {
-		return false, err
+		return false,err
 	}
 	for _, ev := range resp.Kvs {
 		var vm VirtualMachine
 		err = json.Unmarshal([]byte(ev.Value), &vm)
 		if err != nil {
-			return false, nil /// データが存在しない時には、どうするか？
+			return false,nil /// データが存在しない時には、どうするか？
 		}
-		fmt.Println("===========- ipAddress=", ipAddress, "  vm.PrivateIp=", vm.PrivateIp)
+		fmt.Println("===========- ipAddress=",ipAddress,"  vm.PrivateIp=",vm.PrivateIp)
 		if ipAddress == vm.PrivateIp {
 			return true, nil
 		}
 	}
-
 	return false, nil
 }
 
 // ホスト名からVMキーを探す
-func (d *Db) FindByHostname(hostname string) (string, error) {
-	resp, err := d.GetEtcdByPrefix("vm")
+func FindByHostname(con *etcd.Client, hostname string) (string, error) {
+	resp, err := GetEtcdByPrefix(con, "vm")
 	if err != nil {
 		return "", err
 	}
+	//var vm VirtualMachine
 	for _, ev := range resp.Kvs {
 		var vm VirtualMachine
 		err = json.Unmarshal([]byte(ev.Value), &vm)
@@ -370,13 +384,12 @@ func (d *Db) FindByHostname(hostname string) (string, error) {
 			return vm.Key, err
 		}
 	}
-
 	return "", errors.New("NotFound")
 }
 
 // ホスト名とクラスタ名でVMキーを取得する
-func (d *Db) FindByHostAndClusteName(hostname string, clustername string) (string, error) {
-	resp, err := d.GetEtcdByPrefix("vm")
+func FindByHostAndClusteName(con *etcd.Client, hostname string, clustername string) (string, error) {
+	resp, err := GetEtcdByPrefix(con, "vm")
 	if err != nil {
 		return "", err
 	}
@@ -391,52 +404,50 @@ func (d *Db) FindByHostAndClusteName(hostname string, clustername string) (strin
 			return vm.Key, err
 		}
 	}
-
 	return "", errors.New("NotFound")
 }
 
 // OSボリュームのLVをetcdへ登録
-func (d *Db) UpdateOsLv(vmkey string, vg string, lv string) error {
+func UpdateOsLv(con *etcd.Client, vmkey string, vg string, lv string) error {
 	// ロックしたい
-	vm, err := d.GetVmByKey(vmkey)
+	vm, err := GetVmByKey(con, vmkey)
 	if err != nil {
 		return err
 	}
 	vm.OsLv = lv
 	vm.OsVg = vg
-	err = d.PutDataEtcd(vmkey, vm)
-
+	err = PutDataEtcd(con, vmkey, vm)
 	return err
 }
 
 // データボリュームLVをetcdへ登録
-func (d *Db) UpdateDataLv(vmkey string, idx int, vg string, lv string) error {
+func UpdateDataLv(con *etcd.Client, vmkey string, idx int, vg string, lv string) error {
 	// ロックしたい
-	vm, err := d.GetVmByKey(vmkey)
+	vm, err := GetVmByKey(con, vmkey)
 	if err != nil {
 		return err
 	}
 	vm.Storage[idx].Lv = lv
 	vm.Storage[idx].Vg = vg
-	err = d.PutDataEtcd(vmkey, vm)
-
+	err = PutDataEtcd(con, vmkey, vm)
 	return err
 }
 
-func (d *Db) UpdateVmState(vmkey string, state int) error {
+func UpdateVmState(con *etcd.Client, vmkey string, state int) error {
 	// ロックしたい
-	vm, err := d.GetVmByKey(vmkey)
+	vm, err := GetVmByKey(con, vmkey)
 	if err != nil {
 		return err
 	}
 	vm.Status = state
-	err = d.PutDataEtcd(vmkey, vm)
-
+	err = PutDataEtcd(con, vmkey, vm)
 	return err
 }
 
+//////////////////////////////////////////////////////////////
+
 // ハイパーバイザーの設定
-func (d *Db) SetHypervisor(v cf.Hypervisor_yaml) error {
+func SetHypervisor(con *etcd.Client, v cf.Hypervisor_yaml) error {
 	var hv Hypervisor
 
 	hv.Nodename = v.Name
@@ -448,6 +459,13 @@ func (d *Db) SetHypervisor(v cf.Hypervisor_yaml) error {
 	hv.FreeMemory = int(v.Ram * 1024)
 	hv.Status = 2 // テストのため暫定
 
+	//	for _, val := range v.StgPool_yaml {
+	//		var sp St
+	//		sp.VolGroup = val.VolGroup
+	//		sp.Type     = val.Type
+	//		hv.StgPool  = append(hv.StgPool,sp)
+	//	}
+
 	for _, val := range v.Storage {
 		var sp StoragePool
 		sp.VolGroup = val.VolGroup
@@ -455,27 +473,26 @@ func (d *Db) SetHypervisor(v cf.Hypervisor_yaml) error {
 		hv.StgPool = append(hv.StgPool, sp)
 	}
 
-	err := d.PutDataEtcd(hv.Key, hv)
+	err := PutDataEtcd(con, hv.Key, hv)
 	if err != nil {
 		slog.Error("PutDataEtcd()", "err", err)
 		return err
 	}
-
 	return nil
+
 }
 
 // イメージテンプレート
-func (d *Db) SetImageTemplate(v cf.Image_yaml) error {
+func SetImageTemplate(con *etcd.Client, v cf.Image_yaml) error {
 	var osi OsImageTemplate
 	osi.LogicaVol = v.LogicalVolume
 	osi.VolumeGroup = v.VolumeGroup
 	osi.OsVariant = v.Name
 	key := fmt.Sprintf("%v_%v", "OSI", osi.OsVariant)
-	err := d.PutDataEtcd(key, osi)
+	err := PutDataEtcd(con, key, osi)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
 	}
-
 	return nil
 }

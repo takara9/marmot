@@ -1,4 +1,4 @@
-package main
+package util
 
 /*
   LVM関連のユーテリティ関数群
@@ -21,8 +21,9 @@ import (
 	"os/exec"
 
 	cf "github.com/takara9/marmot/pkg/config"
+	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/lvm"
-	"github.com/takara9/marmot/pkg/util"
+	etcd "go.etcd.io/etcd/client/v3"
 )
 
 // LVのパーティションをマップ
@@ -69,8 +70,8 @@ func UnMountLocal(uuid string) error {
 
 // OSテンプVolのスナップショットを作成してデバイス名を返す
 // 　　サイズとテンプレートの選択が無い！？　　将来改良
-func (m *Marmotd) CreateOsLv(tempVg string, tempLv string) (string, error) {
-	seq, err := m.dbc.GetSeq("LVOS")
+func CreateOsLv(conn *etcd.Client, tempVg string, tempLv string) (string, error) {
+	seq, err := db.GetSeq(conn, "LVOS")
 	if err != nil {
 		return "", err
 	}
@@ -84,8 +85,8 @@ func (m *Marmotd) CreateOsLv(tempVg string, tempLv string) (string, error) {
 }
 
 // データボリュームの作成
-func (m *Marmotd) createDataLv(sz uint64, vg string) (string, error) {
-	seq, err := m.dbc.GetSeq("LVDATA")
+func CreateDataLv(conn *etcd.Client, sz uint64, vg string) (string, error) {
+	seq, err := db.GetSeq(conn, "LVDATA")
 	if err != nil {
 		return "", err
 	}
@@ -101,7 +102,7 @@ func (m *Marmotd) createDataLv(sz uint64, vg string) (string, error) {
 // スナップショットボリュームをマウントして、 ホスト名とIPアドレスを設定
 //
 //	Ubuntu Linuxに限定
-func configRootVol(spec cf.VMSpec, vg string, oslv string) error {
+func ConfigRootVol(spec cf.VMSpec, vg string, oslv string) error {
 	err := KpartOn(vg, oslv)
 	if err != nil {
 		slog.Error("", "err", err)
@@ -115,21 +116,21 @@ func configRootVol(spec cf.VMSpec, vg string, oslv string) error {
 	}
 
 	// ホスト名の書き込み
-	err = util.LinuxSetup_hostname(vm_root, spec.Name)
+	err = LinuxSetup_hostname(vm_root, spec.Name)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
 	}
 
 	// NetPlanの雛形へ書出す2
-	err = util.LinuxSetup_createNetplan(spec, vm_root)
+	err = LinuxSetup_createNetplan(spec, vm_root)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
 	}
 
 	// hostidの書き出し
-	err = util.LinuxSetup_hostid(spec, vm_root)
+	err = LinuxSetup_hostid(spec, vm_root)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err

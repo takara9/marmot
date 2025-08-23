@@ -28,7 +28,6 @@ import (
 func LinuxSetup_hostname(vm_root string, hostname string) error {
 	hostname_file := filepath.Join(vm_root, "etc/hostname")
 	err := os.WriteFile(hostname_file, []byte(hostname), 0644)
-
 	return err
 }
 
@@ -37,7 +36,6 @@ func LinuxSetup_hostid(spec cf.VMSpec, vm_root string) error {
 	ipb := IPaddrByteArray(spec.PrivateIP)
 	hostid_file := filepath.Join(vm_root, "etc/hostid")
 	err := os.WriteFile(hostid_file, ipb, 0644)
-
 	return err
 }
 
@@ -49,7 +47,6 @@ func IPaddrByteArray(ip string) []byte {
 		j, _ := strconv.Atoi(xx)
 		ipb[i] = byte(j) & 0x0ff
 	}
-
 	return ipb
 }
 
@@ -112,8 +109,8 @@ func LinuxSetup_createNetplan(spec cf.VMSpec, vm_root string) error {
 			yaml(4, fmt.Sprintf("addresses: [%v]", "192.168.1.4"), f)
 		}
 	}
-
 	return nil
+
 }
 
 // YAMLのlevelに応じた桁下げのYAML行を出力
@@ -130,7 +127,6 @@ func generateMacAddr() string {
 	rand.Read(buf)
 	// Set the local bit https://en.wikipedia.org/wiki/MAC_address
 	buf[0] = 0x02
-
 	return fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5])
 }
 

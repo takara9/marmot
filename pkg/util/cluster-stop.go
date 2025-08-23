@@ -1,28 +1,36 @@
-package main
+package util
 
 import (
+	"fmt"
+	"log/slog"
+	//"os"
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/virt"
+	etcd "go.etcd.io/etcd/client/v3"
 )
 
 // クラスタ停止
-func (m *Marmotd) StopCluster(cnf cf.MarmotConfig, dbUrl string) error {
+func StopCluster(cnf cf.MarmotConfig, dbUrl string) error {
+	Conn, err := db.Connect(dbUrl)
+	if err != nil {
+		slog.Error("", "err", err)
+		return err
+	}
+
 	var NotFound bool = true
 	for _, spec := range cnf.VMSpec {
-		vmKey, _ := m.dbc.FindByHostAndClusteName(spec.Name, cnf.ClusterName)
+		vmKey, _ := db.FindByHostAndClusteName(Conn, spec.Name, cnf.ClusterName)
 		if len(vmKey) > 0 {
 			NotFound = false
 			spec.Key = vmKey
-			vm, err := m.dbc.GetVmByKey(vmKey)
+			vm, err := db.GetVmByKey(Conn, vmKey)
 			if err != nil {
 				slog.Error("", "err", err)
 				continue
@@ -34,6 +42,8 @@ func (m *Marmotd) StopCluster(cnf cf.MarmotConfig, dbUrl string) error {
 			}
 		}
 	}
+	Conn.Close()
+
 	if NotFound {
 		return errors.New("NotExistVM")
 	}
@@ -43,6 +53,7 @@ func (m *Marmotd) StopCluster(cnf cf.MarmotConfig, dbUrl string) error {
 
 func RemoteStopVM(hvNode string, spec cf.VMSpec) error {
 	byteJSON, _ := json.MarshalIndent(spec, "", "    ")
+	//fmt.Println(string(byteJSON))
 
 	// JSON形式でポストする
 	reqURL := fmt.Sprintf("http://%s:8750/%s", hvNode, "stopVm")
@@ -65,13 +76,15 @@ func RemoteStopVM(hvNode string, spec cf.VMSpec) error {
 	if response.StatusCode != 200 {
 		return errors.New(string(body))
 	}
-
 	return nil
 }
 
 // VMの停止
-func (m *Marmotd) StopVM(spec cf.VMSpec) error {
-	vm, err := m.dbc.GetVmByKey(spec.Key)
+func StopVM(Conn *etcd.Client, spec cf.VMSpec) error {
+	// コンフィグからホスト名を取得
+	//vmkey, _ := db.FindByHostname(Conn, spec.Name)
+
+	vm, err := db.GetVmByKey(Conn, spec.Key)
 	if err != nil {
 		slog.Error("", "err", err)
 		return nil
@@ -85,22 +98,21 @@ func (m *Marmotd) StopVM(spec cf.VMSpec) error {
 			slog.Error("", "err", err)
 		}
 		// ハイパーバイザーのリソース削減保存
-		hv, err := m.dbc.GetHvByKey(vm.HvNode)
+		hv, err := db.GetHvByKey(Conn, vm.HvNode)
 		if err != nil {
 			slog.Error("", "err", err)
 		}
 		hv.FreeCpu = hv.FreeCpu + vm.Cpu
 		hv.FreeMemory = hv.FreeMemory + vm.Memory
-		err = m.dbc.PutDataEtcd(hv.Key, hv)
+		err = db.PutDataEtcd(Conn, hv.Key, hv)
 		if err != nil {
 			slog.Error("", "err", err)
 		}
 		// データベースの更新
-		err = m.dbc.UpdateVmState(spec.Key, db.STOPPED) ////////
+		err = db.UpdateVmState(Conn, spec.Key, db.STOPPED) ////////
 		if err != nil {
 			slog.Error("", "err", err)
 		}
 	}
-
 	return nil
 }
