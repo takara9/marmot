@@ -198,6 +198,7 @@ func ListHv(api string) error {
 	dec.Token()
 	return nil
 }
+
 // 仮想マシンの詳細表示
 func DetailVm(cnf cf.MarmotConfig, api string, cname string, vname string) error {
 	_, body, err := ReqGet("virtualMachines", api)
