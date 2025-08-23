@@ -3,10 +3,11 @@ package util
 import (
 	"flag"
 	"fmt"
-	cf "github.com/takara9/marmot/pkg/config"
-	db "github.com/takara9/marmot/pkg/db"
 	"os"
 	"path/filepath"
+
+	cf "github.com/takara9/marmot/pkg/config"
+	db "github.com/takara9/marmot/pkg/db"
 )
 
 type DefaultConfig struct {
@@ -39,16 +40,17 @@ func ReadHvConfig() (cf.Hypervisors_yaml, DefaultConfig, error) {
 func SetHvConfig(hvs cf.Hypervisors_yaml, cnf DefaultConfig) error {
 
 	// etcdへ接続
-	Conn, err := db.Connect(cnf.EtcdServerUrl)
+	//Conn, err := db.Connect(cnf.EtcdServerUrl)
+	d, err := db.NewDatabase(cnf.EtcdServerUrl)
 	if err != nil {
 		return err
 	}
-	defer Conn.Close()
+	//defer Conn.Close()
 
 	// ハイパーバイザー
 	for _, hv := range hvs.Hvs {
 		fmt.Println(hv)
-		err := db.SetHypervisor(Conn, hv)
+		err := d.SetHypervisor(hv)
 		if err != nil {
 			return err
 		}
@@ -56,7 +58,7 @@ func SetHvConfig(hvs cf.Hypervisors_yaml, cnf DefaultConfig) error {
 
 	// OSイメージテンプレート
 	for _, hd := range hvs.Imgs {
-		err := db.SetImageTemplate(Conn, hd)
+		err := d.SetImageTemplate(hd)
 		if err != nil {
 			return err
 		}
@@ -64,7 +66,7 @@ func SetHvConfig(hvs cf.Hypervisors_yaml, cnf DefaultConfig) error {
 
 	// シーケンス番号のリセット
 	for _, sq := range hvs.Seq {
-		err := db.CreateSeq(Conn, sq.Key, sq.Start, sq.Step)
+		err := d.CreateSeq(sq.Key, sq.Start, sq.Step)
 		if err != nil {
 			return err
 		}
