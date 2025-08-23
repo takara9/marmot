@@ -337,9 +337,9 @@ func FindByPublicIPaddress(con *etcd.Client, ipAddress string) (bool, error) {
 		var vm VirtualMachine
 		err = json.Unmarshal([]byte(ev.Value), &vm)
 		if err != nil {
-			return false,nil /// 例外的にエラーを無視
+			return false, nil /// 例外的にエラーを無視
 		}
-		fmt.Println("===========- ipAddress=",ipAddress,"  vm.PublicIp=",vm.PublicIp)
+		fmt.Println("===========- ipAddress=", ipAddress, "  vm.PublicIp=", vm.PublicIp)
 		if ipAddress == vm.PublicIp {
 			return true, nil
 		}
@@ -348,18 +348,18 @@ func FindByPublicIPaddress(con *etcd.Client, ipAddress string) (bool, error) {
 }
 
 // プライベートIPアドレスが一致するインスンスを探す
-func FindByPrivateIPaddress(con *etcd.Client,ipAddress string) (bool, error) {
+func FindByPrivateIPaddress(con *etcd.Client, ipAddress string) (bool, error) {
 	resp, err := GetEtcdByPrefix(con, "vm")
 	if err != nil {
-		return false,err
+		return false, err
 	}
 	for _, ev := range resp.Kvs {
 		var vm VirtualMachine
 		err = json.Unmarshal([]byte(ev.Value), &vm)
 		if err != nil {
-			return false,nil /// データが存在しない時には、どうするか？
+			return false, nil /// データが存在しない時には、どうするか？
 		}
-		fmt.Println("===========- ipAddress=",ipAddress,"  vm.PrivateIp=",vm.PrivateIp)
+		fmt.Println("===========- ipAddress=", ipAddress, "  vm.PrivateIp=", vm.PrivateIp)
 		if ipAddress == vm.PrivateIp {
 			return true, nil
 		}

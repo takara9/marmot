@@ -7,9 +7,7 @@ TAG := $(shell cat TAG)
 BINDIR = $(CURDIR)/marmot-v$(TAG)
 
 $(PROGRAMS):
-	cd api
-	oapi-codegen -config config-v1.yaml marmot-api-v1.yaml
-	cd ..
+	oapi-codegen -config api/config-v1.yaml api/marmot-api-v1.yaml
 	mkdir -p $(BINDIR)
 	cd cmd/$@ && $(MAKE)
 

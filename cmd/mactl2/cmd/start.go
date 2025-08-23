@@ -22,7 +22,7 @@ var startCmd = &cobra.Command{
 			fmt.Printf("Reading the config file", "err", err)
 			return
 		}
-		
+
 		if len(apiEndpoint) > 0 {
 			ApiUrl = apiEndpoint
 		}
