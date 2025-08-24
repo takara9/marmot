@@ -1,3 +1,4 @@
+GO      = /usr/local/go/bin/go
 PROGRAM	= vm-server
 DISTDIR = /usr/local/marmot
 all:	$(PROGRAM)
