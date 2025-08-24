@@ -16,6 +16,10 @@ $(PROGRAM): $(%.go)
 clean:
 	rm -f $(PROGRAM)
 
+.PHONY: test
+test:
+	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -coverprofile cover.out
+
 .PHONY:	install
 install:
 	rm -fr $(DISTDIR)
