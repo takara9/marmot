@@ -1,0 +1,163 @@
+#
+# Ubuntu の 自動アップデートを禁止する
+#
+- name: Disable auto update packages
+  replace:
+    path: /etc/apt/apt.conf.d/20auto-upgrades
+    regexp: 'APT::Periodic::Update-Package-Lists "1";'
+    replace: 'APT::Periodic::Update-Package-Lists "0";'
+    backup: no
+
+#
+# リスタート　systemctl restart systemd-resolved
+#
+- systemd:
+    name: systemd-resolved
+    state: stopped
+    daemon_reload: no
+    enabled: no
+
+#
+# /etc/resolv.conf を変更
+#
+- name: copy resolv.conf
+  template:
+    src: resolv.conf.j2
+    dest: /etc/resolv.conf
+    owner: root
+    group: root
+    mode: '0644'
+
+#
+# スワップ領域の無効化
+#
+- name: Disable SWAP since kubernetes can't work with swap enabled (1/2)
+  command: swapoff -a
+
+- name: Disable SWAP in fstab since kubernetes can't work with swap enabled (2/2)
+  replace:
+    path: /etc/fstab
+    regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+    replace: '# \1'
+
+- name: Ansible delete swap file glob
+  find:
+    paths: /
+    patterns: "swap.img"
+  register: files_to_delete
+
+- name: Ansible remove swap file glob
+  file:
+    path: "{{ item.path }}"
+    state: absent
+  with_items: "{{ files_to_delete.files }}"
+
+#
+# パッケージの追加
+#
+- name: Update apt-get repo and cache
+  apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+
+- name: Install Ubuntu package
+  apt:
+    name: "{{ packages }}"
+    state: present
+    update_cache: yes
+  register: apt_res
+  retries: 10
+  delay: 60
+  until: apt_res is success
+  vars:
+    packages:
+    - nfs-common
+    - nfs-client
+    - emacs-nox
+    - build-essential
+    - software-properties-common
+    - gcc-10
+    - g++-10
+#
+# カーネル設定変更
+#
+- name: Configure Kernel parameter
+  include_tasks: kernel-param.yaml
+
+- name: Ensure /etc/hosts
+  template:
+    src: hosts.j2
+    dest: /etc/hosts
+    owner: root
+    group: root
+    mode: '0644'
+
+#
+# 管理ユーザーをrootグループへ追加
+#
+- name: admin  user add root group
+  user:
+    name: "{{ cluster_admin }}"
+    groups: root
+    append: yes
+
+- name: Ensure group 'admin' exists
+  group:
+    name:  "{{ cluster_admin }}"
+    state: present
+
+- name: Add the user 'admin' with a bash shell,
+  user:
+    name:  "{{ cluster_admin }}"
+    shell: /bin/bash
+    group: "{{ cluster_admin }}"
+
+- name: add sudoers
+  template:
+    src:  sudor.j2
+    dest: "/etc/sudoers.d/{{ cluster_admin }}"
+    owner: root
+    group: root
+    mode: '0440'
+
+#
+# HOSTS設定
+#
+- name: Ensure /etc/hosts
+  template:
+    src: hosts.j2
+    dest: /etc/hosts
+    owner: root
+    group: root
+    mode: '0644'
+
+
+#
+# QEMU/KVM時のコンテナ用ファイルシステム
+#
+- name: Create Container filesystem for QEMU/KVM
+  filesystem:
+    fstype: ext4
+    dev: /dev/vdb
+  when: ansible_facts.devices.vdb is defined
+
+- name: Create mount point for QEMU/KVM
+  file:
+    path: /var/lib/containerd
+    owner: root
+    group: root
+    mode: '0755'
+    state: directory
+  when: ansible_facts.devices.vdb is defined
+
+- name: Mount up device by /dev/vdb for QEMU/KVM
+  mount:
+    path: /var/lib/containerd
+    src:  /dev/vdb
+    fstype: ext4
+    state: mounted
+  when: ansible_facts.devices.vdb is defined
+
+- name: NFS MOUNT
+  include_tasks: nfs-mount.yaml
+
+
+- debug: msg="{{ ansible_facts.virtualization_type }}"

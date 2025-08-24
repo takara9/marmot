@@ -1,0 +1,14 @@
+- name: check mountpoint exist
+  ansible.builtin.file:
+    path: /nfs
+    state: directory
+    mode: 0775
+    owner: root
+    group: root
+
+- name: mount network share
+  mount:
+    src:  "hmc-nfs:/exports/nfs/golang"
+    path: "/nfs"
+    fstype: nfs
+    state: mounted

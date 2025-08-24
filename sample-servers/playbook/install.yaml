@@ -1,0 +1,18 @@
+- name: setup servers
+  hosts: all
+  become: true
+  gather_facts: yes
+  vars:
+    ca_server: 172.16.1.9
+    public_ip_dns: 172.16.1.9
+    cluster_admin: ubuntu
+    sw_container_fs: False
+    prevent_download: True
+    download_dir: /nfs/download
+  tasks:
+    - debug: msg="{{ ansible_facts.hostname }}"
+  roles:
+    - linux-setup
+    - docker
+    - golang
+  

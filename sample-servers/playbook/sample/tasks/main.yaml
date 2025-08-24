@@ -1,0 +1,7 @@
+#
+# 自動設定のタスクを記述する。
+#
+
+- debug: msg="{{ ansible_facts.hostname }}"
+
+- debug: msg="{{ ansible_facts }}"
