@@ -1,0 +1,28 @@
+hv_spec:
+  - name: "hvc"
+    cpu: 8
+    free_cpu: 7
+    ram: 16
+    free_ram: 14
+    ip_addr: "172.16.0.20"
+    storage_pool:
+      - vg: "vg1"
+        type: "ssd"
+      - vg: "vg2"
+        type: "nvme"
+
+image_template:
+  - name: "ubuntu22.04"
+    volumegroup: "vg1"
+    logicalvolume: "lv01"
+
+seqno:
+  - name: "LVOS"
+    start: 100
+    step: 1
+  - name: "LVDATA"
+    start: 100
+    step: 1
+  - name: "VM"
+    start: 100
+    step: 1

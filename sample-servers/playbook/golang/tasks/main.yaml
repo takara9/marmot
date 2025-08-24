@@ -1,0 +1,30 @@
+#
+# 自動設定のタスクを記述する。
+#
+
+- debug: msg="{{ ansible_facts.hostname }}"
+- debug: msg="{{ ansible_facts }}"
+
+
+- get_url:
+    url: https://go.dev/dl/go1.24.0.linux-amd64.tar.gz
+    dest: "/tmp"
+    mode: '0644'
+
+- name: Install golang
+  unarchive:
+    src: "/tmp/go1.24.0.linux-amd64.tar.gz"
+    dest: /usr/local
+    owner: root
+    group: root
+    mode: '0755'
+    remote_src: yes
+
+- name: Remove file (delete file)
+  file:
+    path: "/tmp/go1.24.0.linux-amd64.tar.gz"
+    state: absent
+
+- name: setup path
+  shell: |
+    echo "export PATH=$PATH:/usr/local/go/bin"  >> /home/ubuntu/.bashrc

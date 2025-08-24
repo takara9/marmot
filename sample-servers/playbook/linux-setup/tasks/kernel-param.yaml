@@ -1,0 +1,46 @@
+#
+# カーネル設定変更
+#
+- name: Add the br_netfilter module
+  modprobe:
+    name: br_netfilter
+    state: present
+
+- modprobe:
+    name:  overlay
+    state: present
+
+- sysctl:
+    name: net.bridge.bridge-nf-call-iptables
+    value: "1"
+    sysctl_set: yes
+    sysctl_file: /etc/sysctl.conf
+    state: present
+    reload: yes
+
+- sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    sysctl_set: yes
+    sysctl_file: /etc/sysctl.conf
+    state: present
+    reload: yes
+
+- sysctl:
+    name: vm.max_map_count
+    value: "262144"
+    sysctl_set: yes
+    sysctl_file: /etc/sysctl.conf
+    state: present
+    reload: yes
+
+- sysctl:
+    name: vm.overcommit_memory
+    value: "1"
+    sysctl_set: yes
+    sysctl_file: /etc/sysctl.conf
+    state: present
+    reload: yes
+
+#- name: swap off
+#  command: swapoff -a

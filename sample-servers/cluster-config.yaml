@@ -1,0 +1,19 @@
+#
+# 最小構成のサーバー
+#
+domain: labo.local
+cluster_name: infra
+os_variant:  ubuntu22.04
+
+vm_spec:
+  - name: "server1"
+    cpu: 2
+    memory: 4096
+    private_ip:  "172.16.20.3"
+    public_ip:   "192.168.1.178"
+    storage:
+    - name: /dev/vdb
+      size: 2
+      vg:   vg1
+    comment: "First Simple Server"
+
