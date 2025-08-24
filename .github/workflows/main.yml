@@ -128,3 +128,8 @@ jobs:
         cd pkg/virt
         sudo -s make test
         cd ../..
+    - name: Test cmd/vm-server
+      run: | 
+        cd cmd/vm-server
+        sudo -s make test
+        cd ../..

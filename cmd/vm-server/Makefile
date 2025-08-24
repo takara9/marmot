@@ -1,3 +1,4 @@
+GO      = /usr/local/go/bin/go
 PROGRAM	= vm-server
 DISTDIR = /usr/local/marmot
 all:	$(PROGRAM)
@@ -15,6 +16,10 @@ $(PROGRAM): $(%.go)
 .PHONY:	clean
 clean:
 	rm -f $(PROGRAM)
+
+.PHONY: test
+test:
+	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -coverprofile cover.out
 
 .PHONY:	install
 install:

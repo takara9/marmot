@@ -141,7 +141,7 @@ func createCluster(c *gin.Context) {
 		return
 	}
 
-	if err := ut.CreateCluster(cnf, *etcd, *node); err != nil {
+	if err := CreateCluster(cnf, *etcd, *node); err != nil {
 		slog.Error("create cluster", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
@@ -159,7 +159,7 @@ func destroyCluster(c *gin.Context) {
 	}
 	fmt.Println(cnf)
 
-	if err := ut.DestroyCluster(cnf, *etcd); err != nil {
+	if err := DestroyCluster(cnf, *etcd); err != nil {
 		slog.Error("delete cluster", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
@@ -187,7 +187,7 @@ func createVm(c *gin.Context) {
 	//}
 
 	//err = ut.CreateVM(Conn, spec, *node)
-	err = ut.CreateVM(*etcd, spec, *node)
+	err = CreateVM(*etcd, spec, *node)
 	if err != nil {
 		slog.Error("creating vm", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
@@ -214,7 +214,7 @@ func destroyVm(c *gin.Context) {
 	//	return
 	//}
 
-	err = ut.DestroyVM(*etcd, spec, *node)
+	err = DestroyVM(*etcd, spec, *node)
 	if err != nil {
 		slog.Error("delete vm", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
@@ -232,7 +232,7 @@ func stopCluster(c *gin.Context) {
 		c.JSON(400, gin.H{"msg": "Can't read JSON"})
 		return
 	}
-	if err := ut.StopCluster(cnf, *etcd); err != nil {
+	if err := StopCluster(cnf, *etcd); err != nil {
 		slog.Error("stop cluster", "err", err)
 		return
 	}
@@ -248,7 +248,7 @@ func startCluster(c *gin.Context) {
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
-	if err := ut.StartCluster(cnf, *etcd); err != nil {
+	if err := StartCluster(cnf, *etcd); err != nil {
 		slog.Error("start cluster", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
@@ -273,7 +273,7 @@ func startVm(c *gin.Context) {
 	//	c.JSON(400, gin.H{"msg": err.Error()})
 	//	return
 	//}
-	err = ut.StartVM(*etcd, spec)
+	err = StartVM(*etcd, spec)
 	if err != nil {
 		slog.Error("start vm", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
@@ -299,7 +299,7 @@ func stopVm(c *gin.Context) {
 	//	return
 	//}
 
-	err = ut.StopVM(*etcd, spec)
+	err = StopVM(*etcd, spec)
 	if err != nil {
 		slog.Error("stop vm", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})

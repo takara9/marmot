@@ -1,4 +1,4 @@
-package util
+package main
 
 import (
 	"fmt"
@@ -16,6 +16,7 @@ import (
 
 	//"github.com/takara9/marmot/pkg/dns"
 	"github.com/takara9/marmot/pkg/lvm"
+	"github.com/takara9/marmot/pkg/util"
 	"github.com/takara9/marmot/pkg/virt"
 	//etcd "go.etcd.io/etcd/client/v3"
 )
@@ -151,7 +152,7 @@ func DestroyVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
 		slog.Error("", "err", err)
 	}
 	// ストレージの更新
-	CheckHvVG2(dbUrl, hvNode, vm.OsVg)
+	util.CheckHvVG2(dbUrl, hvNode, vm.OsVg)
 
 	// データLVを削除
 	for _, dd := range vm.Storage {
@@ -160,7 +161,7 @@ func DestroyVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
 			slog.Error("", "err", err)
 		}
 		// ストレージの更新
-		CheckHvVG2(dbUrl, hvNode, dd.Vg)
+		util.CheckHvVG2(dbUrl, hvNode, dd.Vg)
 	}
 
 	return nil
