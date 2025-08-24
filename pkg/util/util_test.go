@@ -113,15 +113,27 @@ var _ = Describe("Util", func() {
 				Expect(status).To(HaveOccurred()) // 問題
 			})
 
-			It("Start", func() {
-				cmd := exec.Command(systemctl_exe, "start", "marmot")
-				start := cmd.Run()
-				Expect(start).To(Succeed()) // 成功
-			})
+			//It("Start", func() {
+			//	cmd := exec.Command(systemctl_exe, "start", "marmot")
+			//	start := cmd.Run()
+			//	Expect(start).To(Succeed()) // 成功
+			//})
 		})
 	})
 
 	Context("Data management", func() {
+		It("Set Hypervisor Config file", func() {
+			cmd := exec.Command(hvadmin_exe, "-config", hv_config)
+			err := cmd.Run()
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("Start", func() {
+			cmd := exec.Command(systemctl_exe, "start", "marmot")
+			start := cmd.Run()
+			Expect(start).To(Succeed()) // 成功
+		})
+
 		It("Check up Marmot daemon", func() {
 			By("Trying to connect to marmot")
 			Eventually(func(g Gomega) {
@@ -132,11 +144,6 @@ var _ = Describe("Util", func() {
 			}).Should(Succeed())
 		})
 
-		It("Set Hypervisor Config file", func() {
-			cmd := exec.Command(hvadmin_exe, "-config", hv_config)
-			err := cmd.Run()
-			Expect(err).NotTo(HaveOccurred())
-		})
 
 		It("Check Hypervisors data", func() {
 			GinkgoWriter.Println(*node)
