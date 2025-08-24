@@ -2,10 +2,11 @@ package util_test
 
 import (
 	"fmt"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	"os"
 	"os/exec"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	cf "github.com/takara9/marmot/pkg/config"
 	ut "github.com/takara9/marmot/pkg/util"
@@ -113,15 +114,22 @@ var _ = Describe("Util", func() {
 				Expect(status).To(HaveOccurred()) // 問題
 			})
 
-			It("Start", func() {
-				cmd := exec.Command(systemctl_exe, "start", "marmot")
-				start := cmd.Run()
-				Expect(start).To(Succeed()) // 成功
-			})
 		})
 	})
 
 	Context("Data management", func() {
+		It("Set Hypervisor Config file", func() {
+			cmd := exec.Command(hvadmin_exe, "-config", hv_config)
+			err := cmd.Run()
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("Start", func() {
+			cmd := exec.Command(systemctl_exe, "start", "marmot")
+			start := cmd.Run()
+			Expect(start).To(Succeed()) // 成功
+		})
+
 		It("Check up Marmot daemon", func() {
 			By("Trying to connect to marmot")
 			Eventually(func(g Gomega) {
@@ -130,12 +138,6 @@ var _ = Describe("Util", func() {
 				GinkgoWriter.Println(cmd, "err= ", err)
 				g.Expect(err).NotTo(HaveOccurred())
 			}).Should(Succeed())
-		})
-
-		It("Set Hypervisor Config file", func() {
-			cmd := exec.Command(hvadmin_exe, "-config", hv_config)
-			err := cmd.Run()
-			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Check Hypervisors data", func() {
