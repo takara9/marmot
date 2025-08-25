@@ -14,20 +14,10 @@ import (
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/util"
 	"github.com/takara9/marmot/pkg/virt"
-	//"github.com/takara9/marmot/pkg/dns"
 )
-
-/*
-以下の説明を作成して、テストを作成すること。
-
-	cnf	:
-	dbUrl
-	hvNode
-*/
 
 // コンフィグからVMクラスタを作成する
 func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
-	//Conn, err := db.Connect(dbUrl)
 	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
 		slog.Error("", "err", err)
@@ -36,13 +26,11 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 
 	// リクエスト送信前にコンフィグのチェックを実施する
 	for _, spec := range cnf.VMSpec {
-
 		// クラスタ名とホスト名の重複チェック
 		vmKey, _ := d.FindByHostAndClusteName(spec.Name, cnf.ClusterName)
 		if len(vmKey) > 0 {
 			return fmt.Errorf("existing same name virttual machine : %v", spec.Name)
 		}
-
 		// ここに、IPアドレスの重複チェックを入れる
 		if len(spec.PublicIP) > 0 {
 			found, err := d.FindByPublicIPaddress(spec.PublicIP)
@@ -66,10 +54,8 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 
 	var break_err bool = false
 	return_errors := errors.New("")
-
 	// 仮想マシンの設定と起動
 	for _, spec := range cnf.VMSpec {
-
 		fmt.Println("ホスト名とクラスタ名でVMキーを取得する")
 		// ホスト名とクラスタ名でVMキーを取得する
 		vmKey, _ := d.FindByHostAndClusteName(spec.Name, cnf.ClusterName)
@@ -135,15 +121,6 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 			break
 		}
 
-		//渡すデータはJSON形式をRESTで渡したい
-		// ローカルHVでVMを作成するケースと、
-		// リモートHVでVMを作成するケースが発生する。
-
-		// vm.HvNode と node を比較してローカルへ
-		//slog.Error("", "err", err)vm.HvNode", " = ", vm.HvNode)
-		//slog.Error("", "err", err)hvNode", " = ", hvNode)
-		//slog.Error("", "err", err)cmp vm.HvNode hvNode", " = ", vm.HvNode == hvNode)
-
 		fmt.Println("リモートとローカル関係なしに、マイクロサービスへリクエストする")
 		// リモートとローカル関係なしに、マイクロサービスへリクエストする
 		d.UpdateVmState(vm.Key, db.PROVISIONING)
@@ -181,10 +158,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 
 // リモートホストにリクエストを送信する
 func RemoteCreateStartVM(hvNode string, spec cf.VMSpec) error {
-
 	byteJSON, _ := json.MarshalIndent(spec, "", "    ")
-	//fmt.Println(string(byteJSON))
-
 	// JSON形式でポストする
 	reqURL := fmt.Sprintf("http://%s:8750/%s", hvNode, "createVm")
 	request, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
@@ -194,7 +168,6 @@ func RemoteCreateStartVM(hvNode string, spec cf.VMSpec) error {
 	}
 
 	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
-
 	client := &http.Client{}
 	response, err := client.Do(request)
 	if err != nil {
@@ -211,19 +184,13 @@ func RemoteCreateStartVM(hvNode string, spec cf.VMSpec) error {
 	return nil
 }
 
-// この部分は、ハイパーバイザーのホストで実行する
 // VMを生成する
-// func CreateVM(conn *etcd.Client, spec cf.VMSpec, hvNode string) error {
 func CreateVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
 	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
 	}
-
-	//slog.Error("", "err", err)Libvirtのテンプレートを読み込んで、設定を変更する")
-	//------------------------------------------------------------
-	// Libvirtのテンプレートを読み込んで、設定を変更する
 	var dom virt.Domain
 	err = virt.ReadXml("temp.xml", &dom)
 	if err != nil {
@@ -238,27 +205,19 @@ func CreateVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
 	dom.Memory.Value = mem
 	dom.CurrentMemory.Value = mem
 
-	//slog.Error("", "err", err)OSボリュームを作成")
-	//------------------------------------------------------------
-	// OSボリュームを作成  (N テンプレートを指定できると良い)
 	osLogicalVol, err := util.CreateOsLv(dbUrl, spec.OsTempVg, spec.OsTempLv)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
 	}
-	dom.Devices.Disk[0].Source.Dev = fmt.Sprintf("/dev/%s/%s", spec.OsTempVg, osLogicalVol)
 
-	//slog.Error("", "err", err)OSボリュームのLV名をetcdへ登録")
-	// OSボリュームのLV名をetcdへ登録
+	dom.Devices.Disk[0].Source.Dev = fmt.Sprintf("/dev/%s/%s", spec.OsTempVg, osLogicalVol)
 	err = d.UpdateOsLv(spec.Key, spec.OsTempVg, osLogicalVol)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
 	}
 
-	//slog.Error("", "err", err)OSボリュームをマウントして、 ホスト名、IPアドレスを設定する")
-	// OSボリュームをマウントして、 ホスト名、IPアドレスを設定する
-	// 必要最小限として、詳細設定はAnsibleで実行する
 	err = util.ConfigRootVol(spec, spec.OsTempVg, osLogicalVol)
 	if err != nil {
 		slog.Error("", "err", err)
@@ -270,7 +229,6 @@ func CreateVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
 	bus := []string{"0x0a", "0x0b", "0x0c", "0x0d", "0x0e", "0x0f", "0x10", "0x11", "0x12"}
 	for i, disk := range spec.Storage {
 		var dk virt.Disk
-
 		// ボリュームグループが指定されていない時はvg1を指定
 		var vg string = "vg1"
 		if len(disk.VolGrp) > 0 {
@@ -309,9 +267,6 @@ func CreateVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
 
 	// ストレージの更新
 	util.CheckHvVG2(dbUrl, hvNode, spec.OsTempVg)
-
-	//------------------------------------------------------------
-	// XMLへNICインターフェースの追加
 	if len(spec.PrivateIP) > 0 {
 		util.CreateNic("pri", &dom.Devices.Interface)
 	}
@@ -320,8 +275,6 @@ func CreateVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
 		util.CreateNic("pub", &dom.Devices.Interface)
 	}
 
-	//------------------------------------------------------------
-	// 仮想マシン定義のXMLファイルを生成する
 	textXml := virt.CreateVirtXML(dom)
 	xmlfileName := fmt.Sprintf("./%v.xml", dom.Uuid)
 	file, err := os.Create(xmlfileName)
@@ -336,8 +289,6 @@ func CreateVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
 		return err
 	}
 
-	//------------------------------------------------------------
-	// 仮想マシンを起動する
 	url := "qemu:///system"
 	err = virt.CreateStartVM(url, xmlfileName)
 	if err != nil {
@@ -351,9 +302,6 @@ func CreateVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
 		slog.Error("", "err", err)
 		return err
 	}
-
 	// 仮想マシンの状態変更(未実装)
-
-	// 正常終了
 	return nil
 }

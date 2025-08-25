@@ -1,25 +1,21 @@
 package main
 
 import (
-	"fmt"
-	"log/slog"
-
-	//"os"
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/virt"
-	//etcd "go.etcd.io/etcd/client/v3"
 )
 
 // クラスタ停止
 func StartCluster(cnf cf.MarmotConfig, dbUrl string) error {
-	//Conn, err := db.Connect(dbUrl)
 	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
 		slog.Error("", "err", err)
@@ -36,24 +32,19 @@ func StartCluster(cnf cf.MarmotConfig, dbUrl string) error {
 		vm, err := d.GetVmByKey(vmKey)
 		if err != nil {
 			slog.Error("", "err", err)
-			//Conn.Close()
 			return err
 		}
 		err = RemoteStartVM(vm.HvNode, spec)
 		if err != nil {
 			slog.Error("", "err", err)
-			//Conn.Close()
 			return err
 		}
 	}
-	//Conn.Close()
 	return nil
 }
 
 func RemoteStartVM(hvNode string, spec cf.VMSpec) error {
 	byteJSON, _ := json.MarshalIndent(spec, "", "    ")
-	//fmt.Println(string(byteJSON))
-
 	// JSON形式でポストする
 	reqURL := fmt.Sprintf("http://%s:8750/%s", hvNode, "startVm")
 	request, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
@@ -81,9 +72,7 @@ func RemoteStartVM(hvNode string, spec cf.VMSpec) error {
 }
 
 // VMの開始
-// func StartVM(Conn *etcd.Client, spec cf.VMSpec) error {
 func StartVM(dbUrl string, spec cf.VMSpec) error {
-
 	// 仮想マシンの開始
 	url := "qemu:///system"
 	err := virt.StartVM(url, spec.Key)
@@ -103,7 +92,6 @@ func StartVM(dbUrl string, spec cf.VMSpec) error {
 	}
 
 	if vm.Status == db.STOPPED {
-
 		// ハイパーバイザーのリソースの減算と保存
 		hv, err := d.GetHvByKey(vm.HvNode)
 		if err != nil {
@@ -116,7 +104,6 @@ func StartVM(dbUrl string, spec cf.VMSpec) error {
 		if err != nil {
 			slog.Error("", "err", err)
 		}
-
 		// データベースの更新
 		err = d.UpdateVmState(spec.Key, db.RUNNING)
 		if err != nil {
