@@ -18,8 +18,8 @@ const (
 	etcdctl_exe   = "/usr/bin/etcdctl"
 )
 
-//var node *string
-//var etcd *string
+// var node *string
+// var etcd *string
 var ccf *string
 
 //var cnf cf.MarmotConfig
