@@ -1,25 +1,21 @@
 package main
 
 import (
-	"fmt"
-	"log/slog"
-
-	//"os"
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/virt"
-	//etcd "go.etcd.io/etcd/client/v3"
 )
 
 // クラスタ停止
 func StopCluster(cnf cf.MarmotConfig, dbUrl string) error {
-	//Conn, err := db.Connect(dbUrl)
 	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
 		slog.Error("", "err", err)
@@ -44,20 +40,15 @@ func StopCluster(cnf cf.MarmotConfig, dbUrl string) error {
 			}
 		}
 	}
-	//Conn.Close()
 	d.Cli.Close()
-
 	if NotFound {
 		return errors.New("NotExistVM")
 	}
-
 	return nil
 }
 
 func RemoteStopVM(hvNode string, spec cf.VMSpec) error {
 	byteJSON, _ := json.MarshalIndent(spec, "", "    ")
-	//fmt.Println(string(byteJSON))
-
 	// JSON形式でポストする
 	reqURL := fmt.Sprintf("http://%s:8750/%s", hvNode, "stopVm")
 	request, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
@@ -83,18 +74,12 @@ func RemoteStopVM(hvNode string, spec cf.VMSpec) error {
 }
 
 // VMの停止
-// func StopVM(Conn *etcd.Client, spec cf.VMSpec) error {
 func StopVM(dbUrl string, spec cf.VMSpec) error {
-
-	// コンフィグからホスト名を取得
-	//vmkey, _ := db.FindByHostname(Conn, spec.Name)
-
 	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
 	}
-
 	vm, err := d.GetVmByKey(spec.Key)
 	if err != nil {
 		slog.Error("", "err", err)
