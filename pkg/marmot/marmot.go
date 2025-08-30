@@ -147,7 +147,7 @@ func (m *marmot) DestroyVm(c *gin.Context) {
 		slog.Error("setup spec", "err", err)
 		return
 	}
-	err = DestroyVM(m.EtcdUrl, spec, m.NodeName)
+	err = m.destroyVM(spec)
 	if err != nil {
 		slog.Error("delete vm", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})

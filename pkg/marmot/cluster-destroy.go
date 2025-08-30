@@ -72,19 +72,21 @@ func remoteDestroyVM(hvNode string, spec cf.VMSpec) error {
 }
 
 // VMの削除
-func DestroyVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
-	d, err := db.NewDatabase(dbUrl)
-	if err != nil {
-		slog.Error("get list virtual machines", "err", err)
-		return err
-	}
-	vm, err := d.GetVmByKey(spec.Key)
+//func (m *marmot) destroyVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
+func (m *marmot) destroyVM(spec cf.VMSpec) error {
+	//d, err := db.NewDatabase(dbUrl)
+	//if err != nil {
+	//	slog.Error("get list virtual machines", "err", err)
+	//	return err
+	//}
+
+	vm, err := m.Db.GetVmByKey(spec.Key)
 	if err != nil {
 		slog.Error("", "err", err)
 	}
 
 	// ハイパーバイザーのリソース削減保存のため値を取得
-	hv, err := d.GetHvByKey(vm.HvNode)
+	hv, err := m.Db.GetHvByKey(vm.HvNode)
 	if err != nil {
 		slog.Error("", "err", err)
 	}
@@ -93,14 +95,14 @@ func DestroyVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
 	if vm.Status != db.STOPPED || vm.Status == db.ERROR {
 		hv.FreeCpu = hv.FreeCpu + vm.Cpu
 		hv.FreeMemory = hv.FreeMemory + vm.Memory
-		err = d.PutDataEtcd(hv.Key, hv)
+		err = m.Db.PutDataEtcd(hv.Key, hv)
 		if err != nil {
 			slog.Error("", "err", err)
 		}
 	}
 
 	// データベースから削除
-	err = d.DelByKey(spec.Key)
+	err = m.Db.DelByKey(spec.Key)
 	if err != nil {
 		slog.Error("", "err", err)
 	}
@@ -118,7 +120,7 @@ func DestroyVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
 		slog.Error("", "err", err)
 	}
 	// ストレージの更新
-	util.CheckHvVG2(dbUrl, hvNode, vm.OsVg)
+	util.CheckHvVG2(m.EtcdUrl, m.NodeName, vm.OsVg)
 
 	// データLVを削除
 	for _, dd := range vm.Storage {
@@ -127,7 +129,7 @@ func DestroyVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
 			slog.Error("", "err", err)
 		}
 		// ストレージの更新
-		util.CheckHvVG2(dbUrl, hvNode, dd.Vg)
+		util.CheckHvVG2(m.EtcdUrl, m.NodeName, dd.Vg)
 	}
 
 	return nil

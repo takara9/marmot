@@ -19,7 +19,6 @@ import (
 // コンフィグからVMクラスタを作成する
 func (m *marmot) createCluster(cnf cf.MarmotConfig) error {
 	var err error
-
 	// リクエスト送信前にコンフィグのチェックを実施する
 	for _, spec := range cnf.VMSpec {
 		// クラスタ名とホスト名の重複チェック
@@ -120,7 +119,7 @@ func (m *marmot) createCluster(cnf cf.MarmotConfig) error {
 		fmt.Println("リモートとローカル関係なしに、マイクロサービスへリクエストする")
 		// リモートとローカル関係なしに、マイクロサービスへリクエストする
 		m.Db.UpdateVmState(vm.Key, db.PROVISIONING)
-		err = RemoteCreateStartVM(vm.HvNode, spec)
+		err = remoteCreateStartVM(vm.HvNode, spec)
 		if err != nil {
 			slog.Error("", "remote request err", err)
 			break_err = true
@@ -141,7 +140,7 @@ func (m *marmot) createCluster(cnf cf.MarmotConfig) error {
 }
 
 // リモートホストにリクエストを送信する
-func RemoteCreateStartVM(hvNode string, spec cf.VMSpec) error {
+func remoteCreateStartVM(hvNode string, spec cf.VMSpec) error {
 	byteJSON, _ := json.MarshalIndent(spec, "", "    ")
 	// JSON形式でポストする
 	reqURL := fmt.Sprintf("http://%s:8750/%s", hvNode, "createVm")
