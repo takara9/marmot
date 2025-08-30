@@ -133,3 +133,8 @@ jobs:
         cd pkg/marmot
         sudo -s make test
         cd ../..
+    - name: Test cmd/marmotd
+      run: | 
+        cd cmd/marmotd
+        sudo -s make test
+        cd ../..

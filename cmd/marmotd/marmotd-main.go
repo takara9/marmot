@@ -1,0 +1,90 @@
+package main
+
+import (
+	"fmt"
+
+	"github.com/labstack/echo/v4"
+	"github.com/takara9/marmot/api"
+)
+
+var EtcdEndpoint string = "http://localhost:12379"
+var NodeName string = "hvc"
+
+type Server struct{}
+
+func main() {
+	e := echo.New()
+	server := Server{}
+	api.RegisterHandlersWithBaseURL(e, server, "/api/v1")
+	// And we serve HTTP until the world ends.
+	fmt.Println(e.Start("0.0.0.0:8080"))
+}
+
+func (s Server) ReplyPing(ctx echo.Context) error {
+	//return ctx.JSON(200, api.ReplyMessage{Message: "ok"})
+	return ctx.JSON(200, nil)
+}
+
+func (s Server) GetVersion(ctx echo.Context) error {
+	return ctx.JSON(200, api.Version{Version: "0.0.1"})
+}
+
+func (s Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsParams) error {
+	return ctx.JSON(200, nil)
+}
+
+func (s Server) ListVirtualMachines(ctx echo.Context) error {
+	return ctx.JSON(200, nil)
+}
+
+func (s Server) CreateCluster(ctx echo.Context) error {
+	return ctx.JSON(201, nil)
+}
+
+func (s Server) DestroyCluster(ctx echo.Context) error {
+	return ctx.JSON(200, "")
+}
+
+func (s Server) CreateVirtualMachine(ctx echo.Context) error {
+	return ctx.JSON(201, "")
+}
+
+func (s Server) DestroyVirtualMachine(ctx echo.Context) error {
+	return ctx.JSON(201, "")
+}
+
+func (s Server) StopCluster(ctx echo.Context) error {
+	return ctx.JSON(200, "")
+}
+
+func (s Server) StopVirtualMachine(ctx echo.Context) error {
+	return ctx.JSON(200, "")
+}
+
+func (s Server) StartCluster(ctx echo.Context) error {
+	return ctx.JSON(200, "")
+}
+
+func (s Server) StartVirtualMachine(ctx echo.Context) error {
+	return ctx.JSON(200, "")
+}
+
+func (s Server) ShowHypervisorById(ctx echo.Context, hypervisorId string) error {
+	return ctx.JSON(200, nil)
+}
+
+func (s Server) CreateVmCluster(ctx echo.Context) error {
+	return ctx.JSON(200, nil)
+}
+
+func (s Server) DeleteVmCluster(ctx echo.Context) error {
+	return ctx.JSON(200, nil)
+}
+
+func (s Server) ListVmClusters(ctx echo.Context) error {
+	return ctx.JSON(200, nil)
+}
+
+func (s Server) UpdateVmCluster(ctx echo.Context) error {
+	return ctx.JSON(200, nil)
+}
