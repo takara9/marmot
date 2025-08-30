@@ -1,4 +1,4 @@
-package main
+package marmot
 
 import (
 	"bytes"
@@ -135,19 +135,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		fmt.Println("実行中へ")
 		d.UpdateVmState(vm.Key, db.RUNNING) // 実行中へ
 
-		// CoreDNS登録
 		fmt.Println("DNS登録をスキップ")
-		/*
-			err = dns.Add(dns.DnsRecord{
-				Hostname: fmt.Sprintf("%s.%s.%s", vm.Name, vm.ClusterName, "a.labo.local"),
-				Ipv4:     vm.PrivateIp,
-				Ttl:      60,
-			}, "http://ns1.labo.local:2379")
-			if err != nil {
-				slog.Error("", "err", err)dns.Add()", err)
-			}
-		*/
-
 	} // END OF LOOP
 
 	if break_err {

@@ -9,6 +9,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	cf "github.com/takara9/marmot/pkg/config"
+	"github.com/takara9/marmot/pkg/marmot"
 	ut "github.com/takara9/marmot/pkg/util"
 )
 
@@ -129,7 +130,7 @@ var _ = Describe("Util", func() {
 		})
 
 		It("Create Cluster()", func() {
-			err := CreateCluster(cnf, *etcd, *node)
+			err := marmot.CreateCluster(cnf, *etcd, *node)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -141,7 +142,7 @@ var _ = Describe("Util", func() {
 		})
 
 		It("Destroy Cluster()", func() {
-			err := DestroyCluster(cnf, *etcd)
+			err := marmot.DestroyCluster(cnf, *etcd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
@@ -156,22 +157,22 @@ var _ = Describe("Util", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 		It("Create Cluster()", func() {
-			err := CreateCluster(cnf, *etcd, *node)
+			err := marmot.CreateCluster(cnf, *etcd, *node)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Stop Cluster", func() {
-			err := StopCluster(cnf, *etcd)
+			err := marmot.StopCluster(cnf, *etcd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Start Cluster", func() {
-			err := StartCluster(cnf, *etcd)
+			err := marmot.StartCluster(cnf, *etcd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Destroy Cluster()", func() {
-			err := DestroyCluster(cnf, *etcd)
+			err := marmot.DestroyCluster(cnf, *etcd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
@@ -186,22 +187,22 @@ var _ = Describe("Util", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 		It("クラスターの起動", func() {
-			err := CreateCluster(cnf, *etcd, *node)
+			err := marmot.CreateCluster(cnf, *etcd, *node)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("クラスターの２重起動 エラー発生が発生", func() {
-			err := CreateCluster(cnf, *etcd, *node)
+			err := marmot.CreateCluster(cnf, *etcd, *node)
 			Expect(err).To(HaveOccurred())
 		})
 
 		It("Start Cluster", func() {
-			err := StartCluster(cnf, *etcd)
+			err := marmot.StartCluster(cnf, *etcd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Destroy Cluster()", func() {
-			err := DestroyCluster(cnf, *etcd)
+			err := marmot.DestroyCluster(cnf, *etcd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})

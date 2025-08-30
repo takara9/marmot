@@ -1,4 +1,4 @@
-package main
+package marmot
 
 import (
 	"bytes"
@@ -15,38 +15,42 @@ import (
 )
 
 // クラスタ停止
-func StartCluster(cnf cf.MarmotConfig, dbUrl string) error {
+func StopCluster(cnf cf.MarmotConfig, dbUrl string) error {
 	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
 	}
 
+	var NotFound bool = true
 	for _, spec := range cnf.VMSpec {
-
 		vmKey, _ := d.FindByHostAndClusteName(spec.Name, cnf.ClusterName)
-		if len(vmKey) == 0 {
-			return errors.New("NotExistVM")
+		if len(vmKey) > 0 {
+			NotFound = false
+			spec.Key = vmKey
+			vm, err := d.GetVmByKey(vmKey)
+			if err != nil {
+				slog.Error("", "err", err)
+				continue
+			}
+			err = RemoteStopVM(vm.HvNode, spec)
+			if err != nil {
+				slog.Error("", "err", err)
+				continue
+			}
 		}
-		spec.Key = vmKey
-		vm, err := d.GetVmByKey(vmKey)
-		if err != nil {
-			slog.Error("", "err", err)
-			return err
-		}
-		err = RemoteStartVM(vm.HvNode, spec)
-		if err != nil {
-			slog.Error("", "err", err)
-			return err
-		}
+	}
+	d.Cli.Close()
+	if NotFound {
+		return errors.New("NotExistVM")
 	}
 	return nil
 }
 
-func RemoteStartVM(hvNode string, spec cf.VMSpec) error {
+func RemoteStopVM(hvNode string, spec cf.VMSpec) error {
 	byteJSON, _ := json.MarshalIndent(spec, "", "    ")
 	// JSON形式でポストする
-	reqURL := fmt.Sprintf("http://%s:8750/%s", hvNode, "startVm")
+	reqURL := fmt.Sprintf("http://%s:8750/%s", hvNode, "stopVm")
 	request, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
 	if err != nil {
 		slog.Error("", "err", err)
@@ -62,8 +66,6 @@ func RemoteStartVM(hvNode string, spec cf.VMSpec) error {
 		return err
 	}
 	defer response.Body.Close()
-
-	// レスポンスを取得する
 	body, _ := io.ReadAll(response.Body)
 	if response.StatusCode != 200 {
 		return errors.New(string(body))
@@ -71,41 +73,39 @@ func RemoteStartVM(hvNode string, spec cf.VMSpec) error {
 	return nil
 }
 
-// VMの開始
-func StartVM(dbUrl string, spec cf.VMSpec) error {
-	// 仮想マシンの開始
-	url := "qemu:///system"
-	err := virt.StartVM(url, spec.Key)
-	if err != nil {
-		slog.Error("", "err", err)
-	}
-
+// VMの停止
+func StopVM(dbUrl string, spec cf.VMSpec) error {
 	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
 	}
-
 	vm, err := d.GetVmByKey(spec.Key)
 	if err != nil {
 		slog.Error("", "err", err)
+		return nil
 	}
 
-	if vm.Status == db.STOPPED {
-		// ハイパーバイザーのリソースの減算と保存
+	if vm.Status == db.RUNNING {
+		// 仮想マシンの停止＆削除
+		url := "qemu:///system"
+		err = virt.StopVM(url, spec.Key)
+		if err != nil {
+			slog.Error("", "err", err)
+		}
+		// ハイパーバイザーのリソース削減保存
 		hv, err := d.GetHvByKey(vm.HvNode)
 		if err != nil {
 			slog.Error("", "err", err)
 		}
-		hv.FreeCpu = hv.FreeCpu - vm.Cpu
-		hv.FreeMemory = hv.FreeMemory - vm.Memory
-
+		hv.FreeCpu = hv.FreeCpu + vm.Cpu
+		hv.FreeMemory = hv.FreeMemory + vm.Memory
 		err = d.PutDataEtcd(hv.Key, hv)
 		if err != nil {
 			slog.Error("", "err", err)
 		}
 		// データベースの更新
-		err = d.UpdateVmState(spec.Key, db.RUNNING)
+		err = d.UpdateVmState(spec.Key, db.STOPPED) ////////
 		if err != nil {
 			slog.Error("", "err", err)
 		}
