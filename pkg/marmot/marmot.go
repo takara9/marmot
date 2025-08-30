@@ -97,7 +97,7 @@ func (m *marmot) CreateCluster(c *gin.Context) {
 		slog.Error("check hypervisor status", "err", err)
 		return
 	}
-	if err := CreateCluster(cnf, m.EtcdUrl, m.NodeName); err != nil {
+	if err := m.createCluster(cnf); err != nil {
 		slog.Error("create cluster", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
@@ -112,7 +112,7 @@ func (m *marmot) DestroyCluster(c *gin.Context) {
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
-	if err := DestroyCluster(cnf, m.EtcdUrl); err != nil {
+	if err := m.destroyCluster(cnf); err != nil {
 		slog.Error("delete cluster", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
@@ -129,7 +129,7 @@ func (m *marmot) CreateVm(c *gin.Context) {
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
-	err = CreateVM(m.EtcdUrl, spec, m.NodeName)
+	err = m.createVM(spec)
 	if err != nil {
 		slog.Error("creating vm", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
@@ -165,7 +165,7 @@ func (m *marmot) StopCluster(c *gin.Context) {
 		c.JSON(400, gin.H{"msg": "Can't read JSON"})
 		return
 	}
-	if err := StopCluster(cnf, m.EtcdUrl); err != nil {
+	if err := m.stopCluster(cnf); err != nil {
 		slog.Error("stop cluster", "err", err)
 		return
 	}
@@ -181,7 +181,7 @@ func (m *marmot) StartCluster(c *gin.Context) {
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
-	if err := StartCluster(cnf, m.EtcdUrl); err != nil {
+	if err := m.startCluster(cnf); err != nil {
 		slog.Error("start cluster", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return

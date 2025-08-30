@@ -15,20 +15,14 @@ import (
 )
 
 // クラスタ停止
-func StopCluster(cnf cf.MarmotConfig, dbUrl string) error {
-	d, err := db.NewDatabase(dbUrl)
-	if err != nil {
-		slog.Error("", "err", err)
-		return err
-	}
-
+func (m *marmot) stopCluster(cnf cf.MarmotConfig) error {
 	var NotFound bool = true
 	for _, spec := range cnf.VMSpec {
-		vmKey, _ := d.FindByHostAndClusteName(spec.Name, cnf.ClusterName)
+		vmKey, _ := m.Db.FindByHostAndClusteName(spec.Name, cnf.ClusterName)
 		if len(vmKey) > 0 {
 			NotFound = false
 			spec.Key = vmKey
-			vm, err := d.GetVmByKey(vmKey)
+			vm, err := m.Db.GetVmByKey(vmKey)
 			if err != nil {
 				slog.Error("", "err", err)
 				continue
@@ -40,7 +34,6 @@ func StopCluster(cnf cf.MarmotConfig, dbUrl string) error {
 			}
 		}
 	}
-	d.Cli.Close()
 	if NotFound {
 		return errors.New("NotExistVM")
 	}

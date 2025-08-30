@@ -17,28 +17,21 @@ import (
 )
 
 // クラスタ削除
-func DestroyCluster(cnf cf.MarmotConfig, dbUrl string) error {
-	fmt.Println("DEBUG Print in DestroyCluster dburl", dbUrl)
-	d, err := db.NewDatabase(dbUrl)
-	if err != nil {
-		slog.Error("", "err", err)
-		return err
-	}
-
+func (m *marmot) destroyCluster(cnf cf.MarmotConfig) error {
 	var NotFound bool = true
 	for _, spec := range cnf.VMSpec {
 		// クラスタ名とホスト名の重複チェック
-		vmKey, _ := d.FindByHostAndClusteName(spec.Name, cnf.ClusterName)
+		vmKey, _ := m.Db.FindByHostAndClusteName(spec.Name, cnf.ClusterName)
 		fmt.Println("DEBUG Print in DestroyCluster vmKey, specName", vmKey, spec.Name)
 		if len(vmKey) > 0 {
 			NotFound = false
 			spec.Key = vmKey
-			vm, err := d.GetVmByKey(vmKey)
+			vm, err := m.Db.GetVmByKey(vmKey)
 			if err != nil {
 				slog.Error("", "err", err)
 				continue
 			}
-			err = RemoteDestroyVM(vm.HvNode, spec)
+			err = remoteDestroyVM(vm.HvNode, spec)
 			if err != nil {
 				slog.Error("", "err", err)
 				continue
@@ -52,7 +45,7 @@ func DestroyCluster(cnf cf.MarmotConfig, dbUrl string) error {
 }
 
 // リモートとローカルHV上のVMを削除する
-func RemoteDestroyVM(hvNode string, spec cf.VMSpec) error {
+func remoteDestroyVM(hvNode string, spec cf.VMSpec) error {
 	byteJSON, _ := json.MarshalIndent(spec, "", "    ")
 	fmt.Println(string(byteJSON))
 	// JSON形式でポストする

@@ -1,4 +1,4 @@
-package main
+package marmot
 
 import (
 	"fmt"
@@ -9,7 +9,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	cf "github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/marmot"
 	ut "github.com/takara9/marmot/pkg/util"
 )
 
@@ -72,12 +71,11 @@ var _ = AfterSuite(func() {
 
 })
 
-var _ = Describe("Util", func() {
+var _ = Describe("Marmot", func() {
 	Context("Data management", func() {
 		It("Set Hypervisor Config file", func() {
 			cmd := exec.Command(hvadmin_exe, "-config", "testdata/hypervisor-config-hvc.yaml")
 			err := cmd.Run()
-
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -122,6 +120,14 @@ var _ = Describe("Util", func() {
 
 	Context("VMクラスタの生成と削除", func() {
 		var cnf cf.MarmotConfig
+		var m *marmot
+
+		It("Create Marmot Instance", func() {
+			var err error
+			m, err = NewMarmot(*node, *etcd)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
 		It("Load Config", func() {
 			fn := "testdata/cluster-config.yaml"
 			ccf = &fn
@@ -130,7 +136,7 @@ var _ = Describe("Util", func() {
 		})
 
 		It("Create Cluster()", func() {
-			err := marmot.CreateCluster(cnf, *etcd, *node)
+			err := m.createCluster(cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -142,13 +148,20 @@ var _ = Describe("Util", func() {
 		})
 
 		It("Destroy Cluster()", func() {
-			err := marmot.DestroyCluster(cnf, *etcd)
+			err := m.destroyCluster(cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 
 	Context("VMクラスタの生成と一時停止と再開", func() {
 		var cnf cf.MarmotConfig
+		var m *marmot
+
+		It("Create Marmot Instance", func() {
+			var err error
+			m, err = NewMarmot(*node, *etcd)
+			Expect(err).NotTo(HaveOccurred())
+		})
 
 		It("Load Config", func() {
 			fn := "testdata/cluster-config.yaml"
@@ -156,29 +169,37 @@ var _ = Describe("Util", func() {
 			err := cf.ReadConfig(*ccf, &cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
+
 		It("Create Cluster()", func() {
-			err := marmot.CreateCluster(cnf, *etcd, *node)
+			err := m.createCluster(cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Stop Cluster", func() {
-			err := marmot.StopCluster(cnf, *etcd)
+			err := m.stopCluster(cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Start Cluster", func() {
-			err := marmot.StartCluster(cnf, *etcd)
+			err := m.startCluster(cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Destroy Cluster()", func() {
-			err := marmot.DestroyCluster(cnf, *etcd)
+			err := m.destroyCluster(cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 
 	Context("VMクラスタの２重起動の防止", func() {
 		var cnf cf.MarmotConfig
+		var m *marmot
+
+		It("Create Marmot Instance", func() {
+			var err error
+			m, err = NewMarmot(*node, *etcd)
+			Expect(err).NotTo(HaveOccurred())
+		})
 
 		It("Load Config", func() {
 			fn := "testdata/cluster-config.yaml"
@@ -187,22 +208,22 @@ var _ = Describe("Util", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 		It("クラスターの起動", func() {
-			err := marmot.CreateCluster(cnf, *etcd, *node)
+			err := m.createCluster(cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("クラスターの２重起動 エラー発生が発生", func() {
-			err := marmot.CreateCluster(cnf, *etcd, *node)
+			err := m.createCluster(cnf)
 			Expect(err).To(HaveOccurred())
 		})
 
 		It("Start Cluster", func() {
-			err := marmot.StartCluster(cnf, *etcd)
+			err := m.startCluster(cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Destroy Cluster()", func() {
-			err := marmot.DestroyCluster(cnf, *etcd)
+			err := m.destroyCluster(cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})

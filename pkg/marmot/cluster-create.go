@@ -17,23 +17,19 @@ import (
 )
 
 // コンフィグからVMクラスタを作成する
-func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
-	d, err := db.NewDatabase(dbUrl)
-	if err != nil {
-		slog.Error("", "err", err)
-		return err
-	}
+func (m *marmot) createCluster(cnf cf.MarmotConfig) error {
+	var err error
 
 	// リクエスト送信前にコンフィグのチェックを実施する
 	for _, spec := range cnf.VMSpec {
 		// クラスタ名とホスト名の重複チェック
-		vmKey, _ := d.FindByHostAndClusteName(spec.Name, cnf.ClusterName)
+		vmKey, _ := m.Db.FindByHostAndClusteName(spec.Name, cnf.ClusterName)
 		if len(vmKey) > 0 {
 			return fmt.Errorf("existing same name virttual machine : %v", spec.Name)
 		}
 		// ここに、IPアドレスの重複チェックを入れる
 		if len(spec.PublicIP) > 0 {
-			found, err := d.FindByPublicIPaddress(spec.PublicIP)
+			found, err := m.Db.FindByPublicIPaddress(spec.PublicIP)
 			if err != nil {
 				return err
 			}
@@ -42,7 +38,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 			}
 		}
 		if len(spec.PrivateIP) > 0 {
-			found, err := d.FindByPrivateIPaddress(spec.PrivateIP)
+			found, err := m.Db.FindByPrivateIPaddress(spec.PrivateIP)
 			if err != nil {
 				return err
 			}
@@ -58,7 +54,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 	for _, spec := range cnf.VMSpec {
 		fmt.Println("ホスト名とクラスタ名でVMキーを取得する")
 		// ホスト名とクラスタ名でVMキーを取得する
-		vmKey, _ := d.FindByHostAndClusteName(spec.Name, cnf.ClusterName)
+		vmKey, _ := m.Db.FindByHostAndClusteName(spec.Name, cnf.ClusterName)
 		if len(vmKey) > 0 {
 			continue
 		}
@@ -85,7 +81,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 
 		//スケジュールを実行
 		fmt.Println("スケジュールを実行")
-		vm.HvNode, vm.Key, vm.Uuid, err = d.AssignHvforVm(vm)
+		vm.HvNode, vm.Key, vm.Uuid, err = m.Db.AssignHvforVm(vm)
 		if err != nil {
 			slog.Error("", "err", err)
 			break_err = true
@@ -96,7 +92,7 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 		// OSのバージョン、テンプレートを設定
 		fmt.Println("OSのバージョン、テンプレートを設定")
 		spec.VMOsVariant = cnf.VMOsVariant
-		spec.OsTempVg, spec.OsTempLv, err = d.GetOsImgTempByKey(cnf.VMOsVariant)
+		spec.OsTempVg, spec.OsTempLv, err = m.Db.GetOsImgTempByKey(cnf.VMOsVariant)
 		if err != nil {
 			slog.Error("", "err", err)
 			break_err = true
@@ -123,17 +119,17 @@ func CreateCluster(cnf cf.MarmotConfig, dbUrl string, hvNode string) error {
 
 		fmt.Println("リモートとローカル関係なしに、マイクロサービスへリクエストする")
 		// リモートとローカル関係なしに、マイクロサービスへリクエストする
-		d.UpdateVmState(vm.Key, db.PROVISIONING)
+		m.Db.UpdateVmState(vm.Key, db.PROVISIONING)
 		err = RemoteCreateStartVM(vm.HvNode, spec)
 		if err != nil {
 			slog.Error("", "remote request err", err)
 			break_err = true
 			return_errors = err
-			d.UpdateVmState(vm.Key, db.ERROR) // エラー状態へ
+			m.Db.UpdateVmState(vm.Key, db.ERROR) // エラー状態へ
 			break
 		}
 		fmt.Println("実行中へ")
-		d.UpdateVmState(vm.Key, db.RUNNING) // 実行中へ
+		m.Db.UpdateVmState(vm.Key, db.RUNNING) // 実行中へ
 
 		fmt.Println("DNS登録をスキップ")
 	} // END OF LOOP
@@ -173,12 +169,8 @@ func RemoteCreateStartVM(hvNode string, spec cf.VMSpec) error {
 }
 
 // VMを生成する
-func CreateVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
-	d, err := db.NewDatabase(dbUrl)
-	if err != nil {
-		slog.Error("", "err", err)
-		return err
-	}
+func (m *marmot) createVM(spec cf.VMSpec) error {
+	var err error
 	var dom virt.Domain
 	err = virt.ReadXml("temp.xml", &dom)
 	if err != nil {
@@ -193,14 +185,14 @@ func CreateVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
 	dom.Memory.Value = mem
 	dom.CurrentMemory.Value = mem
 
-	osLogicalVol, err := util.CreateOsLv(dbUrl, spec.OsTempVg, spec.OsTempLv)
+	osLogicalVol, err := util.CreateOsLv(m.EtcdUrl, spec.OsTempVg, spec.OsTempLv)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
 	}
 
 	dom.Devices.Disk[0].Source.Dev = fmt.Sprintf("/dev/%s/%s", spec.OsTempVg, osLogicalVol)
-	err = d.UpdateOsLv(spec.Key, spec.OsTempVg, osLogicalVol)
+	err = m.Db.UpdateOsLv(spec.Key, spec.OsTempVg, osLogicalVol)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
@@ -222,7 +214,7 @@ func CreateVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
 		if len(disk.VolGrp) > 0 {
 			vg = disk.VolGrp
 		}
-		dlv, err := util.CreateDataLv(dbUrl, uint64(disk.Size), vg)
+		dlv, err := util.CreateDataLv(m.EtcdUrl, uint64(disk.Size), vg)
 		if err != nil {
 			slog.Error("", "err", err)
 			return err
@@ -245,7 +237,7 @@ func CreateVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
 		// 配列に追加
 		dom.Devices.Disk = append(dom.Devices.Disk, dk)
 		// etcdデータベースにlvを登録
-		err = d.UpdateDataLv(spec.Key, i, disk.VolGrp, dlv)
+		err = m.Db.UpdateDataLv(spec.Key, i, disk.VolGrp, dlv)
 		if err != nil {
 			slog.Error("", "err", err)
 			return err
@@ -254,7 +246,7 @@ func CreateVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
 	}
 
 	// ストレージの更新
-	util.CheckHvVG2(dbUrl, hvNode, spec.OsTempVg)
+	util.CheckHvVG2(m.EtcdUrl, m.NodeName, spec.OsTempVg)
 	if len(spec.PrivateIP) > 0 {
 		util.CreateNic("pri", &dom.Devices.Interface)
 	}
