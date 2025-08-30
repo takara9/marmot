@@ -1,0 +1,83 @@
+package marmot
+
+import (
+	"log/slog"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+
+	db "github.com/takara9/marmot/pkg/db"
+	ut "github.com/takara9/marmot/pkg/util"
+)
+
+// main から　Marmot を分離する？
+type marmot struct {
+	NodeName string
+	EtcdUrl  string
+	Db       *db.Database
+}
+
+func NewMarmot(nodeName string, etcdUrl string) (*marmot, error) {
+	var m marmot
+	var err error
+	m.Db, err = db.NewDatabase(etcdUrl)
+	if err != nil {
+		return nil, err
+	}
+	m.NodeName = nodeName
+	m.EtcdUrl = etcdUrl
+	return &m, nil
+}
+
+// コールバック アクセステスト用
+func (m *marmot) AccessTest(c *gin.Context) {
+	// チェック機能を追加して、最終的にOK/NGを返す
+	c.JSON(200, gin.H{"message": "ok"})
+}
+
+// コールバック ハイパーバイザーの状態取得
+func (m *marmot) ListHypervisor(c *gin.Context) {
+	// ハイパーバイザーの稼働チェック　結果はDBへ反映
+	_, err := ut.CheckHypervisors(m.EtcdUrl, m.NodeName)
+	if err != nil {
+		slog.Error("Check if the hypervisor is up and running", "err", err)
+		return
+	}
+
+	// ストレージ容量の更新 結果はDBへ反映
+	err = ut.CheckHvVgAll(m.EtcdUrl, m.NodeName)
+	if err != nil {
+		slog.Error("Update storage capacity", "err", err)
+		return
+	}
+
+	// データベースから情報を取得
+	d, err := db.NewDatabase(m.EtcdUrl)
+	if err != nil {
+		slog.Error("connect to database", "err", err)
+		return
+	}
+	var hvs []db.Hypervisor
+	err = d.GetHvsStatus(&hvs)
+	if err != nil {
+		slog.Error("get hypervisor status", "err", err)
+		return
+	}
+	c.IndentedJSON(http.StatusOK, hvs)
+}
+
+// コールバック 仮想マシンのリスト
+func (m *marmot) ListVirtualMachines(c *gin.Context) {
+	d, err := db.NewDatabase(m.EtcdUrl)
+	if err != nil {
+		slog.Error("get list virtual machines", "err", err)
+		return
+	}
+	var vms []db.VirtualMachine
+	err = d.GetVmsStatus(&vms)
+	if err != nil {
+		slog.Error("get status of virtual machines", "err", err)
+		return
+	}
+	c.IndentedJSON(http.StatusOK, vms)
+}

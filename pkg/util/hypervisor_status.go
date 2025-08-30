@@ -15,19 +15,15 @@ import (
 	"log/slog"
 	"net/http"
 
-	//"strings"
 	"io"
 	"time"
 
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/lvm"
-	//etcd "go.etcd.io/etcd/client/v3"
 )
 
 // ハイパーバイザーのリストを取り出す
 func getHypervisors(dbUrl string) ([]db.Hypervisor, error) {
-
-	//Conn, err := db.Connect(dbUrl)
 	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
 		slog.Error("", "err", err)
@@ -35,7 +31,6 @@ func getHypervisors(dbUrl string) ([]db.Hypervisor, error) {
 	}
 	// クローズが無い？
 
-	// ハイパーバイザーのリストを取り出す
 	resp, err := d.GetEtcdByPrefix("hv")
 	if err != nil {
 		slog.Error("", "err", err)
@@ -56,7 +51,7 @@ func getHypervisors(dbUrl string) ([]db.Hypervisor, error) {
 
 // ハイパーバイザーをREST-APIでアクセスして疎通を確認、DBへ反映させる
 func CheckHypervisors(dbUrl string, node string) ([]db.Hypervisor, error) {
-	//Conn, err := db.Connect(dbUrl)
+//func CheckHypervisors(m marmot) ([]db.Hypervisor, error) {
 	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
 		slog.Error("", "err", err)
@@ -72,25 +67,6 @@ func CheckHypervisors(dbUrl string, node string) ([]db.Hypervisor, error) {
 
 	// 自ノードを含むハイパーバイザーの死活チェック、DBへ反映
 	for _, val := range hvs {
-
-		// ping を変更してデータを収集も可能
-		/*
-			_, body, err := ReqGetQuick("ping", fmt.Sprintf("http://%s:8750",val.IpAddr))
-			if err != nil {
-				slog.Error("", "err", err)Communication failed", err, string(body))
-				val.Status = 0
-			} else {
-				dec := json.NewDecoder(strings.NewReader(string(body)))
-				var msg message
-				dec.Decode(&msg)
-				if msg.Message == "ok" {
-					val.Status = 2 // 正常稼働中
-				} else {
-					val.Status = 1 // 異常発生中
-				}
-			}
-		*/
-
 		// ハイパーバイザーの状態をDBへ書き込み
 		err = d.PutDataEtcd(val.Key, val)
 		if err != nil {
@@ -100,14 +76,8 @@ func CheckHypervisors(dbUrl string, node string) ([]db.Hypervisor, error) {
 	return hvs, nil
 }
 
-// ping の結果を受け取るための構造体、暫定的に配置
-//type message struct {
-//	Message string
-//}
-
 // 短いタイムアウトで、死活監視用
 func ReqGetQuick(apipath string, api string) (*http.Response, []byte, error) {
-
 	// タイムアウト設定
 	client := http.Client{
 		Timeout: 2 * time.Second,
@@ -115,11 +85,6 @@ func ReqGetQuick(apipath string, api string) (*http.Response, []byte, error) {
 	// HTTP GET
 	xxx := fmt.Sprintf("%s/%s", api, apipath)
 	fmt.Println("xxxxxxxxxxxxxxxxxxxx = ", xxx)
-
-	//res, err := client.Get(fmt.Sprintf("%s/%s", api, apipath))
-	//if err != nil {
-	//	return nil, nil, err
-	//}
 
 	res, err := client.Get(fmt.Sprintf("%s/%s", api, apipath))
 	if err != nil {
@@ -136,7 +101,6 @@ func ReqGetQuick(apipath string, api string) (*http.Response, []byte, error) {
 }
 
 func CheckHvVgAll(dbUrl string, node string) error {
-	//Conn, err := db.Connect(dbUrl)
 	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
 		slog.Error("", "err", err)
@@ -167,32 +131,20 @@ func CheckHvVgAll(dbUrl string, node string) error {
 		return err
 	}
 	return nil
-
 }
 
 // ボリュームグループの容量を取得して、DBへセットする
 func CheckHvVG(dbUrl string, node string, vg string) error {
-
-	// DBへのアクセス
-	//Conn, err := db.Connect(dbUrl)
-	//d, err := db.NewDatabase(dbUrl)
-	//if err != nil {
-	//	slog.Error("", "err", err)
-	//	return err
-	//}
-
 	err := CheckHvVG2(dbUrl, node, vg)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
 	}
-
 	return nil
 }
 
 // ボリュームグループの容量を取得して、DBへセットする
 func CheckHvVG2(dbUrl string, node string, vg string) error {
-
 	// LVMへのアクセス
 	total_sz, free_sz, err := lvm.CheckVG(vg)
 	if err != nil {
@@ -205,7 +157,7 @@ func CheckHvVG2(dbUrl string, node string, vg string) error {
 		slog.Error("", "err", err)
 		return err
 	}
-	// キーを取得
+
 	hv, err := d.GetHvByKey(node)
 	if err != nil {
 		slog.Error("", "err", err)
@@ -220,22 +172,11 @@ func CheckHvVG2(dbUrl string, node string, vg string) error {
 		}
 
 	}
-
-	/* 注意 この書き方では、データがセットされない
-	for _,v := range hv.StgPool {
-		if v.VolGroup == vg {
-			v.FreeCap = free_sz/1024/1024/1024
-			v.VgCap   = total_sz/1024/1024/1024
-		}
-	}
-	*/
-
 	// DBへ書き込み
 	err = d.PutDataEtcd(hv.Key, hv)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
 	}
-
 	return nil
 }
