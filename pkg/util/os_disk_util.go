@@ -20,10 +20,10 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/takara9/marmot/api"
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/lvm"
-	//etcd "go.etcd.io/etcd/client/v3"
 )
 
 // LVのパーティションをマップ
@@ -69,7 +69,8 @@ func UnMountLocal(uuid string) error {
 }
 
 // OSテンプVolのスナップショットを作成してデバイス名を返す
-// 　　サイズとテンプレートの選択が無い！？　　将来改良
+//
+//	サイズとテンプレートの選択が無い！？ 将来改良
 func CreateOsLv(dbUrl string, tempVg string, tempLv string) (string, error) {
 	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
@@ -91,7 +92,6 @@ func CreateOsLv(dbUrl string, tempVg string, tempLv string) (string, error) {
 }
 
 // データボリュームの作成
-// func CreateDataLv(conn *etcd.Client, sz uint64, vg string) (string, error) {
 func CreateDataLv(dbUrl string, sz uint64, vg string) (string, error) {
 	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
@@ -151,6 +151,57 @@ func ConfigRootVol(spec cf.VMSpec, vg string, oslv string) error {
 
 	// 後始末
 	err = UnMountLocal(spec.Uuid)
+	if err != nil {
+		slog.Error("", "err", err)
+		return err
+	}
+
+	err = KpartOff(vg, oslv)
+	if err != nil {
+		slog.Error("", "err", err)
+		return err
+	}
+
+	// 正常終了
+	return nil
+}
+
+func ConfigRootVol2(spec api.VmSpec, vg string, oslv string) error {
+	err := KpartOn(vg, oslv)
+	if err != nil {
+		slog.Error("", "err", err)
+		return err
+	}
+	// マウント
+	vm_root, err := MountLocal(vg, oslv, *spec.Uuid)
+	if err != nil {
+		slog.Error("", "err", err)
+		return err
+	}
+
+	// ホスト名の書き込み
+	err = LinuxSetup_hostname(vm_root, *spec.Name)
+	if err != nil {
+		slog.Error("", "err", err)
+		return err
+	}
+
+	// NetPlanの雛形へ書出す2
+	err = LinuxSetup_createNetplan2(spec, vm_root)
+	if err != nil {
+		slog.Error("", "err", err)
+		return err
+	}
+
+	// hostidの書き出し
+	err = LinuxSetup_hostid2(spec, vm_root)
+	if err != nil {
+		slog.Error("", "err", err)
+		return err
+	}
+
+	// 後始末
+	err = UnMountLocal(*spec.Uuid)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err

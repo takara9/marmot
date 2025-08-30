@@ -16,7 +16,7 @@ import (
 )
 
 // 仮想マシンの停止
-func (m *marmot) StopVm(c *gin.Context) {
+func (m *Marmot) StopVm(c *gin.Context) {
 	slog.Info("stop vm", "etcd", m.EtcdUrl)
 	var spec cf.VMSpec
 	err := c.BindJSON(&spec)
@@ -33,7 +33,7 @@ func (m *marmot) StopVm(c *gin.Context) {
 }
 
 // VMの停止
-func (m *marmot) stopVM(spec cf.VMSpec) error {
+func (m *Marmot) stopVM(spec cf.VMSpec) error {
 	vm, err := m.Db.GetVmByKey(spec.Key)
 	if err != nil {
 		slog.Error("", "err", err)
@@ -66,7 +66,6 @@ func (m *marmot) stopVM(spec cf.VMSpec) error {
 	}
 	return nil
 }
-
 
 func stopRemoteVM(hvNode string, spec cf.VMSpec) error {
 	byteJSON, _ := json.MarshalIndent(spec, "", "    ")

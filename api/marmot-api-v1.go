@@ -43,8 +43,10 @@ type MarmotConfig struct {
 	ImgaeTemplatePath *string   `json:"imgae_template_path,omitempty"`
 	NetDevDefault     *string   `json:"net_dev_default,omitempty"`
 	NetDevPrivate     *string   `json:"net_dev_private,omitempty"`
+	NetDevPublic      *string   `json:"net_dev_public,omitempty"`
 	OsVariant         *string   `json:"os_variant,omitempty"`
 	PrivateIpSubnet   *string   `json:"private_ip_subnet,omitempty"`
+	PublicIpDns       *string   `json:"public_ip_dns,omitempty"`
 	PublicIpGw        *string   `json:"public_ip_gw,omitempty"`
 	PublicIpSubnet    *string   `json:"public_ip_subnet,omitempty"`
 	Qcow2Image        *string   `json:"qcow2_image,omitempty"`
@@ -56,6 +58,11 @@ type Pong struct {
 	Ping string `json:"ping"`
 }
 
+// ReplyMessage defines model for ReplyMessage.
+type ReplyMessage struct {
+	Message string `json:"message"`
+}
+
 // Version defines model for Version.
 type Version struct {
 	Version string `json:"version"`
@@ -63,11 +70,12 @@ type Version struct {
 
 // Storage defines model for storage.
 type Storage struct {
-	Lv    *string `json:"lv,omitempty"`
-	Name  *string `json:"name,omitempty"`
-	Paths *string `json:"paths,omitempty"`
-	Size  *int64  `json:"size,omitempty"`
-	Vg    *string `json:"vg,omitempty"`
+	Lv   *string `json:"lv,omitempty"`
+	Name *string `json:"name,omitempty"`
+	Path *string `json:"path,omitempty"`
+	Size *int64  `json:"size,omitempty"`
+	Type *string `json:"type,omitempty"`
+	Vg   *string `json:"vg,omitempty"`
 }
 
 // StoragePool defines model for storagePool.
@@ -83,7 +91,7 @@ type VirtualMachine struct {
 	HvNode      string     `json:"HvNode"`
 	CTime       *time.Time `json:"cTime,omitempty"`
 	ClusterName *string    `json:"clusterName,omitempty"`
-	Content     *string    `json:"content,omitempty"`
+	Comment     *string    `json:"comment,omitempty"`
 	Cpu         *int32     `json:"cpu,omitempty"`
 	Key         *string    `json:"key,omitempty"`
 	Memory      *int64     `json:"memory,omitempty"`
@@ -105,7 +113,7 @@ type VirtualMachines = []VirtualMachine
 
 // VmSpec defines model for vmSpec.
 type VmSpec struct {
-	Content       *string    `json:"content,omitempty"`
+	Comment       *string    `json:"comment,omitempty"`
 	Cpu           *int32     `json:"cpu,omitempty"`
 	Key           *string    `json:"key,omitempty"`
 	Memory        *int64     `json:"memory,omitempty"`
@@ -150,12 +158,6 @@ type StopClusterJSONRequestBody = MarmotConfig
 // StopVirtualMachineJSONRequestBody defines body for StopVirtualMachine for application/json ContentType.
 type StopVirtualMachineJSONRequestBody = VmSpec
 
-// CreateVmClusterJSONRequestBody defines body for CreateVmCluster for application/json ContentType.
-type CreateVmClusterJSONRequestBody = Pong
-
-// UpdateVmClusterJSONRequestBody defines body for UpdateVmCluster for application/json ContentType.
-type UpdateVmClusterJSONRequestBody = Pong
-
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Create Cluster of Virtual Machines
@@ -178,7 +180,7 @@ type ServerInterface interface {
 	ListHypervisors(ctx echo.Context, params ListHypervisorsParams) error
 	// Alive
 	// (GET /ping)
-	GetPong(ctx echo.Context) error
+	ReplyPing(ctx echo.Context) error
 	// Start Cluster of Virtual Machines
 	// (POST /startCluster)
 	StartCluster(ctx echo.Context) error
@@ -197,18 +199,6 @@ type ServerInterface interface {
 	// List Virtual Machines
 	// (GET /virtualMachines)
 	ListVirtualMachines(ctx echo.Context) error
-	// Delete VM Cluster
-	// (DELETE /vm-clusters)
-	DeleteVmCluster(ctx echo.Context) error
-	// List VM Clusters
-	// (GET /vm-clusters)
-	ListVmClusters(ctx echo.Context) error
-	// Create VM Cluster
-	// (POST /vm-clusters)
-	CreateVmCluster(ctx echo.Context) error
-	// Update VM Cluster
-	// (PUT /vm-clusters)
-	UpdateVmCluster(ctx echo.Context) error
 }
 
 // ServerInterfaceWrapper converts echo contexts to parameters.
@@ -286,12 +276,12 @@ func (w *ServerInterfaceWrapper) ListHypervisors(ctx echo.Context) error {
 	return err
 }
 
-// GetPong converts echo context to params.
-func (w *ServerInterfaceWrapper) GetPong(ctx echo.Context) error {
+// ReplyPing converts echo context to params.
+func (w *ServerInterfaceWrapper) ReplyPing(ctx echo.Context) error {
 	var err error
 
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.GetPong(ctx)
+	err = w.Handler.ReplyPing(ctx)
 	return err
 }
 
@@ -349,42 +339,6 @@ func (w *ServerInterfaceWrapper) ListVirtualMachines(ctx echo.Context) error {
 	return err
 }
 
-// DeleteVmCluster converts echo context to params.
-func (w *ServerInterfaceWrapper) DeleteVmCluster(ctx echo.Context) error {
-	var err error
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.DeleteVmCluster(ctx)
-	return err
-}
-
-// ListVmClusters converts echo context to params.
-func (w *ServerInterfaceWrapper) ListVmClusters(ctx echo.Context) error {
-	var err error
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.ListVmClusters(ctx)
-	return err
-}
-
-// CreateVmCluster converts echo context to params.
-func (w *ServerInterfaceWrapper) CreateVmCluster(ctx echo.Context) error {
-	var err error
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.CreateVmCluster(ctx)
-	return err
-}
-
-// UpdateVmCluster converts echo context to params.
-func (w *ServerInterfaceWrapper) UpdateVmCluster(ctx echo.Context) error {
-	var err error
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.UpdateVmCluster(ctx)
-	return err
-}
-
 // This is a simple interface which specifies echo.Route addition functions which
 // are present on both echo.Echo and echo.Group, since we want to allow using
 // either of them for path registration
@@ -419,16 +373,12 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.POST(baseURL+"/destroyVm", wrapper.DestroyVirtualMachine)
 	router.GET(baseURL+"/hypervisor/:hypervisorId", wrapper.ShowHypervisorById)
 	router.GET(baseURL+"/hypervisors", wrapper.ListHypervisors)
-	router.GET(baseURL+"/ping", wrapper.GetPong)
+	router.GET(baseURL+"/ping", wrapper.ReplyPing)
 	router.POST(baseURL+"/startCluster", wrapper.StartCluster)
 	router.POST(baseURL+"/startVm", wrapper.StartVirtualMachine)
 	router.POST(baseURL+"/stopCluster", wrapper.StopCluster)
 	router.POST(baseURL+"/stopVm", wrapper.StopVirtualMachine)
 	router.GET(baseURL+"/version", wrapper.GetVersion)
 	router.GET(baseURL+"/virtualMachines", wrapper.ListVirtualMachines)
-	router.DELETE(baseURL+"/vm-clusters", wrapper.DeleteVmCluster)
-	router.GET(baseURL+"/vm-clusters", wrapper.ListVmClusters)
-	router.POST(baseURL+"/vm-clusters", wrapper.CreateVmCluster)
-	router.PUT(baseURL+"/vm-clusters", wrapper.UpdateVmCluster)
 
 }

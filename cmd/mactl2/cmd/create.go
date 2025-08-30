@@ -4,7 +4,7 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"fmt"
+	"log/slog"
 
 	"github.com/spf13/cobra"
 	cf "github.com/takara9/marmot/pkg/config"
@@ -19,17 +19,16 @@ var createCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		err := cf.ReadConfig(ClusterConfig, &cnf)
 		if err != nil {
-			fmt.Printf("Reading the config file", "err", err)
+			slog.Error("Reading the config file", "err", err)
 			return
 		}
 
 		if len(apiEndpoint) > 0 {
 			ApiUrl = apiEndpoint
 		}
+		
+		// m.CreateCluster(cnf)で置き換える
 		ReqRest(cnf, "createCluster", ApiUrl)
-		//if *auto {
-		//	apply_playbook(cnf)
-		//}
 	},
 }
 

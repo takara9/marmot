@@ -5,11 +5,13 @@ import (
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
+	"github.com/takara9/marmot/api"
 	cf "github.com/takara9/marmot/pkg/config"
+	"github.com/takara9/marmot/pkg/db"
 )
 
 // クラスタの停止
-func (m *marmot) StopCluster(c *gin.Context) {
+func (m *Marmot) StopCluster(c *gin.Context) {
 	slog.Info("stop cluster", "etcd", m.EtcdUrl)
 
 	var cnf cf.MarmotConfig
@@ -25,7 +27,7 @@ func (m *marmot) StopCluster(c *gin.Context) {
 }
 
 // クラスタ停止
-func (m *marmot) stopCluster(cnf cf.MarmotConfig) error {
+func (m *Marmot) stopCluster(cnf cf.MarmotConfig) error {
 	var NotFound bool = true
 	for _, spec := range cnf.VMSpec {
 		vmKey, _ := m.Db.FindByHostAndClusteName(spec.Name, cnf.ClusterName)
@@ -40,6 +42,43 @@ func (m *marmot) stopCluster(cnf cf.MarmotConfig) error {
 			err = stopRemoteVM(vm.HvNode, spec)
 			if err != nil {
 				slog.Error("", "err", err)
+				continue
+			}
+		}
+	}
+	if NotFound {
+		return errors.New("NotExistVM")
+	}
+	return nil
+}
+
+// クラスタ停止
+func (m *Marmot) StopClusterInternal(cnf api.MarmotConfig) error {
+	var NotFound bool = true
+	for _, spec := range *cnf.VmSpec {
+		vmKey, _ := m.Db.FindByHostAndClusteName(*spec.Name, *cnf.ClusterName)
+		if len(vmKey) > 0 {
+			NotFound = false
+			spec.Key = &vmKey
+			vm, err := m.Db.GetVmByKey(vmKey)
+			if err != nil {
+				slog.Error("", "err", err)
+				continue
+			}
+
+			marmotClient, err := NewMarmotdEp(
+				"http",
+				"localhost:8080",
+				"/api/v1",
+				60,
+			)
+			if err != nil {
+				continue
+			}
+			_, _, _, err = marmotClient.StopVirtualMachine(vm.HvNode, spec)
+			if err != nil {
+				slog.Error("", "remote request err", err)
+				m.Db.UpdateVmState(vm.Key, db.ERROR) // エラー状態へ
 				continue
 			}
 		}

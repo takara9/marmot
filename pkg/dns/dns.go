@@ -69,7 +69,6 @@ func Add(rec DnsRecord, dbUrl string) error {
 	ent.Host = rec.Ipv4
 	ent.Ttl = rec.Ttl
 
-	//con, err := db.Connect(dbUrl)
 	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
 		slog.Error("", "err", err)
@@ -102,7 +101,6 @@ func Get(rec DnsRecord, dbUrl string) (db.DNSEntry, error) {
 		return dd, err
 	}
 
-	//con, err := db.Connect(dbUrl)
 	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
 		slog.Error("", "err", err)
@@ -139,7 +137,6 @@ func Del(rec DnsRecord, dbUrl string) error {
 	ent.Host = rec.Ipv4
 	ent.Ttl = rec.Ttl
 
-	//con, err := db.Connect(dbUrl)
 	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
 		slog.Error("", "err", err)

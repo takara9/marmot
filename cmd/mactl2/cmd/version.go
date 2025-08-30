@@ -15,7 +15,7 @@ var versionCmd = &cobra.Command{
 	Short: "バージョンの表示",
 	Long:  `marmot クライアントのバージョンを表示します。`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("version: 0.8.6")
+		fmt.Println("version: 0.8.7")
 	},
 }
 

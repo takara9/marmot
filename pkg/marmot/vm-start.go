@@ -16,7 +16,7 @@ import (
 )
 
 // 仮想マシンの開始
-func (m *marmot) StartVm(c *gin.Context) {
+func (m *Marmot) StartVm(c *gin.Context) {
 	slog.Info("start vm", "etcd", m.EtcdUrl)
 	var spec cf.VMSpec
 	err := c.BindJSON(&spec)

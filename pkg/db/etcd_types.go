@@ -52,7 +52,7 @@ type Storage struct {
 type VirtualMachine struct {
 	Name        string    // OS Hostname
 	ClusterName string    // クラスタ名
-	Key         string    // 　アサイン時に割当 接頭語VM + シリアル番号 etc キー
+	Key         string    // アサイン時に割当 接頭語VM + シリアル番号 etc キー
 	Uuid        uuid.UUID // アサイン時に決定
 	HvNode      string    // アサイン時に決定
 	Ctime       time.Time // Unix時刻で登録タイムスタンプ

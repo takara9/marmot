@@ -72,8 +72,7 @@ func CreateStartVM(url string, filename string) error {
 		return err
 	}
 
-	//time.Sleep(2000 * time.Millisecond)
-	//　オートスタートを設定しないと、HVの再起動からの復帰時、停止している。
+	//オートスタートを設定しないと、HVの再起動からの復帰時、停止している。
 	err = dom.SetAutostart(true)
 	if err != nil {
 		return err
