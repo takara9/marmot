@@ -14,8 +14,8 @@ import (
 	ut "github.com/takara9/marmot/pkg/util"
 )
 
-var node *string
-var etcd *string
+//var node *string
+//var etcd *string
 
 type marmot struct {
 	nodeName string
@@ -37,8 +37,8 @@ func NewMarmot(nodeName string, etcdUrl string) (*marmot, error) {
 
 func main() {
 	// 起動パラメータ
-	node = flag.String("node", "hv1", "Hypervisor node name")
-	etcd = flag.String("etcd", "http://127.0.0.1:2379", "etcd url")
+	node := flag.String("node", "hv1", "Hypervisor node name")
+	etcd := flag.String("etcd", "http://127.0.0.1:2379", "etcd url")
 	flag.Parse()
 	fmt.Println("node = ", *node)
 	fmt.Println("etcd = ", *etcd)
@@ -57,7 +57,7 @@ func main() {
 	}
 
 	// 起動チェック ストレージの空き容量チェック
-	err = ut.CheckHvVgAll(*etcd, *node)
+	err = ut.CheckHvVgAll(m.etcdUrl, m.nodeName)
 	if err != nil {
 		slog.Error("Storage free space check", "err", err)
 		os.Exit(1)
@@ -96,21 +96,21 @@ func (m *marmot) accessTest(c *gin.Context) {
 // コールバック ハイパーバイザーの状態取得
 func (m *marmot) listHypervisor(c *gin.Context) {
 	// ハイパーバイザーの稼働チェック　結果はDBへ反映
-	_, err := ut.CheckHypervisors(*etcd, *node)
+	_, err := ut.CheckHypervisors(m.etcdUrl, m.nodeName)
 	if err != nil {
 		slog.Error("Check if the hypervisor is up and running", "err", err)
 		return
 	}
 
 	// ストレージ容量の更新 結果はDBへ反映
-	err = ut.CheckHvVgAll(*etcd, *node)
+	err = ut.CheckHvVgAll(m.etcdUrl, m.nodeName)
 	if err != nil {
 		slog.Error("Update storage capacity", "err", err)
 		return
 	}
 
 	// データベースから情報を取得
-	d, err := db.NewDatabase(*etcd)
+	d, err := db.NewDatabase(m.etcdUrl)
 	if err != nil {
 		slog.Error("connect to database", "err", err)
 		return
@@ -126,7 +126,7 @@ func (m *marmot) listHypervisor(c *gin.Context) {
 
 // コールバック 仮想マシンのリスト
 func (m *marmot) listVirtualMachines(c *gin.Context) {
-	d, err := db.NewDatabase(*etcd)
+	d, err := db.NewDatabase(m.etcdUrl)
 	if err != nil {
 		slog.Error("get list virtual machines", "err", err)
 		return
@@ -149,12 +149,12 @@ func (m *marmot) createCluster(c *gin.Context) {
 		return
 	}
 	// ハイパーバイザーの稼働チェック　結果はDBへ反映
-	_, err := ut.CheckHypervisors(*etcd, *node)
+	_, err := ut.CheckHypervisors(m.etcdUrl, m.nodeName)
 	if err != nil {
 		slog.Error("check hypervisor status", "err", err)
 		return
 	}
-	if err := CreateCluster(cnf, *etcd, *node); err != nil {
+	if err := CreateCluster(cnf, m.etcdUrl, m.nodeName); err != nil {
 		slog.Error("create cluster", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
@@ -169,7 +169,7 @@ func (m *marmot) destroyCluster(c *gin.Context) {
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
-	if err := DestroyCluster(cnf, *etcd); err != nil {
+	if err := DestroyCluster(cnf, m.etcdUrl); err != nil {
 		slog.Error("delete cluster", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
@@ -178,7 +178,7 @@ func (m *marmot) destroyCluster(c *gin.Context) {
 
 // VMの作成
 func (m *marmot) createVm(c *gin.Context) {
-	slog.Info("create vm", "etcd", *etcd)
+	slog.Info("create vm", "etcd", m.etcdUrl)
 	var spec cf.VMSpec
 	err := c.BindJSON(&spec)
 	if err != nil {
@@ -186,7 +186,7 @@ func (m *marmot) createVm(c *gin.Context) {
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
-	err = CreateVM(*etcd, spec, *node)
+	err = CreateVM(m.etcdUrl, spec, m.nodeName)
 	if err != nil {
 		slog.Error("creating vm", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
@@ -196,7 +196,7 @@ func (m *marmot) createVm(c *gin.Context) {
 
 // VMの削除
 func (m *marmot) destroyVm(c *gin.Context) {
-	slog.Info("destroy vm", "etcd", *etcd)
+	slog.Info("destroy vm", "etcd", m.etcdUrl)
 
 	var spec cf.VMSpec
 	err := c.BindJSON(&spec)
@@ -204,7 +204,7 @@ func (m *marmot) destroyVm(c *gin.Context) {
 		slog.Error("setup spec", "err", err)
 		return
 	}
-	err = DestroyVM(*etcd, spec, *node)
+	err = DestroyVM(m.etcdUrl, spec, m.nodeName)
 	if err != nil {
 		slog.Error("delete vm", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
@@ -214,7 +214,7 @@ func (m *marmot) destroyVm(c *gin.Context) {
 
 // クラスタの停止
 func (m *marmot) stopCluster(c *gin.Context) {
-	slog.Info("stop cluster", "etcd", *etcd)
+	slog.Info("stop cluster", "etcd", m.etcdUrl)
 
 	var cnf cf.MarmotConfig
 	if err := c.BindJSON(&cnf); err != nil {
@@ -222,7 +222,7 @@ func (m *marmot) stopCluster(c *gin.Context) {
 		c.JSON(400, gin.H{"msg": "Can't read JSON"})
 		return
 	}
-	if err := StopCluster(cnf, *etcd); err != nil {
+	if err := StopCluster(cnf, m.etcdUrl); err != nil {
 		slog.Error("stop cluster", "err", err)
 		return
 	}
@@ -230,7 +230,7 @@ func (m *marmot) stopCluster(c *gin.Context) {
 
 // クラスタの再スタート
 func (m *marmot) startCluster(c *gin.Context) {
-	slog.Info("start cluster", "etcd", *etcd)
+	slog.Info("start cluster", "etcd", m.etcdUrl)
 
 	var cnf cf.MarmotConfig
 	if err := c.BindJSON(&cnf); err != nil {
@@ -238,7 +238,7 @@ func (m *marmot) startCluster(c *gin.Context) {
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
-	if err := StartCluster(cnf, *etcd); err != nil {
+	if err := StartCluster(cnf, m.etcdUrl); err != nil {
 		slog.Error("start cluster", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
@@ -247,14 +247,14 @@ func (m *marmot) startCluster(c *gin.Context) {
 
 // 仮想マシンの開始
 func (m *marmot) startVm(c *gin.Context) {
-	slog.Info("start vm", "etcd", *etcd)
+	slog.Info("start vm", "etcd", m.etcdUrl)
 	var spec cf.VMSpec
 	err := c.BindJSON(&spec)
 	if err != nil {
 		slog.Error("setup config", "err", err)
 		return
 	}
-	err = StartVM(*etcd, spec)
+	err = StartVM(m.etcdUrl, spec)
 	if err != nil {
 		slog.Error("start vm", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
@@ -264,14 +264,14 @@ func (m *marmot) startVm(c *gin.Context) {
 
 // 仮想マシンの停止
 func (m *marmot) stopVm(c *gin.Context) {
-	slog.Info("stop vm", "etcd", *etcd)
+	slog.Info("stop vm", "etcd", m.etcdUrl)
 	var spec cf.VMSpec
 	err := c.BindJSON(&spec)
 	if err != nil {
 		slog.Error("setup config", "err", err)
 		return
 	}
-	err = StopVM(*etcd, spec)
+	err = StopVM(m.etcdUrl, spec)
 	if err != nil {
 		slog.Error("stop vm", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})

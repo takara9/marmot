@@ -19,101 +19,64 @@ const (
 )
 
 var ccf *string
-var hv_config string
+var etcd *string
+var node *string
 
+// テスト前の環境設定
 var _ = BeforeSuite(func() {
 	etcd_url := "http://127.0.0.1:12379"
 	etcd = &etcd_url
 	node_name := "127.0.0.1"
 	node = &node_name
-	fmt.Println("node = ", *node)
-	fmt.Println("etcd = ", *etcd)
-	config_fn := "testdata/cluster-config.yaml"
-	ccf = &config_fn
-	fmt.Println("ccf  = ", *ccf)
-	hv_config = "testdata/hypervisor-config-hvc.yaml"
+
+	cmd := exec.Command(systemctl_exe, "stop", "etcd")
+	stop := cmd.Run()
+	Expect(stop).To(Succeed())
+
+	cmd = exec.Command(systemctl_exe, "status", "etcd")
+	status := cmd.Run()
+	Expect(status).To(HaveOccurred())
+
+	cmd = exec.Command(systemctl_exe, "start", "etcd")
+	start := cmd.Run()
+	Expect(start).To(Succeed())
+
+	cmd = exec.Command(systemctl_exe, "stop", "marmot")
+	stop = cmd.Run()
+	Expect(stop).To(Succeed())
+
+	cmd = exec.Command(systemctl_exe, "status", "marmot")
+	status = cmd.Run()
+	Expect(status).To(HaveOccurred())
 })
 
+// テスト後の環境戻し
 var _ = AfterSuite(func() {
 	// データの削除
-	{
-		cmd := exec.Command(etcdctl_exe, "--endpoints=localhost:12379", "del", "hvc")
-		cmd.Env = append(os.Environ(), "ETCDCTL_API=3")
-		out, err := cmd.CombinedOutput()
-		fmt.Println("command = ", string(out))
-		Expect(err).To(Succeed()) // 成功
-	}
+	cmd := exec.Command(etcdctl_exe, "--endpoints=localhost:12379", "del", "hvc")
+	cmd.Env = append(os.Environ(), "ETCDCTL_API=3")
+	out, err := cmd.CombinedOutput()
+	fmt.Println("command = ", string(out))
+	Expect(err).To(Succeed())
 
 	// etcd の停止
-	{
-		cmd := exec.Command(systemctl_exe, "stop", "etcd")
-		_ = cmd.Run()
-	}
-
-	// corednsの停止
-	{
-		cmd := exec.Command(systemctl_exe, "stop", "coredns")
-		_ = cmd.Run()
-	}
+	cmd = exec.Command(systemctl_exe, "stop", "etcd")
+	status := cmd.Run()
+	Expect(status).To(Succeed())
 
 	// marmotの停止
-	{
-		cmd := exec.Command(systemctl_exe, "stop", "marmot")
-		_ = cmd.Run()
-	}
+	cmd = exec.Command(systemctl_exe, "stop", "marmot")
+	status = cmd.Run()
+	Expect(status).To(Succeed())
+
 })
 
 var _ = Describe("Util", func() {
-
-	BeforeEach(func() {
-		/* HV設定ファイルをロードするコードを適正化して必要なコードを組み込む */
-		fmt.Println("node = ", *node)
-		fmt.Println("etcd = ", *etcd)
-		fmt.Println("ccf  = ", *ccf)
-		fmt.Println("hv_config  = ", hv_config)
-	})
-
-	Describe("Check daemons", func() {
-		Context("etcd", func() {
-			It("Stop", func() {
-				cmd := exec.Command(systemctl_exe, "stop", "etcd")
-				stop := cmd.Run()
-				Expect(stop).To(Succeed()) // 成功
-			})
-
-			It("Status", func() {
-				cmd := exec.Command(systemctl_exe, "status", "etcd")
-				status := cmd.Run()
-				Expect(status).To(HaveOccurred()) // 問題
-			})
-
-			It("Start", func() {
-				cmd := exec.Command(systemctl_exe, "start", "etcd")
-				start := cmd.Run()
-				Expect(start).To(Succeed()) // 成功
-			})
-		})
-
-		Context("marmot", func() {
-			It("Stop", func() {
-				cmd := exec.Command(systemctl_exe, "stop", "marmot")
-				stop := cmd.Run()
-				Expect(stop).To(Succeed()) // 成功
-			})
-
-			It("Status", func() {
-				cmd := exec.Command(systemctl_exe, "status", "marmot")
-				status := cmd.Run()
-				Expect(status).To(HaveOccurred()) // 問題
-			})
-
-		})
-	})
-
 	Context("Data management", func() {
 		It("Set Hypervisor Config file", func() {
-			cmd := exec.Command(hvadmin_exe, "-config", hv_config)
+			cmd := exec.Command(hvadmin_exe, "-config", "testdata/hypervisor-config-hvc.yaml")
 			err := cmd.Run()
+
 			Expect(err).NotTo(HaveOccurred())
 		})
 
