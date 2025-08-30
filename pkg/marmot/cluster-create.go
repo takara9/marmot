@@ -10,11 +10,34 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/gin-gonic/gin"
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/util"
+	ut "github.com/takara9/marmot/pkg/util"
 	"github.com/takara9/marmot/pkg/virt"
 )
+
+// コールバック VMクラスタの作成
+func (m *marmot) CreateCluster(c *gin.Context) {
+	var cnf cf.MarmotConfig
+	if err := c.BindJSON(&cnf); err != nil {
+		slog.Error("create vm cluster", "err", err)
+		c.JSON(400, gin.H{"msg": err.Error()})
+		return
+	}
+	// ハイパーバイザーの稼働チェック　結果はDBへ反映
+	_, err := ut.CheckHypervisors(m.EtcdUrl, m.NodeName)
+	if err != nil {
+		slog.Error("check hypervisor status", "err", err)
+		return
+	}
+	if err := m.createCluster(cnf); err != nil {
+		slog.Error("create cluster", "err", err)
+		c.JSON(400, gin.H{"msg": err.Error()})
+		return
+	}
+}
 
 // コンフィグからVMクラスタを作成する
 func (m *marmot) createCluster(cnf cf.MarmotConfig) error {
@@ -165,6 +188,24 @@ func remoteCreateStartVM(hvNode string, spec cf.VMSpec) error {
 		return errors.New(string(body))
 	}
 	return nil
+}
+
+// VMの作成
+func (m *marmot) CreateVm(c *gin.Context) {
+	slog.Info("create vm", "etcd", m.EtcdUrl)
+	var spec cf.VMSpec
+	err := c.BindJSON(&spec)
+	if err != nil {
+		slog.Error("create vm in action", "err", err)
+		c.JSON(400, gin.H{"msg": err.Error()})
+		return
+	}
+	err = m.createVM(spec)
+	if err != nil {
+		slog.Error("creating vm", "err", err)
+		c.JSON(400, gin.H{"msg": err.Error()})
+		return
+	}
 }
 
 // VMを生成する

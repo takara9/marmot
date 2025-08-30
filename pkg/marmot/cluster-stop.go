@@ -9,10 +9,27 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/gin-gonic/gin"
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/virt"
 )
+
+// クラスタの停止
+func (m *marmot) StopCluster(c *gin.Context) {
+	slog.Info("stop cluster", "etcd", m.EtcdUrl)
+
+	var cnf cf.MarmotConfig
+	if err := c.BindJSON(&cnf); err != nil {
+		slog.Error("setup Json", "err", err)
+		c.JSON(400, gin.H{"msg": "Can't read JSON"})
+		return
+	}
+	if err := m.stopCluster(cnf); err != nil {
+		slog.Error("stop cluster", "err", err)
+		return
+	}
+}
 
 // クラスタ停止
 func (m *marmot) stopCluster(cnf cf.MarmotConfig) error {
@@ -27,7 +44,7 @@ func (m *marmot) stopCluster(cnf cf.MarmotConfig) error {
 				slog.Error("", "err", err)
 				continue
 			}
-			err = RemoteStopVM(vm.HvNode, spec)
+			err = remoteStopVM(vm.HvNode, spec)
 			if err != nil {
 				slog.Error("", "err", err)
 				continue
@@ -40,7 +57,7 @@ func (m *marmot) stopCluster(cnf cf.MarmotConfig) error {
 	return nil
 }
 
-func RemoteStopVM(hvNode string, spec cf.VMSpec) error {
+func remoteStopVM(hvNode string, spec cf.VMSpec) error {
 	byteJSON, _ := json.MarshalIndent(spec, "", "    ")
 	// JSON形式でポストする
 	reqURL := fmt.Sprintf("http://%s:8750/%s", hvNode, "stopVm")
@@ -66,14 +83,26 @@ func RemoteStopVM(hvNode string, spec cf.VMSpec) error {
 	return nil
 }
 
-// VMの停止
-func StopVM(dbUrl string, spec cf.VMSpec) error {
-	d, err := db.NewDatabase(dbUrl)
+// 仮想マシンの停止
+func (m *marmot) StopVm(c *gin.Context) {
+	slog.Info("stop vm", "etcd", m.EtcdUrl)
+	var spec cf.VMSpec
+	err := c.BindJSON(&spec)
 	if err != nil {
-		slog.Error("", "err", err)
-		return err
+		slog.Error("setup config", "err", err)
+		return
 	}
-	vm, err := d.GetVmByKey(spec.Key)
+	err = m.stopVM(spec)
+	if err != nil {
+		slog.Error("stop vm", "err", err)
+		c.JSON(400, gin.H{"msg": err.Error()})
+		return
+	}
+}
+
+// VMの停止
+func (m *marmot) stopVM(spec cf.VMSpec) error {
+	vm, err := m.Db.GetVmByKey(spec.Key)
 	if err != nil {
 		slog.Error("", "err", err)
 		return nil
@@ -87,18 +116,18 @@ func StopVM(dbUrl string, spec cf.VMSpec) error {
 			slog.Error("", "err", err)
 		}
 		// ハイパーバイザーのリソース削減保存
-		hv, err := d.GetHvByKey(vm.HvNode)
+		hv, err := m.Db.GetHvByKey(vm.HvNode)
 		if err != nil {
 			slog.Error("", "err", err)
 		}
 		hv.FreeCpu = hv.FreeCpu + vm.Cpu
 		hv.FreeMemory = hv.FreeMemory + vm.Memory
-		err = d.PutDataEtcd(hv.Key, hv)
+		err = m.Db.PutDataEtcd(hv.Key, hv)
 		if err != nil {
 			slog.Error("", "err", err)
 		}
 		// データベースの更新
-		err = d.UpdateVmState(spec.Key, db.STOPPED) ////////
+		err = m.Db.UpdateVmState(spec.Key, db.STOPPED) ////////
 		if err != nil {
 			slog.Error("", "err", err)
 		}

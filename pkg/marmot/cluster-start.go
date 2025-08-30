@@ -9,10 +9,28 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/gin-gonic/gin"
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/virt"
 )
+
+// クラスタの再スタート
+func (m *marmot) StartCluster(c *gin.Context) {
+	slog.Info("start cluster", "etcd", m.EtcdUrl)
+
+	var cnf cf.MarmotConfig
+	if err := c.BindJSON(&cnf); err != nil {
+		slog.Error("setup config", "err", err)
+		c.JSON(400, gin.H{"msg": err.Error()})
+		return
+	}
+	if err := m.startCluster(cnf); err != nil {
+		slog.Error("start cluster", "err", err)
+		c.JSON(400, gin.H{"msg": err.Error()})
+		return
+	}
+}
 
 // クラスタ停止
 func (m *marmot) startCluster(cnf cf.MarmotConfig) error {
@@ -64,8 +82,25 @@ func RemoteStartVM(hvNode string, spec cf.VMSpec) error {
 	return nil
 }
 
+// 仮想マシンの開始
+func (m *marmot) StartVm(c *gin.Context) {
+	slog.Info("start vm", "etcd", m.EtcdUrl)
+	var spec cf.VMSpec
+	err := c.BindJSON(&spec)
+	if err != nil {
+		slog.Error("setup config", "err", err)
+		return
+	}
+	err = startVM(m.EtcdUrl, spec)
+	if err != nil {
+		slog.Error("start vm", "err", err)
+		c.JSON(400, gin.H{"msg": err.Error()})
+		return
+	}
+}
+
 // VMの開始
-func StartVM(dbUrl string, spec cf.VMSpec) error {
+func startVM(dbUrl string, spec cf.VMSpec) error {
 	// 仮想マシンの開始
 	url := "qemu:///system"
 	err := virt.StartVM(url, spec.Key)

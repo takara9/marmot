@@ -9,12 +9,28 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/gin-gonic/gin"
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/lvm"
 	"github.com/takara9/marmot/pkg/util"
 	"github.com/takara9/marmot/pkg/virt"
 )
+
+// コールバック VMクラスタの削除
+func (m *marmot) DestroyCluster(c *gin.Context) {
+	var cnf cf.MarmotConfig
+	if err := c.BindJSON(&cnf); err != nil {
+		slog.Error("prepare to delete cluster", "err", err)
+		c.JSON(400, gin.H{"msg": err.Error()})
+		return
+	}
+	if err := m.destroyCluster(cnf); err != nil {
+		slog.Error("delete cluster", "err", err)
+		c.JSON(400, gin.H{"msg": err.Error()})
+		return
+	}
+}
 
 // クラスタ削除
 func (m *marmot) destroyCluster(cnf cf.MarmotConfig) error {
@@ -72,14 +88,25 @@ func remoteDestroyVM(hvNode string, spec cf.VMSpec) error {
 }
 
 // VMの削除
-//func (m *marmot) destroyVM(dbUrl string, spec cf.VMSpec, hvNode string) error {
-func (m *marmot) destroyVM(spec cf.VMSpec) error {
-	//d, err := db.NewDatabase(dbUrl)
-	//if err != nil {
-	//	slog.Error("get list virtual machines", "err", err)
-	//	return err
-	//}
+func (m *marmot) DestroyVm(c *gin.Context) {
+	slog.Info("destroy vm", "etcd", m.EtcdUrl)
 
+	var spec cf.VMSpec
+	err := c.BindJSON(&spec)
+	if err != nil {
+		slog.Error("setup spec", "err", err)
+		return
+	}
+	err = m.destroyVM(spec)
+	if err != nil {
+		slog.Error("delete vm", "err", err)
+		c.JSON(400, gin.H{"msg": err.Error()})
+		return
+	}
+}
+
+// VMの削除
+func (m *marmot) destroyVM(spec cf.VMSpec) error {
 	vm, err := m.Db.GetVmByKey(spec.Key)
 	if err != nil {
 		slog.Error("", "err", err)
@@ -131,6 +158,5 @@ func (m *marmot) destroyVM(spec cf.VMSpec) error {
 		// ストレージの更新
 		util.CheckHvVG2(m.EtcdUrl, m.NodeName, dd.Vg)
 	}
-
 	return nil
 }
