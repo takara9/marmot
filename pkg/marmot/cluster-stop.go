@@ -9,7 +9,7 @@ import (
 )
 
 // クラスタの停止
-func (m *marmot) StopCluster(c *gin.Context) {
+func (m *Marmot) StopCluster(c *gin.Context) {
 	slog.Info("stop cluster", "etcd", m.EtcdUrl)
 
 	var cnf cf.MarmotConfig
@@ -25,7 +25,7 @@ func (m *marmot) StopCluster(c *gin.Context) {
 }
 
 // クラスタ停止
-func (m *marmot) stopCluster(cnf cf.MarmotConfig) error {
+func (m *Marmot) stopCluster(cnf cf.MarmotConfig) error {
 	var NotFound bool = true
 	for _, spec := range cnf.VMSpec {
 		vmKey, _ := m.Db.FindByHostAndClusteName(spec.Name, cnf.ClusterName)

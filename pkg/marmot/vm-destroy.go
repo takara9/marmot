@@ -18,7 +18,7 @@ import (
 )
 
 // VMの削除
-func (m *marmot) DestroyVm(c *gin.Context) {
+func (m *Marmot) DestroyVm(c *gin.Context) {
 	slog.Info("destroy vm", "etcd", m.EtcdUrl)
 
 	var spec cf.VMSpec
@@ -36,7 +36,7 @@ func (m *marmot) DestroyVm(c *gin.Context) {
 }
 
 // VMの削除
-func (m *marmot) destroyVM(spec cf.VMSpec) error {
+func (m *Marmot) destroyVM(spec cf.VMSpec) error {
 	vm, err := m.Db.GetVmByKey(spec.Key)
 	if err != nil {
 		slog.Error("", "err", err)

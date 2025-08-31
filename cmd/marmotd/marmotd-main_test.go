@@ -23,7 +23,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		GinkgoWriter.Println("Start marmot server mock")
 		startMockServer() // 戻り値なし
 		time.Sleep(5 * time.Second)
-		ep, err = marmot.NewMarmot("hvc", "http://127.0.0.1:12379")
+		ep, err = marmot.NewMarmot("hvc", "http://127.0.0.1:3379")
 		if err != nil {
 			GinkgoWriter.Println("Error creating MarmotEndpoint:", err)
 		} else {
@@ -31,7 +31,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		}
 
 		// Dockerコンテナを起動
-		cmd := exec.Command("docker", "run", "-d", "--name", "etcd0", "-p", "12379:2379", "-p", "12380:2380", "-e", "ALLOW_NONE_AUTHENTICATION=yes", "-e", "ETCD_ADVERTISE_CLIENT_URLS=http://127.0.0.1:12379", "bitnami/etcd")
+		cmd := exec.Command("docker", "run", "-d", "--name", "etcd0", "-p", "3379:2379", "-p", "3380:2380", "-e", "ALLOW_NONE_AUTHENTICATION=yes", "-e", "ETCD_ADVERTISE_CLIENT_URLS=http://127.0.0.1:3379", "bitnami/etcd")
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to start container: %s, %v", string(output), err))
