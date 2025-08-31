@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"time"
@@ -8,27 +9,27 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/marmot"
-	//clientv3 "go.etcd.io/etcd/client/v3"
+	"github.com/takara9/marmot/pkg/util"
 )
 
 var _ = Describe("Marmotd Test", Ordered, func() {
 	var err error
 	var containerID string
-	//var Conn *clientv3.Client
-	var ep *marmot.Marmot
+	var marmotServer *marmot.Marmot
 
 	BeforeAll(func(ctx SpecContext) {
 		GinkgoWriter.Println("Start marmot server mock")
 		startMockServer() // 戻り値なし
 		time.Sleep(5 * time.Second)
-		ep, err = marmot.NewMarmot("hvc", "http://127.0.0.1:3379")
+		marmotServer, err = marmot.NewMarmot("hvc", "http://127.0.0.1:3379")
 		if err != nil {
 			GinkgoWriter.Println("Error creating MarmotEndpoint:", err)
-		} else {
-			GinkgoWriter.Println("MarmotEndpoint created successfully:", ep)
 		}
+		Expect(err).NotTo(HaveOccurred())
+		mx = marmotServer // ここでセットするとは、適切なのか？
 
 		// Dockerコンテナを起動
 		cmd := exec.Command("docker", "run", "-d", "--name", "etcd0", "-p", "3379:2379", "-p", "3380:2380", "-e", "ALLOW_NONE_AUTHENTICATION=yes", "-e", "ETCD_ADVERTISE_CLIENT_URLS=http://127.0.0.1:3379", "bitnami/etcd")
@@ -55,13 +56,71 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		}
 	}, NodeTimeout(20*time.Second))
 
-	Context("基本的なアクセステスト", func() {
-		//const hypervior_config string = "testdata/hypervisor-config-hvc.yaml"
+	Context("基本的なクライアントからのアクセステスト", func() {
 		var hvs config.Hypervisors_yaml
-
+		var marmotClient *marmot.MarmotEndpoint
+		//var ma *marmot.Marmot
 		It("ハイパーバイザーのコンフィグファイルの読み取り", func() {
 			err = config.ReadYAML("testdata/hypervisor-config-hvc.yaml", &hvs)
 			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("Marmotエンドポイントの生成", func() {
+			marmotClient, err = marmot.NewMarmotdEp(
+				"http",
+				"localhost:8080",
+				"/api/v1",
+				5,
+			)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("ハイパーバイザーの情報セット", func() {
+			for _, hv := range hvs.Hvs {
+				fmt.Println(hv)
+				err := marmotServer.Db.SetHypervisor(hv)
+				Expect(err).NotTo(HaveOccurred())
+			}
+		})
+
+		It("ストレージの空き容量チェック", func() {
+			err = util.CheckHvVgAll(marmotServer.EtcdUrl, marmotServer.NodeName)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("Marmotd の生存確認", func() {
+			httpStatus, body, url, err := marmotClient.Ping()
+			var replyMessage api.ReplyMessage
+			Expect(err).NotTo(HaveOccurred())
+			Expect(httpStatus).To(Equal(200))
+			err = json.Unmarshal(body, &replyMessage)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(replyMessage.Message).To(Equal("ok"))
+			Expect(url).To(BeNil())
+		})
+
+		It("Marmotd のバージョン情報取得", func() {
+			httpStatus, body, url, err := marmotClient.GetVersion()
+			var version api.Version
+			Expect(err).NotTo(HaveOccurred())
+			Expect(httpStatus).To(Equal(200))
+			err = json.Unmarshal(body, &version)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(version.Version).To(Equal("0.0.1"))
+			Expect(url).To(BeNil())
+		})
+
+		It("ハイパーバイザーの一覧取得", func() {
+			httpStatus, body, url, err := marmotClient.ListHypervisors(nil)
+			var hvs []api.Hypervisor
+			Expect(err).NotTo(HaveOccurred())
+			Expect(httpStatus).To(Equal(200))
+			err = json.Unmarshal(body, &hvs)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(hvs)).To(Equal(1))
+			Expect(hvs[0].NodeName).To(Equal("hvc"))
+			Expect(*hvs[0].FreeCpu).To(Equal(int32(4)))
+			Expect(url).To(BeNil())
 		})
 	})
 })

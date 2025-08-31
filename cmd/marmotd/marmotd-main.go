@@ -1,18 +1,47 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"log/slog"
+	"net/http"
+	"os"
 
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/marmot"
+	"github.com/takara9/marmot/pkg/util"
 )
 
-var EtcdEndpoint string = "http://localhost:12379"
-var NodeName string = "hvc"
+//var EtcdEndpoint string = "http://localhost:3379"
+//var NodeName string = "hvc"
 
 type Server struct{}
 
+var mx *marmot.Marmot
+
 func main() {
+	var err error
+	node := flag.String("node", "hv1", "Hypervisor node name")
+	etcd := flag.String("etcd", "http://127.0.0.1:3379", "etcd url")
+	flag.Parse()
+	fmt.Println("node = ", *node)
+	fmt.Println("etcd = ", *etcd)
+
+	// Setup slog
+	opts := &slog.HandlerOptions{
+		AddSource: true,
+	}
+	logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
+	slog.SetDefault(logger)
+
+	mx, err = marmot.NewMarmot(*node, *etcd)
+	if err != nil {
+		slog.Error("Storage free space check", "err", err)
+		os.Exit(1)
+	}
+
 	e := echo.New()
 	server := Server{}
 	api.RegisterHandlersWithBaseURL(e, server, "/api/v1")
@@ -21,16 +50,42 @@ func main() {
 }
 
 func (s Server) ReplyPing(ctx echo.Context) error {
-	//return ctx.JSON(200, api.ReplyMessage{Message: "ok"})
-	return ctx.JSON(200, nil)
+	return ctx.JSON(http.StatusOK, api.ReplyMessage{Message: "ok"})
 }
 
 func (s Server) GetVersion(ctx echo.Context) error {
-	return ctx.JSON(200, api.Version{Version: "0.0.1"})
+	return ctx.JSON(http.StatusOK, api.Version{Version: "0.0.1"})
 }
 
 func (s Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsParams) error {
-	return ctx.JSON(200, nil)
+	fmt.Println("--- ListHypervisors")
+	_, err := util.CheckHypervisors(mx.EtcdUrl, mx.NodeName)
+	if err != nil {
+		slog.Error("Check if the hypervisor is up and running", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, nil)
+	}
+	fmt.Println("--- CheckHypervisors")
+
+	// ストレージ容量の更新 結果はDBへ反映
+	err = util.CheckHvVgAll(mx.EtcdUrl, mx.NodeName)
+	if err != nil {
+		slog.Error("Update storage capacity", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, nil)
+	}
+
+	// データベースから情報を取得
+	d, err := db.NewDatabase(mx.EtcdUrl)
+	if err != nil {
+		slog.Error("connect to database", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, nil)
+	}
+	var hvs []db.Hypervisor
+	err = d.GetHvsStatus(&hvs)
+	if err != nil {
+		slog.Error("get hypervisor status", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, nil)
+	}
+	return ctx.JSON(http.StatusOK, hvs)
 }
 
 func (s Server) ListVirtualMachines(ctx echo.Context) error {
