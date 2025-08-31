@@ -14,11 +14,10 @@ import (
 	"github.com/takara9/marmot/pkg/util"
 )
 
-//var EtcdEndpoint string = "http://localhost:3379"
-//var NodeName string = "hvc"
-
+// Echoの実装の構造体、レシーバーとして利用できなさそう
 type Server struct{}
 
+// コールバックで参照できるようにMarmotのインスタンスをグローバルに持つ
 var mx *marmot.Marmot
 
 func main() {
@@ -58,13 +57,11 @@ func (s Server) GetVersion(ctx echo.Context) error {
 }
 
 func (s Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsParams) error {
-	fmt.Println("--- ListHypervisors")
 	_, err := util.CheckHypervisors(mx.EtcdUrl, mx.NodeName)
 	if err != nil {
 		slog.Error("Check if the hypervisor is up and running", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, nil)
 	}
-	fmt.Println("--- CheckHypervisors")
 
 	// ストレージ容量の更新 結果はDBへ反映
 	err = util.CheckHvVgAll(mx.EtcdUrl, mx.NodeName)

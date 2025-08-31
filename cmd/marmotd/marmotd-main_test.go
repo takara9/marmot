@@ -21,15 +21,13 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 	var marmotServer *marmot.Marmot
 
 	BeforeAll(func(ctx SpecContext) {
+		// Marmotサーバーのモック起動
 		GinkgoWriter.Println("Start marmot server mock")
-		startMockServer() // 戻り値なし
-		time.Sleep(5 * time.Second)
+		startMockServer()           // バックグラウンドで起動する
+		time.Sleep(5 * time.Second) // Marmotインスタンスの生成待ち
 		marmotServer, err = marmot.NewMarmot("hvc", "http://127.0.0.1:3379")
-		if err != nil {
-			GinkgoWriter.Println("Error creating MarmotEndpoint:", err)
-		}
 		Expect(err).NotTo(HaveOccurred())
-		mx = marmotServer // ここでセットするとは、適切なのか？
+		mx = marmotServer // グローバル変数に、ここでセットするとは、適切なのか？
 
 		// Dockerコンテナを起動
 		cmd := exec.Command("docker", "run", "-d", "--name", "etcd0", "-p", "3379:2379", "-p", "3380:2380", "-e", "ALLOW_NONE_AUTHENTICATION=yes", "-e", "ETCD_ADVERTISE_CLIENT_URLS=http://127.0.0.1:3379", "bitnami/etcd")
@@ -59,7 +57,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 	Context("基本的なクライアントからのアクセステスト", func() {
 		var hvs config.Hypervisors_yaml
 		var marmotClient *marmot.MarmotEndpoint
-		//var ma *marmot.Marmot
+
 		It("ハイパーバイザーのコンフィグファイルの読み取り", func() {
 			err = config.ReadYAML("testdata/hypervisor-config-hvc.yaml", &hvs)
 			Expect(err).NotTo(HaveOccurred())
