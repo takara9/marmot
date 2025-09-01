@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os/exec"
 	"time"
 
@@ -120,5 +121,51 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			Expect(*hvs[0].FreeCpu).To(Equal(int32(4)))
 			Expect(url).To(BeNil())
 		})
+
+		It("ハイパーバイザーの情報取得", func() {
+			httpStatus, body, url, err := marmotClient.GetHypervisor("hvc")
+			var hv api.Hypervisor
+			Expect(err).NotTo(HaveOccurred())
+			Expect(httpStatus).To(Equal(http.StatusOK))
+			err = json.Unmarshal(body, &hv)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(hv.NodeName).To(Equal("hvc"))
+			Expect(*hv.FreeCpu).To(Equal(int32(4)))
+			Expect(url).To(BeNil())
+		})
+
+		It("存在しないハイパーバイザーの情報取得", func() {
+			httpStatus, body, url, err := marmotClient.GetHypervisor("hvc-noexist")
+			var replyMessage api.ReplyMessage
+			Expect(err).NotTo(HaveOccurred())
+			Expect(httpStatus).To(Equal(http.StatusNotFound))
+			err = json.Unmarshal(body, &replyMessage)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(replyMessage.Message).To(Equal("Hypervisor hvc-noexist not found"))
+			Expect(url).To(BeNil())
+		})
+		/*
+			It("仮想マシンの一覧取得", func() {
+				httpStatus, body, url, err := marmotClient.ListVirtualMachines(nil)
+				var vms []api.VirtualMachine
+				Expect(err).NotTo(HaveOccurred())
+				Expect(httpStatus).To(Equal(200))
+				err = json.Unmarshal(body, &vms)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(len(vms)).To(Equal(0))
+				Expect(url).To(BeNil())
+			})
+
+			It("存在しない仮想マシンの情報取得", func() {
+				httpStatus, body, url, err := marmotClient.GetVirtualMachine("vm-noexist")
+				var replyMessage api.ReplyMessage
+				Expect(err).NotTo(HaveOccurred())
+				Expect(httpStatus).To(Equal(404))
+				err = json.Unmarshal(body, &replyMessage)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(replyMessage.Message).To(Equal("VirtualMachine vm-noexist not found"))
+				Expect(url).To(BeNil())
+			})
+		*/
 	})
 })

@@ -86,7 +86,8 @@ func (s Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPara
 }
 
 func (s Server) ListVirtualMachines(ctx echo.Context) error {
-	return ctx.JSON(200, nil)
+	fmt.Println("ListVirtualMachines")
+	return ctx.JSON(200, "")
 }
 
 func (s Server) CreateCluster(ctx echo.Context) error {
@@ -122,7 +123,53 @@ func (s Server) StartVirtualMachine(ctx echo.Context) error {
 }
 
 func (s Server) ShowHypervisorById(ctx echo.Context, hypervisorId string) error {
-	return ctx.JSON(200, nil)
+	var hvs []db.Hypervisor
+	var hvs2 api.Hypervisor
+	err := mx.Db.GetHvsStatus(&hvs)
+	if err != nil {
+		slog.Error("get hypervisor status", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, nil)
+	}
+
+	if len(hvs) < 1 {
+		slog.Error("No such hypervisor", "id", hypervisorId)
+		return ctx.JSON(http.StatusInternalServerError, nil)
+	}
+
+	for _, v := range hvs {
+		if hypervisorId == v.Nodename {
+			var memory int64 = int64(hvs[0].Memory)
+			var ipaddr string = hvs[0].IpAddr
+			var freecpu int32 = int32(hvs[0].FreeCpu)
+			var freememory int64 = int64(hvs[0].FreeMemory)
+			var status int32 = int32(hvs[0].Status)
+			var stgpool []api.StoragePool
+			for _, v := range hvs[0].StgPool {
+				vg := v.VolGroup
+				fc := int64(v.FreeCap)
+				vc := int64(v.VgCap)
+				tp := v.Type
+				stgpool = append(stgpool, api.StoragePool{
+					VolGroup: &vg,
+					FreeCap:  &fc,
+					VgCap:    &vc,
+					Type:     &tp,
+				})
+			}
+			hvs2 = api.Hypervisor{
+				NodeName:   hvs[0].Nodename,
+				IpAddr:     &ipaddr,
+				Cpu:        int32(hvs[0].Cpu),
+				FreeCpu:    &freecpu,
+				Memory:     &memory,
+				FreeMemory: &freememory,
+				Status:     &status,
+				StgPool:    &stgpool,
+			}
+			return ctx.JSON(http.StatusOK, hvs2)
+		}
+	}
+	return ctx.JSON(http.StatusNotFound, nil)
 }
 
 func (s Server) CreateVmCluster(ctx echo.Context) error {
