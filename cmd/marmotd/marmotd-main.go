@@ -169,7 +169,7 @@ func (s Server) ShowHypervisorById(ctx echo.Context, hypervisorId string) error 
 			return ctx.JSON(http.StatusOK, hvs2)
 		}
 	}
-	return ctx.JSON(http.StatusNotFound, nil)
+	return ctx.JSON(http.StatusNotFound, api.ReplyMessage{Message: "Hypervisor " + hypervisorId + " not found"})
 }
 
 func (s Server) CreateVmCluster(ctx echo.Context) error {
