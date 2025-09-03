@@ -426,7 +426,7 @@ components:
             $ref: "#/components/schemas/storage"
         playbook:
           type: string
-        content:
+        comment:
           type: string
         osLv:
           type: string
@@ -444,7 +444,7 @@ components:
           format: int64
         path:
           type: string
-        type:
+        lv:
           type: string
         vg:
           type: string

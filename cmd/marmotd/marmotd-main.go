@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
@@ -86,8 +87,100 @@ func (s Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPara
 }
 
 func (s Server) ListVirtualMachines(ctx echo.Context) error {
-	fmt.Println("ListVirtualMachines")
-	return ctx.JSON(200, "")
+	fmt.Println("========== ListVirtualMachines ===========")
+	d, err := db.NewDatabase(mx.EtcdUrl)
+	if err != nil {
+		slog.Error("get list virtual machines", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, nil)
+	}
+
+	var vms []db.VirtualMachine
+	err = d.GetVmsStatus(&vms)
+	if err != nil {
+		slog.Error("get status of virtual machines", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, nil)
+	}
+
+	var vms2 []api.VirtualMachine
+	for _, vm := range vms {
+		var memory int64 = int64(vm.Memory)
+		var cpu int32 = int32(vm.Cpu)
+		var status int32 = int32(vm.Status)
+		var uuid string = vm.Uuid.String()
+		var nodename string = vm.Name
+		var privateIp string = vm.PrivateIp
+		var publicIp string = vm.PublicIp
+		var key string = vm.Key
+		var hvnode string = vm.HvNode
+		var clustername string = vm.ClusterName
+		var comment string = vm.Comment
+		var ctime time.Time = vm.Ctime
+		var stime time.Time = vm.Stime
+		var oslv string = vm.OsLv
+		var osvariant string = vm.OsVariant
+		var osvgs string = vm.OsVg
+		var playbook string = vm.Playbook
+		var storages []api.Storage
+
+		for _, s := range vm.Storage {
+			var size int64 = int64(s.Size)
+			storages = append(storages, api.Storage{
+				Name: &s.Name,
+				Path: &s.Path,
+				Size: &size,
+				Vg:   &s.Vg,
+				Lv:   &s.Lv,
+			})
+		}
+
+		/*
+			Storage     *[]Storage `json:"storage,omitempty"`
+		*/
+
+		/*
+			var disk []api.Disk
+			for _, d := range vm.Disk {
+				disk = append(disk, api.Disk{
+					DiskId:   &d.DiskId,
+					Capacity: int64(d.Capacity),
+					Type:     &d.Type,
+					Bus:      &d.Bus,
+				})
+			}
+			var nic []api.Nic
+			for _, n := range vm.Nic {
+				nic = append(nic, api.Nic{
+					NicId: &n.NicId,
+					//Mac:    &n.M
+					Bridge: &n.Bridge,
+					IpAddr: &n.IpAddr,
+					Type:   &n.Type,
+				})
+			}
+		*/
+
+		vms2 = append(vms2, api.VirtualMachine{
+			Uuid:        &uuid,
+			Name:        nodename,
+			PrivateIp:   &privateIp,
+			PublicIp:    &publicIp,
+			Cpu:         &cpu,
+			Memory:      &memory,
+			Status:      &status,
+			Key:         &key,
+			HvNode:      hvnode,
+			ClusterName: &clustername,
+			Comment:     &comment,
+			CTime:       &ctime,
+			STime:       &stime,
+			OsLv:        &oslv,
+			OsVg:        &osvgs,
+			OsVariant:   &osvariant,
+			Playbook:    &playbook,
+			Storage:     &storages,
+		})
+	}
+	return ctx.JSON(http.StatusOK, vms2)
 }
 
 func (s Server) CreateCluster(ctx echo.Context) error {

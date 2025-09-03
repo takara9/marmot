@@ -70,10 +70,10 @@ type Version struct {
 
 // Storage defines model for storage.
 type Storage struct {
+	Lv   *string `json:"lv,omitempty"`
 	Name *string `json:"name,omitempty"`
 	Path *string `json:"path,omitempty"`
 	Size *int64  `json:"size,omitempty"`
-	Type *string `json:"type,omitempty"`
 	Vg   *string `json:"vg,omitempty"`
 }
 
@@ -90,7 +90,7 @@ type VirtualMachine struct {
 	HvNode      string     `json:"HvNode"`
 	CTime       *time.Time `json:"cTime,omitempty"`
 	ClusterName *string    `json:"clusterName,omitempty"`
-	Content     *string    `json:"content,omitempty"`
+	Comment     *string    `json:"comment,omitempty"`
 	Cpu         *int32     `json:"cpu,omitempty"`
 	Key         *string    `json:"key,omitempty"`
 	Memory      *int64     `json:"memory,omitempty"`

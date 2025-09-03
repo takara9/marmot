@@ -144,18 +144,19 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			Expect(replyMessage.Message).To(Equal("Hypervisor hvc-noexist not found"))
 			Expect(url).To(BeNil())
 		})
-		/*
-			It("仮想マシンの一覧取得", func() {
-				httpStatus, body, url, err := marmotClient.ListVirtualMachines(nil)
-				var vms []api.VirtualMachine
-				Expect(err).NotTo(HaveOccurred())
-				Expect(httpStatus).To(Equal(200))
-				err = json.Unmarshal(body, &vms)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(len(vms)).To(Equal(0))
-				Expect(url).To(BeNil())
-			})
+		It("仮想マシンの一覧取得", func() {
+			httpStatus, body, url, err := marmotClient.ListVirtualMachines(nil)
+			var vms []api.VirtualMachine
+			Expect(err).NotTo(HaveOccurred())
+			Expect(httpStatus).To(Equal(200))
+			err = json.Unmarshal(body, &vms)
+			GinkgoWriter.Println("err = ", err)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(vms)).To(Equal(0))
+			Expect(url).To(BeNil())
+		})
 
+		/*
 			It("存在しない仮想マシンの情報取得", func() {
 				httpStatus, body, url, err := marmotClient.GetVirtualMachine("vm-noexist")
 				var replyMessage api.ReplyMessage
