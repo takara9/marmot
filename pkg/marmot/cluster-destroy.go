@@ -10,7 +10,7 @@ import (
 )
 
 // コールバック VMクラスタの削除
-func (m *marmot) DestroyCluster(c *gin.Context) {
+func (m *Marmot) DestroyCluster(c *gin.Context) {
 	var cnf cf.MarmotConfig
 	if err := c.BindJSON(&cnf); err != nil {
 		slog.Error("prepare to delete cluster", "err", err)
@@ -25,7 +25,7 @@ func (m *marmot) DestroyCluster(c *gin.Context) {
 }
 
 // クラスタ削除
-func (m *marmot) destroyCluster(cnf cf.MarmotConfig) error {
+func (m *Marmot) destroyCluster(cnf cf.MarmotConfig) error {
 	var NotFound bool = true
 	for _, spec := range cnf.VMSpec {
 		// クラスタ名とホスト名の重複チェック

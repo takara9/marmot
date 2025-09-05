@@ -17,7 +17,7 @@ import (
 )
 
 // VMの作成
-func (m *marmot) CreateVm(c *gin.Context) {
+func (m *Marmot) CreateVm(c *gin.Context) {
 	slog.Info("create vm", "etcd", m.EtcdUrl)
 	var spec cf.VMSpec
 	err := c.BindJSON(&spec)
@@ -35,7 +35,7 @@ func (m *marmot) CreateVm(c *gin.Context) {
 }
 
 // VMを生成する
-func (m *marmot) createVM(spec cf.VMSpec) error {
+func (m *Marmot) createVM(spec cf.VMSpec) error {
 	var err error
 	var dom virt.Domain
 	err = virt.ReadXml("temp.xml", &dom)

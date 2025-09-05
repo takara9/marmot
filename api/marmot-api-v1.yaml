@@ -33,7 +33,7 @@ paths:
   /ping:
     get:
       summary: "Alive"
-      operationId: getPong
+      operationId: replyPing
       tags:
         - alive
       responses:
@@ -42,7 +42,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Pong"
+                $ref: "#/components/schemas/ReplyMessage"
   /hypervisors:
     get:
       summary: "List Hypervisors"
@@ -426,7 +426,7 @@ components:
             $ref: "#/components/schemas/storage"
         playbook:
           type: string
-        content:
+        comment:
           type: string
         osLv:
           type: string
@@ -442,7 +442,7 @@ components:
         size:
           type: integer
           format: int64
-        paths:
+        path:
           type: string
         lv:
           type: string
@@ -473,7 +473,11 @@ components:
           type: string
         net_dev_private:
           type: string
+        net_dev_public:
+          type: string
         public_ip_gw:
+          type: string
+        public_ip_dns:
           type: string
         vm_spec:
           type: array
@@ -497,7 +501,7 @@ components:
           type: string
         playbook:
           type: string
-        content:
+        comment:
           type: string
         uuid:
           type: string
@@ -525,3 +529,11 @@ components:
           format: int32
         message:
           type: string
+    ReplyMessage:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "ok"
+      required:
+        - message

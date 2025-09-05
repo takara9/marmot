@@ -120,7 +120,7 @@ var _ = Describe("Marmot", func() {
 
 	Context("VMクラスタの生成と削除", func() {
 		var cnf cf.MarmotConfig
-		var m *marmot
+		var m *Marmot
 
 		It("Create Marmot Instance", func() {
 			var err error
@@ -155,7 +155,7 @@ var _ = Describe("Marmot", func() {
 
 	Context("VMクラスタの生成と一時停止と再開", func() {
 		var cnf cf.MarmotConfig
-		var m *marmot
+		var m *Marmot
 
 		It("Create Marmot Instance", func() {
 			var err error
@@ -193,7 +193,7 @@ var _ = Describe("Marmot", func() {
 
 	Context("VMクラスタの２重起動の防止", func() {
 		var cnf cf.MarmotConfig
-		var m *marmot
+		var m *Marmot
 
 		It("Create Marmot Instance", func() {
 			var err error

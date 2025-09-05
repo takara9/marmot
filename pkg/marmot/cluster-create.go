@@ -12,7 +12,7 @@ import (
 )
 
 // コールバック VMクラスタの作成
-func (m *marmot) CreateCluster(c *gin.Context) {
+func (m *Marmot) CreateCluster(c *gin.Context) {
 	var cnf cf.MarmotConfig
 	if err := c.BindJSON(&cnf); err != nil {
 		slog.Error("create vm cluster", "err", err)
@@ -33,7 +33,7 @@ func (m *marmot) CreateCluster(c *gin.Context) {
 }
 
 // コンフィグからVMクラスタを作成する
-func (m *marmot) createCluster(cnf cf.MarmotConfig) error {
+func (m *Marmot) createCluster(cnf cf.MarmotConfig) error {
 	var err error
 	// リクエスト送信前にコンフィグのチェックを実施する
 	for _, spec := range cnf.VMSpec {
