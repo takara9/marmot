@@ -142,3 +142,21 @@ func (m *MarmotEndpoint) ListVirtualMachines(params map[string]string) (int, []b
 }
 
 // Additional methods for other API endpoints can be added here following the same pattern.			
+
+func (m *MarmotEndpoint) CreateCluster(params map[string]string) (int, []byte, *url.URL, error) {
+	fmt.Println("Client: ListVirtualMachines")
+	url, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/createCluster")
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	req, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	req.Header.Set("User-Agent", "MarmotdClient/1.0")
+	req.Header.Set("Accept", "application/json")
+
+
+
+	return m.httpRequest(req)
+}

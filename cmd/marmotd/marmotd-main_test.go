@@ -156,6 +156,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			Expect(url).To(BeNil())
 		})
 
+		// APIに存在していないが、本来は必要な機能なはず
 		/*
 			It("存在しない仮想マシンの情報取得", func() {
 				httpStatus, body, url, err := marmotClient.GetVirtualMachine("vm-noexist")
@@ -168,5 +169,15 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 				Expect(url).To(BeNil())
 			})
 		*/
+
+		It("クラスタの生成 作成途中", func() {
+			httpStatus, body, url, err := marmotClient.CreateCluster(nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(httpStatus).To(Equal(404))
+			var replyMessage api.ReplyMessage
+			err = json.Unmarshal(body, &replyMessage)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(url).To(BeNil())
+		})
 	})
 })
