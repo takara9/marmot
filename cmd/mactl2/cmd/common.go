@@ -17,7 +17,7 @@ import (
 
 // 共通関数 GET
 func ReqGet(apipath string, api string) (*http.Response, []byte, error) {
-	res, err := http.Get(fmt.Sprintf("%s/%s", api, apipath))
+	res, err := http.Get(fmt.Sprintf("%s/api/v1/%s", api, apipath))
 	if err != nil {
 		slog.Error("request by HTTP GET", "err", err)
 		return nil, nil, err
@@ -30,6 +30,38 @@ func ReqGet(apipath string, api string) (*http.Response, []byte, error) {
 		return nil, nil, err
 	}
 	return res, byteBody, err
+}
+
+// 共通関数 POST
+func ReqRest(cnf cf.MarmotConfig, apipath string, api string) (*http.Response, []byte, error) {
+	byteJSON, _ := json.MarshalIndent(cnf, "", "    ")
+	reqURL := fmt.Sprintf("%s/api/v1/%s", api, apipath)
+	request, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
+	if err != nil {
+		slog.Error("request by HTTP-POST", "err", err)
+		return nil, nil, err
+	}
+
+	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
+	client := &http.Client{}
+	resp, err := client.Do(request)
+	if err != nil {
+		slog.Error("http client", "err", err)
+		return resp, nil, err
+	}
+	defer resp.Body.Close()
+
+	// レスポンスを取得する
+	body, err := io.ReadAll(resp.Body)
+	var ErrMsg msg
+	if resp.StatusCode != 200 {
+		fmt.Println("失敗")
+		json.Unmarshal(body, &ErrMsg)
+		fmt.Println("エラーメッセージ:", ErrMsg.Msg)
+	} else {
+		fmt.Println("成功終了")
+	}
+	return resp, body, err
 }
 
 // 仮想マシンのリスト表示
@@ -77,38 +109,6 @@ func ListVm(cnf cf.MarmotConfig, api string) error {
 	}
 	dec.Token()
 	return nil
-}
-
-// 共通関数 POST
-func ReqRest(cnf cf.MarmotConfig, apipath string, api string) (*http.Response, []byte, error) {
-	byteJSON, _ := json.MarshalIndent(cnf, "", "    ")
-	reqURL := fmt.Sprintf("%s/%s", api, apipath)
-	request, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
-	if err != nil {
-		slog.Error("request by HTTP-POST", "err", err)
-		return nil, nil, err
-	}
-
-	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
-	client := &http.Client{}
-	resp, err := client.Do(request)
-	if err != nil {
-		slog.Error("http client", "err", err)
-		return resp, nil, err
-	}
-	defer resp.Body.Close()
-
-	// レスポンスを取得する
-	body, err := io.ReadAll(resp.Body)
-	var ErrMsg msg
-	if resp.StatusCode != 200 {
-		fmt.Println("失敗")
-		json.Unmarshal(body, &ErrMsg)
-		fmt.Println("エラーメッセージ:", ErrMsg.Msg)
-	} else {
-		fmt.Println("成功終了")
-	}
-	return resp, body, err
 }
 
 // Ansible Playbook の適用

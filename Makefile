@@ -1,4 +1,4 @@
-PROGRAMS = vm-server vm-client hv-admin mactl2
+PROGRAMS = vm-server vm-client hv-admin mactl2 marmotd
 all:	$(PROGRAMS)
 
 MAKE = /usr/bin/make
@@ -8,6 +8,7 @@ BINDIR = $(CURDIR)/marmot-v$(TAG)
 
 $(PROGRAMS):
 	oapi-codegen -config api/config-v1.yaml api/marmot-api-v1.yaml
+	npx @redocly/cli build-docs api/marmot-api-v1.yaml -o api/marmot-api-v1.html
 	mkdir -p $(BINDIR)
 	cd cmd/$@ && $(MAKE)
 

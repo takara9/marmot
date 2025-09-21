@@ -120,7 +120,7 @@ var _ = Describe("Marmot", func() {
 
 	Context("VMクラスタの生成と削除", func() {
 		var cnf cf.MarmotConfig
-		var m *marmot
+		var m *Marmot
 
 		It("Create Marmot Instance", func() {
 			var err error
@@ -136,7 +136,7 @@ var _ = Describe("Marmot", func() {
 		})
 
 		It("Create Cluster()", func() {
-			err := m.createCluster(cnf)
+			err := m.CreateCluster2(cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -155,7 +155,7 @@ var _ = Describe("Marmot", func() {
 
 	Context("VMクラスタの生成と一時停止と再開", func() {
 		var cnf cf.MarmotConfig
-		var m *marmot
+		var m *Marmot
 
 		It("Create Marmot Instance", func() {
 			var err error
@@ -171,7 +171,7 @@ var _ = Describe("Marmot", func() {
 		})
 
 		It("Create Cluster()", func() {
-			err := m.createCluster(cnf)
+			err := m.CreateCluster2(cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -193,7 +193,7 @@ var _ = Describe("Marmot", func() {
 
 	Context("VMクラスタの２重起動の防止", func() {
 		var cnf cf.MarmotConfig
-		var m *marmot
+		var m *Marmot
 
 		It("Create Marmot Instance", func() {
 			var err error
@@ -208,12 +208,12 @@ var _ = Describe("Marmot", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 		It("クラスターの起動", func() {
-			err := m.createCluster(cnf)
+			err := m.CreateCluster2(cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("クラスターの２重起動 エラー発生が発生", func() {
-			err := m.createCluster(cnf)
+			err := m.CreateCluster2(cnf)
 			Expect(err).To(HaveOccurred())
 		})
 

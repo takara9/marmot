@@ -11,14 +11,14 @@ import (
 )
 
 // main から　Marmot を分離する？
-type marmot struct {
+type Marmot struct {
 	NodeName string
 	EtcdUrl  string
 	Db       *db.Database
 }
 
-func NewMarmot(nodeName string, etcdUrl string) (*marmot, error) {
-	var m marmot
+func NewMarmot(nodeName string, etcdUrl string) (*Marmot, error) {
+	var m Marmot
 	var err error
 	m.Db, err = db.NewDatabase(etcdUrl)
 	if err != nil {
@@ -30,13 +30,13 @@ func NewMarmot(nodeName string, etcdUrl string) (*marmot, error) {
 }
 
 // コールバック アクセステスト用
-func (m *marmot) AccessTest(c *gin.Context) {
+func (m *Marmot) AccessTest(c *gin.Context) {
 	// チェック機能を追加して、最終的にOK/NGを返す
 	c.JSON(200, gin.H{"message": "ok"})
 }
 
 // コールバック ハイパーバイザーの状態取得
-func (m *marmot) ListHypervisor(c *gin.Context) {
+func (m *Marmot) ListHypervisor(c *gin.Context) {
 	// ハイパーバイザーの稼働チェック　結果はDBへ反映
 	_, err := ut.CheckHypervisors(m.EtcdUrl, m.NodeName)
 	if err != nil {
@@ -67,7 +67,7 @@ func (m *marmot) ListHypervisor(c *gin.Context) {
 }
 
 // コールバック 仮想マシンのリスト
-func (m *marmot) ListVirtualMachines(c *gin.Context) {
+func (m *Marmot) ListVirtualMachines(c *gin.Context) {
 	d, err := db.NewDatabase(m.EtcdUrl)
 	if err != nil {
 		slog.Error("get list virtual machines", "err", err)

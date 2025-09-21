@@ -24,7 +24,6 @@ var cfgFile string
 var apiEndpoint string
 var ClusterConfig string
 
-//var ClusterConfig string
 
 // BODYのJSONエラーメッセージ処理用
 type msg struct {
@@ -48,11 +47,15 @@ func Execute() {
 }
 
 func init() {
-	cf.ReadConfig(filepath.Join(os.Getenv("HOME"), ".config_marmot"), &DefaultConfig)
 	// パラメーター > コンフィグ
+	cf.ReadConfig(filepath.Join(os.Getenv("HOME"), ".config_marmot"), &DefaultConfig)
 	if len(DefaultConfig.ApiServerUrl) > 0 {
 		ApiUrl += DefaultConfig.ApiServerUrl
 	}
+
+	// marmot-client の初期化
+	// NewMarmotdEp()
+
 	rootCmd.PersistentFlags().StringVar(&apiEndpoint, "api", "", "API Endpoint URL (default is $HOME/.config_marmot)")
 	rootCmd.Flags().BoolP("toggle", "t", false, "ヘルプメッセージの表示を切り替えます")
 }

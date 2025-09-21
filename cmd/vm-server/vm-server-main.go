@@ -43,15 +43,15 @@ func main() {
 	router := gin.Default()
 
 	// 状態取得
-	router.GET("/ping", m.AccessTest)
-	router.GET("/hypervisors", m.ListHypervisor)
-	router.GET("/virtualMachines", m.ListVirtualMachines)
+	router.GET("/ping", m.AccessTest)                     //OK
+	router.GET("/hypervisors", m.ListHypervisor)          //OK
+	router.GET("/virtualMachines", m.ListVirtualMachines) //
 
 	// マスター処理
-	router.POST("/createCluster", m.CreateCluster)
-	router.POST("/destroyCluster", m.DestroyCluster)
-	router.POST("/createVm", m.CreateVm)
-	router.POST("/destroyVm", m.DestroyVm)
+	router.POST("/createCluster", m.CreateCluster)   //OK
+	router.POST("/destroyCluster", m.DestroyCluster) //OK
+	router.POST("/createVm", m.CreateVm)             //OK
+	router.POST("/destroyVm", m.DestroyVm)           //OK
 
 	// リモート処理
 	router.POST("/stopCluster", m.StopCluster)

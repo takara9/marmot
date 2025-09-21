@@ -33,7 +33,7 @@ paths:
   /ping:
     get:
       summary: "Alive"
-      operationId: getPong
+      operationId: replyPing
       tags:
         - alive
       responses:
@@ -42,7 +42,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Pong"
+                $ref: "#/components/schemas/ReplyMessage"
   /hypervisors:
     get:
       summary: "List Hypervisors"
@@ -251,67 +251,7 @@ paths:
           description: The id of the pet to retrieve
           schema:
             type: string
-  /vm-clusters:
-    post:
-      summary: "Create VM Cluster"
-      operationId: createVmCluster
-      tags:
-        - vm-cluster
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/Pong"
-      responses:
-        "201":
-          description: VM Cluster Created Successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Pong"
 
-    delete:
-      summary: "Delete VM Cluster"
-      operationId: deleteVmCluster
-      tags:
-        - vm-cluster
-      responses:
-        "204":
-          description: VM Cluster Deleted Successfully
-
-    get:
-      summary: "List VM Clusters"
-      operationId: listVmClusters
-      tags:
-        - vm-cluster
-      responses:
-        "200":
-          description: List of VM Clusters
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Pong"
-
-    put:
-      summary: "Update VM Cluster"
-      operationId: updateVmCluster
-      tags:
-        - vm-cluster
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/Pong"
-
-      responses:
-        "200":
-          description: VM Cluster Updated Successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Pong"
 components:
   schemas:
     Pong:
@@ -426,7 +366,7 @@ components:
             $ref: "#/components/schemas/storage"
         playbook:
           type: string
-        content:
+        comment:
           type: string
         osLv:
           type: string
@@ -442,11 +382,13 @@ components:
         size:
           type: integer
           format: int64
-        paths:
+        path:
           type: string
         lv:
           type: string
         vg:
+          type: string
+        type:
           type: string
     MarmotConfig:
       type: object
@@ -473,7 +415,11 @@ components:
           type: string
         net_dev_private:
           type: string
+        net_dev_public:
+          type: string
         public_ip_gw:
+          type: string
+        public_ip_dns:
           type: string
         vm_spec:
           type: array
@@ -497,7 +443,7 @@ components:
           type: string
         playbook:
           type: string
-        content:
+        comment:
           type: string
         uuid:
           type: string
@@ -525,3 +471,11 @@ components:
           format: int32
         message:
           type: string
+    ReplyMessage:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "ok"
+      required:
+        - message

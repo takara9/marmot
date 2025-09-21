@@ -64,12 +64,6 @@ func CreateSnapshot(vgx string, lvx string, svx string, size uint64) error {
 		return err
 	}
 
-	/*
-		_, err = vg.LookupLogicalVolume(lvx)
-		if err == nil {
-			return err
-		}
-	*/
 	_, err = vg.CreateLogicalVolumeSnapshot(svx, size, tags, lvx)
 	if err == nil {
 		return err

@@ -21,7 +21,6 @@ func ReadHvConfig() (cf.Hypervisors_yaml, DefaultConfig, error) {
 
 	err := cf.ReadConfig(filepath.Join(os.Getenv("HOME"), ".config_marmot"), &cnf)
 	if err != nil {
-		//return nil, nil, err
 		return hvs, cnf, err
 	}
 
@@ -30,7 +29,6 @@ func ReadHvConfig() (cf.Hypervisors_yaml, DefaultConfig, error) {
 	flag.Parse()
 	err = cf.ReadYAML(*config, &hvs)
 	if err != nil {
-		//return nil, nil, err
 		return hvs, cnf, err
 	}
 
@@ -40,12 +38,10 @@ func ReadHvConfig() (cf.Hypervisors_yaml, DefaultConfig, error) {
 func SetHvConfig(hvs cf.Hypervisors_yaml, cnf DefaultConfig) error {
 
 	// etcdへ接続
-	//Conn, err := db.Connect(cnf.EtcdServerUrl)
 	d, err := db.NewDatabase(cnf.EtcdServerUrl)
 	if err != nil {
 		return err
 	}
-	//defer Conn.Close()
 
 	// ハイパーバイザー
 	for _, hv := range hvs.Hvs {

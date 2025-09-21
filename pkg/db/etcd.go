@@ -15,21 +15,6 @@ import (
 	cf "github.com/takara9/marmot/pkg/config"
 )
 
-/*
-   タイムアウトを取る様に修正が必要
-   テスト
-   GoDoc
-*/
-
-// etcdへ接続
-//func Connect(url1 string) (*etcd.Client, error) {
-//	conn, err := etcd.New(etcd.Config{
-//		Endpoints:   []string{url1},
-//		DialTimeout: 2 * time.Second,
-//	})
-//	return conn, err
-//}
-
 type Database struct {
 	Cli *etcd.Client
 	Ctx context.Context
@@ -49,9 +34,7 @@ func NewDatabase(url string) (*Database, error) {
 
 // 前方一致のサーチ
 func (d *Database) GetEtcdByPrefix(key string) (*etcd.GetResponse, error) {
-	//ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	resp, err := d.Cli.Get(d.Ctx, key, etcd.WithPrefix())
-	//cancel()
 	return resp, err
 }
 
@@ -59,10 +42,7 @@ func (d *Database) GetEtcdByPrefix(key string) (*etcd.GetResponse, error) {
 func (d *Database) GetHvByKey(key string) (Hypervisor, error) {
 	var hv Hypervisor
 
-	//ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	resp, err := d.Cli.Get(d.Ctx, key)
-	//cancel()
-
 	if err != nil {
 		return hv, err
 	}
@@ -83,10 +63,7 @@ func (d *Database) GetVmByKey(key string) (VirtualMachine, error) {
 		return vm, errors.New("not found")
 	}
 
-	//ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	resp, err := d.Cli.Get(d.Ctx, key)
-	//cancel()
-
 	if err != nil {
 		return vm, err
 	}
@@ -103,9 +80,7 @@ func (d *Database) GetVmByKey(key string) (VirtualMachine, error) {
 func (d *Database) GetOsImgTempByKey(osv string) (string, string, error) {
 
 	key := fmt.Sprintf("OSI_%v", osv)
-	//ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	resp, err := d.Cli.Get(d.Ctx, key)
-	//cancel()
 	if err != nil {
 		return "", "", err
 	}
@@ -125,10 +100,7 @@ func (d *Database) GetOsImgTempByKey(osv string) (string, string, error) {
 func (d *Database) GetEtcdByKey(path string) (DNSEntry, error) {
 
 	var entry DNSEntry
-	//key := fmt.Sprintf("OSI_%v", osv)
-	//ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	resp, err := d.Cli.Get(d.Ctx, path)
-	//cancel()
 	if err != nil {
 		return entry, err
 	}
@@ -137,7 +109,6 @@ func (d *Database) GetEtcdByKey(path string) (DNSEntry, error) {
 		return entry, errors.New("not found")
 	}
 
-	//var oit OsImageTemplate
 	err = json.Unmarshal([]byte(resp.Kvs[0].Value), &entry)
 	if err != nil {
 		return entry, err
@@ -147,9 +118,7 @@ func (d *Database) GetEtcdByKey(path string) (DNSEntry, error) {
 
 // 削除 キーに一致したデータ
 func (d *Database) DelByKey(key string) error {
-	//ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	_, err := d.Cli.Delete(d.Ctx, key)
-	//cancel()
 	return err
 }
 
@@ -159,7 +128,6 @@ func (d *Database) GetHvsStatus(hvs *[]Hypervisor) error {
 	if err != nil {
 		return err
 	}
-	//var hv Hypervisor
 	for _, ev := range resp.Kvs {
 		var hv Hypervisor
 		err = json.Unmarshal([]byte(ev.Value), &hv)
@@ -177,8 +145,6 @@ func (d *Database) GetVmsStatus(vms *[]VirtualMachine) error {
 	if err != nil {
 		return err
 	}
-	//var vm VirtualMachine  ここに書くと、ループ内で初期化されないで、
-	//                       上書きされるので、バグの原因になる。
 	for _, ev := range resp.Kvs {
 		var vm VirtualMachine // ここに宣言することで、ループ毎に初期化される
 		err = json.Unmarshal(ev.Value, &vm)

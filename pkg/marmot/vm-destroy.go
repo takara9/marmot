@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/takara9/marmot/api"
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/lvm"
@@ -18,7 +19,7 @@ import (
 )
 
 // VMの削除
-func (m *marmot) DestroyVm(c *gin.Context) {
+func (m *Marmot) DestroyVm(c *gin.Context) {
 	slog.Info("destroy vm", "etcd", m.EtcdUrl)
 
 	var spec cf.VMSpec
@@ -36,7 +37,7 @@ func (m *marmot) DestroyVm(c *gin.Context) {
 }
 
 // VMの削除
-func (m *marmot) destroyVM(spec cf.VMSpec) error {
+func (m *Marmot) destroyVM(spec cf.VMSpec) error {
 	vm, err := m.Db.GetVmByKey(spec.Key)
 	if err != nil {
 		slog.Error("", "err", err)
@@ -114,6 +115,66 @@ func destroyRemoteVM(hvNode string, spec cf.VMSpec) error {
 	body, _ := io.ReadAll(response.Body)
 	if response.StatusCode != 200 {
 		return errors.New(string(body))
+	}
+	return nil
+}
+
+// VMの削除
+func (m *Marmot) DestroyVM2(spec api.VmSpec) error {
+	fmt.Println("============== DestroyVM2 ==========")
+	if spec.Key != nil {
+		fmt.Println("key=", *spec.Key)
+	}
+	vm, err := m.Db.GetVmByKey(*spec.Key)
+	if err != nil {
+		slog.Error("", "err", err)
+	}
+
+	// ハイパーバイザーのリソース削減保存のため値を取得
+	hv, err := m.Db.GetHvByKey(vm.HvNode)
+	if err != nil {
+		slog.Error("", "err", err)
+	}
+
+	// ステータスを調べて停止中であれば、足し算しない。
+	if vm.Status != db.STOPPED || vm.Status == db.ERROR {
+		hv.FreeCpu = hv.FreeCpu + vm.Cpu
+		hv.FreeMemory = hv.FreeMemory + vm.Memory
+		err = m.Db.PutDataEtcd(hv.Key, hv)
+		if err != nil {
+			slog.Error("", "err", err)
+		}
+	}
+
+	// データベースから削除
+	err = m.Db.DelByKey(*spec.Key)
+	if err != nil {
+		slog.Error("", "err", err)
+	}
+
+	// 仮想マシンの停止＆削除
+	url := "qemu:///system"
+	err = virt.DestroyVM(url, *spec.Key)
+	if err != nil {
+		slog.Error("", "err", err)
+	}
+
+	// OS LVを削除
+	err = lvm.RemoveLV(vm.OsVg, vm.OsLv)
+	if err != nil {
+		slog.Error("", "err", err)
+	}
+	// ストレージの更新
+	util.CheckHvVG2(m.EtcdUrl, m.NodeName, vm.OsVg)
+
+	// データLVを削除
+	for _, dd := range vm.Storage {
+		err = lvm.RemoveLV(dd.Vg, dd.Lv)
+		if err != nil {
+			slog.Error("", "err", err)
+		}
+		// ストレージの更新
+		util.CheckHvVG2(m.EtcdUrl, m.NodeName, dd.Vg)
 	}
 	return nil
 }

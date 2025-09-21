@@ -51,7 +51,6 @@ func getHypervisors(dbUrl string) ([]db.Hypervisor, error) {
 
 // ハイパーバイザーをREST-APIでアクセスして疎通を確認、DBへ反映させる
 func CheckHypervisors(dbUrl string, node string) ([]db.Hypervisor, error) {
-//func CheckHypervisors(m marmot) ([]db.Hypervisor, error) {
 	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
 		slog.Error("", "err", err)
@@ -83,9 +82,6 @@ func ReqGetQuick(apipath string, api string) (*http.Response, []byte, error) {
 		Timeout: 2 * time.Second,
 	}
 	// HTTP GET
-	xxx := fmt.Sprintf("%s/%s", api, apipath)
-	fmt.Println("xxxxxxxxxxxxxxxxxxxx = ", xxx)
-
 	res, err := client.Get(fmt.Sprintf("%s/%s", api, apipath))
 	if err != nil {
 		log.Printf("--------%v------------ %v", res, err)
