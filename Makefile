@@ -12,8 +12,9 @@ $(PROGRAMS):
 	mkdir -p $(BINDIR)
 	cd cmd/$@ && $(MAKE)
 
-
 setup:
+	cp TAG pkg/marmotd/version.txt
+	cp TAG cmd/mactl2/version.txt
 	env GOFLAGS= go install golang.org/x/tools/cmd/goimports@latest
 	env GOFLAGS= go install honnef.co/go/tools/cmd/staticcheck@latest
 	env GOFLAGS= go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest

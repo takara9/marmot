@@ -1,6 +1,3 @@
-/*
-Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-*/
 package cmd
 
 import (
@@ -15,7 +12,18 @@ var versionCmd = &cobra.Command{
 	Short: "バージョンの表示",
 	Long:  `marmot クライアントのバージョンを表示します。`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("version: 0.8.7")
+
+		m, err := getClientConfig()
+		if err != nil {
+			fmt.Println("err=", err)
+			return
+		}
+		JsonVersion, err := m.GetVersion()
+		if err != nil {
+			fmt.Println("err=", err)
+			return
+		}
+		fmt.Println(string(JsonVersion.Version))
 	},
 }
 

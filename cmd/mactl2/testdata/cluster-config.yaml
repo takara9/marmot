@@ -1,0 +1,22 @@
+domain: labo.local
+os_variant:  ubuntu22.04
+cluster_name: test
+vm_spec:
+  - name: "srv3"
+    cpu: 1
+    memory: 1024
+    private_ip: "172.16.99.11"
+    storage:
+    - name: data
+      size: 10
+      vg:   vg2
+    comment: "test node #1"
+  - name: "srv4"
+    cpu: 1
+    memory: 1024
+    private_ip: "172.16.99.12"
+    storage:
+    - name: data
+      size: 10
+      vg:   vg2
+    comment: "test node #2"

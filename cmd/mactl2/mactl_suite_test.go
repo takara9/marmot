@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestMarmotd(t *testing.T) {
+func TestUtil(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Marmotd Test Suite")
+	RunSpecs(t, "Util Suite")
 }

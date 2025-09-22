@@ -1,10 +1,9 @@
-package main
+package marmotd
 
 import (
 	"time"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 )
 
@@ -98,6 +97,7 @@ func convVMinfoDBtoAPI(vms []db.VirtualMachine) []api.VirtualMachine {
 	return vms2
 }
 
+/*
 // 新APIから旧APIの構造体へ変換する
 func convConfClusterNew2Old(acnf api.MarmotConfig) config.MarmotConfig {
 	var cnf config.MarmotConfig
@@ -261,3 +261,4 @@ func convConfClusterOld2New(cnf config.MarmotConfig) api.MarmotConfig {
 	acnf.VmSpec = &vmSpec
 	return acnf
 }
+*/

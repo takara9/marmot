@@ -1,36 +1,29 @@
 GO=/usr/local/go/bin/go
-PROGRAM	= mactl2
+PROGRAM	= marmotd
 all:	$(PROGRAM)
 
 TAG := $(shell cat ../../TAG)
 BINDIR = ../../marmot-v$(TAG)
-TESTBINDIR = bin
 
 $(PROGRAM): $(%.go)
 	echo $(BINDIR)
 	mkdir -p $(BINDIR)
-	$(GO) build -o $(BINDIR)/$@ $^
-
-mactl2-test: $(%.go)
-	echo $(TESTBINDIR)
-	mkdir -p $(TESTBINDIR)
-	$(GO) build -o $(TESTBINDIR)/$@ $^
+	go build -o $(BINDIR)/$@ $^
 
 .PHONY:	clean
 clean:
 	rm -fr $(BINDIR)
-	rm -fr $(TESTBINDIR)
 
 .PHONY:	install
 install:
 	rm -f /usr/local/bin/$(PROGRAM)
 	install -m 0755 $(PROGRAM) /usr/local/bin
 
-.PHONY:	set-version
-set-version:
-	sed s/MARMOT_VERSION/${TAG}/ cmd/version._ > cmd/version.go
-
 .PHONY: test
 test:
 	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -coverprofile cover.out
-	#$(GINKGO) -v --race --focus-file mactl_test.go
+	#$(GINKGO) -v --race --focus-file mock-server_test.go
+
+.PHONY:	set-version
+set-version:
+	sed s/MARMOT_VERSION/${TAG}/ cmd/version._ > cmd/version.go
