@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	cf "github.com/takara9/marmot/pkg/config"
+	"github.com/takara9/marmot/pkg/config"
 )
 
 var stopCmd = &cobra.Command{

@@ -1,15 +1,14 @@
 package cmd
 
 import (
+	"fmt"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/takara9/marmot/pkg/config"
-	db "github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmot"
 )
 
@@ -33,7 +32,7 @@ func getClientConfig() (*marmot.MarmotEndpoint, error) {
 		u.Host,
 		"/api/v1",
 		60,
-	), nil
+	)
 }
 
 // Ansible Playbook の適用
