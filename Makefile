@@ -26,7 +26,6 @@ test:
 .PHONY:	package
 package: clean all
 	@echo $(TAG)
-	cd cmd/mactl2 && $(MAKE) set-version && cd ../..
 	cp cmd/install.sh $(BINDIR)/install.sh
 	cp cmd/vm-client/config_marmot $(BINDIR)/config_marmot
 	tar czvf marmot-v$(TAG).tgz marmot-v$(TAG)
