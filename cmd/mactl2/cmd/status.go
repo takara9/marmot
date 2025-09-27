@@ -29,8 +29,6 @@ var statusCmd = &cobra.Command{
 			return
 		}
 
-		//ListVm(cnf, ApiUrl)
-
 		_, byteBody, _, err := m.ListVirtualMachines(nil)
 		if err != nil {
 			slog.Error("list vms", "err", err)
@@ -73,7 +71,6 @@ var statusCmd = &cobra.Command{
 			}
 		}
 		dec.Token()
-
 	},
 }
 

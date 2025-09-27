@@ -7,7 +7,6 @@ import (
 	"github.com/takara9/marmot/pkg/config"
 )
 
-// startCmd represents the start command
 var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "停止中の仮想マシンを開始します。",

@@ -1,0 +1,20 @@
+[Unit]
+Description=marmot - vm cluster service
+Documentation=https://github.com/takara9/marmot
+Documentation=man:marmot
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=GIN_MODE=release
+User=root
+Group=root
+PermissionsStartOnly=true
+Restart=always
+
+ExecStart=/bin/sh -c "cd /usr/local/marmot;/usr/local/marmot/marmotd --node=hvc --etcd=http://localhost:2379"
+
+[Install]
+WantedBy=multi-user.target
+Alias=marmot.service

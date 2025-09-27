@@ -7,7 +7,6 @@ import (
 	cf "github.com/takara9/marmot/pkg/config"
 )
 
-// stopCmd represents the stop command
 var stopCmd = &cobra.Command{
 	Use:   "stop",
 	Short: "管理下の仮想マシンをシャットダウンして、CPUとメモリ資源を開放します。しかし、仮想マシンの定義は存続します。",

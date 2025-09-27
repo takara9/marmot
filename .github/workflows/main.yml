@@ -126,6 +126,11 @@ jobs:
         cd ../..
     - name: Test pkg/marmotd
       run: | 
+        cd pkg/marmotd
+        sudo -s make test
+        cd ../..
+    - name: Test cmd/marmotd
+      run: | 
         cd cmd/marmotd
         sudo -s make test
         cd ../..

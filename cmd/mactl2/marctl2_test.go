@@ -121,17 +121,6 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			GinkgoWriter.Println(string(stdoutStderr))
 		})
 
-		// mactl2 コマンドに置き換え
-		//var cnf config.MarmotConfig
-		//It("Load Config", func() {
-		/*
-			fn := "testdata/cluster-config.yaml"
-			ccf := &fn
-			err := config.ReadConfig(*ccf, &cnf)
-			Expect(err).NotTo(HaveOccurred())
-		*/
-		//})
-
 		It("クラスタの生成", func() {
 			cmd := exec.Command("./bin/mactl2-test", "--api", "testdata/config_marmot.conf", "create", "-c", "testdata/cluster-config.yaml")
 			stdoutStderr, err := cmd.CombinedOutput()
