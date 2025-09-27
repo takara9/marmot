@@ -1,9 +1,16 @@
 /*
-Copyright © 2025 NAME HERE <EMAIL ADDRESS>
+Copyright © 2025 Maho Takara <tkr9955@gmail.com>
 */
 package main
 
-import "github.com/spf13/mactl/cmd"
+import (
+	_ "embed"
+
+	"github.com/takara9/marmot/cmd/mactl2/cmd"
+)
+
+//go:embed version.txt
+var version string
 
 func main() {
 	cmd.Execute()

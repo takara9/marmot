@@ -1,4 +1,4 @@
-package main
+package marmotd
 
 import (
 	"encoding/json"
@@ -74,26 +74,26 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		It("ハイパーバイザーの情報セット", func() {
 			for _, hv := range hvs.Hvs {
 				fmt.Println(hv)
-				err := marmotServer.mx.Db.SetHypervisor(hv)
+				err := marmotServer.Ma.Db.SetHypervisor(hv)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
 
 		It("OSイメージテンプレート", func() {
 			for _, hd := range hvs.Imgs {
-				err := marmotServer.mx.Db.SetImageTemplate(hd)
+				err := marmotServer.Ma.Db.SetImageTemplate(hd)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
 		It("シーケンス番号のリセット", func() {
 			for _, sq := range hvs.Seq {
-				err := marmotServer.mx.Db.CreateSeq(sq.Key, sq.Start, sq.Step)
+				err := marmotServer.Ma.Db.CreateSeq(sq.Key, sq.Start, sq.Step)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
 
 		It("ストレージの空き容量チェック", func() {
-			err = util.CheckHvVgAll(marmotServer.mx.EtcdUrl, marmotServer.mx.NodeName)
+			err = util.CheckHvVgAll(marmotServer.Ma.EtcdUrl, marmotServer.Ma.NodeName)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -109,14 +109,14 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		})
 
 		It("Marmotd のバージョン情報取得", func() {
-			httpStatus, body, url, err := marmotClient.GetVersion()
-			var version api.Version
+			body, err := marmotClient.GetVersion()
+			//var version api.Version
 			Expect(err).NotTo(HaveOccurred())
-			Expect(httpStatus).To(Equal(200))
-			err = json.Unmarshal(body, &version)
+			//Expect(httpStatus).To(Equal(200))
+			//err = json.Unmarshal(body, &version)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(version.Version).To(Equal("0.0.1"))
-			Expect(url).To(BeNil())
+			Expect(body.Version).To(Equal("0.0.1"))
+			//Expect(url).To(BeNil())
 		})
 
 		It("ハイパーバイザーの一覧取得", func() {

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 	"github.com/takara9/marmot/api"
@@ -37,7 +38,15 @@ func (m *Marmot) CreateVm(c *gin.Context) {
 
 // VMを生成する
 func (m *Marmot) createVM(spec cf.VMSpec) error {
-	var err error
+	//--------------------------------
+	ex, err := os.Executable()
+	if err != nil {
+		panic(err)
+	}
+	exPath := filepath.Dir(ex)
+	fmt.Println("===================== ", exPath)
+	//--------------------------------
+
 	var dom virt.Domain
 	err = virt.ReadXml("temp.xml", &dom)
 	if err != nil {
@@ -186,6 +195,16 @@ func createRemoteVM(hvNode string, spec cf.VMSpec) error {
 func (m *Marmot) CreateVM2(spec api.VmSpec) error {
 	var err error
 	var dom virt.Domain
+
+	//--------------------------------
+	ex, err := os.Executable()
+	if err != nil {
+		panic(err)
+	}
+	exPath := filepath.Dir(ex)
+	fmt.Println("===================== ", exPath)
+	//--------------------------------
+
 	err = virt.ReadXml("temp.xml", &dom)
 	if err != nil {
 		slog.Error("", "err", err)

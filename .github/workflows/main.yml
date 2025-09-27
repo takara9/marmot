@@ -79,50 +79,41 @@ jobs:
         docker ps
         dig -p 1053 @localhost A minio.labo.local +noall +answer
 
-
     - name: Check etcd put
       run: |
         export ETCDCTL_API=3 
         etcdctl put --endpoints=127.0.0.1:2379 /skydns/local/labo/a/hoge '{"host":"192.168.1.5","ttl":60}'
-  
     - name: Check etcd get
       run: |
         export ETCDCTL_API=3 
         etcdctl get --endpoints=127.0.0.1:2379 /skydns/local/labo/a/hoge
-
     - name: Check resolve by coredns and etcd 
       run: |
         dig -p 1053 @localhost A hoge.a.labo.local +noall +answer
-  
     - name: Test pkg/config
       run: | 
         cd pkg/config
         sudo -s make test
         cd ../..
-       
     - name: Test pkg/db
       run: | 
         cd pkg/db
         sudo -s make test
         cd ../..
-
     - name: Test pkg/dns
       run: | 
         cd pkg/dns
         sudo -s make test
-
     - name: Test pkg/lvm
       run: | 
         cd pkg/lvm
         sudo -s make test
         cd ../..
-
     - name: Test pkg/util
       run: | 
         cd pkg/util
         sudo -s make test
         cd ../..
-
     - name: Test pkg/virt
       run: | 
         cd pkg/virt
@@ -133,8 +124,18 @@ jobs:
         cd pkg/marmot
         sudo -s make test
         cd ../..
-    - name: Test cmd/marmotd
+    - name: Test pkg/marmotd
       run: | 
         cd cmd/marmotd
         sudo -s make test
         cd ../..
+    - name: Test cmd/mactl2
+      run: | 
+        cd cmd/mactl2
+        make mactl2-test
+        sudo -s make test
+        cd ../..
+
+    - name: Clean up
+      run: |
+        go clean -cache -testcache -modcache -fuzzcache
