@@ -13,16 +13,21 @@ var startCmd = &cobra.Command{
 	Long: `stop で停止された仮想マシンの活動を再開します。
 	デフォルトで 仮想マシンのスペック等が記述されたカレントディレクトリの cluster-config.yaml を使用します。`,
 	Run: func(cmd *cobra.Command, args []string) {
-		err := config.ReadConfig(ClusterConfig, &cnf)
+		m, err := getClientConfig()
 		if err != nil {
-			fmt.Printf("Reading the config file", "err", err)
 			return
 		}
 
-		if len(apiEndpoint) > 0 {
-			ApiUrl = apiEndpoint
+		err = config.ReadConfig(ClusterConfig, &cnf)
+		if err != nil {
+			fmt.Println("Reading the config file err=", err)
+			return
 		}
-		ReqRest(cnf, "startCluster", ApiUrl)
+		_, _, _, err = m.StartCluster(cnf)
+		if err != nil {
+			fmt.Println("failed to create VM cluster: ", err)
+			return
+		}
 	},
 }
 

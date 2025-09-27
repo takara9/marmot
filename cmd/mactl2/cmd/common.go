@@ -1,12 +1,6 @@
 package cmd
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"io"
-	"log/slog"
-	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -39,7 +33,7 @@ func getClientConfig() (*marmot.MarmotEndpoint, error) {
 		u.Host,
 		"/api/v1",
 		60,
-	)
+	), nil
 }
 
 // Ansible Playbook の適用
@@ -65,4 +59,3 @@ func apply_playbook(cnf config.MarmotConfig) {
 		}
 	}
 }
-
