@@ -9,7 +9,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/takara9/marmot/pkg/config"
 	cf "github.com/takara9/marmot/pkg/config"
+	"github.com/takara9/marmot/pkg/db"
 	ut "github.com/takara9/marmot/pkg/util"
 )
 
@@ -26,10 +28,6 @@ var node *string
 // テスト前の環境設定
 var _ = BeforeSuite(func() {
 	//etcd_url := "http://127.0.0.1:12379"
-	etcd_url := "http://127.0.0.1:5379"
-	etcd = &etcd_url
-	node_name := "127.0.0.1"
-	node = &node_name
 
 	/*
 		cmd := exec.Command(systemctl_exe, "stop", "etcd")
@@ -76,6 +74,11 @@ var _ = AfterSuite(func() {
 })
 
 var _ = Describe("Marmot", Ordered, func() {
+	etcd_url := "http://127.0.0.1:5379"
+	etcd = &etcd_url
+	node_name := "127.0.0.1"
+	node = &node_name
+	var etcdEp *db.Database
 
 	//var url string
 	//var err error
@@ -85,7 +88,7 @@ var _ = Describe("Marmot", Ordered, func() {
 	BeforeAll(func(ctx SpecContext) {
 		// Dockerコンテナを起動
 		//url = "http://127.0.0.1:5379"
-		cmd := exec.Command("docker", "run", "-d", "--name", "etcd0", "-p", "5379:2379", "-p", "5380:2380", "-e", "ALLOW_NONE_AUTHENTICATION=yes", "-e", "ETCD_ADVERTISE_CLIENT_URLS=http://127.0.0.1:3379", "bitnami/etcd")
+		cmd := exec.Command("docker", "run", "-d", "--name", "etcd0", "-p", "5379:2379", "-p", "5380:2380", "-e", "ALLOW_NONE_AUTHENTICATION=yes", "-e", "ETCD_ADVERTISE_CLIENT_URLS=http://127.0.0.1:5379", "bitnami/etcd")
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to start container: %s, %v", string(output), err))
@@ -110,11 +113,50 @@ var _ = Describe("Marmot", Ordered, func() {
 	}, NodeTimeout(20*time.Second))
 
 	Context("Data management", func() {
-		It("Set Hypervisor Config file", func() {
-			cmd := exec.Command(hvadmin_exe, "-config", "testdata/hypervisor-config-hvc.yaml")
-			err := cmd.Run()
+		//It("Set Hypervisor Config file", func() {
+		/// ポート番号を変えられないとテストできない
+		//	cmd := exec.Command(hvadmin_exe, "-config", "testdata/hypervisor-config-hvc.yaml")
+		//	err := cmd.Run()
+		//	Expect(err).NotTo(HaveOccurred())
+		//})
+		It("Set up databae ", func() {
+			var err error
+			etcdEp, err = db.NewDatabase(etcd_url)
 			Expect(err).NotTo(HaveOccurred())
 		})
+
+		var hvs config.Hypervisors_yaml
+		It("ハイパーバイザーのコンフィグファイルの読み取り", func() {
+			err := config.ReadYAML("testdata/hypervisor-config-hvc.yaml", &hvs)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("ハイパーバイザーの情報セット", func() {
+			for _, hv := range hvs.Hvs {
+				fmt.Println(hv)
+				err := etcdEp.SetHypervisor(hv)
+				Expect(err).NotTo(HaveOccurred())
+			}
+		})
+
+		It("OSイメージテンプレート", func() {
+			for _, hd := range hvs.Imgs {
+				err := etcdEp.SetImageTemplate(hd)
+				Expect(err).NotTo(HaveOccurred())
+			}
+		})
+
+		It("シーケンス番号のリセット", func() {
+			for _, sq := range hvs.Seq {
+				err := etcdEp.CreateSeq(sq.Key, sq.Start, sq.Step)
+				Expect(err).NotTo(HaveOccurred())
+			}
+		})
+
+		//It("ストレージの空き容量チェック", func() {
+		//	err := util.CheckHvVgAll(marmotServer.Ma.EtcdUrl, marmotServer.Ma.NodeName)
+		//	Expect(err).NotTo(HaveOccurred())
+		//})
 
 		It("Start", func() {
 			cmd := exec.Command(systemctl_exe, "start", "marmot")
