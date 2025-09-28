@@ -103,6 +103,8 @@ func (m *Marmot) CreateCluster2(cnf cf.MarmotConfig) error {
 			return_errors = err
 			break
 		}
+		fmt.Println("--- HV node=", vm.HvNode)
+		fmt.Println("----Hv port=", port)
 
 		// OSのバージョン、テンプレートを設定
 		fmt.Println("OSのバージョン、テンプレートを設定")
