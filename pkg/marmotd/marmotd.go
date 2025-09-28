@@ -209,6 +209,17 @@ func (s *Server) CreateVirtualMachine(ctx echo.Context) error {
 	fmt.Println("Spec Name =", *spec.Name)
 	fmt.Println("Spec Cpu =", *spec.Cpu)
 	fmt.Println("Spec Memory =", *spec.Memory)
+	if spec.PrivateIp != nil {
+		fmt.Println("Spec PrivateIP =", *spec.PrivateIp)
+	} else {
+		fmt.Println("Spec PrivateIP =", spec.PrivateIp)
+	}
+	if spec.PublicIp != nil {
+		fmt.Println("Spec PrivateIP =", *spec.PublicIp)
+	} else {
+		fmt.Println("Spec PrivateIP =", spec.PublicIp)
+	}
+
 	err = s.Ma.CreateVM2(spec)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
