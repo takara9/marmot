@@ -66,11 +66,17 @@ func (m *Marmot) StopClusterInternal(cnf api.MarmotConfig) error {
 				continue
 			}
 
+			//marmotClient, err := NewMarmotdEp(
+			//	"http",
+			//	"localhost:8080",
+			//	"/api/v1",
+			//	60,
+			//)
 			marmotClient, err := NewMarmotdEp(
 				"http",
-				"localhost:8080",
+				vm.HvNode,
 				"/api/v1",
-				60,
+				15,
 			)
 			if err != nil {
 				continue

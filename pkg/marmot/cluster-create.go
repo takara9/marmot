@@ -244,9 +244,15 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		m.Db.UpdateVmState(vm.Key, db.PROVISIONING)
 
 		// marmotClient の関数としてコールしないとだめだ
+		//marmotClient, err := NewMarmotdEp(
+		//	"http",
+		//	"localhost:8080",
+		//	"/api/v1",
+		//	15,
+		//)
 		marmotClient, err := NewMarmotdEp(
 			"http",
-			"localhost:8080",
+			vm.HvNode,
 			"/api/v1",
 			15,
 		)
