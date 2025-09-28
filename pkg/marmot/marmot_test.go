@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -24,54 +25,90 @@ var node *string
 
 // テスト前の環境設定
 var _ = BeforeSuite(func() {
-	etcd_url := "http://127.0.0.1:12379"
+	//etcd_url := "http://127.0.0.1:12379"
+	etcd_url := "http://127.0.0.1:5379"
 	etcd = &etcd_url
 	node_name := "127.0.0.1"
 	node = &node_name
 
-	cmd := exec.Command(systemctl_exe, "stop", "etcd")
+	/*
+		cmd := exec.Command(systemctl_exe, "stop", "etcd")
+		stop := cmd.Run()
+		Expect(stop).To(Succeed())
+
+		cmd = exec.Command(systemctl_exe, "status", "etcd")
+		status := cmd.Run()
+		Expect(status).To(HaveOccurred())
+
+		cmd = exec.Command(systemctl_exe, "start", "etcd")
+		start := cmd.Run()
+		Expect(start).To(Succeed())
+	*/
+
+	cmd := exec.Command(systemctl_exe, "stop", "marmot")
 	stop := cmd.Run()
 	Expect(stop).To(Succeed())
 
-	cmd = exec.Command(systemctl_exe, "status", "etcd")
-	status := cmd.Run()
-	Expect(status).To(HaveOccurred())
-
-	cmd = exec.Command(systemctl_exe, "start", "etcd")
-	start := cmd.Run()
-	Expect(start).To(Succeed())
-
-	cmd = exec.Command(systemctl_exe, "stop", "marmot")
-	stop = cmd.Run()
-	Expect(stop).To(Succeed())
-
 	cmd = exec.Command(systemctl_exe, "status", "marmot")
-	status = cmd.Run()
+	status := cmd.Run()
 	Expect(status).To(HaveOccurred())
 })
 
 // テスト後の環境戻し
 var _ = AfterSuite(func() {
 	// データの削除
-	cmd := exec.Command(etcdctl_exe, "--endpoints=localhost:12379", "del", "hvc")
-	cmd.Env = append(os.Environ(), "ETCDCTL_API=3")
-	out, err := cmd.CombinedOutput()
-	fmt.Println("command = ", string(out))
-	Expect(err).To(Succeed())
+	//cmd := exec.Command(etcdctl_exe, "--endpoints=localhost:12379", "del", "hvc")
+	//cmd.Env = append(os.Environ(), "ETCDCTL_API=3")
+	//out, err := cmd.CombinedOutput()
+	//fmt.Println("command = ", string(out))
+	//Expect(err).To(Succeed())
 
 	// etcd の停止
-	cmd = exec.Command(systemctl_exe, "stop", "etcd")
-	status := cmd.Run()
-	Expect(status).To(Succeed())
+	//cmd = exec.Command(systemctl_exe, "stop", "etcd")
+	//status := cmd.Run()
+	//Expect(status).To(Succeed())
 
 	// marmotの停止
-	cmd = exec.Command(systemctl_exe, "stop", "marmot")
-	status = cmd.Run()
+	cmd := exec.Command(systemctl_exe, "stop", "marmot")
+	status := cmd.Run()
 	Expect(status).To(Succeed())
 
 })
 
 var _ = Describe("Marmot", func() {
+
+	//var url string
+	//var err error
+	//var d *Database
+	var containerID string
+
+	BeforeAll(func(ctx SpecContext) {
+		// Dockerコンテナを起動
+		//url = "http://127.0.0.1:5379"
+		cmd := exec.Command("docker", "run", "-d", "--name", "etcd0", "-p", "5379:2379", "-p", "5380:2380", "-e", "ALLOW_NONE_AUTHENTICATION=yes", "-e", "ETCD_ADVERTISE_CLIENT_URLS=http://127.0.0.1:3379", "bitnami/etcd")
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			Fail(fmt.Sprintf("Failed to start container: %s, %v", string(output), err))
+		}
+		containerID = string(output[:12]) // 最初の12文字をIDとして取得
+		fmt.Printf("Container started with ID: %s\n", containerID)
+		time.Sleep(10 * time.Second) // コンテナが起動するまで待機
+	}, NodeTimeout(20*time.Second))
+
+	AfterAll(func(ctx SpecContext) {
+		// Dockerコンテナを停止・削除
+		cmd := exec.Command("docker", "stop", containerID)
+		_, err := cmd.CombinedOutput()
+		if err != nil {
+			fmt.Printf("Failed to stop container: %v\n", err)
+		}
+		cmd = exec.Command("docker", "rm", containerID)
+		_, err = cmd.CombinedOutput()
+		if err != nil {
+			fmt.Printf("Failed to remove container: %v\n", err)
+		}
+	}, NodeTimeout(20*time.Second))
+
 	Context("Data management", func() {
 		It("Set Hypervisor Config file", func() {
 			cmd := exec.Command(hvadmin_exe, "-config", "testdata/hypervisor-config-hvc.yaml")
