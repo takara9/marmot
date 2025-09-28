@@ -1,5 +1,6 @@
 hv_spec:
   - name:     "hv1"
+    port:     8750
     cpu:      10
     free_cpu: 10
     ram:      64
@@ -14,6 +15,7 @@ hv_spec:
       type: "hdd"
 
   - name:     "hv2"
+    port:     8750
     cpu:      10
     free_cpu: 10
     ram:      64

@@ -260,6 +260,7 @@ var _ = Describe("Etcd", func() {
 
 				for _, h := range hvs {
 					GinkgoWriter.Println("Nodename     ", h.Nodename)
+					GinkgoWriter.Println("  PORT       ", h.Port)
 					GinkgoWriter.Println("  CPU        ", h.Cpu)
 					GinkgoWriter.Println("  Memory     ", h.Memory)
 					GinkgoWriter.Println("  FreeCpu    ", h.FreeCpu)
