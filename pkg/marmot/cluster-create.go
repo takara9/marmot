@@ -40,6 +40,8 @@ func (m *Marmot) CreateCluster2(cnf cf.MarmotConfig) error {
 	for _, spec := range cnf.VMSpec {
 		// クラスタ名とホスト名の重複チェック
 		vmKey, _ := m.Db.FindByHostAndClusteName(spec.Name, cnf.ClusterName)
+		fmt.Println("zzzzzzz VM KEY=", vmKey)
+		fmt.Println("zzzzzzz VM KEY=", vmKey)
 		if len(vmKey) > 0 {
 			return fmt.Errorf("existing same name virttual machine : %v", spec.Name)
 		}
