@@ -103,6 +103,7 @@ var _ = Describe("Marmot", func() {
 			for i, v := range hv {
 				GinkgoWriter.Println("xxxxxx hv index    == ", i)
 				GinkgoWriter.Println("xxxxxx hv nodename == ", v.Nodename)
+				GinkgoWriter.Println("xxxxxx hv nodename == ", v.Port)
 				GinkgoWriter.Println("xxxxxx hv CPU      == ", v.Cpu)
 				GinkgoWriter.Println("xxxxxx hv Mem      == ", v.Memory)
 				GinkgoWriter.Println("xxxxxx hv IP addr  == ", v.IpAddr)
