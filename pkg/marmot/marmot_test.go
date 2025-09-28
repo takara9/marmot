@@ -92,7 +92,6 @@ var _ = Describe("Marmot", Ordered, func() {
 	var containerID string
 
 	BeforeAll(func(ctx SpecContext) {
-
 		e := echo.New()
 		server := marmotd.NewServer("hvc", "http://127.0.0.1:5379")
 		go func() {
