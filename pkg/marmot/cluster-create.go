@@ -49,6 +49,7 @@ func (m *Marmot) CreateCluster2(cnf cf.MarmotConfig) error {
 		if len(spec.PublicIP) > 0 {
 			found, err := m.Db.FindByPublicIPaddress(spec.PublicIP)
 			if err != nil {
+				fmt.Println("FindByPublicIPaddress=", spec.PublicIP, "err=", err)
 				return err
 			}
 			if found {
@@ -58,6 +59,7 @@ func (m *Marmot) CreateCluster2(cnf cf.MarmotConfig) error {
 		if len(spec.PrivateIP) > 0 {
 			found, err := m.Db.FindByPrivateIPaddress(spec.PrivateIP)
 			if err != nil {
+				fmt.Println("FindByPrivateIPaddress=", spec.PublicIP, "err=", err)
 				return err
 			}
 			if found {
@@ -67,7 +69,7 @@ func (m *Marmot) CreateCluster2(cnf cf.MarmotConfig) error {
 	} // END OF LOOP
 	var port int
 	var break_err bool = false
-	return_errors := errors.New("")
+	return_errors := errors.New("Failes to create VM")
 	// 仮想マシンの設定と起動
 	for _, spec := range cnf.VMSpec {
 		// ホスト名とクラスタ名でVMキーを取得する
@@ -113,7 +115,7 @@ func (m *Marmot) CreateCluster2(cnf cf.MarmotConfig) error {
 		spec.VMOsVariant = cnf.VMOsVariant
 		spec.OsTempVg, spec.OsTempLv, err = m.Db.GetOsImgTempByKey(cnf.VMOsVariant)
 		if err != nil {
-			slog.Error("", "err", err)
+			slog.Error("GetOsImgTempByKey", "err", err)
 			break_err = true
 			return_errors = err
 			break
@@ -141,7 +143,7 @@ func (m *Marmot) CreateCluster2(cnf cf.MarmotConfig) error {
 		m.Db.UpdateVmState(vm.Key, db.PROVISIONING)
 		err = createRemoteVM(vm.HvNode, port, spec)
 		if err != nil {
-			slog.Error("", "remote request err", err)
+			slog.Error("createRemoteVM", "remote request err", err)
 			break_err = true
 			return_errors = err
 			m.Db.UpdateVmState(vm.Key, db.ERROR) // エラー状態へ
