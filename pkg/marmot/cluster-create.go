@@ -250,7 +250,8 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		//	"/api/v1",
 		//	15,
 		//)
-		marmotHost := vm.HvNode + ":" + string(port)
+		marmotHost := fmt.Sprintf("%s:%d", vm.HvNode, port)
+		//marmotHost := vm.HvNode + ":" + string(port)
 		fmt.Println("VM HOST VM HOST = ", marmotHost)
 		marmotClient, err := NewMarmotdEp(
 			"http",
