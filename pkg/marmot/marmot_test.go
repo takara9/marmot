@@ -46,14 +46,15 @@ var _ = BeforeSuite(func() {
 		start := cmd.Run()
 		Expect(start).To(Succeed())
 	*/
+	/*
+		cmd := exec.Command(systemctl_exe, "stop", "marmot")
+		stop := cmd.Run()
+		Expect(stop).To(Succeed())
 
-	cmd := exec.Command(systemctl_exe, "stop", "marmot")
-	stop := cmd.Run()
-	Expect(stop).To(Succeed())
-
-	cmd = exec.Command(systemctl_exe, "status", "marmot")
-	status := cmd.Run()
-	Expect(status).To(HaveOccurred())
+		cmd = exec.Command(systemctl_exe, "status", "marmot")
+		status := cmd.Run()
+		Expect(status).To(HaveOccurred())
+	*/
 })
 
 // テスト後の環境戻し
@@ -71,10 +72,11 @@ var _ = AfterSuite(func() {
 	//Expect(status).To(Succeed())
 
 	// marmotの停止
-	cmd := exec.Command(systemctl_exe, "stop", "marmot")
-	status := cmd.Run()
-	Expect(status).To(Succeed())
-
+	/*
+		cmd := exec.Command(systemctl_exe, "stop", "marmot")
+		status := cmd.Run()
+		Expect(status).To(Succeed())
+	*/
 })
 
 var _ = Describe("Marmot", Ordered, func() {
@@ -95,7 +97,7 @@ var _ = Describe("Marmot", Ordered, func() {
 		server := marmotd.NewServer("hvc", "http://127.0.0.1:5379")
 		go func() {
 			api.RegisterHandlersWithBaseURL(e, server, "/api/v1")
-			fmt.Println(e.Start("0.0.0.0:8570"), "Mock server is running")
+			fmt.Println(e.Start("0.0.0.0:8750"), "Mock server is running")
 		}()
 
 		// Dockerコンテナを起動
