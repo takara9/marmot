@@ -252,7 +252,7 @@ func (d *Database) AssignHvforVm(vm VirtualMachine) (string, string, uuid.UUID, 
 
 				vm.Status = 0           // 登録中
 				vm.HvNode = hv.Nodename // ハイパーバイザーを決定
-				port = hv.Port
+				vm.HvPort = hv.Port
 				assigned = true
 				break
 			}

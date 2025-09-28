@@ -148,7 +148,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr))
 		})
-		
+
 		It("クラスタの再スタート", func() {
 			cmd := exec.Command("./bin/mactl2-test", "--api", "testdata/config_marmot.conf", "start", "-c", "testdata/cluster-config.yaml")
 			stdoutStderr, err := cmd.CombinedOutput()
@@ -165,6 +165,13 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 		It("クラスタの削除", func() {
 			cmd := exec.Command("./bin/mactl2-test", "--api", "testdata/config_marmot.conf", "destroy", "-c", "testdata/cluster-config.yaml")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+		})
+
+		It("仮想マシンの一覧取得", func() {
+			cmd := exec.Command("./bin/mactl2-test", "--api", "testdata/config_marmot.conf", "status", "-c", "testdata/cluster-config.yaml")
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr))

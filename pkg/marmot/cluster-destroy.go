@@ -77,9 +77,11 @@ func (m *Marmot) DestroyClusterInternal(cnf api.MarmotConfig) error {
 			//	"/api/v1",
 			//	60,
 			//)
+
+			hvService := fmt.Sprintf("%s:%d", vm.HvNode, vm.HvPort)
 			marmotClient, err := NewMarmotdEp(
 				"http",
-				vm.HvNode,
+				hvService,
 				"/api/v1",
 				15,
 			)

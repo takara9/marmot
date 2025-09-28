@@ -1,5 +1,6 @@
 hv_spec:
   - name:     "hvc"
+    port:     8080
     cpu:      4
     free_cpu: 4
     ram:      16

@@ -2,6 +2,7 @@ package marmot
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
@@ -68,15 +69,18 @@ func (m *Marmot) StartClusterInternal(cnf api.MarmotConfig) error {
 		//	"/api/v1",
 		//	60,
 		//)
+
+		hvService := fmt.Sprintf("%s:%d", vm.HvNode, vm.HvPort)
 		marmotClient, err := NewMarmotdEp(
 			"http",
-			vm.HvNode,
+			hvService,
 			"/api/v1",
 			15,
 		)
 		if err != nil {
 			continue
 		}
+
 		_, _, _, err = marmotClient.StartVirtualMachine(vm.HvNode, spec)
 		if err != nil {
 			slog.Error("", "remote request err", err)
