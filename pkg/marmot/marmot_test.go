@@ -88,7 +88,7 @@ var _ = Describe("Marmot", Ordered, func() {
 	BeforeAll(func(ctx SpecContext) {
 		// Dockerコンテナを起動
 		//url = "http://127.0.0.1:5379"
-		cmd := exec.Command("docker", "run", "-d", "--name", "etcd0", "-p", "5379:2379", "-p", "5380:2380", "-e", "ALLOW_NONE_AUTHENTICATION=yes", "-e", "ETCD_ADVERTISE_CLIENT_URLS=http://127.0.0.1:5379", "bitnami/etcd")
+		cmd := exec.Command("docker", "run", "-d", "--name", "etcdmarmot", "-p", "5379:2379", "-p", "5380:2380", "-e", "ALLOW_NONE_AUTHENTICATION=yes", "-e", "ETCD_ADVERTISE_CLIENT_URLS=http://127.0.0.1:5379", "bitnami/etcd")
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to start container: %s, %v", string(output), err))
