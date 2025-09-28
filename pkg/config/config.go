@@ -57,6 +57,7 @@ type StgPool_yaml struct {
 // ハイパーバイザー
 type Hypervisor_yaml struct {
 	Name    string         `yaml:"name"`
+	Port    uint64         `yaml:"port"`
 	Cpu     uint64         `yaml:"cpu"`
 	CpuFree uint64         `yaml:"free_cpu"`
 	Ram     uint64         `yaml:"ram"`

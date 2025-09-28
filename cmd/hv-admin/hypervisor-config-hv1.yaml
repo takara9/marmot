@@ -1,5 +1,6 @@
 hv_spec:
   - name:     "hv1"
+    port:     8750
     cpu:      12
     free_cpu: 12
     ram:      64

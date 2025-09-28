@@ -164,10 +164,10 @@ func (m *Marmot) createVM(spec cf.VMSpec) error {
 
 // 最終的に削除する方向
 // リモートホストにリクエストを送信する
-func createRemoteVM(hvNode string, spec cf.VMSpec) error {
+func createRemoteVM(hvNode string, port int, spec cf.VMSpec) error {
 	byteJSON, _ := json.MarshalIndent(spec, "", "    ")
 	// JSON形式でポストする
-	reqURL := fmt.Sprintf("http://%s:8750/%s", hvNode, "createVm")
+	reqURL := fmt.Sprintf("http://%s:%d/%s", hvNode, port, "createVm")
 	request, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
 	if err != nil {
 		slog.Error("", "err", err)

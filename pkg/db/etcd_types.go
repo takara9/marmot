@@ -1,8 +1,9 @@
 package db
 
 import (
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type StoragePool struct {
@@ -14,6 +15,7 @@ type StoragePool struct {
 
 type Hypervisor struct {
 	Nodename   string        // ハイパーバイザーノード名
+	Port       int           // HVコントローラー(marmotd)のポート番号
 	Cpu        int           // 搭載CPU量 仮想コア数＝VCPU
 	Memory     int           // 搭載メモリ量 MB
 	IpAddr     string        // ハイパーバイザーホストのIP
