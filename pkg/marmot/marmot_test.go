@@ -75,7 +75,7 @@ var _ = AfterSuite(func() {
 
 })
 
-var _ = Describe("Marmot", func() {
+var _ = Describe("Marmot", Ordered, func() {
 
 	//var url string
 	//var err error

@@ -10,7 +10,7 @@ import (
 	cf "github.com/takara9/marmot/pkg/config"
 )
 
-var _ = Describe("Etcd", func() {
+var _ = Describe("Etcd", Ordered, func() {
 	var url string
 	var err error
 	var d *Database
