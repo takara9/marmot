@@ -265,7 +265,7 @@ func (d *Database) AssignHvforVm(vm VirtualMachine) (string, string, uuid.UUID, 
 	}
 	// ハイパーバイザーのリソース削減保存
 	err = d.PutDataEtcd(hv.Key, hv)
-	if err != nil {gi
+	if err != nil {
 		return "", "", txId, 0, err
 	}
 	// VM名登録　シリアル番号取得
