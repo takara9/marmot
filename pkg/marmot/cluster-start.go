@@ -20,7 +20,7 @@ func (m *Marmot) StartCluster(c *gin.Context) {
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
-	if err := m.startCluster(cnf); err != nil {
+	if err := m.StartCluster2(cnf); err != nil {
 		slog.Error("start cluster", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
@@ -28,7 +28,7 @@ func (m *Marmot) StartCluster(c *gin.Context) {
 }
 
 // クラスタ停止
-func (m *Marmot) startCluster(cnf cf.MarmotConfig) error {
+func (m *Marmot) StartCluster2(cnf cf.MarmotConfig) error {
 	for _, spec := range cnf.VMSpec {
 		vmKey, _ := m.Db.FindByHostAndClusteName(spec.Name, cnf.ClusterName)
 		if len(vmKey) == 0 {

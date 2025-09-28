@@ -19,7 +19,7 @@ func (m *Marmot) DestroyCluster(c *gin.Context) {
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
 	}
-	if err := m.destroyCluster(cnf); err != nil {
+	if err := m.DestroyCluster2(cnf); err != nil {
 		slog.Error("delete cluster", "err", err)
 		c.JSON(400, gin.H{"msg": err.Error()})
 		return
@@ -27,7 +27,7 @@ func (m *Marmot) DestroyCluster(c *gin.Context) {
 }
 
 // クラスタ削除
-func (m *Marmot) destroyCluster(cnf cf.MarmotConfig) error {
+func (m *Marmot) DestroyCluster2(cnf cf.MarmotConfig) error {
 	var NotFound bool = true
 	for _, spec := range cnf.VMSpec {
 		// クラスタ名とホスト名の重複チェック

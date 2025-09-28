@@ -20,14 +20,14 @@ func (m *Marmot) StopCluster(c *gin.Context) {
 		c.JSON(400, gin.H{"msg": "Can't read JSON"})
 		return
 	}
-	if err := m.stopCluster(cnf); err != nil {
+	if err := m.StopCluster2(cnf); err != nil {
 		slog.Error("stop cluster", "err", err)
 		return
 	}
 }
 
 // クラスタ停止
-func (m *Marmot) stopCluster(cnf cf.MarmotConfig) error {
+func (m *Marmot) StopCluster2(cnf cf.MarmotConfig) error {
 	var NotFound bool = true
 	for _, spec := range cnf.VMSpec {
 		vmKey, _ := m.Db.FindByHostAndClusteName(spec.Name, cnf.ClusterName)

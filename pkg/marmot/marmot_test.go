@@ -1,4 +1,4 @@
-package marmot
+package marmot_test
 
 import (
 	"fmt"
@@ -6,12 +6,16 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/labstack/echo/v4"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/config"
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/marmot"
+	"github.com/takara9/marmot/pkg/marmotd"
 	ut "github.com/takara9/marmot/pkg/util"
 )
 
@@ -86,8 +90,15 @@ var _ = Describe("Marmot", Ordered, func() {
 	var containerID string
 
 	BeforeAll(func(ctx SpecContext) {
+
+		e := echo.New()
+		server := marmotd.NewServer("hvc", "http://127.0.0.1:5379")
+		go func() {
+			api.RegisterHandlersWithBaseURL(e, server, "/api/v1")
+			fmt.Println(e.Start("0.0.0.0:8570"), "Mock server is running")
+		}()
+
 		// Dockerコンテナを起動
-		//url = "http://127.0.0.1:5379"
 		cmd := exec.Command("docker", "run", "-d", "--name", "etcdmarmot", "-p", "5379:2379", "-p", "5380:2380", "-e", "ALLOW_NONE_AUTHENTICATION=yes", "-e", "ETCD_ADVERTISE_CLIENT_URLS=http://127.0.0.1:5379", "bitnami/etcd")
 		output, err := cmd.CombinedOutput()
 		if err != nil {
@@ -158,11 +169,11 @@ var _ = Describe("Marmot", Ordered, func() {
 		//	Expect(err).NotTo(HaveOccurred())
 		//})
 
-		It("Start", func() {
-			cmd := exec.Command(systemctl_exe, "start", "marmot")
-			start := cmd.Run()
-			Expect(start).To(Succeed()) // 成功
-		})
+		//It("Start", func() {
+		//	cmd := exec.Command(systemctl_exe, "start", "marmot")
+		//	start := cmd.Run()
+		//	Expect(start).To(Succeed()) // 成功
+		//})
 
 		It("Check up Marmot daemon", func() {
 			By("Trying to connect to marmot")
@@ -190,7 +201,7 @@ var _ = Describe("Marmot", Ordered, func() {
 		})
 
 		It("Check the config file to directly etcd", func() {
-			cmd := exec.Command(etcdctl_exe, "--endpoints=localhost:12379", "get", "hvc")
+			cmd := exec.Command(etcdctl_exe, "--endpoints=localhost:5379", "get", "hvc")
 			cmd.Env = append(os.Environ(), "ETCDCTL_API=3")
 			out, err := cmd.CombinedOutput()
 			fmt.Println("command = ", string(out))
@@ -200,11 +211,11 @@ var _ = Describe("Marmot", Ordered, func() {
 
 	Context("VMクラスタの生成と削除", func() {
 		var cnf cf.MarmotConfig
-		var m *Marmot
+		var m *marmot.Marmot
 
 		It("Create Marmot Instance", func() {
 			var err error
-			m, err = NewMarmot(*node, *etcd)
+			m, err = marmot.NewMarmot(*node, *etcd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -228,18 +239,18 @@ var _ = Describe("Marmot", Ordered, func() {
 		})
 
 		It("Destroy Cluster()", func() {
-			err := m.destroyCluster(cnf)
+			err := m.DestroyCluster2(cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 
 	Context("VMクラスタの生成と一時停止と再開", func() {
 		var cnf cf.MarmotConfig
-		var m *Marmot
+		var m *marmot.Marmot
 
 		It("Create Marmot Instance", func() {
 			var err error
-			m, err = NewMarmot(*node, *etcd)
+			m, err = marmot.NewMarmot(*node, *etcd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -256,28 +267,28 @@ var _ = Describe("Marmot", Ordered, func() {
 		})
 
 		It("Stop Cluster", func() {
-			err := m.stopCluster(cnf)
+			err := m.StopCluster2(cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Start Cluster", func() {
-			err := m.startCluster(cnf)
+			err := m.StartCluster2(cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Destroy Cluster()", func() {
-			err := m.destroyCluster(cnf)
+			err := m.DestroyCluster2(cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 
 	Context("VMクラスタの２重起動の防止", func() {
 		var cnf cf.MarmotConfig
-		var m *Marmot
+		var m *marmot.Marmot
 
 		It("Create Marmot Instance", func() {
 			var err error
-			m, err = NewMarmot(*node, *etcd)
+			m, err = marmot.NewMarmot(*node, *etcd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -298,12 +309,12 @@ var _ = Describe("Marmot", Ordered, func() {
 		})
 
 		It("Start Cluster", func() {
-			err := m.startCluster(cnf)
+			err := m.StartCluster2(cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Destroy Cluster()", func() {
-			err := m.destroyCluster(cnf)
+			err := m.DestroyCluster2(cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
