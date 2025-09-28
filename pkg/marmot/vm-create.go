@@ -168,9 +168,10 @@ func createRemoteVM(hvNode string, port int, spec cf.VMSpec) error {
 	byteJSON, _ := json.MarshalIndent(spec, "", "    ")
 	// JSON形式でポストする
 	reqURL := fmt.Sprintf("http://%s:%d/%s", hvNode, port, "createVm")
+	fmt.Println("createRemoteVM", "url=", reqURL)
 	request, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
 	if err != nil {
-		slog.Error("", "err", err)
+		slog.Error("newRequest", "err", err)
 		return err
 	}
 
@@ -178,7 +179,7 @@ func createRemoteVM(hvNode string, port int, spec cf.VMSpec) error {
 	client := &http.Client{}
 	response, err := client.Do(request)
 	if err != nil {
-		slog.Error("", "err", err)
+		slog.Error("client.Do", "err", err)
 		return err
 	}
 	defer response.Body.Close()
