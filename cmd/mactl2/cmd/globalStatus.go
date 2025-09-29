@@ -10,7 +10,6 @@ import (
 	db "github.com/takara9/marmot/pkg/db"
 )
 
-// globalStatusCmd represents the globalStatus command
 var globalStatusCmd = &cobra.Command{
 	Use:   "globalStatus",
 	Short: "管理下のハイパーバイザーと仮想マシンをリストします。",

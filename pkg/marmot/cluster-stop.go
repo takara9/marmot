@@ -2,6 +2,7 @@ package marmot
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
@@ -20,14 +21,14 @@ func (m *Marmot) StopCluster(c *gin.Context) {
 		c.JSON(400, gin.H{"msg": "Can't read JSON"})
 		return
 	}
-	if err := m.stopCluster(cnf); err != nil {
+	if err := m.StopCluster2(cnf); err != nil {
 		slog.Error("stop cluster", "err", err)
 		return
 	}
 }
 
 // クラスタ停止
-func (m *Marmot) stopCluster(cnf cf.MarmotConfig) error {
+func (m *Marmot) StopCluster2(cnf cf.MarmotConfig) error {
 	var NotFound bool = true
 	for _, spec := range cnf.VMSpec {
 		vmKey, _ := m.Db.FindByHostAndClusteName(spec.Name, cnf.ClusterName)
@@ -66,11 +67,18 @@ func (m *Marmot) StopClusterInternal(cnf api.MarmotConfig) error {
 				continue
 			}
 
+			//marmotClient, err := NewMarmotdEp(
+			//	"http",
+			//	"localhost:8080",
+			//	"/api/v1",
+			//	60,
+			//)
+			hvService := fmt.Sprintf("%s:%d", vm.HvNode, vm.HvPort)
 			marmotClient, err := NewMarmotdEp(
 				"http",
-				"localhost:8080",
+				hvService,
 				"/api/v1",
-				60,
+				15,
 			)
 			if err != nil {
 				continue

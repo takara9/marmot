@@ -7,7 +7,6 @@ import (
 	"github.com/takara9/marmot/pkg/config"
 )
 
-// createCmd represents the create command
 var createCmd = &cobra.Command{
 	Use:   "create",
 	Short: "仮想マシンの生成と起動",
@@ -29,7 +28,6 @@ var createCmd = &cobra.Command{
 			fmt.Println("failed to create VM cluster: ", err)
 			return
 		}
-		//ReqRest(cnf, "createCluster", ApiUrl)
 	},
 }
 

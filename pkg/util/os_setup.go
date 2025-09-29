@@ -191,21 +191,25 @@ func LinuxSetup_createNetplan2(spec api.VmSpec, vm_root string) error {
 	yaml(1, "version: 2", f)
 	yaml(1, "ethernets:", f)
 
-	if len(*spec.PrivateIp) > 0 {
-		yaml(2, "enp6s0:", f)
-		yaml(3, "addresses:", f)
-		yaml(4, fmt.Sprintf("- %s/%d", *spec.PrivateIp, 16), f)
-		/*
-		   不安定になるので設定しない と思ったが、プライベートだけだとインターネットへのルートが必要
-		   そこで、パブリックが無い時だけ設定する
-		*/
-		if len(*spec.PublicIp) == 0 {
-			if *spec.Ostempvariant == "ubuntu18.04" {
-				yaml(3, "gateway4: 172.16.0.1", f)
-			} else {
-				yaml(3, "routes:", f)
-				yaml(4, "- to: default", f)
-				yaml(4, "  via: 172.16.0.1", f)
+	if spec.PrivateIp != nil {
+		if len(*spec.PrivateIp) > 0 {
+			yaml(2, "enp6s0:", f)
+			yaml(3, "addresses:", f)
+			yaml(4, fmt.Sprintf("- %s/%d", *spec.PrivateIp, 16), f)
+			/*
+			   不安定になるので設定しない と思ったが、プライベートだけだとインターネットへのルートが必要
+			   そこで、パブリックが無い時だけ設定する
+			*/
+		}
+		if spec.PublicIp != nil {
+			if len(*spec.PublicIp) == 0 {
+				if *spec.Ostempvariant == "ubuntu18.04" {
+					yaml(3, "gateway4: 172.16.0.1", f)
+				} else {
+					yaml(3, "routes:", f)
+					yaml(4, "- to: default", f)
+					yaml(4, "  via: 172.16.0.1", f)
+				}
 			}
 		}
 		yaml(3, "nameservers:", f)
@@ -213,24 +217,25 @@ func LinuxSetup_createNetplan2(spec api.VmSpec, vm_root string) error {
 		yaml(4, fmt.Sprintf("addresses: [%v]", "172.16.0.4"), f)
 	}
 
-	if len(*spec.PublicIp) > 0 {
-		yaml(2, "enp7s0:", f)
-		yaml(3, "addresses:", f)
-		yaml(4, fmt.Sprintf("- %s/%d", *spec.PublicIp, 24), f)
-		if *spec.Ostempvariant == "ubuntu18.04" {
-			yaml(3, "gateway4: 192.168.1.1", f)
+	if spec.PublicIp != nil {
+		if len(*spec.PublicIp) > 0 {
+			yaml(2, "enp7s0:", f)
+			yaml(3, "addresses:", f)
+			yaml(4, fmt.Sprintf("- %s/%d", *spec.PublicIp, 24), f)
+			if *spec.Ostempvariant == "ubuntu18.04" {
+				yaml(3, "gateway4: 192.168.1.1", f)
 
-		} else {
-			yaml(3, "routes:", f)
-			yaml(4, "- to: default", f)
-			yaml(4, "  via: 192.168.1.1", f)
-		}
-		// 両方を有効にできないので、プライベート側を優先する
-		if len(*spec.PrivateIp) == 0 {
-			yaml(4, fmt.Sprintf("search: [%v]", "labo.local"), f)
-			yaml(4, fmt.Sprintf("addresses: [%v]", "192.168.1.4"), f)
+			} else {
+				yaml(3, "routes:", f)
+				yaml(4, "- to: default", f)
+				yaml(4, "  via: 192.168.1.1", f)
+			}
+			// 両方を有効にできないので、プライベート側を優先する
+			if len(*spec.PrivateIp) == 0 {
+				yaml(4, fmt.Sprintf("search: [%v]", "labo.local"), f)
+				yaml(4, fmt.Sprintf("addresses: [%v]", "192.168.1.4"), f)
+			}
 		}
 	}
 	return nil
-
 }

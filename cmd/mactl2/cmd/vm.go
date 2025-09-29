@@ -1,6 +1,3 @@
-/*
-Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-*/
 package cmd
 
 import (
@@ -17,7 +14,6 @@ import (
 var ClusterName string
 var VirtualMachineName string
 
-// vmCmd represents the vm command
 var vmCmd = &cobra.Command{
 	Use:   "vm",
 	Short: "仮想マシンの詳細を表示",
@@ -39,45 +35,65 @@ var vmCmd = &cobra.Command{
 			slog.Error("list vms", "err", err)
 			return
 		}
-
 		StateDsp := []string{"RGIST", "PROVI", "RUN", "STOP", "DELT", "Error"}
 		dec := json.NewDecoder(strings.NewReader(string(byteBody)))
+
 		dec.Token()
-		fmt.Printf("%-10s %-16s %-6s %-5s %-20s %-4v  %-6v %-15v %-15v ",
-			"CLUSTER", "VM-NAME", "H-Visr", "STAT", "VKEY", "VCPU", "RAM", "PubIP", "PriIP")
-		fmt.Printf("%-20s", "DATA STORAGE")
-		fmt.Printf("\n")
+		match := false
+		var vm db.VirtualMachine
+
 		for dec.More() {
 			// クラスタ名と仮想マシンが一致したものだけリスト
-			var vm db.VirtualMachine
 			err := dec.Decode(&vm)
 			if err != nil {
-				slog.Error("list vms in the cluster", "err", err)
+				slog.Error("listing vm status on cluster", "err", err)
 			}
+
 			// フィルター処理
-			match := false
-			if cnf.ClusterName == vm.ClusterName {
-				for _, spec := range cnf.VMSpec {
-					if spec.Name == vm.Name {
-						match = true
-						break
-					}
+			if ClusterName == vm.ClusterName {
+				if VirtualMachineName == vm.Name {
+					match = true
+					break
 				}
 			}
-			// 表示
-			if match {
-				fmt.Printf("%-10s %-16s %-6s %-5s %-20s %-4v  %-6v %-15v %-15v ",
-					vm.ClusterName, vm.Name, vm.HvNode, StateDsp[vm.Status],
-					vm.Key, vm.Cpu, vm.Memory, vm.PrivateIp, vm.PublicIp)
-				for _, dv := range vm.Storage {
-					fmt.Printf("%-4d", dv.Size)
-				}
-				fmt.Printf("\n")
+
+		}
+		// 表示
+		if match {
+			fmt.Printf("\n*** Virtual Machine Detail Info ***\n")
+			fmt.Printf("\n")
+			fmt.Printf("Cluster Name : %s \n", vm.ClusterName)
+			fmt.Printf("Virtual Machine Name : %s \n", vm.Name)
+			fmt.Printf("UUID : %s\n", vm.Uuid)
+			fmt.Printf("Hypervisor : %s\n", vm.HvNode)
+			fmt.Printf("Key: %s \n", vm.Key)
+			fmt.Printf("Create Time: %s\n", vm.Ctime)
+			fmt.Printf("Start  Time: %s\n", vm.Stime)
+			fmt.Printf("Status : %s \n", StateDsp[vm.Status])
+			fmt.Printf("CPU : %d \n", vm.Cpu)
+			fmt.Printf("Memory(MB) : %d\n", vm.Memory)
+			fmt.Printf("Private IP addr : %s\n", vm.PrivateIp)
+			fmt.Printf("Public  IP addr : %s\n", vm.PublicIp)
+			fmt.Printf("\n")
+			fmt.Printf("OS Storage\n")
+			fmt.Printf("    Volume Group Name : %s\n", vm.OsVg)
+			fmt.Printf("    Logical Volume Name : %s\n", vm.OsLv)
+			fmt.Printf("    OS Variant : %s\n", vm.OsVariant)
+			fmt.Printf("\n")
+			fmt.Printf("Data Storage\n")
+			for _, v := range vm.Storage {
+				fmt.Printf("    Storage Name : %s\n", v.Name)
+				fmt.Printf("    Size(GB) : %d\n", v.Size)
+				fmt.Printf("    Volume Group Name : %s\n", v.Vg)
+				fmt.Printf("    Logical Volume Name : %s\n", v.Lv)
+				fmt.Printf("    Path : %s\n", v.Path)
 			}
+			fmt.Printf("\n")
+			fmt.Printf("Comment: %s \n", vm.Comment)
+			fmt.Printf("Ansible Playbook: %s \n", vm.Playbook)
+			fmt.Printf("\n")
 		}
 		dec.Token()
-
-		DetailVm(cnf, ApiUrl, ClusterName, VirtualMachineName)
 	},
 }
 

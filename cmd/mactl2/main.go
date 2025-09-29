@@ -1,6 +1,3 @@
-/*
-Copyright © 2025 Maho Takara <tkr9955@gmail.com>
-*/
 package main
 
 import (

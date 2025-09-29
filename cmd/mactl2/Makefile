@@ -26,10 +26,6 @@ install:
 	rm -f /usr/local/bin/$(PROGRAM)
 	install -m 0755 $(PROGRAM) /usr/local/bin
 
-.PHONY:	set-version
-set-version:
-	sed s/MARMOT_VERSION/${TAG}/ cmd/version._ > cmd/version.go
-
 .PHONY: test
 test:
 	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -coverprofile cover.out

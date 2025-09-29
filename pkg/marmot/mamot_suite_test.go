@@ -1,4 +1,4 @@
-package marmot
+package marmot_test
 
 import (
 	"testing"

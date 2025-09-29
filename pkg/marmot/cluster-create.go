@@ -40,6 +40,8 @@ func (m *Marmot) CreateCluster2(cnf cf.MarmotConfig) error {
 	for _, spec := range cnf.VMSpec {
 		// クラスタ名とホスト名の重複チェック
 		vmKey, _ := m.Db.FindByHostAndClusteName(spec.Name, cnf.ClusterName)
+		fmt.Println("zzzzzzz VM KEY=", vmKey)
+		fmt.Println("zzzzzzz VM KEY=", vmKey)
 		if len(vmKey) > 0 {
 			return fmt.Errorf("existing same name virttual machine : %v", spec.Name)
 		}
@@ -47,6 +49,7 @@ func (m *Marmot) CreateCluster2(cnf cf.MarmotConfig) error {
 		if len(spec.PublicIP) > 0 {
 			found, err := m.Db.FindByPublicIPaddress(spec.PublicIP)
 			if err != nil {
+				fmt.Println("FindByPublicIPaddress=", spec.PublicIP, "err=", err)
 				return err
 			}
 			if found {
@@ -56,6 +59,7 @@ func (m *Marmot) CreateCluster2(cnf cf.MarmotConfig) error {
 		if len(spec.PrivateIP) > 0 {
 			found, err := m.Db.FindByPrivateIPaddress(spec.PrivateIP)
 			if err != nil {
+				fmt.Println("FindByPrivateIPaddress=", spec.PublicIP, "err=", err)
 				return err
 			}
 			if found {
@@ -63,9 +67,9 @@ func (m *Marmot) CreateCluster2(cnf cf.MarmotConfig) error {
 			}
 		}
 	} // END OF LOOP
-
+	var port int
 	var break_err bool = false
-	return_errors := errors.New("")
+	return_errors := errors.New("Failes to create VM")
 	// 仮想マシンの設定と起動
 	for _, spec := range cnf.VMSpec {
 		// ホスト名とクラスタ名でVMキーを取得する
@@ -96,20 +100,22 @@ func (m *Marmot) CreateCluster2(cnf cf.MarmotConfig) error {
 
 		//スケジュールを実行
 		fmt.Println("スケジュールを実行 vm=", vm.Name)
-		vm.HvNode, vm.Key, vm.Uuid, err = m.Db.AssignHvforVm(vm)
+		vm.HvNode, vm.Key, vm.Uuid, port, err = m.Db.AssignHvforVm(vm)
 		if err != nil {
 			slog.Error("", "err", err)
 			break_err = true
 			return_errors = err
 			break
 		}
+		fmt.Println("--- HV node=", vm.HvNode)
+		fmt.Println("----Hv port=", port)
 
 		// OSのバージョン、テンプレートを設定
 		fmt.Println("OSのバージョン、テンプレートを設定")
 		spec.VMOsVariant = cnf.VMOsVariant
 		spec.OsTempVg, spec.OsTempLv, err = m.Db.GetOsImgTempByKey(cnf.VMOsVariant)
 		if err != nil {
-			slog.Error("", "err", err)
+			slog.Error("GetOsImgTempByKey", "err", err)
 			break_err = true
 			return_errors = err
 			break
@@ -135,9 +141,9 @@ func (m *Marmot) CreateCluster2(cnf cf.MarmotConfig) error {
 		fmt.Println("リモートとローカル関係なしに、マイクロサービスへリクエストする")
 		// リモートとローカル関係なしに、マイクロサービスへリクエストする
 		m.Db.UpdateVmState(vm.Key, db.PROVISIONING)
-		err = createRemoteVM(vm.HvNode, spec)
+		err = createRemoteVM(vm.HvNode, port, spec)
 		if err != nil {
-			slog.Error("", "remote request err", err)
+			slog.Error("createRemoteVM", "remote request err", err)
 			break_err = true
 			return_errors = err
 			m.Db.UpdateVmState(vm.Key, db.ERROR) // エラー状態へ
@@ -185,7 +191,7 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 			}
 		}
 	} // END OF LOOP
-
+	//var port int
 	var break_err bool = false
 	return_errors := errors.New("")
 	// 仮想マシンの設定と起動
@@ -200,7 +206,7 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 
 		//スケジュールを実行
 		fmt.Println("スケジュールを実行 vm=", vm.Name)
-		vm.HvNode, vm.Key, vm.Uuid, err = m.Db.AssignHvforVm(vm)
+		vm.HvNode, vm.Key, vm.Uuid, vm.HvPort, err = m.Db.AssignHvforVm(vm)
 		if err != nil {
 			slog.Error("", "err", err)
 			break_err = true
@@ -244,9 +250,18 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		m.Db.UpdateVmState(vm.Key, db.PROVISIONING)
 
 		// marmotClient の関数としてコールしないとだめだ
+		//marmotClient, err := NewMarmotdEp(
+		//	"http",
+		//	"localhost:8080",
+		//	"/api/v1",
+		//	15,
+		//)
+		marmotHost := fmt.Sprintf("%s:%d", vm.HvNode, vm.HvPort)
+		//marmotHost := vm.HvNode + ":" + string(port)
+		fmt.Println("VM HOST VM HOST = ", marmotHost)
 		marmotClient, err := NewMarmotdEp(
 			"http",
-			"localhost:8080",
+			marmotHost,
 			"/api/v1",
 			15,
 		)

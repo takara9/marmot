@@ -29,8 +29,6 @@ var statusCmd = &cobra.Command{
 			return
 		}
 
-		//ListVm(cnf, ApiUrl)
-
 		_, byteBody, _, err := m.ListVirtualMachines(nil)
 		if err != nil {
 			slog.Error("list vms", "err", err)
@@ -44,6 +42,7 @@ var statusCmd = &cobra.Command{
 			"CLUSTER", "VM-NAME", "H-Visr", "STAT", "VKEY", "VCPU", "RAM", "PubIP", "PriIP")
 		fmt.Printf("%-20s", "DATA STORAGE")
 		fmt.Printf("\n")
+
 		for dec.More() {
 			// クラスタ名と仮想マシンが一致したものだけリスト
 			var vm db.VirtualMachine
@@ -73,7 +72,6 @@ var statusCmd = &cobra.Command{
 			}
 		}
 		dec.Token()
-
 	},
 }
 

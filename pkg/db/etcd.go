@@ -217,7 +217,7 @@ func (d *Database) DelSeq(key string) error {
 // 割り当てたハイパーバイザーのリソースを減らす
 // 仮想マシンのデータをセットする
 // 仮想マシンの状態をプロビジョニング中にする
-func (d *Database) AssignHvforVm(vm VirtualMachine) (string, string, uuid.UUID, error) {
+func (d *Database) AssignHvforVm(vm VirtualMachine) (string, string, uuid.UUID, int, error) {
 
 	var txId = uuid.New()
 	//トランザクション開始、他更新ロック
@@ -225,7 +225,7 @@ func (d *Database) AssignHvforVm(vm VirtualMachine) (string, string, uuid.UUID, 
 	var hvs []Hypervisor
 	err := d.GetHvsStatus(&hvs) // HVのステータス取得
 	if err != nil {
-		return "", "", txId, err
+		return "", "", txId, 0, err
 	}
 
 	// フリーのCPU数の降順に並べ替える
@@ -234,6 +234,7 @@ func (d *Database) AssignHvforVm(vm VirtualMachine) (string, string, uuid.UUID, 
 	// リソースに空きのあるハイパーバイザーを探す
 	var assigned = false
 	var hv Hypervisor
+	//var port int
 	for _, hv = range hvs {
 
 		// 停止中のHVの割り当てない
@@ -251,6 +252,7 @@ func (d *Database) AssignHvforVm(vm VirtualMachine) (string, string, uuid.UUID, 
 
 				vm.Status = 0           // 登録中
 				vm.HvNode = hv.Nodename // ハイパーバイザーを決定
+				vm.HvPort = hv.Port
 				assigned = true
 				break
 			}
@@ -259,17 +261,17 @@ func (d *Database) AssignHvforVm(vm VirtualMachine) (string, string, uuid.UUID, 
 	// リソースに空きが無い場合はエラーを返す
 	if !assigned {
 		err := errors.New("could't assign VM due to doesn't have enough a resouce on HV")
-		return "", "", txId, err
+		return "", "", txId, 0, err
 	}
 	// ハイパーバイザーのリソース削減保存
 	err = d.PutDataEtcd(hv.Key, hv)
 	if err != nil {
-		return "", "", txId, err
+		return "", "", txId, 0, err
 	}
 	// VM名登録　シリアル番号取得
 	seqno, err := d.GetSeq("VM")
 	if err != nil {
-		return "", "", txId, err
+		return "", "", txId, 0, err
 	}
 
 	vm.Key = fmt.Sprintf("vm_%s_%04d", vm.Name, seqno)
@@ -279,7 +281,7 @@ func (d *Database) AssignHvforVm(vm VirtualMachine) (string, string, uuid.UUID, 
 	vm.Stime = time.Now()
 	//vm.Status = 1  // 状態プロビ中
 	err = d.PutDataEtcd(vm.Key, vm) // 仮想マシンのデータ登録
-	return vm.HvNode, vm.Key, vm.Uuid, err
+	return vm.HvNode, vm.Key, vm.Uuid, vm.HvPort, err
 }
 
 // VMの終了とリソースの開放
@@ -434,6 +436,7 @@ func (d *Database) SetHypervisor(v cf.Hypervisor_yaml) error {
 	var hv Hypervisor
 
 	hv.Nodename = v.Name
+	hv.Port = int(v.Port)
 	hv.Key = v.Name // Key
 	hv.IpAddr = v.IpAddr
 	hv.Cpu = int(v.Cpu)

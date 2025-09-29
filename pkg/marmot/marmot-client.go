@@ -253,7 +253,7 @@ func (m *MarmotEndpoint) CreateVirtualMachine(node string, spec api.VmSpec) (int
 
 	req, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
 	if err != nil {
-		slog.Error("", "err", err)
+		slog.Error("/createVM", "err", err)
 		return 0, nil, nil, err
 	}
 	req.Header.Set("User-Agent", "MarmotdClient/1.0")

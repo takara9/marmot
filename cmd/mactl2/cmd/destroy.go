@@ -7,7 +7,6 @@ import (
 	"github.com/takara9/marmot/pkg/config"
 )
 
-// destroyCmd represents the destroy command
 var destroyCmd = &cobra.Command{
 	Use:   "destroy",
 	Short: "仮想マシンをシャットダウンして定義を削除します",
@@ -30,8 +29,6 @@ var destroyCmd = &cobra.Command{
 			fmt.Println("failed to destroy VM cluster: ", err)
 			return
 		}
-
-		//ReqRest(cnf, "destroyCluster", ApiUrl)
 	},
 }
 
