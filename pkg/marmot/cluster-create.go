@@ -191,7 +191,7 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 			}
 		}
 	} // END OF LOOP
-	var port int
+	//var port int
 	var break_err bool = false
 	return_errors := errors.New("")
 	// 仮想マシンの設定と起動
@@ -206,7 +206,7 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 
 		//スケジュールを実行
 		fmt.Println("スケジュールを実行 vm=", vm.Name)
-		vm.HvNode, vm.Key, vm.Uuid, port, err = m.Db.AssignHvforVm(vm)
+		vm.HvNode, vm.Key, vm.Uuid, vm.HvPort, err = m.Db.AssignHvforVm(vm)
 		if err != nil {
 			slog.Error("", "err", err)
 			break_err = true
