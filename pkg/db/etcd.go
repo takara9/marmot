@@ -234,7 +234,7 @@ func (d *Database) AssignHvforVm(vm VirtualMachine) (string, string, uuid.UUID, 
 	// リソースに空きのあるハイパーバイザーを探す
 	var assigned = false
 	var hv Hypervisor
-	var port int
+	//var port int
 	for _, hv = range hvs {
 
 		// 停止中のHVの割り当てない
@@ -281,7 +281,7 @@ func (d *Database) AssignHvforVm(vm VirtualMachine) (string, string, uuid.UUID, 
 	vm.Stime = time.Now()
 	//vm.Status = 1  // 状態プロビ中
 	err = d.PutDataEtcd(vm.Key, vm) // 仮想マシンのデータ登録
-	return vm.HvNode, vm.Key, vm.Uuid, port, err
+	return vm.HvNode, vm.Key, vm.Uuid, vm.HvPort, err
 }
 
 // VMの終了とリソースの開放
