@@ -63,12 +63,6 @@ func (m *Marmot) StartClusterInternal(cnf api.MarmotConfig) error {
 			slog.Error("", "err", err)
 			return err
 		}
-		//marmotClient, err := NewMarmotdEp(
-		//	"http",
-		//	"localhost:8080",
-		//	"/api/v1",
-		//	60,
-		//)
 
 		hvService := fmt.Sprintf("%s:%d", vm.HvNode, vm.HvPort)
 		marmotClient, err := NewMarmotdEp(

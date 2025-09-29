@@ -95,7 +95,6 @@ func (m *Marmot) destroyVM(spec cf.VMSpec) error {
 // リモートとローカルHV上のVMを削除する
 func destroyRemoteVM(hvNode string, spec cf.VMSpec) error {
 	byteJSON, _ := json.MarshalIndent(spec, "", "    ")
-	fmt.Println(string(byteJSON))
 	// JSON形式でポストする
 	reqURL := fmt.Sprintf("http://%s:8750/%s", hvNode, "destroyVm")
 	request, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
@@ -121,7 +120,6 @@ func destroyRemoteVM(hvNode string, spec cf.VMSpec) error {
 
 // VMの削除
 func (m *Marmot) DestroyVM2(spec api.VmSpec) error {
-	fmt.Println("============== DestroyVM2 ==========")
 	if spec.Key != nil {
 		fmt.Println("key=", *spec.Key)
 	}

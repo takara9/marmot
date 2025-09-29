@@ -2,7 +2,6 @@ package marmotd
 
 import (
 	_ "embed"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -87,7 +86,6 @@ func (s *Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPar
 
 // 仮想マシンのリスト（テストできていない）
 func (s *Server) ListVirtualMachines(ctx echo.Context) error {
-	fmt.Println("========== ListVirtualMachines ===========")
 	s.Lock.Lock()
 	defer s.Lock.Unlock()
 
@@ -110,7 +108,6 @@ func (s *Server) ListVirtualMachines(ctx echo.Context) error {
 
 // 仮想マシンのクラスタを作成
 func (s *Server) CreateCluster(ctx echo.Context) error {
-	fmt.Println("============== RECV Server: Create Cluster =================")
 	s.Lock.Lock()
 	defer s.Lock.Unlock()
 
@@ -139,7 +136,6 @@ func (s *Server) CreateCluster(ctx echo.Context) error {
 
 // 仮想マシンのクラスタを削除
 func (s *Server) DestroyCluster(ctx echo.Context) error {
-	fmt.Println("============== RECV Server: Destroy Cluster =================")
 	s.Lock.Lock()
 	defer s.Lock.Unlock()
 
@@ -161,7 +157,6 @@ func (s *Server) DestroyCluster(ctx echo.Context) error {
 func (s *Server) StartCluster(ctx echo.Context) error {
 	s.Lock.Lock()
 	defer s.Lock.Unlock()
-	fmt.Println("=========== StartCluster ============")
 
 	var cnf config.MarmotConfig
 	err := ctx.Bind(&cnf)
@@ -181,7 +176,6 @@ func (s *Server) StartCluster(ctx echo.Context) error {
 func (s *Server) StopCluster(ctx echo.Context) error {
 	s.Lock.Lock()
 	defer s.Lock.Unlock()
-	fmt.Println("=========== StopCluster ============")
 
 	var cnf config.MarmotConfig
 	err := ctx.Bind(&cnf)
@@ -204,22 +198,6 @@ func (s *Server) CreateVirtualMachine(ctx echo.Context) error {
 	//defer s.Lock.Unlock()
 	var spec api.VmSpec
 	err := ctx.Bind(&spec)
-	fmt.Println("=========== CreateVirtualMachine ============", err)
-	fmt.Println("Spec=", spec)
-	fmt.Println("Spec Name =", *spec.Name)
-	fmt.Println("Spec Cpu =", *spec.Cpu)
-	fmt.Println("Spec Memory =", *spec.Memory)
-	if spec.PrivateIp != nil {
-		fmt.Println("Spec PrivateIP =", *spec.PrivateIp)
-	} else {
-		fmt.Println("Spec PrivateIP =", spec.PrivateIp)
-	}
-	if spec.PublicIp != nil {
-		fmt.Println("Spec PrivateIP =", *spec.PublicIp)
-	} else {
-		fmt.Println("Spec PrivateIP =", spec.PublicIp)
-	}
-
 	err = s.Ma.CreateVM2(spec)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
@@ -252,10 +230,6 @@ func (s *Server) StopVirtualMachine(ctx echo.Context) error {
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-	fmt.Println("=========== StopVirtualMachine ============", err)
-	fmt.Println("Spec=", spec)
-	fmt.Println("Spec Key =", *spec.Key)
-
 	return ctx.JSON(200, nil)
 }
 
@@ -267,10 +241,6 @@ func (s *Server) StartVirtualMachine(ctx echo.Context) error {
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-	fmt.Println("=========== StartVirtualMachine ============", err)
-	fmt.Println("Spec=", spec)
-	fmt.Println("Spec Key =", *spec.Key)
-
 	return ctx.JSON(200, nil)
 }
 

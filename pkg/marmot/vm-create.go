@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 	"github.com/takara9/marmot/api"
@@ -38,14 +37,10 @@ func (m *Marmot) CreateVm(c *gin.Context) {
 
 // VMを生成する
 func (m *Marmot) createVM(spec cf.VMSpec) error {
-	//--------------------------------
-	ex, err := os.Executable()
+	_, err := os.Executable()
 	if err != nil {
-		panic(err)
+		return err
 	}
-	exPath := filepath.Dir(ex)
-	fmt.Println("===================== ", exPath)
-	//--------------------------------
 
 	var dom virt.Domain
 	err = virt.ReadXml("temp.xml", &dom)
@@ -168,7 +163,6 @@ func createRemoteVM(hvNode string, port int, spec cf.VMSpec) error {
 	byteJSON, _ := json.MarshalIndent(spec, "", "    ")
 	// JSON形式でポストする
 	reqURL := fmt.Sprintf("http://%s:%d/api/v1/%s", hvNode, port, "createVm")
-	fmt.Println("createRemoteVM", "url=", reqURL)
 	request, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
 	if err != nil {
 		slog.Error("newRequest", "err", err)
@@ -194,17 +188,13 @@ func createRemoteVM(hvNode string, port int, spec cf.VMSpec) error {
 
 // VMを生成する
 func (m *Marmot) CreateVM2(spec api.VmSpec) error {
-	var err error
 	var dom virt.Domain
 
-	//--------------------------------
-	ex, err := os.Executable()
+	// ファイル名までのフルパスが exe に格納される
+	_, err := os.Executable()
 	if err != nil {
-		panic(err)
+		return err
 	}
-	exPath := filepath.Dir(ex)
-	fmt.Println("===================== ", exPath)
-	//--------------------------------
 
 	err = virt.ReadXml("temp.xml", &dom)
 	if err != nil {

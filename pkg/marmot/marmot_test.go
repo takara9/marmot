@@ -20,30 +20,6 @@ import (
 	ut "github.com/takara9/marmot/pkg/util"
 )
 
-/*
-このテストの役割と目的を明確にする、以下 AIが生成した説明を再確認すること。
-
-- marmotのAPIサーバーを起動し、VMクラスタの作成、停止、再開、削除が正常に動作することを確認する
-- テスト用のetcdサーバーをDockerコンテナで起動し、テスト終了後に停止・削除する
-- ハイパーバイザーの設定、OSイメージテンプレート、シーケンス番号の初期設定を行う
-- VMクラスタの作成に際して、名前やIPアドレスの重複チェックが正しく機能することを確認する
-
-テストケース
-1. Marmotインスタンスの生成とデータベースのセットアップ
-2. ハイパーバイザーの設定ファイルの読み込みとデータベースへの登録
-3. OSイメージテンプレートの登録
-4. シーケンス番号のリセット
-5. Marmotデーモンの起動確認
-6. ハイパーバイザーの稼働チェック
-7. VMクラスタの生成、停止、再開、削除の一連の操作
-8. VMクラスタの二重起動防止の確認
-
-注意点
-- テスト環境に依存する部分（ポート番号、ファイルパスなど）は適宜調整が必要
-- 実際のハイパーバイザーやネットワーク設定に影響を与えないように注意する
-
-*/
-
 const (
 	systemctl_exe = "/usr/bin/systemctl"
 	hvadmin_exe   = "/usr/local/bin/hv-admin"
@@ -66,14 +42,9 @@ var _ = Describe("Marmot", Ordered, func() {
 	nodeName := "hvc"
 	node = &nodeName
 	var etcdEp *db.Database
-
-	//var url string
-	//var err error
-	//var d *Database
 	var containerID string
 
 	BeforeAll(func(ctx SpecContext) {
-		// ==============================================
 		e := echo.New()
 		server := marmotd.NewServer("hvc", etcdUrl)
 		go func() {
@@ -121,7 +92,6 @@ var _ = Describe("Marmot", Ordered, func() {
 
 		It("ハイパーバイザーの情報セット", func() {
 			for _, hv := range hvs.Hvs {
-				fmt.Println(hv)
 				err := etcdEp.SetHypervisor(hv)
 				Expect(err).NotTo(HaveOccurred())
 			}
@@ -175,7 +145,7 @@ var _ = Describe("Marmot", Ordered, func() {
 			cmd := exec.Command(etcdctl_exe, "--endpoints=localhost:5379", "get", "hvc")
 			cmd.Env = append(os.Environ(), "ETCDCTL_API=3")
 			out, err := cmd.CombinedOutput()
-			fmt.Println("command = ", string(out))
+			GinkgoWriter.Println(out)
 			Expect(err).To(Succeed()) // 成功
 		})
 	})
@@ -184,7 +154,6 @@ var _ = Describe("Marmot", Ordered, func() {
 		var cnf cf.MarmotConfig
 		var m *marmot.Marmot
 
-		// ==============================================
 		It("Create Marmot Instance", func() {
 			var err error
 			m, err = marmot.NewMarmot(*node, *etcd)
@@ -199,7 +168,6 @@ var _ = Describe("Marmot", Ordered, func() {
 		})
 
 		It("Create Cluster()", func() {
-			//err := m.CreateCluster2(cnf)
 			newCnf := marmot.ConvConfClusterOld2New(cnf)
 			err := m.CreateClusterInternal(newCnf)
 			Expect(err).NotTo(HaveOccurred())
@@ -213,7 +181,6 @@ var _ = Describe("Marmot", Ordered, func() {
 		})
 
 		It("Destroy Cluster()", func() {
-			//err := m.DestroyCluster2(cnf)
 			newCnf := marmot.ConvConfClusterOld2New(cnf)
 			err := m.DestroyClusterInternal(newCnf)
 			Expect(err).NotTo(HaveOccurred())
@@ -237,34 +204,25 @@ var _ = Describe("Marmot", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		//It("Create Cluster()", func() {
-		//	err := m.CreateCluster2(cnf)
-		//	Expect(err).NotTo(HaveOccurred())
-		//})
-
 		It("Create Cluster()", func() {
-			//err := m.CreateCluster2(cnf)
 			newCnf := marmot.ConvConfClusterOld2New(cnf)
 			err := m.CreateClusterInternal(newCnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Stop Cluster", func() {
-			//err := m.StopCluster2(cnf)
 			newCnf := marmot.ConvConfClusterOld2New(cnf)
 			err := m.StopClusterInternal(newCnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Start Cluster", func() {
-			//err := m.StartCluster2(cnf)
 			newCnf := marmot.ConvConfClusterOld2New(cnf)
 			err := m.DestroyClusterInternal(newCnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Destroy Cluster()", func() {
-			//err := m.DestroyCluster2(cnf)
 			newCnf := marmot.ConvConfClusterOld2New(cnf)
 			err := m.DestroyClusterInternal(newCnf)
 			Expect(err).NotTo(HaveOccurred())
@@ -289,28 +247,24 @@ var _ = Describe("Marmot", Ordered, func() {
 		})
 
 		It("クラスターの起動", func() {
-			//err := m.CreateCluster2(cnf)
 			newCnf := marmot.ConvConfClusterOld2New(cnf)
 			err := m.CreateClusterInternal(newCnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("クラスターの２重起動 エラー発生が発生", func() {
-			//err := m.CreateCluster2(cnf)
 			newCnf := marmot.ConvConfClusterOld2New(cnf)
 			err := m.CreateClusterInternal(newCnf)
 			Expect(err).To(HaveOccurred())
 		})
 
 		It("Start Cluster", func() {
-			//err := m.StartCluster2(cnf)
 			newCnf := marmot.ConvConfClusterOld2New(cnf)
 			err := m.DestroyClusterInternal(newCnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Destroy Cluster()", func() {
-			//err := m.DestroyCluster2(cnf)
 			newCnf := marmot.ConvConfClusterOld2New(cnf)
 			err := m.DestroyClusterInternal(newCnf)
 			Expect(err).NotTo(HaveOccurred())

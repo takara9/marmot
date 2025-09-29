@@ -101,7 +101,6 @@ func (m *MarmotEndpoint) GetVersion() (*api.Version, error) {
 }
 
 func (m *MarmotEndpoint) ListHypervisors(params map[string]string) (int, []byte, *url.URL, error) {
-	fmt.Println("Client: ListHypervisors")
 	url, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/hypervisors")
 	if err != nil {
 		return 0, nil, nil, err
