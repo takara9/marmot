@@ -45,10 +45,7 @@ jobs:
     runs-on: self-hosted
     services:
       etcd:
-        image: bitnami/etcd
-        env:
-          ALLOW_NONE_AUTHENTICATION: yes
-          ETCD_ADVERTISE_CLIENT_URLS: "http://127.0.0.1:2379"
+        image: ghcr.io/takara9/etcd:3.6.5
         ports:
           - 2379:2379
 
