@@ -32,7 +32,6 @@ func (m *Marmot) DestroyCluster2(cnf cf.MarmotConfig) error {
 	for _, spec := range cnf.VMSpec {
 		// クラスタ名とホスト名の重複チェック
 		vmKey, _ := m.Db.FindByHostAndClusteName(spec.Name, cnf.ClusterName)
-		fmt.Println("DEBUG Print in DestroyCluster vmKey, specName", vmKey, spec.Name)
 		if len(vmKey) > 0 {
 			NotFound = false
 			spec.Key = vmKey
@@ -60,9 +59,7 @@ func (m *Marmot) DestroyClusterInternal(cnf api.MarmotConfig) error {
 	for _, spec := range *cnf.VmSpec {
 		// クラスタ名とホスト名の重複チェック
 		vmKey, _ := m.Db.FindByHostAndClusteName(*spec.Name, *cnf.ClusterName)
-		fmt.Println("DEBUG Print in DestroyCluster vmKey=", vmKey, "specName=", *spec.Name)
 		if len(vmKey) > 0 {
-			//NotFound = false
 			spec.Key = &vmKey
 
 			vm, err := m.Db.GetVmByKey(vmKey)
@@ -70,13 +67,6 @@ func (m *Marmot) DestroyClusterInternal(cnf api.MarmotConfig) error {
 				slog.Error("", "err", err)
 				continue
 			}
-
-			//marmotClient, err := NewMarmotdEp(
-			//	"http",
-			//	"localhost:8080",
-			//	"/api/v1",
-			//	60,
-			//)
 
 			hvService := fmt.Sprintf("%s:%d", vm.HvNode, vm.HvPort)
 			marmotClient, err := NewMarmotdEp(
@@ -89,7 +79,7 @@ func (m *Marmot) DestroyClusterInternal(cnf api.MarmotConfig) error {
 				continue
 			}
 
-			_, _, _, err = marmotClient.DestroyVirtualMachine(vm.HvNode, spec)
+			_, _, _, err = marmotClient.DestroyVirtualMachine(spec)
 			if err != nil {
 				slog.Error("", "remote request err", err)
 				m.Db.UpdateVmState(vm.Key, db.ERROR) // エラー状態へ
@@ -97,8 +87,5 @@ func (m *Marmot) DestroyClusterInternal(cnf api.MarmotConfig) error {
 			}
 		}
 	}
-	//if NotFound {
-	//	return errors.New("NotExistVM")
-	//}
 	return nil
 }

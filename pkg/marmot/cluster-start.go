@@ -63,12 +63,6 @@ func (m *Marmot) StartClusterInternal(cnf api.MarmotConfig) error {
 			slog.Error("", "err", err)
 			return err
 		}
-		//marmotClient, err := NewMarmotdEp(
-		//	"http",
-		//	"localhost:8080",
-		//	"/api/v1",
-		//	60,
-		//)
 
 		hvService := fmt.Sprintf("%s:%d", vm.HvNode, vm.HvPort)
 		marmotClient, err := NewMarmotdEp(
@@ -81,7 +75,7 @@ func (m *Marmot) StartClusterInternal(cnf api.MarmotConfig) error {
 			continue
 		}
 
-		_, _, _, err = marmotClient.StartVirtualMachine(vm.HvNode, spec)
+		_, _, _, err = marmotClient.StartVirtualMachine(spec)
 		if err != nil {
 			slog.Error("", "remote request err", err)
 			m.Db.UpdateVmState(vm.Key, db.ERROR) // エラー状態へ
