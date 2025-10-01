@@ -1,9 +1,0 @@
-- name: install stest
-  hosts: all
-  become: true
-  gather_facts: yes
-  vars:
-    shared_fs: /srv
-  tasks:
-    - debug: msg="{{ ansible_facts }}"
- 

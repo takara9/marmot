@@ -1,4 +1,5 @@
-PROGRAMS = vm-server vm-client hv-admin mactl2 marmotd
+#PROGRAMS = vm-server vm-client hv-admin mactl2 marmotd
+PROGRAMS = hv-admin mactl2 marmotd
 all:	$(PROGRAMS)
 
 MAKE = /usr/bin/make
@@ -36,8 +37,6 @@ clean:
 	rm -f marmot-v$(TAG).tgz 
 
 DISTDIR = /usr/local/marmot
-#SERVER_EXE = vm-server
-#CLIENT_CMD = mactl
 SERVER_EXE = marmotd
 CLIENT_CMD = mactl2
 ADMIN_CMD  = hv-admin

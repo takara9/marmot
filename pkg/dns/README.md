@@ -11,7 +11,7 @@ GitHub Actions でテストを実行する際は、CoreDNSとetcdのサービス
 ~~~
 docker network create inter-network
 docker run -d --name coredns --network inter-network -p 1053:53/udp -v /home/ubuntu/marmot/pkg/dns/testconf:/conf -e CONF="/conf/Corefile" -e PORT="53"  maho/coredns:1.11.1 
-docker run -d --name etcd  --network inter-network -p 2379:2379 -e ALLOW_NONE_AUTHENTICATION=yes -e ETCD_ADVERTISE_CLIENT_URLS="http://0.0.0.0:2379" bitnami/etcd
+docker run -d --name etcd  --network inter-network -p 2379:2379 ghcr.io/takara9/etcd:3.6.5
 ~~~
 
 テストが終わった後は、以下のコマンドで、停止させておきます。再スタートするには、`docker start [name]` を実行します。
