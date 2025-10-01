@@ -30,10 +30,10 @@ func NewMarmot(nodeName string, etcdUrl string) (*Marmot, error) {
 }
 
 // コールバック アクセステスト用
-func (m *Marmot) AccessTest(c *gin.Context) {
-	// チェック機能を追加して、最終的にOK/NGを返す
-	c.JSON(200, gin.H{"message": "ok"})
-}
+//func (m *Marmot) AccessTest(c *gin.Context) {
+// チェック機能を追加して、最終的にOK/NGを返す
+//	c.JSON(200, gin.H{"message": "ok"})
+//}
 
 // コールバック ハイパーバイザーの状態取得
 func (m *Marmot) ListHypervisor(c *gin.Context) {
