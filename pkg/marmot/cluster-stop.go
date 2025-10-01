@@ -77,7 +77,7 @@ func (m *Marmot) StopClusterInternal(cnf api.MarmotConfig) error {
 			if err != nil {
 				continue
 			}
-			_, _, _, err = marmotClient.StopVirtualMachine(vm.HvNode, spec)
+			_, _, _, err = marmotClient.StopVirtualMachine(spec)
 			if err != nil {
 				slog.Error("", "remote request err", err)
 				m.Db.UpdateVmState(vm.Key, db.ERROR) // エラー状態へ

@@ -246,7 +246,7 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		if err != nil {
 			continue
 		}
-		_, _, _, err = marmotClient.CreateVirtualMachine(vm.HvNode, spec)
+		_, _, _, err = marmotClient.CreateVirtualMachine(spec)
 		if err != nil {
 			slog.Error("", "remote request err", err)
 			break_err = true

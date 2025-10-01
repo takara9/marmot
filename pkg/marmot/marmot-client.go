@@ -243,7 +243,7 @@ func (m *MarmotEndpoint) StartCluster(params config.MarmotConfig) (int, []byte, 
 	return m.httpRequest(req)
 }
 
-func (m *MarmotEndpoint) CreateVirtualMachine(node string, spec api.VmSpec) (int, []byte, *url.URL, error) {
+func (m *MarmotEndpoint) CreateVirtualMachine(spec api.VmSpec) (int, []byte, *url.URL, error) {
 	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/createVm")
 	if err != nil {
 		return 0, nil, nil, err
@@ -260,7 +260,7 @@ func (m *MarmotEndpoint) CreateVirtualMachine(node string, spec api.VmSpec) (int
 	return m.httpRequest(req)
 }
 
-func (m *MarmotEndpoint) DestroyVirtualMachine(node string, spec api.VmSpec) (int, []byte, *url.URL, error) {
+func (m *MarmotEndpoint) DestroyVirtualMachine(spec api.VmSpec) (int, []byte, *url.URL, error) {
 	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/destroyVm")
 	if err != nil {
 		return 0, nil, nil, err
@@ -277,7 +277,7 @@ func (m *MarmotEndpoint) DestroyVirtualMachine(node string, spec api.VmSpec) (in
 	return m.httpRequest(req)
 }
 
-func (m *MarmotEndpoint) StopVirtualMachine(node string, spec api.VmSpec) (int, []byte, *url.URL, error) {
+func (m *MarmotEndpoint) StopVirtualMachine(spec api.VmSpec) (int, []byte, *url.URL, error) {
 	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/stopVm")
 	if err != nil {
 		return 0, nil, nil, err
@@ -294,7 +294,7 @@ func (m *MarmotEndpoint) StopVirtualMachine(node string, spec api.VmSpec) (int, 
 	return m.httpRequest(req)
 }
 
-func (m *MarmotEndpoint) StartVirtualMachine(node string, spec api.VmSpec) (int, []byte, *url.URL, error) {
+func (m *MarmotEndpoint) StartVirtualMachine(spec api.VmSpec) (int, []byte, *url.URL, error) {
 	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/startVm")
 	if err != nil {
 		return 0, nil, nil, err

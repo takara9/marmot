@@ -79,7 +79,7 @@ func (m *Marmot) DestroyClusterInternal(cnf api.MarmotConfig) error {
 				continue
 			}
 
-			_, _, _, err = marmotClient.DestroyVirtualMachine(vm.HvNode, spec)
+			_, _, _, err = marmotClient.DestroyVirtualMachine(spec)
 			if err != nil {
 				slog.Error("", "remote request err", err)
 				m.Db.UpdateVmState(vm.Key, db.ERROR) // エラー状態へ

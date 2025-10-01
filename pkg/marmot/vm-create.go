@@ -236,7 +236,7 @@ func (m *Marmot) CreateVM2(spec api.VmSpec) error {
 			var dk virt.Disk
 			// ボリュームグループが指定されていない時はvg1を指定
 			var vg string = "vg1"
-			if len(*disk.Vg) > 0 {
+			if disk.Vg !=nil {
 				vg = *disk.Vg
 			}
 			dlv, err := util.CreateDataLv(m.EtcdUrl, uint64(*disk.Size), vg)
