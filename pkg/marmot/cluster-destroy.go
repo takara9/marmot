@@ -1,16 +1,14 @@
 package marmot
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 
-	"github.com/gin-gonic/gin"
 	"github.com/takara9/marmot/api"
-	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 )
 
+/*
 // コールバック VMクラスタの削除
 func (m *Marmot) DestroyCluster(c *gin.Context) {
 	var cnf cf.MarmotConfig
@@ -52,6 +50,7 @@ func (m *Marmot) DestroyCluster2(cnf cf.MarmotConfig) error {
 	}
 	return nil
 }
+*/
 
 // クラスタ削除
 func (m *Marmot) DestroyClusterInternal(cnf api.MarmotConfig) error {

@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/gin-gonic/gin"
 	"github.com/takara9/marmot/api"
-	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 )
 
+/*
 // クラスタの再スタート
 func (m *Marmot) StartCluster(c *gin.Context) {
 	slog.Info("start cluster", "etcd", m.EtcdUrl)
@@ -49,7 +48,7 @@ func (m *Marmot) StartCluster2(cnf cf.MarmotConfig) error {
 	}
 	return nil
 }
-
+*/
 // クラスタ開始
 func (m *Marmot) StartClusterInternal(cnf api.MarmotConfig) error {
 	for _, spec := range *cnf.VmSpec {

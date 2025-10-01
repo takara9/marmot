@@ -1,22 +1,16 @@
 package marmot
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"log/slog"
-	"net/http"
 	"os"
 
-	"github.com/gin-gonic/gin"
 	"github.com/takara9/marmot/api"
-	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/util"
 	"github.com/takara9/marmot/pkg/virt"
 )
 
+/*
 // VMの作成
 func (m *Marmot) CreateVm(c *gin.Context) {
 	slog.Info("create vm", "etcd", m.EtcdUrl)
@@ -185,6 +179,7 @@ func createRemoteVM(hvNode string, port int, spec cf.VMSpec) error {
 	}
 	return nil
 }
+*/
 
 // VMを生成する
 func (m *Marmot) CreateVM2(spec api.VmSpec) error {
@@ -236,7 +231,7 @@ func (m *Marmot) CreateVM2(spec api.VmSpec) error {
 			var dk virt.Disk
 			// ボリュームグループが指定されていない時はvg1を指定
 			var vg string = "vg1"
-			if disk.Vg !=nil {
+			if disk.Vg != nil {
 				vg = *disk.Vg
 			}
 			dlv, err := util.CreateDataLv(m.EtcdUrl, uint64(*disk.Size), vg)

@@ -1,23 +1,17 @@
 package marmot
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"log/slog"
-	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"github.com/takara9/marmot/api"
-	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/lvm"
 	"github.com/takara9/marmot/pkg/util"
 	"github.com/takara9/marmot/pkg/virt"
 )
 
+/*
 // VMの削除
 func (m *Marmot) DestroyVm(c *gin.Context) {
 	slog.Info("destroy vm", "etcd", m.EtcdUrl)
@@ -117,6 +111,7 @@ func destroyRemoteVM(hvNode string, spec cf.VMSpec) error {
 	}
 	return nil
 }
+*/
 
 // VMの削除
 func (m *Marmot) DestroyVM2(spec api.VmSpec) error {

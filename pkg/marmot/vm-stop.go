@@ -1,20 +1,6 @@
 package marmot
 
-import (
-	"bytes"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io"
-	"log/slog"
-	"net/http"
-
-	"github.com/gin-gonic/gin"
-	cf "github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/virt"
-)
-
+/*
 // 仮想マシンの停止
 func (m *Marmot) StopVm(c *gin.Context) {
 	slog.Info("stop vm", "etcd", m.EtcdUrl)
@@ -92,3 +78,4 @@ func stopRemoteVM(hvNode string, spec cf.VMSpec) error {
 	}
 	return nil
 }
+*/

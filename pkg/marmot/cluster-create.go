@@ -5,13 +5,11 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/gin-gonic/gin"
 	"github.com/takara9/marmot/api"
-	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
-	ut "github.com/takara9/marmot/pkg/util"
 )
 
+/*
 // コールバック VMクラスタの作成
 func (m *Marmot) CreateCluster(c *gin.Context) {
 	var cnf cf.MarmotConfig
@@ -149,6 +147,7 @@ func (m *Marmot) CreateCluster2(cnf cf.MarmotConfig) error {
 	}
 	return nil
 }
+*/
 
 // コンフィグからVMクラスタを作成する  新APIを使用
 func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {

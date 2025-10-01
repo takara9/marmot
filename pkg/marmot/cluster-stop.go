@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/gin-gonic/gin"
 	"github.com/takara9/marmot/api"
-	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 )
 
+/*
 // クラスタの停止
 func (m *Marmot) StopCluster(c *gin.Context) {
 	slog.Info("stop cluster", "etcd", m.EtcdUrl)
@@ -52,7 +51,7 @@ func (m *Marmot) StopCluster2(cnf cf.MarmotConfig) error {
 	}
 	return nil
 }
-
+*/
 // クラスタ停止
 func (m *Marmot) StopClusterInternal(cnf api.MarmotConfig) error {
 	var NotFound bool = true

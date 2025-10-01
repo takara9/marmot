@@ -1,4 +1,5 @@
-PROGRAMS = vm-server vm-client hv-admin mactl2 marmotd
+#PROGRAMS = vm-server vm-client hv-admin mactl2 marmotd
+PROGRAMS = hv-admin mactl2 marmotd
 all:	$(PROGRAMS)
 
 MAKE = /usr/bin/make
