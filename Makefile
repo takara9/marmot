@@ -37,8 +37,6 @@ clean:
 	rm -f marmot-v$(TAG).tgz 
 
 DISTDIR = /usr/local/marmot
-#SERVER_EXE = vm-server
-#CLIENT_CMD = mactl
 SERVER_EXE = marmotd
 CLIENT_CMD = mactl2
 ADMIN_CMD  = hv-admin
