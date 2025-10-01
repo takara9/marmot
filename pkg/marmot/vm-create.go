@@ -228,7 +228,7 @@ func (m *Marmot) CreateVM2(spec api.VmSpec) error {
 		return err
 	}
 
-	if spec.Storage == nil {
+	if spec.Storage != nil {
 		// DATAボリュームを作成 (最大９個)
 		dev := []string{"vdb", "vdc", "vde", "vdf", "vdg", "vdh", "vdj", "vdk", "vdl"}
 		bus := []string{"0x0a", "0x0b", "0x0c", "0x0d", "0x0e", "0x0f", "0x10", "0x11", "0x12"}
@@ -273,7 +273,6 @@ func (m *Marmot) CreateVM2(spec api.VmSpec) error {
 		util.CheckHvVG2(m.EtcdUrl, m.NodeName, *spec.Ostempvg)
 	}
 
-	
 	if spec.PrivateIp != nil {
 		util.CreateNic("pri", &dom.Devices.Interface)
 	}
