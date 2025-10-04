@@ -3,6 +3,7 @@ all:	$(PROGRAM)
 
 TAG := $(shell cat ../../TAG)
 BINDIR = ../../marmot-v$(TAG)
+GO=/usr/local/go/bin/go
 
 $(PROGRAM): $(%.go)
 	echo $(BINDIR)
@@ -20,5 +21,5 @@ install:
 
 .PHONY: test
 test:
-	go test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -coverprofile cover.out
+	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -coverprofile cover.out
 	#$(GINKGO) -v --race --focus-file migtool_test.go
