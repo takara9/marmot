@@ -104,7 +104,7 @@ func CheckHvVgAll(dbUrl string, node string) error {
 	}
 	// クローズが無い？
 
-	hv, err := d.GetHvByKey(node)
+	hv, err := d.GetHypervisorByKey(node)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
@@ -154,7 +154,7 @@ func CheckHvVG2(dbUrl string, node string, vg string) error {
 		return err
 	}
 
-	hv, err := d.GetHvByKey(node)
+	hv, err := d.GetHypervisorByKey(node)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err

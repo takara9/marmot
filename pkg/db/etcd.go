@@ -38,22 +38,6 @@ func (d *Database) GetEtcdByPrefix(key string) (*etcd.GetResponse, error) {
 	return resp, err
 }
 
-// Keyに一致したHVデータの取り出し
-func (d *Database) GetHvByKey(key string) (Hypervisor, error) {
-	var hv Hypervisor
-
-	resp, err := d.Cli.Get(d.Ctx, key)
-	if err != nil {
-		return hv, err
-	}
-
-	if resp.Count == 0 {
-		return hv, errors.New("not found")
-	}
-	err = json.Unmarshal([]byte(resp.Kvs[0].Value), &hv)
-
-	return hv, err
-}
 
 // Keyに一致したVMデータの取り出し
 func (d *Database) GetVmByKey(key string) (VirtualMachine, error) {
@@ -122,22 +106,6 @@ func (d *Database) DelByKey(key string) error {
 	return err
 }
 
-// ハイパーバイザーのデータを取得
-func (d *Database) GetHvsStatus(hvs *[]Hypervisor) error {
-	resp, err := d.GetEtcdByPrefix("hv")
-	if err != nil {
-		return err
-	}
-	for _, ev := range resp.Kvs {
-		var hv Hypervisor
-		err = json.Unmarshal([]byte(ev.Value), &hv)
-		if err != nil {
-			return err
-		}
-		*hvs = append(*hvs, hv)
-	}
-	return nil
-}
 
 // 仮想マシンのデータを取得
 func (d *Database) GetVmsStatus(vms *[]VirtualMachine) error {
@@ -223,7 +191,7 @@ func (d *Database) AssignHvforVm(vm VirtualMachine) (string, string, uuid.UUID, 
 	//トランザクション開始、他更新ロック
 	// 仮想マシンをデータベースに登録、状態は「データ登録中」
 	var hvs []Hypervisor
-	err := d.GetHvsStatus(&hvs) // HVのステータス取得
+	err := d.GetHypervisors(&hvs) // HVのステータス取得
 	if err != nil {
 		return "", "", txId, 0, err
 	}
@@ -293,7 +261,7 @@ func (d *Database) RemoveVmFromHV(vmKey string) error {
 	if err != nil {
 		return err
 	}
-	hv, err := d.GetHvByKey(vm.HvNode)
+	hv, err := d.GetHypervisorByKey(vm.HvNode)
 	if err != nil {
 		return err
 	}
@@ -429,10 +397,24 @@ func (d *Database) UpdateVmState(vmkey string, state int) error {
 	return err
 }
 
-//////////////////////////////////////////////////////////////
+
+// イメージテンプレート
+func (d *Database) SetImageTemplate(v cf.Image_yaml) error {
+	var osi OsImageTemplate
+	osi.LogicaVol = v.LogicalVolume
+	osi.VolumeGroup = v.VolumeGroup
+	osi.OsVariant = v.Name
+	key := fmt.Sprintf("%v_%v", "OSI", osi.OsVariant)
+	err := d.PutDataEtcd(key, osi)
+	if err != nil {
+		slog.Error("", "err", err)
+		return err
+	}
+	return nil
+}
 
 // ハイパーバイザーの設定
-func (d *Database) SetHypervisor(v cf.Hypervisor_yaml) error {
+func (d *Database) SetHypervisors(v cf.Hypervisor_yaml) error {
 	var hv Hypervisor
 
 	hv.Nodename = v.Name
@@ -468,17 +450,36 @@ func (d *Database) SetHypervisor(v cf.Hypervisor_yaml) error {
 
 }
 
-// イメージテンプレート
-func (d *Database) SetImageTemplate(v cf.Image_yaml) error {
-	var osi OsImageTemplate
-	osi.LogicaVol = v.LogicalVolume
-	osi.VolumeGroup = v.VolumeGroup
-	osi.OsVariant = v.Name
-	key := fmt.Sprintf("%v_%v", "OSI", osi.OsVariant)
-	err := d.PutDataEtcd(key, osi)
+// Keyに一致したHVデータの取り出し
+func (d *Database) GetHypervisorByKey(key string) (Hypervisor, error) {
+	var hv Hypervisor
+
+	resp, err := d.Cli.Get(d.Ctx, key)
 	if err != nil {
-		slog.Error("", "err", err)
+		return hv, err
+	}
+
+	if resp.Count == 0 {
+		return hv, errors.New("not found")
+	}
+	err = json.Unmarshal([]byte(resp.Kvs[0].Value), &hv)
+
+	return hv, err
+}
+
+// ハイパーバイザーのデータを取得
+func (d *Database) GetHypervisors(hvs *[]Hypervisor) error {
+	resp, err := d.GetEtcdByPrefix("hv")
+	if err != nil {
 		return err
+	}
+	for _, ev := range resp.Kvs {
+		var hv Hypervisor
+		err = json.Unmarshal([]byte(ev.Value), &hv)
+		if err != nil {
+			return err
+		}
+		*hvs = append(*hvs, hv)
 	}
 	return nil
 }

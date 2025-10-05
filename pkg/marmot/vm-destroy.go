@@ -22,7 +22,7 @@ func (m *Marmot) DestroyVM2(spec api.VmSpec) error {
 	}
 
 	// ハイパーバイザーのリソース削減保存のため値を取得
-	hv, err := m.Db.GetHvByKey(vm.HvNode)
+	hv, err := m.Db.GetHypervisorByKey(vm.HvNode)
 	if err != nil {
 		slog.Error("", "err", err)
 	}

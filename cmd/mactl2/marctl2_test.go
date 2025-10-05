@@ -61,7 +61,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		It("ハイパーバイザーの情報セット", func() {
 			for _, hv := range hvs.Hvs {
 				fmt.Println(hv)
-				err := marmotServer.Ma.Db.SetHypervisor(hv)
+				err := marmotServer.Ma.Db.SetHypervisors(hv)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})

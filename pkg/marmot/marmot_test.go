@@ -92,7 +92,7 @@ var _ = Describe("Marmot", Ordered, func() {
 
 		It("ハイパーバイザーの情報セット", func() {
 			for _, hv := range hvs.Hvs {
-				err := etcdEp.SetHypervisor(hv)
+				err := etcdEp.SetHypervisors(hv)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
