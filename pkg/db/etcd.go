@@ -483,3 +483,20 @@ func (d *Database) GetHypervisors(hvs *[]Hypervisor) error {
 	}
 	return nil
 }
+
+// ハイパーバイザーのデータを取得
+func (d *Database) GetHypervisorsOld(hvs *[]HypervisorOld) error {
+	resp, err := d.GetEtcdByPrefix("hv")
+	if err != nil {
+		return err
+	}
+	for _, ev := range resp.Kvs {
+		var hv HypervisorOld
+		err = json.Unmarshal([]byte(ev.Value), &hv)
+		if err != nil {
+			return err
+		}
+		*hvs = append(*hvs, hv)
+	}
+	return nil
+}

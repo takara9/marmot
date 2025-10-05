@@ -35,14 +35,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println(d)
+
+	var hypervisorOld []db.HypervisorOld
+	//var hypervisor []db.Hypervisor
+	d.GetHypervisorsOld(&hypervisorOld)
 	// ハイパーバイザー
-	//for _, hv := range hvs.Hvs {
-	//	fmt.Println(hv)
-	//	err := d.SetHypervisor(hv)
-	//	if err != nil {
-	//		return err
-	//	}
-	//}
+	for _, hv := range hypervisorOld {
+		fmt.Println(hv)
+
+
+		//		err := d.SetHypervisor(hv)
+		//if err != nil {
+		//	return err
+		//}
+	}
 
 }
