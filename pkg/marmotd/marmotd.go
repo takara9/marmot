@@ -76,7 +76,7 @@ func (s *Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPar
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 	var hvs []db.Hypervisor
-	err = d.GetHvsStatus(&hvs)
+	err = d.GetHypervisors(&hvs)
 	if err != nil {
 		slog.Error("get hypervisor status", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
@@ -249,7 +249,7 @@ func (s *Server) ShowHypervisorById(ctx echo.Context, hypervisorId string) error
 	defer s.Lock.Unlock()
 
 	var hvs []db.Hypervisor
-	err := s.Ma.Db.GetHvsStatus(&hvs)
+	err := s.Ma.Db.GetHypervisors(&hvs)
 	if err != nil {
 		slog.Error("get hypervisor status", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})

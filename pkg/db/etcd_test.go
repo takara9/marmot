@@ -67,7 +67,7 @@ var _ = Describe("Etcd", Ordered, func() {
 			})
 
 			It("Get", func() {
-				data_get, err := d.GetHvByKey(key_hv1)
+				data_get, err := d.GetHypervisorByKey(key_hv1)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(data_get.Cpu).To(Equal(data_hv1.Cpu))
 			})
@@ -78,7 +78,7 @@ var _ = Describe("Etcd", Ordered, func() {
 			})
 
 			It("Check delete data", func() {
-				_, err := d.GetHvByKey(key_hv1)
+				_, err := d.GetHypervisorByKey(key_hv1)
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -214,7 +214,7 @@ var _ = Describe("Etcd", Ordered, func() {
 				// ハイパーバイザー
 				for _, hv := range cnf.Hvs {
 					GinkgoWriter.Println(hv)
-					d.SetHypervisor(hv)
+					d.SetHypervisors(hv)
 				}
 
 				// OSイメージテンプレート
@@ -230,7 +230,7 @@ var _ = Describe("Etcd", Ordered, func() {
 
 			It("Get Hypervisors status", func() {
 				var hvs []Hypervisor
-				err = d.GetHvsStatus(&hvs)
+				err = d.GetHypervisors(&hvs)
 				Expect(err).NotTo(HaveOccurred())
 				for _, h := range hvs {
 					GinkgoWriter.Println("Nodename     ", h.Nodename)
@@ -268,7 +268,7 @@ var _ = Describe("Etcd", Ordered, func() {
 
 			It("Get Hypervisors status", func() {
 				var hvs []Hypervisor
-				err = d.GetHvsStatus(&hvs)
+				err = d.GetHypervisors(&hvs)
 				Expect(err).NotTo(HaveOccurred())
 
 				for _, h := range hvs {

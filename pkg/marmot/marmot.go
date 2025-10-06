@@ -58,7 +58,7 @@ func (m *Marmot) ListHypervisor(c *gin.Context) {
 		return
 	}
 	var hvs []db.Hypervisor
-	err = d.GetHvsStatus(&hvs)
+	err = d.GetHypervisors(&hvs)
 	if err != nil {
 		slog.Error("get hypervisor status", "err", err)
 		return

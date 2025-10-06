@@ -1,6 +1,9 @@
 package config
 
 import (
+	"errors"
+	"os"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -62,6 +65,23 @@ var _ = Describe("Config", func() {
 					GinkgoWriter.Println(i)
 					GinkgoWriter.Println(h.Name)
 					GinkgoWriter.Println(h.Cpu)
+					Expect(h.Name).To(Equal(tests[i].want.name))
+					Expect(h.Cpu).To(Equal(tests[i].want.cpu))
+					Expect(h.Ram).To(Equal(tests[i].want.ram))
+				}
+			})
+
+			It("Write new file", func() {
+				filename := "testdata/out-hypervisor-config.yaml"
+				os.Remove(filename)
+				err := WriteConfig(filename, cnf)
+				Expect(err).NotTo(HaveOccurred())
+				_, err = os.Stat(filename)
+				Expect(errors.Is(err, os.ErrNotExist)).To(Equal(false))
+
+				err = ReadConfig(hypervior_config, &cnf)
+				Expect(err).NotTo(HaveOccurred())
+				for i, h := range cnf.Hvs {
 					Expect(h.Name).To(Equal(tests[i].want.name))
 					Expect(h.Cpu).To(Equal(tests[i].want.cpu))
 					Expect(h.Ram).To(Equal(tests[i].want.ram))

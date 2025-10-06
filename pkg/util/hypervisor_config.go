@@ -46,7 +46,7 @@ func SetHvConfig(hvs cf.Hypervisors_yaml, cnf DefaultConfig) error {
 	// ハイパーバイザー
 	for _, hv := range hvs.Hvs {
 		fmt.Println(hv)
-		err := d.SetHypervisor(hv)
+		err := d.SetHypervisors(hv)
 		if err != nil {
 			return err
 		}
