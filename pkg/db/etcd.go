@@ -484,7 +484,7 @@ func (d *Database) GetHypervisors(hvs *[]Hypervisor) error {
 	return nil
 }
 
-// ハイパーバイザーのデータを取得
+// ハイパーバイザーのデータを取得 今後削除予定
 func (d *Database) GetHypervisorsOld(hvs *[]HypervisorOld) error {
 	resp, err := d.GetEtcdByPrefix("hv")
 	if err != nil {

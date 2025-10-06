@@ -1,5 +1,4 @@
-#PROGRAMS = vm-server vm-client hv-admin mactl2 marmotd
-PROGRAMS = hv-admin mactl2 marmotd
+PROGRAMS = hv-admin mactl2 marmotd migtool
 all:	$(PROGRAMS)
 
 MAKE = /usr/bin/make

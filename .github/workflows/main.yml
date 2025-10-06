@@ -137,6 +137,11 @@ jobs:
         make mactl2-test
         sudo -s make test
         cd ../..
+    - name: Test cmd/migration-tools
+      run: | 
+        cd cmd/migration-tools
+        sudo -s make test
+        cd ../..
 
     - name: Clean up
       run: |

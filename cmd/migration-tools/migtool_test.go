@@ -9,6 +9,8 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/takara9/marmot/pkg/config"
+	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/util"
 )
 
 var _ = Describe("Marmotd Test", Ordered, func() {
@@ -44,12 +46,74 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 	Context("基本的なクライアントからのアクセステスト", func() {
 		var hvs config.Hypervisors_yaml
+		var cnf util.DefaultConfig
+		var d *db.Database
 		//var marmotClient *marmot.MarmotEndpoint
+		var hvsOld []db.HypervisorOld
+		var hvsNew []db.Hypervisor
 
-		It("ハイパーバイザーのコンフィグファイルの読み取り", func() {
-			err = config.ReadYAML("testdata/hypervisor-config-hvc.yaml", &hvs)
+		It("コマンドの構成ファイルの読み取り", func() {
+			err = config.ReadYAML("testdata/config_marmot.conf", &cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
+		It("ハイパーバイザーのコンフィグファイルの読み取り", func() {
+			err := config.ReadConfig("testdata/hypervisor-config-hvc.yaml", &hvs)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("テスト用データベースへの書き込み", func() {
+			d, err = db.NewDatabase(cnf.EtcdServerUrl)
+			Expect(err).NotTo(HaveOccurred())
+			for _, hv := range hvs.Hvs {
+				err := d.SetHypervisors(hv)
+				Expect(err).NotTo(HaveOccurred())
+			}
+		})
+
+		It("移行前データの確認", func() {
+			err = d.GetHypervisorsOld(&hvsOld)
+			Expect(err).NotTo(HaveOccurred())
+			for _, hv := range hvsOld {
+				fmt.Println("Node name =", hv.Nodename)
+				Expect(err).NotTo(HaveOccurred())
+			}
+		})
+
+		It("データ移行実行", func() {
+			hvsNew = convertOldToNew(hvsOld)
+			for _, hv := range hvsNew {
+				fmt.Println("Node name =", hv.Nodename)
+				fmt.Println("Port =", hv.Port)
+				Expect(err).NotTo(HaveOccurred())
+			}
+		})
+
+		It("古いデータの削除", func() {
+			err = deleteOldData(hvsOld, d)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("新しいデータの登録", func() {
+			err = putNewData(hvsNew, d)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("移行後データの確認", func() {
+			var hvsCheck []db.Hypervisor
+			err = d.GetHypervisors(&hvsCheck)
+			Expect(err).NotTo(HaveOccurred())
+			for _, hv := range hvsCheck {
+				fmt.Println("Node name =", hv.Nodename)
+				fmt.Println("Port =", hv.Port)
+				for _, sp := range hv.StgPool {
+					fmt.Println(" Storage Type =", sp.Type)
+					fmt.Println(" Storage FreeCap =", sp.FreeCap)
+					fmt.Println(" Storage VgCap =", sp.VgCap)
+					fmt.Println(" Storage VolGroup =", sp.VolGroup)
+				}
+				Expect(err).NotTo(HaveOccurred())
+			}
+		})
 	})
 })
