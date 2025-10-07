@@ -27,7 +27,6 @@ test:
 package: clean all
 	@echo $(TAG)
 	cp cmd/install.sh $(BINDIR)/install.sh
-	cp cmd/vm-client/config_marmot $(BINDIR)/config_marmot
 	tar czvf marmot-v$(TAG).tgz marmot-v$(TAG)
 
 .PHONY:	clean
