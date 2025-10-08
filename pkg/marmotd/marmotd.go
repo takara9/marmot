@@ -9,10 +9,11 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/config"
+	//"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmot"
 	"github.com/takara9/marmot/pkg/util"
+	"marmot.io/config"
 )
 
 //go:embed version.txt

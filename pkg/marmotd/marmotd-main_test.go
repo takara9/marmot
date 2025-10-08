@@ -11,7 +11,8 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/config"
+	//"github.com/takara9/marmot/pkg/config"
+	"marmot.io/config"
 	"github.com/takara9/marmot/pkg/marmot"
 	"github.com/takara9/marmot/pkg/util"
 )

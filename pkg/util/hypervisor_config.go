@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	cf "github.com/takara9/marmot/pkg/config"
+	"marmot.io/config"
 	db "github.com/takara9/marmot/pkg/db"
 )
 
@@ -15,19 +15,19 @@ type DefaultConfig struct {
 	EtcdServerUrl string `yaml:"etcd_server"`
 }
 
-func ReadHvConfig() (cf.Hypervisors_yaml, DefaultConfig, error) {
-	var hvs cf.Hypervisors_yaml
+func ReadHvConfig() (config.Hypervisors_yaml, DefaultConfig, error) {
+	var hvs config.Hypervisors_yaml
 	var cnf DefaultConfig
 
-	err := cf.ReadConfig(filepath.Join(os.Getenv("HOME"), ".config_marmot"), &cnf)
+	err := config.ReadConfig(filepath.Join(os.Getenv("HOME"), ".config_marmot"), &cnf)
 	if err != nil {
 		return hvs, cnf, err
 	}
 
 	// パラメータの取得
-	config := flag.String("config", "hypervisor-config.yaml", "Hypervisor config file")
+	configFile := flag.String("config", "hypervisor-config.yaml", "Hypervisor config file")
 	flag.Parse()
-	err = cf.ReadYAML(*config, &hvs)
+	err = config.ReadYAML(*configFile, &hvs)
 	if err != nil {
 		return hvs, cnf, err
 	}
@@ -35,7 +35,7 @@ func ReadHvConfig() (cf.Hypervisors_yaml, DefaultConfig, error) {
 	return hvs, cnf, nil
 }
 
-func SetHvConfig(hvs cf.Hypervisors_yaml, cnf DefaultConfig) error {
+func SetHvConfig(hvs config.Hypervisors_yaml, cnf DefaultConfig) error {
 
 	// etcdへ接続
 	d, err := db.NewDatabase(cnf.EtcdServerUrl)

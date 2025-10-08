@@ -8,8 +8,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/marmot"
+	"marmot.io/config"
+
 )
 
 // コンフィグからエンドポイントを取り出してセットする

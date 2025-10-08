@@ -7,7 +7,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	cf "github.com/takara9/marmot/pkg/config"
+	//cf "github.com/takara9/marmot/pkg/config"
+	"marmot.io/config"
 )
 
 var _ = Describe("Etcd", Ordered, func() {
@@ -146,7 +147,7 @@ var _ = Describe("Etcd", Ordered, func() {
 
 	Describe("Read Hypervisor Config file and Check", func() {
 		const hypervior_config string = "testdata/hypervisor-config.yaml"
-		var cn cf.Hypervisors_yaml
+		var cn config.Hypervisors_yaml
 
 		type hv struct {
 			name string
@@ -163,7 +164,7 @@ var _ = Describe("Etcd", Ordered, func() {
 
 		Context("Read a test hypervisor config file", func() {
 			It("Read existing file", func() {
-				err := cf.ReadConfig(hypervior_config, &cn)
+				err := config.ReadConfig(hypervior_config, &cn)
 				Expect(err).NotTo(HaveOccurred())
 				for i, h := range cn.Hvs {
 					GinkgoWriter.Println(i)
@@ -179,7 +180,7 @@ var _ = Describe("Etcd", Ordered, func() {
 
 	Describe("HyperVisor Management Test", func() {
 		const hypervior_config string = "testdata/hypervisor-config.yaml"
-		var cnf cf.Hypervisors_yaml
+		var cnf config.Hypervisors_yaml
 
 		type hv struct {
 			name string
@@ -198,7 +199,7 @@ var _ = Describe("Etcd", Ordered, func() {
 		Context("Test of Hypervisor management : Set up", func() {
 
 			It("Read existing file", func() {
-				err := cf.ReadConfig(hypervior_config, &cnf)
+				err := config.ReadConfig(hypervior_config, &cnf)
 				Expect(err).NotTo(HaveOccurred())
 				for i, h := range cnf.Hvs {
 					GinkgoWriter.Println(i)

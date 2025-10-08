@@ -7,7 +7,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/takara9/marmot/pkg/config"
+	//"github.com/takara9/marmot/pkg/config"
+	"marmot.io/config"
 	db "github.com/takara9/marmot/pkg/db"
 )
 

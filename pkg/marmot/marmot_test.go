@@ -11,8 +11,9 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/config"
-	cf "github.com/takara9/marmot/pkg/config"
+	//"github.com/takara9/marmot/pkg/config"
+	"marmot.io/config"
+	//cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmot"
 	"github.com/takara9/marmot/pkg/marmotd"
@@ -151,7 +152,7 @@ var _ = Describe("Marmot", Ordered, func() {
 	})
 
 	Context("VMクラスタの生成と削除", func() {
-		var cnf cf.MarmotConfig
+		var cnf config.MarmotConfig
 		var m *marmot.Marmot
 
 		It("Create Marmot Instance", func() {
@@ -163,7 +164,7 @@ var _ = Describe("Marmot", Ordered, func() {
 		It("Load Config", func() {
 			fn := "testdata/cluster-config.yaml"
 			ccf = &fn
-			err := cf.ReadConfig(*ccf, &cnf)
+			err := config.ReadConfig(*ccf, &cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -176,7 +177,7 @@ var _ = Describe("Marmot", Ordered, func() {
 		It("Load Config for destroy", func() {
 			fn := "testdata/cluster-config.yaml"
 			ccf = &fn
-			err := cf.ReadConfig(*ccf, &cnf)
+			err := config.ReadConfig(*ccf, &cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -188,7 +189,7 @@ var _ = Describe("Marmot", Ordered, func() {
 	})
 
 	Context("VMクラスタの生成と一時停止と再開", func() {
-		var cnf cf.MarmotConfig
+		var cnf config.MarmotConfig
 		var m *marmot.Marmot
 
 		It("Create Marmot Instance", func() {
@@ -200,7 +201,7 @@ var _ = Describe("Marmot", Ordered, func() {
 		It("Load Config", func() {
 			fn := "testdata/cluster-config.yaml"
 			ccf = &fn
-			err := cf.ReadConfig(*ccf, &cnf)
+			err := config.ReadConfig(*ccf, &cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -230,7 +231,7 @@ var _ = Describe("Marmot", Ordered, func() {
 	})
 
 	Context("VMクラスタの２重起動の防止", func() {
-		var cnf cf.MarmotConfig
+		var cnf config.MarmotConfig
 		var m *marmot.Marmot
 
 		It("Create Marmot Instance", func() {
@@ -242,7 +243,7 @@ var _ = Describe("Marmot", Ordered, func() {
 		It("Load Config", func() {
 			fn := "testdata/cluster-config.yaml"
 			ccf = &fn
-			err := cf.ReadConfig(*ccf, &cnf)
+			err := config.ReadConfig(*ccf, &cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 

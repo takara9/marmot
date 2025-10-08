@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 	etcd "go.etcd.io/etcd/client/v3"
 
-	cf "github.com/takara9/marmot/pkg/config"
+	"marmot.io/config" // 変更点
 )
 
 type Database struct {
@@ -399,7 +399,7 @@ func (d *Database) UpdateVmState(vmkey string, state int) error {
 
 
 // イメージテンプレート
-func (d *Database) SetImageTemplate(v cf.Image_yaml) error {
+func (d *Database) SetImageTemplate(v config.Image_yaml) error {
 	var osi OsImageTemplate
 	osi.LogicaVol = v.LogicalVolume
 	osi.VolumeGroup = v.VolumeGroup
@@ -414,7 +414,7 @@ func (d *Database) SetImageTemplate(v cf.Image_yaml) error {
 }
 
 // ハイパーバイザーの設定
-func (d *Database) SetHypervisors(v cf.Hypervisor_yaml) error {
+func (d *Database) SetHypervisors(v config.Hypervisor_yaml) error {
 	var hv Hypervisor
 
 	hv.Nodename = v.Name

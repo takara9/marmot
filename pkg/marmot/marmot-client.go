@@ -12,7 +12,8 @@ import (
 	"time"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/config"
+	//"github.com/takara9/marmot/pkg/config"
+	"marmot.io/config"
 )
 
 type MarmotEndpoint struct {
