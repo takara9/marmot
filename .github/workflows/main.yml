@@ -137,9 +137,9 @@ jobs:
         make mactl2-test
         sudo -s make test
         cd ../..
-    - name: Test cmd/migration-tools
+    - name: Test cmd/migtool
       run: | 
-        cd cmd/migration-tools
+        cd cmd/migtool
         sudo -s make test
         cd ../..
 
