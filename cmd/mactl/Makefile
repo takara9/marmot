@@ -1,5 +1,5 @@
 GO=/usr/local/go/bin/go
-PROGRAM	= mactl2
+PROGRAM	= mactl
 all:	$(PROGRAM)
 
 TAG := $(shell cat ../../TAG)
