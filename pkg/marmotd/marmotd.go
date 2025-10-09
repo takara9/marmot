@@ -8,11 +8,11 @@ import (
 	"sync"
 
 	"github.com/labstack/echo/v4"
-	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/marmot"
-	"github.com/takara9/marmot/pkg/util"
+	"marmot.io/api"
+	"marmot.io/config"
+	"marmot.io/db"
+	"marmot.io/marmot"
+	"marmot.io/util"
 )
 
 //go:embed version.txt
@@ -197,7 +197,13 @@ func (s *Server) CreateVirtualMachine(ctx echo.Context) error {
 	//s.Lock.Lock()
 	//defer s.Lock.Unlock()
 	var spec api.VmSpec
+
 	err := ctx.Bind(&spec)
+	if err != nil {
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	// ハイパーバイザーの稼働チェック 結果はDBへ反映
 	err = s.Ma.CreateVM2(spec)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})

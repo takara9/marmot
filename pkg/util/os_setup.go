@@ -20,9 +20,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/takara9/marmot/api"
-	cf "github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/virt"
+	"marmot.io/api"
+	"marmot.io/config"
+	"marmot.io/virt"
 )
 
 // Linux ホスト名をOS Volへ書き込み
@@ -33,7 +33,7 @@ func LinuxSetup_hostname(vm_root string, hostname string) error {
 }
 
 // Linux hostidをOS Volへ書き込み
-func LinuxSetup_hostid(spec cf.VMSpec, vm_root string) error {
+func LinuxSetup_hostid(spec config.VMSpec, vm_root string) error {
 	ipb := IPaddrByteArray(spec.PrivateIP)
 	hostid_file := filepath.Join(vm_root, "etc/hostid")
 	err := os.WriteFile(hostid_file, ipb, 0644)
@@ -60,11 +60,11 @@ func IPaddrByteArray(ip string) []byte {
 }
 
 /*
- cnf cf.MarmotConfigは、利用していない。そのため削除したい。
+ cnf config.MarmotConfigは、利用していない。そのため削除したい。
  デフォルトGW,DNSなどの設定のためにコンフィグファイルからの設定を取り入れている
 */
 // Linux Netplanのファイルへ、IPアドレスなどを設定
-func LinuxSetup_createNetplan(spec cf.VMSpec, vm_root string) error {
+func LinuxSetup_createNetplan(spec config.VMSpec, vm_root string) error {
 	var netplanFile = "etc/netplan/00-nic.yaml"
 	netplanPath := filepath.Join(vm_root, netplanFile)
 
@@ -173,7 +173,7 @@ func CreateNic(netClass string, vmXml *[]virt.Interface) error {
 }
 
 /*
- cnf cf.MarmotConfigは、利用していない。そのため削除したい。
+ cnf config.MarmotConfigは、利用していない。そのため削除したい。
  デフォルトGW,DNSなどの設定のためにコンフィグファイルからの設定を取り入れている
 */
 // Linux Netplanのファイルへ、IPアドレスなどを設定

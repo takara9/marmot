@@ -20,10 +20,10 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/takara9/marmot/api"
-	cf "github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/lvm"
+	"marmot.io/api"
+	"marmot.io/config"
+	"marmot.io/db"
+	"marmot.io/lvm"
 )
 
 // LVのパーティションをマップ
@@ -115,7 +115,7 @@ func CreateDataLv(dbUrl string, sz uint64, vg string) (string, error) {
 // スナップショットボリュームをマウントして、 ホスト名とIPアドレスを設定
 //
 //	Ubuntu Linuxに限定
-func ConfigRootVol(spec cf.VMSpec, vg string, oslv string) error {
+func ConfigRootVol(spec config.VMSpec, vg string, oslv string) error {
 	err := KpartOn(vg, oslv)
 	if err != nil {
 		slog.Error("", "err", err)

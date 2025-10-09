@@ -8,9 +8,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/util"
+	"marmot.io/config"
+	"marmot.io/db"
+	"marmot.io/util"
 )
 
 var _ = Describe("Marmotd Test", Ordered, func() {

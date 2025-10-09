@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/takara9/marmot/pkg/config"
-	db "github.com/takara9/marmot/pkg/db"
+	"marmot.io/config"
+	"marmot.io/db"
 )
 
 var ClusterName string

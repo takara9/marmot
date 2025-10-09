@@ -1,8 +1,8 @@
 package marmot
 
 import (
-	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/config"
+	"marmot.io/api"
+	"marmot.io/config"
 )
 
 // 新APIから旧APIの構造体へ変換する
