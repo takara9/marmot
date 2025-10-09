@@ -7,7 +7,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.26.0
 	github.com/onsi/gomega v1.38.2
 	github.com/spf13/cobra v1.7.0
-	github.com/takara9/marmot v0.8.6
+	marmot.io/api v0.8.6
 	marmot.io/config v0.8.6
 	marmot.io/db v0.8.6
 	marmot.io/marmot v0.8.6
@@ -79,7 +79,6 @@ require (
 	gopkg.in/freddierice/go-losetup.v1 v1.0.0-20170407175016-fc9adea44124 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	libvirt.org/go/libvirt v1.11006.0 // indirect
-	marmot.io/api v0.8.6 // indirect
 	marmot.io/lvm v0.8.6 // indirect
 	marmot.io/virt v0.8.6 // indirect
 )
