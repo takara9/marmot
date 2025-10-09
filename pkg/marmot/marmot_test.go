@@ -10,14 +10,13 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/config"
-	cf "github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/marmot"
-	"github.com/takara9/marmot/pkg/marmotd"
-	"github.com/takara9/marmot/pkg/util"
-	ut "github.com/takara9/marmot/pkg/util"
+	"marmot.io/api"
+	//"github.com/takara9/marmot/api"
+	"marmot.io/config"
+	"marmot.io/db"
+	"marmot.io/marmot"
+	"marmot.io/marmotd"
+	"marmot.io/util"
 )
 
 const (
@@ -128,7 +127,7 @@ var _ = Describe("Marmot", Ordered, func() {
 
 		It("Check Hypervisors data", func() {
 			GinkgoWriter.Println(*node)
-			hv, err := ut.CheckHypervisors(*etcd, *node)
+			hv, err := util.CheckHypervisors(*etcd, *node)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("xxxxxx array size == ", len(hv))
 			for i, v := range hv {
@@ -151,7 +150,7 @@ var _ = Describe("Marmot", Ordered, func() {
 	})
 
 	Context("VMクラスタの生成と削除", func() {
-		var cnf cf.MarmotConfig
+		var cnf config.MarmotConfig
 		var m *marmot.Marmot
 
 		It("Create Marmot Instance", func() {
@@ -163,7 +162,7 @@ var _ = Describe("Marmot", Ordered, func() {
 		It("Load Config", func() {
 			fn := "testdata/cluster-config.yaml"
 			ccf = &fn
-			err := cf.ReadConfig(*ccf, &cnf)
+			err := config.ReadConfig(*ccf, &cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -176,7 +175,7 @@ var _ = Describe("Marmot", Ordered, func() {
 		It("Load Config for destroy", func() {
 			fn := "testdata/cluster-config.yaml"
 			ccf = &fn
-			err := cf.ReadConfig(*ccf, &cnf)
+			err := config.ReadConfig(*ccf, &cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -188,7 +187,7 @@ var _ = Describe("Marmot", Ordered, func() {
 	})
 
 	Context("VMクラスタの生成と一時停止と再開", func() {
-		var cnf cf.MarmotConfig
+		var cnf config.MarmotConfig
 		var m *marmot.Marmot
 
 		It("Create Marmot Instance", func() {
@@ -200,7 +199,7 @@ var _ = Describe("Marmot", Ordered, func() {
 		It("Load Config", func() {
 			fn := "testdata/cluster-config.yaml"
 			ccf = &fn
-			err := cf.ReadConfig(*ccf, &cnf)
+			err := config.ReadConfig(*ccf, &cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -230,7 +229,7 @@ var _ = Describe("Marmot", Ordered, func() {
 	})
 
 	Context("VMクラスタの２重起動の防止", func() {
-		var cnf cf.MarmotConfig
+		var cnf config.MarmotConfig
 		var m *marmot.Marmot
 
 		It("Create Marmot Instance", func() {
@@ -242,7 +241,7 @@ var _ = Describe("Marmot", Ordered, func() {
 		It("Load Config", func() {
 			fn := "testdata/cluster-config.yaml"
 			ccf = &fn
-			err := cf.ReadConfig(*ccf, &cnf)
+			err := config.ReadConfig(*ccf, &cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 

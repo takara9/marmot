@@ -5,7 +5,8 @@ import (
 	"log/slog"
 	"strings"
 
-	db "github.com/takara9/marmot/pkg/db"
+	//db "github.com/takara9/marmot/pkg/db"
+	"marmot.io/db"
 )
 
 type DnsRecord struct {

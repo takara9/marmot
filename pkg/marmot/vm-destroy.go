@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/lvm"
-	"github.com/takara9/marmot/pkg/util"
-	"github.com/takara9/marmot/pkg/virt"
+	"marmot.io/api"
+	"marmot.io/db"
+	"marmot.io/lvm"
+	"marmot.io/util"
+	"marmot.io/virt"
 )
 
 // VMの削除

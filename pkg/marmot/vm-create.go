@@ -5,9 +5,10 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/util"
-	"github.com/takara9/marmot/pkg/virt"
+	//"github.com/takara9/marmot/api"
+	"marmot.io/api"
+	"marmot.io/util"
+	"marmot.io/virt"
 )
 
 // VMを生成する
