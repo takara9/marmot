@@ -5,7 +5,7 @@ go 1.24.4
 require (
 	github.com/onsi/ginkgo/v2 v2.26.0
 	github.com/onsi/gomega v1.38.2
-	github.com/takara9/marmot v0.8.6
+	marmot.io/api v0.8.6
 	marmot.io/config v0.8.6
 	marmot.io/db v0.8.6
 	marmot.io/lvm v0.8.6
@@ -26,9 +26,9 @@ require (
 	github.com/google/pprof v0.0.0-20250403155104-27863c87afa6 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3 // indirect
-	github.com/labstack/echo/v4 v4.12.0 // indirect
+	github.com/labstack/echo/v4 v4.13.4 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
-	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/oapi-codegen/runtime v1.1.2 // indirect
 	github.com/takara9/lvm v0.0.0-20230311131147-efbdcda51732 // indirect
@@ -58,8 +58,10 @@ require (
 )
 
 replace (
+	marmot.io/api => ../../api
 	marmot.io/config => ../config
 	marmot.io/db => ../db
 	marmot.io/lvm => ../lvm
+	marmot.io/marmot => ../marmot
 	marmot.io/virt => ../virt
 )

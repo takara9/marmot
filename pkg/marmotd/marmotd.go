@@ -197,7 +197,13 @@ func (s *Server) CreateVirtualMachine(ctx echo.Context) error {
 	//s.Lock.Lock()
 	//defer s.Lock.Unlock()
 	var spec api.VmSpec
+
 	err := ctx.Bind(&spec)
+	if err != nil {
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	// ハイパーバイザーの稼働チェック 結果はDBへ反映
 	err = s.Ma.CreateVM2(spec)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})

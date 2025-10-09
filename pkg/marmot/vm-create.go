@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/takara9/marmot/api"
-	//"marmot.io/api"
+	//"github.com/takara9/marmot/api"
+	"marmot.io/api"
 	"marmot.io/util"
 	"marmot.io/virt"
 )

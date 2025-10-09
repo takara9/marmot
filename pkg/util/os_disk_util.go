@@ -20,10 +20,10 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/takara9/marmot/api"
+	"marmot.io/api"
+	"marmot.io/config"
 	"marmot.io/db"
 	"marmot.io/lvm"
-	"marmot.io/config"
 )
 
 // LVのパーティションをマップ
