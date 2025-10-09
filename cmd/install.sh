@@ -3,7 +3,7 @@
 BINDIR=.
 DISTDIR=/usr/local/marmot
 SERVER_EXE=marmotd
-CLIENT_CMD=mactl2
+CLIENT_CMD=mactl
 CLIENT_CONFIG=config_marmot
 ADMIN_CMD=hv-admin
 

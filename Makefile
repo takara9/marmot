@@ -1,4 +1,4 @@
-PROGRAMS = hv-admin mactl2 marmotd migtool
+PROGRAMS = hv-admin mactl marmotd migtool
 all:	$(PROGRAMS)
 
 MAKE = /usr/bin/make
@@ -14,7 +14,7 @@ $(PROGRAMS):
 
 setup:
 	cp TAG pkg/marmotd/version.txt
-	cp TAG cmd/mactl2/version.txt
+	cp TAG cmd/mactl/version.txt
 	env GOFLAGS= go install golang.org/x/tools/cmd/goimports@latest
 	env GOFLAGS= go install honnef.co/go/tools/cmd/staticcheck@latest
 	env GOFLAGS= go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
@@ -27,7 +27,7 @@ test:
 package: clean all
 	@echo $(TAG)
 	cp cmd/install.sh $(BINDIR)/install.sh
-	cp cmd/mactl2/config_marmot $(BINDIR)/config_marmot
+	cp cmd/mactl/config_marmot $(BINDIR)/config_marmot
 	cp cmd/marmotd/temp.xml $(BINDIR)/temp.xml
 	cp cmd/marmotd/marmot.service $(BINDIR)/marmot.service
 	tar czvf marmot-v$(TAG).tgz marmot-v$(TAG)
@@ -39,7 +39,7 @@ clean:
 
 DISTDIR = /usr/local/marmot
 SERVER_EXE = marmotd
-CLIENT_CMD = mactl2
+CLIENT_CMD = mactl
 ADMIN_CMD  = hv-admin
 
 .PHONY:	install

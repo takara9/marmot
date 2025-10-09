@@ -1,5 +1,5 @@
 GO=/usr/local/go/bin/go
-PROGRAM	= mactl2
+PROGRAM	= mactl
 all:	$(PROGRAM)
 
 TAG := $(shell cat ../../TAG)
@@ -11,7 +11,7 @@ $(PROGRAM): $(%.go)
 	mkdir -p $(BINDIR)
 	$(GO) build -o $(BINDIR)/$@ $^
 
-mactl2-test: $(%.go)
+mactl-test: $(%.go)
 	echo $(TESTBINDIR)
 	mkdir -p $(TESTBINDIR)
 	$(GO) build -o $(TESTBINDIR)/$@ $^
