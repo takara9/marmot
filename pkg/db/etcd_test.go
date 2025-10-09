@@ -7,7 +7,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	//cf "github.com/takara9/marmot/pkg/config"
 	"marmot.io/config"
 )
 
