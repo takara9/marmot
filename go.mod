@@ -11,7 +11,6 @@ require (
 	github.com/onsi/gomega v1.37.0
 	github.com/povsister/scp v0.0.0-20250504051308-e467f71ea63c
 	github.com/takara9/lvm v0.0.0-20230311131147-efbdcda51732
-	//github.com/takara9/marmot/api v0.0.0-20250504051308-e467f71ea63c
 	go.etcd.io/etcd/client/v3 v3.6.1
 	gopkg.in/yaml.v3 v3.0.1
 	libvirt.org/go/libvirt v1.11004.0
