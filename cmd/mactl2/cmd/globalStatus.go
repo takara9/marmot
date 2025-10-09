@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	db "github.com/takara9/marmot/pkg/db"
+	"marmot.io/db"
 )
 
 var globalStatusCmd = &cobra.Command{

@@ -18,8 +18,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/lvm"
+	"marmot.io/db"
+	"marmot.io/lvm"
 )
 
 // ハイパーバイザーのリストを取り出す

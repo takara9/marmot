@@ -9,8 +9,8 @@ import (
 	. "github.com/onsi/gomega"
 
 	"marmot.io/config"
-	"github.com/takara9/marmot/pkg/marmotd"
-	"github.com/takara9/marmot/pkg/util"
+	"marmot.io/marmotd"
+	"marmot.io/util"
 )
 
 var _ = Describe("Marmotd Test", Ordered, func() {

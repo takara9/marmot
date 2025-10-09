@@ -5,9 +5,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-
-	db "github.com/takara9/marmot/pkg/db"
-	ut "github.com/takara9/marmot/pkg/util"
+	"marmot.io/db"
+	"marmot.io/util"
 )
 
 // main から　Marmot を分離する？
@@ -38,14 +37,14 @@ func NewMarmot(nodeName string, etcdUrl string) (*Marmot, error) {
 // コールバック ハイパーバイザーの状態取得
 func (m *Marmot) ListHypervisor(c *gin.Context) {
 	// ハイパーバイザーの稼働チェック　結果はDBへ反映
-	_, err := ut.CheckHypervisors(m.EtcdUrl, m.NodeName)
+	_, err := util.CheckHypervisors(m.EtcdUrl, m.NodeName)
 	if err != nil {
 		slog.Error("Check if the hypervisor is up and running", "err", err)
 		return
 	}
 
 	// ストレージ容量の更新 結果はDBへ反映
-	err = ut.CheckHvVgAll(m.EtcdUrl, m.NodeName)
+	err = util.CheckHvVgAll(m.EtcdUrl, m.NodeName)
 	if err != nil {
 		slog.Error("Update storage capacity", "err", err)
 		return
@@ -67,6 +66,7 @@ func (m *Marmot) ListHypervisor(c *gin.Context) {
 }
 
 // コールバック 仮想マシンのリスト
+/*
 func (m *Marmot) ListVirtualMachines(c *gin.Context) {
 	d, err := db.NewDatabase(m.EtcdUrl)
 	if err != nil {
@@ -81,3 +81,4 @@ func (m *Marmot) ListVirtualMachines(c *gin.Context) {
 	}
 	c.IndentedJSON(http.StatusOK, vms)
 }
+*/

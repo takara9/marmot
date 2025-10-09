@@ -21,9 +21,8 @@ import (
 	"os/exec"
 
 	"github.com/takara9/marmot/api"
-	//	cf "github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/lvm"
+	"marmot.io/db"
+	"marmot.io/lvm"
 	"marmot.io/config"
 )
 

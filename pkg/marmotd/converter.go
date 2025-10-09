@@ -3,8 +3,8 @@ package marmotd
 import (
 	"time"
 
-	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/db"
+	"marmot.io/api"
+	"marmot.io/db"
 )
 
 // HVのデータベース保存形式を新API形式に変換する

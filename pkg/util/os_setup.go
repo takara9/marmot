@@ -21,9 +21,8 @@ import (
 	"strings"
 
 	"github.com/takara9/marmot/api"
-	//cf "github.com/takara9/marmot/pkg/config"
 	"marmot.io/config"
-	"github.com/takara9/marmot/pkg/virt"
+	"marmot.io/virt"
 )
 
 // Linux ホスト名をOS Volへ書き込み

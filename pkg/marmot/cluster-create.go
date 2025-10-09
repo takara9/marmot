@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/db"
+	"marmot.io/api"
+	"marmot.io/db"
 )
 
 // コンフィグからVMクラスタを作成する  新APIを使用

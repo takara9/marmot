@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/labstack/echo/v4"
-	"github.com/takara9/marmot/api"
+	"marmot.io/api"
 )
 
 func startMockServer() *Server {

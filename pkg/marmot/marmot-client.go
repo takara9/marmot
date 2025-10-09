@@ -11,8 +11,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/takara9/marmot/api"
-	//"github.com/takara9/marmot/pkg/config"
+	"marmot.io/api"
 	"marmot.io/config"
 )
 

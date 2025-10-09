@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	//"github.com/takara9/marmot/pkg/config"
 	"marmot.io/config"
 )
 

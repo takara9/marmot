@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/db"
+	"marmot.io/api"
+	"marmot.io/db"
 )
 
 // クラスタ削除

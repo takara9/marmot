@@ -8,12 +8,11 @@ import (
 	"sync"
 
 	"github.com/labstack/echo/v4"
-	"github.com/takara9/marmot/api"
-	//"github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/marmot"
-	"github.com/takara9/marmot/pkg/util"
+	"marmot.io/api"
 	"marmot.io/config"
+	"marmot.io/db"
+	"marmot.io/marmot"
+	"marmot.io/util"
 )
 
 //go:embed version.txt

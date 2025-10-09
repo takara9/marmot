@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"marmot.io/config"
-	db "github.com/takara9/marmot/pkg/db"
+	"marmot.io/db"
 )
 
 type DefaultConfig struct {

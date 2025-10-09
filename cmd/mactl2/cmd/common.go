@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/takara9/marmot/pkg/marmot"
+	"marmot.io/marmot"
 	"marmot.io/config"
 
 )

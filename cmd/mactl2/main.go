@@ -3,7 +3,8 @@ package main
 import (
 	_ "embed"
 
-	"github.com/takara9/marmot/cmd/mactl2/cmd"
+	//"github.com/takara9/marmot/cmd/mactl2/cmd"
+	"main/cmd"
 )
 
 //go:embed version.txt

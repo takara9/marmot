@@ -4,7 +4,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/takara9/marmot/pkg/marmot"
+	"marmot.io/marmot"
 	"marmot.io/config"
 )
 
