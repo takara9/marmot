@@ -6,14 +6,14 @@ import (
 	"os"
 	"strings"
 
-	"github.com/takara9/marmot/pkg/db"
-	ut "github.com/takara9/marmot/pkg/util"
+	"marmot.io/db"
+	"marmot.io/util"
 )
 
 func main() {
 	// ホームディレクトリの.config_marmotから
 	// APIサーバーとetcdサーバーのURLを取得
-	_, cnf, err := ut.ReadHvConfig()
+	_, cnf, err := util.ReadHvConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
@@ -40,7 +40,7 @@ func main() {
 	printHypervisors(new)
 
 	// 古いデータを削除
-	if err = deleteOldData(old,d); err != nil {
+	if err = deleteOldData(old, d); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
