@@ -10,8 +10,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	//"marmot.io/api"
-	"github.com/takara9/marmot/api"
+	"marmot.io/api"
+	//"github.com/takara9/marmot/api"
 	"marmot.io/config"
 	"marmot.io/db"
 	"marmot.io/marmot"
