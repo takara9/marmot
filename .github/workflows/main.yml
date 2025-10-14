@@ -131,10 +131,10 @@ jobs:
         cd cmd/marmotd
         sudo -s make test
         cd ../..
-    - name: Test cmd/mactl2
+    - name: Test cmd/mactl
       run: | 
-        cd cmd/mactl2
-        make mactl2-test
+        cd cmd/mactl
+        make mactl-test
         sudo -s make test
         cd ../..
     - name: Test cmd/migtool
