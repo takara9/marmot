@@ -8,6 +8,7 @@ import (
 
 	db "github.com/takara9/marmot/pkg/db"
 	ut "github.com/takara9/marmot/pkg/util"
+	"github.com/takara9/marmot/pkg/types"
 )
 
 // main から　Marmot を分離する？
@@ -57,7 +58,7 @@ func (m *Marmot) ListHypervisor(c *gin.Context) {
 		slog.Error("connect to database", "err", err)
 		return
 	}
-	var hvs []db.Hypervisor
+	var hvs []types.Hypervisor
 	err = d.GetHypervisors(&hvs)
 	if err != nil {
 		slog.Error("get hypervisor status", "err", err)
@@ -73,7 +74,7 @@ func (m *Marmot) ListVirtualMachines(c *gin.Context) {
 		slog.Error("get list virtual machines", "err", err)
 		return
 	}
-	var vms []db.VirtualMachine
+	var vms []types.VirtualMachine
 	err = d.GetVmsStatus(&vms)
 	if err != nil {
 		slog.Error("get status of virtual machines", "err", err)

@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/client"
+	"github.com/takara9/marmot/pkg/types"
 )
 
 // statusCmd represents the status command
@@ -45,7 +45,7 @@ var statusCmd = &cobra.Command{
 
 		for dec.More() {
 			// クラスタ名と仮想マシンが一致したものだけリスト
-			var vm client.VirtualMachine
+			var vm types.VirtualMachine
 			err := dec.Decode(&vm)
 			if err != nil {
 				slog.Error("list vms in the cluster", "err", err)

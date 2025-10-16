@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/takara9/marmot/pkg/client"
+	"github.com/takara9/marmot/pkg/types"
 )
 
 var hvCmd = &cobra.Command{
@@ -31,7 +31,7 @@ var hvCmd = &cobra.Command{
 		fmt.Printf("%-10s %-3v %-15v %-8v  %-12v   %-12v", "HV-NAME", "ONL", "IPaddr", "VCPU", "RAM(MB)", "Storage(GB)")
 		fmt.Printf("\n")
 		for dec.More() {
-			var hv client.Hypervisor
+			var hv types.Hypervisor
 			err := dec.Decode(&hv)
 			if err != nil {
 				slog.Error("reading hypervisors status", "err", err)

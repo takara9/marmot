@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/client"
+	"github.com/takara9/marmot/pkg/types"
 )
 
 var ClusterName string
@@ -40,7 +40,7 @@ var vmCmd = &cobra.Command{
 
 		dec.Token()
 		match := false
-		var vm client.VirtualMachine
+		var vm types.VirtualMachine
 
 		for dec.More() {
 			// クラスタ名と仮想マシンが一致したものだけリスト

@@ -6,7 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/types"
 )
 
 // コンフィグからVMクラスタを作成する  新APIを使用
@@ -93,7 +93,7 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		}
 
 		// リモートとローカル関係なしに、マイクロサービスへリクエストする
-		m.Db.UpdateVmState(vm.Key, db.PROVISIONING)
+		m.Db.UpdateVmState(vm.Key, types.PROVISIONING)
 
 		marmotHost := fmt.Sprintf("%s:%d", vm.HvNode, vm.HvPort)
 		marmotClient, err := NewMarmotdEp(
@@ -110,11 +110,11 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 			slog.Error("", "remote request err", err)
 			break_err = true
 			return_errors = err
-			m.Db.UpdateVmState(vm.Key, db.ERROR) // エラー状態へ
+			m.Db.UpdateVmState(vm.Key, types.ERROR) // エラー状態へ
 			break
 		}
 		fmt.Println("実行中へ")
-		m.Db.UpdateVmState(vm.Key, db.RUNNING) // 実行中へ
+		m.Db.UpdateVmState(vm.Key, types.RUNNING) // 実行中へ
 
 		fmt.Println("DNS登録をスキップ")
 	} // END OF LOOP
@@ -126,8 +126,8 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 }
 
 // HVへVMスケジュールするために db.VirtualMachineにセットする
-func convApiConfigToDB(spec api.VmSpec, cnf api.MarmotConfig) db.VirtualMachine {
-	var vm db.VirtualMachine
+func convApiConfigToDB(spec api.VmSpec, cnf api.MarmotConfig) types.VirtualMachine {
+	var vm types.VirtualMachine
 	vm.ClusterName = *cnf.ClusterName
 	vm.OsVariant = *cnf.OsVariant
 	vm.Name = *spec.Name // Os のhostname
@@ -137,9 +137,9 @@ func convApiConfigToDB(spec api.VmSpec, cnf api.MarmotConfig) db.VirtualMachine 
 	vm.PublicIp = *spec.PublicIp
 	vm.Playbook = *spec.Playbook
 	vm.Comment = *spec.Comment
-	vm.Status = db.INITALIZING
+	vm.Status = types.INITALIZING
 	for _, stg := range *spec.Storage {
-		var vms db.Storage
+		var vms types.Storage
 		vms.Name = *stg.Name
 		vms.Size = int(*stg.Size)
 		vms.Path = *stg.Path

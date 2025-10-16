@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	cf "github.com/takara9/marmot/pkg/config"
+	. "github.com/takara9/marmot/pkg/types"
 )
 
 var _ = Describe("Etcd", Ordered, func() {

@@ -13,6 +13,8 @@ import (
 	etcd "go.etcd.io/etcd/client/v3"
 
 	cf "github.com/takara9/marmot/pkg/config"
+	. "github.com/takara9/marmot/pkg/types"
+
 )
 
 type Database struct {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/types"
 	"github.com/takara9/marmot/pkg/util"
 )
 
@@ -49,8 +50,8 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		var cnf util.DefaultConfig
 		var d *db.Database
 		//var marmotClient *marmot.MarmotEndpoint
-		var hvsOld []db.HypervisorOld
-		var hvsNew []db.Hypervisor
+		var hvsOld []types.HypervisorOld
+		var hvsNew []types.Hypervisor
 
 		It("コマンドの構成ファイルの読み取り", func() {
 			err = config.ReadYAML("testdata/config_marmot.conf", &cnf)
@@ -100,7 +101,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		})
 
 		It("移行後データの確認", func() {
-			var hvsCheck []db.Hypervisor
+			var hvsCheck []types.Hypervisor
 			err = d.GetHypervisors(&hvsCheck)
 			Expect(err).NotTo(HaveOccurred())
 			for _, hv := range hvsCheck {

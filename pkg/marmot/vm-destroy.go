@@ -5,10 +5,10 @@ import (
 	"log/slog"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/lvm"
 	"github.com/takara9/marmot/pkg/util"
 	"github.com/takara9/marmot/pkg/virt"
+	"github.com/takara9/marmot/pkg/types"
 )
 
 // VMの削除
@@ -28,7 +28,7 @@ func (m *Marmot) DestroyVM2(spec api.VmSpec) error {
 	}
 
 	// ステータスを調べて停止中であれば、足し算しない。
-	if vm.Status != db.STOPPED || vm.Status == db.ERROR {
+	if vm.Status != types.STOPPED || vm.Status == types.ERROR {
 		hv.FreeCpu = hv.FreeCpu + vm.Cpu
 		hv.FreeMemory = hv.FreeMemory + vm.Memory
 		err = m.Db.PutDataEtcd(hv.Key, hv)
