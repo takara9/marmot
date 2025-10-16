@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/marmot"
+	"github.com/takara9/marmot/pkg/client"
 )
 
 type Config struct {
@@ -19,7 +19,7 @@ var ApiUrl string
 var cnf config.MarmotConfig
 var cfgFile string
 var ClusterConfig string
-var marmotClient *marmot.MarmotEndpoint
+var marmotClient *client.MarmotEndpoint
 
 // BODYのJSONエラーメッセージ処理用
 type msg struct {
@@ -28,7 +28,7 @@ type msg struct {
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "mactl2",
+	Use:   "mactl",
 	Short: "Marmot コントロールコマンド",
 	Long:  `mactl は、ローカルPC上で QEMU, KVM、LVM, OpenSwitchを使用して実験や学習用の仮想マシン環境を提供します。`,
 }
