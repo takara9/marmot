@@ -7,8 +7,8 @@ import (
 	"github.com/gin-gonic/gin"
 
 	db "github.com/takara9/marmot/pkg/db"
-	ut "github.com/takara9/marmot/pkg/util"
 	"github.com/takara9/marmot/pkg/types"
+	ut "github.com/takara9/marmot/pkg/util"
 )
 
 // main から　Marmot を分離する？

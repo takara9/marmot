@@ -14,7 +14,6 @@ import (
 
 	cf "github.com/takara9/marmot/pkg/config"
 	. "github.com/takara9/marmot/pkg/types"
-
 )
 
 type Database struct {
@@ -39,7 +38,6 @@ func (d *Database) GetEtcdByPrefix(key string) (*etcd.GetResponse, error) {
 	resp, err := d.Cli.Get(d.Ctx, key, etcd.WithPrefix())
 	return resp, err
 }
-
 
 // Keyに一致したVMデータの取り出し
 func (d *Database) GetVmByKey(key string) (VirtualMachine, error) {
@@ -107,7 +105,6 @@ func (d *Database) DelByKey(key string) error {
 	_, err := d.Cli.Delete(d.Ctx, key)
 	return err
 }
-
 
 // 仮想マシンのデータを取得
 func (d *Database) GetVmsStatus(vms *[]VirtualMachine) error {
@@ -398,7 +395,6 @@ func (d *Database) UpdateVmState(vmkey string, state int) error {
 	err = d.PutDataEtcd(vmkey, vm)
 	return err
 }
-
 
 // イメージテンプレート
 func (d *Database) SetImageTemplate(v cf.Image_yaml) error {

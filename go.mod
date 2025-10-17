@@ -1,6 +1,6 @@
 module github.com/takara9/marmot
 
-go 1.24.4
+go 1.25.3
 
 require (
 	github.com/gin-gonic/gin v1.10.1

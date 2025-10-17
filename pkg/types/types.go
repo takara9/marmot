@@ -46,8 +46,6 @@ type HypervisorOld struct {
 	//VolGroups   []string // ボリュームグループのリスト
 }
 
-
-
 type Hypervisors struct {
 	Hvs []Hypervisor
 }

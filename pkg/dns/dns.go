@@ -7,7 +7,6 @@ import (
 
 	db "github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/types"
-
 )
 
 type DnsRecord struct {
