@@ -1,0 +1,48 @@
+PROGRAMS = mactl
+all:	$(PROGRAMS)
+
+GO = /usr/local/go/bin/go
+MAKE = /usr/bin/make
+CURDIR := $(shell pwd)
+TAG := $(shell cat $(CURDIR)/TAG)
+OSNAME := $(shell uname -s | tr [:upper:] [:lower:])
+MARCH := $(shell uname -m | tr [:upper:] [:lower:])
+BINDIR = $(CURDIR)/mactl-v$(TAG).$(OSNAME)-$(MARCH)
+
+$(PROGRAMS):
+	mkdir -p $(BINDIR)
+	cd cmd/$@ && $(MAKE)
+
+setup:
+	cp TAG cmd/mactl/version.txt
+	env GOFLAGS= go install golang.org/x/tools/cmd/goimports@latest
+	env GOFLAGS= go install honnef.co/go/tools/cmd/staticcheck@latest
+	cd $(CURDIR)/pkg/client && go mod tidy
+	cd $(CURDIR)/pkg/config/ && go mod tidy
+	cd $(CURDIR)/pkg/types/ && go mod tidy
+	cd $(CURDIR)/api/ && go mod tidy
+	cd $(CURDIR) && go mod tidy
+
+test:
+	test -z "$$(gofmt -s -l . | tee /dev/stderr)"
+	staticcheck ./...
+
+.PHONY:	package
+package: clean all
+	@echo $(TAG)
+	tar czvf mactl-v$(TAG).$(OSNAME)-$(MARCH).tgz mactl-v$(TAG).$(OSNAME)-$(MARCH)
+
+.PHONY:	clean
+clean:
+	rm -fr $(BINDIR)
+	rm -f mactl-v$(TAG).$(OSNAME)-$(MARCH).tgz
+
+DISTDIR = /usr/local/marmot
+CLIENT_CMD = mactl
+
+.PHONY:	install
+install:
+	rm -fr $(DISTDIR)
+	mkdir $(DISTDIR)
+	rm -f /usr/local/bin/$(CLIENT_CMD)
+	install -m 0755 $(BINDIR)/$(CLIENT_CMD) /usr/local/bin

@@ -1,0 +1,15 @@
+module client
+
+go 1.25.3
+
+require (
+        github.com/takara9/marmot/api v0.8.7
+        github.com/takara9/marmot/pkg/config v0.8.7
+)
+
+replace (
+        github.com/takara9/marmot/api => ../../api
+        github.com/takara9/marmot/pkg/client => ../client
+        github.com/takara9/marmot/pkg/config => ../config
+        github.com/takara9/marmot/pkg/types => ../types
+)

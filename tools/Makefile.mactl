@@ -1,0 +1,29 @@
+GO=/usr/local/go/bin/go
+PROGRAM	= mactl
+all:	$(PROGRAM)
+
+CURDIR := $(shell pwd)
+TAG := $(shell cat ../../TAG)
+OSNAME := $(shell uname -s | tr [:upper:] [:lower:])
+MARCH := $(shell uname -m | tr [:upper:] [:lower:])
+BINDIR = ../../mactl-v$(TAG).$(OSNAME)-$(MARCH)
+TESTBINDIR = bin
+
+$(PROGRAM): $(%.go)
+	echo $(BINDIR)
+	$(GO) build -o $(BINDIR)/$@ $^
+
+.PHONY:	clean
+clean:
+	rm -fr $(BINDIR)
+	rm -fr $(TESTBINDIR)
+
+.PHONY:	install
+install:
+	rm -f /usr/local/bin/$(PROGRAM)
+	install -m 0755 $(PROGRAM) /usr/local/bin
+
+.PHONY: test
+test:
+	test -z "$$(gofmt -s -l . | tee /dev/stderr)"
+	staticcheck ./...

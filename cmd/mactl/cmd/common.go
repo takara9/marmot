@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/marmot"
+	"github.com/takara9/marmot/pkg/client"
 )
 
 // コンフィグからエンドポイントを取り出してセットする
-func getClientConfig() (*marmot.MarmotEndpoint, error) {
+func getClientConfig() (*client.MarmotEndpoint, error) {
 	configFn := apiConfig
 	if len(configFn) == 0 {
 		configFn = filepath.Join(os.Getenv("HOME"), ".config_marmot")
@@ -27,7 +27,7 @@ func getClientConfig() (*marmot.MarmotEndpoint, error) {
 		return nil, err
 	}
 
-	return marmot.NewMarmotdEp(
+	return client.NewMarmotdEp(
 		u.Scheme,
 		u.Host,
 		"/api/v1",
