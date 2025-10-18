@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	db "github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/types"
 )
 
 type DnsRecord struct {
@@ -65,7 +66,7 @@ func Add(rec DnsRecord, dbUrl string) error {
 	}
 
 	// Create JSON value
-	var ent db.DNSEntry
+	var ent types.DNSEntry
 	ent.Host = rec.Ipv4
 	ent.Ttl = rec.Ttl
 
@@ -87,8 +88,8 @@ func Add(rec DnsRecord, dbUrl string) error {
 }
 
 // 取得
-func Get(rec DnsRecord, dbUrl string) (db.DNSEntry, error) {
-	var dd db.DNSEntry
+func Get(rec DnsRecord, dbUrl string) (types.DNSEntry, error) {
+	var dd types.DNSEntry
 	err := checkParam(rec)
 	if err != nil {
 		slog.Error("", "err", err)
@@ -133,7 +134,7 @@ func Del(rec DnsRecord, dbUrl string) error {
 	}
 
 	// Create JSON value
-	var ent db.DNSEntry
+	var ent types.DNSEntry
 	ent.Host = rec.Ipv4
 	ent.Ttl = rec.Ttl
 

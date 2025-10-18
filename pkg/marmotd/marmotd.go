@@ -12,6 +12,7 @@ import (
 	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmot"
+	"github.com/takara9/marmot/pkg/types"
 	"github.com/takara9/marmot/pkg/util"
 )
 
@@ -75,7 +76,7 @@ func (s *Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPar
 		slog.Error("connect to database", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-	var hvs []db.Hypervisor
+	var hvs []types.Hypervisor
 	err = d.GetHypervisors(&hvs)
 	if err != nil {
 		slog.Error("get hypervisor status", "err", err)
@@ -95,7 +96,7 @@ func (s *Server) ListVirtualMachines(ctx echo.Context) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	var vms []db.VirtualMachine
+	var vms []types.VirtualMachine
 	err = d.GetVmsStatus(&vms)
 	if err != nil {
 		slog.Error("get status of virtual machines", "err", err)
@@ -248,7 +249,7 @@ func (s *Server) ShowHypervisorById(ctx echo.Context, hypervisorId string) error
 	s.Lock.Lock()
 	defer s.Lock.Unlock()
 
-	var hvs []db.Hypervisor
+	var hvs []types.Hypervisor
 	err := s.Ma.Db.GetHypervisors(&hvs)
 	if err != nil {
 		slog.Error("get hypervisor status", "err", err)

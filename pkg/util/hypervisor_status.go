@@ -20,10 +20,11 @@ import (
 
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/lvm"
+	"github.com/takara9/marmot/pkg/types"
 )
 
 // ハイパーバイザーのリストを取り出す
-func getHypervisors(dbUrl string) ([]db.Hypervisor, error) {
+func getHypervisors(dbUrl string) ([]types.Hypervisor, error) {
 	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
 		slog.Error("", "err", err)
@@ -37,9 +38,9 @@ func getHypervisors(dbUrl string) ([]db.Hypervisor, error) {
 		return nil, err
 	}
 
-	var hvs []db.Hypervisor
+	var hvs []types.Hypervisor
 	for _, val := range resp.Kvs {
-		var hv db.Hypervisor
+		var hv types.Hypervisor
 		err = json.Unmarshal(val.Value, &hv)
 		if err != nil {
 			return nil, err
@@ -50,7 +51,7 @@ func getHypervisors(dbUrl string) ([]db.Hypervisor, error) {
 }
 
 // ハイパーバイザーをREST-APIでアクセスして疎通を確認、DBへ反映させる
-func CheckHypervisors(dbUrl string, node string) ([]db.Hypervisor, error) {
+func CheckHypervisors(dbUrl string, node string) ([]types.Hypervisor, error) {
 	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
 		slog.Error("", "err", err)

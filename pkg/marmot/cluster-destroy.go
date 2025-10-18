@@ -5,7 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/types"
 )
 
 // クラスタ削除
@@ -37,7 +37,7 @@ func (m *Marmot) DestroyClusterInternal(cnf api.MarmotConfig) error {
 			_, _, _, err = marmotClient.DestroyVirtualMachine(spec)
 			if err != nil {
 				slog.Error("", "remote request err", err)
-				m.Db.UpdateVmState(vm.Key, db.ERROR) // エラー状態へ
+				m.Db.UpdateVmState(vm.Key, types.ERROR) // エラー状態へ
 				continue
 			}
 		}

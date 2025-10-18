@@ -1,4 +1,4 @@
-package db
+package types
 
 import (
 	"time"
@@ -45,8 +45,6 @@ type HypervisorOld struct {
 	//VgCap       uint64   // VM用ストレージ容量 GB
 	//VolGroups   []string // ボリュームグループのリスト
 }
-
-
 
 type Hypervisors struct {
 	Hvs []Hypervisor

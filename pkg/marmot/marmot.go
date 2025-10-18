@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	db "github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/types"
 	ut "github.com/takara9/marmot/pkg/util"
 )
 
@@ -57,7 +58,7 @@ func (m *Marmot) ListHypervisor(c *gin.Context) {
 		slog.Error("connect to database", "err", err)
 		return
 	}
-	var hvs []db.Hypervisor
+	var hvs []types.Hypervisor
 	err = d.GetHypervisors(&hvs)
 	if err != nil {
 		slog.Error("get hypervisor status", "err", err)
@@ -73,7 +74,7 @@ func (m *Marmot) ListVirtualMachines(c *gin.Context) {
 		slog.Error("get list virtual machines", "err", err)
 		return
 	}
-	var vms []db.VirtualMachine
+	var vms []types.VirtualMachine
 	err = d.GetVmsStatus(&vms)
 	if err != nil {
 		slog.Error("get status of virtual machines", "err", err)

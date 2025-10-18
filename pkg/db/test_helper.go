@@ -1,5 +1,9 @@
 package db
 
+import (
+	. "github.com/takara9/marmot/pkg/types"
+)
+
 func testHvData1() Hypervisor {
 	var hv Hypervisor
 	hv.Nodename = "hv01"

@@ -1,0 +1,17 @@
+module main
+
+go 1.25.3
+
+require (
+	github.com/spf13/cobra v1.10.1
+	github.com/takara9/marmot/pkg/client v0.8.7
+	github.com/takara9/marmot/pkg/config v0.8.7
+	github.com/takara9/marmot/pkg/types v0.8.7
+)
+
+replace (
+	github.com/takara9/marmot/api => ./api
+	github.com/takara9/marmot/pkg/client => ./pkg/client
+	github.com/takara9/marmot/pkg/config => ./pkg/config
+	github.com/takara9/marmot/pkg/types => ./pkg/types
+)

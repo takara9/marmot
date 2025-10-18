@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	db "github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/types"
 )
 
 var globalStatusCmd = &cobra.Command{
@@ -32,7 +32,7 @@ var globalStatusCmd = &cobra.Command{
 		fmt.Printf("%-10s %-3v %-15v %-8v  %-12v   %-12v", "HV-NAME", "ONL", "IPaddr", "VCPU", "RAM(MB)", "Storage(GB)")
 		fmt.Printf("\n")
 		for dec.More() {
-			var hv db.Hypervisor
+			var hv types.Hypervisor
 			err := dec.Decode(&hv)
 			if err != nil {
 				slog.Error("reading hypervisors status", "err", err)
@@ -67,7 +67,7 @@ var globalStatusCmd = &cobra.Command{
 		fmt.Printf("%-20s", "DATA STORAGE")
 		fmt.Printf("\n")
 		for dec.More() {
-			var vm db.VirtualMachine
+			var vm types.VirtualMachine
 			err := dec.Decode(&vm)
 			if err != nil {
 				slog.Error("getting vm status", "err", err)

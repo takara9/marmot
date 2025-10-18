@@ -1,0 +1,11 @@
+module types
+
+go 1.25.3
+
+require github.com/google/uuid v1.6.0
+
+replace (
+	github.com/takara9/marmot/pkg/client => ../client
+	github.com/takara9/marmot/pkg/config => ../config
+	github.com/takara9/marmot/pkg/types => ../types
+)

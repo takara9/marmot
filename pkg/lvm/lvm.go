@@ -6,6 +6,7 @@ import (
 
 // 論理ボリュームの存在チェック
 func IsExist(vgx string, lvx string) error {
+	tlvm.Verbose = false
 
 	vg, err := tlvm.LookupVolumeGroup(vgx)
 	if err != nil {
@@ -22,6 +23,7 @@ func IsExist(vgx string, lvx string) error {
 
 // 論理ボリュームの作成
 func CreateLV(vgx string, lvx string, size uint64) error {
+	tlvm.Verbose = false
 
 	vg, err := tlvm.LookupVolumeGroup(vgx)
 	if err != nil {
@@ -37,6 +39,7 @@ func CreateLV(vgx string, lvx string, size uint64) error {
 
 // 論理ボリュームの削除
 func RemoveLV(vgx string, lvx string) error {
+	tlvm.Verbose = false
 
 	vg, err := tlvm.LookupVolumeGroup(vgx)
 	if err != nil {
@@ -57,6 +60,7 @@ func RemoveLV(vgx string, lvx string) error {
 
 // スナップショットの作成、OSボリューム作成用
 func CreateSnapshot(vgx string, lvx string, svx string, size uint64) error {
+	tlvm.Verbose = false
 
 	tags := []string{"snapshot", "marmot"}
 	vg, err := tlvm.LookupVolumeGroup(vgx)
@@ -74,6 +78,8 @@ func CreateSnapshot(vgx string, lvx string, svx string, size uint64) error {
 
 // ボリュームグループの総量量と空きチェック
 func CheckVG(vgx string) (uint64, uint64, error) {
+	tlvm.Verbose = false
+
 	vg, err := tlvm.LookupVolumeGroup(vgx)
 	if err != nil {
 		return 0, 0, err

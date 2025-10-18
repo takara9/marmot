@@ -4,11 +4,11 @@ import (
 	"time"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/types"
 )
 
 // HVのデータベース保存形式を新API形式に変換する
-func convHVinfoDBtoAPI(hv db.Hypervisor) api.Hypervisor {
+func convHVinfoDBtoAPI(hv types.Hypervisor) api.Hypervisor {
 	var memory int64 = int64(hv.Memory)
 	var ipaddr string = hv.IpAddr
 	var freecpu int32 = int32(hv.FreeCpu)
@@ -40,7 +40,7 @@ func convHVinfoDBtoAPI(hv db.Hypervisor) api.Hypervisor {
 }
 
 // VMのデータベース保存形式を新API形式に変換する
-func convVMinfoDBtoAPI(vms []db.VirtualMachine) []api.VirtualMachine {
+func convVMinfoDBtoAPI(vms []types.VirtualMachine) []api.VirtualMachine {
 	var vms2 []api.VirtualMachine
 	for _, vm := range vms {
 		var memory int64 = int64(vm.Memory)

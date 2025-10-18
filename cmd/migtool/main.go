@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/types"
 	ut "github.com/takara9/marmot/pkg/util"
 )
 
@@ -27,7 +28,7 @@ func main() {
 	}
 
 	// データの変換
-	var old []db.HypervisorOld
+	var old []types.HypervisorOld
 	d.GetHypervisorsOld(&old)
 	fmt.Println("Old Hypervisors:")
 	printHypervisorsOld(old)
@@ -40,7 +41,7 @@ func main() {
 	printHypervisors(new)
 
 	// 古いデータを削除
-	if err = deleteOldData(old,d); err != nil {
+	if err = deleteOldData(old, d); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
@@ -54,7 +55,7 @@ func main() {
 	fmt.Println("Migration completed successfully.")
 }
 
-func putNewData(new []db.Hypervisor, d *db.Database) error {
+func putNewData(new []types.Hypervisor, d *db.Database) error {
 	for _, newHv := range new {
 		err := d.PutDataEtcd(newHv.Key, newHv)
 		if err != nil {
@@ -65,7 +66,7 @@ func putNewData(new []db.Hypervisor, d *db.Database) error {
 	return nil
 }
 
-func deleteOldData(old []db.HypervisorOld, d *db.Database) error {
+func deleteOldData(old []types.HypervisorOld, d *db.Database) error {
 	for _, hv := range old {
 		err := d.DelByKey(hv.Key)
 		if err != nil {
@@ -76,9 +77,9 @@ func deleteOldData(old []db.HypervisorOld, d *db.Database) error {
 	return nil
 }
 
-func convertOldToNew(old []db.HypervisorOld) []db.Hypervisor {
-	var new []db.Hypervisor
-	new = make([]db.Hypervisor, len(old))
+func convertOldToNew(old []types.HypervisorOld) []types.Hypervisor {
+	var new []types.Hypervisor
+	new = make([]types.Hypervisor, len(old))
 	for i, hv := range old {
 		new[i].Nodename = hv.Nodename
 		new[i].Cpu = hv.Cpu
@@ -95,7 +96,7 @@ func convertOldToNew(old []db.HypervisorOld) []db.Hypervisor {
 	return new
 }
 
-func printHypervisors(hvs []db.Hypervisor) {
+func printHypervisors(hvs []types.Hypervisor) {
 	for _, hv := range hvs {
 		fmt.Printf("Nodename: %s, CPU: %d, Memory: %d, IP: %s, FreeCPU: %d, FreeMemory: %d, Port: %d, Key: %s, Status: %v\n",
 			hv.Nodename, hv.Cpu, hv.Memory, hv.IpAddr, hv.FreeCpu, hv.FreeMemory, hv.Port, hv.Key, hv.Status)
@@ -108,7 +109,7 @@ func printHypervisors(hvs []db.Hypervisor) {
 	}
 }
 
-func printHypervisorsOld(hvs []db.HypervisorOld) {
+func printHypervisorsOld(hvs []types.HypervisorOld) {
 	for _, hv := range hvs {
 		fmt.Printf("Nodename: %s, CPU: %d, Memory: %d, IP: %s, FreeCPU: %d, FreeMemory: %d, Key: %s, Status: %v\n",
 			hv.Nodename, hv.Cpu, hv.Memory, hv.IpAddr, hv.FreeCpu, hv.FreeMemory, hv.Key, hv.Status)
