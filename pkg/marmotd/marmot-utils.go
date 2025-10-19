@@ -1,4 +1,4 @@
-package marmot
+package marmotd
 
 import (
 	"log/slog"
@@ -10,7 +10,6 @@ import (
 	"github.com/takara9/marmot/pkg/types"
 	ut "github.com/takara9/marmot/pkg/util"
 )
-
 // main から　Marmot を分離する？
 type Marmot struct {
 	NodeName string

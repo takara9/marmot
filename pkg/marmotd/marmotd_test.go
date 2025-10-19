@@ -1,4 +1,4 @@
-package marmot_test
+package marmotd_test
 
 import (
 	"fmt"
@@ -14,7 +14,6 @@ import (
 	"github.com/takara9/marmot/pkg/config"
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/marmot"
 	"github.com/takara9/marmot/pkg/marmotd"
 	"github.com/takara9/marmot/pkg/util"
 	ut "github.com/takara9/marmot/pkg/util"
@@ -152,11 +151,11 @@ var _ = Describe("Marmot", Ordered, func() {
 
 	Context("VMクラスタの生成と削除", func() {
 		var cnf cf.MarmotConfig
-		var m *marmot.Marmot
+		var m *marmotd.Marmot
 
 		It("Create Marmot Instance", func() {
 			var err error
-			m, err = marmot.NewMarmot(*node, *etcd)
+			m, err = marmotd.NewMarmot(*node, *etcd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -168,7 +167,7 @@ var _ = Describe("Marmot", Ordered, func() {
 		})
 
 		It("Create Cluster()", func() {
-			newCnf := marmot.ConvConfClusterOld2New(cnf)
+			newCnf := marmotd.ConvConfClusterOld2New(cnf)
 			err := m.CreateClusterInternal(newCnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -181,7 +180,7 @@ var _ = Describe("Marmot", Ordered, func() {
 		})
 
 		It("Destroy Cluster()", func() {
-			newCnf := marmot.ConvConfClusterOld2New(cnf)
+			newCnf := marmotd.ConvConfClusterOld2New(cnf)
 			err := m.DestroyClusterInternal(newCnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -189,11 +188,11 @@ var _ = Describe("Marmot", Ordered, func() {
 
 	Context("VMクラスタの生成と一時停止と再開", func() {
 		var cnf cf.MarmotConfig
-		var m *marmot.Marmot
+		var m *marmotd.Marmot
 
 		It("Create Marmot Instance", func() {
 			var err error
-			m, err = marmot.NewMarmot(*node, *etcd)
+			m, err = marmotd.NewMarmot(*node, *etcd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -205,25 +204,25 @@ var _ = Describe("Marmot", Ordered, func() {
 		})
 
 		It("Create Cluster()", func() {
-			newCnf := marmot.ConvConfClusterOld2New(cnf)
+			newCnf := marmotd.ConvConfClusterOld2New(cnf)
 			err := m.CreateClusterInternal(newCnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Stop Cluster", func() {
-			newCnf := marmot.ConvConfClusterOld2New(cnf)
+			newCnf := marmotd.ConvConfClusterOld2New(cnf)
 			err := m.StopClusterInternal(newCnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Start Cluster", func() {
-			newCnf := marmot.ConvConfClusterOld2New(cnf)
+			newCnf := marmotd.ConvConfClusterOld2New(cnf)
 			err := m.DestroyClusterInternal(newCnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Destroy Cluster()", func() {
-			newCnf := marmot.ConvConfClusterOld2New(cnf)
+			newCnf := marmotd.ConvConfClusterOld2New(cnf)
 			err := m.DestroyClusterInternal(newCnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -231,11 +230,11 @@ var _ = Describe("Marmot", Ordered, func() {
 
 	Context("VMクラスタの２重起動の防止", func() {
 		var cnf cf.MarmotConfig
-		var m *marmot.Marmot
+		var m *marmotd.Marmot
 
 		It("Create Marmot Instance", func() {
 			var err error
-			m, err = marmot.NewMarmot(*node, *etcd)
+			m, err = marmotd.NewMarmot(*node, *etcd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -247,25 +246,25 @@ var _ = Describe("Marmot", Ordered, func() {
 		})
 
 		It("クラスターの起動", func() {
-			newCnf := marmot.ConvConfClusterOld2New(cnf)
+			newCnf := marmotd.ConvConfClusterOld2New(cnf)
 			err := m.CreateClusterInternal(newCnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("クラスターの２重起動 エラー発生が発生", func() {
-			newCnf := marmot.ConvConfClusterOld2New(cnf)
+			newCnf := marmotd.ConvConfClusterOld2New(cnf)
 			err := m.CreateClusterInternal(newCnf)
 			Expect(err).To(HaveOccurred())
 		})
 
 		It("Start Cluster", func() {
-			newCnf := marmot.ConvConfClusterOld2New(cnf)
+			newCnf := marmotd.ConvConfClusterOld2New(cnf)
 			err := m.DestroyClusterInternal(newCnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Destroy Cluster()", func() {
-			newCnf := marmot.ConvConfClusterOld2New(cnf)
+			newCnf := marmotd.ConvConfClusterOld2New(cnf)
 			err := m.DestroyClusterInternal(newCnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
