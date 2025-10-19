@@ -178,6 +178,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			err = json.Unmarshal(body, &vms)
 			GinkgoWriter.Println("err = ", err)
 			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println("vms=", vms)
 			Expect(len(vms)).To(Equal(2))
 			Expect(url).To(BeNil())
 		})
