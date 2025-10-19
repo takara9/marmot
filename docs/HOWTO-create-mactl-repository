@@ -1,0 +1,11 @@
+# クライアント mactl 用のディレクトリの作成方法
+
+以下を実行することで、ホームディレクトリのmactl に、最新コードとビルドに必要なコードがコピーされる。
+
+```console
+cd tools
+./make-client-repo.sh
+```
+
+
+https://github.com/takara9/mactl は、このコマンドで作成したリポジトリです。
