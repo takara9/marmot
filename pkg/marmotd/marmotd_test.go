@@ -48,7 +48,8 @@ var _ = Describe("Marmot", Ordered, func() {
 		server := marmotd.NewServer("hvc", etcdUrl)
 		go func() {
 			api.RegisterHandlersWithBaseURL(e, server, "/api/v1")
-			fmt.Println(e.Start("0.0.0.0:8750"), "Mock server is running")
+			//fmt.Println(e.Start("0.0.0.0:8750"), "Mock server is running")
+			fmt.Println(e.Start("0.0.0.0:8752"), "Mock server is running")
 		}()
 
 		// Dockerコンテナを起動
@@ -144,7 +145,7 @@ var _ = Describe("Marmot", Ordered, func() {
 			cmd := exec.Command(etcdctl_exe, "--endpoints=localhost:5379", "get", "hvc")
 			cmd.Env = append(os.Environ(), "ETCDCTL_API=3")
 			out, err := cmd.CombinedOutput()
-			GinkgoWriter.Println(out)
+			GinkgoWriter.Println(string(out))
 			Expect(err).To(Succeed()) // 成功
 		})
 	})
