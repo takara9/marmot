@@ -54,16 +54,16 @@ func NewServer(node string, etcdurl string) *Server {
 
 // 生存確認
 func (s *Server) ReplyPing(ctx echo.Context) error {
-	s.Lock.Lock()
-	defer s.Lock.Unlock()
+	//s.Lock.Lock()
+	//defer s.Lock.Unlock()
 
 	return ctx.JSON(http.StatusOK, api.ReplyMessage{Message: "ok"})
 }
 
 // バージョン取得
 func (s *Server) GetVersion(ctx echo.Context) error {
-	s.Lock.Lock()
-	defer s.Lock.Unlock()
+	//s.Lock.Lock()
+	//defer s.Lock.Unlock()
 	var v api.Version
 	v.Version = version
 	return ctx.JSON(http.StatusOK, v)
@@ -71,8 +71,8 @@ func (s *Server) GetVersion(ctx echo.Context) error {
 
 // ハイパーバイザーのリスト
 func (s *Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsParams) error {
-	s.Lock.Lock()
-	defer s.Lock.Unlock()
+	//s.Lock.Lock()
+	//defer s.Lock.Unlock()
 
 	_, err := util.CheckHypervisors(s.Ma.EtcdUrl, s.Ma.NodeName)
 	if err != nil {
@@ -104,8 +104,8 @@ func (s *Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPar
 
 // 仮想マシンのリスト（テストできていない）
 func (s *Server) ListVirtualMachines(ctx echo.Context) error {
-	s.Lock.Lock()
-	defer s.Lock.Unlock()
+	//s.Lock.Lock()
+	//defer s.Lock.Unlock()
 
 	d, err := db.NewDatabase(s.Ma.EtcdUrl)
 	if err != nil {
@@ -263,8 +263,8 @@ func (s *Server) StartVirtualMachine(ctx echo.Context) error {
 }
 
 func (s *Server) ShowHypervisorById(ctx echo.Context, hypervisorId string) error {
-	s.Lock.Lock()
-	defer s.Lock.Unlock()
+	//s.Lock.Lock()
+	//defer s.Lock.Unlock()
 
 	var hvs []types.Hypervisor
 	err := s.Ma.Db.GetHypervisors(&hvs)
