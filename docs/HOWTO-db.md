@@ -1,8 +1,7 @@
 # データベースの内容の説明と操作
 
-作成中
 
-## ハイパーバイザー設定の初期化
+## データベースのハイパーバイザー設定の初期化
 
 事前にゴミデータが存在すれば、削除しておく
 ```
@@ -13,13 +12,8 @@ $ etcdctl --endpoints=localhost:12379 get --prefix vm
 $ etcdctl --endpoints=localhost:12379 get --prefix OSI
 ```
 
-データの読み込み
-```
-$ hv-admin -config hypervisor-config-hvc.yaml 
-{hvc 8 7 16 14 172.16.0.20 [{vg1 ssd} {vg2 nvme} ]}
-```
 
-セットしたデータの確認
+データの確認
 ```
 $ etcdctl --endpoints=localhost:12379 get --prefix SEQNO
 SEQNO_LVDATA
