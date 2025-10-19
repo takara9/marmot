@@ -18,6 +18,24 @@ import (
 //go:embed version.txt
 var version string
 
+type Marmot struct {
+	NodeName string
+	EtcdUrl  string
+	Db       *db.Database
+}
+
+func NewMarmot(nodeName string, etcdUrl string) (*Marmot, error) {
+	var m Marmot
+	var err error
+	m.Db, err = db.NewDatabase(etcdUrl)
+	if err != nil {
+		return nil, err
+	}
+	m.NodeName = nodeName
+	m.EtcdUrl = etcdUrl
+	return &m, nil
+}
+
 type Server struct {
 	Lock sync.Mutex
 	Ma   *Marmot
