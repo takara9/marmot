@@ -42,7 +42,7 @@ var _ = Describe("Marmot", Ordered, func() {
 	node = &nodeName
 	var etcdEp *db.Database
 	var containerID string
-	marmotdMockAddress := "127.0.0.1:8752"
+	marmotdMockAddress := "0.0.0.0:8752"
 
 	BeforeAll(func(ctx SpecContext) {
 		e := echo.New()
@@ -119,7 +119,7 @@ var _ = Describe("Marmot", Ordered, func() {
 		It("Check up Marmot daemon", func() {
 			By("Trying to connect to marmot")
 			Eventually(func(g Gomega) {
-				cmd := exec.Command("curl", "http://" + marmotdMockAddress + "/ping")
+				cmd := exec.Command("curl", "http://127.0.0.1:8752/ping")
 				err := cmd.Run()
 				GinkgoWriter.Println(cmd, "err= ", err)
 				g.Expect(err).NotTo(HaveOccurred())
