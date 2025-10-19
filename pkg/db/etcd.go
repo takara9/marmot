@@ -219,6 +219,7 @@ func (d *Database) AssignHvforVm(vm VirtualMachine) (string, string, uuid.UUID, 
 
 				vm.Status = 0           // 登録中
 				vm.HvNode = hv.Nodename // ハイパーバイザーを決定
+				vm.HvIpAddr = hv.IpAddr
 				vm.HvPort = hv.Port
 				assigned = true
 				break
@@ -248,7 +249,7 @@ func (d *Database) AssignHvforVm(vm VirtualMachine) (string, string, uuid.UUID, 
 	vm.Stime = time.Now()
 	//vm.Status = 1  // 状態プロビ中
 	err = d.PutDataEtcd(vm.Key, vm) // 仮想マシンのデータ登録
-	return vm.HvNode, vm.Key, vm.Uuid, vm.HvPort, err
+	return vm.HvIpAddr, vm.Key, vm.Uuid, vm.HvPort, err
 }
 
 // VMの終了とリソースの開放

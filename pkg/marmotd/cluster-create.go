@@ -54,7 +54,7 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		vm := convApiConfigToDB(spec, cnf)
 
 		//スケジュールを実行
-		vm.HvNode, vm.Key, vm.Uuid, vm.HvPort, err = m.Db.AssignHvforVm(vm)
+		vm.HvIpAddr, vm.Key, vm.Uuid, vm.HvPort, err = m.Db.AssignHvforVm(vm)
 		if err != nil {
 			slog.Error("", "err", err)
 			break_err = true
@@ -97,7 +97,7 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		// リモートとローカル関係なしに、マイクロサービスへリクエストする
 		m.Db.UpdateVmState(vm.Key, types.PROVISIONING)
 
-		marmotHost := fmt.Sprintf("%s:%d", vm.HvNode, vm.HvPort)
+		marmotHost := fmt.Sprintf("%s:%d", vm.HvIpAddr, vm.HvPort)
 		marmotClient, err := client.NewMarmotdEp(
 			"http",
 			marmotHost,
@@ -127,25 +127,3 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 	return nil
 }
 
-// HVへVMスケジュールするために db.VirtualMachineにセットする
-func convApiConfigToDB(spec api.VmSpec, cnf api.MarmotConfig) types.VirtualMachine {
-	var vm types.VirtualMachine
-	vm.ClusterName = *cnf.ClusterName
-	vm.OsVariant = *cnf.OsVariant
-	vm.Name = *spec.Name // Os のhostname
-	vm.Cpu = int(*spec.Cpu)
-	vm.Memory = int(*spec.Memory)
-	vm.PrivateIp = *spec.PrivateIp
-	vm.PublicIp = *spec.PublicIp
-	vm.Playbook = *spec.Playbook
-	vm.Comment = *spec.Comment
-	vm.Status = types.INITALIZING
-	for _, stg := range *spec.Storage {
-		var vms types.Storage
-		vms.Name = *stg.Name
-		vms.Size = int(*stg.Size)
-		vms.Path = *stg.Path
-		vm.Storage = append(vm.Storage, vms)
-	}
-	return vm
-}

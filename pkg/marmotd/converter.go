@@ -260,3 +260,25 @@ func ConvConfClusterOld2New(cnf config.MarmotConfig) api.MarmotConfig {
 	acnf.VmSpec = &vmSpec
 	return acnf
 }
+// HVへVMスケジュールするために db.VirtualMachineにセットする
+func convApiConfigToDB(spec api.VmSpec, cnf api.MarmotConfig) types.VirtualMachine {
+	var vm types.VirtualMachine
+	vm.ClusterName = *cnf.ClusterName
+	vm.OsVariant = *cnf.OsVariant
+	vm.Name = *spec.Name // Os のhostname
+	vm.Cpu = int(*spec.Cpu)
+	vm.Memory = int(*spec.Memory)
+	vm.PrivateIp = *spec.PrivateIp
+	vm.PublicIp = *spec.PublicIp
+	vm.Playbook = *spec.Playbook
+	vm.Comment = *spec.Comment
+	vm.Status = types.INITALIZING
+	for _, stg := range *spec.Storage {
+		var vms types.Storage
+		vms.Name = *stg.Name
+		vms.Size = int(*stg.Size)
+		vms.Path = *stg.Path
+		vm.Storage = append(vm.Storage, vms)
+	}
+	return vm
+}

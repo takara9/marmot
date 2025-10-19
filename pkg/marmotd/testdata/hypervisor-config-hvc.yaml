@@ -1,5 +1,5 @@
 hv_spec:
-  - name:     "127.0.0.1"
+  - name:     "hvc"
     port:    8752
     cpu:      4
     free_cpu: 4
