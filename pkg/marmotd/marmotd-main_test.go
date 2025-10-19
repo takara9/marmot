@@ -64,7 +64,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		It("Marmotエンドポイントの生成", func() {
 			marmotClient, err = client.NewMarmotdEp(
 				"http",
-				"localhost:8080",
+				"localhost:8752",
 				"/api/v1",
 				60,
 			)
