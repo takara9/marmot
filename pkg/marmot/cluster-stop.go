@@ -7,6 +7,7 @@ import (
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/types"
+	"github.com/takara9/marmot/pkg/client"
 )
 
 // クラスタ停止
@@ -24,7 +25,7 @@ func (m *Marmot) StopClusterInternal(cnf api.MarmotConfig) error {
 			}
 
 			hvService := fmt.Sprintf("%s:%d", vm.HvNode, vm.HvPort)
-			marmotClient, err := NewMarmotdEp(
+			marmotClient, err := client.NewMarmotdEp(
 				"http",
 				hvService,
 				"/api/v1",
