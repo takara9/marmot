@@ -75,7 +75,8 @@ var _ = Describe("Marmot", Ordered, func() {
 		if err != nil {
 			fmt.Printf("Failed to remove container: %v\n", err)
 		}
-	}, NodeTimeout(20*time.Second))
+		time.Sleep(20 * time.Second) // 状態がクリアされるまでの時間待機
+	}, NodeTimeout(30*time.Second))
 
 	Context("Data management", func() {
 		It("Set up databae ", func() {
