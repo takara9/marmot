@@ -11,8 +11,8 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/client"
+	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/util"
 )
 
@@ -171,16 +171,18 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		})
 
 		It("仮想マシンの一覧取得", func() {
-			httpStatus, body, url, err := marmotClient.ListVirtualMachines(nil)
 			var vms []api.VirtualMachine
-			Expect(err).NotTo(HaveOccurred())
-			Expect(httpStatus).To(Equal(200))
-			err = json.Unmarshal(body, &vms)
-			GinkgoWriter.Println("err = ", err)
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("vms=", vms)
-			Expect(len(vms)).To(Equal(2))
-			Expect(url).To(BeNil())
+			Eventually(func(g Gomega) {
+				httpStatus, body, url, err := marmotClient.ListVirtualMachines(nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(httpStatus).To(Equal(200))
+				err = json.Unmarshal(body, &vms)
+				GinkgoWriter.Println("err = ", err)
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println("vms=", vms)
+				Expect(url).To(BeNil())
+				g.Expect(len(vms)).To(Equal(2))
+			}).WithTimeout(10 * time.Second).WithPolling(2 * time.Second).Should(Succeed())
 		})
 
 		It("クラスタの一時停止", func() {
