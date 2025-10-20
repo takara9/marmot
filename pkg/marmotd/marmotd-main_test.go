@@ -36,11 +36,11 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		fmt.Printf("Container started with ID: %s\n", containerID)
 		time.Sleep(10 * time.Second) // コンテナが起動するまで待機
 	
-		//marmotServer = startMockServer() // バックグラウンドで起動する
+		//MockServer バックグラウンドで起動する
 		e := echo.New()
-		server := NewServer("hvc", "http://127.0.0.1:3379")
+		marmotServer = NewServer("hvc", "http://127.0.0.1:3379")
 		go func() {
-			api.RegisterHandlersWithBaseURL(e, server, "/api/v1")
+			api.RegisterHandlersWithBaseURL(e, marmotServer, "/api/v1")
 			fmt.Println(e.Start("127.0.0.1:8080"), "Mock server is running")
 		}()
 		time.Sleep(5 * time.Second) // Marmotインスタンスの生成待ち

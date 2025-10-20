@@ -415,31 +415,22 @@ func (d *Database) SetImageTemplate(v cf.Image_yaml) error {
 // ハイパーバイザーの設定
 func (d *Database) SetHypervisors(v cf.Hypervisor_yaml) error {
 	var hv Hypervisor
-
 	hv.Nodename = v.Name
 	hv.Port = int(v.Port)
 	hv.Key = v.Name // Key
+	fmt.Println("IpAddr=", v.IpAddr)
 	hv.IpAddr = v.IpAddr
 	hv.Cpu = int(v.Cpu)
 	hv.FreeCpu = int(v.Cpu)       // これで良いのか
 	hv.Memory = int(v.Ram * 1024) // MB
 	hv.FreeMemory = int(v.Ram * 1024)
 	hv.Status = 2 // テストのため暫定
-
-	//	for _, val := range v.StgPool_yaml {
-	//		var sp St
-	//		sp.VolGroup = val.VolGroup
-	//		sp.Type     = val.Type
-	//		hv.StgPool  = append(hv.StgPool,sp)
-	//	}
-
 	for _, val := range v.Storage {
 		var sp StoragePool
 		sp.VolGroup = val.VolGroup
 		sp.Type = val.Type
 		hv.StgPool = append(hv.StgPool, sp)
 	}
-
 	err := d.PutDataEtcd(hv.Key, hv)
 	if err != nil {
 		slog.Error("PutDataEtcd()", "err", err)
