@@ -11,6 +11,7 @@ import (
 func convHVinfoDBtoAPI(hv types.Hypervisor) api.Hypervisor {
 	var memory int64 = int64(hv.Memory)
 	var ipaddr string = hv.IpAddr
+	var port int32 = int32(hv.Port)
 	var freecpu int32 = int32(hv.FreeCpu)
 	var freememory int64 = int64(hv.FreeMemory)
 	var status int32 = int32(hv.Status)
@@ -30,6 +31,7 @@ func convHVinfoDBtoAPI(hv types.Hypervisor) api.Hypervisor {
 	return api.Hypervisor{
 		NodeName:   hv.Nodename,
 		IpAddr:     &ipaddr,
+		Port:				&port,
 		Cpu:        int32(hv.Cpu),
 		FreeCpu:    &freecpu,
 		Memory:     &memory,
@@ -52,6 +54,8 @@ func convVMinfoDBtoAPI(vms []types.VirtualMachine) []api.VirtualMachine {
 		var publicIp string = vm.PublicIp
 		var key string = vm.Key
 		var hvnode string = vm.HvNode
+		var hvip string = vm.HvIpAddr
+		var hvport int32 = int32(vm.HvPort)
 		var clustername string = vm.ClusterName
 		var comment string = vm.Comment
 		var ctime time.Time = vm.Ctime
@@ -83,6 +87,8 @@ func convVMinfoDBtoAPI(vms []types.VirtualMachine) []api.VirtualMachine {
 			Status:      &status,
 			Key:         &key,
 			HvNode:      hvnode,
+			HvIpAddr:		 &hvip,
+			HvPort:      &hvport,
 			ClusterName: &clustername,
 			Comment:     &comment,
 			CTime:       &ctime,

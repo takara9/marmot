@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/labstack/echo/v4"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -24,8 +25,6 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 	BeforeAll(func(ctx SpecContext) {
 		// Marmotサーバーのモック起動
 		GinkgoWriter.Println("Start marmot server mock")
-		marmotServer = startMockServer() // バックグラウンドで起動する
-		time.Sleep(5 * time.Second)      // Marmotインスタンスの生成待ち
 
 		// Dockerコンテナを起動
 		cmd := exec.Command("docker", "run", "-d", "--name", "etcd0", "-p", "3379:2379", "-p", "3380:2380", "ghcr.io/takara9/etcd:3.6.5")
@@ -36,6 +35,15 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		containerID = string(output[:12]) // 最初の12文字をIDとして取得
 		fmt.Printf("Container started with ID: %s\n", containerID)
 		time.Sleep(10 * time.Second) // コンテナが起動するまで待機
+	
+		//MockServer バックグラウンドで起動する
+		e := echo.New()
+		marmotServer = NewServer("hvc", "http://127.0.0.1:3379")
+		go func() {
+			api.RegisterHandlersWithBaseURL(e, marmotServer, "/api/v1")
+			fmt.Println(e.Start("127.0.0.1:8080"), "Mock server is running")
+		}()
+		time.Sleep(5 * time.Second) // Marmotインスタンスの生成待ち
 	}, NodeTimeout(20*time.Second))
 
 	AfterAll(func(ctx SpecContext) {

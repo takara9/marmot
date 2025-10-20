@@ -27,6 +27,7 @@ type Hypervisor struct {
 	Key        *string        `json:"key,omitempty"`
 	Memory     *int64         `json:"memory,omitempty"`
 	NodeName   string         `json:"nodeName"`
+	Port       *int32         `json:"port,omitempty"`
 	Status     *int32         `json:"status,omitempty"`
 	StgPool    *[]StoragePool `json:"stgPool,omitempty"`
 }
@@ -88,7 +89,9 @@ type StoragePool struct {
 
 // VirtualMachine defines model for virtualMachine.
 type VirtualMachine struct {
+	HvIpAddr    *string    `json:"HvIpAddr,omitempty"`
 	HvNode      string     `json:"HvNode"`
+	HvPort      *int32     `json:"HvPort,omitempty"`
 	CTime       *time.Time `json:"cTime,omitempty"`
 	ClusterName *string    `json:"clusterName,omitempty"`
 	Comment     *string    `json:"comment,omitempty"`

@@ -6,8 +6,8 @@ import (
 	"log/slog"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/types"
 	"github.com/takara9/marmot/pkg/client"
+	"github.com/takara9/marmot/pkg/types"
 )
 
 // コンフィグからVMクラスタを作成する  新APIを使用
@@ -53,7 +53,7 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		vm := convApiConfigToDB(spec, cnf)
 
 		//スケジュールを実行
-		vm.HvNode, vm.Key, vm.Uuid, vm.HvPort, err = m.Db.AssignHvforVm(vm)
+		vm.HvNode, vm.HvIpAddr, vm.Key, vm.Uuid, vm.HvPort, err = m.Db.AssignHvforVm(vm)
 		if err != nil {
 			slog.Error("", "err", err)
 			break_err = true
@@ -96,7 +96,7 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		// リモートとローカル関係なしに、マイクロサービスへリクエストする
 		m.Db.UpdateVmState(vm.Key, types.PROVISIONING)
 
-		marmotHost := fmt.Sprintf("%s:%d", vm.HvNode, vm.HvPort)
+		marmotHost := fmt.Sprintf("%s:%d", vm.HvIpAddr, vm.HvPort)
 		marmotClient, err := client.NewMarmotdEp(
 			"http",
 			marmotHost,

@@ -5,8 +5,8 @@ import (
 	"log/slog"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/types"
 	"github.com/takara9/marmot/pkg/client"
+	"github.com/takara9/marmot/pkg/types"
 )
 
 // クラスタ削除
@@ -24,7 +24,7 @@ func (m *Marmot) DestroyClusterInternal(cnf api.MarmotConfig) error {
 				continue
 			}
 
-			hvService := fmt.Sprintf("%s:%d", vm.HvNode, vm.HvPort)
+			hvService := fmt.Sprintf("%s:%d", vm.HvIpAddr, vm.HvPort)
 			marmotClient, err := client.NewMarmotdEp(
 				"http",
 				hvService,

@@ -49,7 +49,7 @@ var _ = Describe("Marmot", Ordered, func() {
 		server := marmotd.NewServer("hvc", etcdUrl)
 		go func() {
 			api.RegisterHandlersWithBaseURL(e, server, "/api/v1")
-			fmt.Println(e.Start("0.0.0.0:8750"), "Mock server is running")
+			fmt.Println(e.Start("127.0.0.1:8750"), "Mock server is running")
 		}()
 
 		// Dockerコンテナを起動

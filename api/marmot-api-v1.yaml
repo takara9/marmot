@@ -285,6 +285,9 @@ components:
           format: int64
         ipAddr:
           type: string
+        port:
+          type: integer
+          format: int32
         freeCpu:
           type: integer
           format: int32
@@ -340,6 +343,11 @@ components:
           type: string
         HvNode:
           type: string
+        HvIpAddr:
+          type: string
+        HvPort:
+          type: integer
+          format: int32
         cTime:
           type: string
           format: date-time

@@ -1,11 +1,11 @@
 hv_spec:
   - name:     "hvc"
+    ip_addr:  "127.0.0.1"
     port:    8080
     cpu:      4
     free_cpu: 4
     ram:      16
     free_ram: 16
-    ip_addr:  "127.0.0.1"
     storage_pool:
     - vg: "vg1"
       type: "ssd"

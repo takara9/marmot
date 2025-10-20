@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-
 	db "github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/types"
 	ut "github.com/takara9/marmot/pkg/util"
