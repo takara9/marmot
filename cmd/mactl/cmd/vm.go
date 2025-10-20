@@ -66,6 +66,7 @@ var vmCmd = &cobra.Command{
 			fmt.Printf("Virtual Machine Name : %s \n", vm.Name)
 			fmt.Printf("UUID : %s\n", vm.Uuid)
 			fmt.Printf("Hypervisor : %s\n", vm.HvNode)
+			fmt.Printf("Hypervisor's IP : %s\n", vm.HvIpAddr)
 			fmt.Printf("Key: %s \n", vm.Key)
 			fmt.Printf("Create Time: %s\n", vm.Ctime)
 			fmt.Printf("Start  Time: %s\n", vm.Stime)

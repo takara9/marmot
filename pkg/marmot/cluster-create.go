@@ -52,7 +52,7 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		vm := convApiConfigToDB(spec, cnf)
 
 		//スケジュールを実行
-		vm.HvNode, vm.Key, vm.Uuid, vm.HvPort, err = m.Db.AssignHvforVm(vm)
+		vm.HvNode, vm.HvIpAddr, vm.Key, vm.Uuid, vm.HvPort, err = m.Db.AssignHvforVm(vm)
 		if err != nil {
 			slog.Error("", "err", err)
 			break_err = true
@@ -95,7 +95,7 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		// リモートとローカル関係なしに、マイクロサービスへリクエストする
 		m.Db.UpdateVmState(vm.Key, types.PROVISIONING)
 
-		marmotHost := fmt.Sprintf("%s:%d", vm.HvNode, vm.HvPort)
+		marmotHost := fmt.Sprintf("%s:%d", vm.HvIpAddr, vm.HvPort)
 		marmotClient, err := NewMarmotdEp(
 			"http",
 			marmotHost,

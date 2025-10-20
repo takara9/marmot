@@ -23,7 +23,7 @@ func (m *Marmot) StartClusterInternal(cnf api.MarmotConfig) error {
 			return err
 		}
 
-		hvService := fmt.Sprintf("%s:%d", vm.HvNode, vm.HvPort)
+		hvService := fmt.Sprintf("%s:%d", vm.HvIpAddr, vm.HvPort)
 		marmotClient, err := NewMarmotdEp(
 			"http",
 			hvService,
