@@ -7,6 +7,7 @@ import (
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/types"
+	"github.com/takara9/marmot/pkg/client"
 )
 
 // コンフィグからVMクラスタを作成する  新APIを使用

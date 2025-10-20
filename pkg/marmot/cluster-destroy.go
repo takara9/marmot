@@ -6,6 +6,7 @@ import (
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/types"
+	"github.com/takara9/marmot/pkg/client"
 )
 
 // クラスタ削除

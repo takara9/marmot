@@ -13,8 +13,8 @@ import (
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/marmot"
 	"github.com/takara9/marmot/pkg/util"
+	"github.com/takara9/marmot/pkg/client"
 )
 
 var _ = Describe("Marmotd Test", Ordered, func() {
@@ -62,7 +62,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 	Context("基本的なクライアントからのアクセステスト", func() {
 		var hvs config.Hypervisors_yaml
-		var marmotClient *marmot.MarmotEndpoint
+		var marmotClient *client.MarmotEndpoint
 
 		It("ハイパーバイザーのコンフィグファイルの読み取り", func() {
 			err = config.ReadYAML("testdata/hypervisor-config-hvc.yaml", &hvs)
@@ -70,7 +70,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		})
 
 		It("Marmotエンドポイントの生成", func() {
-			marmotClient, err = marmot.NewMarmotdEp(
+			marmotClient, err = client.NewMarmotdEp(
 				"http",
 				"localhost:8080",
 				"/api/v1",
