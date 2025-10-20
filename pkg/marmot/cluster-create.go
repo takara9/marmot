@@ -6,8 +6,8 @@ import (
 	"log/slog"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/types"
 	"github.com/takara9/marmot/pkg/client"
+	"github.com/takara9/marmot/pkg/types"
 )
 
 // コンフィグからVMクラスタを作成する  新APIを使用
@@ -97,7 +97,7 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		m.Db.UpdateVmState(vm.Key, types.PROVISIONING)
 
 		marmotHost := fmt.Sprintf("%s:%d", vm.HvIpAddr, vm.HvPort)
-		marmotClient, err := NewMarmotdEp(
+		marmotClient, err := client.NewMarmotdEp(
 			"http",
 			marmotHost,
 			"/api/v1",
