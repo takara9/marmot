@@ -52,6 +52,7 @@ func getHypervisors(dbUrl string) ([]types.Hypervisor, error) {
 
 // ハイパーバイザーをREST-APIでアクセスして疎通を確認、DBへ反映させる
 func CheckHypervisors(dbUrl string, node string) ([]types.Hypervisor, error) {
+	// 要らないんじゃない？
 	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
 		slog.Error("", "err", err)

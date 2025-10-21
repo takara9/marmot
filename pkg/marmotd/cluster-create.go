@@ -1,4 +1,4 @@
-package marmot
+package marmotd
 
 import (
 	"errors"
@@ -62,7 +62,6 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		}
 
 		// OSのバージョン、テンプレートを設定
-		fmt.Println("OSのバージョン、テンプレートを設定")
 		spec.Ostempvariant = cnf.OsVariant
 		vg, lv, err := m.Db.GetOsImgTempByKey(*spec.Ostempvariant)
 		spec.Ostempvg = &vg
@@ -75,7 +74,6 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		}
 
 		// VMのUUIDとKEYをコンフィグ情報へセット
-		fmt.Println("VMのUUIDとKEYをコンフィグ情報へセット")
 		u := vm.Uuid.String()
 		spec.Uuid = &u // こんな方法は正しいのか？
 		k := vm.Key
@@ -95,7 +93,6 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 
 		// リモートとローカル関係なしに、マイクロサービスへリクエストする
 		m.Db.UpdateVmState(vm.Key, types.PROVISIONING)
-
 		marmotHost := fmt.Sprintf("%s:%d", vm.HvIpAddr, vm.HvPort)
 		marmotClient, err := client.NewMarmotdEp(
 			"http",
@@ -103,6 +100,7 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 			"/api/v1",
 			15,
 		)
+		// なんだこれ？
 		if err != nil {
 			continue
 		}
@@ -114,10 +112,7 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 			m.Db.UpdateVmState(vm.Key, types.ERROR) // エラー状態へ
 			break
 		}
-		fmt.Println("実行中へ")
 		m.Db.UpdateVmState(vm.Key, types.RUNNING) // 実行中へ
-
-		fmt.Println("DNS登録をスキップ")
 	} // END OF LOOP
 
 	if break_err {

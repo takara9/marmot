@@ -132,7 +132,6 @@ func (m *MarmotEndpoint) ListHypervisors(params map[string]string) (int, []byte,
 }
 
 func (m *MarmotEndpoint) GetHypervisor(nodeName string) (int, []byte, *url.URL, error) {
-	fmt.Println("Client: GetHypervisor")
 	url, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/hypervisor/"+nodeName)
 	if err != nil {
 		return 0, nil, nil, err
@@ -148,7 +147,6 @@ func (m *MarmotEndpoint) GetHypervisor(nodeName string) (int, []byte, *url.URL, 
 }
 
 func (m *MarmotEndpoint) ListVirtualMachines(params map[string]string) (int, []byte, *url.URL, error) {
-	fmt.Println("Client: ListVirtualMachines")
 	url, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/virtualMachines")
 	if err != nil {
 		return 0, nil, nil, err

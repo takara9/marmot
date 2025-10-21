@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	//"github.com/google/uuid"
 )
 
 type Memory struct {
@@ -416,14 +415,9 @@ func CreateVirtXML(domain Domain) string {
 	return xmlText
 }
 
+
 func SetVmParam(domain *Domain) {
-
-	/***  構造体の値についての変更 ***/
-	fmt.Println("VM Name: ", domain.Name)
 	domain.Name = "VMMMMMMMMMMMMMMMMMMMMMMMMMMM"
-	//fmt.Println("UUID: ", domain.Uuid)
-	//domain.Uuid = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
-
 	for _, s := range domain.Devices.Disk {
 		if s.Type == "block" && s.Device == "disk" {
 			fmt.Println(s.Source.Dev)
