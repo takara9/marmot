@@ -200,7 +200,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			err = json.Unmarshal(body, &replyMessage)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(url).To(BeNil())
-			time.Sleep(time.Second * 120)
+			time.Sleep(time.Second * 20)
 		})
 
 		It("クラスタの再スタート", func() {
