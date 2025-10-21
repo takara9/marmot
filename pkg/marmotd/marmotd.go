@@ -54,14 +54,17 @@ func (s *Server) GetVersion(ctx echo.Context) error {
 
 // ハイパーバイザーのリスト
 func (s *Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsParams) error {
+	fmt.Println("=============== ハイパーバイザーのリスト ========= before Lock")
 	s.Lock.Lock()
 	defer s.Lock.Unlock()
+	fmt.Println("=============== ハイパーバイザーのリスト ========= after Lock")
 
 	_, err := util.CheckHypervisors(s.Ma.EtcdUrl, s.Ma.NodeName)
 	if err != nil {
 		slog.Error("Check if the hypervisor is up and running", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
+	fmt.Println("=============== ハイパーバイザーのチェック ========= after")
 
 	// ストレージ容量の更新 結果はDBへ反映
 	err = util.CheckHvVgAll(s.Ma.EtcdUrl, s.Ma.NodeName)
@@ -69,6 +72,7 @@ func (s *Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPar
 		slog.Error("Update storage capacity", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
+	fmt.Println("=============== ストレージ容量の更新 結果はDBへ反映 ========= after")
 
 	// データベースから情報を取得
 	d, err := db.NewDatabase(s.Ma.EtcdUrl)
@@ -76,12 +80,16 @@ func (s *Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPar
 		slog.Error("connect to database", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
+	fmt.Println("=============== データベースへ接続 ========= after")
+
 	var hvs []types.Hypervisor
 	err = d.GetHypervisors(&hvs)
 	if err != nil {
 		slog.Error("get hypervisor status", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
+	fmt.Println("=============== データベースから情報を取得 ========= after")
+
 	return ctx.JSON(http.StatusOK, hvs)
 }
 
