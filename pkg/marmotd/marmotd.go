@@ -2,6 +2,7 @@ package marmotd
 
 import (
 	_ "embed"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -86,14 +87,17 @@ func (s *Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPar
 
 // 仮想マシンのリスト（テストできていない）
 func (s *Server) ListVirtualMachines(ctx echo.Context) error {
+	fmt.Println("========== ListVirtualMachines ========= before Lock")
 	s.Lock.Lock()
 	defer s.Lock.Unlock()
+	fmt.Println("========== ListVirtualMachines ========= after Lock")
 
 	d, err := db.NewDatabase(s.Ma.EtcdUrl)
 	if err != nil {
 		slog.Error("get list virtual machines", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
+	fmt.Println("========== Db connection setup  ========= after Lock")
 
 	var vms []types.VirtualMachine
 	err = d.GetVmsStatus(&vms)
@@ -101,8 +105,11 @@ func (s *Server) ListVirtualMachines(ctx echo.Context) error {
 		slog.Error("get status of virtual machines", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
+	fmt.Println("========== get VMs from DB  ========= after Lock")
 
 	vms2 := convVMinfoDBtoAPI(vms)
+	fmt.Println("========== convert data struncture ========= after Lock")
+
 	return ctx.JSON(http.StatusOK, vms2)
 }
 
