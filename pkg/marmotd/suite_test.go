@@ -1,4 +1,4 @@
-package marmotd
+package marmotd_test
 
 import (
 	"testing"

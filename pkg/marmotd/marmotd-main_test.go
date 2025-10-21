@@ -1,4 +1,4 @@
-package marmotd
+package marmotd_test
 
 import (
 	"encoding/json"
@@ -12,15 +12,16 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/util"
 	"github.com/takara9/marmot/pkg/client"
+	"github.com/takara9/marmot/pkg/config"
+	"github.com/takara9/marmot/pkg/marmotd"
+	"github.com/takara9/marmot/pkg/util"
 )
 
 var _ = Describe("Marmotd Test", Ordered, func() {
 	var err error
 	var containerID string
-	var marmotServer *Server
+	var marmotServer *marmotd.Server
 
 	BeforeAll(func(ctx SpecContext) {
 		// Marmotサーバーのモック起動
@@ -35,10 +36,10 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		containerID = string(output[:12]) // 最初の12文字をIDとして取得
 		fmt.Printf("Container started with ID: %s\n", containerID)
 		time.Sleep(10 * time.Second) // コンテナが起動するまで待機
-	
+
 		//MockServer バックグラウンドで起動する
 		e := echo.New()
-		marmotServer = NewServer("hvc", "http://127.0.0.1:3379")
+		marmotServer = marmotd.NewServer("hvc", "http://127.0.0.1:3379")
 		go func() {
 			api.RegisterHandlersWithBaseURL(e, marmotServer, "/api/v1")
 			fmt.Println(e.Start("127.0.0.1:8080"), "Mock server is running")
@@ -119,7 +120,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		It("Marmotd のバージョン情報取得", func() {
 			serverVer, err := marmotClient.GetVersion()
 			Expect(err).NotTo(HaveOccurred())
-			Expect(fmt.Sprintln(string(serverVer.Version))).To(Equal(fmt.Sprintln(version)))
+			Expect(fmt.Sprintln(string(serverVer.Version))).To(Equal(fmt.Sprintln(marmotd.Version)))
 			GinkgoWriter.Println("Version : ", string(serverVer.Version))
 		})
 
