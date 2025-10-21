@@ -125,7 +125,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		})
 
 		It("ハイパーバイザーの一覧取得", func() {
-			httpStatus, body, url, err := marmotClient.ListHypervisors(nil)
+			httpStatus, body, url, err := marmotClient.ListHypervisors(nil)		
 			var hvs []api.Hypervisor
 			Expect(err).NotTo(HaveOccurred())
 			Expect(httpStatus).To(Equal(200))

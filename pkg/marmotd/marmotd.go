@@ -25,6 +25,10 @@ type Server struct {
 }
 
 func NewServer(node string, etcdurl string) *Server {
+	fmt.Println("###### 新たなmarmotサーバーのインスタンス化")
+	fmt.Println("node =", node)
+	fmt.Println("etcdUrl =", etcdurl)
+	fmt.Println("######################################")
 	marmotInstance, err := NewMarmot(node, etcdurl)
 	if err != nil {
 		slog.Error("Storage free space check", "err", err)
@@ -58,8 +62,8 @@ func (s *Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPar
 	s.Lock.Lock()
 	defer s.Lock.Unlock()
 	fmt.Println("=============== ハイパーバイザーのリスト ========= after Lock")
-  fmt.Println(" ectd url =", s.Ma.EtcdUrl)
-  fmt.Println(" node name =", s.Ma.NodeName)
+	fmt.Println(" ectd url =", s.Ma.EtcdUrl)
+	fmt.Println(" node name =", s.Ma.NodeName)
 	fmt.Println("==============================================")
 
 	_, err := util.CheckHypervisors(s.Ma.EtcdUrl, s.Ma.NodeName)
