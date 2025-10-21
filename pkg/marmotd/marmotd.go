@@ -58,6 +58,9 @@ func (s *Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPar
 	s.Lock.Lock()
 	defer s.Lock.Unlock()
 	fmt.Println("=============== ハイパーバイザーのリスト ========= after Lock")
+  fmt.Println(" ectd url =", s.Ma.EtcdUrl)
+  fmt.Println(" node name =", s.Ma.NodeName)
+	fmt.Println("==============================================")
 
 	_, err := util.CheckHypervisors(s.Ma.EtcdUrl, s.Ma.NodeName)
 	if err != nil {

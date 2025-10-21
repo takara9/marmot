@@ -52,6 +52,8 @@ func getHypervisors(dbUrl string) ([]types.Hypervisor, error) {
 
 // ハイパーバイザーをREST-APIでアクセスして疎通を確認、DBへ反映させる
 func CheckHypervisors(dbUrl string, node string) ([]types.Hypervisor, error) {
+	fmt.Println("----------- ハイパーバイザーをREST-APIでアクセスして疎通を確認 dbUrl=", dbUrl)
+	// 要らないんじゃない？
 	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
 		slog.Error("", "err", err)
@@ -64,6 +66,7 @@ func CheckHypervisors(dbUrl string, node string) ([]types.Hypervisor, error) {
 		slog.Error("", "err", err)
 		return nil, err
 	}
+	fmt.Println("----------- ハイパーバイザーのデータを取得 afrer hvs=", hvs)
 
 	// 自ノードを含むハイパーバイザーの死活チェック、DBへ反映
 	for _, val := range hvs {
