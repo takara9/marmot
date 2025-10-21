@@ -43,6 +43,7 @@ func (m *Marmot) CreateVM2(spec api.VmSpec) error {
 		slog.Error("", "err", err)
 		return err
 	}
+	fmt.Println("****************** OS用LV作成 after ", *spec.Key)
 
 	dom.Devices.Disk[0].Source.Dev = fmt.Sprintf("/dev/%s/%s", *spec.Ostempvg, osLogicalVol)
 	err = m.Db.UpdateOsLv(*spec.Key, *spec.Ostempvg, osLogicalVol)
@@ -50,15 +51,18 @@ func (m *Marmot) CreateVM2(spec api.VmSpec) error {
 		slog.Error("", "err", err)
 		return err
 	}
+	fmt.Println("****************** OS用LV作成 after DB更新", *spec.Key)
 
 	err = util.ConfigRootVol2(spec, *spec.Ostempvg, osLogicalVol)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
 	}
+	fmt.Println("****************** DATA用LV コンフィグ作成 after", *spec.Key)
 
 	if spec.Storage != nil {
 		// DATAボリュームを作成 (最大９個)
+		fmt.Println("*** DATAボリュームを作成 (最大９個)")
 		dev := []string{"vdb", "vdc", "vde", "vdf", "vdg", "vdh", "vdj", "vdk", "vdl"}
 		bus := []string{"0x0a", "0x0b", "0x0c", "0x0d", "0x0e", "0x0f", "0x10", "0x11", "0x12"}
 		for i, disk := range *spec.Storage {
@@ -105,10 +109,12 @@ func (m *Marmot) CreateVM2(spec api.VmSpec) error {
 	if spec.PrivateIp != nil {
 		util.CreateNic("pri", &dom.Devices.Interface)
 	}
+	fmt.Println("****************** プライベートIP設定 after", *spec.Key)
 
 	if spec.PublicIp != nil {
 		util.CreateNic("pub", &dom.Devices.Interface)
 	}
+	fmt.Println("****************** パブリックIP設定 after", *spec.Key)
 
 	textXml := virt.CreateVirtXML(dom)
 	xmlfileName := fmt.Sprintf("./%v.xml", dom.Uuid)
@@ -118,6 +124,7 @@ func (m *Marmot) CreateVM2(spec api.VmSpec) error {
 		return err
 	}
 	defer file.Close()
+	fmt.Println("****************** VM用のXML作成 after", *spec.Key)
 
 	_, err = file.Write([]byte(textXml))
 	if err != nil {
@@ -131,6 +138,7 @@ func (m *Marmot) CreateVM2(spec api.VmSpec) error {
 		slog.Error("", "err", err)
 		return err
 	}
+	fmt.Println("****************** VMをXMLで作成指示 after", *spec.Key)
 
 	// 仮想マシンXMLファイルを削除する
 	err = os.Remove(xmlfileName)
@@ -138,6 +146,8 @@ func (m *Marmot) CreateVM2(spec api.VmSpec) error {
 		slog.Error("", "err", err)
 		return err
 	}
+	fmt.Println("****************** XMLを削除 after", *spec.Key)
+
 	// 仮想マシンの状態変更(未実装)
 	return nil
 }
