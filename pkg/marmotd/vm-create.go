@@ -38,6 +38,7 @@ func (m *Marmot) CreateVM2(spec api.VmSpec) error {
 	dom.Memory.Value = mem
 	dom.CurrentMemory.Value = mem
 
+	fmt.Println("****************** OS用LV作成 before ", *spec.Key)
 	osLogicalVol, err := util.CreateOsLv(m.EtcdUrl, *spec.Ostempvg, *spec.Ostemplv)
 	if err != nil {
 		slog.Error("", "err", err)
