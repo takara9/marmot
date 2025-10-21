@@ -12,6 +12,9 @@ import (
 
 // VMを生成する
 func (m *Marmot) CreateVM2(spec api.VmSpec) error {
+
+	fmt.Println("****************** CreateVM2")
+
 	var dom virt.Domain
 
 	// ファイル名までのフルパスが exe に格納される
@@ -25,6 +28,8 @@ func (m *Marmot) CreateVM2(spec api.VmSpec) error {
 		slog.Error("", "err", err)
 		return err
 	}
+
+	fmt.Println("****************** CreateVM2 spec.Key=", *spec.Key)
 
 	dom.Name = *spec.Key // VMを一意に識別するキーでありhostnameではない
 	dom.Uuid = *spec.Uuid
