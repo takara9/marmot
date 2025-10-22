@@ -26,26 +26,17 @@ const (
 )
 
 var ccf *string
-var etcd *string
-var node *string
+var etcdUrl2 string = "http://127.0.0.1:5379"
+var etcd *string = &etcdUrl2
+var nodeName string = "hvc"
+var node *string = &nodeName
+var etcdEp *db.Database
+var containerID2 string
 
-// テスト前の環境設定
-var _ = BeforeSuite(func() {})
-
-// テスト後の環境戻し
-var _ = AfterSuite(func() {})
-
-var _ = Describe("Marmot", Ordered, func() {
-	etcdUrl := "http://127.0.0.1:5379"
-	etcd = &etcdUrl
-	nodeName := "hvc"
-	node = &nodeName
-	var etcdEp *db.Database
-	var containerID string
-
-	BeforeAll(func(ctx SpecContext) {
+func prepareMockVmfunc(){
+	It("モックサーバーの起動", func(){
 		e := echo.New()
-		server := marmotd.NewServer("hvc", etcdUrl)
+		server := marmotd.NewServer("hvc", etcdUrl2)
 		go func() {
 			api.RegisterHandlersWithBaseURL(e, server, "/api/v1")
 			fmt.Println(e.Start("127.0.0.1:8080"), "Mock server is running")
@@ -57,29 +48,33 @@ var _ = Describe("Marmot", Ordered, func() {
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to start container: %s, %v", string(output), err))
 		}
-		containerID = string(output[:12]) // 最初の12文字をIDとして取得
-		fmt.Printf("Container started with ID: %s\n", containerID)
+		containerID2 = string(output[:12]) // 最初の12文字をIDとして取得
+		fmt.Printf("Container started with ID: %s\n", containerID2)
 		time.Sleep(10 * time.Second) // コンテナが起動するまで待機
 	}, NodeTimeout(20*time.Second))
+}
 
-	AfterAll(func(ctx SpecContext) {
+func cleanupMockVmfunc(){
+	It("モックサーバーの終了", func(){
 		// Dockerコンテナを停止・削除
-		cmd := exec.Command("docker", "stop", containerID)
+		cmd := exec.Command("docker", "stop", containerID2)
 		_, err := cmd.CombinedOutput()
 		if err != nil {
 			fmt.Printf("Failed to stop container: %v\n", err)
 		}
-		cmd = exec.Command("docker", "rm", containerID)
+		cmd = exec.Command("docker", "rm", containerID2)
 		_, err = cmd.CombinedOutput()
 		if err != nil {
 			fmt.Printf("Failed to remove container: %v\n", err)
 		}
 	}, NodeTimeout(20*time.Second))
+}
 
+func testMarmotFuncs() {
 	Context("Data management", func() {
 		It("Set up databae ", func() {
 			var err error
-			etcdEp, err = db.NewDatabase(etcdUrl)
+			etcdEp, err = db.NewDatabase(etcdUrl2)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -111,7 +106,7 @@ var _ = Describe("Marmot", Ordered, func() {
 		})
 
 		It("ストレージの空き容量チェック", func() {
-			err := util.CheckHvVgAll(etcdUrl, nodeName)
+			err := util.CheckHvVgAll(etcdUrl2, nodeName)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -269,4 +264,4 @@ var _ = Describe("Marmot", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
-})
+}
