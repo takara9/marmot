@@ -12,3 +12,6 @@ $ oapi-codegen -config config.yaml marmot-api.yaml
 ## APIのYAMLからHTMLページ生成
 
 npx @redocly/cli build-docs marmot-api-v1.yaml
+
+
+## 

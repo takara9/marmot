@@ -3,7 +3,9 @@ package marmotd_test
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"os"
 	"os/exec"
 	"time"
 
@@ -14,11 +16,12 @@ import (
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/client"
 	"github.com/takara9/marmot/pkg/config"
+	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/marmotd"
 	"github.com/takara9/marmot/pkg/util"
 )
 
-//var err error
+// var err error
 var marmotServerTest *marmotd.Server
 var containerID string
 
@@ -39,6 +42,14 @@ func prepareMockServers() {
 	e := echo.New()
 	marmotServerTest = marmotd.NewServer("hvc", "http://127.0.0.1:3379")
 	go func() {
+		// Setup slog
+		opts := &slog.HandlerOptions{
+			AddSource: true,
+			Level:     slog.LevelDebug,
+		}
+		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
+		slog.SetDefault(logger)
+
 		api.RegisterHandlersWithBaseURL(e, marmotServerTest, "/api/v1")
 		fmt.Println(e.Start("127.0.0.1:8080"), "Mock server is running")
 	}()
@@ -154,16 +165,10 @@ func testMarmotd() {
 		Expect(url).To(BeNil())
 	})
 
-	var cnf config.MarmotConfig
-	It("Load Config", func() {
-		fn := "testdata/cluster-config.yaml"
-		ccf := &fn
-		err := config.ReadConfig(*ccf, &cnf)
-		Expect(err).NotTo(HaveOccurred())
-	})
-
 	It("クラスタの生成", func() {
-		httpStatus, body, url, err := marmotClient.CreateCluster(cnf)
+		cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+		Expect(err).NotTo(HaveOccurred())
+		httpStatus, body, url, err := marmotClient.CreateCluster(*cnf)
 		GinkgoWriter.Println("CreateCluster ERR = ", err)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(httpStatus).To(Equal(201))
@@ -186,7 +191,9 @@ func testMarmotd() {
 	})
 
 	It("クラスタの一時停止", func() {
-		httpStatus, body, url, err := marmotClient.StopCluster(cnf)
+		cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+		Expect(err).NotTo(HaveOccurred())
+		httpStatus, body, url, err := marmotClient.StopCluster(*cnf)
 		GinkgoWriter.Println("StopCluster ERR = ", err)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(httpStatus).To(Equal(201))
@@ -194,11 +201,13 @@ func testMarmotd() {
 		err = json.Unmarshal(body, &replyMessage)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(url).To(BeNil())
-		time.Sleep(time.Second * 120)
+		time.Sleep(time.Second * 20)
 	})
 
 	It("クラスタの再スタート", func() {
-		httpStatus, body, url, err := marmotClient.StartCluster(cnf)
+		cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+		Expect(err).NotTo(HaveOccurred())
+		httpStatus, body, url, err := marmotClient.StartCluster(*cnf)
 		GinkgoWriter.Println("StartCluster ERR = ", err)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(httpStatus).To(Equal(201))
@@ -209,7 +218,9 @@ func testMarmotd() {
 	})
 
 	It("クラスタの削除", func() {
-		httpStatus, body, url, err := marmotClient.DestroyCluster(cnf)
+		cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+		Expect(err).NotTo(HaveOccurred())
+		httpStatus, body, url, err := marmotClient.DestroyCluster(*cnf)
 		GinkgoWriter.Println("DestroyCluster ERR = ", err)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(httpStatus).To(Equal(200))

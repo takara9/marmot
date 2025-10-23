@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"fmt"
+	"log/slog"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/pkg/config"
@@ -15,18 +15,18 @@ var destroyCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		m, err := getClientConfig()
 		if err != nil {
+			slog.Error("faild reading mactl config file", "err", err.Error())
 			return
 		}
 
-		err = config.ReadConfig(ClusterConfig, &cnf)
+		clusterConfig, err := config.ReadYamlClusterConfig(clusterConfigFilename)
 		if err != nil {
-			fmt.Println("Reading the config file err=", err)
+			slog.Error("failed reading cluster-config file", "err", err.Error())
 			return
 		}
-
-		_, _, _, err = m.DestroyCluster(cnf)
+		_, _, _, err = m.DestroyCluster(*clusterConfig)
 		if err != nil {
-			fmt.Println("failed to destroy VM cluster: ", err)
+			slog.Error("failed to destroy virtual machines", "err", err.Error())
 			return
 		}
 	},
@@ -34,5 +34,5 @@ var destroyCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(destroyCmd)
-	destroyCmd.PersistentFlags().StringVarP(&ClusterConfig, "cluster-config", "c", "cluster-config.yaml", "仮想サーバークラスタの構成ファイル")
+	destroyCmd.PersistentFlags().StringVarP(&clusterConfigFilename, "cluster-config", "c", "cluster-config.yaml", "仮想サーバークラスタの構成ファイル")
 }

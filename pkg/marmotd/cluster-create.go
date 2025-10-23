@@ -12,16 +12,35 @@ import (
 
 // コンフィグからVMクラスタを作成する  新APIを使用
 func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
-	var err error
+	if DEBUG {
+		printConfigJson(cnf)
+	}
+	slog.Debug("CreateClusterInternal", "cnf", "")
+
 	// リクエスト送信前にコンフィグのチェックを実施する
+	if cnf.ClusterName == nil {
+		slog.Debug("cnf.ClusterName", "val", "is not set")
+		return errors.New("cluster name is not set")
+	}
+	if cnf.VmSpec == nil {
+		return errors.New("vm spec is not set")
+	}
+	if cnf.OsVariant == nil {
+		return errors.New("OS template is not set")
+	}
+
 	for _, spec := range *cnf.VmSpec {
 		// クラスタ名とホスト名の重複チェック
+		if spec.Name == nil {
+			return errors.New("VM Name is not set")
+		}
 		vmKey, _ := m.Db.FindByHostAndClusteName(*spec.Name, *cnf.ClusterName)
 		if len(vmKey) > 0 {
 			return fmt.Errorf("existing same name virttual machine : %v", spec.Name)
 		}
-		// ここに、IPアドレスの重複チェックを入れる
-		if len(*spec.PublicIp) > 0 {
+
+		// パブリックIPアドレスの重複チェックを入れる
+		if spec.PublicIp != nil {
 			found, err := m.Db.FindByPublicIPaddress(*spec.PublicIp)
 			if err != nil {
 				return err
@@ -30,7 +49,9 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 				return fmt.Errorf("same pubic IP address exist in the cluster IP: %v", *spec.PublicIp)
 			}
 		}
-		if len(*spec.PrivateIp) > 0 {
+
+		// プライベートIPアドレスの重複チェックを入れる
+		if spec.PrivateIp != nil {
 			found, err := m.Db.FindByPrivateIPaddress(*spec.PrivateIp)
 			if err != nil {
 				return err
@@ -40,9 +61,11 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 			}
 		}
 	} // END OF LOOP
-	var break_err bool = false
-	return_errors := errors.New("")
+
 	// 仮想マシンの設定と起動
+	var break_err bool = false
+	var return_err error = nil
+
 	for _, spec := range *cnf.VmSpec {
 		// ホスト名とクラスタ名でVMキーを取得する
 		vmKey, _ := m.Db.FindByHostAndClusteName(*spec.Name, *cnf.ClusterName)
@@ -53,11 +76,12 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		vm := convApiConfigToDB(spec, cnf)
 
 		//スケジュールを実行
+		var err error
 		vm.HvNode, vm.HvIpAddr, vm.Key, vm.Uuid, vm.HvPort, err = m.Db.AssignHvforVm(vm)
 		if err != nil {
 			slog.Error("", "err", err)
 			break_err = true
-			return_errors = err
+			return_err = err
 			break
 		}
 
@@ -69,7 +93,7 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		if err != nil {
 			slog.Error("", "err", err)
 			break_err = true
-			return_errors = err
+			return_err = err
 			break
 		}
 
@@ -82,12 +106,12 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		// 問題発見処理
 		if len(vm.HvNode) == 0 {
 			break_err = true
-			return_errors = err
+			return_err = err
 			break
 		}
 		if len(vm.Name) == 0 {
 			break_err = true
-			return_errors = err
+			return_err = err
 			break
 		}
 
@@ -100,7 +124,7 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 			"/api/v1",
 			15,
 		)
-		// なんだこれ？
+		// エラーが発生しても、次のVMの作成を続ける
 		if err != nil {
 			continue
 		}
@@ -108,7 +132,7 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		if err != nil {
 			slog.Error("", "remote request err", err)
 			break_err = true
-			return_errors = err
+			return_err = err
 			m.Db.UpdateVmState(vm.Key, types.ERROR) // エラー状態へ
 			break
 		}
@@ -116,30 +140,10 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 	} // END OF LOOP
 
 	if break_err {
-		return return_errors
+		return return_err
 	}
-	return nil
-}
+	slog.Debug("CreateClusterInternal()", "return_err", return_err)
+	slog.Debug("CreateClusterInternal()", "break_err", break_err)
 
-// HVへVMスケジュールするために db.VirtualMachineにセットする
-func convApiConfigToDB(spec api.VmSpec, cnf api.MarmotConfig) types.VirtualMachine {
-	var vm types.VirtualMachine
-	vm.ClusterName = *cnf.ClusterName
-	vm.OsVariant = *cnf.OsVariant
-	vm.Name = *spec.Name // Os のhostname
-	vm.Cpu = int(*spec.Cpu)
-	vm.Memory = int(*spec.Memory)
-	vm.PrivateIp = *spec.PrivateIp
-	vm.PublicIp = *spec.PublicIp
-	vm.Playbook = *spec.Playbook
-	vm.Comment = *spec.Comment
-	vm.Status = types.INITALIZING
-	for _, stg := range *spec.Storage {
-		var vms types.Storage
-		vms.Name = *stg.Name
-		vms.Size = int(*stg.Size)
-		vms.Path = *stg.Path
-		vm.Storage = append(vm.Storage, vms)
-	}
-	return vm
+	return nil
 }

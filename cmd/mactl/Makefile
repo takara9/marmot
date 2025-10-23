@@ -27,6 +27,6 @@ install:
 	install -m 0755 $(PROGRAM) /usr/local/bin
 
 .PHONY: test
-test:
+test: mactl-test
 	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -coverprofile cover.out
 	#$(GINKGO) -v --race --focus-file mactl_test.go

@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"fmt"
+	"log/slog"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/pkg/config"
@@ -13,19 +13,23 @@ var createCmd = &cobra.Command{
 	Long: `管理下のハイパーバイザーの一つに仮想マシンをスケジュールして生成と起動を実施します。
 	デフォルトで 仮想マシンのスペック等が記述されたカレントディレクトリの cluster-config.yaml を使用します。`,
 	Run: func(cmd *cobra.Command, args []string) {
+		slog.Debug("===", "createCmd is called", "===")
+
 		m, err := getClientConfig()
 		if err != nil {
+			slog.Error("faild reading mactl config file", "err", err.Error())
 			return
 		}
 
-		err = config.ReadConfig(ClusterConfig, &cnf)
+		clusterConfig, err := config.ReadYamlClusterConfig(clusterConfigFilename)
 		if err != nil {
-			fmt.Println("Reading the config file err=", err)
+			slog.Error("failed reading cluster-config file", "err", err.Error())
 			return
 		}
-		_, _, _, err = m.CreateCluster(cnf)
+
+		_, _, _, err = m.CreateCluster(*clusterConfig)
 		if err != nil {
-			fmt.Println("failed to create VM cluster: ", err)
+			slog.Error("failed to create virtual machines", "err", err.Error())
 			return
 		}
 	},
@@ -33,5 +37,5 @@ var createCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(createCmd)
-	createCmd.PersistentFlags().StringVarP(&ClusterConfig, "config", "c", "cluster-config.yaml", "")
+	createCmd.PersistentFlags().StringVarP(&clusterConfigFilename, "config", "c", "cluster-config.yaml", "")
 }
