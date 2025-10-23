@@ -220,7 +220,7 @@ func (s *Server) CreateVirtualMachine(ctx echo.Context) error {
 	//defer s.Lock.Unlock()
 	var spec api.VmSpec
 	err := ctx.Bind(&spec)
-	err = s.Ma.CreateVM2(spec)
+	err = s.Ma.CreateVM(spec)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
