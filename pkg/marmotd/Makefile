@@ -22,8 +22,7 @@ install:
 .PHONY: test
 test:
 	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -coverprofile cover.out
-	#$(GINKGO) -v --race --focus-file mock-server_test.go
-
+	
 .PHONY:	set-version
 set-version:
 	sed s/MARMOT_VERSION/${TAG}/ cmd/version._ > cmd/version.go

@@ -1,4 +1,4 @@
-package marmot
+package marmotd
 
 import (
 	"fmt"
@@ -32,7 +32,6 @@ func (m *Marmot) CreateVM2(spec api.VmSpec) error {
 	var mem = int(*spec.Memory) * 1024 //KiB
 	dom.Memory.Value = mem
 	dom.CurrentMemory.Value = mem
-
 	osLogicalVol, err := util.CreateOsLv(m.EtcdUrl, *spec.Ostempvg, *spec.Ostemplv)
 	if err != nil {
 		slog.Error("", "err", err)
@@ -54,6 +53,7 @@ func (m *Marmot) CreateVM2(spec api.VmSpec) error {
 
 	if spec.Storage != nil {
 		// DATAボリュームを作成 (最大９個)
+		//fmt.Println("*** DATAボリュームを作成 (最大９個)")
 		dev := []string{"vdb", "vdc", "vde", "vdf", "vdg", "vdh", "vdj", "vdk", "vdl"}
 		bus := []string{"0x0a", "0x0b", "0x0c", "0x0d", "0x0e", "0x0f", "0x10", "0x11", "0x12"}
 		for i, disk := range *spec.Storage {
@@ -133,6 +133,7 @@ func (m *Marmot) CreateVM2(spec api.VmSpec) error {
 		slog.Error("", "err", err)
 		return err
 	}
+
 	// 仮想マシンの状態変更(未実装)
 	return nil
 }

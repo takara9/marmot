@@ -50,7 +50,6 @@ func MountLocal(vg string, lv string, uuid string) (string, error) {
 		return "", err
 	}
 	cmd := exec.Command("mount", "-t", "ext4", dev, mp)
-	fmt.Println(cmd)
 	err = cmd.Run()
 	if err != nil {
 		err := errors.New("mount failed to setup OS-Disk")

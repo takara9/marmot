@@ -2,7 +2,6 @@ package util
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -45,7 +44,7 @@ func SetHvConfig(hvs cf.Hypervisors_yaml, cnf DefaultConfig) error {
 
 	// ハイパーバイザー
 	for _, hv := range hvs.Hvs {
-		fmt.Println(hv)
+		//fmt.Println(hv)
 		err := d.SetHypervisors(hv)
 		if err != nil {
 			return err

@@ -205,7 +205,6 @@ func (d *Database) AssignHvforVm(vm VirtualMachine) (string, string, string, uui
 	for _, hv = range hvs {
 
 		// 停止中のHVの割り当てない
-		//fmt.Println("============= hv status ", hv.Status)
 		if hv.Status != 2 {
 			continue
 		}
@@ -292,7 +291,6 @@ func (d *Database) FindByPublicIPaddress(ipAddress string) (bool, error) {
 		if err != nil {
 			return false, nil /// 例外的にエラーを無視
 		}
-		fmt.Println("===========- ipAddress=", ipAddress, "  vm.PublicIp=", vm.PublicIp)
 		if ipAddress == vm.PublicIp {
 			return true, nil
 		}
@@ -312,7 +310,6 @@ func (d *Database) FindByPrivateIPaddress(ipAddress string) (bool, error) {
 		if err != nil {
 			return false, nil /// データが存在しない時には、どうするか？
 		}
-		fmt.Println("===========- ipAddress=", ipAddress, "  vm.PrivateIp=", vm.PrivateIp)
 		if ipAddress == vm.PrivateIp {
 			return true, nil
 		}
@@ -418,7 +415,6 @@ func (d *Database) SetHypervisors(v cf.Hypervisor_yaml) error {
 	hv.Nodename = v.Name
 	hv.Port = int(v.Port)
 	hv.Key = v.Name // Key
-	fmt.Println("IpAddr=", v.IpAddr)
 	hv.IpAddr = v.IpAddr
 	hv.Cpu = int(v.Cpu)
 	hv.FreeCpu = int(v.Cpu)       // これで良いのか
