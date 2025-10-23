@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/config"
 )
 
 type MarmotClient struct {
@@ -167,7 +166,7 @@ func (m *MarmotEndpoint) ListVirtualMachines(params map[string]string) (int, []b
 	return m.httpRequest(req)
 }
 
-func (m *MarmotEndpoint) CreateCluster(params config.MarmotConfig) (int, []byte, *url.URL, error) {
+func (m *MarmotEndpoint) CreateCluster(params api.MarmotConfig) (int, []byte, *url.URL, error) {
 	jsonBytes, err := json.Marshal(params)
 	if err != nil {
 		return 0, nil, nil, err
@@ -188,7 +187,7 @@ func (m *MarmotEndpoint) CreateCluster(params config.MarmotConfig) (int, []byte,
 	return m.httpRequest(req)
 }
 
-func (m *MarmotEndpoint) DestroyCluster(params config.MarmotConfig) (int, []byte, *url.URL, error) {
+func (m *MarmotEndpoint) DestroyCluster(params api.MarmotConfig) (int, []byte, *url.URL, error) {
 	jsonBytes, err := json.Marshal(params)
 	if err != nil {
 		return 0, nil, nil, err
@@ -209,7 +208,7 @@ func (m *MarmotEndpoint) DestroyCluster(params config.MarmotConfig) (int, []byte
 	return m.httpRequest(req)
 }
 
-func (m *MarmotEndpoint) StopCluster(params config.MarmotConfig) (int, []byte, *url.URL, error) {
+func (m *MarmotEndpoint) StopCluster(params api.MarmotConfig) (int, []byte, *url.URL, error) {
 	jsonBytes, err := json.Marshal(params)
 	if err != nil {
 		return 0, nil, nil, err
@@ -230,7 +229,7 @@ func (m *MarmotEndpoint) StopCluster(params config.MarmotConfig) (int, []byte, *
 	return m.httpRequest(req)
 }
 
-func (m *MarmotEndpoint) StartCluster(params config.MarmotConfig) (int, []byte, *url.URL, error) {
+func (m *MarmotEndpoint) StartCluster(params api.MarmotConfig) (int, []byte, *url.URL, error) {
 	jsonBytes, err := json.Marshal(params)
 	if err != nil {
 		return 0, nil, nil, err

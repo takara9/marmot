@@ -104,6 +104,63 @@ func convVMinfoDBtoAPI(vms []types.VirtualMachine) []api.VirtualMachine {
 	return vms2
 }
 
+func ConvConfClusterOld2New(cnf config.MarmotConfig) api.MarmotConfig {
+	var acnf api.MarmotConfig
+
+	acnf.ClusterName = &cnf.ClusterName
+	acnf.Domain = &cnf.Domain
+	acnf.Hypervisor = &cnf.Hypervisor
+	acnf.ImageDefaultPath = &cnf.VMImageDfltPath
+	acnf.ImgaeTemplatePath = &cnf.VmImageTempPath
+	acnf.Qcow2Image = &cnf.VMImageQCOW
+	acnf.OsVariant = &cnf.VMOsVariant
+	acnf.PrivateIpSubnet = &cnf.PrivateIPSubnet
+	acnf.PublicIpDns = &cnf.PublicIPDns
+	acnf.PublicIpGw = &cnf.PublicIPGw
+	acnf.PublicIpSubnet = &cnf.PublicIPSubnet
+	acnf.NetDevDefault = &cnf.NetDevDefault
+	acnf.NetDevPrivate = &cnf.NetDevPrivate
+	acnf.NetDevPublic = &cnf.NetDevPublic
+
+	var vmSpec []api.VmSpec
+	for _, spec := range cnf.VMSpec {
+		var a api.VmSpec
+		a.Name = &spec.Name
+
+		m := int64(spec.Memory)
+		a.Memory = &m
+
+		c := int32(spec.CPU)
+		a.Cpu = &c
+
+		a.Comment = &spec.Comment
+		a.Key = &spec.Key
+		a.Ostemplv = &spec.OsTempLv
+		a.Ostempvariant = &spec.VMOsVariant
+		a.Ostempvg = &spec.OsTempVg
+		a.Playbook = &spec.AnsiblePB
+		a.PrivateIp = &spec.PrivateIP
+		a.PublicIp = &spec.PublicIP
+		a.Uuid = &spec.Uuid
+
+		var storage []api.Storage
+		for _, stg := range spec.Storage {
+			var s api.Storage
+			s.Name = &stg.Name
+			size := int64(stg.Size)
+			s.Size = &size
+			s.Path = &stg.Path
+			s.Vg = &stg.VolGrp
+			s.Type = &stg.Type
+			storage = append(storage, s)
+		}
+		a.Storage = &storage
+		vmSpec = append(vmSpec, a)
+	}
+	acnf.VmSpec = &vmSpec
+	return acnf
+}
+
 // 新APIから旧APIの構造体へ変換する
 func ConvConfClusterNew2Old(acnf api.MarmotConfig) config.MarmotConfig {
 	var cnf config.MarmotConfig
@@ -211,58 +268,25 @@ func ConvConfClusterNew2Old(acnf api.MarmotConfig) config.MarmotConfig {
 	return cnf
 }
 
-func ConvConfClusterOld2New(cnf config.MarmotConfig) api.MarmotConfig {
-	var acnf api.MarmotConfig
-	acnf.ClusterName = &cnf.ClusterName
-	acnf.Domain = &cnf.Domain
-	acnf.Hypervisor = &cnf.Hypervisor
-	acnf.ImageDefaultPath = &cnf.VMImageDfltPath
-	acnf.ImgaeTemplatePath = &cnf.VmImageTempPath
-	acnf.Qcow2Image = &cnf.VMImageQCOW
-	acnf.OsVariant = &cnf.VMOsVariant
-	acnf.PrivateIpSubnet = &cnf.PrivateIPSubnet
-	acnf.PublicIpDns = &cnf.PublicIPDns
-	acnf.PublicIpGw = &cnf.PublicIPGw
-	acnf.PublicIpSubnet = &cnf.PublicIPSubnet
-	acnf.NetDevDefault = &cnf.NetDevDefault
-	acnf.NetDevPrivate = &cnf.NetDevPrivate
-	acnf.NetDevPublic = &cnf.NetDevPublic
-
-	var vmSpec []api.VmSpec
-	for _, spec := range cnf.VMSpec {
-		var a api.VmSpec
-		a.Name = &spec.Name
-
-		m := int64(spec.Memory)
-		a.Memory = &m
-
-		c := int32(spec.CPU)
-		a.Cpu = &c
-
-		a.Comment = &spec.Comment
-		a.Key = &spec.Key
-		a.Ostemplv = &spec.OsTempLv
-		a.Ostempvariant = &spec.VMOsVariant
-		a.Ostempvg = &spec.OsTempVg
-		a.Playbook = &spec.AnsiblePB
-		a.PrivateIp = &spec.PrivateIP
-		a.PublicIp = &spec.PublicIP
-		a.Uuid = &spec.Uuid
-
-		var storage []api.Storage
-		for _, stg := range spec.Storage {
-			var s api.Storage
-			s.Name = &stg.Name
-			size := int64(stg.Size)
-			s.Size = &size
-			s.Path = &stg.Path
-			s.Vg = &stg.VolGrp
-			s.Type = &stg.Type
-			storage = append(storage, s)
-		}
-		a.Storage = &storage
-		vmSpec = append(vmSpec, a)
+// HVへVMスケジュールするために db.VirtualMachineにセットする
+func convApiConfigToDB(spec api.VmSpec, cnf api.MarmotConfig) types.VirtualMachine {
+	var vm types.VirtualMachine
+	vm.ClusterName = *cnf.ClusterName
+	vm.OsVariant = *cnf.OsVariant
+	vm.Name = *spec.Name // Os のhostname
+	vm.Cpu = int(*spec.Cpu)
+	vm.Memory = int(*spec.Memory)
+	vm.PrivateIp = *spec.PrivateIp
+	vm.PublicIp = *spec.PublicIp
+	vm.Playbook = *spec.Playbook
+	vm.Comment = *spec.Comment
+	vm.Status = types.INITALIZING
+	for _, stg := range *spec.Storage {
+		var vms types.Storage
+		vms.Name = *stg.Name
+		vms.Size = int(*stg.Size)
+		vms.Path = *stg.Path
+		vm.Storage = append(vm.Storage, vms)
 	}
-	acnf.VmSpec = &vmSpec
-	return acnf
+	return vm
 }

@@ -154,7 +154,7 @@ func testMarmotd() {
 		Expect(url).To(BeNil())
 	})
 
-	var cnf config.MarmotConfig
+	var cnf api.MarmotConfig
 	It("Load Config", func() {
 		fn := "testdata/cluster-config.yaml"
 		ccf := &fn
