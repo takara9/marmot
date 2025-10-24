@@ -13,8 +13,11 @@ import (
 // コンフィグからVMクラスタを作成する  新APIを使用
 func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 	// リクエスト送信前にコンフィグのチェックを実施する
-	if cnf.VmSpec == nil || cnf.ClusterName == nil {
-		return errors.New("VM Spec or Cluster Name is not set")
+	if cnf.VmSpec == nil {
+		return errors.New("VM Spec is not set")
+	}
+	if cnf.ClusterName == nil {
+		return errors.New("Cluster Name is not set")
 	}
 
 	for _, spec := range *cnf.VmSpec {
