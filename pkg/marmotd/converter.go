@@ -294,7 +294,7 @@ func convApiConfigToDB(spec api.VmSpec, cnf api.MarmotConfig) types.VirtualMachi
 
 // 新APIから旧APIの構造体へ変換する
 func PrintMarmotConfig(a api.MarmotConfig) {
-
+	fmt.Println("=========================================")
 	if a.ClusterName != nil {
 		fmt.Println("a.ClusterName=", *a.ClusterName)
 	}
@@ -396,5 +396,6 @@ func PrintMarmotConfig(a api.MarmotConfig) {
 			}
 		}
 	}
+	fmt.Println("=========================================")
 	return
 }
