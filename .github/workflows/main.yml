@@ -116,15 +116,15 @@ jobs:
         cd pkg/virt
         sudo -s make test
         cd ../..
-    - name: Test pkg/marmotd
-      run: | 
-        cd pkg/marmotd
-        sudo -s make test
-        cd ../..
     - name: Test cmd/mactl
       run: | 
         cd cmd/mactl
         make mactl-test
+        sudo -s make test
+        cd ../..
+    - name: Test pkg/marmotd
+      run: | 
+        cd pkg/marmotd
         sudo -s make test
         cd ../..
     - name: Test cmd/migtool
