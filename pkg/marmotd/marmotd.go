@@ -135,6 +135,8 @@ func (s *Server) CreateCluster(ctx echo.Context) error {
 		slog.Error("Creating cluster", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
+	// ここで どんな状態でJSONが取れているか確認する
+	PrintMarmotConfig(cnf)
 
 	// ハイパーバイザーの稼働チェック 結果はDBへ反映
 	_, err = util.CheckHypervisors(s.Ma.EtcdUrl, s.Ma.NodeName)
