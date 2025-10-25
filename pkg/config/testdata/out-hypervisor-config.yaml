@@ -1,11 +1,11 @@
 hv_spec:
     - name: hv1
+      ip_addr: 10.0.0.1
       port: 0
       cpu: 10
       free_cpu: 10
       ram: 64
       free_ram: 64
-      ip_addr: 10.0.0.1
       storage_pool:
         - vg: vg1
           type: ssd
@@ -14,12 +14,12 @@ hv_spec:
         - vg: vg3
           type: hdd
     - name: hv2
+      ip_addr: 10.0.0.2
       port: 0
       cpu: 10
       free_cpu: 10
       ram: 64
       free_ram: 64
-      ip_addr: 10.0.0.2
       storage_pool:
         - vg: vg1
           type: ssd
