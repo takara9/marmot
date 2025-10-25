@@ -107,22 +107,42 @@ func convVMinfoDBtoAPI(vms []types.VirtualMachine) []api.VirtualMachine {
 // HVへVMスケジュールするために db.VirtualMachineにセットする
 func convApiConfigToDB(spec api.VmSpec, cnf api.MarmotConfig) types.VirtualMachine {
 	var vm types.VirtualMachine
-	vm.ClusterName = *cnf.ClusterName
-	vm.OsVariant = *cnf.OsVariant
-	vm.Name = *spec.Name // Os のhostname
-	vm.Cpu = int(*spec.Cpu)
-	vm.Memory = int(*spec.Memory)
-	vm.PrivateIp = *spec.PrivateIp
-	vm.PublicIp = *spec.PublicIp
-	vm.Playbook = *spec.Playbook
-	vm.Comment = *spec.Comment
+	if cnf.ClusterName != nil {
+		vm.ClusterName = *cnf.ClusterName
+	}
+	if cnf.OsVariant != nil {
+		vm.OsVariant = *cnf.OsVariant
+	}
+	if spec.Name != nil {
+		vm.Name = *spec.Name // Os のhostname
+	}
+	if spec.Cpu != nil {
+		vm.Cpu = int(*spec.Cpu)
+	}
+	if spec.Memory != nil {
+		vm.Memory = int(*spec.Memory)
+	}
+	if spec.PrivateIp != nil {
+		vm.PrivateIp = *spec.PrivateIp
+	}
+	if spec.PublicIp != nil {
+		vm.PublicIp = *spec.PublicIp
+	}
+	if spec.Playbook != nil {
+		vm.Playbook = *spec.Playbook
+	}
+	if spec.Comment != nil {
+		vm.Comment = *spec.Comment
+	}
 	vm.Status = types.INITALIZING
-	for _, stg := range *spec.Storage {
-		var vms types.Storage
-		vms.Name = *stg.Name
-		vms.Size = int(*stg.Size)
-		vms.Path = *stg.Path
-		vm.Storage = append(vm.Storage, vms)
+	if spec.Storage != nil {
+		for _, stg := range *spec.Storage {
+			var vms types.Storage
+			vms.Name = *stg.Name
+			vms.Size = int(*stg.Size)
+			vms.Path = *stg.Path
+			vm.Storage = append(vm.Storage, vms)
+		}
 	}
 	return vm
 }
@@ -232,5 +252,4 @@ func PrintMarmotConfig(a api.MarmotConfig) {
 		}
 	}
 	fmt.Println("=========================================")
-	return
 }
