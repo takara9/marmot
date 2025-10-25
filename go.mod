@@ -9,7 +9,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.25.1
 	github.com/onsi/gomega v1.38.2
 	github.com/spf13/cobra v1.10.1
-	github.com/takara9/lvm v0.0.0-20251025091755-86116ccc76c5
+	github.com/takara9/lvm v0.0.0-20251025112603-faa673fdfbe3
 	go.etcd.io/etcd/client/v3 v3.6.1
 	gopkg.in/yaml.v3 v3.0.1
 	libvirt.org/go/libvirt v1.11004.0
