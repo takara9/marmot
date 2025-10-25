@@ -124,7 +124,6 @@ jobs:
     - name: Test cmd/mactl
       run: | 
         cd cmd/mactl
-        make mactl-test
         sudo -s make test
         cd ../..
     - name: Test cmd/migtool
