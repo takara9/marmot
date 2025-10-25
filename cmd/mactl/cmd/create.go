@@ -18,7 +18,6 @@ var createCmd = &cobra.Command{
 			return
 		}
 
-		//err = config.ReadConfig(ClusterConfig, &cnf)
 		clusterConfig, err := config.ReadYamlClusterConfig(ClusterConfig)
 		if err != nil {
 			fmt.Println("Reading the config file err=", err)

@@ -167,6 +167,7 @@ func (m *MarmotEndpoint) ListVirtualMachines(params map[string]string) (int, []b
 }
 
 func (m *MarmotEndpoint) CreateCluster(params api.MarmotConfig) (int, []byte, *url.URL, error) {
+	fmt.Println("------------- client CreateCluster ---")
 	jsonBytes, err := json.Marshal(params)
 	if err != nil {
 		return 0, nil, nil, err
