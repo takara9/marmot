@@ -9,7 +9,6 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/types"
 	"github.com/takara9/marmot/pkg/util"
@@ -18,9 +17,27 @@ import (
 //go:embed version.txt
 var Version string
 
+type Marmot struct {
+	NodeName string
+	EtcdUrl  string
+	Db       *db.Database
+}
+
 type Server struct {
 	Lock sync.Mutex
 	Ma   *Marmot
+}
+
+func NewMarmot(nodeName string, etcdUrl string) (*Marmot, error) {
+	var m Marmot
+	var err error
+	m.Db, err = db.NewDatabase(etcdUrl)
+	if err != nil {
+		return nil, err
+	}
+	m.NodeName = nodeName
+	m.EtcdUrl = etcdUrl
+	return &m, nil
 }
 
 func NewServer(node string, etcdurl string) *Server {
@@ -112,12 +129,14 @@ func (s *Server) CreateCluster(ctx echo.Context) error {
 	s.Lock.Lock()
 	defer s.Lock.Unlock()
 
-	var cnf config.MarmotConfig
+	var cnf api.MarmotConfig
 	err := ctx.Bind(&cnf)
 	if err != nil {
 		slog.Error("Creating cluster", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
+	// ここで どんな状態でJSONが取れているか確認する
+	PrintMarmotConfig(cnf)
 
 	// ハイパーバイザーの稼働チェック 結果はDBへ反映
 	_, err = util.CheckHypervisors(s.Ma.EtcdUrl, s.Ma.NodeName)
@@ -126,8 +145,9 @@ func (s *Server) CreateCluster(ctx echo.Context) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	newCnf := ConvConfClusterOld2New(cnf)
-	if err := s.Ma.CreateClusterInternal(newCnf); err != nil {
+	//newCnf := ConvConfClusterOld2New(cnf)
+	//if err := s.Ma.CreateClusterInternal(newCnf); err != nil {
+	if err := s.Ma.CreateClusterInternal(cnf); err != nil {
 		slog.Error("create cluster", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
@@ -140,15 +160,16 @@ func (s *Server) DestroyCluster(ctx echo.Context) error {
 	s.Lock.Lock()
 	defer s.Lock.Unlock()
 
-	var cnf config.MarmotConfig
+	var cnf api.MarmotConfig
 	err := ctx.Bind(&cnf)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	newCnf := ConvConfClusterOld2New(cnf)
-	if err := s.Ma.DestroyClusterInternal(newCnf); err != nil {
-		slog.Error("create cluster", "err", err)
+	//newCnf := ConvConfClusterOld2New(cnf)
+	//if err := s.Ma.DestroyClusterInternal(newCnf); err != nil {
+	if err := s.Ma.DestroyClusterInternal(cnf); err != nil {
+		slog.Error("destroy cluster", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 	return ctx.JSON(http.StatusOK, nil)
@@ -159,15 +180,16 @@ func (s *Server) StartCluster(ctx echo.Context) error {
 	s.Lock.Lock()
 	defer s.Lock.Unlock()
 
-	var cnf config.MarmotConfig
+	var cnf api.MarmotConfig
 	err := ctx.Bind(&cnf)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	newCnf := ConvConfClusterOld2New(cnf)
-	if err := s.Ma.DestroyClusterInternal(newCnf); err != nil {
-		slog.Error("create cluster", "err", err)
+	//newCnf := ConvConfClusterOld2New(cnf)
+	//if err := s.Ma.DestroyClusterInternal(newCnf); err != nil {
+	if err := s.Ma.DestroyClusterInternal(cnf); err != nil {
+		slog.Error("start cluster", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 	return ctx.JSON(http.StatusCreated, nil)
@@ -178,15 +200,17 @@ func (s *Server) StopCluster(ctx echo.Context) error {
 	s.Lock.Lock()
 	defer s.Lock.Unlock()
 
-	var cnf config.MarmotConfig
+	var cnf api.MarmotConfig
 	err := ctx.Bind(&cnf)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-
-	newCnf := ConvConfClusterOld2New(cnf)
-	if err := s.Ma.StopClusterInternal(newCnf); err != nil {
-		slog.Error("create cluster", "err", err)
+	// ここで どんな状態でJSONが取れているか確認する
+	PrintMarmotConfig(cnf)
+	//newCnf := ConvConfClusterOld2New(cnf)
+	//if err := s.Ma.StopClusterInternal(newCnf); err != nil {
+	if err := s.Ma.StopClusterInternal(cnf); err != nil {
+		slog.Error("stop cluster", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 	return ctx.JSON(http.StatusCreated, nil)
@@ -199,7 +223,7 @@ func (s *Server) CreateVirtualMachine(ctx echo.Context) error {
 	//defer s.Lock.Unlock()
 	var spec api.VmSpec
 	err := ctx.Bind(&spec)
-	err = s.Ma.CreateVM2(spec)
+	err = s.Ma.CreateVM(spec)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}

@@ -52,14 +52,15 @@ var statusCmd = &cobra.Command{
 			}
 			// フィルター処理
 			match := false
-			if cnf.ClusterName == vm.ClusterName {
-				for _, spec := range cnf.VMSpec {
-					if spec.Name == vm.Name {
+			if *cnf.ClusterName == vm.ClusterName {
+				for _, spec := range *cnf.VmSpec {
+					if *spec.Name == vm.Name {
 						match = true
 						break
 					}
 				}
 			}
+
 			// 表示
 			if match {
 				fmt.Printf("%-10s %-16s %-6s %-5s %-20s %-4v  %-6v %-15v %-15v ",

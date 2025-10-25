@@ -18,13 +18,12 @@ var destroyCmd = &cobra.Command{
 			return
 		}
 
-		err = config.ReadConfig(ClusterConfig, &cnf)
+		clusterConfig, err := config.ReadYamlClusterConfig(ClusterConfig)
 		if err != nil {
 			fmt.Println("Reading the config file err=", err)
 			return
 		}
-
-		_, _, _, err = m.DestroyCluster(cnf)
+		_, _, _, err = m.DestroyCluster(*clusterConfig)
 		if err != nil {
 			fmt.Println("failed to destroy VM cluster: ", err)
 			return

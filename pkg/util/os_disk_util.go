@@ -21,7 +21,6 @@ import (
 	"os/exec"
 
 	"github.com/takara9/marmot/api"
-	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/lvm"
 )
@@ -114,21 +113,21 @@ func CreateDataLv(dbUrl string, sz uint64, vg string) (string, error) {
 // スナップショットボリュームをマウントして、 ホスト名とIPアドレスを設定
 //
 //	Ubuntu Linuxに限定
-func ConfigRootVol(spec cf.VMSpec, vg string, oslv string) error {
+func ConfigRootVol(spec api.VmSpec, vg string, oslv string) error {
 	err := KpartOn(vg, oslv)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
 	}
 	// マウント
-	vm_root, err := MountLocal(vg, oslv, spec.Uuid)
+	vm_root, err := MountLocal(vg, oslv, *spec.Uuid)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
 	}
 
 	// ホスト名の書き込み
-	err = LinuxSetup_hostname(vm_root, spec.Name)
+	err = LinuxSetup_hostname(vm_root, *spec.Name)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
@@ -149,7 +148,7 @@ func ConfigRootVol(spec cf.VMSpec, vg string, oslv string) error {
 	}
 
 	// 後始末
-	err = UnMountLocal(spec.Uuid)
+	err = UnMountLocal(*spec.Uuid)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err

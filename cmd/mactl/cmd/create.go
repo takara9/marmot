@@ -18,12 +18,17 @@ var createCmd = &cobra.Command{
 			return
 		}
 
-		err = config.ReadConfig(ClusterConfig, &cnf)
+		clusterConfig, err := config.ReadYamlClusterConfig(ClusterConfig)
 		if err != nil {
 			fmt.Println("Reading the config file err=", err)
 			return
 		}
-		_, _, _, err = m.CreateCluster(cnf)
+
+		//
+		PrintMarmotConfig(*clusterConfig)
+		//
+
+		_, _, _, err = m.CreateCluster(*clusterConfig)
 		if err != nil {
 			fmt.Println("failed to create VM cluster: ", err)
 			return

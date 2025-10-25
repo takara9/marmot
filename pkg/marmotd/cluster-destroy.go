@@ -1,6 +1,7 @@
 package marmotd
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -11,9 +12,15 @@ import (
 
 // クラスタ削除
 func (m *Marmot) DestroyClusterInternal(cnf api.MarmotConfig) error {
-	//var NotFound bool = true
+	if cnf.VmSpec == nil || cnf.ClusterName == nil {
+		return errors.New("VM Spec or Cluster Name is not set")
+	}
+
 	for _, spec := range *cnf.VmSpec {
 		// クラスタ名とホスト名の重複チェック
+		if spec.Name == nil {
+			return errors.New("VM Name is not set")
+		}
 		vmKey, _ := m.Db.FindByHostAndClusteName(*spec.Name, *cnf.ClusterName)
 		if len(vmKey) > 0 {
 			spec.Key = &vmKey

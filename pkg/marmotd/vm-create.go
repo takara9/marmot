@@ -11,7 +11,7 @@ import (
 )
 
 // VMを生成する
-func (m *Marmot) CreateVM2(spec api.VmSpec) error {
+func (m *Marmot) CreateVM(spec api.VmSpec) error {
 	var dom virt.Domain
 
 	// ファイル名までのフルパスが exe に格納される

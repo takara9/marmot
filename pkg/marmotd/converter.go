@@ -1,10 +1,10 @@
 package marmotd
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/types"
 )
 
@@ -104,165 +104,158 @@ func convVMinfoDBtoAPI(vms []types.VirtualMachine) []api.VirtualMachine {
 	return vms2
 }
 
-// 新APIから旧APIの構造体へ変換する
-func ConvConfClusterNew2Old(acnf api.MarmotConfig) config.MarmotConfig {
-	var cnf config.MarmotConfig
-	if acnf.ClusterName != nil {
-		cnf.ClusterName = *acnf.ClusterName
+// HVへVMスケジュールするために db.VirtualMachineにセットする
+func convApiConfigToDB(spec api.VmSpec, cnf api.MarmotConfig) types.VirtualMachine {
+	var vm types.VirtualMachine
+	if cnf.ClusterName != nil {
+		vm.ClusterName = *cnf.ClusterName
 	}
-	if acnf.Domain != nil {
-		cnf.Domain = *acnf.Domain
+	if cnf.OsVariant != nil {
+		vm.OsVariant = *cnf.OsVariant
 	}
-	if acnf.Hypervisor != nil {
-		cnf.Hypervisor = *acnf.Hypervisor
+	if spec.Name != nil {
+		vm.Name = *spec.Name // Os のhostname
 	}
-	if acnf.ImageDefaultPath != nil {
-		cnf.VMImageDfltPath = *acnf.ImageDefaultPath
+	if spec.Cpu != nil {
+		vm.Cpu = int(*spec.Cpu)
 	}
-	if acnf.ImgaeTemplatePath != nil {
-		cnf.VmImageTempPath = *acnf.ImgaeTemplatePath
+	if spec.Memory != nil {
+		vm.Memory = int(*spec.Memory)
 	}
-	if acnf.NetDevDefault != nil {
-		cnf.NetDevDefault = *acnf.NetDevDefault
+	if spec.PrivateIp != nil {
+		vm.PrivateIp = *spec.PrivateIp
 	}
-	if acnf.NetDevPrivate != nil {
-		cnf.NetDevPrivate = *acnf.NetDevPrivate
+	if spec.PublicIp != nil {
+		vm.PublicIp = *spec.PublicIp
 	}
-	if acnf.OsVariant != nil {
-		cnf.VMOsVariant = *acnf.OsVariant
+	if spec.Playbook != nil {
+		vm.Playbook = *spec.Playbook
 	}
-	if acnf.PrivateIpSubnet != nil {
-		cnf.PrivateIPSubnet = *acnf.PrivateIpSubnet
+	if spec.Comment != nil {
+		vm.Comment = *spec.Comment
 	}
-	if acnf.PublicIpDns != nil {
-		cnf.PublicIPDns = *acnf.PublicIpDns
-	}
-	if acnf.PublicIpGw != nil {
-		cnf.PublicIPGw = *acnf.PublicIpGw
-	}
-	if acnf.PublicIpSubnet != nil {
-		cnf.PublicIPSubnet = *acnf.PublicIpSubnet
-	}
-	if acnf.Qcow2Image != nil {
-		cnf.VMImageQCOW = *acnf.Qcow2Image
-	}
-	// ここでエラーになるのは、クライアントライブラリが未完のため
-	for _, v := range *acnf.VmSpec {
-		var vm config.VMSpec
-		if v.Name != nil {
-			vm.Name = *v.Name
-		}
-		if v.Cpu != nil {
-			vm.CPU = int(*v.Cpu)
-		}
-		if v.Memory != nil {
-			vm.Memory = int(*v.Memory)
-		}
-		if v.PrivateIp != nil {
-			vm.PrivateIP = *v.PrivateIp
-		}
-		if v.PublicIp != nil {
-			vm.PublicIP = *v.PublicIp
-		}
-		if v.Comment != nil {
-			vm.Comment = *v.Comment
-		}
-		if v.Key != nil {
-			vm.Key = *v.Key
-		}
-		if v.Ostemplv != nil {
-			vm.OsTempLv = *v.Ostemplv
-		}
-		if v.Ostempvg != nil {
-			vm.OsTempVg = *v.Ostempvg
-		}
-		if v.Ostempvariant != nil {
-			vm.VMOsVariant = *v.Ostempvariant
-		}
-		if v.Uuid != nil {
-			vm.Uuid = *v.Uuid
-		}
-		if v.Playbook != nil {
-			vm.AnsiblePB = *v.Playbook
-		}
-		if v.Storage != nil {
-			for _, v2 := range *v.Storage {
-				var ss config.Storage
-				if v2.Name != nil {
-					ss.Name = *v2.Name
-				}
-				if v2.Path != nil {
-					ss.Path = *v2.Path
-				}
-				if v2.Size != nil {
-					ss.Size = int(*v2.Size)
-				}
-				if v2.Type != nil {
-					ss.Type = *v2.Type
-				}
-				if v2.Vg != nil {
-					ss.VolGrp = *v2.Vg
-				}
-				vm.Storage = append(vm.Storage, ss)
+	vm.Status = types.INITALIZING
+	if spec.Storage != nil {
+		for _, stg := range *spec.Storage {
+			var vms types.Storage
+			if stg.Name != nil {
+				vms.Name = *stg.Name
 			}
+			if stg.Size != nil {
+				vms.Size = int(*stg.Size)
+			}
+			if stg.Path != nil {
+				vms.Path = *stg.Path
+			}
+			vm.Storage = append(vm.Storage, vms)
 		}
-		cnf.VMSpec = append(cnf.VMSpec, vm)
 	}
-	return cnf
+	return vm
 }
 
-func ConvConfClusterOld2New(cnf config.MarmotConfig) api.MarmotConfig {
-	var acnf api.MarmotConfig
-	acnf.ClusterName = &cnf.ClusterName
-	acnf.Domain = &cnf.Domain
-	acnf.Hypervisor = &cnf.Hypervisor
-	acnf.ImageDefaultPath = &cnf.VMImageDfltPath
-	acnf.ImgaeTemplatePath = &cnf.VmImageTempPath
-	acnf.Qcow2Image = &cnf.VMImageQCOW
-	acnf.OsVariant = &cnf.VMOsVariant
-	acnf.PrivateIpSubnet = &cnf.PrivateIPSubnet
-	acnf.PublicIpDns = &cnf.PublicIPDns
-	acnf.PublicIpGw = &cnf.PublicIPGw
-	acnf.PublicIpSubnet = &cnf.PublicIPSubnet
-	acnf.NetDevDefault = &cnf.NetDevDefault
-	acnf.NetDevPrivate = &cnf.NetDevPrivate
-	acnf.NetDevPublic = &cnf.NetDevPublic
-
-	var vmSpec []api.VmSpec
-	for _, spec := range cnf.VMSpec {
-		var a api.VmSpec
-		a.Name = &spec.Name
-
-		m := int64(spec.Memory)
-		a.Memory = &m
-
-		c := int32(spec.CPU)
-		a.Cpu = &c
-
-		a.Comment = &spec.Comment
-		a.Key = &spec.Key
-		a.Ostemplv = &spec.OsTempLv
-		a.Ostempvariant = &spec.VMOsVariant
-		a.Ostempvg = &spec.OsTempVg
-		a.Playbook = &spec.AnsiblePB
-		a.PrivateIp = &spec.PrivateIP
-		a.PublicIp = &spec.PublicIP
-		a.Uuid = &spec.Uuid
-
-		var storage []api.Storage
-		for _, stg := range spec.Storage {
-			var s api.Storage
-			s.Name = &stg.Name
-			size := int64(stg.Size)
-			s.Size = &size
-			s.Path = &stg.Path
-			s.Vg = &stg.VolGrp
-			s.Type = &stg.Type
-			storage = append(storage, s)
-		}
-		a.Storage = &storage
-		vmSpec = append(vmSpec, a)
+// 新APIから旧APIの構造体へ変換する
+func PrintMarmotConfig(a api.MarmotConfig) {
+	fmt.Println("=========================================")
+	if a.ClusterName != nil {
+		fmt.Println("a.ClusterName=", *a.ClusterName)
 	}
-	acnf.VmSpec = &vmSpec
-	return acnf
+	if a.Domain != nil {
+		fmt.Println("a.Domain=", *a.Domain)
+	}
+	if a.Hypervisor != nil {
+		fmt.Println("a.Hypervisor=", *a.Hypervisor)
+	}
+	if a.ImageDefaultPath != nil {
+		fmt.Println("a.ImageDefaultPath=", *a.ImageDefaultPath)
+	}
+	if a.ImgaeTemplatePath != nil {
+		fmt.Println("a.ImgaeTemplatePath=", *a.ImgaeTemplatePath)
+	}
+	if a.NetDevDefault != nil {
+		fmt.Println("a.NetDevDefault=", *a.NetDevDefault)
+	}
+	if a.NetDevPrivate != nil {
+		fmt.Println("a.NetDevPrivate=", *a.NetDevPrivate)
+	}
+	if a.OsVariant != nil {
+		fmt.Println("a.OsVariant=", *a.OsVariant)
+	}
+	if a.PrivateIpSubnet != nil {
+		fmt.Println("a.PrivateIpSubnet=", *a.PrivateIpSubnet)
+	}
+	if a.PublicIpDns != nil {
+		fmt.Println("a.PublicIpDns=", *a.PublicIpDns)
+	}
+	if a.PublicIpGw != nil {
+		fmt.Println("a.PublicIpGw=", *a.PublicIpGw)
+	}
+	if a.PublicIpSubnet != nil {
+		fmt.Println("a.PublicIpSubnet=", *a.PublicIpSubnet)
+	}
+	if a.Qcow2Image != nil {
+		fmt.Println("a.Qcow2Image=", *a.Qcow2Image)
+	}
+
+	// ここでエラーになるのは、クライアントライブラリが未完のため
+	if a.VmSpec != nil {
+		for _, v := range *a.VmSpec {
+
+			if v.Name != nil {
+				fmt.Println("v.Name=", *v.Name)
+			}
+			if v.Cpu != nil {
+				fmt.Println("v.Cpu=", int(*v.Cpu))
+			}
+			if v.Memory != nil {
+				fmt.Println("v.Memory=", *v.Memory)
+			}
+			if v.PrivateIp != nil {
+				fmt.Println("v.PrivateIp=", *v.PrivateIp)
+			}
+			if v.PublicIp != nil {
+				fmt.Println("v.PublicIp=", *v.PublicIp)
+			}
+			if v.Comment != nil {
+				fmt.Println("v.Comment=", *v.Comment)
+			}
+			if v.Key != nil {
+				fmt.Println("v.Key=", *v.Key)
+			}
+			if v.Ostemplv != nil {
+				fmt.Println("v.Ostemplv=", *v.Ostemplv)
+			}
+			if v.Ostempvg != nil {
+				fmt.Println("v.Ostempvg=", *v.Ostempvg)
+			}
+			if v.Ostempvariant != nil {
+				fmt.Println("v.Ostempvariant=", *v.Ostempvariant)
+			}
+			if v.Uuid != nil {
+				fmt.Println("v.Uuid=", *v.Uuid)
+			}
+			if v.Playbook != nil {
+				fmt.Println("v.Playbook=", *v.Playbook)
+			}
+			if v.Storage != nil {
+				for _, v2 := range *v.Storage {
+					if v2.Name != nil {
+						fmt.Println("v2.Name=", *v2.Name)
+					}
+					if v2.Path != nil {
+						fmt.Println("v2.Path=", *v2.Path)
+					}
+					if v2.Size != nil {
+						fmt.Println("v2.Size=", int(*v2.Size))
+					}
+					if v2.Type != nil {
+						fmt.Println("v2.Type=", *v2.Type)
+					}
+					if v2.Vg != nil {
+						fmt.Println("v2.Vg=", *v2.Vg)
+					}
+				}
+			}
+		}
+	}
+	fmt.Println("=========================================")
 }

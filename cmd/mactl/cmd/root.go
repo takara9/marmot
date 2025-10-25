@@ -16,7 +16,9 @@ var apiConfig string
 var apiEndpoint string
 var cliConfig Config
 var ApiUrl string
+
 var cnf config.MarmotConfig
+// var cnf api.MarmotConfig
 var cfgFile string
 var ClusterConfig string
 var marmotClient *client.MarmotEndpoint
