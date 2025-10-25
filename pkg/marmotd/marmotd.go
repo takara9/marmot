@@ -169,7 +169,7 @@ func (s *Server) DestroyCluster(ctx echo.Context) error {
 	//newCnf := ConvConfClusterOld2New(cnf)
 	//if err := s.Ma.DestroyClusterInternal(newCnf); err != nil {
 	if err := s.Ma.DestroyClusterInternal(cnf); err != nil {
-		slog.Error("create cluster", "err", err)
+		slog.Error("destroy cluster", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 	return ctx.JSON(http.StatusOK, nil)
@@ -189,7 +189,7 @@ func (s *Server) StartCluster(ctx echo.Context) error {
 	//newCnf := ConvConfClusterOld2New(cnf)
 	//if err := s.Ma.DestroyClusterInternal(newCnf); err != nil {
 	if err := s.Ma.DestroyClusterInternal(cnf); err != nil {
-		slog.Error("create cluster", "err", err)
+		slog.Error("start cluster", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 	return ctx.JSON(http.StatusCreated, nil)
@@ -205,11 +205,12 @@ func (s *Server) StopCluster(ctx echo.Context) error {
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-
+	// ここで どんな状態でJSONが取れているか確認する
+	PrintMarmotConfig(cnf)
 	//newCnf := ConvConfClusterOld2New(cnf)
 	//if err := s.Ma.StopClusterInternal(newCnf); err != nil {
 	if err := s.Ma.StopClusterInternal(cnf); err != nil {
-		slog.Error("create cluster", "err", err)
+		slog.Error("stop cluster", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 	return ctx.JSON(http.StatusCreated, nil)

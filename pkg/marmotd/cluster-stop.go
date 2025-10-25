@@ -13,8 +13,11 @@ import (
 // クラスタ停止
 func (m *Marmot) StopClusterInternal(cnf api.MarmotConfig) error {
 	// リクエスト送信前にコンフィグのチェックを実施する
-	if cnf.VmSpec == nil || cnf.ClusterName == nil {
-		return errors.New("VM Spec or Cluster Name is not set")
+	if cnf.ClusterName == nil {
+		return errors.New("cluster name is not set")
+	}
+	if cnf.VmSpec == nil {
+		return errors.New("vm spec is not set")
 	}
 
 	var NotFound bool = true
