@@ -14,11 +14,12 @@ import (
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/client"
 	"github.com/takara9/marmot/pkg/config"
+	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/marmotd"
 	"github.com/takara9/marmot/pkg/util"
 )
 
-//var err error
+// var err error
 var marmotServerTest *marmotd.Server
 var containerID string
 
@@ -155,15 +156,10 @@ func testMarmotd() {
 	})
 
 	var cnf api.MarmotConfig
-	It("Load Config", func() {
-		fn := "testdata/cluster-config.yaml"
-		ccf := &fn
-		err := config.ReadConfig(*ccf, &cnf)
-		Expect(err).NotTo(HaveOccurred())
-	})
-
 	It("クラスタの生成", func() {
-		httpStatus, body, url, err := marmotClient.CreateCluster(cnf)
+		cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+		Expect(err).NotTo(HaveOccurred())
+		httpStatus, body, url, err := marmotClient.CreateCluster(*cnf)
 		GinkgoWriter.Println("CreateCluster ERR = ", err)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(httpStatus).To(Equal(201))
