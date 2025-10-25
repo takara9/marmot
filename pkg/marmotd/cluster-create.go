@@ -19,16 +19,15 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 	if cnf.VmSpec == nil {
 		return errors.New("vm spec is not set")
 	}
+	if cnf.OsVariant == nil {
+		return errors.New("OS template is not set")
+	}
 
 	for _, spec := range *cnf.VmSpec {
 		// クラスタ名とホスト名の重複チェック
 		if spec.Name == nil {
 			return errors.New("VM Name is not set")
 		}
-		if spec.Ostempvariant == nil {
-			return errors.New("OS template is not set")
-		}
-
 		vmKey, _ := m.Db.FindByHostAndClusteName(*spec.Name, *cnf.ClusterName)
 		if len(vmKey) > 0 {
 			return fmt.Errorf("existing same name virttual machine : %v", spec.Name)
