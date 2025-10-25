@@ -155,7 +155,6 @@ func testMarmotd() {
 		Expect(url).To(BeNil())
 	})
 
-	var cnf api.MarmotConfig
 	It("クラスタの生成", func() {
 		cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
 		Expect(err).NotTo(HaveOccurred())
@@ -182,7 +181,9 @@ func testMarmotd() {
 	})
 
 	It("クラスタの一時停止", func() {
-		httpStatus, body, url, err := marmotClient.StopCluster(cnf)
+		cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+		Expect(err).NotTo(HaveOccurred())
+		httpStatus, body, url, err := marmotClient.StopCluster(*cnf)
 		GinkgoWriter.Println("StopCluster ERR = ", err)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(httpStatus).To(Equal(201))
@@ -194,7 +195,9 @@ func testMarmotd() {
 	})
 
 	It("クラスタの再スタート", func() {
-		httpStatus, body, url, err := marmotClient.StartCluster(cnf)
+		cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+		Expect(err).NotTo(HaveOccurred())
+		httpStatus, body, url, err := marmotClient.StartCluster(*cnf)
 		GinkgoWriter.Println("StartCluster ERR = ", err)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(httpStatus).To(Equal(201))
@@ -205,7 +208,9 @@ func testMarmotd() {
 	})
 
 	It("クラスタの削除", func() {
-		httpStatus, body, url, err := marmotClient.DestroyCluster(cnf)
+		cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+		Expect(err).NotTo(HaveOccurred())
+		httpStatus, body, url, err := marmotClient.DestroyCluster(*cnf)
 		GinkgoWriter.Println("DestroyCluster ERR = ", err)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(httpStatus).To(Equal(200))
