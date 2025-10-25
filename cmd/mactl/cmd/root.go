@@ -4,8 +4,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/client"
+	"github.com/takara9/marmot/pkg/config"
 )
 
 type Config struct {
@@ -17,8 +17,8 @@ var apiEndpoint string
 var cliConfig Config
 var ApiUrl string
 
-// var cnf config.MarmotConfig
-var cnf api.MarmotConfig
+var cnf config.MarmotConfig
+// var cnf api.MarmotConfig
 var cfgFile string
 var ClusterConfig string
 var marmotClient *client.MarmotEndpoint
