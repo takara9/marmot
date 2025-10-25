@@ -138,9 +138,15 @@ func convApiConfigToDB(spec api.VmSpec, cnf api.MarmotConfig) types.VirtualMachi
 	if spec.Storage != nil {
 		for _, stg := range *spec.Storage {
 			var vms types.Storage
-			vms.Name = *stg.Name
-			vms.Size = int(*stg.Size)
-			vms.Path = *stg.Path
+			if stg.Name != nil {
+				vms.Name = *stg.Name
+			}
+			if stg.Size != nil {
+				vms.Size = int(*stg.Size)
+			}
+			if stg.Path != nil {
+				vms.Path = *stg.Path
+			}
 			vm.Storage = append(vm.Storage, vms)
 		}
 	}
