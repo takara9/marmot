@@ -17,6 +17,7 @@ var globalStatusCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		m, err := getClientConfig()
 		if err != nil {
+			slog.Error("faild reading mactl config file", "err", err.Error())
 			return
 		}
 

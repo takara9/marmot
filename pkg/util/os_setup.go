@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"github.com/takara9/marmot/api"
-	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/virt"
 )
 
@@ -33,8 +32,8 @@ func LinuxSetup_hostname(vm_root string, hostname string) error {
 }
 
 // Linux hostidをOS Volへ書き込み
-func LinuxSetup_hostid(spec cf.VMSpec, vm_root string) error {
-	ipb := IPaddrByteArray(spec.PrivateIP)
+func LinuxSetup_hostid(spec api.VmSpec, vm_root string) error {
+	ipb := IPaddrByteArray(*spec.PrivateIp)
 	hostid_file := filepath.Join(vm_root, "etc/hostid")
 	err := os.WriteFile(hostid_file, ipb, 0644)
 	return err
@@ -64,7 +63,7 @@ func IPaddrByteArray(ip string) []byte {
  デフォルトGW,DNSなどの設定のためにコンフィグファイルからの設定を取り入れている
 */
 // Linux Netplanのファイルへ、IPアドレスなどを設定
-func LinuxSetup_createNetplan(spec cf.VMSpec, vm_root string) error {
+func LinuxSetup_createNetplan(spec api.VmSpec, vm_root string) error {
 	var netplanFile = "etc/netplan/00-nic.yaml"
 	netplanPath := filepath.Join(vm_root, netplanFile)
 
@@ -78,16 +77,16 @@ func LinuxSetup_createNetplan(spec cf.VMSpec, vm_root string) error {
 	yaml(1, "version: 2", f)
 	yaml(1, "ethernets:", f)
 
-	if len(spec.PrivateIP) > 0 {
+	if len(*spec.PrivateIp) > 0 {
 		yaml(2, "enp6s0:", f)
 		yaml(3, "addresses:", f)
-		yaml(4, fmt.Sprintf("- %s/%d", spec.PrivateIP, 16), f)
+		yaml(4, fmt.Sprintf("- %s/%d", *spec.PrivateIp, 16), f)
 		/*
 		   不安定になるので設定しない と思ったが、プライベートだけだとインターネットへのルートが必要
 		   そこで、パブリックが無い時だけ設定する
 		*/
-		if len(spec.PublicIP) == 0 {
-			if spec.VMOsVariant == "ubuntu18.04" {
+		if len(*spec.PublicIp) == 0 {
+			if *spec.Ostempvariant == "ubuntu18.04" {
 				yaml(3, "gateway4: 172.16.0.1", f)
 			} else {
 				yaml(3, "routes:", f)
@@ -100,11 +99,11 @@ func LinuxSetup_createNetplan(spec cf.VMSpec, vm_root string) error {
 		yaml(4, fmt.Sprintf("addresses: [%v]", "172.16.0.4"), f)
 	}
 
-	if len(spec.PublicIP) > 0 {
+	if len(*spec.PublicIp) > 0 {
 		yaml(2, "enp7s0:", f)
 		yaml(3, "addresses:", f)
-		yaml(4, fmt.Sprintf("- %s/%d", spec.PublicIP, 24), f)
-		if spec.VMOsVariant == "ubuntu18.04" {
+		yaml(4, fmt.Sprintf("- %s/%d", *spec.PublicIp, 24), f)
+		if *spec.Ostempvariant == "ubuntu18.04" {
 			yaml(3, "gateway4: 192.168.1.1", f)
 
 		} else {
@@ -113,7 +112,7 @@ func LinuxSetup_createNetplan(spec cf.VMSpec, vm_root string) error {
 			yaml(4, "  via: 192.168.1.1", f)
 		}
 		// 両方を有効にできないので、プライベート側を優先する
-		if len(spec.PrivateIP) == 0 {
+		if len(*spec.PrivateIp) == 0 {
 			yaml(4, fmt.Sprintf("search: [%v]", "labo.local"), f)
 			yaml(4, fmt.Sprintf("addresses: [%v]", "192.168.1.4"), f)
 		}

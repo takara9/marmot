@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/types"
 )
 
@@ -21,14 +20,17 @@ var vmCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		m, err := getClientConfig()
 		if err != nil {
+			slog.Error("faild reading mactl config file", "err", err.Error())
 			return
 		}
 
-		err = config.ReadConfig(ClusterConfig, &cnf)
-		if err != nil {
-			fmt.Println("Reading the config file err=", err)
-			return
-		}
+		/*
+			clusterConfig, err := config.ReadYamlClusterConfig(clusterConfigFilename)
+			if err != nil {
+				fmt.Println("Reading the config file err=", err)
+				return
+			}
+		*/
 
 		_, byteBody, _, err := m.ListVirtualMachines(nil)
 		if err != nil {
@@ -100,7 +102,7 @@ var vmCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(vmCmd)
-	vmCmd.Flags().StringVarP(&ClusterName, "cluster", "c", "", "Cluster name (required)")
+	vmCmd.Flags().StringVarP(&ClusterName, "cluster", "n", "", "Cluster name (required)")
 	vmCmd.Flags().StringVarP(&VirtualMachineName, "vmname", "v", "", "Virtual machine name (required)")
 	vmCmd.MarkFlagRequired("cluster")
 	vmCmd.MarkFlagRequired("vmname")

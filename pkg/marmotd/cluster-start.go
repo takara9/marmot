@@ -12,6 +12,11 @@ import (
 
 // クラスタ開始
 func (m *Marmot) StartClusterInternal(cnf api.MarmotConfig) error {
+	// リクエスト送信前にコンフィグのチェックを実施する
+	if cnf.VmSpec == nil || cnf.ClusterName == nil {
+		return errors.New("VM Spec or Cluster Name is not set")
+	}
+
 	for _, spec := range *cnf.VmSpec {
 		vmKey, _ := m.Db.FindByHostAndClusteName(*spec.Name, *cnf.ClusterName)
 		if len(vmKey) == 0 {

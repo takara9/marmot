@@ -20,12 +20,13 @@ var statusCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		m, err := getClientConfig()
 		if err != nil {
+			slog.Error("faild reading mactl config file", "err", err.Error())
 			return
 		}
 
-		err = config.ReadConfig(ClusterConfig, &cnf)
+		clusterConfig, err := config.ReadYamlClusterConfig(clusterConfigFilename)
 		if err != nil {
-			fmt.Println("Reading the config file err=", err)
+			slog.Error("failed reading cluster-config file", "err", err.Error())
 			return
 		}
 
@@ -52,14 +53,15 @@ var statusCmd = &cobra.Command{
 			}
 			// フィルター処理
 			match := false
-			if cnf.ClusterName == vm.ClusterName {
-				for _, spec := range cnf.VMSpec {
-					if spec.Name == vm.Name {
+			if *clusterConfig.ClusterName == vm.ClusterName {
+				for _, spec := range *clusterConfig.VmSpec {
+					if *spec.Name == vm.Name {
 						match = true
 						break
 					}
 				}
 			}
+
 			// 表示
 			if match {
 				fmt.Printf("%-10s %-16s %-6s %-5s %-20s %-4v  %-6v %-15v %-15v ",
@@ -77,5 +79,5 @@ var statusCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(statusCmd)
-	statusCmd.PersistentFlags().StringVarP(&ClusterConfig, "cluster-config", "c", "cluster-config.yaml", "仮想サーバークラスタの構成ファイル")
+	statusCmd.PersistentFlags().StringVarP(&clusterConfigFilename, "cluster-config", "c", "cluster-config.yaml", "仮想サーバークラスタの構成ファイル")
 }

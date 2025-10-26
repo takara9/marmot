@@ -12,6 +12,14 @@ import (
 
 // クラスタ停止
 func (m *Marmot) StopClusterInternal(cnf api.MarmotConfig) error {
+	// リクエスト送信前にコンフィグのチェックを実施する
+	if cnf.ClusterName == nil {
+		return errors.New("cluster name is not set")
+	}
+	if cnf.VmSpec == nil {
+		return errors.New("vm spec is not set")
+	}
+
 	var NotFound bool = true
 	for _, spec := range *cnf.VmSpec {
 		vmKey, _ := m.Db.FindByHostAndClusteName(*spec.Name, *cnf.ClusterName)
@@ -20,7 +28,7 @@ func (m *Marmot) StopClusterInternal(cnf api.MarmotConfig) error {
 			spec.Key = &vmKey
 			vm, err := m.Db.GetVmByKey(vmKey)
 			if err != nil {
-				slog.Error("", "err", err)
+				slog.Error("GetVmByKey()", "err", err)
 				continue
 			}
 
@@ -36,7 +44,7 @@ func (m *Marmot) StopClusterInternal(cnf api.MarmotConfig) error {
 			}
 			_, _, _, err = marmotClient.StopVirtualMachine(spec)
 			if err != nil {
-				slog.Error("", "remote request err", err)
+				slog.Error("marmotClient.StopVirtualMachine()", "err", err)
 				m.Db.UpdateVmState(vm.Key, types.ERROR) // エラー状態へ
 				continue
 			}

@@ -2,6 +2,7 @@ package marmotd_test
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"time"
@@ -38,6 +39,14 @@ func prepareMockVmfunc() {
 	e := echo.New()
 	server := marmotd.NewServer("hvc", etcdUrlTest)
 	go func() {
+		// Setup slog
+		opts := &slog.HandlerOptions{
+			AddSource: true,
+			Level:     slog.LevelDebug,
+		}
+		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
+		slog.SetDefault(logger)
+
 		api.RegisterHandlersWithBaseURL(e, server, "/api/v1")
 		fmt.Println(e.Start("127.0.0.1:8090"), "Mock server is running")
 	}()
@@ -141,7 +150,6 @@ func testMarmotFuncs() {
 	})
 
 	Context("VMクラスタの生成と削除", func() {
-		var cnf cf.MarmotConfig
 		var m *marmotd.Marmot
 
 		It("Create Marmot Instance", func() {
@@ -150,35 +158,25 @@ func testMarmotFuncs() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("Load Config", func() {
-			fn := "testdata/cluster-config.yaml"
-			ccf := &fn
-			err := cf.ReadConfig(*ccf, &cnf)
+		It("Load Config and Create Cluster", func() {
+			cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+			Expect(err).NotTo(HaveOccurred())
+			//
+			marmotd.PrintMarmotConfig(*cnf)
+			//
+			err = m.CreateClusterInternal(*cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("Create Cluster()", func() {
-			newCnf := marmotd.ConvConfClusterOld2New(cnf)
-			err := m.CreateClusterInternal(newCnf)
+		It("Load Config and Destroy Cluster", func() {
+			cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
 			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("Load Config for destroy", func() {
-			fn := "testdata/cluster-config.yaml"
-			ccf := &fn
-			err := cf.ReadConfig(*ccf, &cnf)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("Destroy Cluster()", func() {
-			newCnf := marmotd.ConvConfClusterOld2New(cnf)
-			err := m.DestroyClusterInternal(newCnf)
+			err = m.DestroyClusterInternal(*cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 
 	Context("VMクラスタの生成と一時停止と再開", func() {
-		var cnf cf.MarmotConfig
 		var m *marmotd.Marmot
 
 		It("Create Marmot Instance", func() {
@@ -187,40 +185,36 @@ func testMarmotFuncs() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("Load Config", func() {
-			fn := "testdata/cluster-config.yaml"
-			ccf := &fn
-			err := cf.ReadConfig(*ccf, &cnf)
+		It("Load Config and Create cluster", func() {
+			cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
 			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("Create Cluster()", func() {
-			newCnf := marmotd.ConvConfClusterOld2New(cnf)
-			err := m.CreateClusterInternal(newCnf)
+			err = m.CreateClusterInternal(*cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Stop Cluster", func() {
-			newCnf := marmotd.ConvConfClusterOld2New(cnf)
-			err := m.StopClusterInternal(newCnf)
+			cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+			Expect(err).NotTo(HaveOccurred())
+			err = m.StopClusterInternal(*cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Start Cluster", func() {
-			newCnf := marmotd.ConvConfClusterOld2New(cnf)
-			err := m.DestroyClusterInternal(newCnf)
+			cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+			Expect(err).NotTo(HaveOccurred())
+			err = m.DestroyClusterInternal(*cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Destroy Cluster()", func() {
-			newCnf := marmotd.ConvConfClusterOld2New(cnf)
-			err := m.DestroyClusterInternal(newCnf)
+			cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+			Expect(err).NotTo(HaveOccurred())
+			err = m.DestroyClusterInternal(*cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 
 	Context("VMクラスタの２重起動の防止", func() {
-		var cnf cf.MarmotConfig
 		var m *marmotd.Marmot
 
 		It("Create Marmot Instance", func() {
@@ -229,34 +223,31 @@ func testMarmotFuncs() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("Load Config", func() {
-			fn := "testdata/cluster-config.yaml"
-			ccf := &fn
-			err := cf.ReadConfig(*ccf, &cnf)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
 		It("クラスターの起動", func() {
-			newCnf := marmotd.ConvConfClusterOld2New(cnf)
-			err := m.CreateClusterInternal(newCnf)
+			cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+			Expect(err).NotTo(HaveOccurred())
+			err = m.CreateClusterInternal(*cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("クラスターの２重起動 エラー発生が発生", func() {
-			newCnf := marmotd.ConvConfClusterOld2New(cnf)
-			err := m.CreateClusterInternal(newCnf)
+			cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+			Expect(err).NotTo(HaveOccurred())
+			err = m.CreateClusterInternal(*cnf)
 			Expect(err).To(HaveOccurred())
 		})
 
 		It("Start Cluster", func() {
-			newCnf := marmotd.ConvConfClusterOld2New(cnf)
-			err := m.DestroyClusterInternal(newCnf)
+			cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+			Expect(err).NotTo(HaveOccurred())
+			err = m.DestroyClusterInternal(*cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Destroy Cluster()", func() {
-			newCnf := marmotd.ConvConfClusterOld2New(cnf)
-			err := m.DestroyClusterInternal(newCnf)
+			cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+			Expect(err).NotTo(HaveOccurred())
+			err = m.DestroyClusterInternal(*cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
