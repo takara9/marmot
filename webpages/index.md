@@ -165,11 +165,11 @@ mactlコマンドに、仮想マシンのクラスタ構成 YAML を添えて実
 
 ## ライセンス
 
-このプロジェクトはMITライセンスの下で提供されています。詳細は[LICENSE](LICENSE)ファイルをご覧ください。
+このプロジェクトはMITライセンスの下で提供されています。詳細は[LICENSE](../LICENSE)ファイルをご覧ください。
 
 ## 貢献
 
-貢献を歓迎します！ガイドラインについては[CONTRIBUTING.md](CONTRIBUTING.md)をご覧ください。
+貢献を歓迎します！ガイドラインについては[CONTRIBUTING.md](../CONTRIBUTING.md)をご覧ください。
 
 ## 連絡先
 
