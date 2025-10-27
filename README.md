@@ -130,5 +130,6 @@ sudo ./install.sh
 
 - [設定用Ansibles集](https://github.com/takara9/marmot-servers)
 - [Kubernetesクラスタの実行](https://github.com/takara9/marmot-servers/tree/main/kubernetes)
-- [Cephストレージシステムの実行](https://github.com/takara9/marmot-servers/tree/main/ceph)
+- [Cephストレージシステムの実行](Https://Github.Com/Takara9/Marmot-servers/tree/main/ceph)
 - [メトリックスとログ分析基盤](https://github.com/takara9/docker_and_k8s/tree/main/4-10_Observability)
+- [GitHub Actionと連携したmarmot開発環境](https://github.com/takara9/marmot/docs/HOWTO-CI.md)
