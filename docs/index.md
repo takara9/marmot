@@ -26,8 +26,8 @@ sudo apt update && sudo apt install etcd
 systemctl status etcd
 ```
 
-- [ネットワークの設定方法](../docs/network-setup.md)
-- [データベースの初期化方法](../cmd/hv-admin/README.md)
+- [ネットワークの設定方法](network-setup.md)
+- [データベースの初期化方法](hv-admin/README.md)
 
 marmotのインストール
 
@@ -128,8 +128,8 @@ sudo apt update && sudo apt install etcd
 systemctl status etcd
 ```
 
-- [ネットワークの設定方法](docs/network-setup.md)
-- [データベースの初期化方法](cmd/hv-admin/README.md)
+- [ネットワークの設定方法](network-setup.md)
+- [データベースの初期化方法](hv-admin/README.md)
 
 
 marmotのダウンロードとインストール
@@ -155,21 +155,21 @@ sudo ./install.sh
 ## アーキテクチャ
 mactlコマンドに、仮想マシンのクラスタ構成 YAML を添えて実行することで、仮想マシンが起動します。クラスタは、1サーバーから、リソースのあるだけ起動できます。
 
-![Architecture](docs/architecture-1.png)
+![Architecture](architecture-1.png)
 
 
 複数のmarmotを導入したサーバーを並列化して、クラウドの様な環境を構築できます。
 
-![Architecture](docs/architecture-2.png)
+![Architecture](architecture-2.png)
 
 
 ## ライセンス
 
-このプロジェクトはMITライセンスの下で提供されています。詳細は[LICENSE](../LICENSE)ファイルをご覧ください。
+このプロジェクトはMITライセンスの下で提供されています。詳細は[LICENSE](https://github.com/takara9/marmot?tab=MIT-1-ov-file)ファイルをご覧ください。
 
 ## 貢献
 
-貢献を歓迎します！ガイドラインについては[CONTRIBUTING.md](../CONTRIBUTING.md)をご覧ください。
+貢献を歓迎します！ガイドラインについては[CONTRIBUTING.md](https://github.com/takara9/marmot?tab=contributing-ov-file)をご覧ください。
 
 ## 連絡先
 
