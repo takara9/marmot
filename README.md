@@ -1,26 +1,44 @@
-# 仮想サーバーの管理システム marmot 
+# マイクロ プライベート クラウド Marmot 
 
-検証、実験、そして学習のための、簡便で高速な仮想サーバーの実行環境であり、以下の特徴があります。
+Marmotは、テスト、学習、実験用に設計された、高速で軽量な仮想サーバーオーケストレーションツールです。
+YAMLで仮想サーバーのクラスタ構成を定義し、KVMやその他のLinuxネイティブテクノロジーを使用して数秒で起動できます。
 
-* 6コア程度の低スペックデスクトップPCなどにインストールして、仮想サーバーを複数起動できる
-* 仮想サーバーの起動は、Dockerコンテナを起動するのと同じくらいの高速起動を実現
-* YAMLファイルで仮想サーバーの構成を定義
-* Ubuntu 20.04 以上で動作
-* ゲストVMとして、Ubuntu 20.04, 22.04
-* 複数のPCをクラスタ化して、プライベートなクラウド環境を構築
-* Ansible playbookに適した仮想マシン
+## 特徴
 
-
-## アーキテクチャ
-mactlコマンドに、仮想マシンのクラスタ構成 YAML を添えて実行することで、仮想マシンが起動します。クラスタは、1サーバーから、リソースのあるだけ起動できます。
-
-![Architecture](docs/architecture-1.png)
+- 高速起動（約30秒）の仮想サーバー
+- YAMLベースの構成
+- 複数マシンにわたるクラスタサポート
+- CoreDNS、etcd、Open vSwitchなどとの統合
+- Ubuntu 20.04/22.04のサポート
+- Ansibleベースのセットアップ自動化
+- OpenAPI v3 ベースのREST-APIで MarmotサーバーをAPI操作
 
 
-複数のmarmotを導入したサーバーを並列化して、クラウドの様な環境を構築できます。
+## インストール方法
 
-![Architecture](docs/architecture-2.png)
+CoreDNS,etcd,Open vSwitch,LVM,KVM などのインストールと設定の後、以下の要領で、起動することができます。インストールなどのドキュメントは順次拡充していきます。
 
+データベースサーバーに、etcdを使用しています。
+hvサーバー個別に、etcdをインストールするときは、以下の手順でインストールしてください。
+
+```
+sudo apt update && sudo apt install etcd
+systemctl status etcd
+```
+
+- [ネットワークの設定方法](docs/network-setup.md)
+- [データベースの初期化方法](cmd/hv-admin/README.md)
+
+marmotのインストール
+
+```
+TAG=v0.8.8
+mkdir marmot
+cd marmot
+curl -OL https://github.com/takara9/marmot/releases/download/$TAG/marmot-$TAG.tgz
+tar xzvf marmot-$TAG.tgz
+sudo ./install.sh
+```
 
 ## 使用例
 
@@ -77,7 +95,7 @@ Welcome to Ubuntu 22.04.1 LTS (GNU/Linux 5.15.0-86-generic x86_64)
 
 ```
 
-サーバーは、Ansibleを利用して、セットアップもできます。
+起動したサーバーは、Ansibleを利用して、セットアップもできます。
 
 ```
 ubuntu@hv0:~/marmot-apl$ ansible -i inventory all -m ping
@@ -98,8 +116,7 @@ srv2 | SUCCESS => {
 ```
 
 
-
-## セットアップ方法
+## インストール方法
 
 CoreDNS,etcd,Open vSwitch,LVM,KVM などのインストールと設定の後、以下の要領で、起動することができます。インストールなどのドキュメントは順次拡充していきます。
 
@@ -114,7 +131,8 @@ systemctl status etcd
 - [ネットワークの設定方法](docs/network-setup.md)
 - [データベースの初期化方法](cmd/hv-admin/README.md)
 
-### marmotのインストール
+
+marmotのダウンロードとインストール
 
 ```
 TAG=v0.8.2
@@ -125,11 +143,35 @@ tar xzvf marmot-$TAG.tgz
 sudo ./install.sh
 ```
 
-
-## 応用例
+*応用例*
 
 - [設定用Ansibles集](https://github.com/takara9/marmot-servers)
 - [Kubernetesクラスタの実行](https://github.com/takara9/marmot-servers/tree/main/kubernetes)
 - [Cephストレージシステムの実行](Https://Github.Com/Takara9/Marmot-servers/tree/main/ceph)
 - [メトリックスとログ分析基盤](https://github.com/takara9/docker_and_k8s/tree/main/4-10_Observability)
 - [GitHub Actionと連携したmarmot開発環境](https://github.com/takara9/marmot/docs/HOWTO-CI.md)
+
+
+## アーキテクチャ
+mactlコマンドに、仮想マシンのクラスタ構成 YAML を添えて実行することで、仮想マシンが起動します。クラスタは、1サーバーから、リソースのあるだけ起動できます。
+
+![Architecture](docs/architecture-1.png)
+
+
+複数のmarmotを導入したサーバーを並列化して、クラウドの様な環境を構築できます。
+
+![Architecture](docs/architecture-2.png)
+
+
+## ライセンス
+
+このプロジェクトはMITライセンスの下で提供されています。詳細は[LICENSE](LICENSE)ファイルをご覧ください。
+
+## 貢献
+
+貢献を歓迎します！ガイドラインについては[CONTRIBUTING.md](CONTRIBUTING.md)をご覧ください。
+
+## 連絡先
+
+メンテナー: [takara9](https://github.com/takara9)
+ご質問や議論については、[GitHub Discussions](https://github.com/takara9/marmot/discussions) をご利用ください。
