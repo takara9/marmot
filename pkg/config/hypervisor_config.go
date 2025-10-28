@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/takara9/marmot/pkg/db"
 	"gopkg.in/yaml.v3"
 )
 
@@ -49,37 +48,3 @@ func ReadHvConfig() (Hypervisors_yaml, DefaultConfig, error) {
 	return hvs, cnf, nil
 }
 
-func SetHvConfig(hvs Hypervisors_yaml, cnf DefaultConfig) error {
-
-	// etcdへ接続
-	d, err := db.NewDatabase(cnf.EtcdServerUrl)
-	if err != nil {
-		return err
-	}
-
-	// ハイパーバイザー
-	for _, hv := range hvs.Hvs {
-		err := d.SetHypervisors(hv)
-		if err != nil {
-			return err
-		}
-	}
-
-	// OSイメージテンプレート
-	for _, hd := range hvs.Imgs {
-		err := d.SetImageTemplate(hd)
-		if err != nil {
-			return err
-		}
-	}
-
-	// シーケンス番号のリセット
-	for _, sq := range hvs.Seq {
-		err := d.CreateSeq(sq.Key, sq.Start, sq.Step)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
