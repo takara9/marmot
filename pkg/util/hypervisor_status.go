@@ -22,7 +22,6 @@ import (
 	"github.com/takara9/marmot/pkg/lvm"
 	"github.com/takara9/marmot/pkg/types"
 )
-
 // ハイパーバイザーのリストを取り出す
 func getHypervisors(dbUrl string) ([]types.Hypervisor, error) {
 	d, err := db.NewDatabase(dbUrl)

@@ -11,7 +11,6 @@ import (
 	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/types"
-	"github.com/takara9/marmot/pkg/util"
 )
 
 var _ = Describe("Marmotd Test", Ordered, func() {
@@ -47,7 +46,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 	Context("基本的なクライアントからのアクセステスト", func() {
 		var hvs config.Hypervisors_yaml
-		var cnf util.DefaultConfig
+		var cnf config.DefaultConfig
 		var d *db.Database
 		//var marmotClient *marmot.MarmotEndpoint
 		var hvsOld []types.HypervisorOld

@@ -1,4 +1,4 @@
-package db
+package db_test
 
 import (
 	"fmt"
@@ -8,13 +8,14 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	cf "github.com/takara9/marmot/pkg/config"
+	"github.com/takara9/marmot/pkg/db"
 	. "github.com/takara9/marmot/pkg/types"
 )
 
 var _ = Describe("Etcd", Ordered, func() {
 	var url string
 	var err error
-	var d *Database
+	var d *db.Database
 	var containerID string
 
 	BeforeAll(func(ctx SpecContext) {
@@ -53,14 +54,14 @@ var _ = Describe("Etcd", Ordered, func() {
 	Describe("Test etcd", func() {
 		Context("Test Connection to etcd", func() {
 			It("Connection etcd", func() {
-				d, err = NewDatabase(url)
+				d, err = db.NewDatabase(url)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
 
 		Context("Test access etcd", func() {
 			var key_hv1 = "hv01"
-			data_hv1 := testHvData1()
+			data_hv1 := db.TestHvData1()
 
 			It("Put", func() {
 				err := d.PutDataEtcd(key_hv1, data_hv1)
@@ -286,7 +287,7 @@ var _ = Describe("Etcd", Ordered, func() {
 				GinkgoWriter.Println("test-1 ")
 				td := tests[0]
 				GinkgoWriter.Println("test-2 ")
-				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
+				vm := db.TestVmCreate(td.req.name, td.req.cpu, td.req.ram)
 				GinkgoWriter.Println("test-3 ")
 				hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
 				GinkgoWriter.Println("test-4 ")
@@ -300,7 +301,7 @@ var _ = Describe("Etcd", Ordered, func() {
 
 			It("Scheduling a virtual machine to Hypervisor #2", func() {
 				td := tests[1]
-				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
+				vm := db.TestVmCreate(td.req.name, td.req.cpu, td.req.ram)
 				hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("hvName ", hvName)
@@ -312,7 +313,7 @@ var _ = Describe("Etcd", Ordered, func() {
 
 			It("Scheduling a virtual machine to Hypervisor #3", func() {
 				td := tests[2]
-				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
+				vm := db.TestVmCreate(td.req.name, td.req.cpu, td.req.ram)
 				hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("hvName ", hvName)
@@ -324,7 +325,7 @@ var _ = Describe("Etcd", Ordered, func() {
 
 			It("Scheduling a virtual machine to Hypervisor #4", func() {
 				td := tests[3]
-				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
+				vm := db.TestVmCreate(td.req.name, td.req.cpu, td.req.ram)
 				hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("hvName ", hvName)
@@ -336,7 +337,7 @@ var _ = Describe("Etcd", Ordered, func() {
 
 			It("Scheduling a virtual machine to Hypervisor #5", func() {
 				td := tests[4]
-				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
+				vm := db.TestVmCreate(td.req.name, td.req.cpu, td.req.ram)
 				hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
 				Expect(err).To(HaveOccurred())
 				GinkgoWriter.Println("hvName ", hvName)
@@ -348,7 +349,7 @@ var _ = Describe("Etcd", Ordered, func() {
 
 			It("Scheduling a virtual machine to Hypervisor #6", func() {
 				td := tests[5]
-				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
+				vm := db.TestVmCreate(td.req.name, td.req.cpu, td.req.ram)
 				hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("hvName ", hvName)
@@ -360,7 +361,7 @@ var _ = Describe("Etcd", Ordered, func() {
 
 			It("Scheduling a virtual machine to Hypervisor #7", func() {
 				td := tests[6]
-				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
+				vm := db.TestVmCreate(td.req.name, td.req.cpu, td.req.ram)
 				hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("hvName ", hvName)
@@ -372,7 +373,7 @@ var _ = Describe("Etcd", Ordered, func() {
 
 			It("Scheduling a virtual machine to Hypervisor #8", func() {
 				td := tests[7]
-				vm := testVmCreate(td.req.name, td.req.cpu, td.req.ram)
+				vm := db.TestVmCreate(td.req.name, td.req.cpu, td.req.ram)
 				hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("hvName ", hvName)
