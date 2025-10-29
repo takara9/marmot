@@ -8,6 +8,18 @@ import (
 	"github.com/takara9/marmot/pkg/db"
 )
 
+/*
+	概要
+	  サーバーのセットアップ時にetcd に対して、
+	  marmotd のデータベースへ直接書き込む
+	  セットアップツール
+
+	パラメータ
+	  ハイパーバイザーの初期データのYAMLファイル
+	  etcdのURLアドレスのファイル
+*/
+
+
 func main() {
 
 	// ホームディレクトリの.config_marmotから
@@ -17,6 +29,9 @@ func main() {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
+
+
+
 
 	// データベースに登録
 	err = SetHvConfig(hvs, cnf)
