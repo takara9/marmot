@@ -1,13 +1,15 @@
 package util
 
 import (
-	"flag"
-	"os"
-	"path/filepath"
+	//"flag"
+	//"os"
+	//"path/filepath"
 
-	cf "github.com/takara9/marmot/pkg/config"
-	db "github.com/takara9/marmot/pkg/db"
+	//cf "github.com/takara9/marmot/pkg/config"
+	//db "github.com/takara9/marmot/pkg/db"
 )
+
+/*
 
 type DefaultConfig struct {
 	ApiServerUrl  string `yaml:"api_server"`
@@ -68,3 +70,5 @@ func SetHvConfig(hvs cf.Hypervisors_yaml, cnf DefaultConfig) error {
 
 	return nil
 }
+
+*/

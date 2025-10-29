@@ -6,15 +6,15 @@ import (
 	"os"
 	"strings"
 
+	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/types"
-	ut "github.com/takara9/marmot/pkg/util"
 )
 
 func main() {
 	// ホームディレクトリの.config_marmotから
 	// APIサーバーとetcdサーバーのURLを取得
-	_, cnf, err := ut.ReadHvConfig()
+	_, cnf, err := config.ReadHvConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)

@@ -4,7 +4,7 @@ import (
 	. "github.com/takara9/marmot/pkg/types"
 )
 
-func testHvData1() Hypervisor {
+func TestHvData1() Hypervisor {
 	var hv Hypervisor
 	hv.Nodename = "hv01"
 	hv.Cpu = 10
@@ -16,7 +16,7 @@ func testHvData1() Hypervisor {
 	return hv
 }
 
-func testVmCreate(hostname string, cpu int, ram int) VirtualMachine {
+func TestVmCreate(hostname string, cpu int, ram int) VirtualMachine {
 	var vm VirtualMachine
 	vm.Name = hostname
 	vm.Cpu = cpu

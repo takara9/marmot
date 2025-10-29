@@ -1,4 +1,4 @@
-package config
+package config_test
 
 import (
 	"errors"
@@ -6,6 +6,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/takara9/marmot/pkg/config"
 )
 
 var _ = Describe("Config", func() {
@@ -13,28 +14,28 @@ var _ = Describe("Config", func() {
 	const input1 string = "testdata/ceph-cluster.yaml"
 	const input2 string = "testdata/no-exist.yaml"
 	const output1 string = "testdata/ceph-cluster-out.yaml"
-	var mc MarmotConfig
+	var mc config.MarmotConfig
 
 	Describe("Read / Write config file", func() {
 		Context("Read a test config file", func() {
 			It("Read existing file", func() {
-				err := ReadConfig(input1, &mc)
+				err := config.ReadConfig(input1, &mc)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(*mc.Domain).To(Equal("labo.local"))
 				//Expect(mc.VMSpec[0].Name).To(Equal("node1"))
 			})
 			It("Read no existing file", func() {
-				err := ReadConfig(input2, &mc)
+				err := config.ReadConfig(input2, &mc)
 				Expect(err).To(HaveOccurred())
 			})
 		})
 		Context("Write a test config file", func() {
 			It("Write file", func() {
-				err := WriteConfig(output1, mc)
+				err := config.WriteConfig(output1, mc)
 				Expect(err).NotTo(HaveOccurred())
 			})
 			It("Write file, but can not", func() {
-				err := WriteConfig("testdata", mc)
+				err := config.WriteConfig("testdata", mc)
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -42,7 +43,7 @@ var _ = Describe("Config", func() {
 
 	Describe("Read Hypervisor Config file and Check", func() {
 		const hypervior_config string = "testdata/hypervisor-config.yaml"
-		var cnf Hypervisors_yaml
+		var cnf config.Hypervisors_yaml
 
 		type hv struct {
 			name string
@@ -59,7 +60,7 @@ var _ = Describe("Config", func() {
 
 		Context("Read a test hypervisor config file", func() {
 			It("Read existing file", func() {
-				err := ReadConfig(hypervior_config, &cnf)
+				err := config.ReadConfig(hypervior_config, &cnf)
 				Expect(err).NotTo(HaveOccurred())
 				for i, h := range cnf.Hvs {
 					GinkgoWriter.Println(i)
@@ -74,12 +75,12 @@ var _ = Describe("Config", func() {
 			It("Write new file", func() {
 				filename := "testdata/out-hypervisor-config.yaml"
 				os.Remove(filename)
-				err := WriteConfig(filename, cnf)
+				err := config.WriteConfig(filename, cnf)
 				Expect(err).NotTo(HaveOccurred())
 				_, err = os.Stat(filename)
 				Expect(errors.Is(err, os.ErrNotExist)).To(Equal(false))
 
-				err = ReadConfig(hypervior_config, &cnf)
+				err = config.ReadConfig(hypervior_config, &cnf)
 				Expect(err).NotTo(HaveOccurred())
 				for i, h := range cnf.Hvs {
 					Expect(h.Name).To(Equal(tests[i].want.name))

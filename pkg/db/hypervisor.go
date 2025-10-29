@@ -5,12 +5,12 @@ import (
 	"errors"
 	"log/slog"
 
-	cf "github.com/takara9/marmot/pkg/config"
+	"github.com/takara9/marmot/pkg/config"
 	. "github.com/takara9/marmot/pkg/types"
 )
 
 // ハイパーバイザーの設定
-func (d *Database) SetHypervisors(v cf.Hypervisor_yaml) error {
+func (d *Database) SetHypervisors(v config.Hypervisor_yaml) error {
 	var hv Hypervisor
 	hv.Nodename = v.Name
 	hv.Port = int(v.Port)
