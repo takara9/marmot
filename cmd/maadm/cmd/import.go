@@ -20,7 +20,7 @@ var importCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(migrateCmd)
+	rootCmd.AddCommand(importCmd)
 
 	// Here you will define your flags and configuration settings.
 

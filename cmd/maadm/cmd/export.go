@@ -15,12 +15,12 @@ var exportCmd = &cobra.Command{
 	Short: "marmot のデータをJSON形式でエクスポートする",
 	Long: `marmot の管理データをJSON形式でエクスポートします。バージョンアップ前に本コマンドでデータをバックアップして、バージョンを更新した後にインポートすることでデータの移行を実施できます。`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("migrate called")
+		fmt.Println("export called")
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(migrateCmd)
+	rootCmd.AddCommand(exportCmd)
 
 	// Here you will define your flags and configuration settings.
 
