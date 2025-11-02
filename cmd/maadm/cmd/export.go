@@ -10,15 +10,10 @@ import (
 )
 
 // migrateCmd represents the migrate command
-var migrateCmd = &cobra.Command{
-	Use:   "migrate",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+var exportCmd = &cobra.Command{
+	Use:   "export",
+	Short: "marmot のデータをJSON形式でエクスポートする",
+	Long: `marmot の管理データをJSON形式でエクスポートします。バージョンアップ前に本コマンドでデータをバックアップして、バージョンを更新した後にインポートすることでデータの移行を実施できます。`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("migrate called")
 	},
@@ -36,5 +31,5 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// migrateCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	migrateCmd.PersistentFlags().StringVarP(&etcdUrl, "url", "e", "http://localhost:2379", "URL address of the etcd server")
+	exportCmd.PersistentFlags().StringVarP(&etcdUrl, "url", "e", "http://localhost:2379", "URL address of the etcd server")
 }

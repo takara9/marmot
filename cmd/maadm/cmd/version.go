@@ -8,6 +8,8 @@ import (
 	"github.com/takara9/marmot/pkg/config"
 )
 
+var apiConfigFilename string
+
 // versionCmd represents the version command
 var versionCmd = &cobra.Command{
 	Use:   "version",
@@ -34,4 +36,5 @@ var versionCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(versionCmd)
+	versionCmd.PersistentFlags().StringVar(&apiConfigFilename, "api", "", "API Endpoint URL (default is $HOME/.config_marmot)")
 }

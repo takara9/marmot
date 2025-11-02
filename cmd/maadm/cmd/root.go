@@ -11,8 +11,8 @@ import (
 	//"github.com/takara9/marmot/pkg/config"
 )
 
-var apiConfigFilename string
-var etcdUrl string
+//var apiConfigFilename string
+//var etcdUrl string
 
 //var mactlConfig config.ClientConfig
 //var mactlConfig config.ClientConfig
@@ -33,6 +33,6 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&apiConfigFilename, "api", "", "API Endpoint URL (default is $HOME/.config_marmot)")
+	//rootCmd.PersistentFlags().StringVar(&apiConfigFilename, "api", "", "API Endpoint URL (default is $HOME/.config_marmot)")
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

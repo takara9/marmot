@@ -126,6 +126,11 @@ jobs:
         cd cmd/mactl
         sudo -s make test
         cd ../..
+    - name: Test cmd/maadm
+      run: | 
+        cd cmd/maadm
+        sudo -s make test
+        cd ../..
     - name: Test cmd/migtool
       run: | 
         cd cmd/migtool

@@ -1,4 +1,4 @@
-PROGRAMS = hv-admin mactl marmotd migtool
+PROGRAMS = hv-admin mactl marmotd migtool maadm
 all:	$(PROGRAMS)
 
 MAKE = /usr/bin/make
