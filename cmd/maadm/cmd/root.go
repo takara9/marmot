@@ -34,5 +34,4 @@ func Execute() {
 
 func init() {
 	//rootCmd.PersistentFlags().StringVar(&apiConfigFilename, "api", "", "API Endpoint URL (default is $HOME/.config_marmot)")
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
