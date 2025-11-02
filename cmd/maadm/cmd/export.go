@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// migrateCmd represents the migrate command
+// exportCmd represents the export command
 var exportCmd = &cobra.Command{
 	Use:   "export",
 	Short: "marmot のデータをJSON形式でエクスポートする",
