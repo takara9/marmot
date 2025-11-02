@@ -11,7 +11,7 @@ import (
 
 // migrateCmd represents the migrate command
 var importCmd = &cobra.Command{
-	Use:   "export",
+	Use:   "import",
 	Short: "エクスポートされたデータをmarmotdのデータベースに読み込む",
 	Long: `エクスポートされた marmotd の管理データをインポートします。バージョンアップ前に本コマンドでデータをバックアップして、バージョンを更新した後にインポートすることでデータの移行が実施できます。`,
 	Run: func(cmd *cobra.Command, args []string) {

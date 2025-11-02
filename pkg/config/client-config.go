@@ -9,6 +9,8 @@ import (
 	"github.com/takara9/marmot/pkg/client"
 )
 
+const DefaultTimeoutSeconds = 60
+
 // コンフィグからエンドポイントを取り出してセットする
 func GetClientConfig2(apiConfigFilename string) (*client.MarmotEndpoint, error) {
 	var configFn string
@@ -20,7 +22,10 @@ func GetClientConfig2(apiConfigFilename string) (*client.MarmotEndpoint, error) 
 
 	var mactlConfig DefaultConfig
 	//	var cnf api.MarmotConfig
-	ReadConfig(configFn, &mactlConfig)
+	if ReadConfig(configFn, &mactlConfig) != nil {
+		slog.Error("mactlConfig", "read error", nil)
+		return nil, nil
+	}	
 	if len(mactlConfig.ApiServerUrl) == 0 {
 		mactlConfig.ApiServerUrl = "http://localhost:8080"
 	}
@@ -35,6 +40,6 @@ func GetClientConfig2(apiConfigFilename string) (*client.MarmotEndpoint, error) 
 		u.Scheme,
 		u.Host,
 		"/api/v1",
-		60,
+		DefaultTimeoutSeconds,
 	)
 }
