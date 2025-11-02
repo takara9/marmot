@@ -11,11 +11,13 @@ import (
 
 var _ = Describe("Marmotd Test", Ordered, func() {
 	var containerID string
+	var containerName string
 	//var marmotServer *marmotd.Server
 
 	BeforeAll(func(ctx SpecContext) {
-		// Dockerコンテナを起動
-		cmd := exec.Command("docker", "run", "-d", "--name", "etcd0", "-p", "3379:2379", "-p", "3380:2380", "ghcr.io/takara9/etcd:3.6.5")
+		// Dockerコンテナを起動 - ユニークなコンテナ名を生成
+		containerName = fmt.Sprintf("etcd-test-%d", time.Now().UnixNano())
+		cmd := exec.Command("docker", "run", "-d", "--name", containerName, "-p", "3379:2379", "-p", "3380:2380", "ghcr.io/takara9/etcd:3.6.5")
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to start container: %s, %v", string(output), err))
@@ -27,12 +29,12 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 	AfterAll(func(ctx SpecContext) {
 		// Dockerコンテナを停止・削除
-		cmd := exec.Command("docker", "stop", containerID)
+		cmd := exec.Command("docker", "stop", containerName)
 		_, err := cmd.CombinedOutput()
 		if err != nil {
 			fmt.Printf("Failed to stop container: %v\n", err)
 		}
-		cmd = exec.Command("docker", "rm", containerID)
+		cmd = exec.Command("docker", "rm", containerName)
 		_, err = cmd.CombinedOutput()
 		if err != nil {
 			fmt.Printf("Failed to remove container: %v\n", err)
