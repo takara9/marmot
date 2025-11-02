@@ -22,9 +22,9 @@ func GetClientConfig2(apiConfigFilename string) (*client.MarmotEndpoint, error) 
 
 	var mactlConfig DefaultConfig
 	//	var cnf api.MarmotConfig
-	if ReadConfig(configFn, &mactlConfig) != nil {
-		slog.Error("mactlConfig", "read error", nil)
-		return nil, nil
+	if err := ReadConfig(configFn, &mactlConfig); err != nil {
+		slog.Error("mactlConfig", "read error", err)
+		return nil, err
 	}	
 	if len(mactlConfig.ApiServerUrl) == 0 {
 		mactlConfig.ApiServerUrl = "http://localhost:8080"
