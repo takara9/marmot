@@ -27,5 +27,5 @@ install:
 	install -m 0755 $(PROGRAM) /usr/local/bin
 
 .PHONY: test
-test:
+test: maadm-test
 	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -coverprofile cover.out
