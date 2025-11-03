@@ -103,7 +103,7 @@ func testMarmotFuncs() {
 			}
 		})
 
-		It("シーケンス番号のリセット", func() {
+		It("シーケンス番号のセット", func() {
 			for _, sq := range hvs.Seq {
 				err := etcdEpTest.CreateSeq(sq.Key, sq.Start, sq.Step)
 				Expect(err).NotTo(HaveOccurred())

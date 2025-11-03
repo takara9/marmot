@@ -6,13 +6,14 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
-	//. "github.com/onsi/gomega"
+	. "github.com/onsi/gomega"
+	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/types"
 )
 
 var _ = Describe("Marmotd Test", Ordered, func() {
 	var containerID string
 	var containerName string
-	//var marmotServer *marmotd.Server
 
 	BeforeAll(func(ctx SpecContext) {
 		// Dockerコンテナを起動 - ユニークなコンテナ名を生成
@@ -41,10 +42,21 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		}
 	}, NodeTimeout(20*time.Second))
 
-	Context("基本的なクライアントからのアクセステスト", func() {
-		It("コマンドの構成ファイルの読み取り", func() {
-			GinkgoWriter.Println("Reading config file")
+	Context("ハイパーバイザーのシステム管理操作", func() {
+		var d *db.Database
+	  var h types.Hypervisor
+		It("Marmotd の初期データを、etcdに直接セット", func() {
+			cmd := exec.Command("./bin/maadm-test", "--hvconfig", "testdata/hypervisor-config-hvc.yaml", "--etcdurl", "http://localhost:3379")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println("command messeage: ", string(stdoutStderr))
 		})
-
+		// marmotd を介さなず、DB操作で内容をチェックする
+		It("キーでハイパーバイザーのセットした情報を取得", func() {
+			var err error
+			h, err = d.GetHypervisorByKey("hvc")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(h.Nodename).To(Equal("hvc"))
+		})
 	})
 })

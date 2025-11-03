@@ -4,15 +4,22 @@ all:	$(PROGRAM)
 
 TAG := $(shell cat ../../TAG)
 BINDIR = ../../marmot-v$(TAG)
+TESTBINDIR = bin
 
 $(PROGRAM): $(%.go)
 	echo $(BINDIR)
 	mkdir -p $(BINDIR)
 	$(GO) build -o $(BINDIR)/$@ $^
 
+maadm-test: $(%.go)
+	echo $(TESTBINDIR)
+	mkdir -p $(TESTBINDIR)
+	$(GO) build -o $(TESTBINDIR)/$@ $^
+
 .PHONY:	clean
 clean:
 	rm -fr $(BINDIR)
+	rm -fr $(TESTBINDIR)
 
 .PHONY:	install
 install:

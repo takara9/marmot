@@ -2,8 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/takara9/marmot/pkg/config"
+	"github.com/takara9/marmot/pkg/db"
 )
 
 var hypervisorConfigFilename string
@@ -17,10 +20,22 @@ var setupCmd = &cobra.Command{
 	そのため、このコマンドは、marmotdを起動するサーバーで実行する必要があります。
 	実行に際して「ハイパーバイザーの初期データのYAMLファイル」と「etcdのURLアドレス」を
 	与える必要があります。`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("setup called")
 		fmt.Println("etcd url =", etcdUrl)
 		fmt.Println("hvconfig =", hypervisorConfigFilename)
+
+		err, hvs := config.ReadHypervisorConfig(hypervisorConfigFilename)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return err
+		}
+
+		if err = setHypervisorConfig(*hvs, etcdUrl); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return err
+		}
+		return nil
 	},
 }
 
@@ -29,5 +44,36 @@ func init() {
 	// コンフィグファイル
 	setupCmd.PersistentFlags().StringVarP(&hypervisorConfigFilename, "hvconfig", "v", "hypervisor-config.yaml", "Initial Hypervisor configfile (yaml)")
 	// etcdのURLアドレス
-	setupCmd.PersistentFlags().StringVarP(&etcdUrl, "url", "e", "http://localhost:2379", "URL address of the etcd server")
+	setupCmd.PersistentFlags().StringVarP(&etcdUrl, "etcdurl", "e", "http://localhost:2379", "URL address of the etcd server")
+}
+
+func setHypervisorConfig(hvs config.Hypervisors_yaml, kvsurl string) error {
+
+	d, err := db.NewDatabase(kvsurl)
+	if err != nil {
+		return err
+	}
+
+	// ハイパーバイザーの初期設定をDBへセット
+	for _, hv := range hvs.Hvs {
+		if err := d.SetHypervisors(hv); err != nil {
+			return err
+		}
+	}
+
+	// OSイメージテンプレートの初期設定をDBへセット
+	for _, hd := range hvs.Imgs {
+		if err := d.SetImageTemplate(hd); err != nil {
+			return err
+		}
+	}
+
+	// シーケンス番号の初期値をDBへセット
+	for _, sq := range hvs.Seq {
+		if err := d.CreateSeq(sq.Key, sq.Start, sq.Step); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
