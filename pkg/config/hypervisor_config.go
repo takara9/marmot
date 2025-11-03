@@ -48,11 +48,11 @@ func ReadHvConfig() (Hypervisors_yaml, DefaultConfig, error) {
 	return hvs, cnf, nil
 }
 
-func ReadHypervisorConfig(yamlFileName string) (error, *Hypervisors_yaml) {
+func ReadHypervisorConfig(yamlFileName string) (*Hypervisors_yaml, error) {
 	var hvs Hypervisors_yaml
 
 	if err := ReadConfig(yamlFileName, &hvs); err != nil {
-		return err, nil
+		return nil, err
 	}
-	return nil, &hvs
+	return &hvs, nil
 }

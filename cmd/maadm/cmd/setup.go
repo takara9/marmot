@@ -26,7 +26,7 @@ var setupCmd = &cobra.Command{
 		fmt.Println("etcd url =", etcdUrl)
 		fmt.Println("hvconfig =", hypervisorConfigFilename)
 
-		err, hvs := config.ReadHypervisorConfig(hypervisorConfigFilename)
+		hvs, err := config.ReadHypervisorConfig(hypervisorConfigFilename)
 		if err != nil {
 			fmt.Println("Error:", err)
 			return err

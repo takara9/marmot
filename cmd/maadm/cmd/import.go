@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// migrateCmd represents the migrate command
+// importCmd represents the migrate command
 var importCmd = &cobra.Command{
 	Use:   "import",
 	Short: "エクスポートされたデータをmarmotdのデータベースに読み込む",
