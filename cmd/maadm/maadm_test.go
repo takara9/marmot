@@ -46,8 +46,9 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		var d *db.Database
 	  var h types.Hypervisor
 		It("Marmotd の初期データを、etcdに直接セット", func() {
-			cmd := exec.Command("./bin/maadm-test", "--hvconfig", "testdata/hypervisor-config-hvc.yaml", "--etcdurl", "http://localhost:3379")
+			cmd := exec.Command("./bin/maadm-test", "setup", "--hvconfig", "testdata/hypervisor-config-hvc.yaml", "--etcdurl", "http://localhost:3379")
 			stdoutStderr, err := cmd.CombinedOutput()
+			GinkgoWriter.Println("err: ", err)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("command messeage: ", string(stdoutStderr))
 		})

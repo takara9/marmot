@@ -17,7 +17,6 @@ var versionCmd = &cobra.Command{
 	Long:  `maadm クライアントのバージョンを表示します。`,
 	Run: func(cmd *cobra.Command, args []string) {
 		slog.Debug("===", "versionCmd is called", "===")
-
 		m, err := config.GetClientConfig2(apiConfigFilename)
 		if err != nil {
 			slog.Error("version", "err", err)
@@ -29,7 +28,6 @@ var versionCmd = &cobra.Command{
 			slog.Error("version", "err", err)
 			return
 		}
-
 		fmt.Println(string(JsonVersion.Version))
 	},
 }

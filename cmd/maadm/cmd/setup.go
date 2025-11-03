@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -51,12 +52,14 @@ func setHypervisorConfig(hvs config.Hypervisors_yaml, kvsurl string) error {
 
 	d, err := db.NewDatabase(kvsurl)
 	if err != nil {
+		slog.Error("Failed to connect to etcd", "error", err)
 		return err
 	}
 
 	// ハイパーバイザーの初期設定をDBへセット
 	for _, hv := range hvs.Hvs {
 		if err := d.SetHypervisors(hv); err != nil {
+			slog.Error("Failed to set hypervisor config", "error", err)
 			return err
 		}
 	}
@@ -64,6 +67,7 @@ func setHypervisorConfig(hvs config.Hypervisors_yaml, kvsurl string) error {
 	// OSイメージテンプレートの初期設定をDBへセット
 	for _, hd := range hvs.Imgs {
 		if err := d.SetImageTemplate(hd); err != nil {
+			slog.Error("Failed to set image template", "error", err)
 			return err
 		}
 	}
@@ -71,6 +75,7 @@ func setHypervisorConfig(hvs config.Hypervisors_yaml, kvsurl string) error {
 	// シーケンス番号の初期値をDBへセット
 	for _, sq := range hvs.Seq {
 		if err := d.CreateSeq(sq.Key, sq.Start, sq.Step); err != nil {
+			slog.Error("Failed to create sequence", "error", err)
 			return err
 		}
 	}

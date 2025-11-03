@@ -1,11 +1,13 @@
 package main
 
-import "github.com/takara9/marmot/cmd/maadm/cmd"
+import (
+	_ "embed"
 
+	"github.com/takara9/marmot/cmd/maadm/cmd"
+)
 
 //go:embed version.txt
-var version string
-
+var Version string
 
 func main() {
 	cmd.Execute()
