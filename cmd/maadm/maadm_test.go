@@ -44,7 +44,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 	Context("ハイパーバイザーのシステム管理操作", func() {
 		var d *db.Database
-	  var h types.Hypervisor
+		var h types.Hypervisor
 		It("Marmotd の初期データを、etcdに直接セット", func() {
 			cmd := exec.Command("./bin/maadm-test", "setup", "--hvconfig", "testdata/hypervisor-config-hvc.yaml", "--etcdurl", "http://localhost:3379")
 			stdoutStderr, err := cmd.CombinedOutput()
@@ -52,9 +52,12 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("command messeage: ", string(stdoutStderr))
 		})
+
 		// marmotd を介さなず、DB操作で内容をチェックする
 		It("キーでハイパーバイザーのセットした情報を取得", func() {
 			var err error
+			d, err = db.NewDatabase("http://localhost:3379")
+			Expect(err).NotTo(HaveOccurred())
 			h, err = d.GetHypervisorByKey("hvc")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(h.Nodename).To(Equal("hvc"))
