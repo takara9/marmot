@@ -59,7 +59,12 @@ jobs:
           CONF: "/conf/Corefile"
           PORT: "53"
 
+
     steps:
+    - name: change permissions
+      run: |
+        sudo -S chown -R $USER:$USER /home/github/deployment/{REPOSITORY_NAME_HERE}
+
     - uses: actions/checkout@v5
 
     - name: Install ca-certificates
