@@ -60,7 +60,8 @@ jobs:
           PORT: "53"
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v5
+
     - name: Install ca-certificates
       run: |
         sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
