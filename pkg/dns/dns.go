@@ -41,7 +41,6 @@ func convertEtcdPath(Hostname string) (string, error) {
 	for i := len(h) - 1; i >= 0; i-- {
 		etcdpath = etcdpath + "/" + h[i]
 	}
-
 	return etcdpath, nil
 }
 
@@ -83,7 +82,6 @@ func Add(rec DnsRecord, dbUrl string) error {
 		slog.Error("", "err", err)
 		return err
 	}
-
 	return nil
 }
 
@@ -115,7 +113,6 @@ func Get(rec DnsRecord, dbUrl string) (types.DNSEntry, error) {
 		slog.Error("", "err", err)
 		return rslt, err
 	}
-
 	return rslt, err
 }
 
@@ -151,6 +148,5 @@ func Del(rec DnsRecord, dbUrl string) error {
 		slog.Error("", "err", err)
 		return err
 	}
-
 	return nil
 }
