@@ -28,6 +28,7 @@ var versionCmd = &cobra.Command{
 			slog.Error("version", "err", err)
 			return
 		}
+		
 		fmt.Println(string(JsonVersion.Version))
 	},
 }

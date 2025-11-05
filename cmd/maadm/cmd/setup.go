@@ -22,10 +22,6 @@ var setupCmd = &cobra.Command{
 	実行に際して「ハイパーバイザーの初期データのYAMLファイル」と「etcdのURLアドレス」を
 	与える必要があります。`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("setup called")
-		fmt.Println("etcd url =", etcdUrl)
-		fmt.Println("hvconfig =", hypervisorConfigFilename)
-
 		hvs, err := config.ReadHypervisorConfig(hypervisorConfigFilename)
 		if err != nil {
 			fmt.Println("Error:", err)

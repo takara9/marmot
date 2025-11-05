@@ -2,12 +2,17 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
+	"os"
 	"os/exec"
 	"time"
 
+	"github.com/labstack/echo/v4"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/marmotd"
 	"github.com/takara9/marmot/pkg/types"
 )
 
@@ -25,7 +30,21 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		}
 		containerID = string(output[:12]) // 最初の12文字をIDとして取得
 		fmt.Printf("Container started with ID: %s\n", containerID)
-		time.Sleep(10 * time.Second) // コンテナが起動するまで待機
+
+		e := echo.New()
+		server := marmotd.NewServer("hvc", "http://127.0.0.1:3379")
+		go func() {
+			// Setup slog
+			opts := &slog.HandlerOptions{
+				AddSource: true,
+				Level:     slog.LevelDebug,
+			}
+			logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
+			slog.SetDefault(logger)
+
+			api.RegisterHandlersWithBaseURL(e, server, "/api/v1")
+			fmt.Println(e.Start("0.0.0.0:8080"), "Mock server is running")
+		}()
 	}, NodeTimeout(20*time.Second))
 
 	AfterAll(func(ctx SpecContext) {
@@ -42,7 +61,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		}
 	}, NodeTimeout(20*time.Second))
 
-	Context("ハイパーバイザーのシステム管理操作", func() {
+	Context("maadm setup の動作テスト", func() {
 		var d *db.Database
 		var h types.Hypervisor
 		It("Marmotd の初期データを、etcdに直接セット", func() {
@@ -61,6 +80,53 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			h, err = d.GetHypervisorByKey("hvc")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(h.Nodename).To(Equal("hvc"))
+			Expect(h.IpAddr).To(Equal("127.0.0.1"))
+			Expect(h.Cpu).To(Equal(4))
+			Expect(h.Memory).To(Equal(16384))
+			Expect(h.StgPool[0].VolGroup).To(Equal("vg1"))
+			Expect(h.StgPool[1].VolGroup).To(Equal("vg2"))
+		})
+
+		It("OSイメージ、LVOS、LVDATA、VMのシーケンス番号をチェック", func() {
+			// OSイメージのシーケンス番号をチェック
+			seq, err := d.GetSeq("LVOS")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(seq).To(Equal(uint64(900)))
+			seq, err = d.GetSeq("LVOS")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(seq).To(Equal(uint64(901)))
+			// DATAボリュームのシーケンス番号をチェック
+			seq, err = d.GetSeq("LVDATA")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(seq).To(Equal(uint64(900)))
+			seq, err = d.GetSeq("LVDATA")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(seq).To(Equal(uint64(901)))
+			// VM番号のシーケンス番号をチェック
+			seq, err = d.GetSeq("VM")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(seq).To(Equal(uint64(900)))
+			seq, err = d.GetSeq("VM")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(seq).To(Equal(uint64(901)))
+		})
+
+		It("OSイメージのデータ取得チェック", func() {
+			vg, lv, err := d.GetOsImgTempByKey("ubuntu22.04")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vg).To(Equal("vg1"))
+			Expect(lv).To(Equal("lv01"))
+		})
+	})
+
+	Context("maadm version の動作テスト", func() {
+		It("mactl version でバージョンを取得", func() {
+			cmd := exec.Command("./bin/maadm-test", "version", "--api", "testdata/config_marmot.conf")
+			stdoutStderr, err := cmd.CombinedOutput()
+			GinkgoWriter.Println("err: ", err)
+			GinkgoWriter.Println("client version ", Version)
+			GinkgoWriter.Println("server version ", string(stdoutStderr))
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 })
