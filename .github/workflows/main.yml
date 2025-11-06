@@ -49,15 +49,15 @@ jobs:
         ports:
           - 2379:2379
 
-      coredns:
-        image: maho/coredns:1.11.1
-        ports: 
-          - 1053:53/udp
-        volumes:
-          -  /var/actions-runner/_work/marmot/marmot/pkg/dns/testconf:/conf
-        env:
-          CONF: "/conf/Corefile"
-          PORT: "53"
+      #coredns:
+      #  image: maho/coredns:1.11.1
+      #  ports: 
+      #    - 1053:53/udp
+      #  volumes:
+      #    -  /var/actions-runner/_work/marmot/marmot/pkg/dns/testconf:/conf
+      #  env:
+      #    CONF: "/conf/Corefile"
+      #    PORT: "53"
 
 
     steps:
