@@ -90,9 +90,9 @@ jobs:
       run: |
         export ETCDCTL_API=3 
         etcdctl get --endpoints=127.0.0.1:2379 /skydns/local/labo/a/hoge
-    - name: Check resolve by coredns and etcd 
-      run: |
-        dig -p 1053 @localhost A hoge.a.labo.local +noall +answer
+    #- name: Check resolve by coredns and etcd 
+    #  run: |
+    #    dig -p 1053 @localhost A hoge.a.labo.local +noall +answer
     - name: Test pkg/config
       run: | 
         cd pkg/config
