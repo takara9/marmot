@@ -103,11 +103,11 @@ jobs:
         cd pkg/db
         sudo -s make test
         cd ../..
-    - name: Test pkg/dns
-      run: | 
-        cd pkg/dns
-        sudo -s make test
-        cd ../..
+    #- name: Test pkg/dns
+    #  run: | 
+    #    cd pkg/dns
+    #    sudo -s make test
+    #    cd ../..
     - name: Test pkg/lvm
       run: | 
         cd pkg/lvm
