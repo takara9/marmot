@@ -63,7 +63,7 @@ jobs:
     steps:
     - name: change permissions
       run: |
-        sudo -S chown -R $USER:$USER /home/github/deployment/{REPOSITORY_NAME_HERE}
+        sudo -S chown -R $USER:$USER /var/actions-runner/_work/marmot
 
     - uses: actions/checkout@v5
 
