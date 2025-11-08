@@ -25,7 +25,16 @@ marmot を動かすために、以下のパッケージをインストールす�
 ```
 $ sudo apt-get update -y
 $ sudo apt-get install git curl gcc make kpartx
+```
+
+Ubuntu 22.04の場合
+```
 $ sudo apt-get install virt-top  virt-manager libvirt-dev libvirt-clients libvirt-daemon qemu-kvm qemu openvswitch-switch openvswitch-common openvswitch-doc
+```
+
+Ubuntu 24.04の場合
+```
+$ sudo apt-get install virt-top  virt-manager libvirt-dev libvirt-clients libvirt-daemon qemu-kvm qemu-system qemu-utils openvswitch-switch openvswitch-common openvswitch-doc
 ```
 
 
