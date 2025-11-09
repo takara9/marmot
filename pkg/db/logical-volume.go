@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	cf "github.com/takara9/marmot/pkg/config"
+	"github.com/takara9/marmot/pkg/types"
 	. "github.com/takara9/marmot/pkg/types"
 )
 
@@ -53,7 +54,6 @@ func (d *Database) SetImageTemplate(v cf.Image_yaml) error {
 
 // Keyに一致したOSイメージテンプレートを返す
 func (d *Database) GetOsImgTempByKey(osv string) (string, string, error) {
-
 	key := fmt.Sprintf("OSI_%v", osv)
 	resp, err := d.Cli.Get(d.Ctx, key)
 	if err != nil {
@@ -70,4 +70,25 @@ func (d *Database) GetOsImgTempByKey(osv string) (string, string, error) {
 		return "", "", err
 	}
 	return oit.VolumeGroup, oit.LogicaVol, nil
+}
+
+func (d *Database) GetOsImgTempes(osits *[]types.OsImageTemplate) error {
+	resp, err := d.GetEtcdByPrefix("OSI_")
+	if err != nil {
+		return err
+	}
+	if resp.Count == 0 {
+		return errors.New("NotFound")
+	}
+
+	for _, ev := range resp.Kvs {
+		var osit types.OsImageTemplate
+		err = json.Unmarshal(ev.Value, &osit)
+		if err != nil {
+			return err
+		}
+		*osits = append(*osits, osit)
+	}
+
+	return nil
 }
