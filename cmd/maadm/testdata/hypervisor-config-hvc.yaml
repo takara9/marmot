@@ -13,9 +13,12 @@ hv_spec:
       type: "nvme"
 
 image_template:
-  - name: "ubuntu22.04"
+  - name: "ubuntu20.04"
     volumegroup: "vg1"
     logicalvolume: "lv01"
+  - name: "ubuntu22.04"
+    volumegroup: "vg1"
+    logicalvolume: "lv02"
 
 #
 # シリアル番号管理

@@ -115,7 +115,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			vg, lv, err := d.GetOsImgTempByKey("ubuntu22.04")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vg).To(Equal("vg1"))
-			Expect(lv).To(Equal("lv01"))
+			Expect(lv).To(Equal("lv02"))
 		})
 	})
 
@@ -129,4 +129,25 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
+
+	Context("maadm export/import の動作テスト", func() {
+		/*
+			var d *db.Database
+			It("キーでハイパーバイザーのセットした情報を取得", func() {
+				var err error
+				d, err = db.NewDatabase("http://localhost:3379")
+				Expect(err).NotTo(HaveOccurred())
+			})
+		*/
+
+		It("mactl export 取得", func() {
+			cmd := exec.Command("./bin/maadm-test", "export", "--etcdurl", "http://localhost:3379")
+			stdout, err := cmd.CombinedOutput()
+			GinkgoWriter.Println("err: ", err)
+			GinkgoWriter.Println("stdout: ", string(stdout))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+	})
+
 })
