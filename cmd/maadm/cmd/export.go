@@ -4,6 +4,7 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 
@@ -31,7 +32,9 @@ var exportCmd = &cobra.Command{
 			slog.Error("Failed to get hypervisor infos", "error", err)
 			return err
 		}
-		fmt.Print(hvs)
+		//fmt.Print(hvs)
+		v, err := json.Marshal(hvs)
+		fmt.Println(string(v))
 
 		// OSイメージテンプレート
 		var osit []types.OsImageTemplate
@@ -40,7 +43,9 @@ var exportCmd = &cobra.Command{
 			slog.Error("Failed to get os image templates", "error", err)
 			return err
 		}
-		fmt.Print(osit)
+		//fmt.Print(osit)
+		v, err = json.Marshal(osit)
+		fmt.Println(string(v))
 
 		// シーケンス番号
 		var seqs []types.VmSerial
@@ -49,7 +54,20 @@ var exportCmd = &cobra.Command{
 			slog.Error("Failed to get serials", "error", err)
 			return err
 		}
-		fmt.Print(seqs)
+		//fmt.Print(seqs)
+		v, err = json.Marshal(seqs)
+		fmt.Println(string(v))
+
+		//仮想マシン
+		var vms []types.VirtualMachine
+		err = d.GetVmsStatus(&vms)
+		if err != nil {
+			slog.Error("Failed to get virtual machines", "error", err)
+			return err
+		}
+		//fmt.Print(vms)
+		v, err = json.Marshal(vms)
+		fmt.Println(string(v))
 
 		return nil
 	},
