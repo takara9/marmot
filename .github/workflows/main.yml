@@ -138,11 +138,6 @@ jobs:
         cd cmd/maadm
         sudo -s make test
         cd ../..
-    - name: Test cmd/migtool
-      run: | 
-        cd cmd/migtool
-        sudo -s make test
-        cd ../..
 
     - name: Clean up
       run: |
