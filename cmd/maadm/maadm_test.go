@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -141,13 +142,19 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		*/
 
 		It("mactl export 取得", func() {
-			cmd := exec.Command("./bin/maadm-test", "export", "--etcdurl", "http://localhost:3379")
+			cmd := exec.Command("./bin/maadm-test", "export", "--etcdurl", "http://localhost:3379", "--filename", "/tmp/marmot-backup.zip")
 			stdout, err := cmd.CombinedOutput()
 			GinkgoWriter.Println("err: ", err)
 			GinkgoWriter.Println("stdout: ", string(stdout))
 			Expect(err).NotTo(HaveOccurred())
+
+			cmd = exec.Command("zipinfo", "-1", "/tmp/marmot-backup.zip")
+			stdout, err = cmd.CombinedOutput()
+			GinkgoWriter.Println("err: ", err)
+			GinkgoWriter.Println("stdout: ", string(stdout))
+			line := strings.Split(string(stdout), "\n")
+			GinkgoWriter.Println("stdout line= ", len(line))
+			Expect(5).To(Equal(len(line)))
 		})
-
 	})
-
 })
