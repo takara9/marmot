@@ -12,13 +12,13 @@ import (
 // migrateCmd represents the migrate command
 var migrateCmd = &cobra.Command{
 	Use:   "migrate",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Short: "etcdサーバーのマイグレーションを実行するコマンドです。",
+	Long: `このコマンドはetcdサーバーのマイグレーション処理を実行します。
+サーバーのURLを指定して、必要なデータの移行や更新を行うことができます。
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+例:
+  maadm migrate --url http://localhost:2379
+`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("migrate called")
 	},
