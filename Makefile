@@ -1,4 +1,4 @@
-PROGRAMS = hv-admin mactl marmotd migtool maadm
+PROGRAMS = mactl marmotd maadm
 all:	$(PROGRAMS)
 
 MAKE = /usr/bin/make
@@ -41,7 +41,7 @@ clean:
 DISTDIR = /usr/local/marmot
 SERVER_EXE = marmotd
 CLIENT_CMD = mactl
-ADMIN_CMD  = hv-admin
+ADMIN_CMD  = maadm
 
 .PHONY:	install
 install:
