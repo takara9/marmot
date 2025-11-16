@@ -11,12 +11,6 @@ import (
 	//"github.com/takara9/marmot/pkg/config"
 )
 
-//var apiConfigFilename string
-//var etcdUrl string
-
-//var mactlConfig config.ClientConfig
-//var mactlConfig config.ClientConfig
-
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "maadm",

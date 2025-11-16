@@ -38,7 +38,7 @@ func init() {
 func writeJsonFile(filename string, data interface{}) error {
 	jsonBytes, err := json.Marshal(data)
 	if err != nil {
-		slog.Error("Failed to convert Json from stuct", "error", err)
+		slog.Error("Failed to convert Json from struct", "error", err)
 		return err
 	}
 
@@ -60,7 +60,7 @@ func writeJsonFile(filename string, data interface{}) error {
 func createZip(zipFilename string, srcDirectory string) error {
 	zipFile, err := os.Create(zipFilename)
 	if err != nil {
-		slog.Error(fmt.Sprintf("failed to create zip file %v", zipFilename), "err", err)
+		slog.Error(fmt.Sprintf("failed to creat zip file %v", zipFilename), "err", err)
 		return err
 	}
 	defer zipFile.Close()
@@ -153,8 +153,8 @@ func exportConfig() error {
 		return err
 	}
 
-	// バージョンを書き込むこと
-	// セットアップ時にバージョンを書き込むこと
+	// TODO: バージョンを書き込むこと
+	// TODO: セットアップ時にバージョンを書き込むこと
 
 	// ハイパーバイザー
 	var hvs []types.Hypervisor
