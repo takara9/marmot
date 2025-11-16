@@ -143,3 +143,4 @@ jobs:
       run: |
         go clean -cache -testcache -modcache -fuzzcache
         sudo rm -f /var/actions-runner/_work/marmot/marmot/cmd/mactl/bin/mactl-test
+        sudo rm -f /var/actions-runner/_work/marmot/marmot/cmd/maadm/bin/maadm-test
