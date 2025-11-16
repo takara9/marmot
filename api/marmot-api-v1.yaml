@@ -269,6 +269,10 @@ components:
       properties:
         version:
           type: string
+        serverVersion:
+          type: string
+        clientVersion:
+          type: string
     Hypervisor:
       type: object
       required:

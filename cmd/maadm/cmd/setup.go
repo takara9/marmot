@@ -52,6 +52,9 @@ func setHypervisorConfig(hvs config.Hypervisors_yaml, kvsurl string) error {
 		return err
 	}
 
+	// TODO: データベースへバージョンの書き込み
+	
+
 	// ハイパーバイザーの初期設定をDBへセット
 	for _, hv := range hvs.Hvs {
 		if err := d.SetHypervisors(hv); err != nil {
