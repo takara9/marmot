@@ -13,7 +13,7 @@ Group=root
 PermissionsStartOnly=true
 Restart=always
 
-ExecStart=/bin/sh -c "cd /usr/local/marmot;/usr/local/marmot/marmotd --node=hvc --etcd=http://localhost:2379"
+ExecStart=/bin/sh -c "cd /usr/local/marmot;/usr/local/marmot/marmotd --node=XXXHOSTXXXX --etcd=http://localhost:2379"
 
 [Install]
 WantedBy=multi-user.target
