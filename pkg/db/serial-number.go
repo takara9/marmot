@@ -2,6 +2,7 @@ package db
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	. "github.com/takara9/marmot/pkg/types"
@@ -42,6 +43,27 @@ func (d *Database) GetSeq(key string) (uint64, error) {
 		return 0, err
 	}
 	return seqno, nil
+}
+
+func (d *Database) GetSeqs(seqs *[]VmSerial) error {
+	resp, err := d.GetEtcdByPrefix("SEQNO_")
+	if err != nil {
+		return err
+	}
+	if resp.Count == 0 {
+		return errors.New("NotFound")
+	}
+
+	for _, ev := range resp.Kvs {
+		var seq VmSerial
+		err = json.Unmarshal(ev.Value, &seq)
+		if err != nil {
+			return err
+		}
+		*seqs = append(*seqs, seq)
+	}
+
+	return nil
 }
 
 func (d *Database) DelSeq(key string) error {

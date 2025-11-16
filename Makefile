@@ -1,4 +1,4 @@
-PROGRAMS = hv-admin mactl marmotd migtool
+PROGRAMS = hv-admin mactl marmotd migtool maadm
 all:	$(PROGRAMS)
 
 MAKE = /usr/bin/make
@@ -15,6 +15,7 @@ $(PROGRAMS):
 setup:
 	cp TAG pkg/marmotd/version.txt
 	cp TAG cmd/mactl/version.txt
+	cp TAG cmd/maadm/version.txt
 	env GOFLAGS= go install golang.org/x/tools/cmd/goimports@latest
 	env GOFLAGS= go install honnef.co/go/tools/cmd/staticcheck@latest
 	env GOFLAGS= go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest

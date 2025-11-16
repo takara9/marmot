@@ -8,13 +8,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-
-
 type DefaultConfig struct {
 	ApiServerUrl  string `yaml:"api_server"`
 	EtcdServerUrl string `yaml:"etcd_server"`
 }
-
 
 func ReadYAML(fn string, yf interface{}) error {
 	file, err := os.Open(fn)
@@ -30,7 +27,6 @@ func ReadYAML(fn string, yf interface{}) error {
 	}
 	return nil
 }
-
 
 func ReadHvConfig() (Hypervisors_yaml, DefaultConfig, error) {
 	var hvs Hypervisors_yaml
@@ -52,3 +48,11 @@ func ReadHvConfig() (Hypervisors_yaml, DefaultConfig, error) {
 	return hvs, cnf, nil
 }
 
+func ReadHypervisorConfig(yamlFileName string) (*Hypervisors_yaml, error) {
+	var hvs Hypervisors_yaml
+
+	if err := ReadConfig(yamlFileName, &hvs); err != nil {
+		return nil, err
+	}
+	return &hvs, nil
+}
