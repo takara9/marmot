@@ -1,15 +1,11 @@
 package main
 
 import (
-	_ "embed"
 	"log/slog"
 	"os"
 
 	"github.com/takara9/marmot/cmd/mactl/cmd"
 )
-
-//go:embed version.txt
-var version string
 
 // DEBUG Print
 const DEBUG bool = true

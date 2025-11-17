@@ -8,9 +8,6 @@ import (
 	"github.com/takara9/marmot/cmd/maadm/cmd"
 )
 
-//go:embed version.txt
-var Version string
-
 func main() {
 	// Setup slog
 	opts := &slog.HandlerOptions{

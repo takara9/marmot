@@ -14,13 +14,13 @@ $(PROGRAMS):
 
 setup:
 	cp TAG pkg/marmotd/version.txt
-	cp TAG cmd/mactl/version.txt
-	cp TAG cmd/maadm/version.txt
+	cp TAG cmd/mactl/cmd/version.txt
+	cp TAG cmd/maadm/cmd/version.txt
 	env GOFLAGS= go install golang.org/x/tools/cmd/goimports@latest
 	env GOFLAGS= go install honnef.co/go/tools/cmd/staticcheck@latest
 	env GOFLAGS= go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
 
-test:
+test: setup
 	test -z "$$(gofmt -s -l . | tee /dev/stderr)"
 	staticcheck ./...
 

@@ -1,12 +1,16 @@
 package cmd
 
 import (
+	_ "embed"
 	"fmt"
 	"log/slog"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/pkg/config"
 )
+
+//go:embed version.txt
+var version string
 
 var apiConfigFilename string
 
@@ -28,8 +32,9 @@ var versionCmd = &cobra.Command{
 			slog.Error("version", "err", err)
 			return
 		}
-		
-		fmt.Println(string(JsonVersion.Version))
+
+		fmt.Println("server version =", string(JsonVersion.Version))
+		fmt.Println("cleint version =", version)
 	},
 }
 

@@ -1,11 +1,15 @@
 package cmd
 
 import (
+	_ "embed"
 	"fmt"
 	"log/slog"
 
 	"github.com/spf13/cobra"
 )
+
+//go:embed version.txt
+var version string
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
@@ -26,7 +30,8 @@ var versionCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Println(string(JsonVersion.Version))
+		fmt.Println("server version =", string(JsonVersion.Version))
+		fmt.Println("client version =", version)
 	},
 }
 
