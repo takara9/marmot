@@ -93,6 +93,9 @@ jobs:
     #- name: Check resolve by coredns and etcd 
     #  run: |
     #    dig -p 1053 @localhost A hoge.a.labo.local +noall +answer
+    - name: Setup for build
+      run: |
+        make setup
     - name: Test pkg/config
       run: | 
         cd pkg/config
