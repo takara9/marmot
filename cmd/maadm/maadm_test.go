@@ -144,7 +144,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 	})
 
 	Context("maadm version の動作テスト", func() {
-		It("mactl version でバージョンを取得", func() {
+		It("maadm version でバージョンを取得", func() {
 			cmd := exec.Command("./bin/maadm-test", "version", "--api", "testdata/config_marmot.conf")
 			stdoutStderr, err := cmd.CombinedOutput()
 			GinkgoWriter.Println("err: ", err)
@@ -152,6 +152,31 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			GinkgoWriter.Println("server version ", string(stdoutStderr))
 			Expect(err).NotTo(HaveOccurred())
 		})
+
+		It("maadm version JSON形式でバージョンを取得", func() {
+			cmd := exec.Command("./bin/maadm-test", "version", "--output", "json", "--api", "testdata/config_marmot.conf")
+			stdoutStderr, err := cmd.CombinedOutput()
+			GinkgoWriter.Println("err: ", err)
+			GinkgoWriter.Println("server version ", string(stdoutStderr))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("maadm version TEXT形式でバージョンを取得", func() {
+			cmd := exec.Command("./bin/maadm-test", "version", "--output", "text", "--api", "testdata/config_marmot.conf")
+			stdoutStderr, err := cmd.CombinedOutput()
+			GinkgoWriter.Println("err: ", err)
+			GinkgoWriter.Println("server version ", string(stdoutStderr))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("maadm version YAML形式でバージョンを取得", func() {
+			cmd := exec.Command("./bin/maadm-test", "version", "--output", "yaml", "--api", "testdata/config_marmot.conf")
+			stdoutStderr, err := cmd.CombinedOutput()
+			GinkgoWriter.Println("err: ", err)
+			GinkgoWriter.Println("server version ", string(stdoutStderr))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
 	})
 
 	Context("maadm export/import の動作テスト", func() {

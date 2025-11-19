@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	//"github.com/takara9/marmot/pkg/config"
 )
+var outputStyle string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -28,4 +29,5 @@ func Execute() {
 
 func init() {
 	//rootCmd.PersistentFlags().StringVar(&apiConfigFilename, "api", "", "API Endpoint URL (default is $HOME/.config_marmot)")
+	rootCmd.PersistentFlags().StringVarP(&outputStyle, "output", "o", "text", "Text style output")
 }

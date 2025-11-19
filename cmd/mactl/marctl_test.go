@@ -110,6 +110,30 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			GinkgoWriter.Println("Version : ", string(stdoutStderr))
 		})
 
+		It("mactl version JSON形式でバージョンを取得", func() {
+			cmd := exec.Command("./bin/mactl-test", "version", "--output", "json", "--api", "testdata/config_marmot.conf")
+			stdoutStderr, err := cmd.CombinedOutput()
+			GinkgoWriter.Println("err: ", err)
+			GinkgoWriter.Println("server version ", string(stdoutStderr))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("mactl version TEXT形式でバージョンを取得", func() {
+			cmd := exec.Command("./bin/mactl-test", "version", "--output", "text", "--api", "testdata/config_marmot.conf")
+			stdoutStderr, err := cmd.CombinedOutput()
+			GinkgoWriter.Println("err: ", err)
+			GinkgoWriter.Println("server version ", string(stdoutStderr))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("mactl version YAML形式でバージョンを取得", func() {
+			cmd := exec.Command("./bin/mactl-test", "version", "--output", "yaml", "--api", "testdata/config_marmot.conf")
+			stdoutStderr, err := cmd.CombinedOutput()
+			GinkgoWriter.Println("err: ", err)
+			GinkgoWriter.Println("server version ", string(stdoutStderr))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
 		It("ハイパーバイザーの一覧取得", func() {
 			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "hv")
 			stdoutStderr, err := cmd.CombinedOutput()

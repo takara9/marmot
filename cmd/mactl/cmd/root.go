@@ -11,11 +11,7 @@ import (
 var apiConfigFilename string
 var mactlConfig config.ClientConfig
 var clusterConfigFilename string
-
-// BODYのJSONエラーメッセージ処理用
-type msg struct {
-	Msg string
-}
+var outputStyle string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -35,4 +31,5 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().StringVar(&apiConfigFilename, "api", "", "API Endpoint URL (default is $HOME/.config_marmot)")
 	rootCmd.Flags().BoolP("toggle", "t", false, "ヘルプメッセージの表示を切り替えます")
+	rootCmd.PersistentFlags().StringVarP(&outputStyle, "output", "o", "text", "Text style output")
 }
