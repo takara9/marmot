@@ -265,10 +265,8 @@ components:
     Version:
       type: object
       required:
-        - version
+        - clientVersion
       properties:
-        version:
-          type: string
         serverVersion:
           type: string
         clientVersion:

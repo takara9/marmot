@@ -66,9 +66,9 @@ type ReplyMessage struct {
 
 // Version defines model for Version.
 type Version struct {
-	ClientVersion *string `json:"clientVersion,omitempty"`
+	ClientVersion string `json:"clientVersion,omitempty"`
 	ServerVersion *string `json:"serverVersion,omitempty"`
-	Version       string  `json:"version"`
+	//Version       string  `json:"version"`
 }
 
 // Storage defines model for storage.

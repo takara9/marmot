@@ -56,7 +56,6 @@ func setHypervisorConfig(hvs config.Hypervisors_yaml, kvsurl string) error {
 	// データベースへバージョンの書き込み
 	serverVersion := version
 	ver := api.Version{
-		Version:       version,
 		ServerVersion: &serverVersion,
 	}
 	if err := d.SetVersion(ver); err != nil {

@@ -32,11 +32,10 @@ var versionCmd = &cobra.Command{
 			slog.Error("version", "err", err)
 			return err
 		}
-		sv := string(JsonVersion.Version)
+		sv := string(*JsonVersion.ServerVersion)
 		ver := api.Version{
-			ClientVersion: &version,
+			ClientVersion: version,
 			ServerVersion: &sv,
-			Version:       version,
 		}
 
 		switch outputStyle {
