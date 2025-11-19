@@ -50,7 +50,7 @@ var versionCmd = &cobra.Command{
 				slog.Error("failed to marshal to JSON", "err", err)
 				return err
 			}
-			fmt.Println(textJson)
+			fmt.Println(string(textJson))
 			return nil
 		case "yaml":
 			textYaml, err := yaml.Marshal(ver)
@@ -58,7 +58,7 @@ var versionCmd = &cobra.Command{
 				slog.Error("failed to marshal to YAML", "err", err)
 				return err
 			}
-			fmt.Println(textYaml)
+			fmt.Println(string(textYaml))
 			return nil
 		default:
 			fmt.Println("output style must set text/json/yaml")

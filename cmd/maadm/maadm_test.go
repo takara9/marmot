@@ -148,8 +148,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			cmd := exec.Command("./bin/maadm-test", "version", "--api", "testdata/config_marmot.conf")
 			stdoutStderr, err := cmd.CombinedOutput()
 			GinkgoWriter.Println("err: ", err)
-			//GinkgoWriter.Println("client version ", cmd.Version)
-			GinkgoWriter.Println("server version ", string(stdoutStderr))
+			GinkgoWriter.Println(string(stdoutStderr))
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -157,7 +156,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			cmd := exec.Command("./bin/maadm-test", "version", "--output", "json", "--api", "testdata/config_marmot.conf")
 			stdoutStderr, err := cmd.CombinedOutput()
 			GinkgoWriter.Println("err: ", err)
-			GinkgoWriter.Println("server version ", string(stdoutStderr))
+			GinkgoWriter.Println(string(stdoutStderr))
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -165,7 +164,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			cmd := exec.Command("./bin/maadm-test", "version", "--output", "text", "--api", "testdata/config_marmot.conf")
 			stdoutStderr, err := cmd.CombinedOutput()
 			GinkgoWriter.Println("err: ", err)
-			GinkgoWriter.Println("server version ", string(stdoutStderr))
+			GinkgoWriter.Println(string(stdoutStderr))
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -173,7 +172,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			cmd := exec.Command("./bin/maadm-test", "version", "--output", "yaml", "--api", "testdata/config_marmot.conf")
 			stdoutStderr, err := cmd.CombinedOutput()
 			GinkgoWriter.Println("err: ", err)
-			GinkgoWriter.Println("server version ", string(stdoutStderr))
+			GinkgoWriter.Println(string(stdoutStderr))
 			Expect(err).NotTo(HaveOccurred())
 		})
 
