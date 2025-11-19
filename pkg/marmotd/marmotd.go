@@ -68,7 +68,7 @@ func (s *Server) GetVersion(ctx echo.Context) error {
 	s.Lock.Lock()
 	defer s.Lock.Unlock()
 	var v api.Version
-	v.Version = Version
+	v.ServerVersion = &Version
 	return ctx.JSON(http.StatusOK, v)
 }
 

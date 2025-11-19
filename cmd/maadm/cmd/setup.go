@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 )
@@ -49,6 +50,16 @@ func setHypervisorConfig(hvs config.Hypervisors_yaml, kvsurl string) error {
 	d, err := db.NewDatabase(kvsurl)
 	if err != nil {
 		slog.Error("Failed to connect to etcd", "error", err)
+		return err
+	}
+
+	// データベースへバージョンの書き込み
+	serverVersion := version
+	ver := api.Version{
+		ServerVersion: &serverVersion,
+	}
+	if err := d.SetVersion(ver); err != nil {
+		slog.Error("Failed to set version", "error", err)
 		return err
 	}
 

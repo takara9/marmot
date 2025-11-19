@@ -125,8 +125,8 @@ func testMarmotd() {
 	It("Marmotd のバージョン情報取得", func() {
 		serverVer, err := marmotClient.GetVersion()
 		Expect(err).NotTo(HaveOccurred())
-		Expect(fmt.Sprintln(string(serverVer.Version))).To(Equal(fmt.Sprintln(marmotd.Version)))
-		GinkgoWriter.Println("Version : ", string(serverVer.Version))
+		Expect(fmt.Sprintln(string(*serverVer.ServerVersion))).To(Equal(fmt.Sprintln(marmotd.Version)))
+		GinkgoWriter.Println("Version : ", string(*serverVer.ServerVersion))
 	})
 
 	It("ハイパーバイザーの一覧取得", func() {
