@@ -23,13 +23,13 @@ func (d *Database) GetVersion() (*api.Version, error) {
 
 	ver, err := d.GetByKey("version")
 	if err != nil {
-		slog.Error("PutDataEtcd()", "err", err, "version", ver)
+		slog.Error("GetByKey()", "err", err, "version", ver)
 		return nil, err
 	}
 
 	err = json.Unmarshal(ver, &v)	
 	if err != nil {
-		slog.Error("PutDataEtcd()", "err", err, "version", ver)
+		slog.Error("json.Unmarshal()", "err", err, "version", ver)
 		return nil, err
 	}
 
