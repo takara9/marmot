@@ -94,7 +94,6 @@ var _ = Describe("Etcd", Ordered, func() {
 					ServerVersion: &sv,
 				}
 				err := d.SetVersion(v)
-				GinkgoWriter.Println("err=", err)
 				Expect(err).NotTo(HaveOccurred())
 			})
 			It("Get version", func() {
