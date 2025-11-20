@@ -49,7 +49,6 @@ func (d *Database) GetEtcdByPrefix(key string) (*etcd.GetResponse, error) {
 }
 
 
-
 func (d *Database) GetDnsByKey(path string) (DNSEntry, error) {
 	var entry DNSEntry
 	resp, err := d.Cli.Get(d.Ctx, path)
