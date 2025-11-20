@@ -118,6 +118,11 @@ var _ = Describe("Etcd", Ordered, func() {
 				GinkgoWriter.Println("v.ServerVersion=", v.ServerVersion)
 				Expect(v.ServerVersion).To(BeNil())
 			})
+
+			It("Delete version key", func() {
+				err := d.DelByKey("version")
+				Expect(err).NotTo(HaveOccurred())
+			})
 		})
 
 		Context("Test Sequence number", func() {
