@@ -23,7 +23,7 @@ func (d *Database) GetVersion() (*api.Version, error) {
 
 	ver, err := d.GetByKey("version")
 	if err != nil {
-		slog.Error("GetByKey()", "err", err, "version", ver)
+		slog.Error("GetByKey()", "err", err)
 		return nil, err
 	}
 
