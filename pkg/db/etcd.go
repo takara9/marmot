@@ -28,14 +28,29 @@ func NewDatabase(url string) (*Database, error) {
 	return &db, err
 }
 
+// キーが一致した値を取得
+func (d *Database) GetByKey(key string) ([]byte, error) {
+	resp, err := d.Cli.Get(d.Ctx, key)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.Count == 0 {
+		return nil, errors.New("not found")
+	}
+
+	return resp.Kvs[0].Value, nil
+}
+
 // 前方一致のサーチ
 func (d *Database) GetEtcdByPrefix(key string) (*etcd.GetResponse, error) {
 	resp, err := d.Cli.Get(d.Ctx, key, etcd.WithPrefix())
 	return resp, err
 }
 
-func (d *Database) GetEtcdByKey(path string) (DNSEntry, error) {
 
+
+func (d *Database) GetDnsByKey(path string) (DNSEntry, error) {
 	var entry DNSEntry
 	resp, err := d.Cli.Get(d.Ctx, path)
 	if err != nil {
@@ -52,6 +67,7 @@ func (d *Database) GetEtcdByKey(path string) (DNSEntry, error) {
 	}
 	return entry, nil
 }
+
 
 // 削除 キーに一致したデータ
 func (d *Database) DelByKey(key string) error {

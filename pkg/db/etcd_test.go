@@ -7,6 +7,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/takara9/marmot/api"
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	. "github.com/takara9/marmot/pkg/types"
@@ -82,6 +83,25 @@ var _ = Describe("Etcd", Ordered, func() {
 			It("Check delete data", func() {
 				_, err := d.GetHypervisorByKey(key_hv1)
 				Expect(err).To(HaveOccurred())
+			})
+		})
+		
+		Context("Test Version", func() {
+			It("Set version", func() {
+				sv := "3.2.1"
+				v := api.Version{
+					ClientVersion: "1.2.3",
+					ServerVersion: &sv,
+				}
+				err := d.SetVersion(v)
+				GinkgoWriter.Println("err=", err)
+				Expect(err).NotTo(HaveOccurred())
+			})
+			It("Get version", func() {
+				v, err := d.GetVersion()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(v.ClientVersion).To(Equal("1.2.3"))
+				Expect(*v.ServerVersion).To(Equal("3.2.1"))
 			})
 		})
 
