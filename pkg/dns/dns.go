@@ -108,7 +108,7 @@ func Get(rec DnsRecord, dbUrl string) (types.DNSEntry, error) {
 
 	// Get etcd
 	path = "/skydns" + path
-	rslt, err := d.GetEtcdByKey(path)
+	rslt, err := d.GetDnsByKey(path)
 	if err != nil {
 		slog.Error("", "err", err)
 		return rslt, err

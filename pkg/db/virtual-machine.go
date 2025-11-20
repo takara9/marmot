@@ -9,12 +9,12 @@ import (
 
 	"github.com/google/uuid"
 
-	. "github.com/takara9/marmot/pkg/types"
+	"github.com/takara9/marmot/pkg/types"
 )
 
 // Keyに一致したVMデータの取り出し
-func (d *Database) GetVmByKey(key string) (VirtualMachine, error) {
-	var vm VirtualMachine
+func (d *Database) GetVmByKey(key string) (types.VirtualMachine, error) {
+	var vm types.VirtualMachine
 
 	if len(key) == 0 {
 		return vm, errors.New("not found")
@@ -34,13 +34,13 @@ func (d *Database) GetVmByKey(key string) (VirtualMachine, error) {
 }
 
 // 仮想マシンのデータを取得
-func (d *Database) GetVmsStatus(vms *[]VirtualMachine) error {
+func (d *Database) GetVmsStatus(vms *[]types.VirtualMachine) error {
 	resp, err := d.GetEtcdByPrefix("vm")
 	if err != nil {
 		return err
 	}
 	for _, ev := range resp.Kvs {
-		var vm VirtualMachine // ここに宣言することで、ループ毎に初期化される
+		var vm types.VirtualMachine // ここに宣言することで、ループ毎に初期化される
 		err = json.Unmarshal(ev.Value, &vm)
 		if err != nil {
 			return err
@@ -54,11 +54,11 @@ func (d *Database) GetVmsStatus(vms *[]VirtualMachine) error {
 // 割り当てたハイパーバイザーのリソースを減らす
 // 仮想マシンのデータをセットする
 // 仮想マシンの状態をプロビジョニング中にする
-func (d *Database) AssignHvforVm(vm VirtualMachine) (string, string, string, uuid.UUID, int, error) {
+func (d *Database) AssignHvforVm(vm types.VirtualMachine) (string, string, string, uuid.UUID, int, error) {
 
 	var txId = uuid.New()
 	//トランザクション開始、他更新ロック 仮想マシンをデータベースに登録、状態は「データ登録中」
-	var hvs []Hypervisor
+	var hvs []types.Hypervisor
 	err := d.GetHypervisors(&hvs) // HVのステータス取得
 	if err != nil {
 		return "", "", "", txId, 0, err
@@ -69,7 +69,7 @@ func (d *Database) AssignHvforVm(vm VirtualMachine) (string, string, string, uui
 
 	// リソースに空きのあるハイパーバイザーを探す
 	var assigned = false
-	var hv Hypervisor
+	var hv types.Hypervisor
 	//var port int
 	for _, hv = range hvs {
 

@@ -8,7 +8,7 @@ import (
 
 	etcd "go.etcd.io/etcd/client/v3"
 
-	. "github.com/takara9/marmot/pkg/types"
+	"github.com/takara9/marmot/pkg/types"
 )
 
 type Database struct {
@@ -28,15 +28,29 @@ func NewDatabase(url string) (*Database, error) {
 	return &db, err
 }
 
+// キーが一致した値を取得
+func (d *Database) GetByKey(key string) ([]byte, error) {
+	resp, err := d.Cli.Get(d.Ctx, key)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.Count == 0 {
+		return nil, errors.New("not found")
+	}
+
+	return resp.Kvs[0].Value, nil
+}
+
 // 前方一致のサーチ
 func (d *Database) GetEtcdByPrefix(key string) (*etcd.GetResponse, error) {
 	resp, err := d.Cli.Get(d.Ctx, key, etcd.WithPrefix())
 	return resp, err
 }
 
-func (d *Database) GetEtcdByKey(path string) (DNSEntry, error) {
 
-	var entry DNSEntry
+func (d *Database) GetDnsByKey(path string) (types.DNSEntry, error) {
+	var entry types.DNSEntry
 	resp, err := d.Cli.Get(d.Ctx, path)
 	if err != nil {
 		return entry, err
@@ -52,6 +66,7 @@ func (d *Database) GetEtcdByKey(path string) (DNSEntry, error) {
 	}
 	return entry, nil
 }
+
 
 // 削除 キーに一致したデータ
 func (d *Database) DelByKey(key string) error {
@@ -80,7 +95,7 @@ func (d *Database) FindByPublicIPaddress(ipAddress string) (bool, error) {
 		return false, err
 	}
 	for _, ev := range resp.Kvs {
-		var vm VirtualMachine
+		var vm types.VirtualMachine
 		err = json.Unmarshal([]byte(ev.Value), &vm)
 		if err != nil {
 			return false, nil /// 例外的にエラーを無視
@@ -99,7 +114,7 @@ func (d *Database) FindByPrivateIPaddress(ipAddress string) (bool, error) {
 		return false, err
 	}
 	for _, ev := range resp.Kvs {
-		var vm VirtualMachine
+		var vm types.VirtualMachine
 		err = json.Unmarshal([]byte(ev.Value), &vm)
 		if err != nil {
 			return false, nil /// データが存在しない時には、どうするか？
@@ -119,7 +134,7 @@ func (d *Database) FindByHostname(hostname string) (string, error) {
 	}
 	//var vm VirtualMachine
 	for _, ev := range resp.Kvs {
-		var vm VirtualMachine
+		var vm types.VirtualMachine
 		err = json.Unmarshal([]byte(ev.Value), &vm)
 		if err != nil {
 			return "", err
@@ -139,7 +154,7 @@ func (d *Database) FindByHostAndClusteName(hostname string, clustername string) 
 	}
 
 	for _, ev := range resp.Kvs {
-		var vm VirtualMachine
+		var vm types.VirtualMachine
 		err = json.Unmarshal([]byte(ev.Value), &vm)
 		if err != nil {
 			return "", err

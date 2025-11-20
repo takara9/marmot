@@ -7,9 +7,10 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/takara9/marmot/api"
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
-	. "github.com/takara9/marmot/pkg/types"
+	"github.com/takara9/marmot/pkg/types"
 )
 
 var _ = Describe("Etcd", Ordered, func() {
@@ -63,25 +64,64 @@ var _ = Describe("Etcd", Ordered, func() {
 			var key_hv1 = "hv01"
 			data_hv1 := db.TestHvData1()
 
-			It("Put", func() {
+			It("Put Hypervisor", func() {
 				err := d.PutDataEtcd(key_hv1, data_hv1)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			It("Get", func() {
+			It("Get Hypervisor by key", func() {
 				data_get, err := d.GetHypervisorByKey(key_hv1)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(data_get.Cpu).To(Equal(data_hv1.Cpu))
 			})
 
-			It("Del", func() {
+			It("Delete Hypervisor by key", func() {
 				err = d.DelByKey(key_hv1)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			It("Check delete data", func() {
+			It("Check deleted data", func() {
 				_, err := d.GetHypervisorByKey(key_hv1)
 				Expect(err).To(HaveOccurred())
+			})
+		})
+
+		Context("Test Version", func() {
+			It("Set version", func() {
+				sv := "3.2.1"
+				v := api.Version{
+					ClientVersion: "1.2.3",
+					ServerVersion: &sv,
+				}
+				err := d.SetVersion(v)
+				Expect(err).NotTo(HaveOccurred())
+			})
+			It("Get version", func() {
+				v, err := d.GetVersion()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(v.ClientVersion).To(Equal("1.2.3"))
+				Expect(*v.ServerVersion).To(Equal("3.2.1"))
+			})
+
+			It("Set version with nil", func() {
+				v := api.Version{
+					ClientVersion: "1.2.3",
+				}
+				err := d.SetVersion(v)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("Get version with nil", func() {
+				v, err := d.GetVersion()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(v.ClientVersion).To(Equal("1.2.3"))
+				GinkgoWriter.Println("v.ServerVersion=", v.ServerVersion)
+				Expect(v.ServerVersion).To(BeNil())
+			})
+
+			It("Delete version key", func() {
+				err := d.DelByKey("version")
+				Expect(err).NotTo(HaveOccurred())
 			})
 		})
 
@@ -231,7 +271,7 @@ var _ = Describe("Etcd", Ordered, func() {
 			})
 
 			It("Get Hypervisors status", func() {
-				var hvs []Hypervisor
+				var hvs []types.Hypervisor
 				err = d.GetHypervisors(&hvs)
 				Expect(err).NotTo(HaveOccurred())
 				for _, h := range hvs {
@@ -269,7 +309,7 @@ var _ = Describe("Etcd", Ordered, func() {
 			}
 
 			It("Get Hypervisors status", func() {
-				var hvs []Hypervisor
+				var hvs []types.Hypervisor
 				err = d.GetHypervisors(&hvs)
 				Expect(err).NotTo(HaveOccurred())
 
