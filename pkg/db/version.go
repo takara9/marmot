@@ -33,5 +33,5 @@ func (d *Database) GetVersion() (*api.Version, error) {
 		return nil, err
 	}
 
-	return &v, err
+	return &v, nil
 }
