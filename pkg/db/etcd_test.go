@@ -108,7 +108,6 @@ var _ = Describe("Etcd", Ordered, func() {
 					ClientVersion: "1.2.3",
 				}
 				err := d.SetVersion(v)
-				GinkgoWriter.Println("err=", err)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
