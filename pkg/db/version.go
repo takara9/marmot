@@ -27,7 +27,7 @@ func (d *Database) GetVersion() (*api.Version, error) {
 		return nil, err
 	}
 
-	err = json.Unmarshal(ver, &v)	
+	err = json.Unmarshal(ver, &v)
 	if err != nil {
 		slog.Error("json.Unmarshal()", "err", err, "version", ver)
 		return nil, err
