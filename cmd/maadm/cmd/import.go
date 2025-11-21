@@ -139,7 +139,7 @@ func importConfig() error {
 		slog.Error("Failed to ubmarshal", "error", err)
 		return err
 	}
-
+	slog.Info("Imported version information", "importedVersion", bufVer)
 	// TODO: バージョンの整合性チェックと移行処理を実装する
 
 	// データベースへバージョンの書き込み
