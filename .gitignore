@@ -22,6 +22,8 @@ go.work
 
 bin
 cover.out
+
+# Built binaries
 maadm
 mactl
 marmotd
