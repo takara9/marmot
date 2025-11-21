@@ -116,13 +116,13 @@ func importConfig() error {
 		slog.Error("Failed to read json file in working dir", "error", err)
 		return err
 	}
-	var buf []types.Hypervisor
+	var buf []api.Hypervisor
 	if err := json.Unmarshal(jsonBytes, &buf); err != nil {
 		slog.Error("Failed to unmarshal", "error", err)
 		return err
 	}
 	for _, v := range buf {
-		d.PutDataEtcd(v.Key, v)
+		d.PutDataEtcd(*v.Key, v)
 
 	}
 

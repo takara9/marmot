@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/types"
 )
 
@@ -58,37 +59,36 @@ func (d *Database) AssignHvforVm(vm types.VirtualMachine) (string, string, strin
 
 	var txId = uuid.New()
 	//トランザクション開始、他更新ロック 仮想マシンをデータベースに登録、状態は「データ登録中」
-	var hvs []types.Hypervisor
+	var hvs []api.Hypervisor
 	err := d.GetHypervisors(&hvs) // HVのステータス取得
 	if err != nil {
 		return "", "", "", txId, 0, err
 	}
 
 	// フリーのCPU数の降順に並べ替える
-	sort.Slice(hvs, func(i, j int) bool { return hvs[i].FreeCpu > hvs[j].FreeCpu })
+	sort.Slice(hvs, func(i, j int) bool { return *hvs[i].FreeCpu > *hvs[j].FreeCpu })
 
 	// リソースに空きのあるハイパーバイザーを探す
 	var assigned = false
-	var hv types.Hypervisor
+	var hv api.Hypervisor
 	//var port int
 	for _, hv = range hvs {
 
 		// 停止中のHVの割り当てない
-		if hv.Status != 2 {
+		if *hv.Status != 2 {
 			continue
 		}
 
-		if hv.FreeCpu >= vm.Cpu {
-			if hv.FreeMemory >= vm.Memory {
+		if *hv.FreeCpu >= int32(vm.Cpu) {
+			if *hv.FreeMemory >= int64(vm.Memory) {
 
-				hv.FreeMemory = hv.FreeMemory - vm.Memory
-				hv.FreeCpu = hv.FreeCpu - vm.Cpu
+				*hv.FreeMemory = *hv.FreeMemory - int64(vm.Memory)
+				*hv.FreeCpu = *hv.FreeCpu - int32(vm.Cpu)
 				// ストレージの容量管理は未実装
-
 				vm.Status = 0           // 登録中
-				vm.HvNode = hv.Nodename // ハイパーバイザーを決定
-				vm.HvIpAddr = hv.IpAddr
-				vm.HvPort = hv.Port
+				vm.HvNode = hv.NodeName // ハイパーバイザーを決定
+				vm.HvIpAddr = *hv.IpAddr
+				vm.HvPort = int(*hv.Port)
 				assigned = true
 				break
 			}
@@ -100,17 +100,17 @@ func (d *Database) AssignHvforVm(vm types.VirtualMachine) (string, string, strin
 		return "", "", "", txId, 0, err
 	}
 	// ハイパーバイザーのリソース削減保存
-	err = d.PutDataEtcd(hv.Key, hv)
+	err = d.PutDataEtcd(*hv.Key, hv)
 	if err != nil {
 		return "", "", "", txId, 0, err
 	}
 	// VM名登録　シリアル番号取得
-	seqno, err := d.GetSeq("VM")
+	seqNum, err := d.GetSeq("VM")
 	if err != nil {
 		return "", "", "", txId, 0, err
 	}
 
-	vm.Key = fmt.Sprintf("vm_%s_%04d", vm.Name, seqno)
+	vm.Key = fmt.Sprintf("vm_%s_%04d", vm.Name, seqNum)
 	//vm.NameはOSホスト名なので受けたものを利用
 	vm.Uuid = txId
 	vm.Ctime = time.Now()
@@ -134,8 +134,8 @@ func (d *Database) RemoveVmFromHV(vmKey string) error {
 		return err
 	}
 	// HVからリソースを削除
-	hv.FreeCpu = hv.FreeCpu + vm.Cpu
-	hv.FreeMemory = hv.FreeMemory + vm.Memory
+	*hv.FreeCpu = *hv.FreeCpu + int32(vm.Cpu)
+	*hv.FreeMemory = *hv.FreeMemory + int64(vm.Memory)
 	err = d.PutDataEtcd(vm.HvNode, &hv)
 	if err != nil {
 		return err

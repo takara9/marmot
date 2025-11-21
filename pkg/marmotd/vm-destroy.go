@@ -28,9 +28,9 @@ func (m *Marmot) DestroyVM2(spec api.VmSpec) error {
 
 	// ステータスを調べて停止中であれば、足し算しない。
 	if vm.Status != types.STOPPED || vm.Status == types.ERROR {
-		hv.FreeCpu = hv.FreeCpu + vm.Cpu
-		hv.FreeMemory = hv.FreeMemory + vm.Memory
-		err = m.Db.PutDataEtcd(hv.Key, hv)
+		*hv.FreeCpu = *hv.FreeCpu + int32(vm.Cpu)
+		*hv.FreeMemory = *hv.FreeMemory + int64(vm.Memory)
+		err = m.Db.PutDataEtcd(*hv.Key, hv)
 		if err != nil {
 			slog.Error("PutDataEtcd()", "err", err)
 		}

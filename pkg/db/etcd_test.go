@@ -10,7 +10,6 @@ import (
 	"github.com/takara9/marmot/api"
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/types"
 )
 
 var _ = Describe("Etcd", Ordered, func() {
@@ -271,16 +270,16 @@ var _ = Describe("Etcd", Ordered, func() {
 			})
 
 			It("Get Hypervisors status", func() {
-				var hvs []types.Hypervisor
+				var hvs []api.Hypervisor
 				err = d.GetHypervisors(&hvs)
 				Expect(err).NotTo(HaveOccurred())
 				for _, h := range hvs {
-					GinkgoWriter.Println("Nodename     ", h.Nodename)
-					GinkgoWriter.Println("  PORT       ", h.Port)
+					GinkgoWriter.Println("Nodename     ", h.NodeName)
+					GinkgoWriter.Println("  PORT       ", *h.Port)
 					GinkgoWriter.Println("  CPU        ", h.Cpu)
-					GinkgoWriter.Println("  Memory     ", h.Memory)
-					GinkgoWriter.Println("  FreeCpu    ", h.FreeCpu)
-					GinkgoWriter.Println("  FreeMemory ", h.FreeMemory)
+					GinkgoWriter.Println("  Memory     ", *h.Memory)
+					GinkgoWriter.Println("  FreeCpu    ", *h.FreeCpu)
+					GinkgoWriter.Println("  FreeMemory ", *h.FreeMemory)
 				}
 			})
 		})
@@ -309,17 +308,17 @@ var _ = Describe("Etcd", Ordered, func() {
 			}
 
 			It("Get Hypervisors status", func() {
-				var hvs []types.Hypervisor
+				var hvs []api.Hypervisor
 				err = d.GetHypervisors(&hvs)
 				Expect(err).NotTo(HaveOccurred())
 
 				for _, h := range hvs {
-					GinkgoWriter.Println("Nodename     ", h.Nodename)
+					GinkgoWriter.Println("Nodename     ", h.NodeName)
 					GinkgoWriter.Println("  CPU        ", h.Cpu)
-					GinkgoWriter.Println("  Memory     ", h.Memory)
-					GinkgoWriter.Println("  FreeCpu    ", h.FreeCpu)
-					GinkgoWriter.Println("  FreeMemory ", h.FreeMemory)
-					GinkgoWriter.Println("  Status     ", h.Status)
+					GinkgoWriter.Println("  Memory     ", *h.Memory)
+					GinkgoWriter.Println("  FreeCpu    ", *h.FreeCpu)
+					GinkgoWriter.Println("  FreeMemory ", *h.FreeMemory)
+					GinkgoWriter.Println("  Status     ", *h.Status)
 				}
 			})
 

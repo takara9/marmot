@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/types"
 )
@@ -165,7 +166,7 @@ func exportConfig() error {
 	}
 
 	// ハイパーバイザー
-	var hvs []types.Hypervisor
+	var hvs []api.Hypervisor
 	err = d.GetHypervisors(&hvs)
 	if err != nil {
 		slog.Error("Failed to get hypervisor data", "error", err)
