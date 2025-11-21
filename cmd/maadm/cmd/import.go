@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/types"
 )
@@ -107,10 +108,28 @@ func importConfig() error {
 		return err
 	}
 
+	// バージョン情報
+	// marmot-version.json
+	path := filepath.Join(workDir, "marmot-version.json")
+	jsonBytes, err := os.ReadFile(path)
+	if err != nil {
+		slog.Error("Failed to read version json file in working dir", "error", err)
+		return err
+	}
+	var version api.Version
+	if err := json.Unmarshal(jsonBytes, &version); err != nil {
+		slog.Error("Failed to unmarshal version", "error", err)
+		return err
+	}
+	if err := d.SetVersion(version); err != nil {
+		slog.Error("Failed to set version", "error", err)
+		return err
+	}
+
 	// ハイパーバイザー
 	// read marmot-hv.json
-	path := filepath.Join(workDir, "marmot-hv.json")
-	jsonBytes, err := os.ReadFile(path)
+	path = filepath.Join(workDir, "marmot-hv.json")
+	jsonBytes, err = os.ReadFile(path)
 	if err != nil {
 		slog.Error("Failed to read json file in working dir", "error", err)
 		return err

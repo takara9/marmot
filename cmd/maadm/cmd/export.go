@@ -153,8 +153,16 @@ func exportConfig() error {
 		return err
 	}
 
-	// TODO: バージョンを書き込むこと
-	// TODO: セットアップ時にバージョンを書き込むこと
+	// バージョン情報を取得してエクスポート
+	ver, err := d.GetVersion()
+	if err != nil {
+		slog.Error("Failed to get version data", "error", err)
+		return err
+	}
+	if err := writeJsonFile(filepath.Join(workDir, "marmot-version.json"), ver); err != nil {
+		slog.Error("Failed to write version data", "error", err)
+		return err
+	}
 
 	// ハイパーバイザー
 	var hvs []types.Hypervisor

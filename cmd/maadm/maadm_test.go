@@ -199,6 +199,17 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		var h types.Hypervisor
 
 		// marmotd を介さずに、DB操作で内容をチェックする
+		It("バージョン情報がインポートされたことを確認", func() {
+			var err error
+			d, err = db.NewDatabase("http://localhost:4379")
+			Expect(err).NotTo(HaveOccurred())
+			ver, err := d.GetVersion()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ver).NotTo(BeNil())
+			Expect(ver.ServerVersion).NotTo(BeNil())
+			Expect(*ver.ServerVersion).To(Equal("0.9.0"))
+		})
+
 		It("キーでハイパーバイザーのセットした情報を取得", func() {
 			var err error
 			d, err = db.NewDatabase("http://localhost:4379")
