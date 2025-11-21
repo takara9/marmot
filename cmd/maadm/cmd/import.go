@@ -118,7 +118,7 @@ func importConfig() error {
 	}
 	var buf []types.Hypervisor
 	if err := json.Unmarshal(jsonBytes, &buf); err != nil {
-		slog.Error("Failed to ubmarshal", "error", err)
+		slog.Error("Failed to unmarshal", "error", err)
 		return err
 	}
 	for _, v := range buf {
@@ -136,9 +136,10 @@ func importConfig() error {
 	}
 	var bufVer api.Version
 	if err := json.Unmarshal(jsonBytes, &bufVer); err != nil {
-		slog.Error("Failed to ubmarshal", "error", err)
+		slog.Error("Failed to unmarshal", "error", err)
 		return err
 	}
+	fmt.Println("Importing marmot version:", bufVer.ServerVersion)
 
 	// TODO: バージョンの整合性チェックと移行処理を実装する
 
@@ -162,7 +163,7 @@ func importConfig() error {
 	}
 	var buf2 []types.OsImageTemplate
 	if err := json.Unmarshal(jsonBytes, &buf2); err != nil {
-		slog.Error("Failed to ubmarshal", "error", err)
+		slog.Error("Failed to unmarshal", "error", err)
 		return err
 	}
 	for _, v := range buf2 {
@@ -180,7 +181,7 @@ func importConfig() error {
 	}
 	var buf3 []types.VmSerial
 	if err := json.Unmarshal(jsonBytes, &buf3); err != nil {
-		slog.Error("Failed to ubmarshal", "error", err)
+		slog.Error("Failed to unmarshal", "error", err)
 		return err
 	}
 	for _, v := range buf3 {
@@ -198,7 +199,7 @@ func importConfig() error {
 	}
 	var buf4 []types.VirtualMachine
 	if err := json.Unmarshal(jsonBytes, &buf4); err != nil {
-		slog.Error("Failed to ubmarshal", "error", err)
+		slog.Error("Failed to unmarshal", "error", err)
 		return err
 	}
 	for _, v := range buf4 {
