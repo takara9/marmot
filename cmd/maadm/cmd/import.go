@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/types"
 )
@@ -123,6 +124,32 @@ func importConfig() error {
 	for _, v := range buf {
 		d.PutDataEtcd(v.Key, v)
 
+	}
+
+	// バージョン
+	// marmot-version.json
+	path = filepath.Join(workDir, "marmot-version.json")
+	jsonBytes, err = os.ReadFile(path)
+	if err != nil {
+		slog.Error("Failed to read json file in working dir", "error", err)
+		return err
+	}
+	var bufVer api.Version
+	if err := json.Unmarshal(jsonBytes, &bufVer); err != nil {
+		slog.Error("Failed to ubmarshal", "error", err)
+		return err
+	}
+	slog.Info("Imported version information", "importedVersion", bufVer)
+	// TODO: バージョンの整合性チェックと移行処理を実装する
+
+	// データベースへバージョンの書き込み
+	serverVersion := version
+	ver := api.Version{
+		ServerVersion: &serverVersion,
+	}
+	if err := d.SetVersion(ver); err != nil {
+		slog.Error("Failed to set version", "error", err)
+		return err
 	}
 
 	// OSイメージテンプレート
