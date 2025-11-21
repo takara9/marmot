@@ -81,8 +81,8 @@ func createZip(zipFilename string, srcDirectory string) error {
 	for _, file := range files {
 		slog.Debug(fmt.Sprintf("file: %v in %v", file.Name(), srcDirectory))
 		if file.IsDir() {
-			slog.Error(fmt.Sprintf("Not allow recursive directory: %s", file.Name()))
-			return fmt.Errorf("Not allow recursive directory: %s", file.Name())
+			slog.Error(fmt.Sprintf("not allow recursive directory: %s", file.Name()))
+			return fmt.Errorf("not allow recursive directory: %s", file.Name())
 		}
 		filesToZip = append(filesToZip, filepath.Join(srcDirectory, file.Name()))
 	}
@@ -153,8 +153,16 @@ func exportConfig() error {
 		return err
 	}
 
-	// TODO: バージョンを書き込むこと
-	// TODO: セットアップ時にバージョンを書き込むこと
+	// セットアップ時のバージョンを書き出す
+	ver, err := d.GetVersion()
+	if err != nil {
+		slog.Error("Failed to get marmot version", "error", err)
+		return err
+	}
+	if err := writeJsonFile(filepath.Join(workDir, "marmot-version.json"), ver); err != nil {
+		slog.Error("Failed to write version data", "error", err)
+		return err
+	}
 
 	// ハイパーバイザー
 	var hvs []types.Hypervisor
