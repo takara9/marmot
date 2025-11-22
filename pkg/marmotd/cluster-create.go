@@ -98,14 +98,19 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		vm.Storage = &s
 
 		//スケジュールを実行
-		var err error
-		vm.HvNode, *vm.HvIpAddr, *vm.Key, *vm.Uuid, *vm.HvPort, err = m.Db.AssignHvforVm(vm)
+		//var err error
+		HvNode, HvIpAddr, Key, Uuid, HvPort, err := m.Db.AssignHvforVm(vm)
 		if err != nil {
 			slog.Error("", "err", err)
 			break_err = true
 			return_err = err
 			break
 		}
+		vm.HvNode = HvNode
+		vm.HvIpAddr = &HvIpAddr
+		vm.Key = &Key
+		vm.Uuid = &Uuid
+		vm.HvPort = &HvPort
 
 		// OSのバージョン、テンプレートを設定
 		spec.Ostempvariant = cnf.OsVariant
