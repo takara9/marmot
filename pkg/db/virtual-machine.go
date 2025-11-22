@@ -61,16 +61,18 @@ func (d *Database) AssignHvforVm(vm api.VirtualMachine) (string, string, string,
 	if err != nil {
 		return "", "", "", txId.String(), 0, err
 	}
+	slog.Debug("=== AssignHvforVm", "d.GetHypervisors()", hvs)
 
 	// フリーのCPU数の降順に並べ替える
 	sort.Slice(hvs, func(i, j int) bool { return *hvs[i].FreeCpu > *hvs[j].FreeCpu })
+
+	slog.Debug("=== AssignHvforVm", "sorted", hvs)
 
 	// リソースに空きのあるハイパーバイザーを探す
 	var assigned = false
 	var hv api.Hypervisor
 	//var port int
 	for _, hv = range hvs {
-
 		// 停止中のHVの割り当てない
 		if *hv.Status != 2 {
 			continue
@@ -78,6 +80,7 @@ func (d *Database) AssignHvforVm(vm api.VirtualMachine) (string, string, string,
 
 		if *hv.FreeCpu >= *vm.Cpu {
 			if *hv.FreeMemory >= *vm.Memory {
+				slog.Debug("=== AssignHvforVm assigned", "hv=", hv)
 				*hv.FreeMemory = *hv.FreeMemory - *vm.Memory
 				*hv.FreeCpu = *hv.FreeCpu - *vm.Cpu
 				// ストレージの容量管理は未実装
@@ -92,19 +95,24 @@ func (d *Database) AssignHvforVm(vm api.VirtualMachine) (string, string, string,
 	}
 	// リソースに空きが無い場合はエラーを返す
 	if !assigned {
+		slog.Debug("=== AssignHvforVm failed to assign", "", "")
 		err := errors.New("could't assign VM due to doesn't have enough a resouce on HV")
 		return "", "", "", txId.String(), 0, err
 	}
+
 	// ハイパーバイザーのリソース削減保存
 	err = d.PutDataEtcd(*hv.Key, hv)
 	if err != nil {
 		return "", "", "", txId.String(), 0, err
 	}
+	slog.Debug("=== d.PutDataEtcd", "hv.Key", *hv.Key)
+
 	// VM名登録　シリアル番号取得
 	seqNum, err := d.GetSeq("VM")
 	if err != nil {
 		return "", "", "", txId.String(), 0, err
 	}
+	slog.Debug("=== d.GetSeq()", "seqNum", seqNum)
 
 	*vm.Key = fmt.Sprintf("vm_%s_%04d", vm.Name, seqNum)
 	//vm.NameはOSホスト名なので受けたものを利用
@@ -113,6 +121,7 @@ func (d *Database) AssignHvforVm(vm api.VirtualMachine) (string, string, string,
 	vm.STime = timePtr(time.Now())
 	//vm.Status = 1  // 状態プロビ中
 	err = d.PutDataEtcd(*vm.Key, vm) // 仮想マシンのデータ登録
+	slog.Debug("=== d.PutDataEtcd()", "vm.Key", *vm.Key, vm)
 
 	return vm.HvNode, *vm.HvIpAddr, *vm.Key, *vm.Uuid, *vm.HvPort, err
 }
