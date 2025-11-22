@@ -38,9 +38,8 @@ jobs:
       with:
         who-to-greet: ${{ vars.GREET_NAME }}
 
-
   # Label of the job
-  marmot-CI-job:
+  marmot-package-job:
     needs: display-variables
     runs-on: self-hosted
     services:
@@ -126,6 +125,12 @@ jobs:
         cd pkg/virt
         sudo -s make test
         cd ../..
+ 
+  marmot-command-test-job:
+    runs-on: self-hosted
+    needs: display-variables
+    steps:
+
     - name: Test pkg/marmotd
       run: | 
         cd pkg/marmotd
@@ -142,6 +147,12 @@ jobs:
         sudo -s make test
         cd ../..
 
+  clean-up-job:
+    runs-on: self-hosted
+    needs: 
+      - marmot-package-job 
+      - marmot-command-test-job
+    steps:
     - name: Clean up
       run: |
         go clean -cache -testcache -modcache -fuzzcache

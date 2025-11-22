@@ -18,12 +18,13 @@ import (
 	"io"
 	"time"
 
+	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/lvm"
-	"github.com/takara9/marmot/pkg/types"
 )
+
 // ハイパーバイザーのリストを取り出す
-func getHypervisors(dbUrl string) ([]types.Hypervisor, error) {
+func getHypervisors(dbUrl string) ([]api.Hypervisor, error) {
 	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
 		slog.Error("", "err", err)
@@ -37,9 +38,9 @@ func getHypervisors(dbUrl string) ([]types.Hypervisor, error) {
 		return nil, err
 	}
 
-	var hvs []types.Hypervisor
+	var hvs []api.Hypervisor
 	for _, val := range resp.Kvs {
-		var hv types.Hypervisor
+		var hv api.Hypervisor
 		err = json.Unmarshal(val.Value, &hv)
 		if err != nil {
 			return nil, err
@@ -50,7 +51,7 @@ func getHypervisors(dbUrl string) ([]types.Hypervisor, error) {
 }
 
 // ハイパーバイザーをREST-APIでアクセスして疎通を確認、DBへ反映させる
-func CheckHypervisors(dbUrl string, node string) ([]types.Hypervisor, error) {
+func CheckHypervisors(dbUrl string, node string) ([]api.Hypervisor, error) {
 	// 要らないんじゃない？
 	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
@@ -68,7 +69,7 @@ func CheckHypervisors(dbUrl string, node string) ([]types.Hypervisor, error) {
 	// 自ノードを含むハイパーバイザーの死活チェック、DBへ反映
 	for _, val := range hvs {
 		// ハイパーバイザーの状態をDBへ書き込み
-		err = d.PutDataEtcd(val.Key, val)
+		err = d.PutDataEtcd(*val.Key, val)
 		if err != nil {
 			slog.Error("", "err", err)
 		}
@@ -97,6 +98,8 @@ func ReqGetQuick(apipath string, api string) (*http.Response, []byte, error) {
 	return res, byteBody, nil
 }
 
+func int64Ptr(i uint64) *int64 { j := int64(i); return &j }
+
 func CheckHvVgAll(dbUrl string, node string) error {
 	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
@@ -111,18 +114,18 @@ func CheckHvVgAll(dbUrl string, node string) error {
 		return err
 	}
 
-	for i := 0; i < len(hv.StgPool); i++ {
-		total_sz, free_sz, err := lvm.CheckVG(hv.StgPool[i].VolGroup)
+	for i := 0; i < len(*hv.StgPool); i++ {
+		total_sz, free_sz, err := lvm.CheckVG(*(*hv.StgPool)[i].VolGroup)
 		if err != nil {
 			slog.Error("", "err", err)
 			return err
 		}
-		hv.StgPool[i].FreeCap = free_sz / 1024 / 1024 / 1024
-		hv.StgPool[i].VgCap = total_sz / 1024 / 1024 / 1024
+		(*hv.StgPool)[i].FreeCap = int64Ptr(free_sz / 1024 / 1024 / 1024)
+		(*hv.StgPool)[i].VgCap = int64Ptr(total_sz / 1024 / 1024 / 1024)
 	}
 
 	// DBへ書き込み
-	err = d.PutDataEtcd(hv.Key, hv)
+	err = d.PutDataEtcd(*hv.Key, hv)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
@@ -162,15 +165,15 @@ func CheckHvVG2(dbUrl string, node string, vg string) error {
 	}
 
 	// 一致するVGにデータをセット
-	for i := 0; i < len(hv.StgPool); i++ {
-		if hv.StgPool[i].VolGroup == vg {
-			hv.StgPool[i].FreeCap = free_sz / 1024 / 1024 / 1024
-			hv.StgPool[i].VgCap = total_sz / 1024 / 1024 / 1024
+	for i := 0; i < len(*hv.StgPool); i++ {
+		if *(*hv.StgPool)[i].VolGroup == vg {
+			(*hv.StgPool)[i].FreeCap = int64Ptr(free_sz / 1024 / 1024 / 1024)
+			(*hv.StgPool)[i].VgCap = int64Ptr(total_sz / 1024 / 1024 / 1024)
 		}
-
 	}
+
 	// DBへ書き込み
-	err = d.PutDataEtcd(hv.Key, hv)
+	err = d.PutDataEtcd(*hv.Key, hv)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err

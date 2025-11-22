@@ -116,13 +116,13 @@ func importConfig() error {
 		slog.Error("Failed to read json file in working dir", "error", err)
 		return err
 	}
-	var buf []types.Hypervisor
+	var buf []api.Hypervisor
 	if err := json.Unmarshal(jsonBytes, &buf); err != nil {
-		slog.Error("Failed to ubmarshal", "error", err)
+		slog.Error("Failed to unmarshal", "error", err)
 		return err
 	}
 	for _, v := range buf {
-		d.PutDataEtcd(v.Key, v)
+		d.PutDataEtcd(*v.Key, v)
 
 	}
 
@@ -136,7 +136,7 @@ func importConfig() error {
 	}
 	var bufVer api.Version
 	if err := json.Unmarshal(jsonBytes, &bufVer); err != nil {
-		slog.Error("Failed to ubmarshal", "error", err)
+		slog.Error("Failed to unmarshal", "error", err)
 		return err
 	}
 	slog.Info("Imported version information", "importedVersion", bufVer)
@@ -162,7 +162,7 @@ func importConfig() error {
 	}
 	var buf2 []types.OsImageTemplate
 	if err := json.Unmarshal(jsonBytes, &buf2); err != nil {
-		slog.Error("Failed to ubmarshal", "error", err)
+		slog.Error("Failed to unmarshal", "error", err)
 		return err
 	}
 	for _, v := range buf2 {
@@ -180,7 +180,7 @@ func importConfig() error {
 	}
 	var buf3 []types.VmSerial
 	if err := json.Unmarshal(jsonBytes, &buf3); err != nil {
-		slog.Error("Failed to ubmarshal", "error", err)
+		slog.Error("Failed to unmarshal", "error", err)
 		return err
 	}
 	for _, v := range buf3 {
@@ -198,7 +198,7 @@ func importConfig() error {
 	}
 	var buf4 []types.VirtualMachine
 	if err := json.Unmarshal(jsonBytes, &buf4); err != nil {
-		slog.Error("Failed to ubmarshal", "error", err)
+		slog.Error("Failed to unmarshal", "error", err)
 		return err
 	}
 	for _, v := range buf4 {

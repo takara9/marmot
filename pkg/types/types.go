@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
+/*
 type StoragePool struct {
 	VolGroup string // ボリュームグループ名
 	FreeCap  uint64 // 空き容量 GB
@@ -30,25 +31,12 @@ type Hypervisor struct {
 	//VolGroups   []string // ボリュームグループのリスト
 }
 
-type HypervisorOld struct {
-	Nodename   string        // ハイパーバイザーノード名
-	Cpu        int           // 搭載CPU量 仮想コア数＝VCPU
-	Memory     int           // 搭載メモリ量 MB
-	IpAddr     string        // ハイパーバイザーホストのIP
-	FreeCpu    int           // 空きCPU
-	FreeMemory int           // 空きメモリ
-	Key        string        // Etcd Key
-	Status     int           // 状態  0:停止中, 1:障害中, 2:稼働中
-	StgPool    []StoragePool //
-	// 以下は廃止予定
-	//FreeCap     uint64   // 空き容量 GB
-	//VgCap       uint64   // VM用ストレージ容量 GB
-	//VolGroups   []string // ボリュームグループのリスト
-}
 
 type Hypervisors struct {
 	Hvs []Hypervisor
 }
+*/
+
 
 // Serial Number Control
 type VmSerial struct {
@@ -113,3 +101,22 @@ type DNSEntry struct {
 	Host string `json:"host"`
 	Ttl  uint64 `json:"ttl"`
 }
+
+
+/*
+type HypervisorOld struct {
+	Nodename   string        // ハイパーバイザーノード名
+	Cpu        int           // 搭載CPU量 仮想コア数＝VCPU
+	Memory     int           // 搭載メモリ量 MB
+	IpAddr     string        // ハイパーバイザーホストのIP
+	FreeCpu    int           // 空きCPU
+	FreeMemory int           // 空きメモリ
+	Key        string        // Etcd Key
+	Status     int           // 状態  0:停止中, 1:障害中, 2:稼働中
+	StgPool    []StoragePool //
+	// 以下は廃止予定
+	//FreeCap     uint64   // 空き容量 GB
+	//VgCap       uint64   // VM用ストレージ容量 GB
+	//VolGroups   []string // ボリュームグループのリスト
+}
+*/

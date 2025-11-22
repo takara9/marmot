@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/takara9/marmot/pkg/types"
+	"github.com/takara9/marmot/api"
 )
 
 var hvCmd = &cobra.Command{
@@ -32,15 +32,15 @@ var hvCmd = &cobra.Command{
 		fmt.Printf("%-10s %-3v %-15v %-8v  %-12v   %-12v", "HV-NAME", "ONL", "IPaddr", "VCPU", "RAM(MB)", "Storage(GB)")
 		fmt.Printf("\n")
 		for dec.More() {
-			var hv types.Hypervisor
+			var hv api.Hypervisor
 			err := dec.Decode(&hv)
 			if err != nil {
 				slog.Error("reading hypervisors status", "err", err)
 			}
 			fmt.Printf("%-10s %-3v %-15v %4d/%-4d %6d/%-6d  ",
-				hv.Nodename, status[hv.Status], hv.IpAddr, hv.FreeCpu, hv.Cpu, hv.FreeMemory, hv.Memory)
-			for _, v := range hv.StgPool {
-				fmt.Printf("%v(%v): %5d/%-5d ", v.VolGroup, v.Type, v.FreeCap, v.VgCap)
+				hv.NodeName, status[*hv.Status], hv.IpAddr, *hv.FreeCpu, hv.Cpu, *hv.FreeMemory, *hv.Memory)
+			for _, v := range *hv.StgPool {
+				fmt.Printf("%v(%v): %5d/%-5d ", *v.VolGroup, *v.Type, *v.FreeCap, *v.VgCap)
 			}
 			fmt.Printf("\n")
 		}

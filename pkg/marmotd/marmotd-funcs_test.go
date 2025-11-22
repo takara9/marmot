@@ -132,7 +132,7 @@ func testMarmotFuncs() {
 			GinkgoWriter.Println("xxxxxx array size == ", len(hv))
 			for i, v := range hv {
 				GinkgoWriter.Println("xxxxxx hv index    == ", i)
-				GinkgoWriter.Println("xxxxxx hv nodename == ", v.Nodename)
+				GinkgoWriter.Println("xxxxxx hv nodename == ", v.NodeName)
 				GinkgoWriter.Println("xxxxxx hv port     == ", v.Port)
 				GinkgoWriter.Println("xxxxxx hv CPU      == ", v.Cpu)
 				GinkgoWriter.Println("xxxxxx hv Mem      == ", v.Memory)

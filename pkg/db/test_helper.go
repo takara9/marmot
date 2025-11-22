@@ -1,18 +1,19 @@
 package db
 
 import (
+	"github.com/takara9/marmot/api"
 	. "github.com/takara9/marmot/pkg/types"
 )
 
-func TestHvData1() Hypervisor {
-	var hv Hypervisor
-	hv.Nodename = "hv01"
+func TestHvData1() api.Hypervisor {
+	var hv api.Hypervisor
+	hv.NodeName = "hv01"
 	hv.Cpu = 10
-	hv.Memory = 64
-	hv.IpAddr = "10.1.0.100"
-	hv.FreeCpu = 10
-	hv.FreeMemory = 64
-	hv.Key = "hv01"
+	hv.Memory = int64PtrConvMB(64)
+	hv.IpAddr = stringPtr("10.1.0.100")
+	hv.FreeCpu = int32Ptr(10)
+	hv.FreeMemory = int64PtrConvMB(64)
+	hv.Key = stringPtr("hv01")
 	return hv
 }
 

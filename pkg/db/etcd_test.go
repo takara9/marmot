@@ -10,7 +10,6 @@ import (
 	"github.com/takara9/marmot/api"
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/types"
 )
 
 var _ = Describe("Etcd", Ordered, func() {
@@ -255,8 +254,13 @@ var _ = Describe("Etcd", Ordered, func() {
 			It("PUT Hypervisor node data #2", func() {
 				// ハイパーバイザー
 				for _, hv := range cnf.Hvs {
-					GinkgoWriter.Println(hv)
-					d.SetHypervisors(hv)
+					//GinkgoWriter.Println(hv)
+					GinkgoWriter.Println("Name=", hv.Name)
+					GinkgoWriter.Println("CPU=", hv.Cpu)
+					GinkgoWriter.Println("RAM=", hv.Ram)
+					err = d.SetHypervisors(hv)
+					Expect(err).NotTo(HaveOccurred())
+					GinkgoWriter.Println("Set Hypervisor data into ETCD:", hv.Name)
 				}
 
 				// OSイメージテンプレート
@@ -271,16 +275,16 @@ var _ = Describe("Etcd", Ordered, func() {
 			})
 
 			It("Get Hypervisors status", func() {
-				var hvs []types.Hypervisor
+				var hvs []api.Hypervisor
 				err = d.GetHypervisors(&hvs)
 				Expect(err).NotTo(HaveOccurred())
 				for _, h := range hvs {
-					GinkgoWriter.Println("Nodename     ", h.Nodename)
-					GinkgoWriter.Println("  PORT       ", h.Port)
+					GinkgoWriter.Println("Nodename     ", h.NodeName)
+					GinkgoWriter.Println("  PORT       ", *h.Port)
 					GinkgoWriter.Println("  CPU        ", h.Cpu)
-					GinkgoWriter.Println("  Memory     ", h.Memory)
-					GinkgoWriter.Println("  FreeCpu    ", h.FreeCpu)
-					GinkgoWriter.Println("  FreeMemory ", h.FreeMemory)
+					GinkgoWriter.Println("  Memory     ", *h.Memory)
+					GinkgoWriter.Println("  FreeCpu    ", *h.FreeCpu)
+					GinkgoWriter.Println("  FreeMemory ", *h.FreeMemory)
 				}
 			})
 		})
@@ -309,17 +313,17 @@ var _ = Describe("Etcd", Ordered, func() {
 			}
 
 			It("Get Hypervisors status", func() {
-				var hvs []types.Hypervisor
+				var hvs []api.Hypervisor
 				err = d.GetHypervisors(&hvs)
 				Expect(err).NotTo(HaveOccurred())
 
 				for _, h := range hvs {
-					GinkgoWriter.Println("Nodename     ", h.Nodename)
+					GinkgoWriter.Println("Nodename     ", h.NodeName)
 					GinkgoWriter.Println("  CPU        ", h.Cpu)
-					GinkgoWriter.Println("  Memory     ", h.Memory)
-					GinkgoWriter.Println("  FreeCpu    ", h.FreeCpu)
-					GinkgoWriter.Println("  FreeMemory ", h.FreeMemory)
-					GinkgoWriter.Println("  Status     ", h.Status)
+					GinkgoWriter.Println("  Memory     ", *h.Memory)
+					GinkgoWriter.Println("  FreeCpu    ", *h.FreeCpu)
+					GinkgoWriter.Println("  FreeMemory ", *h.FreeMemory)
+					GinkgoWriter.Println("  Status     ", *h.Status)
 				}
 			})
 

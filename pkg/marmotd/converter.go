@@ -8,6 +8,7 @@ import (
 )
 
 // HVのデータベース保存形式を新API形式に変換する
+/*
 func convHVinfoDBtoAPI(hv types.Hypervisor) api.Hypervisor {
 	var memory int64 = int64(hv.Memory)
 	var ipaddr string = hv.IpAddr
@@ -15,6 +16,7 @@ func convHVinfoDBtoAPI(hv types.Hypervisor) api.Hypervisor {
 	var freecpu int32 = int32(hv.FreeCpu)
 	var freememory int64 = int64(hv.FreeMemory)
 	var status int32 = int32(hv.Status)
+
 	var stgpool []api.StoragePool
 	for _, v := range hv.StgPool {
 		vg := v.VolGroup
@@ -40,6 +42,7 @@ func convHVinfoDBtoAPI(hv types.Hypervisor) api.Hypervisor {
 		StgPool:    &stgpool,
 	}
 }
+*/
 
 // VMのデータベース保存形式を新API形式に変換する
 func convVMinfoDBtoAPI(vms []types.VirtualMachine) []api.VirtualMachine {

@@ -98,7 +98,7 @@ func (s *Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPar
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	var hvs []types.Hypervisor
+	var hvs []api.Hypervisor
 	err = d.GetHypervisors(&hvs)
 	if err != nil {
 		slog.Error("get hypervisor status", "err", err)
@@ -310,7 +310,7 @@ func (s *Server) ShowHypervisorById(ctx echo.Context, hypervisorId string) error
 	//s.Lock.Lock()
 	//defer s.Lock.Unlock()
 
-	var hvs []types.Hypervisor
+	var hvs []api.Hypervisor
 	err := s.Ma.Db.GetHypervisors(&hvs)
 	if err != nil {
 		slog.Error("ShowHypervisorById()", "err", err)
@@ -323,9 +323,9 @@ func (s *Server) ShowHypervisorById(ctx echo.Context, hypervisorId string) error
 	}
 
 	for _, v := range hvs {
-		if hypervisorId == v.Nodename {
-			nhv := convHVinfoDBtoAPI(v)
-			return ctx.JSON(http.StatusOK, nhv)
+		if hypervisorId == v.NodeName {
+			//nhv := convHVinfoDBtoAPI(v)
+			return ctx.JSON(http.StatusOK, v)
 		}
 	}
 	return ctx.JSON(http.StatusNotFound, api.ReplyMessage{Message: "Hypervisor " + hypervisorId + " not found"})
