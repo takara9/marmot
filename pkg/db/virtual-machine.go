@@ -114,16 +114,24 @@ func (d *Database) AssignHvforVm(vm api.VirtualMachine) (string, string, string,
 	}
 	slog.Debug("=== d.GetSeq()", "seqNum", seqNum)
 
-	*vm.Key = fmt.Sprintf("vm_%s_%04d", vm.Name, seqNum)
+	//var vm2 api.VirtualMachine
+	vm.Key = stringPtr(fmt.Sprintf("vm_%s_%04d", vm.Name, seqNum))
 	//vm.NameはOSホスト名なので受けたものを利用
 	vm.Uuid = stringPtr(txId.String())
 	vm.CTime = timePtr(time.Now())
 	vm.STime = timePtr(time.Now())
-	//vm.Status = 1  // 状態プロビ中
-	err = d.PutDataEtcd(*vm.Key, vm) // 仮想マシンのデータ登録
-	slog.Debug("=== d.PutDataEtcd", "vm.Key", *vm.Key)
+	//vm2.Cpu = vm.Cpu
+	//vm2.Memory = vm.Memory
+	//vm2.DiskSize = vm.DiskSize
+	//vm2.HvNode = vm.HvNode
+	//vm2.HvIpAddr = vm.HvIpAddr
+	//vm2.HvPort = vm.HvPort
+	//vm2.OsImage = vm.OsImage
+	vm.Status = int32Ptr(1)           // 登録中
+	err = d.PutDataEtcd(*vm.Key, &vm) // 仮想マシンのデータ登録
+	slog.Debug("=== d.PutDataEtcd", "vm.Key", *vm.Key, "err", err)
 
-	return vm.HvNode, *vm.HvIpAddr, *vm.Key, *vm.Uuid, *vm.HvPort, err
+	return vm.HvNode, *vm.HvIpAddr, *vm.Key, txId.String(), *vm.HvPort, err
 }
 
 // VMの終了とリソースの開放
