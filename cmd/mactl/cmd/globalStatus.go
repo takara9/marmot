@@ -39,7 +39,7 @@ var globalStatusCmd = &cobra.Command{
 				slog.Error("reading hypervisors status", "err", err)
 			}
 			fmt.Printf("%-10s %-3v %-15v %4d/%-4d %6d/%-6d  ",
-				hv.NodeName, status[*hv.Status], hv.IpAddr, *hv.FreeCpu, hv.Cpu, *hv.FreeMemory, *hv.Memory)
+				hv.NodeName, status[*hv.Status], *hv.IpAddr, *hv.FreeCpu, hv.Cpu, *hv.FreeMemory, *hv.Memory)
 			for _, v := range *hv.StgPool {
 				fmt.Printf("%v(%v): %5d/%-5d ", *v.VolGroup, *v.Type, *v.FreeCap, *v.VgCap)
 			}
@@ -74,10 +74,10 @@ var globalStatusCmd = &cobra.Command{
 				slog.Error("getting vm status", "err", err)
 			}
 			fmt.Printf("%-10s %-16s %-6s %-5s %-20s %-4v  %-6v %-15v %-15v ",
-				vm.ClusterName, vm.Name, vm.HvNode, StateDsp[*vm.Status],
-				vm.Key, vm.Cpu, vm.Memory, vm.PrivateIp, vm.PublicIp)
+				*vm.ClusterName, vm.Name, vm.HvNode, StateDsp[*vm.Status],
+				*vm.Key, *vm.Cpu, *vm.Memory, *vm.PrivateIp, *vm.PublicIp)
 			for _, dv := range *vm.Storage {
-				fmt.Printf("%-4d", dv.Size)
+				fmt.Printf("%-4d", *dv.Size)
 			}
 			fmt.Printf("\n")
 		}
