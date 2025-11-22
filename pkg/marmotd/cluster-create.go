@@ -9,6 +9,7 @@ import (
 	"github.com/takara9/marmot/pkg/client"
 	"github.com/takara9/marmot/pkg/types"
 )
+func int32Ptr(i int32) *int32            { j := int32(i); return &j }
 
 // コンフィグからVMクラスタを作成する  新APIを使用
 func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
@@ -84,7 +85,7 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		vm.PrivateIp = spec.PrivateIp
 		vm.Playbook = spec.Playbook
 		vm.Comment = spec.Comment
-		*vm.Status = types.INITALIZING
+		vm.Status = int32Ptr(types.INITALIZING)
 		var s []api.Storage
 		for _, stg := range *spec.Storage {
 			var vms api.Storage
