@@ -2,6 +2,8 @@ package db_test
 
 import (
 	"fmt"
+	"log/slog"
+	"os"
 	"os/exec"
 	"time"
 
@@ -19,6 +21,14 @@ var _ = Describe("Etcd", Ordered, func() {
 	var containerID string
 
 	BeforeAll(func(ctx SpecContext) {
+		// Setup slog
+		opts := &slog.HandlerOptions{
+			AddSource: true,
+			Level:     slog.LevelDebug,
+		}
+		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
+		slog.SetDefault(logger)
+
 		// Dockerコンテナを起動
 		url = "http://127.0.0.1:4379"
 		cmd := exec.Command("docker", "run", "-d", "--name", "etcddb", "-p", "4379:2379", "-p", "4380:2380", "ghcr.io/takara9/etcd:3.6.5")
@@ -28,6 +38,7 @@ var _ = Describe("Etcd", Ordered, func() {
 		}
 		containerID = string(output[:12]) // 最初の12文字をIDとして取得
 		fmt.Printf("Container started with ID: %s\n", containerID)
+
 		time.Sleep(10 * time.Second) // コンテナが起動するまで待機
 	}, NodeTimeout(20*time.Second))
 
@@ -336,6 +347,7 @@ var _ = Describe("Etcd", Ordered, func() {
 				hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
 				GinkgoWriter.Println("test-4 ")
 				Expect(err).NotTo(HaveOccurred())
+
 				GinkgoWriter.Println("hvName ", hvName)
 				GinkgoWriter.Println("hvIp.  ", hvIp)
 				GinkgoWriter.Println("port  ", port)
