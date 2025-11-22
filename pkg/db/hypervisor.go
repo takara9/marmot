@@ -11,7 +11,7 @@ import (
 
 func int32Ptr(i uint64) *int32       { j := int32(i); return &j }
 func int64PtrConvMB(i uint64) *int64 { j := int64(i) * 1024; return &j }
-func stringPtr(s string) *string    { return &s }
+func stringPtr(s string) *string     { return &s }
 
 // ハイパーバイザーの設定
 func (d *Database) SetHypervisors(v config.Hypervisor_yaml) error {
@@ -27,13 +27,14 @@ func (d *Database) SetHypervisors(v config.Hypervisor_yaml) error {
 	hv.FreeMemory = int64PtrConvMB(v.Ram)
 	hv.Status = int32Ptr(2) // 暫定
 
-	for _, val := range v.Storage {
-		var sp api.StoragePool
-		sp.VolGroup = &val.VolGroup
-		sp.Type = &val.Type
-		*hv.StgPool = append(*hv.StgPool, sp)
+	if len(v.Storage) > 0 {
+		for _, val := range v.Storage {
+			var sp api.StoragePool
+			sp.VolGroup = &val.VolGroup
+			sp.Type = &val.Type
+			*hv.StgPool = append(*hv.StgPool, sp)
+		}
 	}
-
 	err := d.PutDataEtcd(*hv.Key, hv)
 	if err != nil {
 		slog.Error("PutDataEtcd()", "err", err)
