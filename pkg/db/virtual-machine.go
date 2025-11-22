@@ -53,7 +53,7 @@ func (d *Database) GetVmsStatus(vms *[]api.VirtualMachine) error {
 // 仮想マシンのデータをセットする
 // 仮想マシンの状態をプロビジョニング中にする
 func (d *Database) AssignHvforVm(vm api.VirtualMachine) (string, string, string, string, int32, error) {
-	slog.Debug("=== AssignHvforVm called ===", vm)
+	slog.Debug("=== AssignHvforVm called ===", "start", vm)
 	var txId = uuid.New()
 	//トランザクション開始、他更新ロック 仮想マシンをデータベースに登録、状態は「データ登録中」
 	var hvs []api.Hypervisor
