@@ -31,7 +31,7 @@ func (m *Marmot) DestroyClusterInternal(cnf api.MarmotConfig) error {
 				continue
 			}
 
-			hvService := fmt.Sprintf("%s:%d", vm.HvIpAddr, vm.HvPort)
+			hvService := fmt.Sprintf("%s:%d", *vm.HvIpAddr, *vm.HvPort)
 			marmotClient, err := client.NewMarmotdEp(
 				"http",
 				hvService,
