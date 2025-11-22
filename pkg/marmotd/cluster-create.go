@@ -136,7 +136,7 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 
 		// リモートとローカル関係なしに、マイクロサービスへリクエストする
 		m.Db.UpdateVmState(*vm.Key, types.PROVISIONING)
-		marmotHost := fmt.Sprintf("%s:%d", vm.HvIpAddr, vm.HvPort)
+		marmotHost := fmt.Sprintf("%s:%d", *vm.HvIpAddr, *vm.HvPort)
 		marmotClient, err := client.NewMarmotdEp(
 			"http",
 			marmotHost,
