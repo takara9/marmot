@@ -146,6 +146,7 @@ func (m *MarmotEndpoint) GetHypervisor(nodeName string) (int, []byte, *url.URL, 
 }
 
 func (m *MarmotEndpoint) ListVirtualMachines(params map[string]string) (int, []byte, *url.URL, error) {
+	slog.Debug("=====", "mactl ListVirtualMachines", "=====")
 	url, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/virtualMachines")
 	if err != nil {
 		return 0, nil, nil, err
@@ -157,6 +158,7 @@ func (m *MarmotEndpoint) ListVirtualMachines(params map[string]string) (int, []b
 	req.Header.Set("User-Agent", "MarmotdClient/1.0")
 	req.Header.Set("Content-Type", "application/json")
 
+	slog.Debug("=====", "get http query", "=====")
 	q := req.URL.Query()
 	for k, v := range params {
 		q.Add(k, v)
