@@ -40,7 +40,7 @@ jobs:
 
   # Label of the job
   marmot-package-job:
-    #needs: display-variables
+    needs: display-variables
     runs-on: self-hosted
     services:
       etcd:
@@ -128,6 +128,7 @@ jobs:
  
   marmot-command-test-job:
     runs-on: self-hosted
+    needs: display-variables
     steps:
 
     - name: Test pkg/marmotd
@@ -149,7 +150,6 @@ jobs:
   clean-up-job:
     runs-on: self-hosted
     needs: 
-      - display-variables
       - marmot-package-job 
       - marmot-command-test-job
     steps:
