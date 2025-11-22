@@ -26,12 +26,15 @@ func (d *Database) SetHypervisors(v config.Hypervisor_yaml) error {
 	hv.Memory = int64PtrConvMB(v.Ram)
 	hv.FreeMemory = int64PtrConvMB(v.Ram)
 	hv.Status = int32Ptr(2) // 暫定
-
 	if len(v.Storage) > 0 {
 		for _, val := range v.Storage {
 			var sp api.StoragePool
-			sp.VolGroup = &val.VolGroup
-			sp.Type = &val.Type
+			if &val.VolGroup != nil {
+				sp.VolGroup = &val.VolGroup
+			}
+			if &val.Type != nil {
+				sp.Type = &val.Type
+			}
 			*hv.StgPool = append(*hv.StgPool, sp)
 		}
 	}
