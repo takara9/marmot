@@ -68,7 +68,7 @@ var statusCmd = &cobra.Command{
 					*vm.ClusterName, vm.Name, vm.HvNode, StateDsp[*vm.Status],
 					*vm.Key, *vm.Cpu, *vm.Memory, *vm.PrivateIp, *vm.PublicIp)
 				for _, dv := range *vm.Storage {
-					fmt.Printf("%-4d", dv.Size)
+					fmt.Printf("%-4d", *dv.Size)
 				}
 				fmt.Printf("\n")
 			}

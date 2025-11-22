@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/client"
 	"github.com/takara9/marmot/pkg/config"
 )
@@ -67,6 +66,7 @@ func apply_playbook(cnf config.MarmotConfig) {
 	}
 }
 
+/*
 // 新APIから旧APIの構造体へ変換する
 func PrintMarmotConfig(a api.MarmotConfig) {
 	fmt.Println("=========================================XX")
@@ -173,3 +173,4 @@ func PrintMarmotConfig(a api.MarmotConfig) {
 	}
 	fmt.Println("=========================================XX")
 }
+*/
