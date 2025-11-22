@@ -205,7 +205,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			h, err = d.GetHypervisorByKey("hvc")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(h.NodeName).To(Equal("hvc"))
-			Expect(h.IpAddr).To(Equal("127.0.0.1"))
+			Expect(*h.IpAddr).To(Equal("127.0.0.1"))
 			Expect(h.Cpu).To(Equal(int32(4)))
 			Expect(h.Memory).To(Equal(int64(16384)))
 			Expect(*(*h.StgPool)[0].VolGroup).To(Equal("vg1"))
