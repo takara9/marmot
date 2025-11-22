@@ -9,7 +9,8 @@ import (
 	"github.com/takara9/marmot/pkg/client"
 	"github.com/takara9/marmot/pkg/types"
 )
-func int32Ptr(i int32) *int32            { j := int32(i); return &j }
+
+func int32Ptr(i int32) *int32 { j := int32(i); return &j }
 
 // コンフィグからVMクラスタを作成する  新APIを使用
 func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
@@ -137,7 +138,7 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 
 		// リモートとローカル関係なしに、マイクロサービスへリクエストする
 		m.Db.UpdateVmState(*vm.Key, types.PROVISIONING)
-		marmotHost := fmt.Sprintf("%s:%d", vm.HvIpAddr, *vm.HvPort)
+		marmotHost := fmt.Sprintf("%s:%d", *vm.HvIpAddr, *vm.HvPort)
 		marmotClient, err := client.NewMarmotdEp(
 			"http",
 			marmotHost,
