@@ -202,7 +202,7 @@ func exportConfig() error {
 	}
 
 	//仮想マシン
-	var vms []types.VirtualMachine
+	var vms []api.VirtualMachine
 	err = d.GetVmsStatus(&vms)
 	if err != nil {
 		slog.Error("Failed to get data of virtual machines", "error", err)

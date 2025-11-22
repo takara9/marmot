@@ -38,7 +38,7 @@ var hvCmd = &cobra.Command{
 				slog.Error("reading hypervisors status", "err", err)
 			}
 			fmt.Printf("%-10s %-3v %-15v %4d/%-4d %6d/%-6d  ",
-				hv.NodeName, status[*hv.Status], hv.IpAddr, *hv.FreeCpu, hv.Cpu, *hv.FreeMemory, *hv.Memory)
+				hv.NodeName, status[*hv.Status], *hv.IpAddr, *hv.FreeCpu, hv.Cpu, *hv.FreeMemory, *hv.Memory)
 			for _, v := range *hv.StgPool {
 				fmt.Printf("%v(%v): %5d/%-5d ", *v.VolGroup, *v.Type, *v.FreeCap, *v.VgCap)
 			}

@@ -8,6 +8,7 @@ import (
 
 	etcd "go.etcd.io/etcd/client/v3"
 
+	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/types"
 )
 
@@ -48,7 +49,6 @@ func (d *Database) GetEtcdByPrefix(key string) (*etcd.GetResponse, error) {
 	return resp, err
 }
 
-
 func (d *Database) GetDnsByKey(path string) (types.DNSEntry, error) {
 	var entry types.DNSEntry
 	resp, err := d.Cli.Get(d.Ctx, path)
@@ -66,7 +66,6 @@ func (d *Database) GetDnsByKey(path string) (types.DNSEntry, error) {
 	}
 	return entry, nil
 }
-
 
 // 削除 キーに一致したデータ
 func (d *Database) DelByKey(key string) error {
@@ -95,12 +94,12 @@ func (d *Database) FindByPublicIPaddress(ipAddress string) (bool, error) {
 		return false, err
 	}
 	for _, ev := range resp.Kvs {
-		var vm types.VirtualMachine
+		var vm api.VirtualMachine
 		err = json.Unmarshal([]byte(ev.Value), &vm)
 		if err != nil {
 			return false, nil /// 例外的にエラーを無視
 		}
-		if ipAddress == vm.PublicIp {
+		if ipAddress == *vm.PublicIp {
 			return true, nil
 		}
 	}
@@ -114,12 +113,12 @@ func (d *Database) FindByPrivateIPaddress(ipAddress string) (bool, error) {
 		return false, err
 	}
 	for _, ev := range resp.Kvs {
-		var vm types.VirtualMachine
+		var vm api.VirtualMachine
 		err = json.Unmarshal([]byte(ev.Value), &vm)
 		if err != nil {
 			return false, nil /// データが存在しない時には、どうするか？
 		}
-		if ipAddress == vm.PrivateIp {
+		if ipAddress == *vm.PrivateIp {
 			return true, nil
 		}
 	}
@@ -134,13 +133,13 @@ func (d *Database) FindByHostname(hostname string) (string, error) {
 	}
 	//var vm VirtualMachine
 	for _, ev := range resp.Kvs {
-		var vm types.VirtualMachine
+		var vm api.VirtualMachine
 		err = json.Unmarshal([]byte(ev.Value), &vm)
 		if err != nil {
 			return "", err
 		}
 		if hostname == vm.Name {
-			return vm.Key, err
+			return *vm.Key, err
 		}
 	}
 	return "", errors.New("NotFound")
@@ -154,13 +153,13 @@ func (d *Database) FindByHostAndClusteName(hostname string, clustername string) 
 	}
 
 	for _, ev := range resp.Kvs {
-		var vm types.VirtualMachine
+		var vm api.VirtualMachine
 		err = json.Unmarshal([]byte(ev.Value), &vm)
 		if err != nil {
 			return "", err
 		}
-		if hostname == vm.Name && clustername == vm.ClusterName {
-			return vm.Key, err
+		if hostname == vm.Name && clustername == *vm.ClusterName {
+			return *vm.Key, err
 		}
 	}
 	return "", errors.New("NotFound")

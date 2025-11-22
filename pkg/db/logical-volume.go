@@ -17,10 +17,9 @@ func (d *Database) UpdateOsLv(vmkey string, vg string, lv string) error {
 	if err != nil {
 		return err
 	}
-	vm.OsLv = lv
-	vm.OsVg = vg
-	err = d.PutDataEtcd(vmkey, vm)
-	return err
+	vm.OsLv = stringPtr(lv)
+	vm.OsVg = stringPtr(vg)
+	return d.PutDataEtcd(vmkey, vm)
 }
 
 // データボリュームLVをetcdへ登録
@@ -30,10 +29,9 @@ func (d *Database) UpdateDataLv(vmkey string, idx int, vg string, lv string) err
 	if err != nil {
 		return err
 	}
-	vm.Storage[idx].Lv = lv
-	vm.Storage[idx].Vg = vg
-	err = d.PutDataEtcd(vmkey, vm)
-	return err
+	(*vm.Storage)[idx].Lv = stringPtr(lv)
+	(*vm.Storage)[idx].Vg = stringPtr(vg)
+	return d.PutDataEtcd(vmkey, vm)
 }
 
 // イメージテンプレート

@@ -156,7 +156,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("仮想マシンの一覧取得", func() {
+		It("仮想マシンの一覧取得-1", func() {
 			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "status", "-c", "testdata/cluster-config1.yaml")
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
@@ -177,7 +177,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			GinkgoWriter.Println(string(stdoutStderr))
 		})
 
-		It("仮想マシンの一覧取得", func() {
+		It("仮想マシンの一覧取得-2", func() {
 			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "status", "-c", "testdata/cluster-config2.yaml")
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
@@ -191,7 +191,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			GinkgoWriter.Println(string(stdoutStderr))
 		})
 
-		It("仮想マシンの一覧取得", func() {
+		It("仮想マシンの一覧取得-3", func() {
 			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "status", "-c", "testdata/cluster-config2.yaml")
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
@@ -205,7 +205,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			GinkgoWriter.Println(string(stdoutStderr))
 		})
 
-		It("仮想マシンの一覧取得", func() {
+		It("仮想マシンの一覧取得-4", func() {
 			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "status", "-c", "testdata/cluster-config2.yaml")
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
@@ -219,7 +219,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			GinkgoWriter.Println(string(stdoutStderr))
 		})
 
-		It("仮想マシンの一覧取得", func() {
+		It("仮想マシンの一覧取得-5", func() {
 			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "status", "-c", "testdata/cluster-config2.yaml")
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())

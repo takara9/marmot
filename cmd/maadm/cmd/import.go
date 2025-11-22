@@ -196,7 +196,7 @@ func importConfig() error {
 		slog.Error("Failed to read json file in working dir", "error", err)
 		return err
 	}
-	var buf4 []types.VirtualMachine
+	var buf4 []api.VirtualMachine
 	if err := json.Unmarshal(jsonBytes, &buf4); err != nil {
 		slog.Error("Failed to unmarshal", "error", err)
 		return err

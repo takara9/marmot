@@ -31,7 +31,7 @@ func (m *Marmot) DestroyClusterInternal(cnf api.MarmotConfig) error {
 				continue
 			}
 
-			hvService := fmt.Sprintf("%s:%d", vm.HvIpAddr, vm.HvPort)
+			hvService := fmt.Sprintf("%s:%d", *vm.HvIpAddr, *vm.HvPort)
 			marmotClient, err := client.NewMarmotdEp(
 				"http",
 				hvService,
@@ -45,7 +45,7 @@ func (m *Marmot) DestroyClusterInternal(cnf api.MarmotConfig) error {
 			_, _, _, err = marmotClient.DestroyVirtualMachine(spec)
 			if err != nil {
 				slog.Error("", "remote request err", err)
-				m.Db.UpdateVmState(vm.Key, types.ERROR) // エラー状態へ
+				m.Db.UpdateVmState(*vm.Key, types.ERROR) // エラー状態へ
 				continue
 			}
 		}

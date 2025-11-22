@@ -1,12 +1,5 @@
 package marmotd
 
-import (
-	"time"
-
-	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/types"
-)
-
 // HVのデータベース保存形式を新API形式に変換する
 /*
 func convHVinfoDBtoAPI(hv types.Hypervisor) api.Hypervisor {
@@ -45,6 +38,7 @@ func convHVinfoDBtoAPI(hv types.Hypervisor) api.Hypervisor {
 */
 
 // VMのデータベース保存形式を新API形式に変換する
+/*
 func convVMinfoDBtoAPI(vms []types.VirtualMachine) []api.VirtualMachine {
 	var vms2 []api.VirtualMachine
 	for _, vm := range vms {
@@ -105,7 +99,8 @@ func convVMinfoDBtoAPI(vms []types.VirtualMachine) []api.VirtualMachine {
 	}
 	return vms2
 }
-
+*/
+/*
 // HVへVMスケジュールするために db.VirtualMachineにセットする
 func convApiConfigToDB(spec api.VmSpec, cnf api.MarmotConfig) types.VirtualMachine {
 	var vm types.VirtualMachine
@@ -154,3 +149,4 @@ func convApiConfigToDB(spec api.VmSpec, cnf api.MarmotConfig) types.VirtualMachi
 	}
 	return vm
 }
+*/
