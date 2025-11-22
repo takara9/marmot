@@ -254,8 +254,13 @@ var _ = Describe("Etcd", Ordered, func() {
 			It("PUT Hypervisor node data #2", func() {
 				// ハイパーバイザー
 				for _, hv := range cnf.Hvs {
-					GinkgoWriter.Println(hv)
-					d.SetHypervisors(hv)
+					//GinkgoWriter.Println(hv)
+					GinkgoWriter.Println("Name=", hv.Name)
+					GinkgoWriter.Println("CPU=", hv.Cpu)
+					GinkgoWriter.Println("RAM=", hv.Ram)
+					err = d.SetHypervisors(hv)
+					Expect(err).NotTo(HaveOccurred())
+					GinkgoWriter.Println("Set Hypervisor data into ETCD:", hv.Name)
 				}
 
 				// OSイメージテンプレート
