@@ -121,7 +121,7 @@ func (d *Database) AssignHvforVm(vm api.VirtualMachine) (string, string, string,
 	vm.STime = timePtr(time.Now())
 	//vm.Status = 1  // 状態プロビ中
 	err = d.PutDataEtcd(*vm.Key, vm) // 仮想マシンのデータ登録
-	slog.Debug("=== d.PutDataEtcd()", "vm.Key", *vm.Key, vm)
+	slog.Debug("=== d.PutDataEtcd", "vm.Key", *vm.Key)
 
 	return vm.HvNode, *vm.HvIpAddr, *vm.Key, *vm.Uuid, *vm.HvPort, err
 }
