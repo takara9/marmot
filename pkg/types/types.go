@@ -1,11 +1,5 @@
 package types
 
-import (
-	"time"
-
-	"github.com/google/uuid"
-)
-
 /*
 type StoragePool struct {
 	VolGroup string // ボリュームグループ名
@@ -38,14 +32,8 @@ type Hypervisors struct {
 */
 
 
-// Serial Number Control
-type VmSerial struct {
-	Serial uint64
-	Start  uint64
-	Step   uint64
-	Key    string
-}
 
+/*
 // VM Storage
 type Storage struct {
 	Name string
@@ -82,6 +70,15 @@ type VirtualMachines struct {
 	Vms []VirtualMachine
 }
 
+*/
+
+// Serial Number Control
+type VmSerial struct {
+	Serial uint64
+	Start  uint64
+	Step   uint64
+	Key    string
+}
 type OsImageTemplate struct {
 	LogicaVol   string // vg1
 	VolumeGroup string // lv01,lv02
@@ -101,7 +98,6 @@ type DNSEntry struct {
 	Host string `json:"host"`
 	Ttl  uint64 `json:"ttl"`
 }
-
 
 /*
 type HypervisorOld struct {

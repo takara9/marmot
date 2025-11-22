@@ -43,7 +43,7 @@ func (m *Marmot) StartClusterInternal(cnf api.MarmotConfig) error {
 		_, _, _, err = marmotClient.StartVirtualMachine(spec)
 		if err != nil {
 			slog.Error("", "remote request err", err)
-			m.Db.UpdateVmState(vm.Key, types.ERROR) // エラー状態へ
+			m.Db.UpdateVmState(*vm.Key, types.ERROR) // エラー状態へ
 			continue
 		}
 	}

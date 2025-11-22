@@ -10,7 +10,6 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/types"
 	"github.com/takara9/marmot/pkg/util"
 )
 
@@ -120,14 +119,14 @@ func (s *Server) ListVirtualMachines(ctx echo.Context) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	var vms []types.VirtualMachine
+	var vms []api.VirtualMachine
 	err = d.GetVmsStatus(&vms)
 	if err != nil {
 		slog.Error("get vm status", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-	vms2 := convVMinfoDBtoAPI(vms)
-	return ctx.JSON(http.StatusOK, vms2)
+	//vms2 := convVMinfoDBtoAPI(vms)
+	return ctx.JSON(http.StatusOK, vms)
 }
 
 // 仮想マシンのクラスタを作成
@@ -241,7 +240,7 @@ func (s *Server) CreateVirtualMachine(ctx echo.Context) error {
 		slog.Error("CreateVirtualMachine()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
- 
+
 	if DEBUG {
 		printVmSpecJson(spec)
 	}

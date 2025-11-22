@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/takara9/marmot/pkg/types"
+	"github.com/takara9/marmot/api"
 )
 
 var ClusterName string
@@ -42,7 +42,7 @@ var vmCmd = &cobra.Command{
 
 		dec.Token()
 		match := false
-		var vm types.VirtualMachine
+		var vm api.VirtualMachine
 
 		for dec.More() {
 			// クラスタ名と仮想マシンが一致したものだけリスト
@@ -52,7 +52,7 @@ var vmCmd = &cobra.Command{
 			}
 
 			// フィルター処理
-			if ClusterName == vm.ClusterName {
+			if ClusterName == *vm.ClusterName {
 				if VirtualMachineName == vm.Name {
 					match = true
 					break
@@ -66,34 +66,34 @@ var vmCmd = &cobra.Command{
 			fmt.Printf("\n")
 			fmt.Printf("Cluster Name : %s \n", vm.ClusterName)
 			fmt.Printf("Virtual Machine Name : %s \n", vm.Name)
-			fmt.Printf("UUID : %s\n", vm.Uuid)
+			fmt.Printf("UUID : %s\n", *vm.Uuid)
 			fmt.Printf("Hypervisor : %s\n", vm.HvNode)
-			fmt.Printf("Hypervisor's IP : %s\n", vm.HvIpAddr)
+			fmt.Printf("Hypervisor's IP : %s\n", *vm.HvIpAddr)
 			fmt.Printf("Key: %s \n", vm.Key)
-			fmt.Printf("Create Time: %s\n", vm.Ctime)
-			fmt.Printf("Start  Time: %s\n", vm.Stime)
-			fmt.Printf("Status : %s \n", StateDsp[vm.Status])
-			fmt.Printf("CPU : %d \n", vm.Cpu)
-			fmt.Printf("Memory(MB) : %d\n", vm.Memory)
-			fmt.Printf("Private IP addr : %s\n", vm.PrivateIp)
-			fmt.Printf("Public  IP addr : %s\n", vm.PublicIp)
+			fmt.Printf("Create Time: %s\n", vm.CTime.String())
+			fmt.Printf("Start  Time: %s\n", vm.STime.String())
+			fmt.Printf("Status : %s \n", StateDsp[*vm.Status])
+			fmt.Printf("CPU : %d \n", *vm.Cpu)
+			fmt.Printf("Memory(MB) : %d\n", *vm.Memory)
+			fmt.Printf("Private IP addr : %s\n", *vm.PrivateIp)
+			fmt.Printf("Public  IP addr : %s\n", *vm.PublicIp)
 			fmt.Printf("\n")
 			fmt.Printf("OS Storage\n")
-			fmt.Printf("    Volume Group Name : %s\n", vm.OsVg)
-			fmt.Printf("    Logical Volume Name : %s\n", vm.OsLv)
-			fmt.Printf("    OS Variant : %s\n", vm.OsVariant)
+			fmt.Printf("    Volume Group Name : %s\n", *vm.OsVg)
+			fmt.Printf("    Logical Volume Name : %s\n", *vm.OsLv)
+			fmt.Printf("    OS Variant : %s\n", *vm.OsVariant)
 			fmt.Printf("\n")
 			fmt.Printf("Data Storage\n")
-			for _, v := range vm.Storage {
-				fmt.Printf("    Storage Name : %s\n", v.Name)
-				fmt.Printf("    Size(GB) : %d\n", v.Size)
-				fmt.Printf("    Volume Group Name : %s\n", v.Vg)
-				fmt.Printf("    Logical Volume Name : %s\n", v.Lv)
-				fmt.Printf("    Path : %s\n", v.Path)
+			for _, v := range *vm.Storage {
+				fmt.Printf("    Storage Name : %s\n", *v.Name)
+				fmt.Printf("    Size(GB) : %d\n", *v.Size)
+				fmt.Printf("    Volume Group Name : %s\n", *v.Vg)
+				fmt.Printf("    Logical Volume Name : %s\n", *v.Lv)
+				fmt.Printf("    Path : %s\n", *v.Path)
 			}
 			fmt.Printf("\n")
-			fmt.Printf("Comment: %s \n", vm.Comment)
-			fmt.Printf("Ansible Playbook: %s \n", vm.Playbook)
+			fmt.Printf("Comment: %s \n", *vm.Comment)
+			fmt.Printf("Ansible Playbook: %s \n", *vm.Playbook)
 			fmt.Printf("\n")
 		}
 		dec.Token()

@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/types"
 )
 
 // statusCmd represents the status command
@@ -46,14 +46,14 @@ var statusCmd = &cobra.Command{
 
 		for dec.More() {
 			// クラスタ名と仮想マシンが一致したものだけリスト
-			var vm types.VirtualMachine
+			var vm api.VirtualMachine
 			err := dec.Decode(&vm)
 			if err != nil {
 				slog.Error("list vms in the cluster", "err", err)
 			}
 			// フィルター処理
 			match := false
-			if *clusterConfig.ClusterName == vm.ClusterName {
+			if *clusterConfig.ClusterName == *vm.ClusterName {
 				for _, spec := range *clusterConfig.VmSpec {
 					if *spec.Name == vm.Name {
 						match = true
@@ -65,9 +65,9 @@ var statusCmd = &cobra.Command{
 			// 表示
 			if match {
 				fmt.Printf("%-10s %-16s %-6s %-5s %-20s %-4v  %-6v %-15v %-15v ",
-					vm.ClusterName, vm.Name, vm.HvNode, StateDsp[vm.Status],
+					vm.ClusterName, vm.Name, vm.HvNode, StateDsp[*vm.Status],
 					vm.Key, vm.Cpu, vm.Memory, vm.PrivateIp, vm.PublicIp)
-				for _, dv := range vm.Storage {
+				for _, dv := range *vm.Storage {
 					fmt.Printf("%-4d", dv.Size)
 				}
 				fmt.Printf("\n")

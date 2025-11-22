@@ -45,7 +45,7 @@ func (m *Marmot) StopClusterInternal(cnf api.MarmotConfig) error {
 			_, _, _, err = marmotClient.StopVirtualMachine(spec)
 			if err != nil {
 				slog.Error("marmotClient.StopVirtualMachine()", "err", err)
-				m.Db.UpdateVmState(vm.Key, types.ERROR) // エラー状態へ
+				m.Db.UpdateVmState(*vm.Key, types.ERROR) // エラー状態へ
 				continue
 			}
 		}
