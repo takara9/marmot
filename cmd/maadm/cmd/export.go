@@ -82,8 +82,8 @@ func createZip(zipFilename string, srcDirectory string) error {
 	for _, file := range files {
 		slog.Debug(fmt.Sprintf("file: %v in %v", file.Name(), srcDirectory))
 		if file.IsDir() {
-			slog.Error(fmt.Sprintf("not allow recursive directory: %s", file.Name()))
-			return fmt.Errorf("not allow recursive directory: %s", file.Name())
+			slog.Error(fmt.Sprintf("recursive directories not allowed: %s", file.Name()))
+			return fmt.Errorf("recursive directories not allowed: %s", file.Name())
 		}
 		filesToZip = append(filesToZip, filepath.Join(srcDirectory, file.Name()))
 	}

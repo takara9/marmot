@@ -139,8 +139,7 @@ func importConfig() error {
 		slog.Error("Failed to unmarshal", "error", err)
 		return err
 	}
-	fmt.Println("Importing marmot version:", bufVer.ServerVersion)
-
+	slog.Info("Imported version information", "importedVersion", bufVer)
 	// TODO: バージョンの整合性チェックと移行処理を実装する
 
 	// データベースへバージョンの書き込み
