@@ -30,12 +30,13 @@ var statusCmd = &cobra.Command{
 			return
 		}
 
+		slog.Debug("mactl ListVirtualMachines", "before", nil)
 		_, byteBody, _, err := m.ListVirtualMachines(nil)
 		if err != nil {
 			slog.Error("list vms", "err", err)
 			return
 		}
-		slog.Debug("ListVirtualMachines", "body", string(byteBody))
+		slog.Debug("mactl ListVirtualMachines", "body", string(byteBody))
 
 		StateDsp := []string{"RGIST", "PROVI", "RUN", "STOP", "DELT", "Error"}
 		dec := json.NewDecoder(strings.NewReader(string(byteBody)))
