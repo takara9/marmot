@@ -10,11 +10,13 @@ import (
 	"github.com/takara9/marmot/pkg/types"
 )
 
+func int32Ptr(i int32) *int32 { j := int32(i); return &j }
+
 // コンフィグからVMクラスタを作成する  新APIを使用
 func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
-	if DEBUG {
-		printConfigJson(cnf)
-	}
+	//if DEBUG {
+	//	printConfigJson(cnf)
+	//}
 	slog.Debug("CreateClusterInternal", "cnf", "")
 
 	// リクエスト送信前にコンフィグのチェックを実施する
@@ -73,17 +75,43 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 			continue
 		}
 		// 新API Config, VmSpec から DBの構造体へセット
-		vm := convApiConfigToDB(spec, cnf)
-
+		//vm := convApiConfigToDB(spec, cnf)
+		var vm api.VirtualMachine
+		vm.ClusterName = cnf.ClusterName
+		vm.OsVariant = cnf.OsVariant
+		vm.Name = *spec.Name
+		vm.Cpu = spec.Cpu
+		vm.Memory = spec.Memory
+		vm.PublicIp = spec.PublicIp
+		vm.PrivateIp = spec.PrivateIp
+		vm.Playbook = spec.Playbook
+		vm.Comment = spec.Comment
+		vm.Status = int32Ptr(types.INITALIZING)
+		var s []api.Storage
+		if spec.Storage != nil {
+			for _, stg := range *spec.Storage {
+				var vms api.Storage
+				vms.Name = stg.Name
+				vms.Size = stg.Size
+				vms.Path = stg.Path
+				s = append(s, vms)
+			}
+			vm.Storage = &s
+		}
 		//スケジュールを実行
-		var err error
-		vm.HvNode, vm.HvIpAddr, vm.Key, vm.Uuid, vm.HvPort, err = m.Db.AssignHvforVm(vm)
+		//var err error
+		HvNode, HvIpAddr, Key, Uuid, HvPort, err := m.Db.AssignHvforVm(vm)
 		if err != nil {
 			slog.Error("", "err", err)
 			break_err = true
 			return_err = err
 			break
 		}
+		vm.HvNode = HvNode
+		vm.HvIpAddr = &HvIpAddr
+		vm.Key = &Key
+		vm.Uuid = &Uuid
+		vm.HvPort = &HvPort
 
 		// OSのバージョン、テンプレートを設定
 		spec.Ostempvariant = cnf.OsVariant
@@ -98,10 +126,9 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		}
 
 		// VMのUUIDとKEYをコンフィグ情報へセット
-		u := vm.Uuid.String()
-		spec.Uuid = &u // こんな方法は正しいのか？
-		k := vm.Key
-		spec.Key = &k
+		//u := vm.Uuid.String()
+		spec.Uuid = vm.Uuid // こんな方法は正しいのか？
+		spec.Key = vm.Key
 
 		// 問題発見処理
 		if len(vm.HvNode) == 0 {
@@ -116,8 +143,8 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		}
 
 		// リモートとローカル関係なしに、マイクロサービスへリクエストする
-		m.Db.UpdateVmState(vm.Key, types.PROVISIONING)
-		marmotHost := fmt.Sprintf("%s:%d", vm.HvIpAddr, vm.HvPort)
+		m.Db.UpdateVmState(*vm.Key, types.PROVISIONING)
+		marmotHost := fmt.Sprintf("%s:%d", *vm.HvIpAddr, *vm.HvPort)
 		marmotClient, err := client.NewMarmotdEp(
 			"http",
 			marmotHost,
@@ -133,10 +160,10 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 			slog.Error("", "remote request err", err)
 			break_err = true
 			return_err = err
-			m.Db.UpdateVmState(vm.Key, types.ERROR) // エラー状態へ
+			m.Db.UpdateVmState(*vm.Key, types.ERROR) // エラー状態へ
 			break
 		}
-		m.Db.UpdateVmState(vm.Key, types.RUNNING) // 実行中へ
+		m.Db.UpdateVmState(*vm.Key, types.RUNNING) // 実行中へ
 	} // END OF LOOP
 
 	if break_err {

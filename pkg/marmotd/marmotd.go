@@ -10,7 +10,6 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/types"
 	"github.com/takara9/marmot/pkg/util"
 )
 
@@ -108,7 +107,7 @@ func (s *Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPar
 	return ctx.JSON(http.StatusOK, hvs)
 }
 
-// 仮想マシンのリスト（テストできていない）
+// 仮想マシンのリスト
 func (s *Server) ListVirtualMachines(ctx echo.Context) error {
 	slog.Debug("===", "ListVirtualMachines() is called", "===")
 	s.Lock.Lock()
@@ -120,14 +119,14 @@ func (s *Server) ListVirtualMachines(ctx echo.Context) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	var vms []types.VirtualMachine
+	var vms []api.VirtualMachine
 	err = d.GetVmsStatus(&vms)
 	if err != nil {
 		slog.Error("get vm status", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-	vms2 := convVMinfoDBtoAPI(vms)
-	return ctx.JSON(http.StatusOK, vms2)
+	//vms2 := convVMinfoDBtoAPI(vms)
+	return ctx.JSON(http.StatusOK, vms)
 }
 
 // 仮想マシンのクラスタを作成
@@ -144,9 +143,9 @@ func (s *Server) CreateCluster(ctx echo.Context) error {
 	}
 
 	// ここで どんな状態でJSONが取れているか確認する
-	if DEBUG {
-		PrintMarmotConfig(cnf)
-	}
+	//if DEBUG {
+	//	PrintMarmotConfig(cnf)
+	//}
 
 	// ハイパーバイザーの稼働チェック 結果はDBへ反映
 	_, err = util.CheckHypervisors(s.Ma.EtcdUrl, s.Ma.NodeName)
@@ -196,7 +195,7 @@ func (s *Server) StartCluster(ctx echo.Context) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	if err := s.Ma.DestroyClusterInternal(cnf); err != nil {
+	if err := s.Ma.StartClusterInternal(cnf); err != nil {
 		slog.Error("StartCluster()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
@@ -217,9 +216,9 @@ func (s *Server) StopCluster(ctx echo.Context) error {
 	}
 
 	// ここで どんな状態でJSONが取れているか確認する
-	if DEBUG {
-		PrintMarmotConfig(cnf)
-	}
+	//if DEBUG {
+	//	PrintMarmotConfig(cnf)
+	//}
 
 	if err := s.Ma.StopClusterInternal(cnf); err != nil {
 		slog.Error("StopCluster()", "err", err)
@@ -241,10 +240,10 @@ func (s *Server) CreateVirtualMachine(ctx echo.Context) error {
 		slog.Error("CreateVirtualMachine()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
- 
-	if DEBUG {
-		printVmSpecJson(spec)
-	}
+
+	//if DEBUG {
+	//	printVmSpecJson(spec)
+	//}
 
 	err = s.Ma.CreateVM(spec)
 	if err != nil {

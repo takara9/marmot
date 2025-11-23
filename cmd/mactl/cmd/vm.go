@@ -7,7 +7,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/takara9/marmot/pkg/types"
+	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/config"
 )
 
 var ClusterName string
@@ -24,13 +25,11 @@ var vmCmd = &cobra.Command{
 			return
 		}
 
-		/*
-			clusterConfig, err := config.ReadYamlClusterConfig(clusterConfigFilename)
-			if err != nil {
-				fmt.Println("Reading the config file err=", err)
-				return
-			}
-		*/
+		clusterConfig, err := config.ReadYamlClusterConfig(clusterConfigFilename)
+		if err != nil {
+			fmt.Println("Reading the config file err=", err)
+			return
+		}
 
 		_, byteBody, _, err := m.ListVirtualMachines(nil)
 		if err != nil {
@@ -42,7 +41,7 @@ var vmCmd = &cobra.Command{
 
 		dec.Token()
 		match := false
-		var vm types.VirtualMachine
+		var vm api.VirtualMachine
 
 		for dec.More() {
 			// クラスタ名と仮想マシンが一致したものだけリスト
@@ -52,11 +51,11 @@ var vmCmd = &cobra.Command{
 			}
 
 			// フィルター処理
-			if ClusterName == vm.ClusterName {
-				if VirtualMachineName == vm.Name {
-					match = true
-					break
-				}
+			if *clusterConfig.ClusterName == *vm.ClusterName {
+				//if VirtualMachineName == vm.Name {
+				match = true
+				break
+				//}
 			}
 
 		}
@@ -66,34 +65,36 @@ var vmCmd = &cobra.Command{
 			fmt.Printf("\n")
 			fmt.Printf("Cluster Name : %s \n", vm.ClusterName)
 			fmt.Printf("Virtual Machine Name : %s \n", vm.Name)
-			fmt.Printf("UUID : %s\n", vm.Uuid)
+			fmt.Printf("UUID : %s\n", nilToEmptyString(vm.Uuid))
 			fmt.Printf("Hypervisor : %s\n", vm.HvNode)
-			fmt.Printf("Hypervisor's IP : %s\n", vm.HvIpAddr)
-			fmt.Printf("Key: %s \n", vm.Key)
-			fmt.Printf("Create Time: %s\n", vm.Ctime)
-			fmt.Printf("Start  Time: %s\n", vm.Stime)
-			fmt.Printf("Status : %s \n", StateDsp[vm.Status])
-			fmt.Printf("CPU : %d \n", vm.Cpu)
-			fmt.Printf("Memory(MB) : %d\n", vm.Memory)
-			fmt.Printf("Private IP addr : %s\n", vm.PrivateIp)
-			fmt.Printf("Public  IP addr : %s\n", vm.PublicIp)
+			fmt.Printf("Hypervisor's IP : %s\n", nilToEmptyString(vm.HvIpAddr))
+			fmt.Printf("Key: %s \n", nilToEmptyString(vm.Key))
+			fmt.Printf("Create Time: %s\n", nilToTime(vm.CTime))
+			fmt.Printf("Start  Time: %s\n", nilToTime(vm.STime))
+			fmt.Printf("Status : %s \n", StateDsp[nil32ToZero(vm.Status)])
+			fmt.Printf("CPU : %d \n", nil32ToZero(vm.Cpu))
+			fmt.Printf("Memory(MB) : %d\n", nil64ToZero(vm.Memory))
+			fmt.Printf("Private IP addr : %s\n", nilToEmptyString(vm.PrivateIp))
+			fmt.Printf("Public  IP addr : %s\n", nilToEmptyString(vm.PublicIp))
 			fmt.Printf("\n")
 			fmt.Printf("OS Storage\n")
-			fmt.Printf("    Volume Group Name : %s\n", vm.OsVg)
-			fmt.Printf("    Logical Volume Name : %s\n", vm.OsLv)
-			fmt.Printf("    OS Variant : %s\n", vm.OsVariant)
+			fmt.Printf("    Volume Group Name : %s\n", nilToEmptyString(vm.OsVg))
+			fmt.Printf("    Logical Volume Name : %s\n", nilToEmptyString(vm.OsLv))
+			fmt.Printf("    OS Variant : %s\n", nilToEmptyString(vm.OsVariant))
 			fmt.Printf("\n")
 			fmt.Printf("Data Storage\n")
-			for _, v := range vm.Storage {
-				fmt.Printf("    Storage Name : %s\n", v.Name)
-				fmt.Printf("    Size(GB) : %d\n", v.Size)
-				fmt.Printf("    Volume Group Name : %s\n", v.Vg)
-				fmt.Printf("    Logical Volume Name : %s\n", v.Lv)
-				fmt.Printf("    Path : %s\n", v.Path)
+			if vm.Storage != nil {
+				for _, v := range *vm.Storage {
+					fmt.Printf("    Storage Name : %s\n", nilToEmptyString(v.Name))
+					fmt.Printf("    Size(GB) : %d\n", nil64ToZero(v.Size))
+					fmt.Printf("    Volume Group Name : %s\n", nilToEmptyString(v.Vg))
+					fmt.Printf("    Logical Volume Name : %s\n", nilToEmptyString(v.Lv))
+					fmt.Printf("    Path : %s\n", nilToEmptyString(v.Path))
+				}
 			}
 			fmt.Printf("\n")
-			fmt.Printf("Comment: %s \n", vm.Comment)
-			fmt.Printf("Ansible Playbook: %s \n", vm.Playbook)
+			fmt.Printf("Comment: %s \n", nilToEmptyString(vm.Comment))
+			fmt.Printf("Ansible Playbook: %s \n", nilToEmptyString(vm.Playbook))
 			fmt.Printf("\n")
 		}
 		dec.Token()

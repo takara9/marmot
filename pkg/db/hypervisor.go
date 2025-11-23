@@ -4,14 +4,18 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"time"
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/config"
 )
 
+func intPtr(i int) *int32            { j := int32(i); return &j }
+func int64Ptr(i int) *int64          { j := int64(i); return &j }
 func int32Ptr(i uint64) *int32       { j := int32(i); return &j }
 func int64PtrConvMB(i uint64) *int64 { j := int64(i) * 1024; return &j }
 func stringPtr(s string) *string     { return &s }
+func timePtr(t time.Time) *time.Time { return &t }
 
 // ハイパーバイザーの設定
 func (d *Database) SetHypervisors(v config.Hypervisor_yaml) error {

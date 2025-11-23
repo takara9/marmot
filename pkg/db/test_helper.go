@@ -2,7 +2,6 @@ package db
 
 import (
 	"github.com/takara9/marmot/api"
-	. "github.com/takara9/marmot/pkg/types"
 )
 
 func TestHvData1() api.Hypervisor {
@@ -17,33 +16,39 @@ func TestHvData1() api.Hypervisor {
 	return hv
 }
 
-func TestVmCreate(hostname string, cpu int, ram int) VirtualMachine {
-	var vm VirtualMachine
+func TestVmCreate(hostname string, cpu int, ram int) api.VirtualMachine {
+	var vm api.VirtualMachine
 	vm.Name = hostname
-	vm.Cpu = cpu
-	vm.Memory = ram
-	vm.PrivateIp = "172.16.0.100"
-	vm.PublicIp = "192.168.1.100"
-	vm.Playbook = "setup.yaml"
-	vm.Comment = "Test Data Cluster "
+	vm.Cpu = intPtr(cpu)
+	vm.Memory = int64Ptr(ram)
+	vm.PrivateIp = stringPtr("172.16.0.100")
+	vm.PublicIp = stringPtr("192.168.1.100")
+	vm.Playbook = stringPtr("setup.yaml")
+	vm.Comment = stringPtr("Test Data Cluster ")
 
-	var st Storage
-	st.Name = "log"
-	st.Size = 10
-	st.Path = "/stg"
-	vm.Storage = append(vm.Storage, st)
-	st.Name = "data1"
-	st.Size = 100
-	st.Path = "/stg"
-	vm.Storage = append(vm.Storage, st)
-	st.Name = "data2"
-	st.Size = 100
-	st.Path = "/stg"
-	vm.Storage = append(vm.Storage, st)
-	st.Name = "data3"
-	st.Size = 100
-	st.Path = "/stg"
-	vm.Storage = append(vm.Storage, st)
+	var sta []api.Storage
+	var st api.Storage
+
+	st.Name = stringPtr("log")
+	st.Size = int64Ptr(10)
+	st.Path = stringPtr("/stg")
+	sta = append(sta, st)
+
+	st.Name = stringPtr("data1")
+	st.Size = int64Ptr(100)
+	st.Path = stringPtr("/stg")
+	sta = append(sta, st)
+
+	st.Name = stringPtr("data2")
+	st.Size = int64Ptr(100)
+	st.Path = stringPtr("/stg")
+	sta = append(sta, st)
+
+	st.Name = stringPtr("data3")
+	st.Size = int64Ptr(100)
+	st.Path = stringPtr("/stg")
+	sta = append(sta, st)
+	vm.Storage = &sta
 
 	return vm
 }

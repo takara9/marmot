@@ -12,11 +12,6 @@ import (
 )
 
 func main() {
-	node := flag.String("node", "hv1", "Hypervisor node name")
-	etcd := flag.String("etcd", "http://127.0.0.1:3379", "etcd url")
-	flag.Parse()
-	slog.Debug("node", *node, "etcd url", *etcd)
-
 	// Setup slog
 	opts := &slog.HandlerOptions{
 		AddSource: true,
@@ -24,6 +19,12 @@ func main() {
 	}
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
 	slog.SetDefault(logger)
+
+	node := flag.String("node", "hv1", "Hypervisor node name")
+	etcd := flag.String("etcd", "http://127.0.0.1:3379", "etcd url")
+	flag.Parse()
+
+	//slog.Debug("node", *node, "etcd url", *etcd)
 
 	e := echo.New()
 	Server := marmotd.NewServer(*node, *etcd)

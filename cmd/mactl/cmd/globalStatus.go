@@ -8,7 +8,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/types"
 )
 
 var globalStatusCmd = &cobra.Command{
@@ -40,7 +39,7 @@ var globalStatusCmd = &cobra.Command{
 				slog.Error("reading hypervisors status", "err", err)
 			}
 			fmt.Printf("%-10s %-3v %-15v %4d/%-4d %6d/%-6d  ",
-				hv.NodeName, status[*hv.Status], hv.IpAddr, *hv.FreeCpu, hv.Cpu, *hv.FreeMemory, *hv.Memory)
+				hv.NodeName, status[*hv.Status], *hv.IpAddr, *hv.FreeCpu, hv.Cpu, *hv.FreeMemory, *hv.Memory)
 			for _, v := range *hv.StgPool {
 				fmt.Printf("%v(%v): %5d/%-5d ", *v.VolGroup, *v.Type, *v.FreeCap, *v.VgCap)
 			}
@@ -69,16 +68,18 @@ var globalStatusCmd = &cobra.Command{
 		fmt.Printf("%-20s", "DATA STORAGE")
 		fmt.Printf("\n")
 		for dec.More() {
-			var vm types.VirtualMachine
+			var vm api.VirtualMachine
 			err := dec.Decode(&vm)
 			if err != nil {
 				slog.Error("getting vm status", "err", err)
 			}
 			fmt.Printf("%-10s %-16s %-6s %-5s %-20s %-4v  %-6v %-15v %-15v ",
-				vm.ClusterName, vm.Name, vm.HvNode, StateDsp[vm.Status],
-				vm.Key, vm.Cpu, vm.Memory, vm.PrivateIp, vm.PublicIp)
-			for _, dv := range vm.Storage {
-				fmt.Printf("%-4d", dv.Size)
+				*vm.ClusterName, vm.Name, vm.HvNode, StateDsp[*vm.Status],
+				*vm.Key, *vm.Cpu, *vm.Memory, *vm.PrivateIp, *vm.PublicIp)
+			if vm.Storage != nil {
+				for _, dv := range *vm.Storage {
+					fmt.Printf("%-4d", *dv.Size)
+				}
 			}
 			fmt.Printf("\n")
 		}

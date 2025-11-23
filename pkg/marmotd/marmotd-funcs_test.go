@@ -42,7 +42,7 @@ func prepareMockVmfunc() {
 		// Setup slog
 		opts := &slog.HandlerOptions{
 			AddSource: true,
-			//Level:     slog.LevelDebug,
+			Level:     slog.LevelDebug,
 		}
 		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
 		slog.SetDefault(logger)
@@ -162,7 +162,7 @@ func testMarmotFuncs() {
 			cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
 			Expect(err).NotTo(HaveOccurred())
 			//
-			marmotd.PrintMarmotConfig(*cnf)
+			//marmotd.PrintMarmotConfig(*cnf)
 			//
 			err = m.CreateClusterInternal(*cnf)
 			Expect(err).NotTo(HaveOccurred())

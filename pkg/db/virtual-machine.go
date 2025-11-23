@@ -4,19 +4,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sort"
 	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/types"
 )
 
 // Keyに一致したVMデータの取り出し
-func (d *Database) GetVmByKey(key string) (types.VirtualMachine, error) {
-	var vm types.VirtualMachine
-
+func (d *Database) GetVmByKey(key string) (api.VirtualMachine, error) {
+	var vm api.VirtualMachine
 	if len(key) == 0 {
 		return vm, errors.New("not found")
 	}
@@ -25,23 +24,21 @@ func (d *Database) GetVmByKey(key string) (types.VirtualMachine, error) {
 	if err != nil {
 		return vm, err
 	}
-
 	if resp.Count == 0 {
 		return vm, errors.New("not found")
 	}
 	err = json.Unmarshal([]byte(resp.Kvs[0].Value), &vm)
-
 	return vm, err
 }
 
 // 仮想マシンのデータを取得
-func (d *Database) GetVmsStatus(vms *[]types.VirtualMachine) error {
+func (d *Database) GetVmsStatus(vms *[]api.VirtualMachine) error {
 	resp, err := d.GetEtcdByPrefix("vm")
 	if err != nil {
 		return err
 	}
 	for _, ev := range resp.Kvs {
-		var vm types.VirtualMachine // ここに宣言することで、ループ毎に初期化される
+		var vm api.VirtualMachine // ここに宣言することで、ループ毎に初期化される
 		err = json.Unmarshal(ev.Value, &vm)
 		if err != nil {
 			return err
@@ -55,40 +52,42 @@ func (d *Database) GetVmsStatus(vms *[]types.VirtualMachine) error {
 // 割り当てたハイパーバイザーのリソースを減らす
 // 仮想マシンのデータをセットする
 // 仮想マシンの状態をプロビジョニング中にする
-func (d *Database) AssignHvforVm(vm types.VirtualMachine) (string, string, string, uuid.UUID, int, error) {
-
+func (d *Database) AssignHvforVm(vm api.VirtualMachine) (string, string, string, string, int32, error) {
+	slog.Debug("=== AssignHvforVm called ===", "start", vm)
 	var txId = uuid.New()
 	//トランザクション開始、他更新ロック 仮想マシンをデータベースに登録、状態は「データ登録中」
 	var hvs []api.Hypervisor
 	err := d.GetHypervisors(&hvs) // HVのステータス取得
 	if err != nil {
-		return "", "", "", txId, 0, err
+		return "", "", "", txId.String(), 0, err
 	}
+	slog.Debug("=== AssignHvforVm", "d.GetHypervisors()", hvs)
 
 	// フリーのCPU数の降順に並べ替える
 	sort.Slice(hvs, func(i, j int) bool { return *hvs[i].FreeCpu > *hvs[j].FreeCpu })
+
+	slog.Debug("=== AssignHvforVm", "sorted", hvs)
 
 	// リソースに空きのあるハイパーバイザーを探す
 	var assigned = false
 	var hv api.Hypervisor
 	//var port int
 	for _, hv = range hvs {
-
 		// 停止中のHVの割り当てない
 		if *hv.Status != 2 {
 			continue
 		}
 
-		if *hv.FreeCpu >= int32(vm.Cpu) {
-			if *hv.FreeMemory >= int64(vm.Memory) {
-
-				*hv.FreeMemory = *hv.FreeMemory - int64(vm.Memory)
-				*hv.FreeCpu = *hv.FreeCpu - int32(vm.Cpu)
+		if *hv.FreeCpu >= *vm.Cpu {
+			if *hv.FreeMemory >= *vm.Memory {
+				slog.Debug("=== AssignHvforVm assigned", "hv=", hv)
+				*hv.FreeMemory = *hv.FreeMemory - *vm.Memory
+				*hv.FreeCpu = *hv.FreeCpu - *vm.Cpu
 				// ストレージの容量管理は未実装
-				vm.Status = 0           // 登録中
+				vm.Status = int32Ptr(0) // 登録中
 				vm.HvNode = hv.NodeName // ハイパーバイザーを決定
-				vm.HvIpAddr = *hv.IpAddr
-				vm.HvPort = int(*hv.Port)
+				vm.HvIpAddr = hv.IpAddr
+				vm.HvPort = hv.Port
 				assigned = true
 				break
 			}
@@ -96,28 +95,43 @@ func (d *Database) AssignHvforVm(vm types.VirtualMachine) (string, string, strin
 	}
 	// リソースに空きが無い場合はエラーを返す
 	if !assigned {
+		slog.Debug("=== AssignHvforVm failed to assign", "", "")
 		err := errors.New("could't assign VM due to doesn't have enough a resouce on HV")
-		return "", "", "", txId, 0, err
+		return "", "", "", txId.String(), 0, err
 	}
+
 	// ハイパーバイザーのリソース削減保存
 	err = d.PutDataEtcd(*hv.Key, hv)
 	if err != nil {
-		return "", "", "", txId, 0, err
+		return "", "", "", txId.String(), 0, err
 	}
+	slog.Debug("=== d.PutDataEtcd", "hv.Key", *hv.Key)
+
 	// VM名登録　シリアル番号取得
 	seqNum, err := d.GetSeq("VM")
 	if err != nil {
-		return "", "", "", txId, 0, err
+		return "", "", "", txId.String(), 0, err
 	}
+	slog.Debug("=== d.GetSeq()", "seqNum", seqNum)
 
-	vm.Key = fmt.Sprintf("vm_%s_%04d", vm.Name, seqNum)
+	//var vm2 api.VirtualMachine
+	vm.Key = stringPtr(fmt.Sprintf("vm_%s_%04d", vm.Name, seqNum))
 	//vm.NameはOSホスト名なので受けたものを利用
-	vm.Uuid = txId
-	vm.Ctime = time.Now()
-	vm.Stime = time.Now()
-	//vm.Status = 1  // 状態プロビ中
-	err = d.PutDataEtcd(vm.Key, vm) // 仮想マシンのデータ登録
-	return vm.HvNode, vm.HvIpAddr, vm.Key, vm.Uuid, vm.HvPort, err
+	vm.Uuid = stringPtr(txId.String())
+	vm.CTime = timePtr(time.Now())
+	vm.STime = timePtr(time.Now())
+	//vm2.Cpu = vm.Cpu
+	//vm2.Memory = vm.Memory
+	//vm2.DiskSize = vm.DiskSize
+	//vm2.HvNode = vm.HvNode
+	//vm2.HvIpAddr = vm.HvIpAddr
+	//vm2.HvPort = vm.HvPort
+	//vm2.OsImage = vm.OsImage
+	vm.Status = int32Ptr(1)           // 登録中
+	err = d.PutDataEtcd(*vm.Key, &vm) // 仮想マシンのデータ登録
+	slog.Debug("=== d.PutDataEtcd", "vm.Key", *vm.Key, "err", err)
+
+	return vm.HvNode, *vm.HvIpAddr, *vm.Key, txId.String(), *vm.HvPort, err
 }
 
 // VMの終了とリソースの開放
@@ -134,14 +148,14 @@ func (d *Database) RemoveVmFromHV(vmKey string) error {
 		return err
 	}
 	// HVからリソースを削除
-	*hv.FreeCpu = *hv.FreeCpu + int32(vm.Cpu)
-	*hv.FreeMemory = *hv.FreeMemory + int64(vm.Memory)
+	*hv.FreeCpu = *hv.FreeCpu + *vm.Cpu
+	*hv.FreeMemory = *hv.FreeMemory + *vm.Memory
 	err = d.PutDataEtcd(vm.HvNode, &hv)
 	if err != nil {
 		return err
 	}
 	// VMを削除
-	err = d.DelByKey(vm.Key)
+	err = d.DelByKey(*vm.Key)
 	if err != nil {
 		return err
 	}
@@ -154,7 +168,7 @@ func (d *Database) UpdateVmState(vmkey string, state int) error {
 	if err != nil {
 		return err
 	}
-	vm.Status = state
+	vm.Status = intPtr(state)
 	err = d.PutDataEtcd(vmkey, vm)
 	return err
 }
