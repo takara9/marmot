@@ -14,9 +14,9 @@ func int32Ptr(i int32) *int32 { j := int32(i); return &j }
 
 // コンフィグからVMクラスタを作成する  新APIを使用
 func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
-	if DEBUG {
-		printConfigJson(cnf)
-	}
+	//if DEBUG {
+	//	printConfigJson(cnf)
+	//}
 	slog.Debug("CreateClusterInternal", "cnf", "")
 
 	// リクエスト送信前にコンフィグのチェックを実施する

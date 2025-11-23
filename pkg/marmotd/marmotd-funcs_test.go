@@ -162,7 +162,7 @@ func testMarmotFuncs() {
 			cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
 			Expect(err).NotTo(HaveOccurred())
 			//
-			marmotd.PrintMarmotConfig(*cnf)
+			//marmotd.PrintMarmotConfig(*cnf)
 			//
 			err = m.CreateClusterInternal(*cnf)
 			Expect(err).NotTo(HaveOccurred())

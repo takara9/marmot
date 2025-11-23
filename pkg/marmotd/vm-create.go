@@ -12,9 +12,9 @@ import (
 
 // VMを生成する
 func (m *Marmot) CreateVM(spec api.VmSpec) error {
-	if DEBUG {
-		printVmSpecJson(spec)
-	}
+	//if DEBUG {
+	//	printVmSpecJson(spec)
+	//}
 	slog.Debug("=====","CreateVM()", "=====")
 
 	var dom virt.Domain

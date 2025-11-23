@@ -1,12 +1,6 @@
 package marmotd
 
-import (
-	"encoding/json"
-	"fmt"
-
-	"github.com/takara9/marmot/api"
-)
-
+/*
 // 新APIから旧APIの構造体へ変換する
 func PrintMarmotConfig(a api.MarmotConfig) {
 	fmt.Println("=========================================")
@@ -124,3 +118,4 @@ func printVmSpecJson(cnf api.VmSpec) {
 	fmt.Println(string(param))
 }
 
+*/

@@ -143,9 +143,9 @@ func (s *Server) CreateCluster(ctx echo.Context) error {
 	}
 
 	// ここで どんな状態でJSONが取れているか確認する
-	if DEBUG {
-		PrintMarmotConfig(cnf)
-	}
+	//if DEBUG {
+	//	PrintMarmotConfig(cnf)
+	//}
 
 	// ハイパーバイザーの稼働チェック 結果はDBへ反映
 	_, err = util.CheckHypervisors(s.Ma.EtcdUrl, s.Ma.NodeName)
@@ -216,9 +216,9 @@ func (s *Server) StopCluster(ctx echo.Context) error {
 	}
 
 	// ここで どんな状態でJSONが取れているか確認する
-	if DEBUG {
-		PrintMarmotConfig(cnf)
-	}
+	//if DEBUG {
+	//	PrintMarmotConfig(cnf)
+	//}
 
 	if err := s.Ma.StopClusterInternal(cnf); err != nil {
 		slog.Error("StopCluster()", "err", err)
@@ -241,9 +241,9 @@ func (s *Server) CreateVirtualMachine(ctx echo.Context) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	if DEBUG {
-		printVmSpecJson(spec)
-	}
+	//if DEBUG {
+	//	printVmSpecJson(spec)
+	//}
 
 	err = s.Ma.CreateVM(spec)
 	if err != nil {
