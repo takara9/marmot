@@ -83,11 +83,11 @@ var statusCmd = &cobra.Command{
 			// 表示
 			if match {
 				fmt.Printf("%-10s %-16s %-6s %-5s %-20s %-4v  %-6v %-15v %-15v ", nilToEmptyString(vm.ClusterName), vm.Name, vm.HvNode, StateDsp[*vm.Status], nilToEmptyString(vm.Key), nil32ToZero(vm.Cpu), nil64ToZero(vm.Memory), nilToEmptyString(vm.PrivateIp), nilToEmptyString(vm.PublicIp))
-				if vm.Storage != nil {
-					for _, dv := range *vm.Storage {
-						fmt.Printf("%-4d", nil64ToZero(dv.Size))
-					}
-				}
+				//if vm.Storage != nil {
+				//	for _, dv := range *vm.Storage {
+				//		fmt.Printf("%-4d", nil64ToZero(dv.Size))
+				//	}
+				//}
 				fmt.Printf("\n")
 			}
 		}
