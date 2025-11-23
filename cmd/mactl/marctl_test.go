@@ -149,11 +149,9 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 		It("クラスタ 1 の生成", func() {
 			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "create", "-c", "testdata/cluster-config1.yaml")
-			//stdoutStderr, err := cmd.CombinedOutput()
-			_, err := cmd.CombinedOutput()
-			//GinkgoWriter.Println("stdout =", string(stdoutStderr))
-			//GinkgoWriter.Println("err = ", string(err.Error()))
+			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
 		})
 
 		It("仮想マシンの一覧取得-1", func() {

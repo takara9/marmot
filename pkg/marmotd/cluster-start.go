@@ -12,6 +12,8 @@ import (
 
 // クラスタ開始
 func (m *Marmot) StartClusterInternal(cnf api.MarmotConfig) error {
+	slog.Debug("StartClusterInternal", "cnf", "")
+
 	// リクエスト送信前にコンフィグのチェックを実施する
 	if cnf.VmSpec == nil || cnf.ClusterName == nil {
 		return errors.New("VM Spec or Cluster Name is not set")

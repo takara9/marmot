@@ -107,7 +107,7 @@ func (s *Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPar
 	return ctx.JSON(http.StatusOK, hvs)
 }
 
-// 仮想マシンのリスト（テストできていない）
+// 仮想マシンのリスト
 func (s *Server) ListVirtualMachines(ctx echo.Context) error {
 	slog.Debug("===", "ListVirtualMachines() is called", "===")
 	s.Lock.Lock()
@@ -195,7 +195,7 @@ func (s *Server) StartCluster(ctx echo.Context) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	if err := s.Ma.DestroyClusterInternal(cnf); err != nil {
+	if err := s.Ma.StartClusterInternal(cnf); err != nil {
 		slog.Error("StartCluster()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}

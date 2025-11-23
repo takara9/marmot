@@ -4,12 +4,30 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/config"
 )
+
+func nilToEmptyString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+func nil64ToZero(i *int64) int64 {
+	if i == nil {
+		return 0
+	}
+	return *i
+}
+func nil32ToZero(i *int32) int32 {
+	if i == nil {
+		return 0
+	}
+	return *i
+}
 
 // statusCmd represents the status command
 var statusCmd = &cobra.Command{
@@ -30,29 +48,27 @@ var statusCmd = &cobra.Command{
 			return
 		}
 
-		slog.Debug("mactl ListVirtualMachines", "before", nil)
+		slog.Debug("mactl ListVirtualMachines", "before", clusterConfig)
 		_, byteBody, _, err := m.ListVirtualMachines(nil)
 		if err != nil {
 			slog.Error("list vms", "err", err)
 			return
 		}
 		slog.Debug("mactl ListVirtualMachines", "body", string(byteBody))
+		var vms []api.VirtualMachine
+		err = json.Unmarshal(byteBody, &vms)
+		if err != nil {
+			slog.Error("Unmarshal", "err", err)
+			return
+		}
 
-		StateDsp := []string{"RGIST", "PROVI", "RUN", "STOP", "DELT", "Error"}
-		dec := json.NewDecoder(strings.NewReader(string(byteBody)))
-		dec.Token()
 		fmt.Printf("%-10s %-16s %-6s %-5s %-20s %-4v  %-6v %-15v %-15v ",
 			"CLUSTER", "VM-NAME", "H-Visr", "STAT", "VKEY", "VCPU", "RAM", "PubIP", "PriIP")
 		fmt.Printf("%-20s", "DATA STORAGE")
 		fmt.Printf("\n")
 
-		for dec.More() {
-			// クラスタ名と仮想マシンが一致したものだけリスト
-			var vm api.VirtualMachine
-			err := dec.Decode(&vm)
-			if err != nil {
-				slog.Error("list vms in the cluster", "err", err)
-			}
+		StateDsp := []string{"RGIST", "PROVI", "RUN", "STOP", "DELT", "Error"}
+		for _, vm := range vms {
 			// フィルター処理
 			match := false
 			if *clusterConfig.ClusterName == *vm.ClusterName {
@@ -66,16 +82,15 @@ var statusCmd = &cobra.Command{
 
 			// 表示
 			if match {
-				fmt.Printf("%-10s %-16s %-6s %-5s %-20s %-4v  %-6v %-15v %-15v ",
-					*vm.ClusterName, vm.Name, vm.HvNode, StateDsp[*vm.Status],
-					*vm.Key, *vm.Cpu, *vm.Memory, *vm.PrivateIp, *vm.PublicIp)
-				for _, dv := range *vm.Storage {
-					fmt.Printf("%-4d", *dv.Size)
+				fmt.Printf("%-10s %-16s %-6s %-5s %-20s %-4v  %-6v %-15v %-15v ", nilToEmptyString(vm.ClusterName), vm.Name, vm.HvNode, StateDsp[*vm.Status], nilToEmptyString(vm.Key), nil32ToZero(vm.Cpu), nil64ToZero(vm.Memory), nilToEmptyString(vm.PrivateIp), nilToEmptyString(vm.PublicIp))
+				if vm.Storage != nil {
+					for _, dv := range *vm.Storage {
+						fmt.Printf("%-4d", nil64ToZero(dv.Size))
+					}
 				}
 				fmt.Printf("\n")
 			}
 		}
-		dec.Token()
 	},
 }
 

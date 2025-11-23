@@ -88,15 +88,16 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		vm.Comment = spec.Comment
 		vm.Status = int32Ptr(types.INITALIZING)
 		var s []api.Storage
-		for _, stg := range *spec.Storage {
-			var vms api.Storage
-			vms.Name = stg.Name
-			vms.Size = stg.Size
-			vms.Path = stg.Path
-			s = append(s, vms)
+		if spec.Storage != nil {
+			for _, stg := range *spec.Storage {
+				var vms api.Storage
+				vms.Name = stg.Name
+				vms.Size = stg.Size
+				vms.Path = stg.Path
+				s = append(s, vms)
+			}
+			vm.Storage = &s
 		}
-		vm.Storage = &s
-
 		//スケジュールを実行
 		//var err error
 		HvNode, HvIpAddr, Key, Uuid, HvPort, err := m.Db.AssignHvforVm(vm)
