@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -27,6 +28,13 @@ func nil32ToZero(i *int32) int32 {
 		return 0
 	}
 	return *i
+}
+
+func nilToTime(t *time.Time) string {
+	if t == nil {
+		return ""
+	}
+	return t.String()
 }
 
 // statusCmd represents the status command
