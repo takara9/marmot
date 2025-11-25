@@ -11,7 +11,6 @@ import (
 
 	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/marmotd"
-	"github.com/takara9/marmot/pkg/util"
 )
 
 var _ = Describe("Marmotd Test", Ordered, func() {
@@ -81,11 +80,6 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 				err := marmotServer.Ma.Db.CreateSeq(sq.Key, sq.Start, sq.Step)
 				Expect(err).NotTo(HaveOccurred())
 			}
-		})
-
-		It("ストレージの空き容量チェック", func() {
-			err = util.CheckHvVgAll(marmotServer.Ma.EtcdUrl, marmotServer.Ma.NodeName)
-			Expect(err).NotTo(HaveOccurred())
 		})
 
 		// mactl2 コマンドに置き換え　実装が必要

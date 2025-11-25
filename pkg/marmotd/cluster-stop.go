@@ -21,14 +21,16 @@ func (m *Marmot) StopClusterInternal(cnf api.MarmotConfig) error {
 	}
 
 	var NotFound bool = true
+	var vmKey string
 	for _, spec := range *cnf.VmSpec {
-		vmKey, _ := m.Db.FindByHostAndClusteName(*spec.Name, *cnf.ClusterName)
+		vmKey, _ = m.Db.FindByHostAndClusteName(*spec.Name, *cnf.ClusterName)
+		slog.Debug("FindByHostAndClusteName()", "vmKey", vmKey, "spec.Name", *spec.Name, "cnf.ClusterName", *cnf.ClusterName)
 		if len(vmKey) > 0 {
 			NotFound = false
 			spec.Key = &vmKey
-			vm, err := m.Db.GetVmByKey(vmKey)
+			vm, err := m.Db.GetVmByVmKey(vmKey)
 			if err != nil {
-				slog.Error("GetVmByKey()", "err", err)
+				slog.Error("GetVmByVmKey()", "err", err, "vmKey=", vmKey)
 				continue
 			}
 
@@ -44,13 +46,14 @@ func (m *Marmot) StopClusterInternal(cnf api.MarmotConfig) error {
 			}
 			_, _, _, err = marmotClient.StopVirtualMachine(spec)
 			if err != nil {
-				slog.Error("marmotClient.StopVirtualMachine()", "err", err)
-				m.Db.UpdateVmState(*vm.Key, types.ERROR) // エラー状態へ
+				slog.Error("marmotClient.StopVirtualMachine()", "err", err, "vmKey=", vmKey)
+				m.Db.UpdateVmStateByKey(*vm.Key, types.ERROR) // エラー状態へ
 				continue
 			}
 		}
 	}
 	if NotFound {
+		slog.Info("StopClusterInternal()", "err", "NotExistVM", "vmKey", vmKey, "clusterName", *cnf.ClusterName)
 		return errors.New("NotExistVM")
 	}
 	return nil

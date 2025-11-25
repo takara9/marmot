@@ -9,7 +9,7 @@ import (
 
 func (d *Database) SetVersion(ver api.Version) error {
 	slog.Debug("Called SetVersion with open api")
-	err := d.PutDataEtcd("version", ver)
+	err := d.PutDataEtcd(VersionKey, ver)
 	if err != nil {
 		slog.Error("PutDataEtcd()", "err", err, "version", ver)
 		return err
@@ -21,7 +21,7 @@ func (d *Database) SetVersion(ver api.Version) error {
 func (d *Database) GetVersion() (*api.Version, error) {
 	var v api.Version
 
-	ver, err := d.GetByKey("version")
+	ver, err := d.GetByKey(VersionKey)
 	if err != nil {
 		slog.Error("GetByKey()", "err", err)
 		return nil, err
@@ -29,7 +29,7 @@ func (d *Database) GetVersion() (*api.Version, error) {
 
 	err = json.Unmarshal(ver, &v)
 	if err != nil {
-		slog.Error("json.Unmarshal()", "err", err, "version", ver)
+		slog.Error("json.Unmarshal()", "err", err, VersionKey, ver)
 		return nil, err
 	}
 

@@ -9,7 +9,6 @@ package util
 // チェック結果をetcdへ反映させる
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"log/slog"
@@ -20,35 +19,7 @@ import (
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/lvm"
 )
-
-// ハイパーバイザーのリストを取り出す
-func getHypervisors(dbUrl string) ([]api.Hypervisor, error) {
-	d, err := db.NewDatabase(dbUrl)
-	if err != nil {
-		slog.Error("", "err", err)
-		return nil, err
-	}
-	// クローズが無い？
-
-	resp, err := d.GetEtcdByPrefix("hv")
-	if err != nil {
-		slog.Error("", "err", err)
-		return nil, err
-	}
-
-	var hvs []api.Hypervisor
-	for _, val := range resp.Kvs {
-		var hv api.Hypervisor
-		err = json.Unmarshal(val.Value, &hv)
-		if err != nil {
-			return nil, err
-		}
-		hvs = append(hvs, hv)
-	}
-	return hvs, nil
-}
 
 // ハイパーバイザーをREST-APIでアクセスして疎通を確認、DBへ反映させる
 func CheckHypervisors(dbUrl string, node string) ([]api.Hypervisor, error) {
@@ -60,8 +31,8 @@ func CheckHypervisors(dbUrl string, node string) ([]api.Hypervisor, error) {
 	}
 	// クローズが無い？
 
-	hvs, err := getHypervisors(dbUrl)
-	if err != nil {
+	var hvs []api.Hypervisor
+	if err := d.GetHypervisors(&hvs); err != nil {
 		slog.Error("", "err", err)
 		return nil, err
 	}
@@ -100,39 +71,7 @@ func ReqGetQuick(apipath string, api string) (*http.Response, []byte, error) {
 
 func int64Ptr(i uint64) *int64 { j := int64(i); return &j }
 
-func CheckHvVgAll(dbUrl string, node string) error {
-	d, err := db.NewDatabase(dbUrl)
-	if err != nil {
-		slog.Error("", "err", err)
-		return err
-	}
-	// クローズが無い？
-
-	hv, err := d.GetHypervisorByKey(node)
-	if err != nil {
-		slog.Error("", "err", err)
-		return err
-	}
-
-	for i := 0; i < len(*hv.StgPool); i++ {
-		total_sz, free_sz, err := lvm.CheckVG(*(*hv.StgPool)[i].VolGroup)
-		if err != nil {
-			slog.Error("", "err", err)
-			return err
-		}
-		(*hv.StgPool)[i].FreeCap = int64Ptr(free_sz / 1024 / 1024 / 1024)
-		(*hv.StgPool)[i].VgCap = int64Ptr(total_sz / 1024 / 1024 / 1024)
-	}
-
-	// DBへ書き込み
-	err = d.PutDataEtcd(*hv.Key, hv)
-	if err != nil {
-		slog.Error("", "err", err)
-		return err
-	}
-	return nil
-}
-
+/*
 // ボリュームグループの容量を取得して、DBへセットする
 func CheckHvVG(dbUrl string, node string, vg string) error {
 	err := CheckHvVG2(dbUrl, node, vg)
@@ -142,7 +81,9 @@ func CheckHvVG(dbUrl string, node string, vg string) error {
 	}
 	return nil
 }
+*/
 
+/*
 // ボリュームグループの容量を取得して、DBへセットする
 func CheckHvVG2(dbUrl string, node string, vg string) error {
 	// LVMへのアクセス
@@ -180,3 +121,4 @@ func CheckHvVG2(dbUrl string, node string, vg string) error {
 	}
 	return nil
 }
+*/

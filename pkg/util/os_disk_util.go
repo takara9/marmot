@@ -21,8 +21,6 @@ import (
 	"os/exec"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/lvm"
 )
 
 // LVのパーティションをマップ
@@ -69,6 +67,7 @@ func UnMountLocal(uuid string) error {
 // OSテンプVolのスナップショットを作成してデバイス名を返す
 //
 //	サイズとテンプレートの選択が無い！？ 将来改良
+/*
 func CreateOsLv(dbUrl string, tempVg string, tempLv string) (string, error) {
 	d, err := db.NewDatabase(dbUrl)
 	if err != nil {
@@ -88,7 +87,9 @@ func CreateOsLv(dbUrl string, tempVg string, tempLv string) (string, error) {
 	}
 	return lvName, err
 }
+*/
 
+/*
 // データボリュームの作成
 func CreateDataLv(dbUrl string, sz uint64, vg string) (string, error) {
 	d, err := db.NewDatabase(dbUrl)
@@ -109,6 +110,7 @@ func CreateDataLv(dbUrl string, sz uint64, vg string) (string, error) {
 	}
 	return lvName, err
 }
+*/
 
 // スナップショットボリュームをマウントして、 ホスト名とIPアドレスを設定
 //

@@ -31,15 +31,20 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		return errors.New("OS template is not set")
 	}
 
+	slog.Debug("CreateClusterInternal", "コンディションのチェック", "開始")
 	for _, spec := range *cnf.VmSpec {
+		slog.Debug("CreateClusterInternal", "spec.Name", spec.Name)
+
 		// クラスタ名とホスト名の重複チェック
 		if spec.Name == nil {
 			return errors.New("VM Name is not set")
 		}
-		vmKey, _ := m.Db.FindByHostAndClusteName(*spec.Name, *cnf.ClusterName)
+		vmKey, err := m.Db.FindByHostAndClusteName(*spec.Name, *cnf.ClusterName)
 		if len(vmKey) > 0 {
-			return fmt.Errorf("existing same name virttual machine : %v", spec.Name)
+			slog.Debug("重複ホスト名のチェック NG", "err", err, "hostname", *spec.Name, "clustername", *cnf.ClusterName)
+			return fmt.Errorf("existing same name virttual machine : %v, vmkey = %v", *spec.Name, vmKey)
 		}
+		slog.Debug("CreateClusterInternal", "同一クラスにホスト名重複のチェック", "PASS")
 
 		// パブリックIPアドレスの重複チェックを入れる
 		if spec.PublicIp != nil {
@@ -50,6 +55,7 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 			if found {
 				return fmt.Errorf("same pubic IP address exist in the cluster IP: %v", *spec.PublicIp)
 			}
+			slog.Debug("CreateClusterInternal", "パブリックIPアドレスの重複のチェック", "PASS")
 		}
 
 		// プライベートIPアドレスの重複チェックを入れる
@@ -61,12 +67,20 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 			if found {
 				return fmt.Errorf("same private IP address exist in the cluster IP: %v", *spec.PrivateIp)
 			}
+			slog.Debug("CreateClusterInternal", "プライベートIPアドレスの重複のチェック", "PASS")
 		}
 	} // END OF LOOP
+	slog.Debug("CreateClusterInternal", "コンディションのチェック", "終了")
 
 	// 仮想マシンの設定と起動
 	var break_err bool = false
 	var return_err error = nil
+
+	slog.Debug("CreateClusterInternal", "仮想マシンの設定と起動", "")
+
+	/*
+		NewVMの登録が無いみたい。
+	*/
 
 	for _, spec := range *cnf.VmSpec {
 		// ホスト名とクラスタ名でVMキーを取得する
@@ -100,6 +114,8 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		}
 		//スケジュールを実行
 		//var err error
+
+		// この中で,NEW VMの登録を行っているのか？
 		HvNode, HvIpAddr, Key, Uuid, HvPort, err := m.Db.AssignHvforVm(vm)
 		if err != nil {
 			slog.Error("", "err", err)
@@ -115,11 +131,11 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 
 		// OSのバージョン、テンプレートを設定
 		spec.Ostempvariant = cnf.OsVariant
-		vg, lv, err := m.Db.GetOsImgTempByKey(*spec.Ostempvariant)
+		vg, lv, err := m.Db.GetOsImgTempByOsVariant(*spec.Ostempvariant)
 		spec.Ostempvg = &vg
 		spec.Ostemplv = &lv
 		if err != nil {
-			slog.Error("", "err", err)
+			slog.Error("GetOsImgTempByKey", "err", err)
 			break_err = true
 			return_err = err
 			break
@@ -143,7 +159,13 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		}
 
 		// リモートとローカル関係なしに、マイクロサービスへリクエストする
-		m.Db.UpdateVmState(*vm.Key, types.PROVISIONING)
+		if err := m.Db.UpdateVmStateByKey(*vm.Key, types.PROVISIONING); err != nil {
+			slog.Error("UpdateVmStateByKey", "err", err, "key", *vm.Key)
+			break_err = true
+			return_err = err
+			break
+		}
+
 		marmotHost := fmt.Sprintf("%s:%d", *vm.HvIpAddr, *vm.HvPort)
 		marmotClient, err := client.NewMarmotdEp(
 			"http",
@@ -160,17 +182,19 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 			slog.Error("", "remote request err", err)
 			break_err = true
 			return_err = err
-			m.Db.UpdateVmState(*vm.Key, types.ERROR) // エラー状態へ
+			if err := m.Db.UpdateVmStateByKey(*vm.Key, types.ERROR); err != nil {
+				slog.Error("UpdateVmStateByKey", "err", err, "key", *vm.Key)
+			}
 			break
 		}
-		m.Db.UpdateVmState(*vm.Key, types.RUNNING) // 実行中へ
+		if err := m.Db.UpdateVmStateByKey(*vm.Key, types.RUNNING); err != nil {
+			slog.Error("UpdateVmStateByKey", "err", err, "key", *vm.Key)
+		}
 	} // END OF LOOP
-
 	if break_err {
 		return return_err
 	}
 	slog.Debug("CreateClusterInternal()", "return_err", return_err)
 	slog.Debug("CreateClusterInternal()", "break_err", break_err)
-
 	return nil
 }
