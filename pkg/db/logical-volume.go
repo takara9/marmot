@@ -42,32 +42,50 @@ func (d *Database) SetImageTemplate(v cf.Image_yaml) error {
 	osit.LogicalVolume = v.LogicalVolume
 	osit.VolumeGroup = v.VolumeGroup
 	osit.OsVariant = v.Name
-
-	if err := d.PutDataEtcd(OsImagePrefix+"/"+osit.OsVariant, osit); err != nil {
-		slog.Error("SetImageTemplate() put", "err", err, "key", OsImagePrefix+"/"+osit.OsVariant)
+	osit.Key = OsImagePrefix + "/" + osit.OsVariant
+	if err := d.PutDataEtcd(osit.Key, osit); err != nil {
+		slog.Error("SetImageTemplate() put", "err", err, "key", osit.Key)
 		return err
 	}
 	return nil
 }
 
+func (d *Database) GetOsImgTempByKey(key string) (types.OsImageTemplate, error) {
+	var osit types.OsImageTemplate
+	resp, err := d.Cli.Get(d.Ctx, key)
+	if err != nil {
+		return osit, err
+	}
+	if resp.Count == 0 {
+		slog.Error("GetOsImgTempByKey() NotFound", "key", key)
+		return osit, errors.New("NotFound")
+	}
+
+	err = json.Unmarshal([]byte(resp.Kvs[0].Value), &osit)
+	if err != nil {
+		return osit, err
+	}
+	return osit, nil
+}
+
 // Keyに一致したOSイメージテンプレートを返す
-func (d *Database) GetOsImgTempByOsVariant(osVariant string) (string, string, error) {
+func (d *Database) GetOsImgTempByOsVariant(osVariant string) (types.OsImageTemplate, error) {
 	slog.Debug("GetOsImgTempByOsVariant", "key=", OsImagePrefix+"/"+osVariant)
 	resp, err := d.Cli.Get(d.Ctx, OsImagePrefix+"/"+osVariant)
 	if err != nil {
-		return "", "", err
+		return types.OsImageTemplate{}, err
 	}
 	if resp.Count == 0 {
 		slog.Error("GetOsImgTempByKey() NotFound", "key", OsImagePrefix+"/"+osVariant)
-		return "", "", errors.New("NotFound")
+		return types.OsImageTemplate{}, errors.New("NotFound")
 	}
 
 	var osit types.OsImageTemplate
 	err = json.Unmarshal([]byte(resp.Kvs[0].Value), &osit)
 	if err != nil {
-		return "", "", err
+		return types.OsImageTemplate{}, err
 	}
-	return osit.VolumeGroup, osit.LogicalVolume, nil
+	return osit, nil
 }
 
 func (d *Database) GetOsImgTempes(osits *[]types.OsImageTemplate) error {

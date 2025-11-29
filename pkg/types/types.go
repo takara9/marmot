@@ -9,8 +9,9 @@ type VmSerial struct {
 }
 type OsImageTemplate struct {
 	LogicalVolume string // vg1
-	VolumeGroup string // lv01,lv02
-	OsVariant   string // Key
+	VolumeGroup   string // lv01,lv02
+	OsVariant     string // OS variant name
+	Key           string // key for etcd access
 }
 
 const (

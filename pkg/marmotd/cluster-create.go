@@ -131,11 +131,11 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 
 		// OSのバージョン、テンプレートを設定
 		spec.Ostempvariant = cnf.OsVariant
-		vg, lv, err := m.Db.GetOsImgTempByOsVariant(*spec.Ostempvariant)
-		spec.Ostempvg = &vg
-		spec.Ostemplv = &lv
+		osv, err := m.Db.GetOsImgTempByOsVariant(*spec.Ostempvariant)
+		spec.Ostempvg = &osv.VolumeGroup
+		spec.Ostemplv = &osv.LogicalVolume
 		if err != nil {
-			slog.Error("GetOsImgTempByKey", "err", err)
+			slog.Error("GetOsImgTempByOsVariant", "err", err)
 			break_err = true
 			return_err = err
 			break
