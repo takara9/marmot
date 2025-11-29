@@ -135,11 +135,20 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		})
 
 		It("OSイメージのデータ取得チェック", func() {
-			vg, lv, err := d1.GetOsImgTempByOsVariant("ubuntu22.04")
+			v, err := d1.GetOsImgTempByOsVariant("ubuntu22.04")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(vg).To(Equal("vg1"))
-			Expect(lv).To(Equal("lv02"))
+			Expect(v.VolumeGroup).To(Equal("vg1"))
+			Expect(v.LogicalVolume).To(Equal("lv02"))
 		})
+
+		It("OSイメージのデータ取得チェック", func() {
+			key := db.OsImagePrefix + "/" + "ubuntu22.04"
+			osit, err := d1.GetOsImgTempByKey(key)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(osit.VolumeGroup).To(Equal("vg1"))
+			Expect(osit.LogicalVolume).To(Equal("lv02"))
+		})
+
 	})
 
 	Context("maadm version の動作テスト", func() {
@@ -229,10 +238,19 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		})
 
 		It("OSイメージのデータ取得チェック", func() {
-			vg, lv, err := d2.GetOsImgTempByOsVariant("ubuntu22.04")
+			v, err := d2.GetOsImgTempByOsVariant("ubuntu22.04")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(vg).To(Equal("vg1"))
-			Expect(lv).To(Equal("lv02"))
+			Expect(v.VolumeGroup).To(Equal("vg1"))
+			Expect(v.LogicalVolume).To(Equal("lv02"))
 		})
+
+		It("OSイメージのデータ取得チェック", func() {
+			key := db.OsImagePrefix + "/" + "ubuntu22.04"
+			osit, err := d2.GetOsImgTempByKey(key)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(osit.VolumeGroup).To(Equal("vg1"))
+			Expect(osit.LogicalVolume).To(Equal("lv02"))
+		})
+
 	})
 })

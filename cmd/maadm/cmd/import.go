@@ -168,9 +168,9 @@ func importConfig() error {
 	// 配列データを1件ずつ登録している。正しいのか？
 
 	for _, v := range buf2 {
-		slog.Debug("marmot-os-temp.json", "key", db.OsImagePrefix+"/"+v.OsVariant)
-		if err := d.PutDataEtcd(db.OsImagePrefix+"/"+v.OsVariant, v); err != nil {
-			slog.Error("Failed to put OS image template data", "error", err, "key", db.OsImagePrefix+"/"+v.OsVariant)
+		slog.Debug("marmot-os-temp.json", "key", v.Key)
+		if err := d.PutDataEtcd(v.Key, v); err != nil {
+			slog.Error("Failed to put OS image template data", "error", err, "key", v.Key)
 			return err
 		}
 	}
