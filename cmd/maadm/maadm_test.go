@@ -244,7 +244,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			Expect(v.LogicalVolume).To(Equal("lv02"))
 		})
 
-		It("OSイメージのデータ取得チェック", func() {
+		It("OSイメージのKey経由でのデータ取得チェック", func() {
 			key := db.OsImagePrefix + "/" + "ubuntu22.04"
 			osit, err := d2.GetOsImgTempByKey(key)
 			Expect(err).NotTo(HaveOccurred())
