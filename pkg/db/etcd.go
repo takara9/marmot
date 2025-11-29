@@ -4,12 +4,23 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log/slog"
 	"time"
 
 	etcd "go.etcd.io/etcd/client/v3"
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/types"
+)
+
+const (
+	HvPrefix      = "/marmot/hypervisor"
+	VmPrefix      = "/marmot/virtualmachine"
+	OsImagePrefix = "/marmot/osimage"
+	VolumePrefix  = "/marmot/volume"
+	SeqPrefix     = "/marmot/sequence"
+	VersionKey    = "/marmot/version"
 )
 
 type Database struct {
@@ -46,7 +57,11 @@ func (d *Database) GetByKey(key string) ([]byte, error) {
 // 前方一致のサーチ
 func (d *Database) GetEtcdByPrefix(key string) (*etcd.GetResponse, error) {
 	resp, err := d.Cli.Get(d.Ctx, key, etcd.WithPrefix())
-	return resp, err
+	if err != nil {
+		slog.Debug("GetEtcdByPrefix()", "err", err, "key", key)
+		return nil, err
+	}
+	return resp, nil
 }
 
 func (d *Database) GetDnsByKey(path string) (types.DNSEntry, error) {
@@ -89,10 +104,14 @@ func (d *Database) PutDataEtcd(k string, v interface{}) error {
 
 // パブリックIPアドレスが一致するインスタンスを探す
 func (d *Database) FindByPublicIPaddress(ipAddress string) (bool, error) {
-	resp, err := d.GetEtcdByPrefix("vm")
+	resp, err := d.GetEtcdByPrefix(VmPrefix)
 	if err != nil {
+		if err.Error() == "not found" {
+			return false, nil
+		}
 		return false, err
 	}
+
 	for _, ev := range resp.Kvs {
 		var vm api.VirtualMachine
 		err = json.Unmarshal([]byte(ev.Value), &vm)
@@ -108,15 +127,18 @@ func (d *Database) FindByPublicIPaddress(ipAddress string) (bool, error) {
 
 // プライベートIPアドレスが一致するインスンスを探す
 func (d *Database) FindByPrivateIPaddress(ipAddress string) (bool, error) {
-	resp, err := d.GetEtcdByPrefix("vm")
+	resp, err := d.GetEtcdByPrefix(VmPrefix)
 	if err != nil {
+		if err.Error() == "not found" {
+			return false, nil
+		}
 		return false, err
 	}
 	for _, ev := range resp.Kvs {
 		var vm api.VirtualMachine
 		err = json.Unmarshal([]byte(ev.Value), &vm)
 		if err != nil {
-			return false, nil /// データが存在しない時には、どうするか？
+			return false, nil /// 例外的にエラーを無視
 		}
 		if ipAddress == *vm.PrivateIp {
 			return true, nil
@@ -127,10 +149,14 @@ func (d *Database) FindByPrivateIPaddress(ipAddress string) (bool, error) {
 
 // ホスト名からVMキーを探す
 func (d *Database) FindByHostname(hostname string) (string, error) {
-	resp, err := d.GetEtcdByPrefix("vm")
+	resp, err := d.GetEtcdByPrefix(VmPrefix)
 	if err != nil {
+		if err.Error() == "not found" {
+			return "", nil
+		}
 		return "", err
 	}
+
 	//var vm VirtualMachine
 	for _, ev := range resp.Kvs {
 		var vm api.VirtualMachine
@@ -147,19 +173,26 @@ func (d *Database) FindByHostname(hostname string) (string, error) {
 
 // ホスト名とクラスタ名でVMキーを取得する
 func (d *Database) FindByHostAndClusteName(hostname string, clustername string) (string, error) {
-	resp, err := d.GetEtcdByPrefix("vm")
+	resp, err := d.GetEtcdByPrefix(VmPrefix)
 	if err != nil {
+		slog.Error("FindByHostAndClusteName()", "err", err, "hostname", hostname, "clustername", clustername)
 		return "", err
+	} else if resp.Count == 0 {
+		return "", nil
 	}
 
 	for _, ev := range resp.Kvs {
 		var vm api.VirtualMachine
 		err = json.Unmarshal([]byte(ev.Value), &vm)
 		if err != nil {
+			slog.Error("FindByHostAndClusteName()", "err", err, "hostname", hostname, "clustername", clustername)
 			return "", err
 		}
+
+		fmt.Println("DEBUG", "hostname", hostname, "vm.Name", vm.Name, "clustername", *vm.ClusterName)
+
 		if hostname == vm.Name && clustername == *vm.ClusterName {
-			return *vm.Key, err
+			return *vm.Key, nil
 		}
 	}
 	return "", errors.New("NotFound")

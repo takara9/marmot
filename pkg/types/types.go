@@ -8,7 +8,7 @@ type VmSerial struct {
 	Key    string
 }
 type OsImageTemplate struct {
-	LogicaVol   string // vg1
+	LogicalVolume string // vg1
 	VolumeGroup string // lv01,lv02
 	OsVariant   string // Key
 }

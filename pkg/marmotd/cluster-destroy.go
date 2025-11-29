@@ -21,13 +21,17 @@ func (m *Marmot) DestroyClusterInternal(cnf api.MarmotConfig) error {
 		if spec.Name == nil {
 			return errors.New("VM Name is not set")
 		}
-		vmKey, _ := m.Db.FindByHostAndClusteName(*spec.Name, *cnf.ClusterName)
+		vmKey, err := m.Db.FindByHostAndClusteName(*spec.Name, *cnf.ClusterName)
+		if err != nil {
+			slog.Error("FindByHostAndClusteName()", "err", err, "spec.Name", *spec.Name, "cnf.ClusterName", *cnf.ClusterName)
+			return err
+		}
 		if len(vmKey) > 0 {
 			spec.Key = &vmKey
 
-			vm, err := m.Db.GetVmByKey(vmKey)
+			vm, err := m.Db.GetVmByVmKey(vmKey)
 			if err != nil {
-				slog.Error("", "err", err)
+				slog.Error("GetVmByVmKey()", "err", err, "vmKey", vmKey)
 				continue
 			}
 
@@ -45,7 +49,7 @@ func (m *Marmot) DestroyClusterInternal(cnf api.MarmotConfig) error {
 			_, _, _, err = marmotClient.DestroyVirtualMachine(spec)
 			if err != nil {
 				slog.Error("", "remote request err", err)
-				m.Db.UpdateVmState(*vm.Key, types.ERROR) // エラー状態へ
+				m.Db.UpdateVmStateByKey(*vm.Key, types.ERROR) // エラー状態へ
 				continue
 			}
 		}

@@ -3,74 +3,75 @@ package db
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/types"
 )
 
-// OSボリュームのLVをetcdへ登録
-func (d *Database) UpdateOsLv(vmkey string, vg string, lv string) error {
-	// ロックしたい
-	vm, err := d.GetVmByKey(vmkey)
+func (d *Database) UpdateOsLvByVmKey(vmKey string, osVg string, osLv string) error {
+	// 名前に一致した情報を取得
+	vm, err := d.GetVmByVmKey(vmKey)
 	if err != nil {
 		return err
 	}
-	vm.OsLv = stringPtr(lv)
-	vm.OsVg = stringPtr(vg)
-	return d.PutDataEtcd(vmkey, vm)
+
+	// LV, VGをセット
+	vm.OsLv = stringPtr(osLv)
+	vm.OsVg = stringPtr(osVg)
+
+	// etcdへ登録
+	return d.PutVmByVmKey(vmKey, vm)
 }
 
 // データボリュームLVをetcdへ登録
-func (d *Database) UpdateDataLv(vmkey string, idx int, vg string, lv string) error {
-	// ロックしたい
-	vm, err := d.GetVmByKey(vmkey)
+func (d *Database) UpdateDataLvByVmKey(vmKey string, idx int, dataVg string, dataLv string) error {
+	// 名前に一致したVM情報を取得
+	vm, err := d.GetVmByVmKey(vmKey)
 	if err != nil {
 		return err
 	}
-	(*vm.Storage)[idx].Lv = stringPtr(lv)
-	(*vm.Storage)[idx].Vg = stringPtr(vg)
-	return d.PutDataEtcd(vmkey, vm)
+	(*vm.Storage)[idx].Lv = stringPtr(dataLv)
+	(*vm.Storage)[idx].Vg = stringPtr(dataVg)
+	return d.PutVmByVmKey(vmKey, vm)
 }
 
 // イメージテンプレート
 func (d *Database) SetImageTemplate(v cf.Image_yaml) error {
-	var osi types.OsImageTemplate
-	osi.LogicaVol = v.LogicalVolume
-	osi.VolumeGroup = v.VolumeGroup
-	osi.OsVariant = v.Name
-	key := fmt.Sprintf("%v_%v", "OSI", osi.OsVariant)
-	err := d.PutDataEtcd(key, osi)
-	if err != nil {
-		slog.Error("", "err", err)
+	var osit types.OsImageTemplate
+	osit.LogicalVolume = v.LogicalVolume
+	osit.VolumeGroup = v.VolumeGroup
+	osit.OsVariant = v.Name
+
+	if err := d.PutDataEtcd(OsImagePrefix+"/"+osit.OsVariant, osit); err != nil {
+		slog.Error("SetImageTemplate() put", "err", err, "key", OsImagePrefix+"/"+osit.OsVariant)
 		return err
 	}
 	return nil
 }
 
 // Keyに一致したOSイメージテンプレートを返す
-func (d *Database) GetOsImgTempByKey(osv string) (string, string, error) {
-	key := fmt.Sprintf("OSI_%v", osv)
-	resp, err := d.Cli.Get(d.Ctx, key)
+func (d *Database) GetOsImgTempByOsVariant(osVariant string) (string, string, error) {
+	slog.Debug("GetOsImgTempByOsVariant", "key=", OsImagePrefix+"/"+osVariant)
+	resp, err := d.Cli.Get(d.Ctx, OsImagePrefix+"/"+osVariant)
 	if err != nil {
 		return "", "", err
 	}
-
 	if resp.Count == 0 {
+		slog.Error("GetOsImgTempByKey() NotFound", "key", OsImagePrefix+"/"+osVariant)
 		return "", "", errors.New("NotFound")
 	}
 
-	var oit types.OsImageTemplate
-	err = json.Unmarshal([]byte(resp.Kvs[0].Value), &oit)
+	var osit types.OsImageTemplate
+	err = json.Unmarshal([]byte(resp.Kvs[0].Value), &osit)
 	if err != nil {
 		return "", "", err
 	}
-	return oit.VolumeGroup, oit.LogicaVol, nil
+	return osit.VolumeGroup, osit.LogicalVolume, nil
 }
 
 func (d *Database) GetOsImgTempes(osits *[]types.OsImageTemplate) error {
-	resp, err := d.GetEtcdByPrefix("OSI_")
+	resp, err := d.GetEtcdByPrefix(OsImagePrefix)
 	if err != nil {
 		return err
 	}

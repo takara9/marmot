@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/util"
@@ -15,13 +16,13 @@ func (m *Marmot) CreateVM(spec api.VmSpec) error {
 	//if DEBUG {
 	//	printVmSpecJson(spec)
 	//}
-	slog.Debug("=====","CreateVM()", "=====")
+	slog.Debug("=====", "CreateVM()", "=====")
 
 	var dom virt.Domain
 	// ファイル名までのフルパスが exe に格納される
 	_, err := os.Executable()
 	if err != nil {
-		slog.Error("os.Executable()","err",err)
+		slog.Error("os.Executable()", "err", err)
 		return err
 	}
 
@@ -31,9 +32,13 @@ func (m *Marmot) CreateVM(spec api.VmSpec) error {
 		return err
 	}
 
+	// どこでシリアルをつけているのか、問題だ
 	if spec.Key != nil {
-		dom.Name = *spec.Key // VMを一意に識別するキーでありhostnameではない
+		//dom.Name = *spec.Key // VMを一意に識別するキーでありhostnameではない
+		x := strings.Split(*spec.Key, "/")
+		dom.Name = x[len(x)-1] // VMを一意に識別するキーでありhostnameではない
 	}
+
 	if spec.Uuid != nil {
 		dom.Uuid = *spec.Uuid
 	}
@@ -47,32 +52,32 @@ func (m *Marmot) CreateVM(spec api.VmSpec) error {
 	}
 
 	slog.Debug("CreateOsLv()", "spec", "check")
-	if spec.Ostempvg == nil ||  spec.Ostemplv == nil {
+	if spec.Ostempvg == nil || spec.Ostemplv == nil {
 		slog.Error("OS Temp VG or OS Temp LV is null", "", "")
 		return fmt.Errorf("OS Temp VG or OS Temp LV is null")
 	}
-	osLogicalVol, err := util.CreateOsLv(m.EtcdUrl, *spec.Ostempvg, *spec.Ostemplv)
+
+	osLogicalVol, err := m.Db.CreateOsLv(*spec.Ostempvg, *spec.Ostemplv)
 	if err != nil {
 		slog.Error("util.CreateOsLv()", "err", err)
 		return err
 	}
 	slog.Debug("CreateOsLv()", "lv", "osLogicalVol")
 
-	dom.Devices.Disk[0].Source.Dev = fmt.Sprintf("/dev/%s/%s", *spec.Ostempvg, osLogicalVol)
-	err = m.Db.UpdateOsLv(*spec.Key, *spec.Ostempvg, osLogicalVol)
+	err = m.Db.UpdateOsLvByVmKey(*spec.Key, *spec.Ostempvg, osLogicalVol)
 	if err != nil {
-		slog.Error("util.CreateOsLv()", "err", err)
+		slog.Error("util.CreateOsLv()", "err", err, "*spec.Key", *spec.Key)
 		return err
 	}
 
-	err = util.ConfigRootVol2(spec, *spec.Ostempvg, osLogicalVol)
-	if err != nil {
+	dom.Devices.Disk[0].Source.Dev = fmt.Sprintf("/dev/%s/%s", *spec.Ostempvg, osLogicalVol)
+
+	if err := util.ConfigRootVol2(spec, *spec.Ostempvg, osLogicalVol); err != nil {
 		slog.Error("util.CreateOsLv()", "err", err)
 		return err
 	}
 
 	slog.Debug("spec.Storage", "start", "")
-
 
 	if spec.Storage != nil {
 		// DATAボリュームを作成 (最大９個)
@@ -89,7 +94,7 @@ func (m *Marmot) CreateVM(spec api.VmSpec) error {
 			if disk.Vg != nil {
 				vg = *disk.Vg
 			}
-			dlv, err := util.CreateDataLv(m.EtcdUrl, uint64(*disk.Size), vg)
+			dlv, err := m.Db.CreateDataLv(uint64(*disk.Size), vg)
 			if err != nil {
 				slog.Error("", "err", err)
 				return err
@@ -112,7 +117,7 @@ func (m *Marmot) CreateVM(spec api.VmSpec) error {
 			// 配列に追加
 			dom.Devices.Disk = append(dom.Devices.Disk, dk)
 			// etcdデータベースにlvを登録
-			err = m.Db.UpdateDataLv(*spec.Key, i, *disk.Vg, dlv)
+			err = m.Db.UpdateDataLvByVmKey(*spec.Key, i, *disk.Vg, dlv)
 			if err != nil {
 				slog.Error("", "err", err)
 				return err
@@ -120,7 +125,7 @@ func (m *Marmot) CreateVM(spec api.VmSpec) error {
 			// エラー発生時にロールバックが必要（未実装）
 		}
 		// ストレージの更新
-		util.CheckHvVG2(m.EtcdUrl, m.NodeName, *spec.Ostempvg)
+		m.Db.CheckHvVG2ByName(m.NodeName, *spec.Ostempvg)
 	}
 	slog.Debug("spec.Storage", "finish", "")
 

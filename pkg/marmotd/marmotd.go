@@ -83,13 +83,6 @@ func (s *Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPar
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	// ストレージ容量の更新 結果はDBへ反映
-	err = util.CheckHvVgAll(s.Ma.EtcdUrl, s.Ma.NodeName)
-	if err != nil {
-		slog.Error("Update storage capacity", "err", err)
-		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
-	}
-
 	// データベースから情報を取得
 	d, err := db.NewDatabase(s.Ma.EtcdUrl)
 	if err != nil {
@@ -97,9 +90,14 @@ func (s *Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPar
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
+	// ストレージ容量の更新 結果はDBへ反映
+	if err := d.CheckHvVgAllByName(s.Ma.NodeName); err != nil {
+		slog.Error("Update storage capacity", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
 	var hvs []api.Hypervisor
-	err = d.GetHypervisors(&hvs)
-	if err != nil {
+	if err := d.GetHypervisors(&hvs); err != nil {
 		slog.Error("get hypervisor status", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
@@ -120,7 +118,7 @@ func (s *Server) ListVirtualMachines(ctx echo.Context) error {
 	}
 
 	var vms []api.VirtualMachine
-	err = d.GetVmsStatus(&vms)
+	err = d.GetVmsStatuses(&vms)
 	if err != nil {
 		slog.Error("get vm status", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})

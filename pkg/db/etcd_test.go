@@ -71,27 +71,27 @@ var _ = Describe("Etcd", Ordered, func() {
 		})
 
 		Context("Test access etcd", func() {
-			var key_hv1 = "hv01"
+			var hvNode = "hv01"
 			data_hv1 := db.TestHvData1()
 
-			It("Put Hypervisor", func() {
-				err := d.PutDataEtcd(key_hv1, data_hv1)
+			It("Create Hypervisor", func() {
+				err := d.NewHypervisor(hvNode, data_hv1)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("Get Hypervisor by key", func() {
-				data_get, err := d.GetHypervisorByKey(key_hv1)
+				data_get, err := d.GetHypervisorByName(hvNode)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(data_get.Cpu).To(Equal(data_hv1.Cpu))
 			})
 
-			It("Delete Hypervisor by key", func() {
-				err = d.DelByKey(key_hv1)
+			It("Delete Hypervisor by name", func() {
+				err = d.DeleteHypervisorByName(hvNode)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("Check deleted data", func() {
-				_, err := d.GetHypervisorByKey(key_hv1)
+				_, err := d.GetHypervisorByName(hvNode)
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -159,21 +159,21 @@ var _ = Describe("Etcd", Ordered, func() {
 			}
 
 			It(tests[0].name, func() {
-				seqno, err := d.GetSeq(IDX)
+				seqno, err := d.GetSeqByKind(IDX)
 				GinkgoWriter.Println("seqno ", seqno)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(seqno).To(Equal(uint64(tests[0].want)))
 			})
 
 			It(tests[1].name, func() {
-				seqno, err := d.GetSeq(IDX)
+				seqno, err := d.GetSeqByKind(IDX)
 				GinkgoWriter.Println("seqno ", seqno)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(seqno).To(Equal(uint64(tests[1].want)))
 			})
 
 			It(tests[2].name, func() {
-				seqno, err := d.GetSeq(IDX)
+				seqno, err := d.GetSeqByKind(IDX)
 				GinkgoWriter.Println("seqno ", seqno)
 
 				Expect(err).NotTo(HaveOccurred())
@@ -181,7 +181,7 @@ var _ = Describe("Etcd", Ordered, func() {
 			})
 
 			It(tests[3].name, func() {
-				seqno, err := d.GetSeq(IDX)
+				seqno, err := d.GetSeqByKind(IDX)
 				GinkgoWriter.Println("seqno ", seqno)
 
 				Expect(err).NotTo(HaveOccurred())

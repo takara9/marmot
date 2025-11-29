@@ -16,7 +16,6 @@ import (
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
-	"github.com/takara9/marmot/pkg/util"
 	ut "github.com/takara9/marmot/pkg/util"
 )
 
@@ -110,11 +109,6 @@ func testMarmotFuncs() {
 			}
 		})
 
-		It("ストレージの空き容量チェック", func() {
-			err := util.CheckHvVgAll(etcdUrlTest, nodeName)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
 		It("Check up Marmot daemon", func() {
 			By("Trying to connect to marmot")
 			Eventually(func(g Gomega) {
@@ -133,10 +127,10 @@ func testMarmotFuncs() {
 			for i, v := range hv {
 				GinkgoWriter.Println("xxxxxx hv index    == ", i)
 				GinkgoWriter.Println("xxxxxx hv nodename == ", v.NodeName)
-				GinkgoWriter.Println("xxxxxx hv port     == ", v.Port)
+				GinkgoWriter.Println("xxxxxx hv port     == ", *v.Port)
 				GinkgoWriter.Println("xxxxxx hv CPU      == ", v.Cpu)
-				GinkgoWriter.Println("xxxxxx hv Mem      == ", v.Memory)
-				GinkgoWriter.Println("xxxxxx hv IP addr  == ", v.IpAddr)
+				GinkgoWriter.Println("xxxxxx hv Mem      == ", *v.Memory)
+				GinkgoWriter.Println("xxxxxx hv IP addr  == ", *v.IpAddr)
 			}
 		})
 
@@ -151,6 +145,8 @@ func testMarmotFuncs() {
 
 	Context("VMクラスタの生成と削除", func() {
 		var m *marmotd.Marmot
+		var cnf *api.MarmotConfig
+		var err error
 
 		It("Create Marmot Instance", func() {
 			var err error
@@ -158,19 +154,19 @@ func testMarmotFuncs() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("Load Config and Create Cluster", func() {
-			cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+		It("Load Config for Create Cluster", func() {
+			By("Loading cluster config")
+			cnf, err = cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
 			Expect(err).NotTo(HaveOccurred())
-			//
 			//marmotd.PrintMarmotConfig(*cnf)
-			//
-			err = m.CreateClusterInternal(*cnf)
+		})
+
+		It("Create Cluster", func() {
+			err = m.CreateClusterInternal(*cnf) // VMがDBに登録されていない？
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("Load Config and Destroy Cluster", func() {
-			cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
-			Expect(err).NotTo(HaveOccurred())
+		It("Destroy Cluster", func() {
 			err = m.DestroyClusterInternal(*cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -178,37 +174,36 @@ func testMarmotFuncs() {
 
 	Context("VMクラスタの生成と一時停止と再開", func() {
 		var m *marmotd.Marmot
+		var cnf *api.MarmotConfig
+		var err error
 
 		It("Create Marmot Instance", func() {
-			var err error
 			m, err = marmotd.NewMarmot(*nodeNamePtr, *etcdTest)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("Load Config and Create cluster", func() {
-			cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+		It("Load Config for Create cluster", func() {
+			cnf, err = cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
 			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("Create cluster", func() {
 			err = m.CreateClusterInternal(*cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Stop Cluster", func() {
-			cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
-			Expect(err).NotTo(HaveOccurred())
 			err = m.StopClusterInternal(*cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Start Cluster", func() {
-			cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
-			Expect(err).NotTo(HaveOccurred())
 			err = m.DestroyClusterInternal(*cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Destroy Cluster()", func() {
-			cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
-			Expect(err).NotTo(HaveOccurred())
+			By("Destroying cluster")
 			err = m.DestroyClusterInternal(*cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -216,37 +211,35 @@ func testMarmotFuncs() {
 
 	Context("VMクラスタの２重起動の防止", func() {
 		var m *marmotd.Marmot
+		var cnf *api.MarmotConfig
+		var err error
 
 		It("Create Marmot Instance", func() {
-			var err error
 			m, err = marmotd.NewMarmot(*nodeNamePtr, *etcdTest)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("クラスターの起動", func() {
-			cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+		It("クラスターコンフィグの読み取り", func() {
+			cnf, err = cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
 			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("クラスターの起動", func() {
 			err = m.CreateClusterInternal(*cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("クラスターの２重起動 エラー発生が発生", func() {
-			cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
-			Expect(err).NotTo(HaveOccurred())
 			err = m.CreateClusterInternal(*cnf)
 			Expect(err).To(HaveOccurred())
 		})
 
 		It("Start Cluster", func() {
-			cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
-			Expect(err).NotTo(HaveOccurred())
 			err = m.DestroyClusterInternal(*cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Destroy Cluster()", func() {
-			cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
-			Expect(err).NotTo(HaveOccurred())
 			err = m.DestroyClusterInternal(*cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})

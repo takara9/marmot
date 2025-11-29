@@ -165,9 +165,14 @@ func importConfig() error {
 		slog.Error("Failed to unmarshal", "error", err)
 		return err
 	}
+	// 配列データを1件ずつ登録している。正しいのか？
+
 	for _, v := range buf2 {
-		key := fmt.Sprintf("OSI_%v", v.OsVariant)
-		d.PutDataEtcd(key, v)
+		slog.Debug("marmot-os-temp.json", "key", db.OsImagePrefix+"/"+v.OsVariant)
+		if err := d.PutDataEtcd(db.OsImagePrefix+"/"+v.OsVariant, v); err != nil {
+			slog.Error("Failed to put OS image template data", "error", err, "key", db.OsImagePrefix+"/"+v.OsVariant)
+			return err
+		}
 	}
 
 	// シーケンス番号
@@ -184,8 +189,7 @@ func importConfig() error {
 		return err
 	}
 	for _, v := range buf3 {
-		key := fmt.Sprintf("SEQNO_%v", v.Key)
-		d.PutDataEtcd(key, v)
+		d.PutDataEtcd(v.Key, v)
 	}
 
 	//Read 仮想マシン
@@ -202,8 +206,7 @@ func importConfig() error {
 		return err
 	}
 	for _, v := range buf4 {
-		key := fmt.Sprintf("vm%v", v.Key)
-		d.PutDataEtcd(key, v)
+		d.PutDataEtcd(*v.Key, v)
 	}
 
 	return nil

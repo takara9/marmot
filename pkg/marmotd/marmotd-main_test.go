@@ -18,7 +18,6 @@ import (
 	"github.com/takara9/marmot/pkg/config"
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/marmotd"
-	"github.com/takara9/marmot/pkg/util"
 )
 
 // var err error
@@ -104,11 +103,6 @@ func testMarmotd() {
 			err := marmotServerTest.Ma.Db.CreateSeq(sq.Key, sq.Start, sq.Step)
 			Expect(err).NotTo(HaveOccurred())
 		}
-	})
-
-	It("ストレージの空き容量チェック", func() {
-		err := util.CheckHvVgAll(marmotServerTest.Ma.EtcdUrl, marmotServerTest.Ma.NodeName)
-		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("Marmotd の生存確認", func() {

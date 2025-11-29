@@ -85,7 +85,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 	}, NodeTimeout(20*time.Second))
 
 	Context("maadm setup の動作テスト", func() {
-		var d *db.Database
+		var d1 *db.Database
 		var h api.Hypervisor
 		It("Marmotd の初期データを、etcdに直接セット", func() {
 			cmd := exec.Command("./bin/maadm-test", "setup", "--hvconfig", "testdata/hypervisor-config-hvc.yaml", "--etcdurl", "http://localhost:3379")
@@ -98,9 +98,9 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		// marmotd を介さずに、DB操作で内容をチェックする
 		It("キーでハイパーバイザーのセットした情報を取得", func() {
 			var err error
-			d, err = db.NewDatabase("http://localhost:3379")
+			d1, err = db.NewDatabase("http://localhost:3379")
 			Expect(err).NotTo(HaveOccurred())
-			h, err = d.GetHypervisorByKey("hvc")
+			h, err = d1.GetHypervisorByName("hvc")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(h.NodeName).To(Equal("hvc"))
 			Expect(*h.IpAddr).To(Equal("127.0.0.1"))
@@ -112,30 +112,30 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 		It("OSイメージ、LVOS、LVDATA、VMのシーケンス番号をチェック", func() {
 			// OSイメージのシーケンス番号をチェック
-			seq, err := d.GetSeq("LVOS")
+			seq, err := d1.GetSeqByKind("LVOS")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(seq).To(Equal(uint64(900)))
-			seq, err = d.GetSeq("LVOS")
+			seq, err = d1.GetSeqByKind("LVOS")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(seq).To(Equal(uint64(901)))
 			// DATAボリュームのシーケンス番号をチェック
-			seq, err = d.GetSeq("LVDATA")
+			seq, err = d1.GetSeqByKind("LVDATA")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(seq).To(Equal(uint64(900)))
-			seq, err = d.GetSeq("LVDATA")
+			seq, err = d1.GetSeqByKind("LVDATA")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(seq).To(Equal(uint64(901)))
 			// VM番号のシーケンス番号をチェック
-			seq, err = d.GetSeq("VM")
+			seq, err = d1.GetSeqByKind("VM")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(seq).To(Equal(uint64(900)))
-			seq, err = d.GetSeq("VM")
+			seq, err = d1.GetSeqByKind("VM")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(seq).To(Equal(uint64(901)))
 		})
 
 		It("OSイメージのデータ取得チェック", func() {
-			vg, lv, err := d.GetOsImgTempByKey("ubuntu22.04")
+			vg, lv, err := d1.GetOsImgTempByOsVariant("ubuntu22.04")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vg).To(Equal("vg1"))
 			Expect(lv).To(Equal("lv02"))
@@ -194,15 +194,15 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		var d *db.Database
+		var d2 *db.Database
 		var h api.Hypervisor
 
 		// marmotd を介さずに、DB操作で内容をチェックする
 		It("キーでハイパーバイザーのセットした情報を取得", func() {
 			var err error
-			d, err = db.NewDatabase("http://localhost:4379")
+			d2, err = db.NewDatabase("http://localhost:4379")
 			Expect(err).NotTo(HaveOccurred())
-			h, err = d.GetHypervisorByKey("hvc")
+			h, err = d2.GetHypervisorByName("hvc")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(h.NodeName).To(Equal("hvc"))
 			Expect(*h.IpAddr).To(Equal("127.0.0.1"))
@@ -215,21 +215,21 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 		It("OSイメージ、LVOS、LVDATA、VMのシーケンス番号をチェック", func() {
 			By("OSイメージのシーケンス番号をチェック")
-			seq, err := d.GetSeq("LVOS")
+			seq, err := d2.GetSeqByKind("LVOS")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(seq).To(Equal(uint64(902)))
 			By("DATAボリュームのシーケンス番号をチェック")
-			seq, err = d.GetSeq("LVDATA")
+			seq, err = d2.GetSeqByKind("LVDATA")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(seq).To(Equal(uint64(902)))
 			By("VM番号のシーケンス番号をチェック")
-			seq, err = d.GetSeq("VM")
+			seq, err = d2.GetSeqByKind("VM")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(seq).To(Equal(uint64(902)))
 		})
 
 		It("OSイメージのデータ取得チェック", func() {
-			vg, lv, err := d.GetOsImgTempByKey("ubuntu22.04")
+			vg, lv, err := d2.GetOsImgTempByOsVariant("ubuntu22.04")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vg).To(Equal("vg1"))
 			Expect(lv).To(Equal("lv02"))

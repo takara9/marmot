@@ -25,7 +25,7 @@ func (m *Marmot) StartClusterInternal(cnf api.MarmotConfig) error {
 			return errors.New("NotExistVM")
 		}
 		spec.Key = &vmKey
-		vm, err := m.Db.GetVmByKey(vmKey)
+		vm, err := m.Db.GetVmByVmKey(vmKey)
 		if err != nil {
 			slog.Error("", "err", err)
 			return err
@@ -45,7 +45,7 @@ func (m *Marmot) StartClusterInternal(cnf api.MarmotConfig) error {
 		_, _, _, err = marmotClient.StartVirtualMachine(spec)
 		if err != nil {
 			slog.Error("", "remote request err", err)
-			m.Db.UpdateVmState(*vm.Key, types.ERROR) // エラー状態へ
+			m.Db.UpdateVmStateByKey(*vm.Key, types.ERROR) // エラー状態へ
 			continue
 		}
 	}

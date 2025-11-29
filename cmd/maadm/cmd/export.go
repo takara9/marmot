@@ -196,6 +196,7 @@ func exportConfig() error {
 		slog.Error("Failed to get Serial numbers data", "error", err)
 		return err
 	}
+	slog.Debug("Serial numbers data:", "data", seqs)
 	if err := writeJsonFile(filepath.Join(workDir, "marmot-seq-data.json"), seqs); err != nil {
 		slog.Error("Failed to write Serial numbers data", "error", err)
 		return err
@@ -203,7 +204,7 @@ func exportConfig() error {
 
 	//仮想マシン
 	var vms []api.VirtualMachine
-	err = d.GetVmsStatus(&vms)
+	err = d.GetVmsStatuses(&vms)
 	if err != nil {
 		slog.Error("Failed to get data of virtual machines", "error", err)
 		return err

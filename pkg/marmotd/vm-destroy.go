@@ -3,11 +3,11 @@ package marmotd
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/lvm"
 	"github.com/takara9/marmot/pkg/types"
-	"github.com/takara9/marmot/pkg/util"
 	"github.com/takara9/marmot/pkg/virt"
 )
 
@@ -16,15 +16,15 @@ func (m *Marmot) DestroyVM2(spec api.VmSpec) error {
 	if spec.Key != nil {
 		slog.Debug("DestroyVM2()", "key", *spec.Key)
 	}
-	vm, err := m.Db.GetVmByKey(*spec.Key)
+	vm, err := m.Db.GetVmByVmKey(*spec.Key)
 	if err != nil {
-		slog.Error("GetVmByKey()", "err", err)
+		slog.Error("GetVmByVmKey()", "err", err)
 	}
 
 	// ハイパーバイザーのリソース削減保存のため値を取得
-	hv, err := m.Db.GetHypervisorByKey(vm.HvNode)
+	hv, err := m.Db.GetHypervisorByName(vm.HvNode)
 	if err != nil {
-		slog.Error("GetHypervisorByKey()", "err", err)
+		slog.Error("GetHypervisorByName()", "err", err)
 	}
 
 	// ステータスを調べて停止中であれば、足し算しない。
@@ -44,9 +44,10 @@ func (m *Marmot) DestroyVM2(spec api.VmSpec) error {
 		slog.Error("DelByKey(", "err", err)
 	}
 
+	domName := strings.Split(*spec.Key, "/")
 	// 仮想マシンの停止＆削除
-	if err := virt.DestroyVM("qemu:///system", *spec.Key); err != nil {
-		slog.Error("DestroyVM()", "err", err, "vmKey", *spec.Key)
+	if err := virt.DestroyVM("qemu:///system", domName[len(domName)-1]); err != nil {
+		slog.Error("DestroyVM()", "err", err, "vmKey", *spec.Key, "key", domName[len(domName)-1])
 	}
 
 	// OS LVを削除
@@ -55,7 +56,7 @@ func (m *Marmot) DestroyVM2(spec api.VmSpec) error {
 	}
 
 	// ストレージの更新
-	util.CheckHvVG2(m.EtcdUrl, m.NodeName, *vm.OsVg)
+	m.Db.CheckHvVG2ByName(m.NodeName, *vm.OsVg)
 
 	// データLVを削除
 	if vm.Storage != nil {
@@ -65,7 +66,7 @@ func (m *Marmot) DestroyVM2(spec api.VmSpec) error {
 				slog.Error("RemoveLV()", "err", err)
 			}
 			// ストレージの更新
-			util.CheckHvVG2(m.EtcdUrl, m.NodeName, *dd.Vg)
+			m.Db.CheckHvVG2ByName(m.NodeName, *dd.Vg)
 		}
 	}
 	return nil
