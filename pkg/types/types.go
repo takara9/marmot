@@ -15,8 +15,8 @@ type OsImageTemplate struct {
 }
 
 const (
-	INITALIZING  = 0 // 0 登録中
-	PROVISIONING = 1 // 1 プロビ中
+	INITIALIZING = 0 // 0 登録中
+	PROVISIONING = 1 // 1 プロビジョニング中
 	RUNNING      = 2 // 2 実行中
 	STOPPED      = 3 // 3 停止中
 	DELETEING    = 4 // 4 削除中

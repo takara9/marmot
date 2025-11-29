@@ -12,6 +12,7 @@ import (
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/lvm"
+	"github.com/takara9/marmot/pkg/types"
 )
 
 func (d *Database) GetVmByVmKey(vmKey string) (api.VirtualMachine, error) {
@@ -81,7 +82,7 @@ func (d *Database) AssignHvforVm(vm api.VirtualMachine) (string, string, string,
 
 	for _, hv = range hvs {
 		// 停止中のHVの割り当てない
-		if *hv.Status != 2 {
+		if *hv.Status != types.RUNNING {
 			continue
 		}
 
@@ -91,8 +92,8 @@ func (d *Database) AssignHvforVm(vm api.VirtualMachine) (string, string, string,
 				*hv.FreeMemory = *hv.FreeMemory - *vm.Memory
 				*hv.FreeCpu = *hv.FreeCpu - *vm.Cpu
 				// ストレージの容量管理は未実装
-				vm.Status = int32Ptr(0) // 登録中
-				vm.HvNode = hv.NodeName // ハイパーバイザーを決定
+				vm.Status = int32Ptr(types.INITIALIZING) // 登録中
+				vm.HvNode = hv.NodeName                  // ハイパーバイザーを決定
 				vm.HvIpAddr = hv.IpAddr
 				vm.HvPort = hv.Port
 				assigned = true
@@ -126,7 +127,7 @@ func (d *Database) AssignHvforVm(vm api.VirtualMachine) (string, string, string,
 	vm.Uuid = stringPtr(txId.String())
 	vm.CTime = timePtr(time.Now())
 	vm.STime = timePtr(time.Now())
-	vm.Status = int32Ptr(1)           // 登録中
+	vm.Status = int32Ptr(types.PROVISIONING)            // プロビジョニング中
 	if err := d.PutDataEtcd(*vm.Key, &vm); err != nil { // 仮想マシンのデータ登録
 		slog.Debug("=== d.PutDataEtcd failed", "vm.Key", *vm.Key, "err", err)
 		return "", "", "", txId.String(), 0, err
