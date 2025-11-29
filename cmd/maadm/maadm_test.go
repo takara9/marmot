@@ -145,6 +145,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			key := db.OsImagePrefix + "/" + "ubuntu22.04"
 			osit, err := d1.GetOsImgTempByKey(key)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(osit.Key).To(Equal(key))
 			Expect(osit.VolumeGroup).To(Equal("vg1"))
 			Expect(osit.LogicalVolume).To(Equal("lv02"))
 		})
