@@ -8,11 +8,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type DefaultConfig struct {
-	ApiServerUrl  string `yaml:"api_server"`
-	EtcdServerUrl string `yaml:"etcd_server"`
-}
-
 func ReadYAML(fn string, yf interface{}) error {
 	file, err := os.Open(fn)
 	if err != nil {
@@ -28,9 +23,9 @@ func ReadYAML(fn string, yf interface{}) error {
 	return nil
 }
 
-func ReadHvConfig() (Hypervisors_yaml, DefaultConfig, error) {
+func ReadHvConfig() (Hypervisors_yaml, mactlClientConfig, error) {
 	var hvs Hypervisors_yaml
-	var cnf DefaultConfig
+	var cnf mactlClientConfig
 
 	err := ReadConfig(filepath.Join(os.Getenv("HOME"), ".config_marmot"), &cnf)
 	if err != nil {

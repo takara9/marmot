@@ -20,7 +20,7 @@ func GetClientConfig2(apiConfigFilename string) (*client.MarmotEndpoint, error) 
 		configFn = apiConfigFilename
 	}
 
-	var mactlConfig DefaultConfig
+	var mactlConfig mactlClientConfig
 	if err := ReadConfig(configFn, &mactlConfig); err != nil {
 		slog.Error("mactlConfig", "read error", err)
 		return nil, err

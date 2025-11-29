@@ -1,5 +1,9 @@
 package config
 
+/*
+	ハイパーバイザーのセットアップ用YAMLの型定義
+*/
+
 type StgPool_yaml struct {
 	VolGroup string `yaml:"vg"`
 	Type     string `yaml:"type"`
@@ -36,7 +40,6 @@ type SeqNo_yaml struct {
 	Step  uint64 `yaml:"step"`
 	Key   string `yaml:"name"`
 }
-
 
 type ClientConfig struct {
 	ApiServerUrl string `yaml:"api_server"`
