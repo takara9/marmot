@@ -100,7 +100,7 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		vm.PrivateIp = spec.PrivateIp
 		vm.Playbook = spec.Playbook
 		vm.Comment = spec.Comment
-		vm.Status = int32Ptr(types.INITALIZING)
+		vm.Status = int32Ptr(types.INITIALIZING)
 		var s []api.Storage
 		if spec.Storage != nil {
 			for _, stg := range *spec.Storage {
