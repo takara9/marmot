@@ -85,6 +85,7 @@ vdc    252:32   0   100G  0 disk
 vdd    252:48   0   100G  0 disk 
 ```
 
+## PVの作成
 
 ```
 root@runner1:/etc# pvcreate /dev/vdc
@@ -93,12 +94,16 @@ root@runner1:/etc# pvcreate /dev/vdd
   Physical volume "/dev/vdd" successfully created.
 ```
 
+## PGの作成
+
 ```
 root@runner1:/etc# vgcreate vg1 /dev/vdc
   Volume group "vg1" successfully created
 root@runner1:/etc# vgcreate vg2 /dev/vdd
   Volume group "vg2" successfully created
 ```
+
+## PGの作成状態の確認
 
 ```
 root@runner1:/etc# vgs
@@ -107,6 +112,7 @@ root@runner1:/etc# vgs
   vg2   1   0   0 wz--n- <100.00g <100.00g
 ```
 
+## イメージテンプレート用のロジカルボリュームの作成
 
 ```
 root@runner1:/etc# lvcreate --name lv01 --size 16GB vg1
@@ -116,10 +122,13 @@ root@runner1:/etc# lvs
   lv01 vg1 -wi-a----- 16.00g   
 ```
 
+## NFSクライアントのインストール
 
 ```
 root@runner1:/etc# apt install nfs-common
 ```
+
+## NFSサーバーのデータを利用するため、fstabに追加とNFSマウント
 
 ```
 # vi /etc/fstab
@@ -138,6 +147,8 @@ tmpfs                        7.9G     0  7.9G   0% /run/qemu
 hmc-nfs:/exports/nfs/golang  110G   91G   14G  87% /nfs
 ```
 
+## マウントポイントの追加
+
 ```
 root@runner1:/home/ubuntu# mount -t nfs hmc-nfs:/backup /mnt
 root@runner1:/home/ubuntu# df -h
@@ -152,12 +163,16 @@ hmc-nfs:/exports/nfs/golang  110G   91G   14G  87% /nfs
 hmc-nfs:/backup              110G   51G   54G  49% /mnt
 ```
 
+## NFSサーバー上のディスクイメージをコピー
+
 ```
 root@runner1:/# dd if=/mnt/lv03.img of=/dev/vg1/lv01 bs=4294967296
 0+9 records in
 0+9 records out
 17179869184 bytes (17 GB, 16 GiB) copied, 157.197 s, 109 MB/s
 ```
+
+## /var を専用ストレージに移行
 
 ```
 # vi /etc/fstab
@@ -175,6 +190,7 @@ hmc-nfs:/exports/nfs/golang /nfs nfs defaults 0 0
 # rm -fr var.backup/
 ```
 
+## DNSリゾルバーの設定変更
 
 ```
 root@runner1:/# rm /etc/resolv.conf 
@@ -186,3 +202,34 @@ nameserver 172.16.0.9
 options edns0 trust-ad
 search labo.local
 ```
+
+## ネットワークの設定（ホスト側のハイパーバイザーの設定）
+
+  - https://github.com/takara9/marmot/blob/main/docs/network-setup-nested-vm.md#%E3%83%99%E3%82%A2%E3%83%A1%E3%82%BF%E3%83%AB%E3%81%AE%E3%83%8F%E3%82%A4%E3%83%91%E3%83%BC%E3%83%90%E3%82%A4%E3%82%B6%E3%83%BC%E5%81%B4
+
+## ネットワークの設定（ランナー側の設定）
+
+  - https://github.com/takara9/marmot/blob/main/docs/network-setup-nested-vm.md#%E3%83%99%E3%82%A2%E3%83%A1%E3%82%BF%E3%83%AB%E3%81%AE%E3%83%8F%E3%82%A4%E3%83%91%E3%83%BC%E3%83%90%E3%82%A4%E3%82%B6%E3%83%BC%E5%81%B4
+
+## Dockerのインストール
+  - インストール https://docs.docker.com/engine/install/ubuntu/
+  - 一般ユーザーが起動するための設定 https://docs.docker.com/engine/install/linux-postinstall
+
+## Go言語のインストール
+  - ダウンロードとインストール https://go.dev/doc/install
+　- パスの設定 https://github.com/takara9/marmot/blob/main/docs/HOWTO-install-golang.md
+  - rootのホームにも設定すること
+
+## GitHub Action runnerのインストール
+  - https://github.com/takara9/marmot/settings/actions/runners
+
+
+## systemdから起動できるように設定
+
+```
+# cd /var
+# mkdir actions-runner
+# chown ubuntu:ubuntu -R actions-runner
+```
+
+https://github.com/takara9/marmot/settings/actions/runners
