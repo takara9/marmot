@@ -43,6 +43,7 @@ var _ = Describe("Etcd", Ordered, func() {
 	}, NodeTimeout(20*time.Second))
 
 	AfterAll(func(ctx SpecContext) {
+		fmt.Println("STOPPING CONTAINER:", containerID)
 		// Dockerコンテナを停止・削除
 		cmd := exec.Command("docker", "stop", containerID)
 		_, err := cmd.CombinedOutput()
