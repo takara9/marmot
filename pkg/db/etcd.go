@@ -21,6 +21,7 @@ const (
 	VolumePrefix  = "/marmot/volume"
 	SeqPrefix     = "/marmot/sequence"
 	VersionKey    = "/marmot/version"
+	JobPrefix     = "/marmot/job"
 )
 
 type Database struct {
