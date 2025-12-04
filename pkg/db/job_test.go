@@ -15,8 +15,8 @@ import (
 var _ = Describe("Jobs", Ordered, func() {
 	var url string
 	var err error
-	var d *db.Database
 	var containerID string
+	var j *db.Job
 
 	BeforeAll(func(ctx SpecContext) {
 		// Setup slog
@@ -63,18 +63,158 @@ var _ = Describe("Jobs", Ordered, func() {
 
 	Describe("Test etcd", func() {
 		Context("Test Connection to etcd", func() {
-			It("Connection etcd", func() {
-				d, err = db.NewDatabase(url)
+			It("Create Job control instance", func() {
+				j, err = db.NewJobController(url, "")
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
 
 		Context("Job Control", func() {
 			It("Entry new job", func() {
-				jobTask := "sleep 3"
-				jobId, err := d.RegisterJob(jobTask)
+				jobId, err := j.EntryJob("test job1", "sleep", "2")
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println(jobId)
+				time.Sleep(1 * time.Second)
+			})
+
+			It("Entry new job", func() {
+				jobId, err := j.EntryJob("test job2", "echo", "Hello,", " World!")
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println(jobId)
+				time.Sleep(1 * time.Second)
+			})
+
+			It("Entry new job", func() {
+				jobId, err := j.EntryJob("test job3", "false")
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println(jobId)
+				time.Sleep(1 * time.Second)
+			})
+
+			It("Get Job entry list", func() {
+				jobs, err := j.GetJobs(db.JOB_PENDING)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(len(jobs)).To(BeNumerically(">", 0))
+				for _, job := range jobs {
+					GinkgoWriter.Printf("Job ID: %s, Task: %s, Args: %v, ReqTime: %s\n", job.Id, job.JobName, job.Cmd, job.ReqTime.String())
+				}
+			})
+
+			It("Fetch and Cancel a job", func() {
+				job, err := j.FetchJob()
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Printf("Job ID: %s, Task:[%s], Args: %v, ReqTime: %s\n", job.Id, job.JobName, job.Cmd, job.ReqTime.String())
+				err = j.CancelJob(job.Id)
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Printf("Cancelled Job ID: %s\n", job.Id)
+			})
+
+			It("Get Job entry list", func() {
+				jobs, err := j.GetJobs(db.JOB_PENDING)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(len(jobs)).To(BeNumerically(">", 0))
+				for _, job := range jobs {
+					GinkgoWriter.Printf("Job ID: %s, Task:[%s], Args: %v, ReqTime: %s\n", job.Id, job.JobName, job.Cmd, job.ReqTime.String())
+				}
+			})
+
+			It("Fetch and Run a job #1", func() {
+				job, err := j.FetchJob()
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Printf("Job ID: %s, Task:[%s], Args: %v, ReqTime: %s\n", job.Id, job.JobName, job.Cmd, job.ReqTime.String())
+
+				err = j.RunJob(job)
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Printf("Completed Job ID: %s\n", job.Id)
+			})
+
+			It("Get Job entry list", func() {
+				jobs, err := j.GetJobs(db.JOB_PENDING)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(len(jobs)).To(BeNumerically(">", 0))
+				for _, job := range jobs {
+					GinkgoWriter.Printf("Job ID: %s, Task:[%s], Args: %v, ReqTime: %s\n", job.Id, job.JobName, job.Cmd, job.ReqTime.String())
+				}
+			})
+
+			It("Fetch and Run a job #2", func() {
+				job, err := j.FetchJob()
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Printf("Job ID: %s, Task:[%s], Args: %v, ReqTime: %s\n", job.Id, job.JobName, job.Cmd, job.ReqTime.String())
+
+				err = j.RunJob(job)
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Printf("Completed Job ID: %s\n", job.Id)
+			})
+
+			It("Entry new job", func() {
+				jobId, err := j.EntryJob("test job4", "testdata/test-job1.sh")
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println(jobId)
+				time.Sleep(1 * time.Second)
+			})
+
+			It("Fetch and Run a job #4", func() {
+				job, err := j.FetchJob()
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Printf("Job ID: %s, Task:[%s], Args: %v, ReqTime: %s\n", job.Id, job.JobName, job.Cmd, job.ReqTime.String())
+
+				go func() {
+					err = j.RunJob(job)
+					Expect(err).NotTo(HaveOccurred())
+					GinkgoWriter.Printf("Completed Job ID: %s\n", job.Id)
+				}()
+				time.Sleep(2 * time.Second)
+			})
+
+			It("Get Job entry list", func() {
+				for {
+					jobs, err := j.GetJobs(db.JOB_RUNNING)
+					Expect(err).NotTo(HaveOccurred())
+					fmt.Println("Running Jobs Count:", len(jobs))
+					if len(jobs) == 0 {
+						break
+					}
+					for _, job := range jobs {
+						GinkgoWriter.Printf("Job ID: %s, Task:[%s], Args: %v, ReqTime: %s\n", job.Id, job.JobName, job.Cmd, job.ReqTime.String())
+					}
+					time.Sleep(5 * time.Second)
+				}
+			})
+
+			It("Entry new job", func() {
+				jobId, err := j.EntryJob("test job5", "testdata/test-job2.sh")
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println(jobId)
+				time.Sleep(1 * time.Second)
+			})
+
+			It("Fetch and Run a job #5", func() {
+				job, err := j.FetchJob()
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Printf("Job ID: %s, Task:[%s], Args: %v, ReqTime: %s\n", job.Id, job.JobName, job.Cmd, job.ReqTime.String())
+
+				go func() {
+					err = j.RunJob(job)
+					Expect(err).NotTo(HaveOccurred())
+					GinkgoWriter.Printf("Completed Job ID: %s\n", job.Id)
+				}()
+				time.Sleep(2 * time.Second)
+			})
+
+			It("Get Job entry list", func() {
+				for {
+					jobs, err := j.GetJobs(db.JOB_RUNNING)
+					Expect(err).NotTo(HaveOccurred())
+					fmt.Println("Running Jobs Count:", len(jobs))
+					if len(jobs) == 0 {
+						break
+					}
+					for _, job := range jobs {
+						GinkgoWriter.Printf("Job ID: %s, Task:[%s], Args: %v, ReqTime: %s\n", job.Id, job.JobName, job.Cmd, job.ReqTime.String())
+					}
+					time.Sleep(5 * time.Second)
+				}
 			})
 		})
 	})
