@@ -73,7 +73,7 @@ func (vc *VolumeController) CreateVolume(volName, path, volType, kind string, Si
 	}
 	vol.Kind = kind
 	vol.Type = volType
-	vol.Status = VOLUME_INUSE
+	vol.Status = VOLUME_AVAILABLE
 	vol.VolumeName = volName
 	vol.Path = path
 	vol.SizeGB = SizeGB
