@@ -19,10 +19,14 @@ func (d *Database) CreateSeq(key string, start uint64, step uint64) error {
 	return err
 }
 
-// シリアル番号の取得
+// シリアル番号の取得（ロックが必須）
 func (d *Database) GetSeqByKind(key string) (uint64, error) {
-	etcdKey := SeqPrefix + "/" + key
+	// 排他制御
+	d.Lock.Lock()
+	defer d.Lock.Unlock()
 
+	// etcdキーを使ったシリアル番号の取得
+	etcdKey := SeqPrefix + "/" + key
 	resp, err := d.Cli.Get(d.Ctx, etcdKey)
 	if err != nil {
 		slog.Error("GetSeqByKind()", "err", err, "etcdKey", etcdKey)
@@ -38,6 +42,7 @@ func (d *Database) GetSeqByKind(key string) (uint64, error) {
 		return 0, err
 	}
 
+	// シリアル番号のインクリメントと保存
 	seqno := seq.Serial
 	seq.Serial = seq.Serial + seq.Step
 	if err := d.PutDataEtcd(etcdKey, seq); err != nil {

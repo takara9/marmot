@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	etcd "go.etcd.io/etcd/client/v3"
@@ -25,8 +26,9 @@ const (
 )
 
 type Database struct {
-	Cli *etcd.Client
-	Ctx context.Context
+	Cli  *etcd.Client
+	Ctx  context.Context
+	Lock sync.Mutex
 }
 
 func NewDatabase(url string) (*Database, error) {
@@ -90,13 +92,13 @@ func (d *Database) DelByKey(key string) error {
 }
 
 // etcdへ保存
-func (d *Database) PutDataEtcd(k string, v interface{}) error {
+func (d *Database) PutDataEtcd(key string, v interface{}) error {
 	byteJSON, err := json.Marshal(v)
 	if err != nil {
 		return err
 	}
 
-	_, err = d.Cli.Put(context.TODO(), k, string(byteJSON))
+	_, err = d.Cli.Put(context.TODO(), key, string(byteJSON))
 	if err != nil {
 		return err
 	}
