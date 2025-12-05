@@ -26,7 +26,7 @@ type Volume struct {
 	VolumeName string // ボリューム名
 	SizeGB     int    // サイズ(GB)
 	Path       string // ボリュームの保存パス
-	Status     int    // 状態  inuse, available
+	Status     int    // 状態 (int: VOLUME_INUSE=1, VOLUME_AVAILABLE=2)
 	OsName     string // OS名 (osボリュームの場合)
 	OsVersion  string // OSバージョン (osボリュームの場合)
 }
