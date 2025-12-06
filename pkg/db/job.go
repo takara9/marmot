@@ -73,6 +73,7 @@ func NewJobController(url, jobLogPath string) (*Job, error) {
 
 // 新しいジョブの登録
 func (d *Job) EntryJob(name string, cmd ...string) (string, error) {
+	// ジョブのIDの重複は発生しないので、排他制御しない
 	var job JobEntry
 	job.Kind = "request"
 	id, err := uuid.NewRandom()
@@ -161,7 +162,7 @@ func (d *Job) RunJob(job JobEntry) error {
 	defer file.Close()
 	fmt.Fprintf(file, "Job Name: [%v] ID [%v] at %v\n", job.JobName, job.Id, job.StartTime.String())
 
-	// ジョブ状態の更新
+	// ジョブ状態の更新 （ここだけ別関数にして排他制御を入れるのが良いかも）
 	job.Status = JOB_RUNNING
 	job.StartTime = time.Now()
 	if err := d.Database.PutDataEtcd(JobPrefix+"/"+job.Id, job); err != nil {
