@@ -30,6 +30,7 @@ type Server struct {
 	Ma   *Marmot
 }
 
+
 func NewMarmot(nodeName string, etcdUrl string) (*Marmot, error) {
 	var m Marmot
 	var err error
@@ -326,4 +327,34 @@ func (s *Server) ShowHypervisorById(ctx echo.Context, hypervisorId string) error
 		}
 	}
 	return ctx.JSON(http.StatusNotFound, api.ReplyMessage{Message: "Hypervisor " + hypervisorId + " not found"})
+}
+
+// CreateVolume implements api.ServerInterface.
+func (s *Server) CreateVolume(ctx echo.Context) error {
+	slog.Debug("===", "CreateVolume() is called", "===")
+	return ctx.JSON(http.StatusNotImplemented, nil)
+}
+
+// DeleteVolumeById implements api.ServerInterface.
+func (s *Server) DeleteVolumeById(ctx echo.Context, volumeId string) error {
+	slog.Debug("===", "DDeleteVolumeById() is called", "===")
+	return ctx.JSON(http.StatusNotImplemented, nil)
+}
+
+// ListVolumes implements api.ServerInterface.
+func (s *Server) ListVolumes(ctx echo.Context) error {
+	slog.Debug("===", "ListVolumes() is called", "===")
+	return ctx.JSON(http.StatusNotImplemented, nil)
+}
+
+// ShowVolumeById implements api.ServerInterface.
+func (s *Server) ShowVolumeById(ctx echo.Context, volumeId string) error {
+	slog.Debug("===", "ShowVolumeById() is called", "===")
+	return ctx.JSON(http.StatusNotImplemented, nil)
+}
+
+// UpdateVolumeById implements api.ServerInterface.
+func (s *Server) UpdateVolumeById(ctx echo.Context, volumeId string) error {
+	slog.Debug("===", "UpdateVolumeById() is called", "===")
+	return ctx.JSON(http.StatusNotImplemented, nil)
 }
