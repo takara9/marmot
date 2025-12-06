@@ -4,33 +4,26 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"time"
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/lvm"
+	"github.com/takara9/marmot/pkg/util"
 )
-
-func intPtr(i int) *int32            { j := int32(i); return &j }
-func int64Ptr(i int) *int64          { j := int64(i); return &j }
-func int32Ptr(i uint64) *int32       { j := int32(i); return &j }
-func int64PtrConvMB(i uint64) *int64 { j := int64(i) * 1024; return &j }
-func stringPtr(s string) *string     { return &s }
-func timePtr(t time.Time) *time.Time { return &t }
 
 // ハイパーバイザーの設定
 func (d *Database) SetHypervisors(v config.Hypervisor_yaml) error {
 	var hv api.Hypervisor
 	hv.NodeName = v.Name
-	hv.Port = int32Ptr(v.Port)
+	hv.Port = util.Int64PtrInt32(v.Port)
 	hvKey := HvPrefix + "/" + v.Name
 	hv.Key = &hvKey
 	hv.IpAddr = &v.IpAddr
 	hv.Cpu = int32(v.Cpu) // 必須項目のためポインタではない
-	hv.FreeCpu = int32Ptr(v.Cpu)
-	hv.Memory = int64PtrConvMB(v.Ram)
-	hv.FreeMemory = int64PtrConvMB(v.Ram)
-	hv.Status = int32Ptr(2) // 暫定
+	hv.FreeCpu = util.Int64PtrInt32(v.Cpu)
+	hv.Memory = util.Int64PtrConvMB(v.Ram)
+	hv.FreeMemory = util.Int64PtrConvMB(v.Ram)
+	hv.Status = util.Int64PtrInt32(2) // 暫定
 
 	var stgpool []api.StoragePool
 	for _, val := range v.Storage {
@@ -53,7 +46,7 @@ func (d *Database) NewHypervisor(node string, hv api.Hypervisor) error {
 	hv.NodeName = node
 	etcdKey := HvPrefix + "/" + node
 	hv.Key = &etcdKey
-	hv.Status = int32Ptr(2) // 暫定
+	hv.Status = util.Int64PtrInt32(2) // 暫定
 
 	if err := d.PutDataEtcd(etcdKey, hv); err != nil {
 		slog.Error("PutDataEtcd()", "err", err)
@@ -127,8 +120,8 @@ func (d *Database) CheckHvVgAllByName(nodeName string) error {
 			slog.Error("", "err", err)
 			return err
 		}
-		(*hv.StgPool)[i].FreeCap = int64Ptr(int(free_sz / 1024 / 1024 / 1024))
-		(*hv.StgPool)[i].VgCap = int64Ptr(int(total_sz / 1024 / 1024 / 1024))
+		(*hv.StgPool)[i].FreeCap = util.IntPtrInt64(int(free_sz / 1024 / 1024 / 1024))
+		(*hv.StgPool)[i].VgCap = util.IntPtrInt64(int(total_sz / 1024 / 1024 / 1024))
 	}
 
 	// DBへ書き込み
@@ -156,8 +149,8 @@ func (d *Database) CheckHvVG2ByName(nodeName string, vg string) error {
 	// 一致するVGにデータをセット
 	for i := 0; i < len(*hv.StgPool); i++ {
 		if *(*hv.StgPool)[i].VolGroup == vg {
-			(*hv.StgPool)[i].FreeCap = int64Ptr(int(free_sz / 1024 / 1024 / 1024))
-			(*hv.StgPool)[i].VgCap = int64Ptr(int(total_sz / 1024 / 1024 / 1024))
+			(*hv.StgPool)[i].FreeCap = util.IntPtrInt64(int(free_sz / 1024 / 1024 / 1024))
+			(*hv.StgPool)[i].VgCap = util.IntPtrInt64(int(total_sz / 1024 / 1024 / 1024))
 		}
 	}
 
@@ -168,4 +161,31 @@ func (d *Database) CheckHvVG2ByName(nodeName string, vg string) error {
 		return err
 	}
 	return nil
+}
+
+// ハイパーバイザーをREST-APIでアクセスして疎通を確認、DBへ反映させる
+func (d *Database) CheckHypervisors(dbUrl string, node string) ([]api.Hypervisor, error) {
+	// 要らないんじゃない？
+	//d, err := db.NewDatabase(dbUrl)
+	//if err != nil {
+	//	slog.Error("", "err", err)
+	//	return nil, err
+	//}
+	// クローズが無い？
+
+	var hvs []api.Hypervisor
+	if err := d.GetHypervisors(&hvs); err != nil {
+		slog.Error("", "err", err)
+		return nil, err
+	}
+
+	// 自ノードを含むハイパーバイザーの死活チェック、DBへ反映
+	for _, val := range hvs {
+		// ハイパーバイザーの状態をDBへ書き込み
+		err := d.PutDataEtcd(*val.Key, val)
+		if err != nil {
+			slog.Error("", "err", err)
+		}
+	}
+	return hvs, nil
 }

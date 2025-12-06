@@ -22,7 +22,15 @@ install:
 .PHONY: test
 test:
 	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -coverprofile cover.out
-	
+
+.PHONY: test-volume
+test-volume:
+	$(GO) test -ginkgo.focus-file marmotd-volume_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+
+.PHONY: test-func
+test-func:
+	$(GO) test -ginkgo.focus-file marmotd-funcs_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+
 .PHONY:	set-version
 set-version:
 	sed s/MARMOT_VERSION/${TAG}/ cmd/version._ > cmd/version.go

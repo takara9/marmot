@@ -7,6 +7,7 @@ import (
 
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/types"
+	"github.com/takara9/marmot/pkg/util"
 )
 
 func (d *Database) UpdateOsLvByVmKey(vmKey string, osVg string, osLv string) error {
@@ -17,8 +18,8 @@ func (d *Database) UpdateOsLvByVmKey(vmKey string, osVg string, osLv string) err
 	}
 
 	// LV, VGをセット
-	vm.OsLv = stringPtr(osLv)
-	vm.OsVg = stringPtr(osVg)
+	vm.OsLv = util.StringPtr(osLv)
+	vm.OsVg = util.StringPtr(osVg)
 
 	// etcdへ登録
 	return d.PutVmByVmKey(vmKey, vm)
@@ -31,8 +32,8 @@ func (d *Database) UpdateDataLvByVmKey(vmKey string, idx int, dataVg string, dat
 	if err != nil {
 		return err
 	}
-	(*vm.Storage)[idx].Lv = stringPtr(dataLv)
-	(*vm.Storage)[idx].Vg = stringPtr(dataVg)
+	(*vm.Storage)[idx].Lv = util.StringPtr(dataLv)
+	(*vm.Storage)[idx].Vg = util.StringPtr(dataVg)
 	return d.PutVmByVmKey(vmKey, vm)
 }
 

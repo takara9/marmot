@@ -15,23 +15,13 @@ import (
 	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
+	ut "github.com/takara9/marmot/pkg/util"
 )
 
-const (
-	//systemctl_exe = "/usr/bin/systemctl"
-	//hvadmin_exe   = "/usr/local/bin/hv-admin"
-	etcdctl_exe = "/usr/bin/etcdctl"
-)
+var etcdContainerIdVol string
 
-var etcdUrlTest string = "http://127.0.0.1:5379"
-var etcdTest *string = &etcdUrlTest
-var nodeName string = "hvc"
-var nodeNamePtr *string = &nodeName
-var etcdEpTest *db.Database
-var etcdContainerIdFunc string
-
-func prepareMockVmfunc() {
-	fmt.Println("モックサーバーの起動")
+func prepareMockVolume() {
+	fmt.Println("モックサーバーの起動 for ボリュームテスト")
 
 	e := echo.New()
 	server := marmotd.NewServer("hvc", etcdUrlTest)
@@ -45,35 +35,35 @@ func prepareMockVmfunc() {
 		slog.SetDefault(logger)
 
 		api.RegisterHandlersWithBaseURL(e, server, "/api/v1")
-		fmt.Println(e.Start("127.0.0.1:8090"), "Mock server is running")
+		fmt.Println(e.Start("127.0.0.1:8092"), "Mock server is running")
 	}()
 
 	// Dockerコンテナを起動
-	cmd := exec.Command("docker", "run", "-d", "--name", "etcdmarmot", "-p", "5379:2379", "-p", "5380:2380", "ghcr.io/takara9/etcd:3.6.5")
+	cmd := exec.Command("docker", "run", "-d", "--name", "etcdvolume", "-p", "7379:2379", "-p", "7380:2380", "ghcr.io/takara9/etcd:3.6.5")
 	output, err := cmd.CombinedOutput()
 	Expect(err).NotTo(HaveOccurred())
-	etcdContainerIdFunc = string(output[:12]) // 最初の12文字をIDとして取得
-	fmt.Printf("Container started with ID: %s\n", etcdContainerIdFunc)
+	etcdContainerIdVol = string(output[:12]) // 最初の12文字をIDとして取得
+	fmt.Printf("Container started with ID: %s\n", etcdContainerIdVol)
 	time.Sleep(10 * time.Second) // コンテナが起動するまで待機
 }
 
-func cleanupMockVmfunc() {
-	fmt.Println("モックサーバーの終了")
+func cleanupMockVolume() {
+	fmt.Println("ボリュームテスト用モックサーバーの終了")
 	// Dockerコンテナを停止・削除
-	cmd := exec.Command("docker", "stop", etcdContainerIdFunc)
+	cmd := exec.Command("docker", "stop", etcdContainerIdVol)
 	_, err := cmd.CombinedOutput()
 	if err != nil {
 		fmt.Printf("Failed to stop container: %v\n", err)
 	}
-	cmd = exec.Command("docker", "rm", etcdContainerIdFunc)
+	cmd = exec.Command("docker", "rm", etcdContainerIdVol)
 	_, err = cmd.CombinedOutput()
 	if err != nil {
 		fmt.Printf("Failed to remove container: %v\n", err)
 	}
 }
 
-func testMarmotFuncs() {
-	Context("Data management", func() {
+func testMarmotVolumes() {
+	Context("テストデータの初期化", func() {
 		It("Set up databae ", func() {
 			var err error
 			etcdEpTest, err = db.NewDatabase(etcdUrlTest)
@@ -110,7 +100,7 @@ func testMarmotFuncs() {
 		It("Check up Marmot daemon", func() {
 			By("Trying to connect to marmot")
 			Eventually(func(g Gomega) {
-				cmd := exec.Command("curl", "http://localhost:8090/ping")
+				cmd := exec.Command("curl", "http://localhost:8092/ping")
 				err := cmd.Run()
 				GinkgoWriter.Println(cmd, "err= ", err)
 				g.Expect(err).NotTo(HaveOccurred())
@@ -133,7 +123,7 @@ func testMarmotFuncs() {
 		})
 
 		It("Check the config file to directly etcd", func() {
-			cmd := exec.Command(etcdctl_exe, "--endpoints=localhost:5379", "get", "hvc")
+			cmd := exec.Command(etcdctl_exe, "--endpoints=localhost:7379", "get", "hvc")
 			cmd.Env = append(os.Environ(), "ETCDCTL_API=3")
 			out, err := cmd.CombinedOutput()
 			GinkgoWriter.Println(out)
@@ -141,105 +131,107 @@ func testMarmotFuncs() {
 		})
 	})
 
-	Context("VMクラスタの生成と削除", func() {
+	Context("OSボリュームの生成から削除", func() {
 		var m *marmotd.Marmot
-		var cnf *api.MarmotConfig
+		var volKey string
 		var err error
 
-		It("Create Marmot Instance", func() {
+		It("Marmotインスタンスの生成", func() {
 			var err error
 			m, err = marmotd.NewMarmot(*nodeNamePtr, *etcdTest)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("Load Config for Create Cluster", func() {
-			By("Loading cluster config")
-			cnf, err = config.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+		It("OSボリュームの生成", func() {
+			v := api.Volume{
+				Name:   "test-os-volume-001",
+				Type:   ut.StringPtr("lvm"),
+				Kind:   ut.StringPtr("os"),
+				OsName: ut.StringPtr("ubuntu22.04"),
+			}
+			GinkgoWriter.Println("Creating OS volume", "volume", v)
+			volKey, err = m.CreateVolume(v)
 			Expect(err).NotTo(HaveOccurred())
-			//marmotd.PrintMarmotConfig(*cnf)
+			GinkgoWriter.Println("Created volume key: ", volKey)
 		})
 
-		It("Create Cluster", func() {
-			err = m.CreateClusterInternal(*cnf) // VMがDBに登録されていない？
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("Destroy Cluster", func() {
-			err = m.DestroyClusterInternal(*cnf)
-			Expect(err).NotTo(HaveOccurred())
-		})
-	})
-
-	Context("VMクラスタの生成と一時停止と再開", func() {
-		var m *marmotd.Marmot
-		var cnf *api.MarmotConfig
-		var err error
-
-		It("Create Marmot Instance", func() {
-			m, err = marmotd.NewMarmot(*nodeNamePtr, *etcdTest)
+		It("OSボリュームの削除", func() {
+			err = m.RemoveVolume(volKey)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("Load Config for Create cluster", func() {
-			cnf, err = config.ReadYamlClusterConfig("testdata/cluster-config.yaml")
-			Expect(err).NotTo(HaveOccurred())
+		It("OSボリュームの生成 （失敗ケース)", func() {
+			v := api.Volume{
+				Name:   "test-os-volume-001",
+				Type:   ut.StringPtr("lvm"),
+				Kind:   ut.StringPtr("os"),
+				OsName: ut.StringPtr("ubuntu22.NOXIST"),
+			}
+			GinkgoWriter.Println("Creating OS volume", "volume", v)
+			volKey, err = m.CreateVolume(v)
+			Expect(err).To(HaveOccurred())
+			GinkgoWriter.Println("Created volume key: ", volKey)
 		})
 
-		It("Create cluster", func() {
-			err = m.CreateClusterInternal(*cnf)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("Stop Cluster", func() {
-			err = m.StopClusterInternal(*cnf)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("Start Cluster", func() {
-			err = m.DestroyClusterInternal(*cnf)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("Destroy Cluster()", func() {
-			By("Destroying cluster")
-			err = m.DestroyClusterInternal(*cnf)
-			Expect(err).NotTo(HaveOccurred())
-		})
-	})
-
-	Context("VMクラスタの２重起動の防止", func() {
-		var m *marmotd.Marmot
-		var cnf *api.MarmotConfig
-		var err error
-
-		It("Create Marmot Instance", func() {
-			m, err = marmotd.NewMarmot(*nodeNamePtr, *etcdTest)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("クラスターコンフィグの読み取り", func() {
-			cnf, err = config.ReadYamlClusterConfig("testdata/cluster-config.yaml")
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("クラスターの起動", func() {
-			err = m.CreateClusterInternal(*cnf)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("クラスターの２重起動 エラー発生が発生", func() {
-			err = m.CreateClusterInternal(*cnf)
+		It("OSボリュームの生成 （失敗ケース)", func() {
+			v := api.Volume{
+				Name:   "test-os-volume-001",
+				Type:   ut.StringPtr("noexist"),
+				Kind:   ut.StringPtr("os"),
+				OsName: ut.StringPtr("ubuntu22.04"),
+			}
+			GinkgoWriter.Println("Creating OS volume", "volume", v)
+			volKey, err = m.CreateVolume(v)
+			GinkgoWriter.Println("Created volume key: ", volKey)
+			GinkgoWriter.Println("err=", err)
 			Expect(err).To(HaveOccurred())
 		})
 
-		It("Start Cluster", func() {
-			err = m.DestroyClusterInternal(*cnf)
+		It("OSボリュームの生成 （失敗ケース)", func() {
+			v := api.Volume{
+				Name:   "test-os-volume-001",
+				Type:   ut.StringPtr("qcow2"),
+				Kind:   ut.StringPtr("os"),
+				OsName: ut.StringPtr("ubuntu22.04"),
+			}
+			GinkgoWriter.Println("Creating OS volume", "volume", v)
+			volKey, err = m.CreateVolume(v)
+			GinkgoWriter.Println("err=", err)
+			GinkgoWriter.Println("Created volume key: ", volKey)
+			Expect(err).To(HaveOccurred())
+		})
+
+	})
+
+	Context("データボリュームの生成から削除", func() {
+		var m *marmotd.Marmot
+		var volKey string
+		var err error
+
+		It("Marmotインスタンスの生成", func() {
+			var err error
+			m, err = marmotd.NewMarmot(*nodeNamePtr, *etcdTest)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("Destroy Cluster()", func() {
-			err = m.DestroyClusterInternal(*cnf)
+		It("DATAボリュームの生成", func() {
+			v := api.Volume{
+				Name: "test-data-volume-001",
+				Type: ut.StringPtr("lvm"),
+				Kind: ut.StringPtr("data"),
+				Size: ut.IntPtrInt(20),
+			}
+			GinkgoWriter.Println("Creating Data volume", "volume", v)
+			volKey, err = m.CreateVolume(v)
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println("Created volume key: ", volKey)
+		})
+
+		It("Dataボリュームの削除", func() {
+			err = m.RemoveVolume(volKey)
 			Expect(err).NotTo(HaveOccurred())
 		})
+
 	})
+
 }

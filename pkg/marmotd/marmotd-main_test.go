@@ -16,7 +16,6 @@ import (
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/client"
 	"github.com/takara9/marmot/pkg/config"
-	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/marmotd"
 )
 
@@ -160,7 +159,7 @@ func testMarmotd() {
 	})
 
 	It("クラスタの生成", func() {
-		cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+		cnf, err := config.ReadYamlClusterConfig("testdata/cluster-config.yaml")
 		Expect(err).NotTo(HaveOccurred())
 		httpStatus, body, url, err := marmotClient.CreateCluster(*cnf)
 		GinkgoWriter.Println("CreateCluster ERR = ", err)
@@ -185,7 +184,7 @@ func testMarmotd() {
 	})
 
 	It("クラスタの一時停止", func() {
-		cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+		cnf, err := config.ReadYamlClusterConfig("testdata/cluster-config.yaml")
 		Expect(err).NotTo(HaveOccurred())
 		httpStatus, body, url, err := marmotClient.StopCluster(*cnf)
 		GinkgoWriter.Println("StopCluster ERR = ", err)
@@ -199,7 +198,7 @@ func testMarmotd() {
 	})
 
 	It("クラスタの再スタート", func() {
-		cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+		cnf, err := config.ReadYamlClusterConfig("testdata/cluster-config.yaml")
 		Expect(err).NotTo(HaveOccurred())
 		httpStatus, body, url, err := marmotClient.StartCluster(*cnf)
 		GinkgoWriter.Println("StartCluster ERR = ", err)
@@ -212,7 +211,7 @@ func testMarmotd() {
 	})
 
 	It("クラスタの削除", func() {
-		cnf, err := cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+		cnf, err := config.ReadYamlClusterConfig("testdata/cluster-config.yaml")
 		Expect(err).NotTo(HaveOccurred())
 		httpStatus, body, url, err := marmotClient.DestroyCluster(*cnf)
 		GinkgoWriter.Println("DestroyCluster ERR = ", err)
