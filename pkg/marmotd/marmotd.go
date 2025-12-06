@@ -30,6 +30,31 @@ type Server struct {
 	Ma   *Marmot
 }
 
+// CreateVolume implements api.ServerInterface.
+func (s *Server) CreateVolume(ctx echo.Context) error {
+	panic("unimplemented")
+}
+
+// DeleteVolumeById implements api.ServerInterface.
+func (s *Server) DeleteVolumeById(ctx echo.Context, volumeId string) error {
+	panic("unimplemented")
+}
+
+// ListVolumes implements api.ServerInterface.
+func (s *Server) ListVolumes(ctx echo.Context) error {
+	panic("unimplemented")
+}
+
+// ShowVolumeById implements api.ServerInterface.
+func (s *Server) ShowVolumeById(ctx echo.Context, volumeId string) error {
+	panic("unimplemented")
+}
+
+// UpdateVolumeById implements api.ServerInterface.
+func (s *Server) UpdateVolumeById(ctx echo.Context, volumeId string) error {
+	panic("unimplemented")
+}
+
 func NewMarmot(nodeName string, etcdUrl string) (*Marmot, error) {
 	var m Marmot
 	var err error

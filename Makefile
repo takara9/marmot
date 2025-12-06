@@ -7,8 +7,6 @@ TAG := $(shell cat TAG)
 BINDIR = $(CURDIR)/marmot-v$(TAG)
 
 $(PROGRAMS):
-	oapi-codegen -config api/config-v1.yaml api/marmot-api-v1.yaml
-	npx @redocly/cli build-docs api/marmot-api-v1.yaml -o api/marmot-api-v1.html
 	mkdir -p $(BINDIR)
 	cd cmd/$@ && $(MAKE)
 
@@ -19,6 +17,9 @@ setup:
 	env GOFLAGS= go install golang.org/x/tools/cmd/goimports@latest
 	env GOFLAGS= go install honnef.co/go/tools/cmd/staticcheck@latest
 	env GOFLAGS= go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
+	oapi-codegen -config api/config-v1.yaml api/marmot-api-v1.yaml
+	npx @redocly/cli build-docs api/marmot-api-v1.yaml -o api/marmot-api-v1.html
+	go mod tidy
 
 test: setup
 	test -z "$$(gofmt -s -l . | tee /dev/stderr)"
