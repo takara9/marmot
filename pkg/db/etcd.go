@@ -16,13 +16,14 @@ import (
 )
 
 const (
-	HvPrefix      = "/marmot/hypervisor"
-	VmPrefix      = "/marmot/virtualmachine"
-	OsImagePrefix = "/marmot/osimage"
-	VolumePrefix  = "/marmot/volume"
-	SeqPrefix     = "/marmot/sequence"
-	VersionKey    = "/marmot/version"
-	JobPrefix     = "/marmot/job"
+	HvPrefix              = "/marmot/hypervisor"
+	VmPrefix              = "/marmot/virtualmachine"
+	OsTemplateImagePrefix = "/marmot/osTemplateImage"
+	OsImagePrefix         = "/marmot/osimage"
+	VolumePrefix          = "/marmot/volume"
+	SeqPrefix             = "/marmot/sequence"
+	VersionKey            = "/marmot/version"
+	JobPrefix             = "/marmot/job"
 )
 
 type Database struct {
@@ -41,6 +42,10 @@ func NewDatabase(url string) (*Database, error) {
 	})
 	db.Cli = conn
 	return &db, err
+}
+
+func (d *Database) Close() error {
+	return d.Cli.Close()
 }
 
 // キーが一致した値を取得

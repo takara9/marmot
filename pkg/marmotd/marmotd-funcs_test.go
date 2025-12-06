@@ -13,16 +13,14 @@ import (
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/config"
-	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
-	ut "github.com/takara9/marmot/pkg/util"
 )
 
 const (
-	systemctl_exe = "/usr/bin/systemctl"
-	hvadmin_exe   = "/usr/local/bin/hv-admin"
-	etcdctl_exe   = "/usr/bin/etcdctl"
+	//systemctl_exe = "/usr/bin/systemctl"
+	//hvadmin_exe   = "/usr/local/bin/hv-admin"
+	etcdctl_exe = "/usr/bin/etcdctl"
 )
 
 var etcdUrlTest string = "http://127.0.0.1:5379"
@@ -41,7 +39,7 @@ func prepareMockVmfunc() {
 		// Setup slog
 		opts := &slog.HandlerOptions{
 			AddSource: true,
-			Level:     slog.LevelDebug,
+			//Level:     slog.LevelDebug,
 		}
 		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
 		slog.SetDefault(logger)
@@ -121,7 +119,7 @@ func testMarmotFuncs() {
 
 		It("Check Hypervisors data", func() {
 			GinkgoWriter.Println(*nodeNamePtr)
-			hv, err := ut.CheckHypervisors(*etcdTest, *nodeNamePtr)
+			hv, err := etcdEpTest.CheckHypervisors(*etcdTest, *nodeNamePtr)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("xxxxxx array size == ", len(hv))
 			for i, v := range hv {
@@ -156,7 +154,7 @@ func testMarmotFuncs() {
 
 		It("Load Config for Create Cluster", func() {
 			By("Loading cluster config")
-			cnf, err = cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+			cnf, err = config.ReadYamlClusterConfig("testdata/cluster-config.yaml")
 			Expect(err).NotTo(HaveOccurred())
 			//marmotd.PrintMarmotConfig(*cnf)
 		})
@@ -183,7 +181,7 @@ func testMarmotFuncs() {
 		})
 
 		It("Load Config for Create cluster", func() {
-			cnf, err = cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+			cnf, err = config.ReadYamlClusterConfig("testdata/cluster-config.yaml")
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -220,7 +218,7 @@ func testMarmotFuncs() {
 		})
 
 		It("クラスターコンフィグの読み取り", func() {
-			cnf, err = cf.ReadYamlClusterConfig("testdata/cluster-config.yaml")
+			cnf, err = config.ReadYamlClusterConfig("testdata/cluster-config.yaml")
 			Expect(err).NotTo(HaveOccurred())
 		})
 

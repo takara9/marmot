@@ -11,8 +11,8 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/lvm"
 	"github.com/takara9/marmot/pkg/types"
+	"github.com/takara9/marmot/pkg/util"
 )
 
 func (d *Database) GetVmByVmKey(vmKey string) (api.VirtualMachine, error) {
@@ -92,8 +92,8 @@ func (d *Database) AssignHvforVm(vm api.VirtualMachine) (string, string, string,
 				*hv.FreeMemory = *hv.FreeMemory - *vm.Memory
 				*hv.FreeCpu = *hv.FreeCpu - *vm.Cpu
 				// ストレージの容量管理は未実装
-				vm.Status = int32Ptr(types.INITIALIZING) // 登録中
-				vm.HvNode = hv.NodeName                  // ハイパーバイザーを決定
+				vm.Status = util.Int64PtrInt32(types.INITIALIZING) // 登録中
+				vm.HvNode = hv.NodeName                            // ハイパーバイザーを決定
 				vm.HvIpAddr = hv.IpAddr
 				vm.HvPort = hv.Port
 				assigned = true
@@ -123,11 +123,11 @@ func (d *Database) AssignHvforVm(vm api.VirtualMachine) (string, string, string,
 	slog.Debug("=== d.GetSeq()", "seqNum", seqNum)
 
 	//vm.NameはOSホスト名なので受けたものを利用
-	vm.Key = stringPtr(fmt.Sprintf("%v/%s_%04d", VmPrefix, vm.Name, seqNum))
-	vm.Uuid = stringPtr(txId.String())
-	vm.CTime = timePtr(time.Now())
-	vm.STime = timePtr(time.Now())
-	vm.Status = int32Ptr(types.PROVISIONING)            // プロビジョニング中
+	vm.Key = util.StringPtr(fmt.Sprintf("%v/%s_%04d", VmPrefix, vm.Name, seqNum))
+	vm.Uuid = util.StringPtr(txId.String())
+	vm.CTime = util.TimePtr(time.Now())
+	vm.STime = util.TimePtr(time.Now())
+	vm.Status = util.Int64PtrInt32(types.PROVISIONING)       // プロビジョニング中
 	if err := d.PutDataEtcd(*vm.Key, &vm); err != nil { // 仮想マシンのデータ登録
 		slog.Debug("=== d.PutDataEtcd failed", "vm.Key", *vm.Key, "err", err)
 		return "", "", "", txId.String(), 0, err
@@ -143,37 +143,7 @@ func (d *Database) UpdateVmStateByKey(vmKey string, state int) error {
 	if err != nil {
 		return err
 	}
-	vm.Status = intPtr(state)
+	vm.Status = util.IntPtrInt32(state)
 	err = d.PutDataEtcd(vmKey, vm)
 	return err
-}
-
-// OSテンプVolのスナップショットを作成してデバイス名を返す
-func (d *Database) CreateOsLv(tempVg string, tempLv string) (string, error) {
-	seq, err := d.GetSeqByKind("LVOS")
-	if err != nil {
-		return "", err
-	}
-	lvName := fmt.Sprintf("oslv%04d", seq)
-	var lvSize uint64 = 1024 * 1024 * 1024 * 16 // 8GB
-	err = lvm.CreateSnapshot(tempVg, tempLv, lvName, lvSize)
-	if err != nil {
-		return "", err
-	}
-	return lvName, err
-}
-
-// データボリュームの作成
-func (d *Database) CreateDataLv(sz uint64, vg string) (string, error) {
-	seq, err := d.GetSeqByKind("LVDATA")
-	if err != nil {
-		return "", err
-	}
-	lvName := fmt.Sprintf("data%04d", seq)
-	lvSize := 1024 * 1024 * 1024 * sz
-	err = lvm.CreateLV(vg, lvName, lvSize)
-	if err != nil {
-		return "", err
-	}
-	return lvName, err
 }

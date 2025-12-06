@@ -2,51 +2,52 @@ package db
 
 import (
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/util"
 )
 
 func TestHvData1() api.Hypervisor {
 	var hv api.Hypervisor
 	hv.NodeName = "hv01"
 	hv.Cpu = 10
-	hv.Memory = int64PtrConvMB(64)
-	hv.IpAddr = stringPtr("10.1.0.100")
-	hv.FreeCpu = int32Ptr(10)
-	hv.FreeMemory = int64PtrConvMB(64)
-	hv.Key = stringPtr("hv01")
+	hv.Memory = util.Int64PtrConvMB(64)
+	hv.IpAddr = util.StringPtr("10.1.0.100")
+	hv.FreeCpu = util.Int64PtrInt32(10)
+	hv.FreeMemory = util.Int64PtrConvMB(64)
+	hv.Key = util.StringPtr("hv01")
 	return hv
 }
 
 func TestVmCreate(hostname string, cpu int, ram int) api.VirtualMachine {
 	var vm api.VirtualMachine
 	vm.Name = hostname
-	vm.Cpu = intPtr(cpu)
-	vm.Memory = int64Ptr(ram)
-	vm.PrivateIp = stringPtr("172.16.0.100")
-	vm.PublicIp = stringPtr("192.168.1.100")
-	vm.Playbook = stringPtr("setup.yaml")
-	vm.Comment = stringPtr("Test Data Cluster ")
+	vm.Cpu = util.IntPtrInt32(cpu)
+	vm.Memory = util.IntPtrInt64(ram)
+	vm.PrivateIp = util.StringPtr("172.16.0.100")
+	vm.PublicIp = util.StringPtr("192.168.1.100")
+	vm.Playbook = util.StringPtr("setup.yaml")
+	vm.Comment = util.StringPtr("Test Data Cluster ")
 
 	var sta []api.Storage
 	var st api.Storage
 
-	st.Name = stringPtr("log")
-	st.Size = int64Ptr(10)
-	st.Path = stringPtr("/stg")
+	st.Name = util.StringPtr("log")
+	st.Size = util.IntPtrInt64(10)
+	st.Path = util.StringPtr("/stg")
 	sta = append(sta, st)
 
-	st.Name = stringPtr("data1")
-	st.Size = int64Ptr(100)
-	st.Path = stringPtr("/stg")
+	st.Name = util.StringPtr("data1")
+	st.Size = util.IntPtrInt64(100)
+	st.Path = util.StringPtr("/stg")
 	sta = append(sta, st)
 
-	st.Name = stringPtr("data2")
-	st.Size = int64Ptr(100)
-	st.Path = stringPtr("/stg")
+	st.Name = util.StringPtr("data2")
+	st.Size = util.IntPtrInt64(100)
+	st.Path = util.StringPtr("/stg")
 	sta = append(sta, st)
 
-	st.Name = stringPtr("data3")
-	st.Size = int64Ptr(100)
-	st.Path = stringPtr("/stg")
+	st.Name = util.StringPtr("data3")
+	st.Size = util.IntPtrInt64(100)
+	st.Path = util.StringPtr("/stg")
 	sta = append(sta, st)
 	vm.Storage = &sta
 

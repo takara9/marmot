@@ -64,54 +64,6 @@ func UnMountLocal(uuid string) error {
 	return err
 }
 
-// OSテンプVolのスナップショットを作成してデバイス名を返す
-//
-//	サイズとテンプレートの選択が無い！？ 将来改良
-/*
-func CreateOsLv(dbUrl string, tempVg string, tempLv string) (string, error) {
-	d, err := db.NewDatabase(dbUrl)
-	if err != nil {
-		slog.Error("connect to database", "err", err)
-		return "", err
-	}
-
-	seq, err := d.GetSeq("LVOS")
-	if err != nil {
-		return "", err
-	}
-	lvName := fmt.Sprintf("oslv%04d", seq)
-	var lvSize uint64 = 1024 * 1024 * 1024 * 16 // 8GB
-	err = lvm.CreateSnapshot(tempVg, tempLv, lvName, lvSize)
-	if err != nil {
-		return "", err
-	}
-	return lvName, err
-}
-*/
-
-/*
-// データボリュームの作成
-func CreateDataLv(dbUrl string, sz uint64, vg string) (string, error) {
-	d, err := db.NewDatabase(dbUrl)
-	if err != nil {
-		slog.Error("connect to database", "err", err)
-		return "", err
-	}
-
-	seq, err := d.GetSeq("LVDATA")
-	if err != nil {
-		return "", err
-	}
-	lvName := fmt.Sprintf("data%04d", seq)
-	lvSize := 1024 * 1024 * 1024 * sz
-	err = lvm.CreateLV(vg, lvName, lvSize)
-	if err != nil {
-		return "", err
-	}
-	return lvName, err
-}
-*/
-
 // スナップショットボリュームをマウントして、 ホスト名とIPアドレスを設定
 //
 //	Ubuntu Linuxに限定
