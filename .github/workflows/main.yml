@@ -2,12 +2,12 @@ name: marmot CI on self-hosted hv1
 on: push
 env:
   # Setting an environment variable with the value of a configuration variable
-  env_var: ${{ vars.ENV_CONTEXT_VAR }}
+  env_var: ${{ vars.ENV_CONTEXT_VAR || 'MARMOT CI' }}
   DEBUG: true
 
 jobs:
   display-variables:
-    name: ${{ vars.JOB_NAME }}
+    name: ${{ vars.JOB_NAME || 'Display Configuration Variables' }}
     # You can use configuration variables with the `vars` context for dynamic jobs
     #if: ${{ vars.USE_VARIABLES == 'true' }}
     #runs-on: ${{ vars.RUNNER }}
@@ -126,16 +126,23 @@ jobs:
         sudo -s make test
         cd ../..
  
+    - name: Test pkg/marmotd ボリューム機能テスト
+      run: | 
+        cd pkg/marmotd
+        sudo -s make test-volume
+        cd ../..    
+
+    - name: Test pkg/marmotd 全機能テスト
+      run: | 
+        cd pkg/marmotd
+        sudo -s make test
+        cd ../..    
+
   marmot-command-test-job:
     runs-on: self-hosted
     needs: display-variables
     steps:
 
-    - name: Test pkg/marmotd
-      run: | 
-        cd pkg/marmotd
-        sudo -s make test
-        cd ../..
     - name: Test cmd/mactl
       run: | 
         cd cmd/mactl
