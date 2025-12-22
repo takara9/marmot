@@ -325,3 +325,97 @@ func (m *MarmotEndpoint) StartVirtualMachine(spec api.VmSpec) (int, []byte, *url
 	req.Header.Set("Content-Type", "application/json")
 	return m.httpRequest(req)
 }
+
+func (m *MarmotEndpoint) CreateVolume(spec api.Volume) (int, []byte, *url.URL, error) {
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/volume")
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	slog.Debug("CreateVolume", "reqURL", reqURL)
+	slog.Debug("CreateVolume", "spec", spec)
+
+	byteJSON, _ := json.Marshal(spec)
+	req, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	req.Header.Set("User-Agent", "MarmotdClient/1.0")
+	req.Header.Set("Content-Type", "application/json")
+	return m.httpRequest(req)
+}
+
+func (m *MarmotEndpoint) DeleteVolumeById(key string) (int, []byte, *url.URL, error) {
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/volume", key)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	slog.Debug("CreateVolume", "reqURL", reqURL)
+	slog.Debug("CreateVolume", "key", key)
+
+	req, err := http.NewRequest("DELETE", reqURL, nil)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	req.Header.Set("User-Agent", "MarmotdClient/1.0")
+	req.Header.Set("Content-Type", "application/json")
+	return m.httpRequest(req)
+}
+
+func (m *MarmotEndpoint) ListVolumes() (int, []byte, *url.URL, error) {
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/volume")
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	slog.Debug("ListVolumes", "reqURL", reqURL)
+
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	req.Header.Set("User-Agent", "MarmotdClient/1.0")
+	req.Header.Set("Content-Type", "application/json")
+	return m.httpRequest(req)
+}
+
+
+func (m *MarmotEndpoint) ShowVolumeById(key string) (int, []byte, *url.URL, error) {
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/volume", key)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+
+	slog.Debug("ShowVolumeById", "reqURL", reqURL)
+
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	req.Header.Set("User-Agent", "MarmotdClient/1.0")
+	req.Header.Set("Content-Type", "application/json")
+	return m.httpRequest(req)
+}
+
+func (m *MarmotEndpoint) UpdateVolumeById(key string, spec api.Volume) (int, []byte, *url.URL, error) {
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/volume", key)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+
+	slog.Debug("UpdateVolumeById", "reqURL", reqURL)
+
+	byteJSON, err := json.Marshal(spec)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+
+	slog.Debug("UpdateVolumeById", "body", string(byteJSON))
+
+	req, err := http.NewRequest("PUT", reqURL, bytes.NewBuffer(byteJSON))
+	if err != nil {
+		return 0, nil, nil, err
+	}
+
+	req.Header.Set("User-Agent", "MarmotdClient/1.0")
+	req.Header.Set("Content-Type", "application/json")
+	return m.httpRequest(req)
+}

@@ -23,7 +23,7 @@ var _ = Describe("QCOW2 Volume", Ordered, func() {
 	Describe("Manipulation QCOW2 Volume", func() {
 		Context("Lifecycle of QCOW2 Volume", func() {
 			It("Create QCOW2 Volume", func() {
-				err := qcow.CreateQcow("testdata/test.qcow2", 100)
+				err := qcow.CreateQcow("testdata/test.qcow2", 1) // 1GB
 				Expect(err).NotTo(HaveOccurred())
 			})
 

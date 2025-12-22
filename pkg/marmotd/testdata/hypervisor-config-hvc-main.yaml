@@ -16,7 +16,7 @@ image_template:
   - name: "ubuntu22.04"
     volumegroup: "vg1"
     logicalvolume: "lv01"
-
+    qcow2_path: "testdata/ubuntu22.04.qcow2"
 #
 # シリアル番号管理
 #

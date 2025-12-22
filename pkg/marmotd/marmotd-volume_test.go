@@ -2,7 +2,6 @@ package marmotd_test
 
 import (
 	"fmt"
-	"log/slog"
 	"os"
 	"os/exec"
 	"time"
@@ -27,14 +26,16 @@ func prepareMockVolume() {
 	e := echo.New()
 	server := marmotd.NewServer("hvc", etcdUrlTest)
 	go func() {
-		// Setup slog
-		opts := &slog.HandlerOptions{
-			AddSource: true,
-			//Level:     slog.LevelDebug,
-		}
-		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
-		slog.SetDefault(logger)
 
+		/*
+			// Setup slog
+			opts := &slog.HandlerOptions{
+				AddSource: true,
+				Level:     slog.LevelDebug,
+			}
+			logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
+			slog.SetDefault(logger)
+		*/
 		api.RegisterHandlersWithBaseURL(e, server, "/api/v1")
 		fmt.Println(e.Start("127.0.0.1:8092"), "Mock server is running")
 	}()
@@ -74,6 +75,8 @@ func cleanupMockVolume() {
 	cmd = exec.Command("lvremove vg2/data0901 -y")
 	cmd.CombinedOutput()
 	cmd = exec.Command("lvremove vg2/data0902 -y")
+	cmd.CombinedOutput()
+	cmd = exec.Command("lvremove vg2/data0903 -y")
 	cmd.CombinedOutput()
 
 }
@@ -325,7 +328,7 @@ func testMarmotVolumes() {
 				Name: "test-data-volume-001",
 				Type: ut.StringPtr("lvm"),
 				Kind: ut.StringPtr("data"),
-				Size: ut.IntPtrInt(20),
+				Size: ut.IntPtrInt(1),
 			}
 			GinkgoWriter.Println("Creating DATA 論理ボリューム", "volume", v)
 			volKey, err = m.CreateVolume(v)
@@ -388,7 +391,7 @@ func testMarmotVolumes() {
 				Name: "test-data-volume-001",
 				Type: ut.StringPtr("lvm"),
 				Kind: ut.StringPtr("data"),
-				Size: ut.IntPtrInt(20),
+				Size: ut.IntPtrInt(1),
 			}
 			GinkgoWriter.Println("Creating Data volume", "volume", v)
 			tmpKey, err := m.CreateVolume(v)
@@ -402,7 +405,7 @@ func testMarmotVolumes() {
 				Name: "test-data-volume-002",
 				Type: ut.StringPtr("lvm"),
 				Kind: ut.StringPtr("data"),
-				Size: ut.IntPtrInt(20),
+				Size: ut.IntPtrInt(1),
 			}
 			GinkgoWriter.Println("Creating Data volume", "volume", v)
 			tmpKey, err := m.CreateVolume(v)
@@ -589,7 +592,7 @@ func testMarmotVolumes() {
 				Name: "test-qcow2-volume-003",
 				Type: ut.StringPtr("qcow2"),
 				Kind: ut.StringPtr("data"),
-				Size: ut.IntPtrInt(20),
+				Size: ut.IntPtrInt(1),
 			}
 			tmpKey, err := m.CreateVolume(v)
 			key = append(key, tmpKey)

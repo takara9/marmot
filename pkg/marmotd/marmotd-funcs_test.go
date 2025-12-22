@@ -18,8 +18,6 @@ import (
 )
 
 const (
-	//systemctl_exe = "/usr/bin/systemctl"
-	//hvadmin_exe   = "/usr/local/bin/hv-admin"
 	etcdctl_exe = "/usr/bin/etcdctl"
 )
 
@@ -39,7 +37,7 @@ func prepareMockVmfunc() {
 		// Setup slog
 		opts := &slog.HandlerOptions{
 			AddSource: true,
-			//Level:     slog.LevelDebug,
+			Level:     slog.LevelDebug,
 		}
 		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
 		slog.SetDefault(logger)
@@ -70,6 +68,21 @@ func cleanupMockVmfunc() {
 	if err != nil {
 		fmt.Printf("Failed to remove container: %v\n", err)
 	}
+	cmd = exec.Command("lvremove vg1/oslv0900 -y")
+	cmd.CombinedOutput()
+	cmd = exec.Command("lvremove vg1/oslv0901 -y")
+	cmd.CombinedOutput()
+	cmd = exec.Command("lvremove vg1/oslv0902 -y")
+	cmd.CombinedOutput()
+
+	cmd = exec.Command("lvremove vg2/data0900 -y")
+	cmd.CombinedOutput()
+	cmd = exec.Command("lvremove vg2/data0901 -y")
+	cmd.CombinedOutput()
+	cmd = exec.Command("lvremove vg2/data0902 -y")
+	cmd.CombinedOutput()
+	cmd = exec.Command("lvremove vg2/data0903 -y")
+	cmd.CombinedOutput()
 }
 
 func testMarmotFuncs() {
