@@ -325,3 +325,10 @@ func (m *MarmotEndpoint) StartVirtualMachine(spec api.VmSpec) (int, []byte, *url
 	req.Header.Set("Content-Type", "application/json")
 	return m.httpRequest(req)
 }
+
+func (m *MarmotEndpoint) CreateVolume() (*api.Version, error) {
+
+	
+
+	return nil, nil
+}

@@ -43,7 +43,7 @@ func prepareMockServers() {
 		// Setup slog
 		opts := &slog.HandlerOptions{
 			AddSource: true,
-			//Level:     slog.LevelDebug,
+			Level:     slog.LevelDebug,
 		}
 		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
 		slog.SetDefault(logger)
@@ -221,5 +221,10 @@ func testMarmotd() {
 		err = json.Unmarshal(body, &replyMessage)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(url).To(BeNil())
+	})
+
+	It("ボリュームの作成", func() {
+		_, err := marmotClient.CreateVolume()
+		Expect(err).NotTo(HaveOccurred())
 	})
 }
