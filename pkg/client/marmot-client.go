@@ -325,3 +325,22 @@ func (m *MarmotEndpoint) StartVirtualMachine(spec api.VmSpec) (int, []byte, *url
 	req.Header.Set("Content-Type", "application/json")
 	return m.httpRequest(req)
 }
+
+
+
+func (m *MarmotEndpoint) CreateVolume(spec api.Volume) (int, []byte, *url.URL, error) {
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/volume")
+	if err != nil {
+		return 0, nil, nil, err
+	}
+
+	byteJSON, _ := json.Marshal(spec)
+
+	req, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	req.Header.Set("User-Agent", "MarmotdClient/1.0")
+	req.Header.Set("Content-Type", "application/json")
+	return m.httpRequest(req)
+}
