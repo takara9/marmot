@@ -43,7 +43,7 @@ func prepareMockServers() {
 		// Setup slog
 		opts := &slog.HandlerOptions{
 			AddSource: true,
-			Level:     slog.LevelDebug,
+			//Level:     slog.LevelDebug,
 		}
 		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
 		slog.SetDefault(logger)
@@ -217,18 +217,6 @@ func testMarmotd() {
 		GinkgoWriter.Println("DestroyCluster ERR = ", err)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(httpStatus).To(Equal(200))
-		var replyMessage api.ReplyMessage
-		err = json.Unmarshal(body, &replyMessage)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(url).To(BeNil())
-	})
-
-	It("ボリュームの作成 xxxxxxx", func() {
-		var x api.Volume
-		httpStatus, body, url, err := marmotClient.CreateVolume(x)
-		GinkgoWriter.Println("CreateVolume ERR = ", err)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(httpStatus).To(Equal(201))
 		var replyMessage api.ReplyMessage
 		err = json.Unmarshal(body, &replyMessage)
 		Expect(err).NotTo(HaveOccurred())
