@@ -32,6 +32,7 @@ type Image_yaml struct {
 	Name          string `yaml:"name"`
 	VolumeGroup   string `yaml:"volumegroup"`
 	LogicalVolume string `yaml:"logicalvolume"`
+	Qcow2ImagePath string `yaml:"qcow2_path"`
 }
 
 // シーケンス番号

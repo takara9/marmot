@@ -2,6 +2,7 @@ package marmotd
 
 import (
 	_ "embed"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"os"
@@ -10,7 +11,6 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/util"
 )
 
 //go:embed version.txt
@@ -42,6 +42,10 @@ func NewMarmot(nodeName string, etcdUrl string) (*Marmot, error) {
 	return &m, nil
 }
 
+func (m *Marmot) Close() error {
+	return m.Db.Close()
+}
+
 func NewServer(node string, etcdurl string) *Server {
 	marmotInstance, err := NewMarmot(node, etcdurl)
 	if err != nil {
@@ -51,6 +55,10 @@ func NewServer(node string, etcdurl string) *Server {
 	return &Server{
 		Ma: marmotInstance,
 	}
+}
+
+func (s *Server) Close() error {
+	return s.Ma.Db.Close()
 }
 
 // 生存確認
@@ -77,16 +85,16 @@ func (s *Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPar
 	s.Lock.Lock()
 	defer s.Lock.Unlock()
 
-	_, err := util.CheckHypervisors(s.Ma.EtcdUrl, s.Ma.NodeName)
-	if err != nil {
-		slog.Error("Check if the hypervisor is up and running", "err", err)
-		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
-	}
-
 	// データベースから情報を取得
 	d, err := db.NewDatabase(s.Ma.EtcdUrl)
 	if err != nil {
 		slog.Error("connect to database", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	_, err = d.CheckHypervisors(s.Ma.EtcdUrl, s.Ma.NodeName)
+	if err != nil {
+		slog.Error("Check if the hypervisor is up and running", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
@@ -144,9 +152,15 @@ func (s *Server) CreateCluster(ctx echo.Context) error {
 	//if DEBUG {
 	//	PrintMarmotConfig(cnf)
 	//}
+	// データベースから情報を取得
+	d, err := db.NewDatabase(s.Ma.EtcdUrl)
+	if err != nil {
+		slog.Error("connect to database", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
 
 	// ハイパーバイザーの稼働チェック 結果はDBへ反映
-	_, err = util.CheckHypervisors(s.Ma.EtcdUrl, s.Ma.NodeName)
+	_, err = d.CheckHypervisors(s.Ma.EtcdUrl, s.Ma.NodeName)
 	if err != nil {
 		slog.Error("check hypervisor status", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
@@ -316,7 +330,7 @@ func (s *Server) ShowHypervisorById(ctx echo.Context, hypervisorId string) error
 
 	if len(hvs) < 1 {
 		slog.Error("ShowHypervisorById()", "id", hypervisorId)
-		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: ""})
 	}
 
 	for _, v := range hvs {
@@ -326,4 +340,43 @@ func (s *Server) ShowHypervisorById(ctx echo.Context, hypervisorId string) error
 		}
 	}
 	return ctx.JSON(http.StatusNotFound, api.ReplyMessage{Message: "Hypervisor " + hypervisorId + " not found"})
+}
+
+// CreateVolume implements api.ServerInterface.
+func (s *Server) CreateVolume(ctx echo.Context) error {
+	slog.Debug("===", "CreateVolume() is called", "===")
+
+	var volSpec api.Volume
+	err := ctx.Bind(&volSpec)
+	if err != nil {
+		volSpecString, err2 := json.MarshalIndent(volSpec, "", "  ")
+		slog.Error("CreateVolume()", "err", err, "volSpec", string(volSpecString), "err2", err2)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	return ctx.JSON(http.StatusNotImplemented, nil)
+}
+
+// DeleteVolumeById implements api.ServerInterface.
+func (s *Server) DeleteVolumeById(ctx echo.Context, volumeId string) error {
+	slog.Debug("===", "DDeleteVolumeById() is called", "===")
+	return ctx.JSON(http.StatusNotImplemented, nil)
+}
+
+// ListVolumes implements api.ServerInterface.
+func (s *Server) ListVolumes(ctx echo.Context) error {
+	slog.Debug("===", "ListVolumes() is called", "===")
+	return ctx.JSON(http.StatusNotImplemented, nil)
+}
+
+// ShowVolumeById implements api.ServerInterface.
+func (s *Server) ShowVolumeById(ctx echo.Context, volumeId string) error {
+	slog.Debug("===", "ShowVolumeById() is called", "===")
+	return ctx.JSON(http.StatusNotImplemented, nil)
+}
+
+// UpdateVolumeById implements api.ServerInterface.
+func (s *Server) UpdateVolumeById(ctx echo.Context, volumeId string) error {
+	slog.Debug("===", "UpdateVolumeById() is called", "===")
+	return ctx.JSON(http.StatusNotImplemented, nil)
 }

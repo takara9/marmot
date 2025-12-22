@@ -48,7 +48,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			// Setup slog
 			opts := &slog.HandlerOptions{
 				AddSource: true,
-				Level:     slog.LevelDebug,
+				//Level:     slog.LevelDebug,
 			}
 			logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
 			slog.SetDefault(logger)
@@ -142,7 +142,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		})
 
 		It("OSイメージのKey経由でのデータ取得チェック", func() {
-			key := db.OsImagePrefix + "/" + "ubuntu22.04"
+			key := db.OsTemplateImagePrefix + "/" + "ubuntu22.04"
 			osit, err := d1.GetOsImgTempByKey(key)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(osit.Key).To(Equal(key))
@@ -246,7 +246,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		})
 
 		It("OSイメージのKey経由でのデータ取得チェック", func() {
-			key := db.OsImagePrefix + "/" + "ubuntu22.04"
+			key := db.OsTemplateImagePrefix + "/" + "ubuntu22.04"
 			osit, err := d2.GetOsImgTempByKey(key)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(osit.Key).To(Equal(key))

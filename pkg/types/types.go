@@ -12,6 +12,7 @@ type OsImageTemplate struct {
 	VolumeGroup   string // lv01,lv02
 	OsVariant     string // OS variant name
 	Key           string // key for etcd access
+	Qcow2Path     string // qcow2イメージのパス
 }
 
 const (

@@ -1,6 +1,6 @@
 openapi: "3.0.3"
 info:
-  version: 0.0.2
+  version: 0.0.3
   title: REST API of Marmot Server
 servers:
   - url: http://0.0.0.0:{port}{basePath}
@@ -252,6 +252,99 @@ paths:
           schema:
             type: string
 
+  /volume:
+    post:
+      summary: "Create Volume"
+      operationId: createVolume
+      tags:
+        - storage
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/volume"
+      responses:
+        "200":
+          description: Created the Volume
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      summary: "List Volumes"
+      operationId: listVolumes
+      tags:
+        - storage
+      responses:
+        "200":
+          description: List of Volumes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/volume"
+  /volume/{volumeId}:
+    get:
+      summary: "Info for a specific volume"
+      operationId: showVolumeById
+      tags:
+        - storage
+      parameters:
+        - name: volumeId
+          in: path
+          required: true
+          description: The id of the volume to retrieve
+          schema:
+            type: string
+    put:
+      summary: "Update Volume"
+      operationId: updateVolumeById
+      tags:
+        - storage
+      parameters:
+        - name: volumeId
+          in: path
+          required: true
+          description: The id of the volume to update
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/volume"
+      responses:
+        "200":
+          description: Updated the Volume
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: "Delete Volume"
+      operationId: deleteVolumeById
+      tags:
+        - storage
+      parameters:
+        - name: volumeId
+          in: path
+          required: true
+          description: The id of the volume to delete
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted the Volume
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
   schemas:
     Pong:
@@ -489,3 +582,39 @@ components:
           example: "ok"
       required:
         - message
+    volume:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        kind:
+          type: string
+        key:
+          type: string
+        name:
+          type: string
+        size:
+          type: integer
+          format: int
+        path:
+          type: string
+        status:
+          type: integer
+          format: int32
+        cTime:
+          type: string
+          format: date-time
+        mTime:
+          type: string
+          format: date-time
+        osName:
+          type: string
+        osVersion:
+          type: string
+        comment:
+          type: string

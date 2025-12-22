@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/util"
 )
 
 var _ = Describe("Volumes", Ordered, func() {
@@ -22,7 +23,7 @@ var _ = Describe("Volumes", Ordered, func() {
 		// Setup slog
 		opts := &slog.HandlerOptions{
 			AddSource: true,
-			Level:     slog.LevelDebug,
+			//Level:     slog.LevelDebug,
 		}
 		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
 		slog.SetDefault(logger)
@@ -63,54 +64,76 @@ var _ = Describe("Volumes", Ordered, func() {
 	Describe("ボリューム管理テスト", func() {
 		var v *db.VolumeController
 		Context("基本アクセス", func() {
+			var key string
 			It("データボリュームコントローラの生成", func() {
 				v, err = db.NewVolumeController(url)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			It("データボリュームの作成 #1", func() {
-				id, err := v.CreateVolume("data01", "/var/lib/marmot/volumes/data01.qcow2", "qcow2", "data", 10)
+			It("ボリュームの作成 #1", func() {
+				key, err = v.CreateVolumeOnDB("data01", "/var/lib/marmot/volumes/data01.qcow2", "qcow2", "data", 10)
 				Expect(err).NotTo(HaveOccurred())
-				fmt.Println("Created data volume with ID:", id)
+				fmt.Println("Created data volume with ID:", key)
 			})
 
-			It("データボリュームの作成 #2", func() {
-				id, err := v.CreateVolume("data02", "/var/lib/marmot/volumes/data02.qcow2", "qcow2", "data", 10)
+			It("Keyからボリューム情報を取得", func() {
+				vol, err := v.GetVolumeByKey(key)
 				Expect(err).NotTo(HaveOccurred())
-				fmt.Println("Created data volume with ID:", id)
+				fmt.Printf("Retrieved volume: Id=%s Key=%s Name=%s Path=%s Size=%d Status=%v\n", vol.Id, *vol.Key, *vol.VolumeName, *vol.Path, *vol.Size, db.VolStatus[*vol.Status])
 			})
 
-			It("データボリュームの作成 #3", func() {
-				id, err := v.CreateVolume("data03", "/dev/mapper/vg2/datalv0100", "lvm", "data", 10)
+			It("ボリュームの状態更新 #1", func() {
+				vol := db.Volume{
+					Key:    &key,
+					Status: util.IntPtrInt(db.VOLUME_AVAILABLE),
+				}
+				err = v.UpdateVolume(key, vol)
 				Expect(err).NotTo(HaveOccurred())
-				fmt.Println("Created data volume with ID:", id)
 			})
 
-			It("データボリュームの一覧取得", func() {
+			It("Keyからボリューム情報を取得", func() {
+				vol, err := v.GetVolumeByKey(key)
+				Expect(err).NotTo(HaveOccurred())
+				fmt.Printf("Retrieved volume: Id=%s Key=%s Name=%s Path=%s Size=%d Status=%v\n", vol.Id, *vol.Key, *vol.VolumeName, *vol.Path, *vol.Size, db.VolStatus[*vol.Status])
+			})
+
+			It("ボリュームの作成 #2", func() {
+				key, err := v.CreateVolumeOnDB("data02", "/var/lib/marmot/volumes/data02.qcow2", "qcow2", "data", 10)
+				Expect(err).NotTo(HaveOccurred())
+				fmt.Println("Created data volume with ID:", key)
+			})
+
+			It("ボリュームの作成 #3", func() {
+				key, err := v.CreateVolumeOnDB("data03", "/dev/mapper/vg2/datalv0100", "lvm", "data", 10)
+				Expect(err).NotTo(HaveOccurred())
+				fmt.Println("Created data volume with ID:", key)
+			})
+
+			It("ボリュームの一覧取得", func() {
 				vols, err := v.ListVolumes("data")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(len(vols)).To(Equal(3))
 				fmt.Println("データボリューム一覧:")
 				for _, vol := range vols {
-					fmt.Printf("Id=%s Key=%s Name=%s Path=%s SizeGB=%d\n", vol.Id, vol.Key, vol.VolumeName, vol.Path, vol.SizeGB)
+					fmt.Printf("Id=%s Key=%s Name=%s Path=%s Size=%d Status=%v\n", vol.Id, *vol.Key, *vol.VolumeName, *vol.Path, *vol.Size, db.VolStatus[*vol.Status])
 				}
 			})
 
-			It("データボリュームの削除", func() {
+			It("ボリュームの削除", func() {
 				vols, err := v.FindVolumeByName("data01", "data")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(len(vols)).To(Equal(1))
-				err = v.DeleteVolume(vols[0].Key)
+				err = v.DeleteVolume(*vols[0].Key)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			It("データボリュームの一覧取得", func() {
+			It("ボリュームの一覧取得", func() {
 				vols, err := v.ListVolumes("data")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(len(vols)).To(Equal(2))
 				fmt.Println("データボリューム一覧:")
 				for _, vol := range vols {
-					fmt.Printf("Id=%s Key=%s Name=%s Path=%s SizeGB=%d\n", vol.Id, vol.Key, vol.VolumeName, vol.Path, vol.SizeGB)
+					fmt.Printf("Id=%s Key=%s Name=%s Path=%s Size=%d Status=%v\n", vol.Id, *vol.Key, *vol.VolumeName, *vol.Path, *vol.Size, db.VolStatus[*vol.Status])
 				}
 			})
 		})

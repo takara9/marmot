@@ -66,9 +66,8 @@ type ReplyMessage struct {
 
 // Version defines model for Version.
 type Version struct {
-	ClientVersion string `json:"clientVersion,omitempty"`
+	ClientVersion string  `json:"clientVersion"`
 	ServerVersion *string `json:"serverVersion,omitempty"`
-	//Version       string  `json:"version"`
 }
 
 // Storage defines model for storage.
@@ -133,6 +132,23 @@ type VmSpec struct {
 	Uuid          *string    `json:"uuid,omitempty"`
 }
 
+// Volume defines model for volume.
+type Volume struct {
+	CTime     *time.Time `json:"cTime,omitempty"`
+	Comment   *string    `json:"comment,omitempty"`
+	Id        string     `json:"id"`
+	Key       *string    `json:"key,omitempty"`
+	Kind      *string    `json:"kind,omitempty"`
+	MTime     *time.Time `json:"mTime,omitempty"`
+	Name      string     `json:"name"`
+	OsName    *string    `json:"osName,omitempty"`
+	OsVersion *string    `json:"osVersion,omitempty"`
+	Path      *string    `json:"path,omitempty"`
+	Size      *int       `json:"size,omitempty"`
+	Status    *int32     `json:"status,omitempty"`
+	Type      *string    `json:"type,omitempty"`
+}
+
 // ListHypervisorsParams defines parameters for ListHypervisors.
 type ListHypervisorsParams struct {
 	// Limit How many items to return at one time (max 100)
@@ -162,6 +178,12 @@ type StopClusterJSONRequestBody = MarmotConfig
 
 // StopVirtualMachineJSONRequestBody defines body for StopVirtualMachine for application/json ContentType.
 type StopVirtualMachineJSONRequestBody = VmSpec
+
+// CreateVolumeJSONRequestBody defines body for CreateVolume for application/json ContentType.
+type CreateVolumeJSONRequestBody = Volume
+
+// UpdateVolumeByIdJSONRequestBody defines body for UpdateVolumeById for application/json ContentType.
+type UpdateVolumeByIdJSONRequestBody = Volume
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -204,6 +226,21 @@ type ServerInterface interface {
 	// List Virtual Machines
 	// (GET /virtualMachines)
 	ListVirtualMachines(ctx echo.Context) error
+	// List Volumes
+	// (GET /volume)
+	ListVolumes(ctx echo.Context) error
+	// Create Volume
+	// (POST /volume)
+	CreateVolume(ctx echo.Context) error
+	// Delete Volume
+	// (DELETE /volume/{volumeId})
+	DeleteVolumeById(ctx echo.Context, volumeId string) error
+	// Info for a specific volume
+	// (GET /volume/{volumeId})
+	ShowVolumeById(ctx echo.Context, volumeId string) error
+	// Update Volume
+	// (PUT /volume/{volumeId})
+	UpdateVolumeById(ctx echo.Context, volumeId string) error
 }
 
 // ServerInterfaceWrapper converts echo contexts to parameters.
@@ -344,6 +381,72 @@ func (w *ServerInterfaceWrapper) ListVirtualMachines(ctx echo.Context) error {
 	return err
 }
 
+// ListVolumes converts echo context to params.
+func (w *ServerInterfaceWrapper) ListVolumes(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ListVolumes(ctx)
+	return err
+}
+
+// CreateVolume converts echo context to params.
+func (w *ServerInterfaceWrapper) CreateVolume(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.CreateVolume(ctx)
+	return err
+}
+
+// DeleteVolumeById converts echo context to params.
+func (w *ServerInterfaceWrapper) DeleteVolumeById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "volumeId" -------------
+	var volumeId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "volumeId", ctx.Param("volumeId"), &volumeId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter volumeId: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.DeleteVolumeById(ctx, volumeId)
+	return err
+}
+
+// ShowVolumeById converts echo context to params.
+func (w *ServerInterfaceWrapper) ShowVolumeById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "volumeId" -------------
+	var volumeId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "volumeId", ctx.Param("volumeId"), &volumeId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter volumeId: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ShowVolumeById(ctx, volumeId)
+	return err
+}
+
+// UpdateVolumeById converts echo context to params.
+func (w *ServerInterfaceWrapper) UpdateVolumeById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "volumeId" -------------
+	var volumeId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "volumeId", ctx.Param("volumeId"), &volumeId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter volumeId: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.UpdateVolumeById(ctx, volumeId)
+	return err
+}
+
 // This is a simple interface which specifies echo.Route addition functions which
 // are present on both echo.Echo and echo.Group, since we want to allow using
 // either of them for path registration
@@ -385,5 +488,10 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.POST(baseURL+"/stopVm", wrapper.StopVirtualMachine)
 	router.GET(baseURL+"/version", wrapper.GetVersion)
 	router.GET(baseURL+"/virtualMachines", wrapper.ListVirtualMachines)
+	router.GET(baseURL+"/volume", wrapper.ListVolumes)
+	router.POST(baseURL+"/volume", wrapper.CreateVolume)
+	router.DELETE(baseURL+"/volume/:volumeId", wrapper.DeleteVolumeById)
+	router.GET(baseURL+"/volume/:volumeId", wrapper.ShowVolumeById)
+	router.PUT(baseURL+"/volume/:volumeId", wrapper.UpdateVolumeById)
 
 }
