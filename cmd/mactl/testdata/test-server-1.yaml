@@ -1,0 +1,23 @@
+name: test-server-1
+cpu: 2
+memory: 2048
+osVariant: ubuntu22.04
+nic:
+  - name: "eth0"
+    network: "private-net"
+    ipAddress: "172.16.0.100"
+    macAddress: "52:54:00:ab:cd:ef"
+    comment: "private network interface"
+  - name: "eth1"
+    network: "public-net"
+    ipAddress: "192.168.1.90"
+    macAddress: "52:54:00:12:34:56"
+    comment: "public network interface"
+storage:
+  - name: "data-disk-1"
+    size: 1
+    comment: "data volume"
+  - name: "data-disk-2"
+    size: 1
+    comment: "backup volume"
+comment: "This is a test server configuration"

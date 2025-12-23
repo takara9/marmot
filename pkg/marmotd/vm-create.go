@@ -13,9 +13,6 @@ import (
 
 // VMを生成する
 func (m *Marmot) CreateVM(spec api.VmSpec) error {
-	//if DEBUG {
-	//	printVmSpecJson(spec)
-	//}
 	slog.Debug("=====", "CreateVM()", "=====")
 
 	var dom virt.Domain
@@ -62,7 +59,7 @@ func (m *Marmot) CreateVM(spec api.VmSpec) error {
 		slog.Error("util.CreateOsLv()", "err", err)
 		return err
 	}
-	slog.Debug("CreateOsLv()", "lv", "osLogicalVol")
+	slog.Debug("CreateOsLv()", "lv", osLogicalVol)
 
 	err = m.Db.UpdateOsLvByVmKey(*spec.Key, *spec.Ostempvg, osLogicalVol)
 	if err != nil {

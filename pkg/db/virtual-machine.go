@@ -16,35 +16,32 @@ import (
 )
 
 func (d *Database) GetVmByVmKey(vmKey string) (api.VirtualMachine, error) {
-	if len(vmKey) == 0 {
-		return api.VirtualMachine{}, errors.New("not found")
-	}
-
-	resp, err := d.Cli.Get(d.Ctx, vmKey)
-	if err != nil {
+	var vm api.VirtualMachine
+	if _, err := d.GetJSON(vmKey, &vm); err != nil {
 		return api.VirtualMachine{}, err
 	}
-	if resp.Count == 0 {
-		return api.VirtualMachine{}, errors.New("not found")
-	}
-
-	var vm api.VirtualMachine
-	err = json.Unmarshal([]byte(resp.Kvs[0].Value), &vm)
-	return vm, err
+	return vm, nil
 }
 
 // キーに一致したVM情報をetcdへ登録
 func (d *Database) PutVmByVmKey(vmKey string, vm api.VirtualMachine) error {
-	return d.PutDataEtcd(vmKey, vm)
+	//key := VmPrefix + "/" + vmKey // プレフィックスは付けない。既についているから
+	key := vmKey
+	lockKey := "/lock/hv/" + vmKey
+	mutex, err := d.LockKey(lockKey)
+	if err != nil {
+		slog.Error("failed to lock", "err", err, "key", lockKey)
+		return err
+	}
+	defer d.UnlockKey(mutex)
+	return d.PutJSON(key, vm)
 }
 
 // 仮想マシンのデータを取得
 func (d *Database) GetVmsStatuses(vms *[]api.VirtualMachine) error {
-	resp, err := d.GetEtcdByPrefix(VmPrefix)
+	resp, err := d.GetByPrefix(VmPrefix)
 	if err != nil {
 		return err
-	} else if resp.Count == 0 {
-		return nil
 	}
 	for _, ev := range resp.Kvs {
 		var vm api.VirtualMachine // ここに宣言することで、ループ毎に初期化される
@@ -63,13 +60,33 @@ func (d *Database) GetVmsStatuses(vms *[]api.VirtualMachine) error {
 // 仮想マシンの状態をプロビジョニング中にする
 func (d *Database) AssignHvforVm(vm api.VirtualMachine) (string, string, string, string, int32, error) {
 	slog.Debug("=== AssignHvforVm called ===", "start", vm)
-	var txId = uuid.New()
 
+	// ここにロックをかけるとデッドロックする可能性がある???
+	lockKey := "/lock/vm/" + vm.Name
+	mutex, err := d.LockKey(lockKey)
+	if err != nil {
+		slog.Error("failed to lock", "err", err, "key", lockKey)
+		return "", "", "", "", 0, err
+	}
+	defer d.UnlockKey(mutex)
+
+	var txId = uuid.New()
+	//=====================================
 	//トランザクション開始、他更新ロック 仮想マシンをデータベースに登録、状態は「データ登録中」
+
+	lockKey2 := "/lock/hv"
+	mutex2, err := d.LockKey(lockKey2)
+	if err != nil {
+		slog.Error("failed to lock", "err", err, "key", lockKey2)
+		return "", "", "", "", 0, err
+	}
+	defer d.UnlockKey(mutex2)
+
 	var hvs []api.Hypervisor
 	if err := d.GetHypervisors(&hvs); err != nil { // HVのステータス取得
 		return "", "", "", txId.String(), 0, err
 	}
+
 	slog.Debug("=== AssignHvforVm", "d.GetHypervisors()", hvs)
 
 	// フリーのCPU数の降順に並べ替える
@@ -109,11 +126,11 @@ func (d *Database) AssignHvforVm(vm api.VirtualMachine) (string, string, string,
 	}
 
 	// ハイパーバイザーのリソース削減保存
-	//etcdKey := HvPrefix + "/" + *hv.Key
-	if err := d.PutDataEtcd(*hv.Key, hv); err != nil {
+	if err := d.PutJSON(*hv.Key, hv); err != nil {
 		return "", "", "", txId.String(), 0, err
 	}
 	slog.Debug("=== d.PutDataEtcd", "hv.Key", *hv.Key)
+	//=====================================
 
 	// VM名登録　シリアル番号取得
 	seqNum, err := d.GetSeqByKind("VM")
@@ -127,12 +144,11 @@ func (d *Database) AssignHvforVm(vm api.VirtualMachine) (string, string, string,
 	vm.Uuid = util.StringPtr(txId.String())
 	vm.CTime = util.TimePtr(time.Now())
 	vm.STime = util.TimePtr(time.Now())
-	vm.Status = util.Int64PtrInt32(types.PROVISIONING)       // プロビジョニング中
-	if err := d.PutDataEtcd(*vm.Key, &vm); err != nil { // 仮想マシンのデータ登録
+	vm.Status = util.Int64PtrInt32(types.PROVISIONING) // プロビジョニング中
+	if err := d.PutJSON(*vm.Key, &vm); err != nil {    // 仮想マシンのデータ登録
 		slog.Debug("=== d.PutDataEtcd failed", "vm.Key", *vm.Key, "err", err)
 		return "", "", "", txId.String(), 0, err
 	}
-
 	slog.Debug("=== d.PutDataEtcd", "vm.Key", *vm.Key, "err", err)
 
 	return vm.HvNode, *vm.HvIpAddr, *vm.Key, txId.String(), *vm.HvPort, err
@@ -144,6 +160,6 @@ func (d *Database) UpdateVmStateByKey(vmKey string, state int) error {
 		return err
 	}
 	vm.Status = util.IntPtrInt32(state)
-	err = d.PutDataEtcd(vmKey, vm)
+	err = d.PutJSON(vmKey, vm)
 	return err
 }

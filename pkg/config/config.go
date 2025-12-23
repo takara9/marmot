@@ -8,7 +8,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func ReadConfig(fn string, yf interface{}) error {
+// YAML形式のコンフィグファイルを構造体に読み込む
+func ReadYamlConfig(fn string, yamlConfig interface{}) error {
 	file, err := os.Open(fn)
 	if err != nil {
 		return err
@@ -20,7 +21,7 @@ func ReadConfig(fn string, yf interface{}) error {
 		return err
 	}
 
-	err = yaml.Unmarshal(byteData, yf)
+	err = yaml.Unmarshal(byteData, yamlConfig)
 	if err != nil {
 		return err
 	}

@@ -19,16 +19,6 @@ var _ = Describe("Etcd", Ordered, func() {
 	var containerID string
 
 	BeforeAll(func(ctx SpecContext) {
-		/*
-			// Setup slog
-			opts := &slog.HandlerOptions{
-					AddSource: true,
-					Level:     slog.LevelDebug,
-				}
-			logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
-			slog.SetDefault(logger)
-		*/
-
 		// Dockerコンテナを起動
 		url = "http://127.0.0.1:4379"
 		cmd := exec.Command("docker", "run", "-d", "--name", "etcddb", "-p", "4379:2379", "-p", "4380:2380", "ghcr.io/takara9/etcd:3.6.5")
@@ -56,12 +46,6 @@ var _ = Describe("Etcd", Ordered, func() {
 			fmt.Printf("Failed to remove container: %v\n", err)
 		}
 	}, NodeTimeout(20*time.Second))
-
-	BeforeEach(func() {
-	})
-
-	AfterEach(func() {
-	})
 
 	Describe("Test etcd", func() {
 		Context("Test Connection to etcd", func() {
@@ -131,7 +115,7 @@ var _ = Describe("Etcd", Ordered, func() {
 			})
 
 			It("Delete version key", func() {
-				err := d.DelByKey("version")
+				err := d.DeleteJSON("version")
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
@@ -140,7 +124,7 @@ var _ = Describe("Etcd", Ordered, func() {
 			var IDX = "TST"
 
 			It("Delete seqno key", func() {
-				err := d.DelByKey(IDX)
+				err := d.DeleteJSON(IDX)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -190,7 +174,7 @@ var _ = Describe("Etcd", Ordered, func() {
 			})
 
 			It("Delete seqno key", func() {
-				err := d.DelByKey(IDX)
+				err := d.DeleteJSON(IDX)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
@@ -216,7 +200,7 @@ var _ = Describe("Etcd", Ordered, func() {
 
 		Context("Read a test hypervisor config file", func() {
 			It("Read existing file", func() {
-				err := cf.ReadConfig(hypervior_config, &cn)
+				err := cf.ReadYamlConfig(hypervior_config, &cn)
 				Expect(err).NotTo(HaveOccurred())
 				for i, h := range cn.Hvs {
 					GinkgoWriter.Println(i)
@@ -251,7 +235,7 @@ var _ = Describe("Etcd", Ordered, func() {
 		Context("Test of Hypervisor management : Set up", func() {
 
 			It("Read existing file", func() {
-				err := cf.ReadConfig(hypervior_config, &cnf)
+				err := cf.ReadYamlConfig(hypervior_config, &cnf)
 				Expect(err).NotTo(HaveOccurred())
 				for i, h := range cnf.Hvs {
 					GinkgoWriter.Println(i)

@@ -6,34 +6,11 @@ import (
 	"log/slog"
 
 	"github.com/google/uuid"
+	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/lvm"
 	"github.com/takara9/marmot/pkg/util"
 	etcd "go.etcd.io/etcd/client/v3"
 )
-
-/*
-ボリュームの管理用データ構造体
-対象は、OSイメージテンプレートとデータボリューム
-*/
-type VolumeController struct {
-	Database *Database
-	vol      []Volume
-}
-
-type Volume struct {
-	Kind          *string   // ボリュームの種類  os, data
-	Type          *string   // ボリュームのタイプ qcow2, lvm, raw
-	Id            uuid.UUID // UUID
-	Key           *string   // etcdに登録したキー
-	VolumeName    *string   // ボリューム名
-	VolumeGroup   *string   // ボリュームグループ (lvm形式の場合)
-	LogicalVolume *string   // 論理ボリューム名 (lvm形式の場合)
-	Size          *int      // サイズ(MB)
-	Path          *string   // ボリュームの保存パス
-	Status        *int      // 状態 (int: VOLUME_INUSE=1, VOLUME_AVAILABLE=2)
-	OsName        *string   // OS名 (osボリュームの場合)
-	OsVersion     *string   // OSバージョン (osボリュームの場合)
-}
 
 const (
 	VOLUME_PROVISIONING = 0 // プロビジョニング中
@@ -47,240 +24,172 @@ var VolStatus = map[int]string{
 	2: "AVAILABLE",
 }
 
-// ボリュームコントローラの生成
-func NewVolumeController(url string) (*VolumeController, error) {
-	var vc VolumeController
-	var err error
-
-	// データベース接続の生成
-	vc.Database, err = NewDatabase(url)
-	if err != nil {
-		slog.Error("failed to create database", "err", err)
-		return nil, err
-	}
-	return &vc, nil
-}
-
-func (vc *VolumeController) Close() error {
-	return vc.Database.Close()
-}
-
 // 仮想マシンを生成する時にボリュームを生成して、アタッチする
-
 // OS or DATA ボリュームの作成
-func (vc *VolumeController) CreateVolumeOnDB(volName, volPath, volType, volKind string, volSize int) (string, error) {
+func (d *Database) CreateVolumeOnDB(volName, volPath, volType, volKind string, volSize int) (*api.Volume, error) {
 	slog.Debug("CreateVolume()", "volName", volName, "volPath", volPath, "volType", volType, "volKind", volKind, "volSize", volSize)
-	var vol Volume
+	var vol api.Volume
 
-	// パラメータチェック
-	//if volName == "" || volPath == "" || volType == "" || volKind == "" || volSize <= 0 {
-	//	return "", fmt.Errorf("invalid parameters")
-	//}
-
-	// ボリューム情報の生成
-	vol.Id = uuid.New()
-
-	switch volKind {
-	case "data":
-		vol.Key = util.StringPtr(VolumePrefix + "/" + vol.Id.String())
-	case "os":
-		vol.Key = util.StringPtr(OsImagePrefix + "/" + vol.Id.String())
-	default:
-		return "", fmt.Errorf("unknown volume kind: %s", volKind)
+	lockKey := "/lock/volume/" + volName
+	mutex, err := d.LockKey(lockKey)
+	if err != nil {
+		slog.Error("failed to lock", "err", err, "key", lockKey)
+		return &vol, err
 	}
+	defer d.UnlockKey(mutex)
+
+	vol.Id = uuid.New().String()
+	key := VolumePrefix + "/" + vol.Id // DATAボリューム
+	vol.Key = util.StringPtr(key)
 	vol.Kind = util.StringPtr(volKind)
 	vol.Type = util.StringPtr(volType)
 	vol.Status = util.IntPtrInt(VOLUME_PROVISIONING)
-	vol.VolumeName = util.StringPtr(volName)
+	vol.Name = util.StringPtr(volName)
 	vol.Path = util.StringPtr(volPath)
 	vol.Size = util.IntPtrInt(volSize)
-	// データベースに登録
-	err := vc.Database.PutDataEtcd(*vol.Key, vol)
-	if err != nil {
-		slog.Error("PutDataEtcd() failed", "err", err, "key", *vol.Key)
-		return "", err
+
+	if err := d.PutJSON(key, vol); err != nil {
+		slog.Error("failed to write database data", "err", err, "key", *vol.Key)
+		return nil, err
 	}
-	vc.vol = append(vc.vol, vol) //なんのため？要らんのでは？
-	return *vol.Key, nil
+	return &vol, nil
 }
 
-func (vc *VolumeController) RollbackVolumeCreation(volKey string) {
-	slog.Debug("Rolling back volume creation", "volKey", volKey)
-	if err := vc.DeleteVolume(volKey); err != nil {
-		slog.Error("failed to rollback volume creation", "err", err, "volKey", volKey)
+// ボリューム作成のロールバック
+func (d *Database) RollbackVolumeCreation(id string) {
+	slog.Debug("Rolling back volume creation", "id", id)
+
+	lockKey := "/lock/volume/" + id
+	mutex, err := d.LockKey(lockKey)
+	if err != nil {
+		slog.Error("failed to lock", "err", err, "key", lockKey)
+		return
+	}
+	defer d.UnlockKey(mutex)
+
+	key := VolumePrefix + "/" + id
+	if err := d.DeleteVolume(key); err != nil {
+		slog.Error("failed to rollback volume creation", "err", err, "volKey", id)
 	}
 }
 
-// ボリュームの情報更新
-func (vc *VolumeController) UpdateVolume(key string, vol Volume) error {
-	vc.Database.Lock.Lock()
-	defer vc.Database.Lock.Unlock()
-
-	//if vol.Key == nil {
-	//	return fmt.Errorf("volume key is nil")
-	//}
-
-	resp, err := vc.Database.GetByKey(key)
+// ボリュームの情報更新 CASを持ちるべき？
+func (d *Database) UpdateVolume(id string, updateData api.Volume) error {
+	lockKey := "/lock/volume/" + id
+	mutex, err := d.LockKey(lockKey)
 	if err != nil {
-		slog.Error("GetByKey() failed", "err", err, "key", key)
+		slog.Error("failed to lock", "err", err, "lockkey", lockKey)
 		return err
 	}
+	defer d.UnlockKey(mutex)
 
-	var updateVol Volume
-	err = json.Unmarshal([]byte(resp), &updateVol)
-	if err != nil {
-		slog.Error("Unmarshal() failed", "err", err, "key", key)
+	var rec api.Volume
+	key := VolumePrefix + "/" + id
+	if _, err := d.GetJSON(key, &rec); err != nil {
+		slog.Error("GetJSON() failed", "err", err, "key", key)
 		return err
 	}
 
 	// 更新フィールドの反映
-	util.Assign(&updateVol.VolumeName, vol.VolumeName)
-	util.Assign(&updateVol.Path, vol.Path)
-	util.Assign(&updateVol.Type, vol.Type)
-	util.Assign(&updateVol.Kind, vol.Kind)
-	util.Assign(&updateVol.Size, vol.Size)
-	util.Assign(&updateVol.Status, vol.Status)
-	util.Assign(&updateVol.VolumeGroup, vol.VolumeGroup)
-	util.Assign(&updateVol.LogicalVolume, vol.LogicalVolume)
-	util.Assign(&updateVol.OsName, vol.OsName)
-	util.Assign(&updateVol.OsVersion, vol.OsVersion)
+	util.Assign(&rec.Name, updateData.Name)
+	util.Assign(&rec.Path, updateData.Path)
+	util.Assign(&rec.Type, updateData.Type)
+	util.Assign(&rec.Kind, updateData.Kind)
+	util.Assign(&rec.Size, updateData.Size)
+	util.Assign(&rec.Status, updateData.Status)
+	util.Assign(&rec.VolumeGroup, updateData.VolumeGroup)
+	util.Assign(&rec.LogicalVolume, updateData.LogicalVolume)
+	util.Assign(&rec.OsName, updateData.OsName)
+	util.Assign(&rec.OsVersion, updateData.OsVersion)
 
 	// データベースに更新
-	return vc.Database.PutDataEtcd(key, updateVol)
+	return d.PutJSON(key, rec)
 }
 
 // データボリュームの削除
-func (vc *VolumeController) DeleteVolume(key string) error {
-	return vc.Database.DelByKey(key)
+func (d *Database) DeleteVolume(id string) error {
+	lockKey := "/lock/volume/" + id
+	mutex, err := d.LockKey(lockKey)
+	if err != nil {
+		slog.Error("failed to lock", "err", err, "lockkey", lockKey)
+		return err
+	}
+	defer d.UnlockKey(mutex)
+	key := VolumePrefix + "/" + id
+	return d.DeleteJSON(key)
 }
 
 // データボリュームの一覧取得
-func (vc *VolumeController) ListVolumes(kind string) ([]Volume, error) {
-	var volumes []Volume
+func (d *Database) ListVolumes(kind string) ([]api.Volume, error) {
+	var volumes []api.Volume
 	var err error
 	var resp *etcd.GetResponse
 
-	switch kind {
-	case "data":
-		resp, err = vc.Database.GetEtcdByPrefix(VolumePrefix + "/")
-	case "os":
-		resp, err = vc.Database.GetEtcdByPrefix(OsImagePrefix + "/")
-	default:
-		return nil, fmt.Errorf("unknown volume kind: %s", kind)
-	}
-
-	if err != nil {
-		slog.Error("GetEtcdByPrefix() failed", "err", err, "key", VolumePrefix+"/")
+	prefix := VolumePrefix
+	resp, err = d.GetByPrefix(prefix)
+	if err == ErrNotFound {
+		slog.Debug("no volumes found", "key-prefix", prefix)
+		return volumes, nil
+	} else if err != nil {
+		slog.Error("GetByPrefix() failed", "err", err, "key-prefix", prefix)
 		return volumes, err
 	}
 	for _, kv := range resp.Kvs {
-		var vol Volume
+		var vol api.Volume
 		err := json.Unmarshal([]byte(kv.Value), &vol)
 		if err != nil {
 			slog.Error("Unmarshal() failed", "err", err, "key", string(kv.Key))
 			continue
 		}
-		volumes = append(volumes, vol)
+		if *vol.Kind == kind {
+			volumes = append(volumes, vol)
+		}
 	}
 
 	return volumes, nil
 }
 
 // データボリュームの情報取得
-func (vc *VolumeController) GetVolumeByKey(key string) (Volume, error) {
-	var vol Volume
-	resp, err := vc.Database.GetByKey(key)
-	if err != nil {
-		slog.Error("GetEtcdByKey() failed", "err", err, "key", key)
-		return vol, err
-	}
-	if len(resp) == 0 {
-		slog.Error("GetEtcdByKey() returned empty response", "key", key)
-		return vol, fmt.Errorf("volume not found for key: %s", key)
-	}
-
-	err = json.Unmarshal([]byte(resp), &vol)
-	if err != nil {
-		slog.Error("Unmarshal() failed", "err", err, "key", key)
+func (d *Database) GetVolumeById(id string) (api.Volume, error) {
+	var vol api.Volume
+	key := VolumePrefix + "/" + id
+	slog.Debug("volume data", "key", key, "id", id)
+	if _, err := d.GetJSON(key, &vol); err != nil {
+		slog.Error("failed to get volume data", "err", err, "key", key, "id", id)
 		return vol, err
 	}
 	return vol, nil
 }
 
 // データボリュームの一覧取得
-func (vc *VolumeController) FindVolumeByName(name, kind string) ([]Volume, error) {
-	var volumes []Volume
-	var key string
-
-	switch kind {
-	case "data":
-		key = VolumePrefix + "/"
-	case "os":
-		key = OsImagePrefix + "/"
-	default:
-		return nil, fmt.Errorf("unknown volume kind: %s", kind)
-	}
-
-	resp, err := vc.Database.GetEtcdByPrefix(key)
+func (d *Database) FindVolumeByName(name, kind string) ([]api.Volume, error) {
+	var volumes []api.Volume
+	prefix := VolumePrefix + "/"
+	resp, err := d.GetByPrefix(prefix)
 	if err != nil {
-		slog.Error("GetEtcdByPrefix() failed", "err", err, "key", key)
+		slog.Error("GetEtcdByPrefix() failed", "err", err, "key-prefix", prefix)
 		return volumes, err
 	}
 
 	for _, kv := range resp.Kvs {
-		var vol Volume
+		var vol api.Volume
 		err := json.Unmarshal([]byte(kv.Value), &vol)
 		if err != nil {
 			slog.Error("Unmarshal() failed", "err", err, "key", string(kv.Key))
 			continue
 		}
-		if *vol.VolumeName != name {
-			continue
+		if *vol.Name == name && *vol.Kind == kind {
+			volumes = append(volumes, vol)
 		}
-		volumes = append(volumes, vol)
 	}
 
 	return volumes, nil
 }
 
-// OSボリュームの作成
-/*
-func (vc *VolumeController) CreateOSVolume(volName, path, volType string, sizeGB int, osName, osVersion string) (string, error) {
-	if osName == "" || osVersion == "" {
-		return "", fmt.Errorf("invalid parameters")
-	}
-
-	key, err := vc.CreateVolume(volName, path, volType, "os", sizeGB)
-	if err != nil {
-		return "", err
-	}
-	vol, err := vc.GetVolumeByKey(key)
-	if err != nil {
-		return "", err
-	}
-
-	vol.OsName = &osName
-	vol.OsVersion = &osVersion
-
-	vc.Database.Lock.Lock()
-	defer vc.Database.Lock.Unlock()
-	if err := vc.Database.PutDataEtcd(*vol.Key, vol); err != nil {
-		return "", err
-	}
-
-	return key, nil
-}
-*/
-
-/*
-	TODO: データベースの操作とボリュームの実体作成を行う関数群を分割する
-*/
-//
 // OSテンプVolのスナップショットを作成してデバイス名を返す
 // この関数が呼ばれているのは、以下の一箇所のみ
 // https://github.com/takara9/marmot/blob/main/pkg/marmotd/vm-create.go#L60
 func (d *Database) CreateOsLv(tempVg string, tempLv string) (string, error) {
-	// シリアルを取得
 	seq, err := d.GetSeqByKind("LVOS")
 	if err != nil {
 		return "", err
@@ -300,7 +209,6 @@ func (d *Database) CreateOsLv(tempVg string, tempLv string) (string, error) {
 // この関数が呼ばれているのは、以下の一箇所のみ
 // https://github.com/takara9/marmot/blob/main/pkg/marmotd/vm-create.go#L97
 func (d *Database) CreateDataLv(sz uint64, vg string) (string, error) {
-	// シリアルを取得
 	seq, err := d.GetSeqByKind("LVDATA")
 	if err != nil {
 		return "", err

@@ -7,12 +7,14 @@ import (
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/client"
+	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/types"
 )
 
 func int32Ptr(i int32) *int32 { j := int32(i); return &j }
 
 // コンフィグからVMクラスタを作成する  新APIを使用
+// 非推奨
 func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 	//if DEBUG {
 	//	printConfigJson(cnf)
@@ -39,35 +41,29 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		if spec.Name == nil {
 			return errors.New("VM Name is not set")
 		}
-		vmKey, err := m.Db.FindByHostAndClusteName(*spec.Name, *cnf.ClusterName)
-		if len(vmKey) > 0 {
-			slog.Debug("重複ホスト名のチェック NG", "err", err, "hostname", *spec.Name, "clustername", *cnf.ClusterName)
-			return fmt.Errorf("existing same name virttual machine : %v, vmkey = %v", *spec.Name, vmKey)
+		_, err := m.Db.FindByHostAndClusteName(*spec.Name, *cnf.ClusterName)
+		if err == db.ErrNotFound {
+			slog.Debug("not found the host on the cluster", "host", *spec.Name, "cluster", *cnf.ClusterName)
+		} else if err == db.ErrFound {
+			return fmt.Errorf("the host name '%s' is already used on the cluster '%s'", *spec.Name, *cnf.ClusterName)
+		} else if err != nil {
+			return err
 		}
-		slog.Debug("CreateClusterInternal", "同一クラスにホスト名重複のチェック", "PASS")
 
 		// パブリックIPアドレスの重複チェックを入れる
 		if spec.PublicIp != nil {
-			found, err := m.Db.FindByPublicIPaddress(*spec.PublicIp)
-			if err != nil {
-				return err
+			if err := m.Db.FindByPublicIPaddress(*spec.PublicIp); err == db.ErrNotFound {
+				slog.Debug("CreateClusterInternal", "パブリックIPアドレスの重複のチェック", "PASS")
+				continue
 			}
-			if found {
-				return fmt.Errorf("same pubic IP address exist in the cluster IP: %v", *spec.PublicIp)
-			}
-			slog.Debug("CreateClusterInternal", "パブリックIPアドレスの重複のチェック", "PASS")
 		}
 
 		// プライベートIPアドレスの重複チェックを入れる
 		if spec.PrivateIp != nil {
-			found, err := m.Db.FindByPrivateIPaddress(*spec.PrivateIp)
-			if err != nil {
-				return err
+			if err := m.Db.FindByPrivateIPaddress(*spec.PrivateIp); err == db.ErrNotFound {
+				slog.Debug("CreateClusterInternal", "プライベートIPアドレスの重複のチェック", "PASS")
+				continue
 			}
-			if found {
-				return fmt.Errorf("same private IP address exist in the cluster IP: %v", *spec.PrivateIp)
-			}
-			slog.Debug("CreateClusterInternal", "プライベートIPアドレスの重複のチェック", "PASS")
 		}
 	} // END OF LOOP
 	slog.Debug("CreateClusterInternal", "コンディションのチェック", "終了")

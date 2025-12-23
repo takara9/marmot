@@ -1,6 +1,6 @@
 openapi: "3.0.3"
 info:
-  version: 0.0.3
+  version: 0.0.5
   title: REST API of Marmot Server
 servers:
   - url: http://0.0.0.0:{port}{basePath}
@@ -251,7 +251,6 @@ paths:
           description: The id of the pet to retrieve
           schema:
             type: string
-
   /volume:
     post:
       summary: "Create Volume"
@@ -262,7 +261,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/volume"
+              $ref: "#/components/schemas/Volume"
       responses:
         "200":
           description: Created the Volume
@@ -283,7 +282,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/volume"
+                $ref: "#/components/schemas/Volume"
   /volume/{volumeId}:
     get:
       summary: "Info for a specific volume"
@@ -313,7 +312,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/volume"
+              $ref: "#/components/schemas/Volume"
       responses:
         "200":
           description: Updated the Volume
@@ -344,6 +343,139 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /server:
+    post:
+      summary: "Create Virtual Server"
+      description: |
+        Create a new virtual server. The virtual server specifications are specified in the request body.
+        If the virtual server is successfully created, the information of the created virtual server is returned in the response.
+        The virtual server is then automatically started.
+        The virtual server specifications include CPU, memory, storage, network settings, and more.
+        If an error occurs during virtual server creation, an appropriate error message is returned.
+      operationId: createServer
+      tags:
+        - server
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Server"
+      responses:
+        "201":
+          description: "Successfully created and started the virtual server."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Success"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      summary: "Get Server Information"
+      description: |
+        Retrieve information about existing virtual servers. A list of virtual servers is returned in the response.
+        Each virtual server's information includes server ID, status, resource usage, and more.
+        If no virtual servers exist or an error occurs while retrieving information, an appropriate error message is returned.
+      operationId: getServers
+      tags:
+        - server
+      responses:
+        "200":
+          description: "Successfully retrieved the list of servers."
+          content:
+            application/json:
+              schema:
+                  $ref: "#/components/schemas/Servers"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /server/{id}:
+      get:
+        summary: "Get particular server Information"
+        operationId: getServerById
+        tags:
+          - server
+        parameters:
+          - name: id
+            in: path
+            required: true
+            description: The ID identifies the server.
+            schema:
+              type: string
+        responses:
+          "200":
+            description: "Successfully retrieved the server information."
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Server"
+          default:
+            description: "An error occurred."
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Error"
+      put:
+        summary: "Update Server Information by Id"
+        operationId: updateServerById
+        tags:
+          - server
+        parameters:
+          - name: id
+            in: path
+            required: true
+            description: The id of the server to update
+            schema:
+              type: string
+        requestBody:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Server"
+        responses:
+          "200":
+            description: Updated the Server
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Success"
+          default:
+            description: unexpected error
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Error"
+      delete:
+        summary: "Delete Server"
+        operationId: deleteServerById
+        tags:
+          - server
+        parameters:
+          - name: id
+            in: path
+            required: true
+            description: The id of the server to delete
+            schema:
+              type: string
+        responses:
+          "200":
+            description: Deleted the Server
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Success"
+          default:
+            description: unexpected error
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Error"
 
 components:
   schemas:
@@ -582,11 +714,10 @@ components:
           example: "ok"
       required:
         - message
-    volume:
+    Volume:
       type: object
       required:
         - id
-        - name
       properties:
         id:
           type: string
@@ -598,6 +729,10 @@ components:
           type: string
         name:
           type: string
+        volumeGroup:
+          type: string
+        logicalVolume:
+          type: string
         size:
           type: integer
           format: int
@@ -605,7 +740,7 @@ components:
           type: string
         status:
           type: integer
-          format: int32
+          format: int
         cTime:
           type: string
           format: date-time
@@ -617,4 +752,74 @@ components:
         osVersion:
           type: string
         comment:
+          type: string
+
+    Success:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        message:
+          type: string
+
+    Servers:
+      type: array
+      maxItems: 100
+      items:
+        $ref: "#/components/schemas/Server"
+    Server:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        clusterName:
+          type: string
+        key:
+          type: string
+        HvNode:
+          type: string
+        HvIpAddr:
+          type: string
+        HvPort:
+          type: integer
+          format: int
+        cTime:
+          type: string
+          format: date-time
+        sTime:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          format: int
+        cpu:
+          type: integer
+          format: int
+        memory:
+          type: integer
+          format: int
+        privateIp:
+          type: string
+        publicIp:
+          type: string
+        storage:
+          type: array
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/Volume"
+        playbook:
+          type: string
+        comment:
+          type: string
+        osLv:
+          type: string
+        osVg:
+          type: string
+        osVariant:
           type: string

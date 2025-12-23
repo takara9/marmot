@@ -13,12 +13,6 @@ var destroyCmd = &cobra.Command{
 	Long: `管理下のハイパーバイザー上の仮想マシンのシャットダウンと定義の削除を実施します。
 	デフォルトで 仮想マシンのスペック等が記述されたカレントディレクトリの cluster-config.yaml を使用します。`,
 	Run: func(cmd *cobra.Command, args []string) {
-		m, err := getClientConfig()
-		if err != nil {
-			slog.Error("faild reading mactl config file", "err", err.Error())
-			return
-		}
-
 		clusterConfig, err := config.ReadYamlClusterConfig(clusterConfigFilename)
 		if err != nil {
 			slog.Error("failed reading cluster-config file", "err", err.Error())

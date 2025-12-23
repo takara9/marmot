@@ -13,12 +13,6 @@ var stopCmd = &cobra.Command{
 	Long: `管理下の仮想マシンをシャットダウンして、CPUとメモリ資源を開放しますが、仮想マシンの定義は存続し、startコマンドで再開できます。
 	デフォルトで 仮想マシンのスペック等が記述されたカレントディレクトリの cluster-config.yaml を使用します。`,
 	Run: func(cmd *cobra.Command, args []string) {
-		m, err := getClientConfig()
-		if err != nil {
-			slog.Error("faild reading mactl config file", "err", err.Error())
-			return
-		}
-
 		clusterConfig, err := config.ReadYamlClusterConfig(clusterConfigFilename)
 		if err != nil {
 			slog.Error("failed reading cluster-config file", "err", err.Error())

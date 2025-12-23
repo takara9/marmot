@@ -1,96 +1,58 @@
 package marmotd_test
 
 import (
+	"context"
 	"fmt"
-	"log/slog"
 	"os"
 	"os/exec"
 	"time"
 
-	"github.com/labstack/echo/v4"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
 )
 
-const (
-	etcdctl_exe = "/usr/bin/etcdctl"
-)
+var _ = Describe("関数テスト", Ordered, func() {
+	const (
+		marmotPort = 8090
+		etcdPort   = 5379
+		etcdctlExe = "/usr/bin/etcdctl"
+		nodeName   = "hvc"
+		etcdImage  = "ghcr.io/takara9/etcd:3.6.5"
+		etcdContainerName = "etcd-func"
+	)
+	var (
+		containerID  string
+		ctx          context.Context
+		cancel       context.CancelFunc
+		marmotServer *marmotd.Server
+	)
+	etcdUrl := "http://127.0.0.1:" + fmt.Sprintf("%d", etcdPort)
 
-var etcdUrlTest string = "http://127.0.0.1:5379"
-var etcdTest *string = &etcdUrlTest
-var nodeName string = "hvc"
-var nodeNamePtr *string = &nodeName
-var etcdEpTest *db.Database
-var etcdContainerIdFunc string
+	BeforeAll(func(ctx0 SpecContext) {
+	})
+	AfterAll(func(ctx0 SpecContext) {
+		marmotd.CleanupTestEnvironment()
+	})
 
-func prepareMockVmfunc() {
-	fmt.Println("モックサーバーの起動")
+	Context("テスト環境初期化", func() {
+		It("モックサーバー用etcdの起動", func() {
+			cmd := exec.Command("docker", "run", "-d", "--name", etcdContainerName, "-p", fmt.Sprintf("%d", etcdPort)+":2379", "-p", fmt.Sprintf("%d", etcdPort+1)+":2380", "--rm", etcdImage)
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				Fail(fmt.Sprintf("Failed to start container: %s, %v", string(output), err))
+			}
+			containerID = string(output[:12]) // 最初の12文字をIDとして取得
+			fmt.Printf("Container started with ID: %s\n", containerID)
+			time.Sleep(10 * time.Second) // コンテナが起動するまで待機
+		})
 
-	e := echo.New()
-	server := marmotd.NewServer("hvc", etcdUrlTest)
-	go func() {
-		// Setup slog
-		opts := &slog.HandlerOptions{
-			AddSource: true,
-			Level:     slog.LevelDebug,
-		}
-		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
-		slog.SetDefault(logger)
-
-		api.RegisterHandlersWithBaseURL(e, server, "/api/v1")
-		fmt.Println(e.Start("127.0.0.1:8090"), "Mock server is running")
-	}()
-
-	// Dockerコンテナを起動
-	cmd := exec.Command("docker", "run", "-d", "--name", "etcdmarmot", "-p", "5379:2379", "-p", "5380:2380", "ghcr.io/takara9/etcd:3.6.5")
-	output, err := cmd.CombinedOutput()
-	Expect(err).NotTo(HaveOccurred())
-	etcdContainerIdFunc = string(output[:12]) // 最初の12文字をIDとして取得
-	fmt.Printf("Container started with ID: %s\n", etcdContainerIdFunc)
-	time.Sleep(10 * time.Second) // コンテナが起動するまで待機
-}
-
-func cleanupMockVmfunc() {
-	fmt.Println("モックサーバーの終了")
-	// Dockerコンテナを停止・削除
-	cmd := exec.Command("docker", "stop", etcdContainerIdFunc)
-	_, err := cmd.CombinedOutput()
-	if err != nil {
-		fmt.Printf("Failed to stop container: %v\n", err)
-	}
-	cmd = exec.Command("docker", "rm", etcdContainerIdFunc)
-	_, err = cmd.CombinedOutput()
-	if err != nil {
-		fmt.Printf("Failed to remove container: %v\n", err)
-	}
-	cmd = exec.Command("lvremove vg1/oslv0900 -y")
-	cmd.CombinedOutput()
-	cmd = exec.Command("lvremove vg1/oslv0901 -y")
-	cmd.CombinedOutput()
-	cmd = exec.Command("lvremove vg1/oslv0902 -y")
-	cmd.CombinedOutput()
-
-	cmd = exec.Command("lvremove vg2/data0900 -y")
-	cmd.CombinedOutput()
-	cmd = exec.Command("lvremove vg2/data0901 -y")
-	cmd.CombinedOutput()
-	cmd = exec.Command("lvremove vg2/data0902 -y")
-	cmd.CombinedOutput()
-	cmd = exec.Command("lvremove vg2/data0903 -y")
-	cmd.CombinedOutput()
-}
-
-func testMarmotFuncs() {
-	Context("Data management", func() {
-		It("Set up databae ", func() {
-			var err error
-			etcdEpTest, err = db.NewDatabase(etcdUrlTest)
-			Expect(err).NotTo(HaveOccurred())
+		It("モックサーバーの起動", func() {
+			ctx, cancel = context.WithCancel(context.Background())
+			marmotServer = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
 		})
 
 		var hvs config.Hypervisors_yaml
@@ -101,21 +63,21 @@ func testMarmotFuncs() {
 
 		It("ハイパーバイザーの情報セット", func() {
 			for _, hv := range hvs.Hvs {
-				err := etcdEpTest.SetHypervisors(hv)
+				err := marmotServer.Ma.Db.SetHypervisors(hv)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
 
 		It("OSイメージテンプレート", func() {
 			for _, hd := range hvs.Imgs {
-				err := etcdEpTest.SetImageTemplate(hd)
+				err := marmotServer.Ma.Db.SetImageTemplate(hd)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
 
 		It("シーケンス番号のセット", func() {
 			for _, sq := range hvs.Seq {
-				err := etcdEpTest.CreateSeq(sq.Key, sq.Start, sq.Step)
+				err := marmotServer.Ma.Db.CreateSeq(sq.Key, sq.Start, sq.Step)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
@@ -123,7 +85,7 @@ func testMarmotFuncs() {
 		It("Check up Marmot daemon", func() {
 			By("Trying to connect to marmot")
 			Eventually(func(g Gomega) {
-				cmd := exec.Command("curl", "http://localhost:8090/ping")
+				cmd := exec.Command("curl", etcdUrl+"/ping")
 				err := cmd.Run()
 				GinkgoWriter.Println(cmd, "err= ", err)
 				g.Expect(err).NotTo(HaveOccurred())
@@ -131,8 +93,7 @@ func testMarmotFuncs() {
 		})
 
 		It("Check Hypervisors data", func() {
-			GinkgoWriter.Println(*nodeNamePtr)
-			hv, err := etcdEpTest.CheckHypervisors(*etcdTest, *nodeNamePtr)
+			hv, err := marmotServer.Ma.Db.CheckHypervisors(etcdUrl, nodeName)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("xxxxxx array size == ", len(hv))
 			for i, v := range hv {
@@ -145,8 +106,8 @@ func testMarmotFuncs() {
 			}
 		})
 
-		It("Check the config file to directly etcd", func() {
-			cmd := exec.Command(etcdctl_exe, "--endpoints=localhost:5379", "get", "hvc")
+		It("etcdへのダイレクトアクセス", func() {
+			cmd := exec.Command(etcdctlExe, "--endpoints=localhost:"+fmt.Sprintf("%d", etcdPort), "get", "hvc")
 			cmd.Env = append(os.Environ(), "ETCDCTL_API=3")
 			out, err := cmd.CombinedOutput()
 			GinkgoWriter.Println(out)
@@ -161,7 +122,7 @@ func testMarmotFuncs() {
 
 		It("Create Marmot Instance", func() {
 			var err error
-			m, err = marmotd.NewMarmot(*nodeNamePtr, *etcdTest)
+			m, err = marmotd.NewMarmot(nodeName, etcdUrl)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -169,11 +130,10 @@ func testMarmotFuncs() {
 			By("Loading cluster config")
 			cnf, err = config.ReadYamlClusterConfig("testdata/cluster-config.yaml")
 			Expect(err).NotTo(HaveOccurred())
-			//marmotd.PrintMarmotConfig(*cnf)
 		})
 
 		It("Create Cluster", func() {
-			err = m.CreateClusterInternal(*cnf) // VMがDBに登録されていない？
+			err = m.CreateClusterInternal(*cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -189,7 +149,7 @@ func testMarmotFuncs() {
 		var err error
 
 		It("Create Marmot Instance", func() {
-			m, err = marmotd.NewMarmot(*nodeNamePtr, *etcdTest)
+			m, err = marmotd.NewMarmot(nodeName, etcdUrl)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -208,15 +168,14 @@ func testMarmotFuncs() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("Start Cluster", func() {
+		It("Destroy Cluster", func() {
 			err = m.DestroyClusterInternal(*cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("Destroy Cluster()", func() {
-			By("Destroying cluster")
+		It("Destroy Cluster again", func() {
 			err = m.DestroyClusterInternal(*cnf)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
@@ -226,7 +185,7 @@ func testMarmotFuncs() {
 		var err error
 
 		It("Create Marmot Instance", func() {
-			m, err = marmotd.NewMarmot(*nodeNamePtr, *etcdTest)
+			m, err = marmotd.NewMarmot(nodeName, etcdUrl)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -245,14 +204,25 @@ func testMarmotFuncs() {
 			Expect(err).To(HaveOccurred())
 		})
 
-		It("Start Cluster", func() {
-			err = m.DestroyClusterInternal(*cnf)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
 		It("Destroy Cluster()", func() {
 			err = m.DestroyClusterInternal(*cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
-}
+
+	Context("停止", func() {
+		It("コンテナとモック", func() {
+			cmd := exec.Command("docker", "kill", containerID)
+			_, err := cmd.CombinedOutput()
+			if err != nil {
+				fmt.Printf("Failed to stop container: %v\n", err)
+			}
+			cmd = exec.Command("docker", "rm", containerID)
+			_, err = cmd.CombinedOutput()
+			if err != nil {
+				fmt.Printf("Failed to remove container: %v\n", err)
+			}
+			cancel() // モックサーバー停止
+		})
+	})
+})
