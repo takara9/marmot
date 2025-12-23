@@ -16,7 +16,9 @@ import (
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/client"
 	"github.com/takara9/marmot/pkg/config"
+	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
+	"github.com/takara9/marmot/pkg/util"
 )
 
 // var err error
@@ -43,7 +45,7 @@ func prepareMockServers() {
 		// Setup slog
 		opts := &slog.HandlerOptions{
 			AddSource: true,
-			//Level:     slog.LevelDebug,
+			Level:     slog.LevelDebug,
 		}
 		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
 		slog.SetDefault(logger)
@@ -61,6 +63,23 @@ func cleanupMockServers() {
 	cmd = exec.Command("docker", "rm", containerID)
 	_, err = cmd.CombinedOutput()
 	Expect(err).NotTo(HaveOccurred())
+
+	cmd = exec.Command("lvremove vg1/oslv0900 -y")
+	cmd.CombinedOutput()
+	cmd = exec.Command("lvremove vg1/oslv0901 -y")
+	cmd.CombinedOutput()
+	cmd = exec.Command("lvremove vg1/oslv0902 -y")
+	cmd.CombinedOutput()
+
+	cmd = exec.Command("lvremove vg2/data0900 -y")
+	cmd.CombinedOutput()
+	cmd = exec.Command("lvremove vg2/data0901 -y")
+	cmd.CombinedOutput()
+	cmd = exec.Command("lvremove vg2/data0902 -y")
+	cmd.CombinedOutput()
+	cmd = exec.Command("lvremove vg2/data0903 -y")
+	cmd.CombinedOutput()
+
 }
 
 func testMarmotd() {
@@ -221,5 +240,250 @@ func testMarmotd() {
 		err = json.Unmarshal(body, &replyMessage)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(url).To(BeNil())
+	})
+
+	var replyVolume api.Volume
+	It("DATAボリューム(qcow2)の作成", func() {
+		var vol api.Volume
+		vol.Name = "test-volume-001"
+		vol.Type = util.StringPtr("qcow2")
+		vol.Kind = util.StringPtr("data")
+		vol.Size = util.IntPtrInt(100)
+
+		httpStatus, body, url, err := marmotClient.CreateVolume(vol)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(httpStatus).To(Equal(201))
+		err = json.Unmarshal(body, &replyVolume)
+		GinkgoWriter.Println("CreateVolume replyVolume Key = ", *replyVolume.Key)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(url).To(BeNil())
+	})
+
+	It("DATAボリューム(qcow2)のリスト取得", func() {
+		httpStatus, body, url, err := marmotClient.ListVolumes()
+		var vols []api.Volume
+		Expect(err).NotTo(HaveOccurred())
+		Expect(httpStatus).To(Equal(200))
+		err = json.Unmarshal(body, &vols)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(vols)).To(BeNumerically(">", 0))
+		GinkgoWriter.Println("ListVolumes =", vols)
+		Expect(url).To(BeNil())
+
+		out, err := exec.Command("ls", "-alhg", "/var/lib/marmot/volumes").Output()
+		GinkgoWriter.Println("ls output:\n", string(out))
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("DATAボリューム(qcow2)の削除", func() {
+		GinkgoWriter.Println("受信したボリュームキー = ", *replyVolume.Key)
+		httpStatus, body, url, err := marmotClient.DeleteVolumeById(*replyVolume.Key)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(httpStatus).To(Equal(200))
+		GinkgoWriter.Println("DeleteVolumeById body =", string(body))
+		Expect(url).To(BeNil())
+
+		out, err := exec.Command("ls", "-alhg", "/var/lib/marmot/volumes").Output()
+		GinkgoWriter.Println("ls output:\n", string(out))
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("OSボリューム(qcow2)の作成", func() {
+		var vol api.Volume
+		vol.Name = "test-volume-002"
+		vol.Type = util.StringPtr("qcow2")
+		vol.Kind = util.StringPtr("os")
+		vol.OsName = util.StringPtr("ubuntu22.04")
+
+		httpStatus, body, url, err := marmotClient.CreateVolume(vol)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(httpStatus).To(Equal(201))
+		err = json.Unmarshal(body, &replyVolume)
+		GinkgoWriter.Println("CreateVolume replyVolume Key = ", *replyVolume.Key)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(url).To(BeNil())
+
+		out, err := exec.Command("ls", "-alhg", "/var/lib/marmot/volumes").Output()
+		GinkgoWriter.Println("ls output:\n", string(out))
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("OSボリューム(qcow2)の削除", func() {
+		GinkgoWriter.Println("受信したボリュームキー = ", *replyVolume.Key)
+		httpStatus, body, url, err := marmotClient.DeleteVolumeById(*replyVolume.Key)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(httpStatus).To(Equal(200))
+		GinkgoWriter.Println("DeleteVolumeById body =", string(body))
+		Expect(url).To(BeNil())
+	})
+
+	It("OSボリューム(qcow2)のリスト取得", func() {
+		httpStatus, body, url, err := marmotClient.ListVolumes()
+		var vols []api.Volume
+		Expect(err).NotTo(HaveOccurred())
+		Expect(httpStatus).To(Equal(200))
+		err = json.Unmarshal(body, &vols)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(vols)).To(Equal(0))
+		GinkgoWriter.Println("ListVolumes =", vols)
+		Expect(url).To(BeNil())
+
+		out, err := exec.Command("ls", "-alhg", "/var/lib/marmot/volumes").Output()
+		GinkgoWriter.Println("ls output:\n", string(out))
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("OSボリューム(LVM)の作成", func() {
+		var vol api.Volume
+		vol.Name = "test-volume-002"
+		vol.Type = util.StringPtr("lvm")
+		vol.Kind = util.StringPtr("os")
+		vol.OsName = util.StringPtr("ubuntu22.04")
+
+		httpStatus, body, url, err := marmotClient.CreateVolume(vol)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(httpStatus).To(Equal(201))
+		err = json.Unmarshal(body, &replyVolume)
+		GinkgoWriter.Println("CreateVolume replyVolume Key = ", *replyVolume.Key)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(url).To(BeNil())
+	})
+
+	It("OSボリューム(LVM)のリスト取得 生成後", func() {
+		httpStatus, body, url, err := marmotClient.ListVolumes()
+		var vols []api.Volume
+		Expect(err).NotTo(HaveOccurred())
+		Expect(httpStatus).To(Equal(200))
+		err = json.Unmarshal(body, &vols)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(vols)).To(BeNumerically(">", 0))
+		GinkgoWriter.Println("ListVolumes =", vols)
+		Expect(url).To(BeNil())
+
+		out, err := exec.Command("lvs", "vg1").Output()
+		GinkgoWriter.Println("lvs output:\n", string(out))
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("OSボリューム(LVM)の削除", func() {
+		GinkgoWriter.Println("受信したボリュームキー = ", *replyVolume.Key)
+		httpStatus, body, url, err := marmotClient.DeleteVolumeById(*replyVolume.Key)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(httpStatus).To(Equal(200))
+		GinkgoWriter.Println("DeleteVolumeById body =", string(body))
+		Expect(url).To(BeNil())
+	})
+
+	It("OSボリューム(LVM)のリスト取得 削除後", func() {
+		httpStatus, body, url, err := marmotClient.ListVolumes()
+		var vols []api.Volume
+		Expect(err).NotTo(HaveOccurred())
+		Expect(httpStatus).To(Equal(200))
+		err = json.Unmarshal(body, &vols)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(vols)).To(Equal(0))
+		GinkgoWriter.Println("ListVolumes =", vols)
+		Expect(url).To(BeNil())
+
+		out, err := exec.Command("lvs", "vg1").Output()
+		GinkgoWriter.Println("lvs output:\n", string(out))
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("DATAボリューム(LVM)の作成 0000", func() {
+		var vol api.Volume
+		vol.Name = "test-volume-002"
+		vol.Type = util.StringPtr("lvm")
+		vol.Kind = util.StringPtr("data")
+		vol.Size = util.IntPtrInt(1)
+
+		httpStatus, body, url, err := marmotClient.CreateVolume(vol)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(httpStatus).To(Equal(201))
+		err = json.Unmarshal(body, &replyVolume)
+		GinkgoWriter.Println("CreateVolume replyVolume Key = ", *replyVolume.Key)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(url).To(BeNil())
+
+	})
+
+	It("DATAボリューム(LVM)のリスト取得 生成後", func() {
+		httpStatus, body, url, err := marmotClient.ListVolumes()
+		var vols []api.Volume
+		Expect(err).NotTo(HaveOccurred())
+		Expect(httpStatus).To(Equal(200))
+		err = json.Unmarshal(body, &vols)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(vols)).To(BeNumerically(">", 0))
+		GinkgoWriter.Println("ListVolumes =", vols)
+		Expect(url).To(BeNil())
+
+		out, err := exec.Command("lvs").Output()
+		GinkgoWriter.Println("lvs output:\n", string(out))
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("DATAボリューム(LVM)の詳細取得 0001", func() {
+		httpStatus, body, url, err := marmotClient.ShowVolumeById(*replyVolume.Key)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(httpStatus).To(Equal(200))
+		var vol db.Volume
+		err = json.Unmarshal(body, &vol)
+		Expect(err).NotTo(HaveOccurred())
+		GinkgoWriter.Println("ShowVolumeById Id  =", vol.Id)
+		GinkgoWriter.Println("ShowVolumeById Key =", *vol.Key)
+		GinkgoWriter.Println("ShowVolumeById VolumeName =", *vol.VolumeName)
+		Expect(url).To(BeNil())
+	})
+
+	It("DATAボリューム(LVM)の情報更新", func() {
+		var spec api.Volume
+		spec.Name = "updated-volume-name"
+		httpStatus, body, url, err := marmotClient.UpdateVolumeById(*replyVolume.Key, spec)
+		GinkgoWriter.Println("UpdateVolumeById err =", err)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(httpStatus).To(Equal(200))
+		GinkgoWriter.Println("UpdateVolumeById body =", string(body))
+		Expect(url).To(BeNil())
+	})
+
+	It("DATAボリューム(LVM)の詳細取得 0002", func() {
+		httpStatus, body, url, err := marmotClient.ShowVolumeById(*replyVolume.Key)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(httpStatus).To(Equal(200))
+		var vol db.Volume
+		err = json.Unmarshal(body, &vol)
+		//Expect(err).NotTo(HaveOccurred())
+		//GinkgoWriter.Println("ShowVolumeById volume =", vol)
+		GinkgoWriter.Println("ShowVolumeById Id  =", vol.Id)
+		GinkgoWriter.Println("ShowVolumeById Key =", *vol.Key)
+		GinkgoWriter.Println("ShowVolumeById VolumeName =", *vol.VolumeName)
+		Expect(*vol.VolumeName).To(Equal("updated-volume-name"))
+		Expect(url).To(BeNil())
+	})
+
+	It("DATAボリューム(LVM)の削除", func() {
+		GinkgoWriter.Println("受信したボリュームキー = ", *replyVolume.Key)
+		httpStatus, body, url, err := marmotClient.DeleteVolumeById(*replyVolume.Key)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(httpStatus).To(Equal(200))
+		GinkgoWriter.Println("DeleteVolumeById body =", string(body))
+		Expect(url).To(BeNil())
+	})
+
+	It("DATAボリューム(LVM)のリスト取得 削除後", func() {
+		httpStatus, body, url, err := marmotClient.ListVolumes()
+		var vols []api.Volume
+		Expect(err).NotTo(HaveOccurred())
+		Expect(httpStatus).To(Equal(200))
+		err = json.Unmarshal(body, &vols)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(vols)).To(Equal(0))
+		GinkgoWriter.Println("ListVolumes =", vols)
+		Expect(url).To(BeNil())
+
+		out, err := exec.Command("lvs").Output()
+		GinkgoWriter.Println("lvs output:\n", string(out))
+		Expect(err).NotTo(HaveOccurred())
 	})
 }

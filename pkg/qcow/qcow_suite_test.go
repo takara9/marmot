@@ -1,7 +1,6 @@
 package qcow_test
 
 import (
-	"log/slog"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -9,8 +8,14 @@ import (
 )
 
 func TestQcow(t *testing.T) {
-	slog.SetDefault(slog.New(slog.NewTextHandler(GinkgoWriter, &slog.HandlerOptions{Level: slog.LevelDebug})))
-
+	/*
+		opts := &slog.HandlerOptions{
+			AddSource: true,
+			Level:     slog.LevelDebug,
+		}
+		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
+		slog.SetDefault(logger)
+	*/
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "QCOW2 Suite")
 }

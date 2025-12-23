@@ -194,6 +194,11 @@ func (vc *VolumeController) GetVolumeByKey(key string) (Volume, error) {
 		slog.Error("GetEtcdByKey() failed", "err", err, "key", key)
 		return vol, err
 	}
+	if len(resp) == 0 {
+		slog.Error("GetEtcdByKey() returned empty response", "key", key)
+		return vol, fmt.Errorf("volume not found for key: %s", key)
+	}
+
 	err = json.Unmarshal([]byte(resp), &vol)
 	if err != nil {
 		slog.Error("Unmarshal() failed", "err", err, "key", key)

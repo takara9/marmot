@@ -3,7 +3,6 @@ package marmotd_test
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -18,7 +17,6 @@ var _ = BeforeSuite(func() {
 	fmt.Println("Preparing...")
 	prepareMockVmfunc()
 	prepareMockServers()
-	time.Sleep(1 * time.Second) // to see debug logs
 	prepareMockVolume()
 	fmt.Println("Finish preparing!")
 })
@@ -31,7 +29,7 @@ var _ = AfterSuite(func() {
 	fmt.Println("Finish clean up!")
 })
 
-var _ = Describe("Test marmot server functions", func() {
+var _ = Describe("Test marmot server functions", Ordered, func() {
 	Context("internal functions of Marmot servers", testMarmotFuncs)
 	Context("api calles for Marmot servers", testMarmotd)
 	Context("volume functions of Marmot servers", testMarmotVolumes)

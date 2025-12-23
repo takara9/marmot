@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -196,8 +195,6 @@ func (d *Database) FindByHostAndClusteName(hostname string, clustername string) 
 			slog.Error("FindByHostAndClusteName()", "err", err, "hostname", hostname, "clustername", clustername)
 			return "", err
 		}
-
-		fmt.Println("DEBUG", "hostname", hostname, "vm.Name", vm.Name, "clustername", *vm.ClusterName)
 
 		if hostname == vm.Name && clustername == *vm.ClusterName {
 			return *vm.Key, nil

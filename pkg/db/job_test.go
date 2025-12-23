@@ -2,8 +2,6 @@ package db_test
 
 import (
 	"fmt"
-	"log/slog"
-	"os"
 	"os/exec"
 	"time"
 
@@ -19,13 +17,15 @@ var _ = Describe("Jobs", Ordered, func() {
 	var j *db.Job
 
 	BeforeAll(func(ctx SpecContext) {
-		// Setup slog
-		opts := &slog.HandlerOptions{
-			AddSource: true,
-			//Level:     slog.LevelDebug,
-		}
-		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
-		slog.SetDefault(logger)
+		/*
+			// Setup slog
+			opts := &slog.HandlerOptions{
+				AddSource: true,
+				Level:     slog.LevelDebug,
+			}
+			logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
+			slog.SetDefault(logger)
+		*/
 
 		// Dockerコンテナを起動
 		url = "http://127.0.0.1:5379"

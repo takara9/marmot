@@ -23,6 +23,7 @@ type Marmot struct {
 	NodeName string
 	EtcdUrl  string
 	Db       *db.Database
+	Vc       *db.VolumeController
 }
 
 type Server struct {
@@ -39,6 +40,12 @@ func NewMarmot(nodeName string, etcdUrl string) (*Marmot, error) {
 	}
 	m.NodeName = nodeName
 	m.EtcdUrl = etcdUrl
+
+	m.Vc, err = db.NewVolumeController(etcdUrl)
+	if err != nil {
+		return nil, err
+	}
+
 	return &m, nil
 }
 
@@ -345,8 +352,8 @@ func (s *Server) ShowHypervisorById(ctx echo.Context, hypervisorId string) error
 // CreateVolume implements api.ServerInterface.
 func (s *Server) CreateVolume(ctx echo.Context) error {
 	slog.Debug("===", "CreateVolume() is called", "===")
-
 	var volSpec api.Volume
+
 	err := ctx.Bind(&volSpec)
 	if err != nil {
 		volSpecString, err2 := json.MarshalIndent(volSpec, "", "  ")
@@ -354,29 +361,79 @@ func (s *Server) CreateVolume(ctx echo.Context) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	return ctx.JSON(http.StatusNotImplemented, nil)
+	volKey, err := s.Ma.CreateVolume(volSpec)
+	if err != nil {
+		slog.Error("CreateVolume()", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+	slog.Debug("CreateVolume()", "volKey", volKey)
+	volSpec.Key = &volKey
+
+	return ctx.JSON(http.StatusCreated, volSpec)
 }
 
 // DeleteVolumeById implements api.ServerInterface.
 func (s *Server) DeleteVolumeById(ctx echo.Context, volumeId string) error {
-	slog.Debug("===", "DDeleteVolumeById() is called", "===")
-	return ctx.JSON(http.StatusNotImplemented, nil)
+	slog.Debug("===", "DeleteVolumeById() is called", "===", "volumeId", volumeId)
+
+	key := "/" + volumeId
+	err := s.Ma.RemoveVolume(key)
+	if err != nil {
+		slog.Error("RemoveVolume()", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	return ctx.JSON(http.StatusOK, nil)
 }
 
 // ListVolumes implements api.ServerInterface.
 func (s *Server) ListVolumes(ctx echo.Context) error {
 	slog.Debug("===", "ListVolumes() is called", "===")
-	return ctx.JSON(http.StatusNotImplemented, nil)
+	vols, err := s.Ma.GetDataVolumes()
+	if err != nil {
+		slog.Error("ListVolumes()", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	vols2, err := s.Ma.GetOsVolumes()
+	if err != nil {
+		slog.Error("ListVolumes()", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	vols = append(vols, vols2...)
+
+	return ctx.JSON(http.StatusOK, vols)
 }
 
 // ShowVolumeById implements api.ServerInterface.
 func (s *Server) ShowVolumeById(ctx echo.Context, volumeId string) error {
-	slog.Debug("===", "ShowVolumeById() is called", "===")
-	return ctx.JSON(http.StatusNotImplemented, nil)
+	slog.Debug("===", "ShowVolumeById() is called", "===", "volumeId", volumeId)
+	vol, err := s.Ma.ShowVolumeById(volumeId)
+	if err != nil {
+		slog.Error("ShowVolumeById()", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+	slog.Debug("ShowVolumeById()", "vol", vol)
+
+	return ctx.JSON(http.StatusOK, vol)
 }
 
 // UpdateVolumeById implements api.ServerInterface.
 func (s *Server) UpdateVolumeById(ctx echo.Context, volumeId string) error {
-	slog.Debug("===", "UpdateVolumeById() is called", "===")
-	return ctx.JSON(http.StatusNotImplemented, nil)
+	slog.Debug("===", "UpdateVolumeById() is called", "===", "volumeId", volumeId)
+	var volSpec api.Volume
+	if err := ctx.Bind(&volSpec); err != nil {
+		volSpecString, _ := json.MarshalIndent(volSpec, "", "  ")
+		slog.Error("CreateVolume()", "err", err, "volSpec", string(volSpecString), "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	key := "/" + volumeId
+	if _, err := s.Ma.UpdateVolumeById(key, volSpec); err != nil {
+		slog.Error("UpdateVolumeById()", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	return ctx.JSON(http.StatusOK, volSpec)
 }

@@ -2,8 +2,6 @@ package db_test
 
 import (
 	"fmt"
-	"log/slog"
-	"os"
 	"os/exec"
 	"time"
 
@@ -20,13 +18,16 @@ var _ = Describe("Volumes", Ordered, func() {
 	//var j *db.Job
 
 	BeforeAll(func(ctx SpecContext) {
-		// Setup slog
-		opts := &slog.HandlerOptions{
-			AddSource: true,
-			//Level:     slog.LevelDebug,
-		}
-		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
-		slog.SetDefault(logger)
+
+		/*
+			// Setup slog
+			opts := &slog.HandlerOptions{
+				AddSource: true,
+				Level:     slog.LevelDebug,
+			}
+			logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
+			slog.SetDefault(logger)
+		*/
 
 		// Dockerコンテナを起動
 		cmd := exec.Command("docker", "run", "-d", "--name", "jobEtcdDb", "-p", "6379:2379", "-p", "6380:2380", "ghcr.io/takara9/etcd:3.6.5")

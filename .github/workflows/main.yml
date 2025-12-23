@@ -6,41 +6,9 @@ env:
   DEBUG: true
 
 jobs:
-  display-variables:
-    name: ${{ vars.JOB_NAME || 'Display Configuration Variables' }}
-    # You can use configuration variables with the `vars` context for dynamic jobs
-    #if: ${{ vars.USE_VARIABLES == 'true' }}
-    #runs-on: ${{ vars.RUNNER }}
-    runs-on: self-hosted
-    environment: ${{ vars.ENVIRONMENT_STAGE }}
-    steps:
-    - name: Use variables
-      run: |
-        echo "repository variable : $REPOSITORY_VAR"
-        echo "organization variable : $ORGANIZATION_VAR"
-        echo "overridden variable : $OVERRIDE_VAR"
-        echo "variable from shell environment : $env_var"
-      env:
-        REPOSITORY_VAR: ${{ vars.REPOSITORY_VAR }}
-        ORGANIZATION_VAR: ${{ vars.ORGANIZATION_VAR }}
-        OVERRIDE_VAR: ${{ vars.OVERRIDE_VAR }}
-    - name: show variables
-      run: |
-        echo ${DEBUG}
-        env
-        pwd
-        ls -lR
-        #echo "path2" $RUNNER_WORKSPACE
-  
-    - name: ${{ vars.HELLO_WORLD_STEP }}
-      if: ${{ vars.HELLO_WORLD_ENABLED == 'true' }}
-      uses: actions/hello-world-javascript-action@main
-      with:
-        who-to-greet: ${{ vars.GREET_NAME }}
-
   # Label of the job
   marmot-package-job:
-    needs: display-variables
+    #needs: display-variables
     runs-on: self-hosted
     services:
       etcd:
@@ -146,22 +114,70 @@ jobs:
         cd pkg/virt
         sudo -s make test
         cd ../..
- 
     - name: Test pkg/marmotd ボリューム機能テスト
-      run: | 
+      run: |
         cd pkg/marmotd
         sudo -s make test-volume
-        cd ../..    
+        cd ../..
+  # Label of the job
+  marmot-daemon:
+    #needs: display-variables
+    runs-on: self-hosted
+    services:
+      etcd:
+        image: ghcr.io/takara9/etcd:3.6.5
+        ports:
+          - 2379:2379
 
+    steps:
+    - name: change permissions
+      run: |
+        sudo -S chown -R $USER:$USER /var/actions-runner/_work/marmot
+
+    - uses: actions/checkout@v5
+
+    - name: Install ca-certificates
+      run: |
+        sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
+        sudo update-ca-certificates
+
+    - name: Configure MinIO Client
+      run: |
+        mc alias set myminio ${{ secrets.MINIO_ENDPOINT }} \
+          ${{ secrets.MINIO_ACCESS_KEY }} \
+          ${{ secrets.MINIO_SECRET_KEY }}
+
+    - name: Download file from MinIO
+      run: |
+        mkdir -p pkg/qcow/testdata
+        chmod 755 pkg/qcow/testdata
+        sudo mkdir -p /var/lib/marmot/volumes
+        sudo chmod 755 /var/lib/marmot/volumes
+        mc cp myminio/os-image/jammy-server-cloudimg-amd64.img pkg/marmotd/testdata/ubuntu22.04.qcow2
+
+    - name: Check etcd put
+      run: |
+        export ETCDCTL_API=3 
+        etcdctl put --endpoints=127.0.0.1:2379 /skydns/local/labo/a/hoge '{"host":"192.168.1.5","ttl":60}'
+
+    - name: Check etcd get
+      run: |
+        export ETCDCTL_API=3 
+        etcdctl get --endpoints=127.0.0.1:2379 /skydns/local/labo/a/hoge
+  
+    - name: Setup for build
+      run: |
+        make setup
+ 
     - name: Test pkg/marmotd 全機能テスト
-      run: | 
+      run: |
         cd pkg/marmotd
         sudo -s make test
-        cd ../..    
+        cd ../..
 
   marmot-command-test-job:
     runs-on: self-hosted
-    needs: display-variables
+    #needs: display-variables
     steps:
 
     - name: Test cmd/mactl
@@ -175,15 +191,15 @@ jobs:
         sudo -s make test
         cd ../..
 
-  clean-up-job:
-    runs-on: self-hosted
-    needs: 
-      - marmot-package-job 
-      - marmot-command-test-job
-    steps:
-    - name: Clean up
-      run: |
-        go clean -cache -testcache -modcache -fuzzcache
-        sudo rm -f /var/actions-runner/_work/marmot/marmot/cmd/mactl/bin/mactl-test
-        sudo rm -f /var/actions-runner/_work/marmot/marmot/cmd/maadm/bin/maadm-test
+  #clean-up-job:
+  #  runs-on: self-hosted
+  #  needs: 
+  #    - marmot-package-job 
+  #    - marmot-command-test-job
+  #  steps:
+  #  - name: Clean up
+  #    run: |
+  #      go clean -cache -testcache -modcache -fuzzcache
+  #      sudo rm -f /var/actions-runner/_work/marmot/marmot/cmd/mactl/bin/mactl-test
+  #      sudo rm -f /var/actions-runner/_work/marmot/marmot/cmd/maadm/bin/maadm-test
   

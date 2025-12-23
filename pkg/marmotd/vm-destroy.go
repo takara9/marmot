@@ -1,7 +1,6 @@
 package marmotd
 
 import (
-	"fmt"
 	"log/slog"
 	"strings"
 
@@ -36,8 +35,6 @@ func (m *Marmot) DestroyVM2(spec api.VmSpec) error {
 			slog.Error("PutDataEtcd()", "err", err)
 		}
 	}
-
-	fmt.Println("======= DestroyVM2()", "vmKey", *spec.Key)
 
 	// データベースから削除
 	if err := m.Db.DelByKey(*spec.Key); err != nil {
