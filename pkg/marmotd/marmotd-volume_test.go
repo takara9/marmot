@@ -79,6 +79,11 @@ func cleanupMockVolume() {
 	cmd = exec.Command("lvremove vg2/data0903 -y")
 	cmd.CombinedOutput()
 
+	cmd = exec.Command("docker kill $(docker ps |awk 'NR>1 {print $1}')")
+	cmd.CombinedOutput()
+
+	cmd = exec.Command("docker rm $(docker ps --all |awk 'NR>1 {print $1}')")
+	cmd.CombinedOutput()
 }
 
 func testMarmotVolumes() {
@@ -159,7 +164,7 @@ func testMarmotVolumes() {
 
 	Context("OSLVの生成から削除", func() {
 		var m *marmotd.Marmot
-		var volKey string
+		var volSpec *api.Volume
 		var err error
 
 		It("Marmotインスタンスの生成", func() {
@@ -176,15 +181,15 @@ func testMarmotVolumes() {
 				OsName: ut.StringPtr("ubuntu22.04"),
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
-			volKey, err = m.CreateVolume(v)
+			volSpec, err = m.CreateNewVolume(v)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created volume key: ", volKey)
+			GinkgoWriter.Println("Created volume key: ", *volSpec.Key)
 		})
 
 		// ここが失敗している模様 !!!
 		It("OS論理ボリュームの削除", func() {
 			fmt.Println("================================!!!!!!!!!!!!!!")
-			err = m.RemoveVolume(volKey)
+			err = m.RemoveVolume(*volSpec.Key)
 			Expect(err).NotTo(HaveOccurred())
 
 			out, err := exec.Command("lvs", "vg1").Output()
@@ -224,9 +229,8 @@ func testMarmotVolumes() {
 				OsName: ut.StringPtr("ubuntu22.NOXIST"),
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
-			volKey, err = m.CreateVolume(v)
+			volSpec, err = m.CreateNewVolume(v)
 			Expect(err).To(HaveOccurred())
-			GinkgoWriter.Println("Created volume key: ", volKey)
 		})
 
 		It("OS論理ボリュームの生成 （失敗ケース)", func() {
@@ -237,8 +241,7 @@ func testMarmotVolumes() {
 				OsName: ut.StringPtr("ubuntu22.04"),
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
-			volKey, err = m.CreateVolume(v)
-			GinkgoWriter.Println("Created volume key: ", volKey)
+			volSpec, err = m.CreateNewVolume(v)
 			GinkgoWriter.Println("err=", err)
 			Expect(err).To(HaveOccurred())
 		})
@@ -252,7 +255,7 @@ func testMarmotVolumes() {
 					OsName: ut.StringPtr("ubuntu22.04"),
 				}
 				GinkgoWriter.Println("Creating OS volume", "volume", v)
-				volKey, err = m.CreateVolume(v)
+				volKey, err = m.CreateNewVolume(v)
 				GinkgoWriter.Println("err=", err)
 				GinkgoWriter.Println("Created volume key: ", volKey)
 				Expect(err).To(HaveOccurred())
@@ -265,9 +268,9 @@ func testMarmotVolumes() {
 			GinkgoWriter.Println("ボリュームリストの取得:", "volume count=", len(vols))
 			for i, v := range vols {
 				if v.Status != nil {
-					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(v.VolumeName, "Null"), "status=", *v.Status)
+					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(&v.Name, "Null"), "status=", *v.Status)
 				} else {
-					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(v.VolumeName, "Null"), "status=<nil>")
+					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(&v.Name, "Null"), "status=<nil>")
 				}
 			}
 			out, err := exec.Command("lvs").Output()
@@ -281,9 +284,9 @@ func testMarmotVolumes() {
 			GinkgoWriter.Println("DATA 論理ボリュームリストの取得:", "volume count=", len(vols))
 			for i, v := range vols {
 				if v.Status != nil {
-					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(v.VolumeName, "Null"), "status=", *v.Status)
+					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(&v.Name, "Null"), "status=", *v.Status)
 				} else {
-					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(v.VolumeName, "Null"), "status=<nil>")
+					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(&v.Name, "Null"), "status=<nil>")
 				}
 			}
 			out, err := exec.Command("lvs").Output()
@@ -310,7 +313,7 @@ func testMarmotVolumes() {
 
 	Context("DATALVの生成から削除", func() {
 		var m *marmotd.Marmot
-		var volKey string
+		var volSpec *api.Volume
 		var err error
 
 		It("Marmotインスタンスの生成", func() {
@@ -319,7 +322,7 @@ func testMarmotVolumes() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("DATA論理ボリュームの生成 問題発生箇所", func() {
+		It("DATA論理ボリュームの生成", func() {
 			out, err := exec.Command("lvs", "vg2").Output()
 			GinkgoWriter.Println("lvs output:\n", string(out))
 			Expect(err).NotTo(HaveOccurred())
@@ -331,13 +334,13 @@ func testMarmotVolumes() {
 				Size: ut.IntPtrInt(1),
 			}
 			GinkgoWriter.Println("Creating DATA 論理ボリューム", "volume", v)
-			volKey, err = m.CreateVolume(v)
+			volSpec, err = m.CreateNewVolume(v)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created volume key: ", volKey)
+			GinkgoWriter.Println("Created volume key: ", *volSpec.Key)
 		})
 
 		It("DATA論理ボリュームの削除", func() {
-			err = m.RemoveVolume(volKey)
+			err = m.RemoveVolume(*volSpec.Key)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -366,10 +369,10 @@ func testMarmotVolumes() {
 				OsName: ut.StringPtr("ubuntu22.04"),
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
-			tmpKey, err := m.CreateVolume(v)
-			key = append(key, tmpKey)
+			tmpSpec, err := m.CreateNewVolume(v)
+			key = append(key, *tmpSpec.Key)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created volume key: ", tmpKey)
+			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Key)
 		})
 
 		It("OS論理ボリュームの生成2", func() {
@@ -380,10 +383,10 @@ func testMarmotVolumes() {
 				OsName: ut.StringPtr("ubuntu22.04"),
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
-			tmpKey, err := m.CreateVolume(v)
-			key = append(key, tmpKey)
+			tmpSpec, err := m.CreateNewVolume(v)
+			key = append(key, *tmpSpec.Key)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created volume key: ", tmpKey)
+			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Key)
 		})
 
 		It("DATA論理ボリュームの生成1", func() {
@@ -394,10 +397,10 @@ func testMarmotVolumes() {
 				Size: ut.IntPtrInt(1),
 			}
 			GinkgoWriter.Println("Creating Data volume", "volume", v)
-			tmpKey, err := m.CreateVolume(v)
-			key = append(key, tmpKey)
+			tmpSpec, err := m.CreateNewVolume(v)
+			key = append(key, *tmpSpec.Key)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created volume key: ", tmpKey)
+			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Key)
 		})
 
 		It("DATA論理ボリュームの生成2", func() {
@@ -408,10 +411,10 @@ func testMarmotVolumes() {
 				Size: ut.IntPtrInt(1),
 			}
 			GinkgoWriter.Println("Creating Data volume", "volume", v)
-			tmpKey, err := m.CreateVolume(v)
-			key = append(key, tmpKey)
+			tmpSpec, err := m.CreateNewVolume(v)
+			key = append(key, *tmpSpec.Key)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created volume key: ", tmpKey)
+			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Key)
 		})
 
 		It("OS論理ボリュームリストの取得", func() {
@@ -420,9 +423,9 @@ func testMarmotVolumes() {
 			GinkgoWriter.Println("論理ボリュームリストの取得:", "volume count=", len(vols))
 			for i, v := range vols {
 				if v.Status != nil {
-					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(v.VolumeName, "Null"), "status=", *v.Status)
+					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(&v.Name, "Null"), "status=", *v.Status)
 				} else {
-					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(v.VolumeName, "Null"), "status=<nil>")
+					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(&v.Name, "Null"), "status=<nil>")
 				}
 			}
 			out, err := exec.Command("lvs").Output()
@@ -436,9 +439,9 @@ func testMarmotVolumes() {
 			GinkgoWriter.Println("DATA 論理ボリュームリストの取得:", "volume count=", len(vols))
 			for i, v := range vols {
 				if v.Status != nil {
-					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(v.VolumeName, "Null"), "status=", *v.Status)
+					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(&v.Name, "Null"), "status=", *v.Status)
 				} else {
-					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(v.VolumeName, "Null"), "status=<nil>")
+					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(&v.Name, "Null"), "status=<nil>")
 				}
 			}
 			out, err := exec.Command("lvs").Output()
@@ -463,9 +466,9 @@ func testMarmotVolumes() {
 			GinkgoWriter.Println("論理ボリューム のリスト数:", "volume count=", len(vols))
 			for i, v := range vols {
 				if v.Status != nil {
-					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(v.VolumeName, "Null"), "status=", *v.Status)
+					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(&v.Name, "Null"), "status=", *v.Status)
 				} else {
-					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(v.VolumeName, "Null"), "status=<nil>")
+					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(&v.Name, "Null"), "status=<nil>")
 				}
 			}
 			out, err := exec.Command("lvs").Output()
@@ -479,9 +482,9 @@ func testMarmotVolumes() {
 			GinkgoWriter.Println("DATA 論理ボリュームリストの取得:", "volume count=", len(vols))
 			for i, v := range vols {
 				if v.Status != nil {
-					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(v.VolumeName, "Null"), "status=", *v.Status)
+					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(&v.Name, "Null"), "status=", *v.Status)
 				} else {
-					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(v.VolumeName, "Null"), "status=<nil>")
+					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(&v.Name, "Null"), "status=<nil>")
 				}
 			}
 			out, err := exec.Command("lvs").Output()
@@ -511,9 +514,9 @@ func testMarmotVolumes() {
 			GinkgoWriter.Println("生成前qcow2ボリュームリストの取得:", "volume count=", len(vols))
 			for i, v := range vols {
 				if v.Status != nil {
-					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(v.VolumeName, "Null"), "status=", *v.Status)
+					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(&v.Name, "Null"), "status=", *v.Status)
 				} else {
-					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(v.VolumeName, "Null"), "status=<nil>")
+					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(&v.Name, "Null"), "status=<nil>")
 				}
 			}
 		})
@@ -526,10 +529,10 @@ func testMarmotVolumes() {
 				OsName: ut.StringPtr("ubuntu22.04"),
 			}
 			//			GinkgoWriter.Println("Creating qcow2 volume", "volume", v.Path)
-			tmpKey, err := m.CreateVolume(v)
-			key = append(key, tmpKey)
+			tmpSSpec, err := m.CreateNewVolume(v)
+			key = append(key, *tmpSSpec.Key)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created volume key: ", tmpKey)
+			GinkgoWriter.Println("Created volume key: ", *tmpSSpec.Key)
 		})
 
 		It("qcow2ボリュームリストの取得", func() {
@@ -538,9 +541,9 @@ func testMarmotVolumes() {
 			GinkgoWriter.Println("qcow2ボリュームリストの取得:", "volume count=", len(vols))
 			for i, v := range vols {
 				if v.Status != nil {
-					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(v.VolumeName, "Null"), "status=", *v.Status)
+					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(&v.Name, "Null"), "status=", *v.Status)
 				} else {
-					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(v.VolumeName, "Null"), "status=<nil>")
+					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(&v.Name, "Null"), "status=<nil>")
 				}
 			}
 			out, err := exec.Command("ls", "-al", "/var/lib/marmot/volumes").Output()
@@ -560,9 +563,9 @@ func testMarmotVolumes() {
 			GinkgoWriter.Println("削除後のqcow2ボリュームリストの取得:", "volume count=", len(vols))
 			for i, v := range vols {
 				if v.Status != nil {
-					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(v.VolumeName, "Null"), "status=", *v.Status)
+					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(&v.Name, "Null"), "status=", *v.Status)
 				} else {
-					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(v.VolumeName, "Null"), "status=<nil>")
+					GinkgoWriter.Println("index=", i, "volKey=", *v.Key, "Name", util.OrDefault(&v.Name, "Null"), "status=<nil>")
 				}
 			}
 			out, err := exec.Command("ls", "-al", "/var/lib/marmot/volumes").Output()
@@ -594,10 +597,10 @@ func testMarmotVolumes() {
 				Kind: ut.StringPtr("data"),
 				Size: ut.IntPtrInt(1),
 			}
-			tmpKey, err := m.CreateVolume(v)
-			key = append(key, tmpKey)
+			tmpSpec, err := m.CreateNewVolume(v)
+			key = append(key, *tmpSpec.Key)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created volume key: ", tmpKey)
+			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Key)
 
 			out, err := exec.Command("ls", "-alh", "/var/lib/marmot/volumes").Output()
 			Expect(err).NotTo(HaveOccurred())

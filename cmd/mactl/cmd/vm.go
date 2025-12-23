@@ -19,12 +19,6 @@ var vmCmd = &cobra.Command{
 	Short: "仮想マシンの詳細を表示",
 	Long:  `仮想マシンの内部情報を含めた詳細な情報を表示します。`,
 	Run: func(cmd *cobra.Command, args []string) {
-		m, err := getClientConfig()
-		if err != nil {
-			slog.Error("faild reading mactl config file", "err", err.Error())
-			return
-		}
-
 		clusterConfig, err := config.ReadYamlClusterConfig(clusterConfigFilename)
 		if err != nil {
 			fmt.Println("Reading the config file err=", err)

@@ -16,7 +16,6 @@ import (
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/client"
 	"github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
 	"github.com/takara9/marmot/pkg/util"
 )
@@ -80,6 +79,11 @@ func cleanupMockServers() {
 	cmd = exec.Command("lvremove vg2/data0903 -y")
 	cmd.CombinedOutput()
 
+	cmd = exec.Command("docker kill $(docker ps |awk 'NR>1 {print $1}')")
+	cmd.CombinedOutput()
+
+	cmd = exec.Command("docker rm $(docker ps --all |awk 'NR>1 {print $1}')")
+	cmd.CombinedOutput()
 }
 
 func testMarmotd() {
@@ -427,12 +431,12 @@ func testMarmotd() {
 		httpStatus, body, url, err := marmotClient.ShowVolumeById(*replyVolume.Key)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(httpStatus).To(Equal(200))
-		var vol db.Volume
+		var vol api.Volume
 		err = json.Unmarshal(body, &vol)
 		Expect(err).NotTo(HaveOccurred())
 		GinkgoWriter.Println("ShowVolumeById Id  =", vol.Id)
 		GinkgoWriter.Println("ShowVolumeById Key =", *vol.Key)
-		GinkgoWriter.Println("ShowVolumeById VolumeName =", *vol.VolumeName)
+		GinkgoWriter.Println("ShowVolumeById VolumeName =", vol.Name)
 		Expect(url).To(BeNil())
 	})
 
@@ -451,14 +455,14 @@ func testMarmotd() {
 		httpStatus, body, url, err := marmotClient.ShowVolumeById(*replyVolume.Key)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(httpStatus).To(Equal(200))
-		var vol db.Volume
+		var vol api.Volume
 		err = json.Unmarshal(body, &vol)
 		//Expect(err).NotTo(HaveOccurred())
 		//GinkgoWriter.Println("ShowVolumeById volume =", vol)
 		GinkgoWriter.Println("ShowVolumeById Id  =", vol.Id)
 		GinkgoWriter.Println("ShowVolumeById Key =", *vol.Key)
-		GinkgoWriter.Println("ShowVolumeById VolumeName =", *vol.VolumeName)
-		Expect(*vol.VolumeName).To(Equal("updated-volume-name"))
+		GinkgoWriter.Println("ShowVolumeById VolumeName =", vol.Name)
+		Expect(vol.Name).To(Equal("updated-volume-name"))
 		Expect(url).To(BeNil())
 	})
 

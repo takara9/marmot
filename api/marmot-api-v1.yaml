@@ -598,6 +598,10 @@ components:
           type: string
         name:
           type: string
+        volumeGroup:
+          type: string
+        logicalVolume:
+          type: string
         size:
           type: integer
           format: int
@@ -605,7 +609,7 @@ components:
           type: string
         status:
           type: integer
-          format: int32
+          format: int
         cTime:
           type: string
           format: date-time

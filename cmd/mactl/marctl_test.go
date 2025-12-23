@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,6 +10,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/marmotd"
 )
@@ -32,8 +34,8 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		}
 		containerID = string(output[:12]) // 最初の12文字をIDとして取得
 		fmt.Printf("Container started with ID: %s\n", containerID)
-		time.Sleep(10 * time.Second) // コンテナが起動するまで待機
-	}, NodeTimeout(20*time.Second))
+		time.Sleep(5 * time.Second) // コンテナが起動するまで待機
+	}, NodeTimeout(15*time.Second))
 
 	AfterAll(func(ctx SpecContext) {
 		// Dockerコンテナを停止・削除
@@ -49,7 +51,24 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		}
 		os.Remove("bin/mactl-test")
 		os.Remove("/var/actions-runner/_work/marmot/marmot/cmd/mactl/bin/mactl-test")
-	}, NodeTimeout(20*time.Second))
+
+		cmd = exec.Command("lvremove vg1/oslv0900 -y")
+		cmd.CombinedOutput()
+		cmd = exec.Command("lvremove vg1/oslv0901 -y")
+		cmd.CombinedOutput()
+		cmd = exec.Command("lvremove vg1/oslv0902 -y")
+		cmd.CombinedOutput()
+
+		cmd = exec.Command("lvremove vg2/data0900 -y")
+		cmd.CombinedOutput()
+		cmd = exec.Command("lvremove vg2/data0901 -y")
+		cmd.CombinedOutput()
+		cmd = exec.Command("lvremove vg2/data0902 -y")
+		cmd.CombinedOutput()
+		cmd = exec.Command("lvremove vg2/data0903 -y")
+		cmd.CombinedOutput()
+
+	}, NodeTimeout(30*time.Second))
 
 	Context("基本的なクライアントからのアクセステスト", func() {
 		var hvs config.Hypervisors_yaml
@@ -82,7 +101,6 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			}
 		})
 
-		// mactl2 コマンドに置き換え　実装が必要
 		It("Marmotd の生存確認", func() {
 			/*
 				httpStatus, body, url, err := marmotClient.Ping()
@@ -216,6 +234,102 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr))
+		})
+
+		It("ボリュームのリスト取得  00", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "list")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+		})
+
+		It("ボリュームの作成  data qcow2 26", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "create", "-n", "test-volume1", "-t", "qcow2", "-k", "data", "-s", "2", "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+		})
+
+		It("ボリュームの作成  data lvm 26", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "create", "-n", "test-volume2", "-t", "lvm", "-k", "data", "-s", "1", "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+		})
+
+		It("ボリュームの作成  os qcow2 26", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "create", "-n", "test-volume3", "-t", "qcow2", "-k", "os", "-l", "ubuntu22.04", "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+		})
+
+		It("ボリュームの作成  os lvm 26", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "create", "-n", "test-volume4", "-t", "lvm", "-k", "os", "-l", "ubuntu22.04", "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+		})
+
+		It("ボリュームのTEXTリスト取得  26", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "list", "--output", "text")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+		})
+
+		It("ボリュームのJSONリスト取得  26", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "list", "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+		})
+
+		It("ボリュームのYAMLリスト取得  26", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "list", "--output", "yaml")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+		})
+
+		It("ボリューム名変更", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "list", "--output", "json")
+			Expect(err).NotTo(HaveOccurred())
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			jsonStr := string(stdoutStderr)
+			GinkgoWriter.Print("stdout:", jsonStr)
+
+			var volumes []api.Volume
+			if err := json.Unmarshal([]byte(jsonStr), &volumes); err != nil {
+				Expect(err).NotTo(HaveOccurred())
+			}
+			for _, v := range volumes {
+				cmdDel := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "rename", *v.Key, "NEW_NAME", "--output", "json")
+				stdoutStderr, err := cmdDel.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Print(string(stdoutStderr))
+			}
+		})
+
+		It("ボリュームのJSONリスト取得＆削除 26", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "list", "--output", "json")
+			Expect(err).NotTo(HaveOccurred())
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			jsonStr := string(stdoutStderr)
+			GinkgoWriter.Print("stdout:", jsonStr)
+
+			var volumes []api.Volume
+			if err := json.Unmarshal([]byte(jsonStr), &volumes); err != nil {
+				Expect(err).NotTo(HaveOccurred())
+			}
+			for _, v := range volumes {
+				cmdDel := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "destroy", *v.Key, "--output", "json")
+				stdoutStderr, err := cmdDel.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Print(string(stdoutStderr))
+			}
 		})
 	})
 })

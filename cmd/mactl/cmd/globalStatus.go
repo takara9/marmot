@@ -15,12 +15,6 @@ var globalStatusCmd = &cobra.Command{
 	Short: "管理下のハイパーバイザーと仮想マシンをリストします。",
 	Long:  `管理下のハイパーバイザーと仮想マシンをリストします。デフォルトでホームディレクトリの.config_marmotを使用して、ハイパーバイザーに接続します。`,
 	Run: func(cmd *cobra.Command, args []string) {
-		m, err := getClientConfig()
-		if err != nil {
-			slog.Error("faild reading mactl config file", "err", err.Error())
-			return
-		}
-
 		fmt.Printf("\n               *** SYSTEM STATUS ***\n")
 		_, byteBody, _, err := m.ListHypervisors(nil)
 		if err != nil {
