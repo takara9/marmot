@@ -15,12 +15,6 @@ var hvCmd = &cobra.Command{
 	Short: "ハイパーバイザー（仮想マシンのホスト）を表示",
 	Long:  `仮想マシンを動かすためのハイパーバイザーを表示します。`,
 	Run: func(cmd *cobra.Command, args []string) {
-		m, err := getClientConfig()
-		if err != nil {
-			slog.Error("faild reading mactl config file", "err", err.Error())
-			return
-		}
-
 		_, byteBody, _, err := m.ListHypervisors(nil)
 		if err != nil {
 			slog.Error("list vms", "err", err)

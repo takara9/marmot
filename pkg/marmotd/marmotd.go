@@ -155,10 +155,6 @@ func (s *Server) CreateCluster(ctx echo.Context) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	// ここで どんな状態でJSONが取れているか確認する
-	//if DEBUG {
-	//	PrintMarmotConfig(cnf)
-	//}
 	// データベースから情報を取得
 	d, err := db.NewDatabase(s.Ma.EtcdUrl)
 	if err != nil {
@@ -234,11 +230,6 @@ func (s *Server) StopCluster(ctx echo.Context) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	// ここで どんな状態でJSONが取れているか確認する
-	//if DEBUG {
-	//	PrintMarmotConfig(cnf)
-	//}
-
 	if err := s.Ma.StopClusterInternal(cnf); err != nil {
 		slog.Error("StopCluster()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
@@ -249,6 +240,7 @@ func (s *Server) StopCluster(ctx echo.Context) error {
 // 仮想マシンの生成
 func (s *Server) CreateVirtualMachine(ctx echo.Context) error {
 	slog.Debug("===", "CreateVirtualMachine() is called", "===")
+
 	// ここをロックすると、テストが実施できない。実際にも動かないかも
 	//s.Lock.Lock()
 	//defer s.Lock.Unlock()
@@ -259,10 +251,6 @@ func (s *Server) CreateVirtualMachine(ctx echo.Context) error {
 		slog.Error("CreateVirtualMachine()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-
-	//if DEBUG {
-	//	printVmSpecJson(spec)
-	//}
 
 	err = s.Ma.CreateVM(spec)
 	if err != nil {
@@ -342,7 +330,6 @@ func (s *Server) ShowHypervisorById(ctx echo.Context, hypervisorId string) error
 
 	for _, v := range hvs {
 		if hypervisorId == v.NodeName {
-			//nhv := convHVinfoDBtoAPI(v)
 			return ctx.JSON(http.StatusOK, v)
 		}
 	}
@@ -361,15 +348,15 @@ func (s *Server) CreateVolume(ctx echo.Context) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	volKey, err := s.Ma.CreateVolume(volSpec)
+	// キーだけでなく、スペック全体を返すようにする
+	spec, err := s.Ma.CreateNewVolume(volSpec)
 	if err != nil {
-		slog.Error("CreateVolume()", "err", err)
+		slog.Error("CreateNewVolume()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-	slog.Debug("CreateVolume()", "volKey", volKey)
-	volSpec.Key = &volKey
+	slog.Debug("CreateVolume()", "volKey", *spec.Key)
 
-	return ctx.JSON(http.StatusCreated, volSpec)
+	return ctx.JSON(http.StatusCreated, spec)
 }
 
 // DeleteVolumeById implements api.ServerInterface.
@@ -383,7 +370,7 @@ func (s *Server) DeleteVolumeById(ctx echo.Context, volumeId string) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	return ctx.JSON(http.StatusOK, nil)
+	return ctx.JSON(http.StatusOK, api.ReplyMessage{Message: "Successfully deleted"})
 }
 
 // ListVolumes implements api.ServerInterface.
@@ -424,8 +411,8 @@ func (s *Server) UpdateVolumeById(ctx echo.Context, volumeId string) error {
 	slog.Debug("===", "UpdateVolumeById() is called", "===", "volumeId", volumeId)
 	var volSpec api.Volume
 	if err := ctx.Bind(&volSpec); err != nil {
-		volSpecString, _ := json.MarshalIndent(volSpec, "", "  ")
-		slog.Error("CreateVolume()", "err", err, "volSpec", string(volSpecString), "err", err)
+		//volSpecString, _ := json.MarshalIndent(volSpec, "", "  ")
+		slog.Error("UpdateVolumeById()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
@@ -434,6 +421,8 @@ func (s *Server) UpdateVolumeById(ctx echo.Context, volumeId string) error {
 		slog.Error("UpdateVolumeById()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
+	volSpec.Key = &key
+	volSpec.Id = volumeId
 
 	return ctx.JSON(http.StatusOK, volSpec)
 }

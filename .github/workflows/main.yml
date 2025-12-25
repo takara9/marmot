@@ -7,7 +7,7 @@ env:
 
 jobs:
   # Label of the job
-  marmot-package-job:
+  marmot-package:
     #needs: display-variables
     runs-on: self-hosted
     services:
@@ -25,7 +25,6 @@ jobs:
       #  env:
       #    CONF: "/conf/Corefile"
       #    PORT: "53"
-
 
     steps:
     - name: change permissions
@@ -175,10 +174,33 @@ jobs:
         sudo -s make test
         cd ../..
 
-  marmot-command-test-job:
+  marmot-command:
     runs-on: self-hosted
     #needs: display-variables
     steps:
+    - name: change permissions
+      run: |
+        sudo -S chown -R $USER:$USER /var/actions-runner/_work/marmot
+
+    - uses: actions/checkout@v5
+
+    - name: Install ca-certificates
+      run: |
+        sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
+        sudo update-ca-certificates
+
+    - name: Configure MinIO Client
+      run: |
+        mc alias set myminio ${{ secrets.MINIO_ENDPOINT }} \
+          ${{ secrets.MINIO_ACCESS_KEY }} \
+          ${{ secrets.MINIO_SECRET_KEY }}
+
+    - name: Download file from MinIO
+      run: |
+        sudo mkdir -p /var/lib/marmot/volumes
+        sudo chown ubuntu:ubuntu /var/lib/marmot/volumes
+        sudo chmod 755 /var/lib/marmot/volumes
+        mc cp myminio/os-image/jammy-server-cloudimg-amd64.img /var/lib/marmot/volumes/ubuntu22.04.qcow2
 
     - name: Test cmd/mactl
       run: | 

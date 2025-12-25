@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -20,16 +21,9 @@ var versionCmd = &cobra.Command{
 	Long:  `marmot クライアントのバージョンを表示します。`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		slog.Debug("===", "versionCmd is called", "===")
-
-		m, err := getClientConfig()
-		if err != nil {
-			slog.Error("version", "err", err)
-			return err
-		}
-
 		JsonVersion, err := m.GetVersion()
 		if err != nil {
-			slog.Error("version", "err", err)
+			fmt.Fprintf(os.Stderr, "failed to get server version: %v\n", err)
 			return err
 		}
 		sv := string(*JsonVersion.ServerVersion)

@@ -83,6 +83,12 @@ func cleanupMockVmfunc() {
 	cmd.CombinedOutput()
 	cmd = exec.Command("lvremove vg2/data0903 -y")
 	cmd.CombinedOutput()
+
+	cmd = exec.Command("docker kill $(docker ps |awk 'NR>1 {print $1}')")
+	cmd.CombinedOutput()
+
+	cmd = exec.Command("docker rm $(docker ps --all |awk 'NR>1 {print $1}')")
+	cmd.CombinedOutput()	
 }
 
 func testMarmotFuncs() {

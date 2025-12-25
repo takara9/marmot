@@ -134,19 +134,21 @@ type VmSpec struct {
 
 // Volume defines model for volume.
 type Volume struct {
-	CTime     *time.Time `json:"cTime,omitempty"`
-	Comment   *string    `json:"comment,omitempty"`
-	Id        string     `json:"id"`
-	Key       *string    `json:"key,omitempty"`
-	Kind      *string    `json:"kind,omitempty"`
-	MTime     *time.Time `json:"mTime,omitempty"`
-	Name      string     `json:"name"`
-	OsName    *string    `json:"osName,omitempty"`
-	OsVersion *string    `json:"osVersion,omitempty"`
-	Path      *string    `json:"path,omitempty"`
-	Size      *int       `json:"size,omitempty"`
-	Status    *int32     `json:"status,omitempty"`
-	Type      *string    `json:"type,omitempty"`
+	CTime         *time.Time `json:"cTime,omitempty"`
+	Comment       *string    `json:"comment,omitempty"`
+	Id            string     `json:"id"`
+	Key           *string    `json:"key,omitempty"`
+	Kind          *string    `json:"kind,omitempty"`
+	LogicalVolume *string    `json:"logicalVolume,omitempty"`
+	MTime         *time.Time `json:"mTime,omitempty"`
+	Name          string     `json:"name"`
+	OsName        *string    `json:"osName,omitempty"`
+	OsVersion     *string    `json:"osVersion,omitempty"`
+	Path          *string    `json:"path,omitempty"`
+	Size          *int       `json:"size,omitempty"`
+	Status        *int       `json:"status,omitempty"`
+	Type          *string    `json:"type,omitempty"`
+	VolumeGroup   *string    `json:"volumeGroup,omitempty"`
 }
 
 // ListHypervisorsParams defines parameters for ListHypervisors.
