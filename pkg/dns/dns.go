@@ -143,7 +143,7 @@ func Del(rec DnsRecord, dbUrl string) error {
 
 	// Add etcd
 	path = "/skydns" + path
-	err = d.DelByKey(path)
+	err = d.DeleteDataByKey(path)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err

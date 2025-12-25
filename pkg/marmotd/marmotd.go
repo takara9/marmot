@@ -92,27 +92,21 @@ func (s *Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPar
 	s.Lock.Lock()
 	defer s.Lock.Unlock()
 
-	// データベースから情報を取得
-	d, err := db.NewDatabase(s.Ma.EtcdUrl)
-	if err != nil {
-		slog.Error("connect to database", "err", err)
-		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
-	}
-
-	_, err = d.CheckHypervisors(s.Ma.EtcdUrl, s.Ma.NodeName)
+	slog.Debug("ListHypervisors() ", "NodeName", s.Ma.NodeName)
+	_, err := s.Ma.Db.CheckHypervisors(s.Ma.EtcdUrl, s.Ma.NodeName)
 	if err != nil {
 		slog.Error("Check if the hypervisor is up and running", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
 	// ストレージ容量の更新 結果はDBへ反映
-	if err := d.CheckHvVgAllByName(s.Ma.NodeName); err != nil {
+	if err := s.Ma.Db.CheckHvVgAllByName(s.Ma.NodeName); err != nil {
 		slog.Error("Update storage capacity", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
 	var hvs []api.Hypervisor
-	if err := d.GetHypervisors(&hvs); err != nil {
+	if err := s.Ma.Db.GetHypervisors(&hvs); err != nil {
 		slog.Error("get hypervisor status", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
@@ -126,14 +120,8 @@ func (s *Server) ListVirtualMachines(ctx echo.Context) error {
 	s.Lock.Lock()
 	defer s.Lock.Unlock()
 
-	d, err := db.NewDatabase(s.Ma.EtcdUrl)
-	if err != nil {
-		slog.Error("setup error at new database connection", "err", err)
-		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
-	}
-
 	var vms []api.VirtualMachine
-	err = d.GetVmsStatuses(&vms)
+	err := s.Ma.Db.GetVmsStatuses(&vms)
 	if err != nil {
 		slog.Error("get vm status", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
@@ -155,15 +143,8 @@ func (s *Server) CreateCluster(ctx echo.Context) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	// データベースから情報を取得
-	d, err := db.NewDatabase(s.Ma.EtcdUrl)
-	if err != nil {
-		slog.Error("connect to database", "err", err)
-		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
-	}
-
 	// ハイパーバイザーの稼働チェック 結果はDBへ反映
-	_, err = d.CheckHypervisors(s.Ma.EtcdUrl, s.Ma.NodeName)
+	_, err = s.Ma.Db.CheckHypervisors(s.Ma.EtcdUrl, s.Ma.NodeName)
 	if err != nil {
 		slog.Error("check hypervisor status", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})

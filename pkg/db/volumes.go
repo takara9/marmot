@@ -2,6 +2,7 @@ package db
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -9,7 +10,9 @@ import (
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/lvm"
 	"github.com/takara9/marmot/pkg/util"
+	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	etcd "go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/client/v3/concurrency"
 )
 
 /*
@@ -55,7 +58,16 @@ func (vc *VolumeController) Close() error {
 // OS or DATA ボリュームの作成
 func (vc *VolumeController) CreateVolumeOnDB(volName, volPath, volType, volKind string, volSize int) (*api.Volume, error) {
 	slog.Debug("CreateVolume()", "volName", volName, "volPath", volPath, "volType", volType, "volKind", volKind, "volSize", volSize)
-
+	// 分散ロックの取得
+	mutex := concurrency.NewMutex(vc.Database.Session, "/lock/volume")
+	if err := mutex.Lock(vc.Database.Ctx); err != nil {
+		if errors.Is(err, rpctypes.ErrLeaseNotFound) {
+			slog.Debug("lease not found, ignoring")
+		} else {
+			return nil, fmt.Errorf("failed to acquire lock: %w", err)
+		}
+	}
+	defer mutex.Unlock(vc.Database.Ctx)
 	// ボリューム情報の生成
 	var vol api.Volume
 	vol.Id = uuid.New().String()
@@ -92,12 +104,23 @@ func (vc *VolumeController) RollbackVolumeCreation(volKey string) {
 
 // ボリュームの情報更新
 func (vc *VolumeController) UpdateVolume(key string, update api.Volume) error {
-	vc.Database.Lock.Lock()
-	defer vc.Database.Lock.Unlock()
-
-	resp, err := vc.Database.GetByKey(key)
+	// 分散ロックの取得
+	mutex := concurrency.NewMutex(vc.Database.Session, "/lock/volume")
+	if err := mutex.Lock(vc.Database.Ctx); err != nil {
+		if errors.Is(err, rpctypes.ErrLeaseNotFound) {
+			slog.Debug("lease not found, ignoring")
+		} else {
+			return fmt.Errorf("failed to acquire etcd lock: %w", err)
+		}
+	}
+	defer func() {
+		if err := mutex.Unlock(vc.Database.Ctx); err != nil {
+			slog.Error("failed to release lock", "err", err.Error())
+		}
+	}()
+	resp, err := vc.Database.GetDataByKey(key)
 	if err != nil {
-		slog.Error("GetByKey() failed", "err", err, "key", key)
+		slog.Error("GetDataByKey() failed", "err", err, "key", key)
 		return err
 	}
 
@@ -128,26 +151,28 @@ func (vc *VolumeController) UpdateVolume(key string, update api.Volume) error {
 
 // データボリュームの削除
 func (vc *VolumeController) DeleteVolume(key string) error {
-	return vc.Database.DelByKey(key)
+	return vc.Database.DeleteDataByKey(key)
 }
 
 // データボリュームの一覧取得
 func (vc *VolumeController) ListVolumes(kind string) ([]api.Volume, error) {
-	var volumes []api.Volume
 	var err error
 	var resp *etcd.GetResponse
-
 	switch kind {
 	case "data":
-		resp, err = vc.Database.GetEtcdByPrefix(VolumePrefix + "/")
+		resp, err = vc.Database.GetDataByPrefix(VolumePrefix + "/")
 	case "os":
-		resp, err = vc.Database.GetEtcdByPrefix(OsImagePrefix + "/")
+		resp, err = vc.Database.GetDataByPrefix(OsImagePrefix + "/")
 	default:
 		return nil, fmt.Errorf("unknown volume kind: %s", kind)
 	}
 
+	var volumes []api.Volume
 	if err != nil {
-		slog.Error("GetEtcdByPrefix() failed", "err", err, "key", VolumePrefix+"/")
+		if errors.Is(err, ErrNotFound) {
+			return volumes, nil
+		}
+		slog.Error("GetDataByPrefix() failed", "err", err, "key", VolumePrefix+"/")
 		return volumes, err
 	}
 	for _, kv := range resp.Kvs {
@@ -166,13 +191,13 @@ func (vc *VolumeController) ListVolumes(kind string) ([]api.Volume, error) {
 // データボリュームの情報取得
 func (vc *VolumeController) GetVolumeByKey(key string) (api.Volume, error) {
 	var vol api.Volume
-	resp, err := vc.Database.GetByKey(key)
+	resp, err := vc.Database.GetDataByKey(key)
 	if err != nil {
-		slog.Error("GetEtcdByKey() failed", "err", err, "key", key)
+		slog.Error("GetDataByKey() failed", "err", err, "key", key)
 		return vol, err
 	}
 	if len(resp) == 0 {
-		slog.Error("GetEtcdByKey() returned empty response", "key", key)
+		slog.Error("GetDataByKey() returned empty response", "key", key)
 		return vol, fmt.Errorf("volume not found for key: %s", key)
 	}
 
@@ -186,9 +211,7 @@ func (vc *VolumeController) GetVolumeByKey(key string) (api.Volume, error) {
 
 // データボリュームの一覧取得
 func (vc *VolumeController) FindVolumeByName(name, kind string) ([]api.Volume, error) {
-	var volumes []api.Volume
 	var key string
-
 	switch kind {
 	case "data":
 		key = VolumePrefix + "/"
@@ -198,9 +221,13 @@ func (vc *VolumeController) FindVolumeByName(name, kind string) ([]api.Volume, e
 		return nil, fmt.Errorf("unknown volume kind: %s", kind)
 	}
 
-	resp, err := vc.Database.GetEtcdByPrefix(key)
+	var volumes []api.Volume
+	resp, err := vc.Database.GetDataByPrefix(key)
 	if err != nil {
-		slog.Error("GetEtcdByPrefix() failed", "err", err, "key", key)
+		if errors.Is(err, ErrNotFound) {
+			return volumes, nil
+		}
+		slog.Error("GetDataByPrefix() failed", "err", err, "key", key)
 		return volumes, err
 	}
 

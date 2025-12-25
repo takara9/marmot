@@ -25,11 +25,8 @@ var marmotServerTest *marmotd.Server
 var containerID string
 
 func prepareMockServers() {
-	fmt.Println("Marmotサーバーのモック起動")
-	// Marmotサーバーのモック起動
-	GinkgoWriter.Println("Start marmot server mock")
-
-	// Dockerコンテナを起動
+	// Etcdサーバーのモック起動
+	GinkgoWriter.Println("etcdのモック起動")
 	cmd := exec.Command("docker", "run", "-d", "--name", "etcd0", "-p", "3379:2379", "-p", "3380:2380", "ghcr.io/takara9/etcd:3.6.5")
 	output, err := cmd.CombinedOutput()
 	Expect(err).NotTo(HaveOccurred())
@@ -37,7 +34,8 @@ func prepareMockServers() {
 	fmt.Printf("Container started with ID: %s\n", containerID)
 	time.Sleep(10 * time.Second) // コンテナが起動するまで待機
 
-	//MockServer バックグラウンドで起動する
+	// Marmotサーバーのモック起動
+	GinkgoWriter.Println("Marmotサーバーのモック起動")
 	e := echo.New()
 	marmotServerTest = marmotd.NewServer("hvc", "http://127.0.0.1:3379")
 	go func() {

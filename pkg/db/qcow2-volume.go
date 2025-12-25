@@ -73,12 +73,12 @@ func (d *Database) GetOsImgTempQcow2ByOsVariant(osVariant string) (types.OsImage
 }
 
 func (d *Database) GetOsImgQcow2Tempes(osits *[]types.OsImageTemplate) error {
-	resp, err := d.GetEtcdByPrefix(OsTemplateImagePrefix)
+	resp, err := d.GetDataByPrefix(OsTemplateImagePrefix)
 	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return nil
+		}
 		return err
-	}
-	if resp.Count == 0 {
-		return errors.New("NotFound")
 	}
 
 	for _, ev := range resp.Kvs {

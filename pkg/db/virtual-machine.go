@@ -40,11 +40,12 @@ func (d *Database) PutVmByVmKey(vmKey string, vm api.VirtualMachine) error {
 
 // 仮想マシンのデータを取得
 func (d *Database) GetVmsStatuses(vms *[]api.VirtualMachine) error {
-	resp, err := d.GetEtcdByPrefix(VmPrefix)
+	resp, err := d.GetDataByPrefix(VmPrefix)
 	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return nil
+		}
 		return err
-	} else if resp.Count == 0 {
-		return nil
 	}
 	for _, ev := range resp.Kvs {
 		var vm api.VirtualMachine // ここに宣言することで、ループ毎に初期化される
@@ -127,7 +128,7 @@ func (d *Database) AssignHvforVm(vm api.VirtualMachine) (string, string, string,
 	vm.Uuid = util.StringPtr(txId.String())
 	vm.CTime = util.TimePtr(time.Now())
 	vm.STime = util.TimePtr(time.Now())
-	vm.Status = util.Int64PtrInt32(types.PROVISIONING)       // プロビジョニング中
+	vm.Status = util.Int64PtrInt32(types.PROVISIONING)  // プロビジョニング中
 	if err := d.PutDataEtcd(*vm.Key, &vm); err != nil { // 仮想マシンのデータ登録
 		slog.Debug("=== d.PutDataEtcd failed", "vm.Key", *vm.Key, "err", err)
 		return "", "", "", txId.String(), 0, err

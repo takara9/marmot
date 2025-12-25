@@ -6,6 +6,8 @@ import (
 	"log/slog"
 
 	. "github.com/takara9/marmot/pkg/types"
+	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
+	"go.etcd.io/etcd/client/v3/concurrency"
 )
 
 // シリアル番号
@@ -14,16 +16,28 @@ func (d *Database) CreateSeq(key string, start uint64, step uint64) error {
 	seq.Serial = start
 	seq.Start = start
 	seq.Step = step
-	seq.Key = SeqPrefix+"/"+key
+	seq.Key = SeqPrefix + "/" + key
 	err := d.PutDataEtcd(seq.Key, seq)
 	return err
 }
 
 // シリアル番号の取得（ロックが必須）
 func (d *Database) GetSeqByKind(key string) (uint64, error) {
-	// 排他制御
-	d.Lock.Lock()
-	defer d.Lock.Unlock()
+	// 分散ロック
+	mutex := concurrency.NewMutex(d.Session, "/lock/serial")
+	if err := mutex.Lock(d.Ctx); err != nil {
+		if errors.Is(err, rpctypes.ErrLeaseNotFound) {
+			slog.Debug("lease not found, ignoring")
+		} else {
+			slog.Error("failed to acquire lock", "err", err.Error())
+			return 0, err
+		}
+	}
+	defer func() {
+		if err := mutex.Unlock(d.Ctx); err != nil {
+			slog.Error("failed to release lock", "err", err.Error())
+		}
+	}()
 
 	// etcdキーを使ったシリアル番号の取得
 	etcdKey := SeqPrefix + "/" + key
@@ -53,12 +67,12 @@ func (d *Database) GetSeqByKind(key string) (uint64, error) {
 }
 
 func (d *Database) GetSeqs(seqs *[]VmSerial) error {
-	resp, err := d.GetEtcdByPrefix(SeqPrefix + "/")
+	resp, err := d.GetDataByPrefix(SeqPrefix + "/")
 	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return nil
+		}
 		return err
-	}
-	if resp.Count == 0 {
-		return errors.New("NotFound")
 	}
 
 	for _, ev := range resp.Kvs {
@@ -73,5 +87,5 @@ func (d *Database) GetSeqs(seqs *[]VmSerial) error {
 }
 
 func (d *Database) DelSeqByKey(key string) error {
-	return d.DelByKey(SeqPrefix + "/" + key)
+	return d.DeleteDataByKey(SeqPrefix + "/" + key)
 }

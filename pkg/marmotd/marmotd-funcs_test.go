@@ -29,8 +29,15 @@ var etcdEpTest *db.Database
 var etcdContainerIdFunc string
 
 func prepareMockVmfunc() {
-	fmt.Println("モックサーバーの起動")
+	fmt.Println("モック etcd サーバーの起動")
+	cmd := exec.Command("docker", "run", "-d", "--name", "etcdmarmot", "-p", "5379:2379", "-p", "5380:2380", "ghcr.io/takara9/etcd:3.6.5")
+	output, err := cmd.CombinedOutput()
+	Expect(err).NotTo(HaveOccurred())
+	etcdContainerIdFunc = string(output[:12]) // 最初の12文字をIDとして取得
+	fmt.Printf("Container started with ID: %s\n", etcdContainerIdFunc)
+	time.Sleep(10 * time.Second) // コンテナが起動するまで待機
 
+	fmt.Println("モックサーバーの準備")
 	e := echo.New()
 	server := marmotd.NewServer("hvc", etcdUrlTest)
 	go func() {
@@ -45,14 +52,6 @@ func prepareMockVmfunc() {
 		api.RegisterHandlersWithBaseURL(e, server, "/api/v1")
 		fmt.Println(e.Start("127.0.0.1:8090"), "Mock server is running")
 	}()
-
-	// Dockerコンテナを起動
-	cmd := exec.Command("docker", "run", "-d", "--name", "etcdmarmot", "-p", "5379:2379", "-p", "5380:2380", "ghcr.io/takara9/etcd:3.6.5")
-	output, err := cmd.CombinedOutput()
-	Expect(err).NotTo(HaveOccurred())
-	etcdContainerIdFunc = string(output[:12]) // 最初の12文字をIDとして取得
-	fmt.Printf("Container started with ID: %s\n", etcdContainerIdFunc)
-	time.Sleep(10 * time.Second) // コンテナが起動するまで待機
 }
 
 func cleanupMockVmfunc() {
@@ -88,7 +87,7 @@ func cleanupMockVmfunc() {
 	cmd.CombinedOutput()
 
 	cmd = exec.Command("docker rm $(docker ps --all |awk 'NR>1 {print $1}')")
-	cmd.CombinedOutput()	
+	cmd.CombinedOutput()
 }
 
 func testMarmotFuncs() {

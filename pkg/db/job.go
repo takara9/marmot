@@ -2,6 +2,7 @@ package db
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -97,7 +98,7 @@ func (d *Job) EntryJob(name string, cmd ...string) (string, error) {
 // ジョブ番号を指定してジョブをキャンセルする
 func (d *Job) CancelJob(id string) error {
 	key := JobPrefix + "/" + id
-	if err := d.Database.DelByKey(key); err != nil {
+	if err := d.Database.DeleteDataByKey(key); err != nil {
 		slog.Error("CancelJob() failed", "err", err, "key", key)
 		return err
 	}
@@ -107,14 +108,15 @@ func (d *Job) CancelJob(id string) error {
 // 古いものから順番にジョブのリストを取得する
 func (d *Job) GetJobs(jobStatus int) ([]JobEntry, error) {
 	var jobs []JobEntry
-	resp, err := d.Database.GetEtcdByPrefix(JobPrefix)
+	resp, err := d.Database.GetDataByPrefix(JobPrefix)
 	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return jobs, nil
+		}
 		slog.Error("failed to getting prefix", "err", err)
-		return nil, err
+		return jobs, err
 	}
-	if resp.Count == 0 {
-		return nil, nil
-	}
+
 	for _, ev := range resp.Kvs {
 		var job JobEntry
 		if err := json.Unmarshal([]byte(ev.Value), &job); err != nil {

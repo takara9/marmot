@@ -131,7 +131,7 @@ var _ = Describe("Etcd", Ordered, func() {
 			})
 
 			It("Delete version key", func() {
-				err := d.DelByKey("version")
+				err := d.DeleteDataByKey("version")
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
@@ -140,7 +140,7 @@ var _ = Describe("Etcd", Ordered, func() {
 			var IDX = "TST"
 
 			It("Delete seqno key", func() {
-				err := d.DelByKey(IDX)
+				err := d.DeleteDataByKey(IDX)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -190,7 +190,7 @@ var _ = Describe("Etcd", Ordered, func() {
 			})
 
 			It("Delete seqno key", func() {
-				err := d.DelByKey(IDX)
+				err := d.DeleteDataByKey(IDX)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})

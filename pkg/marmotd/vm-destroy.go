@@ -37,8 +37,8 @@ func (m *Marmot) DestroyVM2(spec api.VmSpec) error {
 	}
 
 	// データベースから削除
-	if err := m.Db.DelByKey(*spec.Key); err != nil {
-		slog.Error("DelByKey(", "err", err)
+	if err := m.Db.DeleteDataByKey(*spec.Key); err != nil {
+		slog.Error("DeleteDataByKey() failed", "err", err)
 	}
 
 	domName := strings.Split(*spec.Key, "/")
