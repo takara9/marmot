@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -25,10 +26,12 @@ func Execute() {
 	var err error
 	m, err = getClientConfig()
 	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
 		os.Exit(1)
 	}
 	err = rootCmd.Execute()
 	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed error:", err)
 		os.Exit(1)
 	}
 	os.Exit(0)
