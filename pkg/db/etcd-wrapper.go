@@ -167,10 +167,8 @@ func (d *Database) PutJSONCAS(key string, expectedRev int64, v interface{}) erro
 
 // キーが一致した値を取得
 func (d *Database) GetDataByKey(key string) ([]byte, error) {
-	//ctx, cancel := context.WithTimeout(d.Ctx, 5*time.Second)
-	//defer cancel()
-
-	resp, err := d.Cli.Get(d.Ctx, key, etcd.WithLimit(1))
+	ctx, _ := context.WithTimeout(d.Ctx, 5*time.Second)
+	resp, err := d.Cli.Get(ctx, key, etcd.WithLimit(1))
 	if err != nil {
 		return nil, err
 	}
@@ -184,10 +182,8 @@ func (d *Database) GetDataByKey(key string) ([]byte, error) {
 
 // 前方一致のサーチ
 func (d *Database) GetDataByPrefix(key string) (*etcd.GetResponse, error) {
-	//ctx, cancel := context.WithTimeout(d.Ctx, 5*time.Second)
-	//defer cancel()
-
-	resp, err := d.Cli.Get(d.Ctx, key, etcd.WithPrefix())
+	ctx, _ := context.WithTimeout(d.Ctx, 5*time.Second)
+	resp, err := d.Cli.Get(ctx, key, etcd.WithPrefix())
 	if err != nil {
 		slog.Debug("GetDataByPrefix()", "err", err, "key", key)
 		return nil, err
@@ -203,11 +199,9 @@ func (d *Database) GetDataByPrefix(key string) (*etcd.GetResponse, error) {
 
 // 廃止予定
 func (d *Database) GetDnsByKey(path string) (types.DNSEntry, error) {
-	//ctx, cancel := context.WithTimeout(d.Ctx, 5*time.Second)
-	//defer cancel()
-
+	ctx, _ := context.WithTimeout(d.Ctx, 5*time.Second)
 	var entry types.DNSEntry
-	resp, err := d.Cli.Get(d.Ctx, path)
+	resp, err := d.Cli.Get(ctx, path)
 	if err != nil {
 		return entry, err
 	}
@@ -238,10 +232,8 @@ func (d *Database) DeleteDataByKey(key string) error {
 			slog.Error("failed to release lock", "err", err.Error())
 		}
 	}()
-	//ctx, cancel := context.WithTimeout(d.Ctx, 5*time.Second)
-	//defer cancel()
-
-	_, err := d.Cli.Delete(d.Ctx, key)
+	ctx, _ := context.WithTimeout(d.Ctx, 5*time.Second)
+	_, err := d.Cli.Delete(ctx, key)
 	if err != nil {
 		slog.Error("DelDataByKey() failed", "err", err, "key", key)
 	}
@@ -266,8 +258,6 @@ func (d *Database) PutDataEtcd(key string, v interface{}) error {
 	}
 
 	ctx, _ := context.WithTimeout(d.Ctx, 5*time.Second)
-	//defer cancel()
-
 	_, err = d.Cli.Put(ctx, key, string(byteJSON))
 	if err != nil {
 		slog.Error("failed to put data", "err", err, "key", key)

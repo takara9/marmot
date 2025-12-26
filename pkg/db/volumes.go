@@ -54,7 +54,6 @@ func (vc *VolumeController) Close() error {
 }
 
 // 仮想マシンを生成する時にボリュームを生成して、アタッチする
-
 // OS or DATA ボリュームの作成
 func (vc *VolumeController) CreateVolumeOnDB(volName, volPath, volType, volKind string, volSize int) (*api.Volume, error) {
 	slog.Debug("CreateVolume()", "volName", volName, "volPath", volPath, "volType", volType, "volKind", volKind, "volSize", volSize)

@@ -1,10 +1,12 @@
 package db
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/config"
@@ -62,12 +64,8 @@ func (d *Database) NewHypervisor(node string, hv api.Hypervisor) error {
 // Keyに一致したHVデータの取り出し
 func (d *Database) GetHypervisorByName(hbNode string) (api.Hypervisor, error) {
 	var hv api.Hypervisor
-
-	//ctx, cancel := context.WithTimeout(d.Ctx, 5*time.Second)
-	//defer cancel()
-
-	//resp, err := d.Cli.Get(ctx, HvPrefix+"/"+hbNode)
-	resp, err := d.Cli.Get(d.Ctx, HvPrefix+"/"+hbNode)
+	ctx, _ := context.WithTimeout(d.Ctx, 5*time.Second)
+	resp, err := d.Cli.Get(ctx, HvPrefix+"/"+hbNode)
 	if err != nil {
 		slog.Error("GetHypervisorByName()", "err", err)
 		return api.Hypervisor{}, err
