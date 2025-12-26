@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -375,4 +376,12 @@ func (d *Database) FindByHostAndClusteName(hostname string, clustername string) 
 		}
 	}
 	return "", errors.New("NotFound")
+}
+
+func decodeBase64(data []byte) ([]byte, error) {
+	decoded, err := base64.StdEncoding.DecodeString(string(data))
+	if err != nil {
+		return nil, err
+	}
+	return []byte(decoded), nil
 }

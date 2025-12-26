@@ -124,7 +124,10 @@ func (d *Database) GetHypervisors(hvs *[]api.Hypervisor) error {
 		var hv api.Hypervisor
 		slog.Debug("GetHypervisors()", "etcd value string", string(ev.Value))
 		slog.Debug("GetHypervisors()", "etcd value raw", ev.Value)
-		err = json.Unmarshal([]byte(ev.Value), &hv)
+		decodedValue, err := decodeBase64(ev.Value)
+		slog.Debug("GetHypervisors()", "etcd value decoded", string(decodedValue))
+
+		err = json.Unmarshal([]byte(decodedValue), &hv)
 		if err != nil {
 			slog.Error("GetHypervisors()", "err", err)
 			return err
