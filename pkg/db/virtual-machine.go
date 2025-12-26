@@ -80,7 +80,8 @@ func (d *Database) AssignHvforVm(vm api.VirtualMachine) (string, string, string,
 	slog.Debug("=== AssignHvforVm called ===", "start", vm)
 	var txId = uuid.New()
 
-	lockKey := "/lock/vm/" + *vm.Key
+	//lockKey := "/lock/vm/" + *vm.Key
+	lockKey := "/lock/vm/"
 	mutex, err := d.LockKey(lockKey)
 	if err != nil {
 		slog.Error("failed to lock", "err", err, "key", lockKey)
@@ -150,8 +151,8 @@ func (d *Database) AssignHvforVm(vm api.VirtualMachine) (string, string, string,
 	vm.Uuid = util.StringPtr(txId.String())
 	vm.CTime = util.TimePtr(time.Now())
 	vm.STime = util.TimePtr(time.Now())
-	vm.Status = util.Int64PtrInt32(types.PROVISIONING)  // プロビジョニング中
-	if err := d.PutJSON(*vm.Key, &vm); err != nil { // 仮想マシンのデータ登録
+	vm.Status = util.Int64PtrInt32(types.PROVISIONING) // プロビジョニング中
+	if err := d.PutJSON(*vm.Key, &vm); err != nil {    // 仮想マシンのデータ登録
 		slog.Debug("=== d.PutJSON failed", "vm.Key", *vm.Key, "err", err)
 		return "", "", "", txId.String(), 0, err
 	}
