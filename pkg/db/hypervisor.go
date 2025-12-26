@@ -122,14 +122,14 @@ func (d *Database) GetHypervisors(hvs *[]api.Hypervisor) error {
 
 	for _, ev := range resp.Kvs {
 		var hv api.Hypervisor
-		slog.Debug("GetHypervisors()", "etcd value string", string(ev.Value))
-		slog.Debug("GetHypervisors()", "etcd value raw", ev.Value)
-		decodedValue, err := decodeBase64(ev.Value)
-		slog.Debug("GetHypervisors()", "etcd value decoded", decodedValue)
+		//slog.Debug("GetHypervisors()", "etcd value string", string(ev.Value))
+		//slog.Debug("GetHypervisors()", "etcd value raw", ev.Value)
+		//decodedValue, err := decodeBase64(ev.Value)
+		//slog.Debug("GetHypervisors()", "etcd value decoded", decodedValue)
 
-		err = json.Unmarshal(decodedValue, &hv)
+		err = json.Unmarshal([]byte(ev.Value), &hv)
 		if err != nil {
-			slog.Error("GetHypervisors()", "err", err)
+			slog.Error("GetHypervisors()", "err", err, "etcd value", string(ev.Value))
 			return err
 		}
 		*hvs = append(*hvs, hv)
