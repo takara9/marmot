@@ -65,7 +65,7 @@ func (d *Database) NewHypervisor(node string, hv api.Hypervisor) error {
 	defer d.UnlockKey(mutex)
 
 	if err := d.PutJSON(etcdKey, hv); err != nil {
-		slog.Error("PutJSON()", "err", err, "key", etcdKey)
+		slog.Error("failed to write Hypervisor data", "err", err, "key", etcdKey)
 		return err
 	}
 
@@ -122,8 +122,10 @@ func (d *Database) GetHypervisors(hvs *[]api.Hypervisor) error {
 
 	for _, ev := range resp.Kvs {
 		var hv api.Hypervisor
+		slog.Debug("GetHypervisors()", "etcd value", string(ev.Value))
 		err = json.Unmarshal([]byte(ev.Value), &hv)
 		if err != nil {
+			slog.Error("GetHypervisors()", "err", err)
 			return err
 		}
 		*hvs = append(*hvs, hv)
@@ -266,7 +268,6 @@ func (d *Database) CheckHypervisors(dbUrl string, nodeName string) ([]api.Hyperv
 		return hvs, err
 	}
 	defer d.UnlockKey(mutex)
-
 
 	if err := d.GetHypervisors(&hvs); err != nil {
 		slog.Error("failed to get hypervisors", "err", err)
