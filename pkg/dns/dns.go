@@ -77,7 +77,7 @@ func Add(rec DnsRecord, dbUrl string) error {
 
 	// Add etcd
 	path = "/skydns" + path
-	err = d.PutDataEtcd(path, &ent)
+	err = d.PutJSON(path, &ent)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
@@ -143,7 +143,7 @@ func Del(rec DnsRecord, dbUrl string) error {
 
 	// Add etcd
 	path = "/skydns" + path
-	err = d.DeleteDataByKey(path)
+	err = d.DeleteJSON(path)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err

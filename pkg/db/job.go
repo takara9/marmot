@@ -74,7 +74,6 @@ func NewJobController(url, jobLogPath string) (*Job, error) {
 
 // 新しいジョブの登録
 func (d *Job) EntryJob(name string, cmd ...string) (string, error) {
-	// ジョブのIDの重複は発生しないので、排他制御しない
 	var job JobEntry
 	job.Kind = "request"
 	id, err := uuid.NewRandom()
@@ -88,18 +87,27 @@ func (d *Job) EntryJob(name string, cmd ...string) (string, error) {
 	job.JobName = name
 	job.Cmd = cmd
 	job.Status = JOB_PENDING
-	if err := d.Database.PutDataEtcd(job.Key, job); err != nil {
-		slog.Error("PutDataEtcd() failed", "err", err, "key", job.Key)
+
+	mutex, err := d.Database.LockKey(job.Key)
+	if err != nil {
+		slog.Error("failed to lock", "err", err, "key", job.Key)
 		return "", err
 	}
+	defer d.Database.UnlockKey(mutex)
+
+	if err := d.Database.PutJSON(job.Key, job); err != nil {
+		slog.Error("failed to write", "err", err, "key", job.Key)
+		return "", err
+	}
+
 	return job.Id, nil
 }
 
 // ジョブ番号を指定してジョブをキャンセルする
 func (d *Job) CancelJob(id string) error {
 	key := JobPrefix + "/" + id
-	if err := d.Database.DeleteDataByKey(key); err != nil {
-		slog.Error("CancelJob() failed", "err", err, "key", key)
+	if err := d.Database.DeleteJSON(key); err != nil {
+		slog.Error("failed to delete job", "err", err, "key", key)
 		return err
 	}
 	return nil
@@ -108,7 +116,7 @@ func (d *Job) CancelJob(id string) error {
 // 古いものから順番にジョブのリストを取得する
 func (d *Job) GetJobs(jobStatus int) ([]JobEntry, error) {
 	var jobs []JobEntry
-	resp, err := d.Database.GetDataByPrefix(JobPrefix)
+	resp, err := d.Database.GetByPrefix(JobPrefix)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return jobs, nil
@@ -167,10 +175,21 @@ func (d *Job) RunJob(job JobEntry) error {
 	// ジョブ状態の更新 （ここだけ別関数にして排他制御を入れるのが良いかも）
 	job.Status = JOB_RUNNING
 	job.StartTime = time.Now()
-	if err := d.Database.PutDataEtcd(JobPrefix+"/"+job.Id, job); err != nil {
-		slog.Error("PutDataEtcd() failed", "err", err, "key", job.Key)
+	key := JobPrefix + "/" + job.Id
+
+	mutex, err := d.Database.LockKey(key)
+	if err != nil {
+		slog.Error("failed to lock", "err", err, "key", key)
 		return err
 	}
+
+	if err := d.Database.PutJSON(key, job); err != nil {
+		slog.Error("failed to write", "err", err, "key", job.Key)
+		return err
+	}
+	
+	// ロックのリリース
+	d.Database.UnlockKey(mutex)
 
 	// ジョブの実行
 	fmt.Println("===", job.Cmd[0], job.Cmd[1:], "===")
@@ -238,8 +257,16 @@ func (d *Job) RunJob(job JobEntry) error {
 	} else {
 		job.Status = JOB_ERROR
 	}
-	if err := d.Database.PutDataEtcd(JobPrefix+"/"+job.Id, job); err != nil {
-		slog.Error("PutDataEtcd() failed", "err", err, "key", job.Key)
+	
+	mutex, err = d.Database.LockKey(key)
+	if err != nil {
+		slog.Error("failed to lock", "err", err, "key", key)
+		return err
+	}
+	defer d.Database.UnlockKey(mutex)
+
+	if err := d.Database.PutJSON(key, job); err != nil {
+		slog.Error("failed to write", "err", err, "key", key)
 		return err
 	}
 

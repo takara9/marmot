@@ -46,9 +46,18 @@ func (d *Database) SetImageTemplate(v cf.Image_yaml) error {
 	osit.VolumeGroup = v.VolumeGroup
 	osit.OsVariant = v.Name
 	osit.Qcow2Path = v.Qcow2ImagePath
-	osit.Key = OsTemplateImagePrefix + "/" + osit.OsVariant
-	if err := d.PutDataEtcd(osit.Key, osit); err != nil {
-		slog.Error("SetImageTemplate() put", "err", err, "key", osit.Key)
+	key := OsTemplateImagePrefix + "/" + osit.OsVariant
+	osit.Key = key
+
+	mutex, err := d.LockKey(key)
+	if err != nil {
+		slog.Error("failed to lock", "err", err, "key", key)
+		return err
+	}
+	defer d.UnlockKey(mutex)
+
+	if err := d.PutJSON(key, osit); err != nil {
+		slog.Error("failed to write template image data", "err", err, "key", osit.Key)
 		return err
 	}
 	return nil
@@ -56,46 +65,29 @@ func (d *Database) SetImageTemplate(v cf.Image_yaml) error {
 
 func (d *Database) GetOsImgTempByKey(key string) (types.OsImageTemplate, error) {
 	var osit types.OsImageTemplate
-	resp, err := d.Cli.Get(d.Ctx, key)
-	if err != nil {
-		return osit, err
-	}
-	if resp.Count == 0 {
-		slog.Error("GetOsImgTempByKey() NotFound", "key", key)
-		return osit, errors.New("NotFound")
-	}
-
-	err = json.Unmarshal([]byte(resp.Kvs[0].Value), &osit)
+	_, err := d.GetJSON(key, &osit)
 	if err != nil {
 		return osit, err
 	}
 	return osit, nil
 }
 
-// Keyに一致したOSイメージテンプレートを返す
-// lvタイプとqcow2タイプの両方に対応するようにしたい
-// OsImageTemplate構造体にタイプ情報を追加する必要があるかも
+// 一致したOSイメージテンプレートを返す
 func (d *Database) GetOsImgTempByOsVariant(osVariant string) (types.OsImageTemplate, error) {
-	slog.Debug("GetOsImgTempByOsVariant", "key=", OsTemplateImagePrefix+"/"+osVariant)
-	resp, err := d.Cli.Get(d.Ctx, OsTemplateImagePrefix+"/"+osVariant)
-	if err != nil {
-		return types.OsImageTemplate{}, err
-	}
-	if resp.Count == 0 {
-		slog.Error("GetOsImgTempByKey() NotFound", "key", OsTemplateImagePrefix+"/"+osVariant)
-		return types.OsImageTemplate{}, errors.New("NotFound")
-	}
+	key := OsTemplateImagePrefix+"/"+osVariant
+	slog.Debug("GetOsImgTempByOsVariant", "key=", key)
 
 	var osit types.OsImageTemplate
-	err = json.Unmarshal([]byte(resp.Kvs[0].Value), &osit)
+	_, err := d.GetJSON(key, &osit)
 	if err != nil {
 		return types.OsImageTemplate{}, err
 	}
+
 	return osit, nil
 }
 
 func (d *Database) GetOsImgTempes(osits *[]types.OsImageTemplate) error {
-	resp, err := d.GetDataByPrefix(OsTemplateImagePrefix)
+	resp, err := d.GetByPrefix(OsTemplateImagePrefix)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return nil

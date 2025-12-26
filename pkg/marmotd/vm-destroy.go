@@ -12,9 +12,18 @@ import (
 
 // VMの削除
 func (m *Marmot) DestroyVM2(spec api.VmSpec) error {
-	if spec.Key != nil {
-		slog.Debug("DestroyVM2()", "key", *spec.Key)
+	slog.Debug("DestroyVM2() called", "key", *spec.Key)
+	key := *spec.Key
+	lockKey := "/lock/vm/" + key
+
+	mutex, err := m.Db.LockKey(lockKey)
+	if err != nil {
+		slog.Error("failed to lock", "err", err, "key", lockKey)
+		return err
 	}
+	defer m.Db.UnlockKey(mutex)
+
+
 	vm, err := m.Db.GetVmByVmKey(*spec.Key)
 	if err != nil {
 		slog.Error("GetVmByVmKey()", "err", err)
@@ -30,14 +39,14 @@ func (m *Marmot) DestroyVM2(spec api.VmSpec) error {
 	if *vm.Status != types.STOPPED && *vm.Status != types.ERROR {
 		*hv.FreeCpu = *hv.FreeCpu + int32(*vm.Cpu)
 		*hv.FreeMemory = *hv.FreeMemory + *vm.Memory
-		err = m.Db.PutDataEtcd(*hv.Key, hv)
+		err = m.Db.PutJSON(*hv.Key, hv)
 		if err != nil {
 			slog.Error("PutDataEtcd()", "err", err)
 		}
 	}
 
 	// データベースから削除
-	if err := m.Db.DeleteDataByKey(*spec.Key); err != nil {
+	if err := m.Db.DeleteJSON(*spec.Key); err != nil {
 		slog.Error("DeleteDataByKey() failed", "err", err)
 	}
 

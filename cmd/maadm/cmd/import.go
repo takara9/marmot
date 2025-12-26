@@ -122,7 +122,7 @@ func importConfig() error {
 		return err
 	}
 	for _, v := range buf {
-		d.PutDataEtcd(*v.Key, v)
+		d.PutJSON(*v.Key, v)
 
 	}
 
@@ -169,7 +169,7 @@ func importConfig() error {
 
 	for _, v := range buf2 {
 		slog.Debug("marmot-os-temp.json", "key", v.Key)
-		if err := d.PutDataEtcd(v.Key, v); err != nil {
+		if err := d.PutJSON(v.Key, v); err != nil {
 			slog.Error("Failed to put OS image template data", "error", err, "key", v.Key)
 			return err
 		}
@@ -189,7 +189,7 @@ func importConfig() error {
 		return err
 	}
 	for _, v := range buf3 {
-		d.PutDataEtcd(v.Key, v)
+		d.PutJSON(v.Key, v)
 	}
 
 	//Read 仮想マシン
@@ -206,7 +206,7 @@ func importConfig() error {
 		return err
 	}
 	for _, v := range buf4 {
-		d.PutDataEtcd(*v.Key, v)
+		d.PutJSON(*v.Key, v)
 	}
 
 	return nil

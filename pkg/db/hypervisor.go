@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -12,8 +11,6 @@ import (
 	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/lvm"
 	"github.com/takara9/marmot/pkg/util"
-	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
-	"go.etcd.io/etcd/client/v3/concurrency"
 )
 
 // ハイパーバイザーの設定
@@ -39,8 +36,15 @@ func (d *Database) SetHypervisors(v config.Hypervisor_yaml) error {
 	}
 	hv.StgPool = &stgpool
 
-	if err := d.PutDataEtcd(hvKey, hv); err != nil {
-		slog.Error("PutDataEtcd()", "err", err)
+	mutex, err := d.LockKey(hvKey)
+	if err != nil {
+		slog.Error("failed to lock", "err", err, "key", hvKey)
+		return err
+	}
+	defer d.UnlockKey(mutex)
+
+	if err := d.PutJSON(hvKey, hv); err != nil {
+		slog.Error("failed to write", "err", err, "key", hvKey)
 		return err
 	}
 
@@ -53,8 +57,15 @@ func (d *Database) NewHypervisor(node string, hv api.Hypervisor) error {
 	hv.Key = &etcdKey
 	hv.Status = util.Int64PtrInt32(2) // 暫定
 
-	if err := d.PutDataEtcd(etcdKey, hv); err != nil {
-		slog.Error("PutDataEtcd()", "err", err)
+	mutex, err := d.LockKey(etcdKey)
+	if err != nil {
+		slog.Error("LockKey()", "err", err, "key", etcdKey)
+		return err
+	}
+	defer d.UnlockKey(mutex)
+
+	if err := d.PutJSON(etcdKey, hv); err != nil {
+		slog.Error("PutJSON()", "err", err, "key", etcdKey)
 		return err
 	}
 
@@ -85,7 +96,15 @@ func (d *Database) GetHypervisorByName(hbNode string) (api.Hypervisor, error) {
 
 // Keyに一致したHVを削除
 func (d *Database) DeleteHypervisorByName(name string) error {
-	if err := d.DeleteDataByKey(HvPrefix + "/" + name); err != nil {
+	etcdKey := HvPrefix + "/" + name
+	mutex, err := d.LockKey(etcdKey)
+	if err != nil {
+		slog.Error("LockKey()", "err", err, "key", etcdKey)
+		return err
+	}
+	defer d.UnlockKey(mutex)
+
+	if err := d.DeleteJSON(etcdKey); err != nil {
 		return err
 	}
 	return nil
@@ -93,7 +112,7 @@ func (d *Database) DeleteHypervisorByName(name string) error {
 
 // ハイパーバイザーのデータを取得
 func (d *Database) GetHypervisors(hvs *[]api.Hypervisor) error {
-	resp, err := d.GetDataByPrefix(HvPrefix)
+	resp, err := d.GetByPrefix(HvPrefix)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return nil
@@ -115,39 +134,49 @@ func (d *Database) GetHypervisors(hvs *[]api.Hypervisor) error {
 func (d *Database) CheckHvVgAllByName(nodeName string) error {
 	slog.Debug("CheckHvVgAllByName()", "nodeName", nodeName)
 
-	mutex := concurrency.NewMutex(d.Session, "/lock/hypervisor/"+nodeName)
-	if err := mutex.Lock(d.Ctx); err != nil {
-		if errors.Is(err, rpctypes.ErrLeaseNotFound) {
-			slog.Debug("lease not found, ignoring")
-		} else {
-			slog.Error("failed to acquire lock", "err", err.Error())
-			return fmt.Errorf("failed to acquire lock: %w", err)
+	/*
+		mutex := concurrency.NewMutex(d.Session, "/lock/hypervisor/"+nodeName)
+		if err := mutex.Lock(d.Ctx); err != nil {
+			if errors.Is(err, rpctypes.ErrLeaseNotFound) {
+				slog.Debug("lease not found, ignoring")
+			} else {
+				slog.Error("failed to acquire lock", "err", err.Error())
+				return fmt.Errorf("failed to acquire lock: %w", err)
+			}
 		}
+		defer func() {
+			if err := mutex.Unlock(d.Ctx); err != nil {
+				slog.Error("failed to release lock", "err", err.Error())
+			}
+		}()
+	*/
+
+	etcdKey := HvPrefix + "/" + nodeName
+	mutex, err := d.LockKey(etcdKey)
+	if err != nil {
+		slog.Error("LockKey()", "err", err, "key", etcdKey)
+		return err
 	}
-	defer func() {
-		if err := mutex.Unlock(d.Ctx); err != nil {
-			slog.Error("failed to release lock", "err", err.Error())
-		}
-	}()
+	defer d.UnlockKey(mutex)
 
 	hv, err := d.GetHypervisorByName(nodeName)
 	if err != nil {
-		slog.Error("", "err", err)
+		slog.Error("GetHypervisorByName()", "err", err)
 		return err
 	}
 
 	for i := 0; i < len(*hv.StgPool); i++ {
 		total_sz, free_sz, err := lvm.CheckVG(*(*hv.StgPool)[i].VolGroup)
 		if err != nil {
-			slog.Error("", "err", err)
+			slog.Error("lvm.CheckVG()", "err", err)
 			return err
 		}
 		(*hv.StgPool)[i].FreeCap = util.IntPtrInt64(int(free_sz / 1024 / 1024 / 1024))
 		(*hv.StgPool)[i].VgCap = util.IntPtrInt64(int(total_sz / 1024 / 1024 / 1024))
 	}
 
-	if err := d.PutDataEtcd(HvPrefix+"/"+nodeName, hv); err != nil {
-		slog.Error("", "err", err)
+	if err := d.PutJSON(etcdKey, hv); err != nil {
+		slog.Error("PutJSON()", "err", err)
 		return err
 	}
 	return nil
@@ -156,20 +185,29 @@ func (d *Database) CheckHvVgAllByName(nodeName string) error {
 func (d *Database) CheckHvVG2ByName(nodeName string, vg string) error {
 	slog.Debug("CheckHvVG2ByName()", "nodeName", nodeName, "vg", vg)
 
-	mutex := concurrency.NewMutex(d.Session, "/lock/hypervisor/"+nodeName)
-	if err := mutex.Lock(d.Ctx); err != nil {
-		if errors.Is(err, rpctypes.ErrLeaseNotFound) {
-			slog.Debug("lease not found, ignoring")
-		} else {
-			slog.Error("failed to acquire lock", "err", err.Error())
-			return fmt.Errorf("failed to acquire lock: %w", err)
+	/*
+		mutex := concurrency.NewMutex(d.Session, "/lock/hypervisor/"+nodeName)
+		if err := mutex.Lock(d.Ctx); err != nil {
+			if errors.Is(err, rpctypes.ErrLeaseNotFound) {
+				slog.Debug("lease not found, ignoring")
+			} else {
+				slog.Error("failed to acquire lock", "err", err.Error())
+				return fmt.Errorf("failed to acquire lock: %w", err)
+			}
 		}
+		defer func() {
+			if err := mutex.Unlock(d.Ctx); err != nil {
+				slog.Error("failed to release lock", "err", err.Error())
+			}
+		}()
+	*/
+	etcdKey := HvPrefix + "/" + nodeName
+	mutex, err := d.LockKey(etcdKey)
+	if err != nil {
+		slog.Error("LockKey()", "err", err, "key", etcdKey)
+		return err
 	}
-	defer func() {
-		if err := mutex.Unlock(d.Ctx); err != nil {
-			slog.Error("failed to release lock", "err", err.Error())
-		}
-	}()
+	defer d.UnlockKey(mutex)
 
 	// LVMへのアクセス
 	total_sz, free_sz, err := lvm.CheckVG(vg)
@@ -193,9 +231,8 @@ func (d *Database) CheckHvVG2ByName(nodeName string, vg string) error {
 	}
 
 	// DBへ書き込み
-	err = d.PutDataEtcd(HvPrefix+"/"+nodeName, hv)
-	if err != nil {
-		slog.Error("", "err", err)
+	if err := d.PutJSON(etcdKey, hv); err != nil {
+		slog.Error("PutJSON()", "err", err)
 		return err
 	}
 	return nil
@@ -204,22 +241,32 @@ func (d *Database) CheckHvVG2ByName(nodeName string, vg string) error {
 // ハイパーバイザーをREST-APIでアクセスして疎通を確認、DBへ反映させる
 func (d *Database) CheckHypervisors(dbUrl string, nodeName string) ([]api.Hypervisor, error) {
 	slog.Debug("CheckHypervisors()", "dbUrl", dbUrl, "node", nodeName)
-
 	var hvs []api.Hypervisor
-	mutex := concurrency.NewMutex(d.Session, "/lock/hypervisor/"+nodeName)
-	if err := mutex.Lock(d.Ctx); err != nil {
-		if errors.Is(err, rpctypes.ErrLeaseNotFound) {
-			slog.Debug("lease not found, ignoring")
-		} else {
-			slog.Error("failed to acquire lock", "err", err.Error())
-			return hvs, fmt.Errorf("failed to acquire lock: %w", err)
+	/*
+		mutex := concurrency.NewMutex(d.Session, "/lock/hypervisor/"+nodeName)
+		if err := mutex.Lock(d.Ctx); err != nil {
+			if errors.Is(err, rpctypes.ErrLeaseNotFound) {
+				slog.Debug("lease not found, ignoring")
+			} else {
+				slog.Error("failed to acquire lock", "err", err.Error())
+				return hvs, fmt.Errorf("failed to acquire lock: %w", err)
+			}
 		}
+		defer func() {
+			if err := mutex.Unlock(d.Ctx); err != nil {
+				slog.Error("failed to release lock", "err", err.Error())
+			}
+		}()
+	*/
+
+	etcdKey := HvPrefix + "/" + nodeName
+	mutex, err := d.LockKey(etcdKey)
+	if err != nil {
+		slog.Error("LockKey()", "err", err, "key", etcdKey)
+		return hvs, err
 	}
-	defer func() {
-		if err := mutex.Unlock(d.Ctx); err != nil {
-			slog.Error("failed to release lock", "err", err.Error())
-		}
-	}()
+	defer d.UnlockKey(mutex)
+
 
 	if err := d.GetHypervisors(&hvs); err != nil {
 		slog.Error("failed to get hypervisors", "err", err)
@@ -228,10 +275,9 @@ func (d *Database) CheckHypervisors(dbUrl string, nodeName string) ([]api.Hyperv
 
 	// 自ノードを含むハイパーバイザーの死活チェック、DBへ反映
 	for _, val := range hvs {
-		// ハイパーバイザーの状態をDBへ書き込み
-		err := d.PutDataEtcd(*val.Key, val)
+		err := d.PutJSON(*val.Key, val)
 		if err != nil {
-			slog.Error("failed to put hypervisor data", "err", err)
+			slog.Error("PutJSON()", "err", err)
 		}
 	}
 	return hvs, nil

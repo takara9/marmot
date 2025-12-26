@@ -10,9 +10,7 @@ import (
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/lvm"
 	"github.com/takara9/marmot/pkg/util"
-	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	etcd "go.etcd.io/etcd/client/v3"
-	"go.etcd.io/etcd/client/v3/concurrency"
 )
 
 /*
@@ -57,17 +55,6 @@ func (vc *VolumeController) Close() error {
 // OS or DATA ボリュームの作成
 func (vc *VolumeController) CreateVolumeOnDB(volName, volPath, volType, volKind string, volSize int) (*api.Volume, error) {
 	slog.Debug("CreateVolume()", "volName", volName, "volPath", volPath, "volType", volType, "volKind", volKind, "volSize", volSize)
-	// 分散ロックの取得
-	mutex := concurrency.NewMutex(vc.Database.Session, "/lock/volume")
-	if err := mutex.Lock(vc.Database.Ctx); err != nil {
-		if errors.Is(err, rpctypes.ErrLeaseNotFound) {
-			slog.Debug("lease not found, ignoring")
-		} else {
-			return nil, fmt.Errorf("failed to acquire lock: %w", err)
-		}
-	}
-	defer mutex.Unlock(vc.Database.Ctx)
-	// ボリューム情報の生成
 	var vol api.Volume
 	vol.Id = uuid.New().String()
 	switch volKind {
@@ -85,12 +72,19 @@ func (vc *VolumeController) CreateVolumeOnDB(volName, volPath, volType, volKind 
 	vol.Path = util.StringPtr(volPath)
 	vol.Size = util.IntPtrInt(volSize)
 
-	// データベースに登録
-	err := vc.Database.PutDataEtcd(*vol.Key, vol)
+	mutex, err := vc.Database.LockKey(*vol.Key)
 	if err != nil {
-		slog.Error("PutDataEtcd() failed", "err", err, "key", *vol.Key)
+		slog.Error("LockKey()", "err", err, "key", *vol.Key)
 		return nil, err
 	}
+	defer vc.Database.UnlockKey(mutex)
+
+	// データベースに登録
+	if err := vc.Database.PutJSON(*vol.Key, vol); err != nil {
+		slog.Error("PutJSON()", "err", err, "key", *vol.Key)
+		return nil, err
+	}
+
 	return &vol, nil
 }
 
@@ -103,30 +97,17 @@ func (vc *VolumeController) RollbackVolumeCreation(volKey string) {
 
 // ボリュームの情報更新
 func (vc *VolumeController) UpdateVolume(key string, update api.Volume) error {
-	// 分散ロックの取得
-	mutex := concurrency.NewMutex(vc.Database.Session, "/lock/volume")
-	if err := mutex.Lock(vc.Database.Ctx); err != nil {
-		if errors.Is(err, rpctypes.ErrLeaseNotFound) {
-			slog.Debug("lease not found, ignoring")
-		} else {
-			return fmt.Errorf("failed to acquire etcd lock: %w", err)
-		}
-	}
-	defer func() {
-		if err := mutex.Unlock(vc.Database.Ctx); err != nil {
-			slog.Error("failed to release lock", "err", err.Error())
-		}
-	}()
-	resp, err := vc.Database.GetDataByKey(key)
+	mutex, err := vc.Database.LockKey(key)
 	if err != nil {
-		slog.Error("GetDataByKey() failed", "err", err, "key", key)
+		slog.Error("LockKey()", "err", err, "key", key)
 		return err
 	}
+	defer vc.Database.UnlockKey(mutex)
 
 	var rec api.Volume
-	err = json.Unmarshal([]byte(resp), &rec)
+	_, err = vc.Database.GetJSON(key, &rec)
 	if err != nil {
-		slog.Error("Unmarshal() failed", "err", err, "key", key)
+		slog.Error("GetJSON() failed", "err", err, "key", key)
 		return err
 	}
 
@@ -145,12 +126,19 @@ func (vc *VolumeController) UpdateVolume(key string, update api.Volume) error {
 	util.Assign(&rec.OsVersion, update.OsVersion)
 
 	// データベースに更新
-	return vc.Database.PutDataEtcd(key, rec)
+	return vc.Database.PutJSON(key, rec)
 }
 
 // データボリュームの削除
 func (vc *VolumeController) DeleteVolume(key string) error {
-	return vc.Database.DeleteDataByKey(key)
+	lockKey := "/lock/volume/" + key
+	mutex, err := vc.Database.LockKey(lockKey)
+	if err != nil {
+		slog.Error("failed to lock", "err", err, "key", lockKey)
+		return err
+	}
+	defer vc.Database.UnlockKey(mutex)
+	return vc.Database.DeleteJSON(key)
 }
 
 // データボリュームの一覧取得
@@ -159,9 +147,9 @@ func (vc *VolumeController) ListVolumes(kind string) ([]api.Volume, error) {
 	var resp *etcd.GetResponse
 	switch kind {
 	case "data":
-		resp, err = vc.Database.GetDataByPrefix(VolumePrefix + "/")
+		resp, err = vc.Database.GetByPrefix(VolumePrefix + "/")
 	case "os":
-		resp, err = vc.Database.GetDataByPrefix(OsImagePrefix + "/")
+		resp, err = vc.Database.GetByPrefix(OsImagePrefix + "/")
 	default:
 		return nil, fmt.Errorf("unknown volume kind: %s", kind)
 	}
@@ -190,21 +178,12 @@ func (vc *VolumeController) ListVolumes(kind string) ([]api.Volume, error) {
 // データボリュームの情報取得
 func (vc *VolumeController) GetVolumeByKey(key string) (api.Volume, error) {
 	var vol api.Volume
-	resp, err := vc.Database.GetDataByKey(key)
+	_, err := vc.Database.GetJSON(key, &vol)
 	if err != nil {
-		slog.Error("GetDataByKey() failed", "err", err, "key", key)
+		slog.Error("GetJSON() failed", "err", err, "key", key)
 		return vol, err
-	}
-	if len(resp) == 0 {
-		slog.Error("GetDataByKey() returned empty response", "key", key)
-		return vol, fmt.Errorf("volume not found for key: %s", key)
 	}
 
-	err = json.Unmarshal([]byte(resp), &vol)
-	if err != nil {
-		slog.Error("Unmarshal() failed", "err", err, "key", key)
-		return vol, err
-	}
 	return vol, nil
 }
 
@@ -221,12 +200,12 @@ func (vc *VolumeController) FindVolumeByName(name, kind string) ([]api.Volume, e
 	}
 
 	var volumes []api.Volume
-	resp, err := vc.Database.GetDataByPrefix(key)
+	resp, err := vc.Database.GetByPrefix(key)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return volumes, nil
 		}
-		slog.Error("GetDataByPrefix() failed", "err", err, "key", key)
+		slog.Error("GetByPrefix() failed", "err", err, "key", key)
 		return volumes, err
 	}
 

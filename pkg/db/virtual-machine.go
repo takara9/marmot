@@ -35,12 +35,25 @@ func (d *Database) GetVmByVmKey(vmKey string) (api.VirtualMachine, error) {
 
 // キーに一致したVM情報をetcdへ登録
 func (d *Database) PutVmByVmKey(vmKey string, vm api.VirtualMachine) error {
-	return d.PutDataEtcd(vmKey, vm)
+	lockKey := "/lock/vm/" + vmKey
+	mutex, err := d.LockKey(lockKey)
+	if err != nil {
+		slog.Error("failed to lock", "err", err, "key", lockKey)
+		return err
+	}
+	defer d.UnlockKey(mutex)
+
+	if err := d.PutJSON(vmKey, vm); err != nil {
+		slog.Error("failed to write", "err", err, "key", vmKey)
+		return err
+	}
+
+	return nil
 }
 
 // 仮想マシンのデータを取得
 func (d *Database) GetVmsStatuses(vms *[]api.VirtualMachine) error {
-	resp, err := d.GetDataByPrefix(VmPrefix)
+	resp, err := d.GetByPrefix(VmPrefix)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return nil
@@ -62,9 +75,18 @@ func (d *Database) GetVmsStatuses(vms *[]api.VirtualMachine) error {
 // 割り当てたハイパーバイザーのリソースを減らす
 // 仮想マシンのデータをセットする
 // 仮想マシンの状態をプロビジョニング中にする
+// return hvNode, hvIpAddr, vmKey, txId, hvPort, err
 func (d *Database) AssignHvforVm(vm api.VirtualMachine) (string, string, string, string, int32, error) {
 	slog.Debug("=== AssignHvforVm called ===", "start", vm)
 	var txId = uuid.New()
+
+	lockKey := "/lock/vm/" + *vm.Key
+	mutex, err := d.LockKey(lockKey)
+	if err != nil {
+		slog.Error("failed to lock", "err", err, "key", lockKey)
+		return "", "", "", txId.String(), 0, err
+	}
+	defer d.UnlockKey(mutex)
 
 	//トランザクション開始、他更新ロック 仮想マシンをデータベースに登録、状態は「データ登録中」
 	var hvs []api.Hypervisor
@@ -111,7 +133,7 @@ func (d *Database) AssignHvforVm(vm api.VirtualMachine) (string, string, string,
 
 	// ハイパーバイザーのリソース削減保存
 	//etcdKey := HvPrefix + "/" + *hv.Key
-	if err := d.PutDataEtcd(*hv.Key, hv); err != nil {
+	if err := d.PutJSON(*hv.Key, hv); err != nil {
 		return "", "", "", txId.String(), 0, err
 	}
 	slog.Debug("=== d.PutDataEtcd", "hv.Key", *hv.Key)
@@ -129,22 +151,28 @@ func (d *Database) AssignHvforVm(vm api.VirtualMachine) (string, string, string,
 	vm.CTime = util.TimePtr(time.Now())
 	vm.STime = util.TimePtr(time.Now())
 	vm.Status = util.Int64PtrInt32(types.PROVISIONING)  // プロビジョニング中
-	if err := d.PutDataEtcd(*vm.Key, &vm); err != nil { // 仮想マシンのデータ登録
-		slog.Debug("=== d.PutDataEtcd failed", "vm.Key", *vm.Key, "err", err)
+	if err := d.PutJSON(*vm.Key, &vm); err != nil { // 仮想マシンのデータ登録
+		slog.Debug("=== d.PutJSON failed", "vm.Key", *vm.Key, "err", err)
 		return "", "", "", txId.String(), 0, err
 	}
 
-	slog.Debug("=== d.PutDataEtcd", "vm.Key", *vm.Key, "err", err)
+	slog.Debug("=== d.PutJSON", "vm.Key", *vm.Key, "err", err)
 
 	return vm.HvNode, *vm.HvIpAddr, *vm.Key, txId.String(), *vm.HvPort, err
 }
 
+// この更新はCASに変えるべき
 func (d *Database) UpdateVmStateByKey(vmKey string, state int) error {
 	vm, err := d.GetVmByVmKey(vmKey)
 	if err != nil {
 		return err
 	}
+	lockKey := "/lock/vm/" + vmKey
 	vm.Status = util.IntPtrInt32(state)
-	err = d.PutDataEtcd(vmKey, vm)
+	if err := d.PutJSON(lockKey, vm); err != nil {
+		slog.Error("failed to write", "err", err, "key", lockKey)
+		return err
+	}
+
 	return err
 }

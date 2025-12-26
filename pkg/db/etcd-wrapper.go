@@ -8,12 +8,10 @@ import (
 	"log/slog"
 	"time"
 
-	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
-	etcd "go.etcd.io/etcd/client/v3"
-	"go.etcd.io/etcd/client/v3/concurrency"
-
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/types"
+	etcd "go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/client/v3/concurrency"
 )
 
 const (
@@ -134,6 +132,11 @@ func (d *Database) GetByPrefix(prefix string) (*etcd.GetResponse, error) {
 	if err != nil {
 		return nil, fmt.Errorf("etcd get prefix failed: %w", err)
 	}
+	if resp.Count == 0 {
+		slog.Debug("GetDataByPrefix(): no results", "key", prefix)
+		return nil, ErrNotFound
+	}
+
 	return resp, nil
 }
 
@@ -163,10 +166,21 @@ func (d *Database) PutJSONCAS(key string, expectedRev int64, v interface{}) erro
 	return nil
 }
 
+func (d *Database) DeleteJSON(key string) error {
+	ctx, _ := context.WithTimeout(d.Ctx, 5*time.Second)
+	_, err := d.Cli.Delete(ctx, key)
+	if err != nil {
+		slog.Error("DeleteJSON() failed", "err", err, "key", key)
+		return err
+	}
+	return nil
+}
+
 //---------------------------------------------------------------------------------------------------
 
 // キーが一致した値を取得
-func (d *Database) GetDataByKey(key string) ([]byte, error) {
+/*
+func (d *Database) _GetDataByKey(key string) ([]byte, error) {
 	ctx, _ := context.WithTimeout(d.Ctx, 5*time.Second)
 	resp, err := d.Cli.Get(ctx, key, etcd.WithLimit(1))
 	if err != nil {
@@ -196,6 +210,7 @@ func (d *Database) GetDataByPrefix(key string) (*etcd.GetResponse, error) {
 
 	return resp, nil
 }
+*/
 
 // 廃止予定
 func (d *Database) GetDnsByKey(path string) (types.DNSEntry, error) {
@@ -217,6 +232,7 @@ func (d *Database) GetDnsByKey(path string) (types.DNSEntry, error) {
 	return entry, nil
 }
 
+/*
 // 削除 キーに一致したデータ
 func (d *Database) DeleteDataByKey(key string) error {
 	mutex := concurrency.NewMutex(d.Session, "/lock/put/"+key)
@@ -241,7 +257,7 @@ func (d *Database) DeleteDataByKey(key string) error {
 }
 
 // etcdへ保存
-func (d *Database) PutDataEtcd(key string, v interface{}) error {
+func (d *Database) _PutDataEtcd(key string, v interface{}) error {
 	mutex := concurrency.NewMutex(d.Session, "/lock/put/"+key)
 	if err := mutex.Lock(d.Ctx); err != nil {
 		if errors.Is(err, rpctypes.ErrLeaseNotFound) {
@@ -265,10 +281,11 @@ func (d *Database) PutDataEtcd(key string, v interface{}) error {
 	}
 	return nil
 }
+*/
 
 // パブリックIPアドレスが一致するインスタンスを探す
 func (d *Database) FindByPublicIPaddress(ipAddress string) (bool, error) {
-	resp, err := d.GetDataByPrefix(VmPrefix)
+	resp, err := d.GetByPrefix(VmPrefix)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return false, nil
@@ -291,7 +308,7 @@ func (d *Database) FindByPublicIPaddress(ipAddress string) (bool, error) {
 
 // プライベートIPアドレスが一致するインスンスを探す
 func (d *Database) FindByPrivateIPaddress(ipAddress string) (bool, error) {
-	resp, err := d.GetDataByPrefix(VmPrefix)
+	resp, err := d.GetByPrefix(VmPrefix)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return false, nil
@@ -313,7 +330,7 @@ func (d *Database) FindByPrivateIPaddress(ipAddress string) (bool, error) {
 
 // ホスト名からVMキーを探す
 func (d *Database) FindByHostname(hostname string) (string, error) {
-	resp, err := d.GetDataByPrefix(VmPrefix)
+	resp, err := d.GetByPrefix(VmPrefix)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return "", nil
@@ -336,7 +353,7 @@ func (d *Database) FindByHostname(hostname string) (string, error) {
 
 // ホスト名とクラスタ名でVMキーを取得する
 func (d *Database) FindByHostAndClusteName(hostname string, clustername string) (string, error) {
-	resp, err := d.GetDataByPrefix(VmPrefix)
+	resp, err := d.GetByPrefix(VmPrefix)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return "", nil

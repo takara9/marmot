@@ -44,9 +44,18 @@ func (d *Database) SetImageQcow2Template(v cf.Image_yaml) error {
 	osit.LogicalVolume = v.LogicalVolume
 	osit.VolumeGroup = v.VolumeGroup
 	osit.OsVariant = v.Name
-	osit.Key = OsTemplateImagePrefix + "/" + osit.OsVariant
-	if err := d.PutDataEtcd(osit.Key, osit); err != nil {
-		slog.Error("SetImageTemplate() put", "err", err, "key", osit.Key)
+	key := OsTemplateImagePrefix + "/" + osit.OsVariant
+	osit.Key = key
+
+	mutex, err := d.LockKey(key)
+	if err != nil {
+		slog.Error("failed to lock", "err", err, "key", key)
+		return err
+	}
+	defer d.UnlockKey(mutex)
+
+	if err := d.PutJSON(key, osit); err != nil {
+		slog.Error("failed to write template image data", "err", err, "key", osit.Key)
 		return err
 	}
 	return nil
@@ -54,26 +63,19 @@ func (d *Database) SetImageQcow2Template(v cf.Image_yaml) error {
 
 // Keyに一致したOSイメージテンプレートqcow2を返す
 func (d *Database) GetOsImgTempQcow2ByOsVariant(osVariant string) (types.OsImageTemplate, error) {
-	slog.Debug("GetOsImgTempByOsVariant", "key=", OsTemplateImagePrefix+"/"+osVariant)
-	resp, err := d.Cli.Get(d.Ctx, OsTemplateImagePrefix+"/"+osVariant)
-	if err != nil {
-		return types.OsImageTemplate{}, err
-	}
-	if resp.Count == 0 {
-		slog.Error("GetOsImgTempByKey() NotFound", "key", OsTemplateImagePrefix+"/"+osVariant)
-		return types.OsImageTemplate{}, errors.New("NotFound")
-	}
+	key := OsTemplateImagePrefix + "/" + osVariant
+	slog.Debug("GetOsImgTempByOsVariant", "key=", key)
 
 	var osit types.OsImageTemplate
-	err = json.Unmarshal([]byte(resp.Kvs[0].Value), &osit)
-	if err != nil {
-		return types.OsImageTemplate{}, err
+	_, err := d.GetJSON(key, &osit)
+	if err == nil {
+		return osit, nil
 	}
 	return osit, nil
 }
 
 func (d *Database) GetOsImgQcow2Tempes(osits *[]types.OsImageTemplate) error {
-	resp, err := d.GetDataByPrefix(OsTemplateImagePrefix)
+	resp, err := d.GetByPrefix(OsTemplateImagePrefix)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return nil
