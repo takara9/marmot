@@ -18,8 +18,8 @@ func (d *Database) SetHypervisors(v config.Hypervisor_yaml) error {
 	var hv api.Hypervisor
 	hv.NodeName = v.Name
 	hv.Port = util.Int64PtrInt32(v.Port)
-	hvKey := HvPrefix + "/" + v.Name
-	hv.Key = &hvKey
+	key := HvPrefix + "/" + v.Name
+	hv.Key = &key
 	hv.IpAddr = &v.IpAddr
 	hv.Cpu = int32(v.Cpu) // 必須項目のためポインタではない
 	hv.FreeCpu = util.Int64PtrInt32(v.Cpu)
@@ -36,15 +36,15 @@ func (d *Database) SetHypervisors(v config.Hypervisor_yaml) error {
 	}
 	hv.StgPool = &stgpool
 
-	mutex, err := d.LockKey(hvKey)
+	mutex, err := d.LockKey(key)
 	if err != nil {
-		slog.Error("failed to lock", "err", err, "key", hvKey)
+		slog.Error("failed to lock", "err", err, "key", key)
 		return err
 	}
 	defer d.UnlockKey(mutex)
 
-	if err := d.PutJSON(hvKey, hv); err != nil {
-		slog.Error("failed to write", "err", err, "key", hvKey)
+	if err := d.PutJSON(key, hv); err != nil {
+		slog.Error("failed to write", "err", err, "key", key)
 		return err
 	}
 
@@ -52,20 +52,20 @@ func (d *Database) SetHypervisors(v config.Hypervisor_yaml) error {
 }
 
 func (d *Database) NewHypervisor(node string, hv api.Hypervisor) error {
+	key := HvPrefix + "/" + node
 	hv.NodeName = node
-	etcdKey := HvPrefix + "/" + node
-	hv.Key = &etcdKey
+	hv.Key = &key
 	hv.Status = util.Int64PtrInt32(2) // 暫定
 
-	mutex, err := d.LockKey(etcdKey)
+	mutex, err := d.LockKey(key)
 	if err != nil {
-		slog.Error("LockKey()", "err", err, "key", etcdKey)
+		slog.Error("LockKey()", "err", err, "key", key)
 		return err
 	}
 	defer d.UnlockKey(mutex)
 
-	if err := d.PutJSON(etcdKey, hv); err != nil {
-		slog.Error("failed to write Hypervisor data", "err", err, "key", etcdKey)
+	if err := d.PutJSON(key, hv); err != nil {
+		slog.Error("failed to write Hypervisor data", "err", err, "key", key)
 		return err
 	}
 
@@ -122,7 +122,8 @@ func (d *Database) GetHypervisors(hvs *[]api.Hypervisor) error {
 
 	for _, ev := range resp.Kvs {
 		var hv api.Hypervisor
-		slog.Debug("GetHypervisors()", "etcd value", string(ev.Value))
+		slog.Debug("GetHypervisors()", "etcd value string", string(ev.Value))
+		slog.Debug("GetHypervisors()", "etcd value raw", ev.Value)
 		err = json.Unmarshal([]byte(ev.Value), &hv)
 		if err != nil {
 			slog.Error("GetHypervisors()", "err", err)
