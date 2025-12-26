@@ -137,7 +137,7 @@ func testMarmotFuncs() {
 
 		It("Check Hypervisors data", func() {
 			GinkgoWriter.Println(*nodeNamePtr)
-			hv, err := etcdEpTest.CheckHypervisors(*etcdTest, *nodeNamePtr)
+			hv, err := etcdEpTest.CheckHypervisors()
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("xxxxxx array size == ", len(hv))
 			for i, v := range hv {

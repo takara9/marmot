@@ -93,7 +93,7 @@ func (s *Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsPar
 	defer s.Lock.Unlock()
 
 	slog.Debug("ListHypervisors() ", "NodeName", s.Ma.NodeName)
-	_, err := s.Ma.Db.CheckHypervisors(s.Ma.EtcdUrl, s.Ma.NodeName)
+	_, err := s.Ma.Db.CheckHypervisors()
 	if err != nil {
 		slog.Error("Check if the hypervisor is up and running", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
@@ -144,7 +144,7 @@ func (s *Server) CreateCluster(ctx echo.Context) error {
 	}
 
 	// ハイパーバイザーの稼働チェック 結果はDBへ反映
-	_, err = s.Ma.Db.CheckHypervisors(s.Ma.EtcdUrl, s.Ma.NodeName)
+	_, err = s.Ma.Db.CheckHypervisors()
 	if err != nil {
 		slog.Error("check hypervisor status", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
