@@ -57,11 +57,11 @@ var _ = Describe("Etcd", Ordered, func() {
 		}
 	}, NodeTimeout(20*time.Second))
 
-	BeforeEach(func() {
-	})
+	//BeforeEach(func() {
+	//})
 
-	AfterEach(func() {
-	})
+	//AfterEach(func() {
+	//})
 
 	Describe("Test etcd", func() {
 		Context("Test Connection to etcd", func() {
