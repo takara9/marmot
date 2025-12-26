@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -120,9 +121,11 @@ func (d *Database) GetHypervisors(hvs *[]api.Hypervisor) error {
 		return err
 	}
 
+	fmt.Println("GetHypervisors(): found", resp.Count, "hypervisors")
+
 	for _, ev := range resp.Kvs {
 		var hv api.Hypervisor
-		//slog.Debug("GetHypervisors()", "etcd value string", string(ev.Value))
+		slog.Debug("GetHypervisors()", "etcd value string", string(ev.Value))
 		//slog.Debug("GetHypervisors()", "etcd value raw", ev.Value)
 		//decodedValue, err := decodeBase64(ev.Value)
 		//slog.Debug("GetHypervisors()", "etcd value decoded", decodedValue)
@@ -245,8 +248,9 @@ func (d *Database) CheckHvVG2ByName(nodeName string, vg string) error {
 }
 
 // ハイパーバイザーをREST-APIでアクセスして疎通を確認、DBへ反映させる
-func (d *Database) CheckHypervisors(dbUrl string, nodeName string) ([]api.Hypervisor, error) {
-	slog.Debug("CheckHypervisors()", "dbUrl", dbUrl, "node", nodeName)
+// func (d *Database) CheckHypervisors(dbUrl string, nodeName string) ([]api.Hypervisor, error) {
+func (d *Database) CheckHypervisors() ([]api.Hypervisor, error) {
+	slog.Debug("CheckHypervisors()", "", "")
 	var hvs []api.Hypervisor
 	/*
 		mutex := concurrency.NewMutex(d.Session, "/lock/hypervisor/"+nodeName)
@@ -265,10 +269,10 @@ func (d *Database) CheckHypervisors(dbUrl string, nodeName string) ([]api.Hyperv
 		}()
 	*/
 
-	etcdKey := HvPrefix + "/" + nodeName
-	mutex, err := d.LockKey(etcdKey)
+	lockKey := HvPrefix
+	mutex, err := d.LockKey(lockKey)
 	if err != nil {
-		slog.Error("LockKey()", "err", err, "key", etcdKey)
+		slog.Error("LockKey()", "err", err, "key", lockKey)
 		return hvs, err
 	}
 	defer d.UnlockKey(mutex)
