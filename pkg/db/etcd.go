@@ -277,6 +277,7 @@ func (d *Database) FindByPrivateIPaddress(ipAddress string) (bool, error) {
 // ホスト名からVMキーを探す
 func (d *Database) FindByHostname(hostname string) (string, error) {
 	resp, err := d.GetByPrefix(VmPrefix)
+
 	if err != nil {
 		return "", err
 	}
@@ -296,10 +297,8 @@ func (d *Database) FindByHostname(hostname string) (string, error) {
 // ホスト名とクラスタ名でVMキーを取得する
 func (d *Database) FindByHostAndClusteName(hostname string, clustername string) (string, error) {
 	resp, err := d.GetByPrefix(VmPrefix)
-	if err == ErrNotFound {
-		return "", nil
-	} else if err != nil {
-		slog.Error("FindByHostAndClusteName()", "err", err, "hostname", hostname, "clustername", clustername)
+	if err != nil {
+		slog.Error("search failed", "err", err, "hostname", hostname, "clustername", clustername)
 		return "", err
 	}
 
