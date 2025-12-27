@@ -43,6 +43,8 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		_, err := m.Db.FindByHostAndClusteName(*spec.Name, *cnf.ClusterName)
 		if err == db.ErrNotFound {
 			slog.Debug("not found the host on the cluster", "host", *spec.Name, "cluster", *cnf.ClusterName)
+		} else if err == db.ErrFound {
+			return fmt.Errorf("the host name '%s' is already used on the cluster '%s'", *spec.Name, *cnf.ClusterName)
 		} else if err != nil {
 			return err
 		}

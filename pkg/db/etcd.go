@@ -304,7 +304,7 @@ func (d *Database) FindByHostAndClusteName(hostname string, clustername string) 
 		}
 
 		if hostname == vm.Name && clustername == *vm.ClusterName {
-			return *vm.Key, nil
+			return *vm.Key, ErrFound
 		}
 	}
 	return "", ErrNotFound
