@@ -49,9 +49,10 @@ func (d *Database) SetImageTemplate(v cf.Image_yaml) error {
 	key := OsTemplateImagePrefix + "/" + osit.OsVariant
 	osit.Key = key
 
-	mutex, err := d.LockKey(key)
+	lockKey := "/lock/image/" + osit.OsVariant
+	mutex, err := d.LockKey(lockKey)
 	if err != nil {
-		slog.Error("failed to lock", "err", err, "key", key)
+		slog.Error("failed to lock", "err", err, "key", lockKey)
 		return err
 	}
 	defer d.UnlockKey(mutex)

@@ -59,9 +59,10 @@ func (d *Database) NewHypervisor(node string, hv api.Hypervisor) error {
 	hv.Key = &key
 	hv.Status = util.Int64PtrInt32(2) // 暫定
 
-	mutex, err := d.LockKey(key)
+	lockKey := "/lock/hv" + node
+	mutex, err := d.LockKey(lockKey)
 	if err != nil {
-		slog.Error("LockKey()", "err", err, "key", key)
+		slog.Error("LockKey()", "err", err, "key", lockKey)
 		return err
 	}
 	defer d.UnlockKey(mutex)
@@ -98,15 +99,16 @@ func (d *Database) GetHypervisorByName(hbNode string) (api.Hypervisor, error) {
 
 // Keyに一致したHVを削除
 func (d *Database) DeleteHypervisorByName(name string) error {
-	etcdKey := HvPrefix + "/" + name
-	mutex, err := d.LockKey(etcdKey)
+	lockKey := "/lock/hv/" + name
+	mutex, err := d.LockKey(lockKey)
 	if err != nil {
-		slog.Error("LockKey()", "err", err, "key", etcdKey)
+		slog.Error("LockKey()", "err", err, "key", lockKey)
 		return err
 	}
 	defer d.UnlockKey(mutex)
 
-	if err := d.DeleteJSON(etcdKey); err != nil {
+	key := HvPrefix + "/" + name
+	if err := d.DeleteJSON(key); err != nil {
 		return err
 	}
 	return nil
@@ -132,10 +134,10 @@ func (d *Database) CheckHvVgAllByName(nodeName string) error {
 		}()
 	*/
 
-	etcdKey := HvPrefix + "/" + nodeName
-	mutex, err := d.LockKey(etcdKey)
+	lockKey := "/lock/hv/" + nodeName
+	mutex, err := d.LockKey(lockKey)
 	if err != nil {
-		slog.Error("LockKey()", "err", err, "key", etcdKey)
+		slog.Error("LockKey()", "err", err, "key", lockKey)
 		return err
 	}
 	defer d.UnlockKey(mutex)
@@ -156,7 +158,8 @@ func (d *Database) CheckHvVgAllByName(nodeName string) error {
 		(*hv.StgPool)[i].VgCap = util.IntPtrInt64(int(total_sz / 1024 / 1024 / 1024))
 	}
 
-	if err := d.PutJSON(etcdKey, hv); err != nil {
+	key := HvPrefix + "/" + nodeName
+	if err := d.PutJSON(key, hv); err != nil {
 		slog.Error("PutJSON()", "err", err)
 		return err
 	}
@@ -182,10 +185,10 @@ func (d *Database) CheckHvVG2ByName(nodeName string, vg string) error {
 			}
 		}()
 	*/
-	etcdKey := HvPrefix + "/" + nodeName
-	mutex, err := d.LockKey(etcdKey)
+	lockKey := "/lock/hv/" + nodeName
+	mutex, err := d.LockKey(lockKey)
 	if err != nil {
-		slog.Error("LockKey()", "err", err, "key", etcdKey)
+		slog.Error("LockKey()", "err", err, "key", lockKey)
 		return err
 	}
 	defer d.UnlockKey(mutex)
@@ -212,7 +215,8 @@ func (d *Database) CheckHvVG2ByName(nodeName string, vg string) error {
 	}
 
 	// DBへ書き込み
-	if err := d.PutJSON(etcdKey, hv); err != nil {
+	key := HvPrefix + "/" + nodeName
+	if err := d.PutJSON(key, hv); err != nil {
 		slog.Error("PutJSON()", "err", err)
 		return err
 	}
