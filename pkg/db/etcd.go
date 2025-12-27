@@ -306,6 +306,7 @@ func (d *Database) FindByHostAndClusteName(hostname string, clustername string) 
 			slog.Error("FindByHostAndClusteName()", "err", err, "hostname", hostname, "clustername", clustername)
 			return "", err
 		}
+
 		if hostname == vm.Name && clustername == *vm.ClusterName {
 			return *vm.Key, nil
 		}

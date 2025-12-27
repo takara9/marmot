@@ -213,15 +213,14 @@ func testMarmotFuncs() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("Start Cluster", func() {
+		It("Destroy Cluster", func() {
 			err = m.DestroyClusterInternal(*cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("Destroy Cluster()", func() {
-			By("Destroying cluster")
+		It("Destroy Cluster again", func() {
 			err = m.DestroyClusterInternal(*cnf)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
