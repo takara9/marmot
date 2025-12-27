@@ -41,12 +41,11 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 			return errors.New("VM Name is not set")
 		}
 		_, err := m.Db.FindByHostAndClusteName(*spec.Name, *cnf.ClusterName)
-		if err != db.ErrNotFound {
-			return fmt.Errorf("existing same name virttual machine : %v in cluster %v", *spec.Name, *cnf.ClusterName)
+		if err == db.ErrNotFound {
+			slog.Debug("not found the host on the cluster", "host", *spec.Name, "cluster", *cnf.ClusterName)
 		} else if err != nil {
 			return err
 		}
-		slog.Debug("CreateClusterInternal", "同一クラスにホスト名重複のチェック", "PASS")
 
 		// パブリックIPアドレスの重複チェックを入れる
 		if spec.PublicIp != nil {

@@ -29,6 +29,7 @@ const (
 var (
 	ErrNotFound       = errors.New("not found")
 	ErrUpdateConflict = errors.New("update conflict")
+	ErrFound          = errors.New("found")
 )
 
 type Database struct {
@@ -277,7 +278,6 @@ func (d *Database) FindByPrivateIPaddress(ipAddress string) (bool, error) {
 // ホスト名からVMキーを探す
 func (d *Database) FindByHostname(hostname string) (string, error) {
 	resp, err := d.GetByPrefix(VmPrefix)
-
 	if err != nil {
 		return "", err
 	}
@@ -298,17 +298,14 @@ func (d *Database) FindByHostname(hostname string) (string, error) {
 func (d *Database) FindByHostAndClusteName(hostname string, clustername string) (string, error) {
 	resp, err := d.GetByPrefix(VmPrefix)
 	if err != nil {
-		slog.Error("search failed", "err", err, "hostname", hostname, "clustername", clustername)
 		return "", err
 	}
-
 	for _, ev := range resp.Kvs {
 		var vm api.VirtualMachine
 		if err := json.Unmarshal([]byte(ev.Value), &vm); err != nil {
 			slog.Error("FindByHostAndClusteName()", "err", err, "hostname", hostname, "clustername", clustername)
 			return "", err
 		}
-
 		if hostname == vm.Name && clustername == *vm.ClusterName {
 			return *vm.Key, nil
 		}
