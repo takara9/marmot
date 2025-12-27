@@ -202,9 +202,3 @@ func (d *Database) FindByHostAndClusteName(hostname string, clustername string) 
 	}
 	return "", errors.New("NotFound")
 }
-
-/*
-
-どうして問題が起きるかわからない。
-OpenAPに聞いてても、正しいと回答がくる。
-*/
