@@ -238,11 +238,7 @@ func (d *Database) GetHypervisors(hvs *[]api.Hypervisor) error {
 	for _, ev := range resp.Kvs {
 		var hv api.Hypervisor
 		slog.Debug("GetHypervisors()", "etcd value string", string(ev.Value))
-		//slog.Debug("GetHypervisors()", "etcd value raw", ev.Value)
-		//decodedValue, err := decodeBase64(ev.Value)
-		//slog.Debug("GetHypervisors()", "etcd value decoded", decodedValue)
-
-		err = json.Unmarshal([]byte(ev.Value), &hv)
+		err = json.Unmarshal(ev.Value, &hv)
 		if err != nil {
 			slog.Error("GetHypervisors()", "err", err, "etcd value", string(ev.Value))
 			return err
@@ -253,26 +249,9 @@ func (d *Database) GetHypervisors(hvs *[]api.Hypervisor) error {
 }
 
 // ハイパーバイザーをREST-APIでアクセスして疎通を確認、DBへ反映させる
-// func (d *Database) CheckHypervisors(dbUrl string, nodeName string) ([]api.Hypervisor, error) {
 func (d *Database) CheckHypervisors() ([]api.Hypervisor, error) {
 	slog.Debug("CheckHypervisors()", "", "")
 	var hvs []api.Hypervisor
-	/*
-		mutex := concurrency.NewMutex(d.Session, "/lock/hypervisor/"+nodeName)
-		if err := mutex.Lock(d.Ctx); err != nil {
-			if errors.Is(err, rpctypes.ErrLeaseNotFound) {
-				slog.Debug("lease not found, ignoring")
-			} else {
-				slog.Error("failed to acquire lock", "err", err.Error())
-				return hvs, fmt.Errorf("failed to acquire lock: %w", err)
-			}
-		}
-		defer func() {
-			if err := mutex.Unlock(d.Ctx); err != nil {
-				slog.Error("failed to release lock", "err", err.Error())
-			}
-		}()
-	*/
 
 	lockKey := HvPrefix + "/lock_all"
 	mutex, err := d.LockKey(lockKey)
@@ -287,7 +266,6 @@ func (d *Database) CheckHypervisors() ([]api.Hypervisor, error) {
 		return hvs, err
 	}
 
-	// 自ノードを含むハイパーバイザーの死活チェック、DBへ反映
 	for _, val := range hvs {
 		err := d.PutJSON(*val.Key, val)
 		if err != nil {
