@@ -230,15 +230,18 @@ func (d *Database) PutDataEtcd(key string, v interface{}) error {
 // パブリックIPアドレスが一致するインスタンスを探す
 func (d *Database) FindByPublicIPaddress(ipAddress string) (bool, error) {
 	resp, err := d.GetByPrefix(VmPrefix)
-	if err != nil {
+	if err == ErrNotFound {
+		return false, nil
+	} else if err != nil {
+		slog.Error("failed to search etcd", "err", err, "ipAddress", ipAddress)
 		return false, err
 	}
 
 	for _, ev := range resp.Kvs {
 		var vm api.VirtualMachine
-		err = json.Unmarshal([]byte(ev.Value), &vm)
-		if err != nil {
-			return false, nil /// 例外的にエラーを無視
+		if err := json.Unmarshal([]byte(ev.Value), &vm); err != nil {
+			slog.Error("failed unmarshal", "err", err, "ipAddress", ipAddress)
+			return false, nil
 		}
 		if ipAddress == *vm.PublicIp {
 			return true, nil
@@ -250,14 +253,19 @@ func (d *Database) FindByPublicIPaddress(ipAddress string) (bool, error) {
 // プライベートIPアドレスが一致するインスンスを探す
 func (d *Database) FindByPrivateIPaddress(ipAddress string) (bool, error) {
 	resp, err := d.GetByPrefix(VmPrefix)
-	if err != nil {
+	if err == ErrNotFound {
+		return false, nil
+	} else if err != nil {
+		slog.Error("failed to search etcd", "err", err, "ipAddress", ipAddress)
 		return false, err
 	}
+
 	for _, ev := range resp.Kvs {
 		var vm api.VirtualMachine
 		err = json.Unmarshal([]byte(ev.Value), &vm)
 		if err != nil {
-			return false, nil /// 例外的にエラーを無視
+			slog.Error("failed unmarshal", "err", err, "ipAddress", ipAddress)
+			return false, nil
 		}
 		if ipAddress == *vm.PrivateIp {
 			return true, nil
