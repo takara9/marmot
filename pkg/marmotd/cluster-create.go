@@ -49,26 +49,18 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 
 		// パブリックIPアドレスの重複チェックを入れる
 		if spec.PublicIp != nil {
-			found, err := m.Db.FindByPublicIPaddress(*spec.PublicIp)
-			if err != nil {
-				return err
+			if err := m.Db.FindByPublicIPaddress(*spec.PublicIp); err == db.ErrNotFound {
+				slog.Debug("CreateClusterInternal", "パブリックIPアドレスの重複のチェック", "PASS")
+				continue
 			}
-			if found {
-				return fmt.Errorf("same pubic IP address exist in the cluster IP: %v", *spec.PublicIp)
-			}
-			slog.Debug("CreateClusterInternal", "パブリックIPアドレスの重複のチェック", "PASS")
 		}
 
 		// プライベートIPアドレスの重複チェックを入れる
 		if spec.PrivateIp != nil {
-			found, err := m.Db.FindByPrivateIPaddress(*spec.PrivateIp)
-			if err != nil {
-				return err
+			if err := m.Db.FindByPrivateIPaddress(*spec.PrivateIp); err == db.ErrNotFound {
+				slog.Debug("CreateClusterInternal", "プライベートIPアドレスの重複のチェック", "PASS")
+				continue
 			}
-			if found {
-				return fmt.Errorf("same private IP address exist in the cluster IP: %v", *spec.PrivateIp)
-			}
-			slog.Debug("CreateClusterInternal", "プライベートIPアドレスの重複のチェック", "PASS")
 		}
 	} // END OF LOOP
 	slog.Debug("CreateClusterInternal", "コンディションのチェック", "終了")

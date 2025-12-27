@@ -229,36 +229,30 @@ func (d *Database) PutDataEtcd(key string, v interface{}) error {
 }
 
 // パブリックIPアドレスが一致するインスタンスを探す
-func (d *Database) FindByPublicIPaddress(ipAddress string) (bool, error) {
+func (d *Database) FindByPublicIPaddress(ipAddress string) error {
 	resp, err := d.GetByPrefix(VmPrefix)
-	if err == ErrNotFound {
-		return false, nil
-	} else if err != nil {
-		slog.Error("failed to search etcd", "err", err, "ipAddress", ipAddress)
-		return false, err
+	if err != nil {
+		return err
 	}
 
 	for _, ev := range resp.Kvs {
 		var vm api.VirtualMachine
 		if err := json.Unmarshal([]byte(ev.Value), &vm); err != nil {
 			slog.Error("failed unmarshal", "err", err, "ipAddress", ipAddress)
-			return false, nil
+			return err
 		}
 		if ipAddress == *vm.PublicIp {
-			return true, nil
+			return ErrFound
 		}
 	}
-	return false, nil
+	return ErrNotFound
 }
 
 // プライベートIPアドレスが一致するインスンスを探す
-func (d *Database) FindByPrivateIPaddress(ipAddress string) (bool, error) {
+func (d *Database) FindByPrivateIPaddress(ipAddress string) error {
 	resp, err := d.GetByPrefix(VmPrefix)
-	if err == ErrNotFound {
-		return false, nil
-	} else if err != nil {
-		slog.Error("failed to search etcd", "err", err, "ipAddress", ipAddress)
-		return false, err
+	if err != nil {
+		return err
 	}
 
 	for _, ev := range resp.Kvs {
@@ -266,15 +260,16 @@ func (d *Database) FindByPrivateIPaddress(ipAddress string) (bool, error) {
 		err = json.Unmarshal([]byte(ev.Value), &vm)
 		if err != nil {
 			slog.Error("failed unmarshal", "err", err, "ipAddress", ipAddress)
-			return false, nil
+			return err
 		}
 		if ipAddress == *vm.PrivateIp {
-			return true, nil
+			return ErrFound
 		}
 	}
-	return false, nil
+	return ErrNotFound
 }
 
+/*
 // ホスト名からVMキーを探す
 func (d *Database) FindByHostname(hostname string) (string, error) {
 	resp, err := d.GetByPrefix(VmPrefix)
@@ -293,6 +288,7 @@ func (d *Database) FindByHostname(hostname string) (string, error) {
 	}
 	return "", ErrNotFound
 }
+*/
 
 // ホスト名とクラスタ名でVMキーを取得する
 func (d *Database) FindByHostAndClusteName(hostname string, clustername string) (string, error) {
