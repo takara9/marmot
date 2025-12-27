@@ -90,8 +90,6 @@ func (d *Database) UnlockKey(m *concurrency.Mutex) {
 	_ = m.Unlock(d.Ctx)
 }
 
-
-
 // 単純 Put（ロック前提・上書きで良い場合）
 func (d *Database) PutJSON(key string, v interface{}) error {
 	byteJSON, err := json.Marshal(v)
@@ -129,20 +127,6 @@ func (d *Database) GetJSON(key string, out interface{}) (*etcd.GetResponse, erro
 	return resp, nil
 }
 
-// 削除対象 キーが一致した値を取得
-func (d *Database) GetByKey(key string) ([]byte, error) {
-	resp, err := d.Cli.Get(d.Ctx, key)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.Count == 0 {
-		return nil, errors.New("not found")
-	}
-
-	return resp.Kvs[0].Value, nil
-}
-
 // プレフィックス検索で取得
 func (d *Database) GetByPrefix(prefix string) (*etcd.GetResponse, error) {
 	resp, err := d.Cli.Get(d.Ctx, prefix, etcd.WithPrefix())
@@ -150,7 +134,7 @@ func (d *Database) GetByPrefix(prefix string) (*etcd.GetResponse, error) {
 		return nil, fmt.Errorf("etcd get prefix failed: %w", err)
 	}
 	if resp.Count == 0 {
-		slog.Debug("GetByPrefix(): no results", "key", prefix)
+		slog.Debug("no results", "key", prefix)
 		return nil, ErrNotFound
 	}
 
@@ -166,8 +150,6 @@ func (d *Database) GetEtcdByPrefix(key string) (*etcd.GetResponse, error) {
 	}
 	return resp, nil
 }
-
-
 
 // PutJSONCAS: ModRevision が expectedRev の時だけ更新する
 func (d *Database) PutJSONCAS(key string, expectedRev int64, v interface{}) error {
@@ -207,7 +189,7 @@ func (d *Database) DeleteJSON(key string) error {
 
 // ---------------------------------------------------------------------------
 
-// 削除対象 
+// 削除対象
 func (d *Database) GetDnsByKey(path string) (types.DNSEntry, error) {
 	var entry types.DNSEntry
 	resp, err := d.Cli.Get(d.Ctx, path)
@@ -248,11 +230,8 @@ func (d *Database) PutDataEtcd(key string, v interface{}) error {
 
 // パブリックIPアドレスが一致するインスタンスを探す
 func (d *Database) FindByPublicIPaddress(ipAddress string) (bool, error) {
-	resp, err := d.GetEtcdByPrefix(VmPrefix)
+	resp, err := d.GetByPrefix(VmPrefix)
 	if err != nil {
-		if err.Error() == "not found" {
-			return false, nil
-		}
 		return false, err
 	}
 
@@ -271,11 +250,8 @@ func (d *Database) FindByPublicIPaddress(ipAddress string) (bool, error) {
 
 // プライベートIPアドレスが一致するインスンスを探す
 func (d *Database) FindByPrivateIPaddress(ipAddress string) (bool, error) {
-	resp, err := d.GetEtcdByPrefix(VmPrefix)
+	resp, err := d.GetByPrefix(VmPrefix)
 	if err != nil {
-		if err.Error() == "not found" {
-			return false, nil
-		}
 		return false, err
 	}
 	for _, ev := range resp.Kvs {
@@ -293,42 +269,37 @@ func (d *Database) FindByPrivateIPaddress(ipAddress string) (bool, error) {
 
 // ホスト名からVMキーを探す
 func (d *Database) FindByHostname(hostname string) (string, error) {
-	resp, err := d.GetEtcdByPrefix(VmPrefix)
+	resp, err := d.GetByPrefix(VmPrefix)
 	if err != nil {
-		if err.Error() == "not found" {
-			return "", nil
-		}
 		return "", err
 	}
 
-	//var vm VirtualMachine
 	for _, ev := range resp.Kvs {
 		var vm api.VirtualMachine
-		err = json.Unmarshal([]byte(ev.Value), &vm)
-		if err != nil {
+		if err := json.Unmarshal([]byte(ev.Value), &vm); err != nil {
 			return "", err
 		}
 		if hostname == vm.Name {
 			return *vm.Key, err
 		}
 	}
-	return "", errors.New("NotFound")
+	return "", ErrNotFound
 }
 
 // ホスト名とクラスタ名でVMキーを取得する
 func (d *Database) FindByHostAndClusteName(hostname string, clustername string) (string, error) {
-	resp, err := d.GetEtcdByPrefix(VmPrefix)
+	resp, err := d.GetByPrefix(VmPrefix)
 	if err != nil {
+		if err == ErrNotFound {
+			return "", nil
+		}
 		slog.Error("FindByHostAndClusteName()", "err", err, "hostname", hostname, "clustername", clustername)
 		return "", err
-	} else if resp.Count == 0 {
-		return "", nil
 	}
 
 	for _, ev := range resp.Kvs {
 		var vm api.VirtualMachine
-		err = json.Unmarshal([]byte(ev.Value), &vm)
-		if err != nil {
+		if err := json.Unmarshal([]byte(ev.Value), &vm); err != nil {
 			slog.Error("FindByHostAndClusteName()", "err", err, "hostname", hostname, "clustername", clustername)
 			return "", err
 		}
@@ -337,5 +308,5 @@ func (d *Database) FindByHostAndClusteName(hostname string, clustername string) 
 			return *vm.Key, nil
 		}
 	}
-	return "", errors.New("NotFound")
+	return "", ErrNotFound
 }
