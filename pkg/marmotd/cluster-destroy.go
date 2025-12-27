@@ -23,35 +23,31 @@ func (m *Marmot) DestroyClusterInternal(cnf api.MarmotConfig) error {
 		}
 		vmKey, err := m.Db.FindByHostAndClusteName(*spec.Name, *cnf.ClusterName)
 		if err != nil {
-			slog.Error("FindByHostAndClusteName()", "err", err, "spec.Name", *spec.Name, "cnf.ClusterName", *cnf.ClusterName)
 			return err
 		}
-		if len(vmKey) > 0 {
-			spec.Key = &vmKey
+		spec.Key = &vmKey
+		vm, err := m.Db.GetVmByVmKey(vmKey)
+		if err != nil {
+			slog.Error("GetVmByVmKey()", "err", err, "vmKey", vmKey)
+			continue
+		}
 
-			vm, err := m.Db.GetVmByVmKey(vmKey)
-			if err != nil {
-				slog.Error("GetVmByVmKey()", "err", err, "vmKey", vmKey)
-				continue
-			}
+		hvService := fmt.Sprintf("%s:%d", *vm.HvIpAddr, *vm.HvPort)
+		marmotClient, err := client.NewMarmotdEp(
+			"http",
+			hvService,
+			"/api/v1",
+			15,
+		)
+		if err != nil {
+			continue
+		}
 
-			hvService := fmt.Sprintf("%s:%d", *vm.HvIpAddr, *vm.HvPort)
-			marmotClient, err := client.NewMarmotdEp(
-				"http",
-				hvService,
-				"/api/v1",
-				15,
-			)
-			if err != nil {
-				continue
-			}
-
-			_, _, _, err = marmotClient.DestroyVirtualMachine(spec)
-			if err != nil {
-				slog.Error("", "remote request err", err)
-				m.Db.UpdateVmStateByKey(*vm.Key, types.ERROR) // エラー状態へ
-				continue
-			}
+		_, _, _, err = marmotClient.DestroyVirtualMachine(spec)
+		if err != nil {
+			slog.Error("", "remote request err", err)
+			m.Db.UpdateVmStateByKey(*vm.Key, types.ERROR) // エラー状態へ
+			continue
 		}
 	}
 	return nil
