@@ -87,8 +87,8 @@ func (d *Job) EntryJob(name string, cmd ...string) (string, error) {
 	job.JobName = name
 	job.Cmd = cmd
 	job.Status = JOB_PENDING
-	if err := d.Database.PutDataEtcd(job.Key, job); err != nil {
-		slog.Error("PutDataEtcd() failed", "err", err, "key", job.Key)
+	if err := d.Database.PutJSON(job.Key, job); err != nil {
+		slog.Error("failed to put job entry", "err", err, "key", job.Key)
 		return "", err
 	}
 	return job.Id, nil
@@ -97,7 +97,7 @@ func (d *Job) EntryJob(name string, cmd ...string) (string, error) {
 // ジョブ番号を指定してジョブをキャンセルする
 func (d *Job) CancelJob(id string) error {
 	key := JobPrefix + "/" + id
-	if err := d.Database.DelByKey(key); err != nil {
+	if err := d.Database.DeleteJSON(key); err != nil {
 		slog.Error("CancelJob() failed", "err", err, "key", key)
 		return err
 	}
@@ -107,7 +107,7 @@ func (d *Job) CancelJob(id string) error {
 // 古いものから順番にジョブのリストを取得する
 func (d *Job) GetJobs(jobStatus int) ([]JobEntry, error) {
 	var jobs []JobEntry
-	resp, err := d.Database.GetEtcdByPrefix(JobPrefix)
+	resp, err := d.Database.GetByPrefix(JobPrefix)
 	if err != nil {
 		slog.Error("failed to getting prefix", "err", err)
 		return nil, err
@@ -163,10 +163,11 @@ func (d *Job) RunJob(job JobEntry) error {
 	fmt.Fprintf(file, "Job Name: [%v] ID [%v] at %v\n", job.JobName, job.Id, job.StartTime.String())
 
 	// ジョブ状態の更新 （ここだけ別関数にして排他制御を入れるのが良いかも）
+	key := JobPrefix + "/" + job.Id
 	job.Status = JOB_RUNNING
 	job.StartTime = time.Now()
-	if err := d.Database.PutDataEtcd(JobPrefix+"/"+job.Id, job); err != nil {
-		slog.Error("PutDataEtcd() failed", "err", err, "key", job.Key)
+	if err := d.Database.PutJSON(key, job); err != nil {
+		slog.Error("failed to put job entry", "err", err, "key", key)
 		return err
 	}
 
@@ -236,8 +237,8 @@ func (d *Job) RunJob(job JobEntry) error {
 	} else {
 		job.Status = JOB_ERROR
 	}
-	if err := d.Database.PutDataEtcd(JobPrefix+"/"+job.Id, job); err != nil {
-		slog.Error("PutDataEtcd() failed", "err", err, "key", job.Key)
+	if err := d.Database.PutJSON(key, job); err != nil {
+		slog.Error("failed to write Job data", "err", err, "key", key)
 		return err
 	}
 

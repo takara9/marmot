@@ -2,7 +2,6 @@ package db
 
 import (
 	"encoding/json"
-	"errors"
 	"log/slog"
 
 	"github.com/takara9/marmot/api"
@@ -13,13 +12,21 @@ import (
 
 // ハイパーバイザーの設定
 func (d *Database) SetHypervisors(v config.Hypervisor_yaml) error {
+	key := HvPrefix + "/" + v.Name
+	lockKey := "/lock/hv/" + v.Name
+	mutex, err := d.LockKey(lockKey)
+	if err != nil {
+		slog.Error("failed to lock", "err", err, "key", lockKey)
+		return err
+	}
+	defer d.UnlockKey(mutex)
+
 	var hv api.Hypervisor
 	hv.NodeName = v.Name
 	hv.Port = util.Int64PtrInt32(v.Port)
-	hvKey := HvPrefix + "/" + v.Name
-	hv.Key = &hvKey
+	hv.Key = &key
 	hv.IpAddr = &v.IpAddr
-	hv.Cpu = int32(v.Cpu) // 必須項目のためポインタではない
+	hv.Cpu = int32(v.Cpu) 
 	hv.FreeCpu = util.Int64PtrInt32(v.Cpu)
 	hv.Memory = util.Int64PtrConvMB(v.Ram)
 	hv.FreeMemory = util.Int64PtrConvMB(v.Ram)
@@ -34,8 +41,8 @@ func (d *Database) SetHypervisors(v config.Hypervisor_yaml) error {
 	}
 	hv.StgPool = &stgpool
 
-	if err := d.PutDataEtcd(hvKey, hv); err != nil {
-		slog.Error("PutDataEtcd()", "err", err)
+	if err := d.PutJSON(key, hv); err != nil {
+		slog.Error("failed to write hypervisor data", "err", err)
 		return err
 	}
 
@@ -43,13 +50,21 @@ func (d *Database) SetHypervisors(v config.Hypervisor_yaml) error {
 }
 
 func (d *Database) NewHypervisor(node string, hv api.Hypervisor) error {
+	key := HvPrefix + "/" + node
+	lockKey := "/lock/hv/" + node
+	mutex, err := d.LockKey(lockKey)
+	if err != nil {
+		slog.Error("failed to lock", "err", err, "key", lockKey)
+		return err
+	}
+	defer d.UnlockKey(mutex)
+
 	hv.NodeName = node
-	etcdKey := HvPrefix + "/" + node
-	hv.Key = &etcdKey
+	hv.Key = &key
 	hv.Status = util.Int64PtrInt32(2) // 暫定
 
-	if err := d.PutDataEtcd(etcdKey, hv); err != nil {
-		slog.Error("PutDataEtcd()", "err", err)
+	if err := d.PutJSON(key, hv); err != nil {
+		slog.Error("failed to write hypervisor data", "err", err, "key", key)
 		return err
 	}
 
@@ -57,30 +72,30 @@ func (d *Database) NewHypervisor(node string, hv api.Hypervisor) error {
 }
 
 // Keyに一致したHVデータの取り出し
-func (d *Database) GetHypervisorByName(hbNode string) (api.Hypervisor, error) {
+func (d *Database) GetHypervisorByName(nodeName string) (api.Hypervisor, error) {
 	var hv api.Hypervisor
+	key := HvPrefix + "/" + nodeName
 
-	resp, err := d.Cli.Get(d.Ctx, HvPrefix+"/"+hbNode)
-	if err != nil {
-		slog.Error("GetHypervisorByName()", "err", err)
-		return api.Hypervisor{}, err
+	if _, err := d.GetJSON(key, &hv); err != nil {
+		slog.Error("failed to get hypervisor by name", "err", err)
+		return hv, err
 	}
 
-	if resp.Count == 0 {
-		return hv, errors.New("not found")
-	}
-
-	if err = json.Unmarshal([]byte(resp.Kvs[0].Value), &hv); err != nil {
-		slog.Error("Unmarshal()", "err", err)
-		return api.Hypervisor{}, err
-	}
-
-	return hv, err
+	return hv, nil
 }
 
 // Keyに一致したHVを削除
-func (d *Database) DeleteHypervisorByName(name string) error {
-	if err := d.DelByKey(HvPrefix + "/" + name); err != nil {
+func (d *Database) DeleteHypervisorByName(nodeName string) error {
+	key := HvPrefix + "/" + nodeName
+	lockKey := "/lock/hv/" + nodeName
+	mutex, err := d.LockKey(lockKey)
+	if err != nil {
+		slog.Error("failed to lock", "err", err, "key", lockKey)
+		return err
+	}
+	defer d.UnlockKey(mutex)
+
+	if err := d.DeleteJSON(key); err != nil {
 		return err
 	}
 	return nil
@@ -88,11 +103,8 @@ func (d *Database) DeleteHypervisorByName(name string) error {
 
 // ハイパーバイザーのデータを取得
 func (d *Database) GetHypervisors(hvs *[]api.Hypervisor) error {
-	resp, err := d.GetEtcdByPrefix(HvPrefix)
+	resp, err := d.GetByPrefix(HvPrefix)
 	if err != nil {
-		if err.Error() == "not found" {
-			return nil
-		}
 		return err
 	}
 
@@ -108,9 +120,18 @@ func (d *Database) GetHypervisors(hvs *[]api.Hypervisor) error {
 }
 
 func (d *Database) CheckHvVgAllByName(nodeName string) error {
+	key := HvPrefix + "/" + nodeName
+	lockKey := "/lock/hv/" + nodeName
+	mutex, err := d.LockKey(lockKey)
+	if err != nil {
+		slog.Error("failed to lock", "err", err, "key", lockKey)
+		return err
+	}
+	defer d.UnlockKey(mutex)
+
 	hv, err := d.GetHypervisorByName(nodeName)
 	if err != nil {
-		slog.Error("", "err", err)
+		slog.Error("failed to get hypervisor by name", "err", err)
 		return err
 	}
 
@@ -120,29 +141,37 @@ func (d *Database) CheckHvVgAllByName(nodeName string) error {
 			slog.Error("", "err", err)
 			return err
 		}
-		(*hv.StgPool)[i].FreeCap = util.IntPtrInt64(int(free_sz / 1024 / 1024 / 1024))
+		(*hv.StgPool)[i].FreeCap = util.IntPtrInt64(int(free_sz / 1024 / 1024 / 1024)) //GBに変換
 		(*hv.StgPool)[i].VgCap = util.IntPtrInt64(int(total_sz / 1024 / 1024 / 1024))
 	}
 
-	// DBへ書き込み
-	if err := d.PutDataEtcd(HvPrefix+"/"+nodeName, hv); err != nil {
-		slog.Error("", "err", err)
+	if err := d.PutJSON(key, hv); err != nil {
+		slog.Error("failed to write hypervisor data", "err", err)
 		return err
 	}
 	return nil
 }
 
 func (d *Database) CheckHvVG2ByName(nodeName string, vg string) error {
+	key := HvPrefix + "/" + nodeName
+	lockKey := "/lock/hv/" + nodeName
+	mutex, err := d.LockKey(lockKey)
+	if err != nil {
+		slog.Error("failed to lock", "err", err, "key", lockKey)
+		return err
+	}
+	defer d.UnlockKey(mutex)
+
 	// LVMへのアクセス
 	total_sz, free_sz, err := lvm.CheckVG(vg)
 	if err != nil {
-		slog.Error("", "err", err)
+		slog.Error("failed to check VG", "err", err)
 		return err
 	}
 
 	hv, err := d.GetHypervisorByName(nodeName)
 	if err != nil {
-		slog.Error("", "err", err)
+		slog.Error("failed to get hypervisor by name", "err", err)
 		return err
 	}
 
@@ -154,10 +183,8 @@ func (d *Database) CheckHvVG2ByName(nodeName string, vg string) error {
 		}
 	}
 
-	// DBへ書き込み
-	err = d.PutDataEtcd(HvPrefix+"/"+nodeName, hv)
-	if err != nil {
-		slog.Error("", "err", err)
+	if err := d.PutJSON(key, hv); err != nil {
+		slog.Error("failed to write hypervisor data", "err", err)
 		return err
 	}
 	return nil
@@ -165,26 +192,24 @@ func (d *Database) CheckHvVG2ByName(nodeName string, vg string) error {
 
 // ハイパーバイザーをREST-APIでアクセスして疎通を確認、DBへ反映させる
 func (d *Database) CheckHypervisors(dbUrl string, node string) ([]api.Hypervisor, error) {
-	// 要らないんじゃない？
-	//d, err := db.NewDatabase(dbUrl)
-	//if err != nil {
-	//	slog.Error("", "err", err)
-	//	return nil, err
-	//}
-	// クローズが無い？
+	lockKey := "/lock/hvs"
+	mutex, err := d.LockKey(lockKey)
+	if err != nil {
+		slog.Error("failed to lock", "err", err, "key", lockKey)
+		return nil, err
+	}
+	defer d.UnlockKey(mutex)
 
 	var hvs []api.Hypervisor
 	if err := d.GetHypervisors(&hvs); err != nil {
-		slog.Error("", "err", err)
+		slog.Error("failed to get hypervisors", "err", err)
 		return nil, err
 	}
 
-	// 自ノードを含むハイパーバイザーの死活チェック、DBへ反映
 	for _, val := range hvs {
-		// ハイパーバイザーの状態をDBへ書き込み
-		err := d.PutDataEtcd(*val.Key, val)
-		if err != nil {
-			slog.Error("", "err", err)
+		if err := d.PutJSON(*val.Key, val); err != nil {
+			slog.Error("failed to write hypervisor data", "err", err, "key", *val.Key)
+			return nil, err
 		}
 	}
 	return hvs, nil

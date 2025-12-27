@@ -23,7 +23,6 @@ type Marmot struct {
 	NodeName string
 	EtcdUrl  string
 	Db       *db.Database
-	Vc       *db.VolumeController
 }
 
 type Server struct {
@@ -40,12 +39,6 @@ func NewMarmot(nodeName string, etcdUrl string) (*Marmot, error) {
 	}
 	m.NodeName = nodeName
 	m.EtcdUrl = etcdUrl
-
-	m.Vc, err = db.NewVolumeController(etcdUrl)
-	if err != nil {
-		return nil, err
-	}
-
 	return &m, nil
 }
 
@@ -134,7 +127,9 @@ func (s *Server) ListVirtualMachines(ctx echo.Context) error {
 
 	var vms []api.VirtualMachine
 	err = d.GetVmsStatuses(&vms)
-	if err != nil {
+	if err == db.ErrNotFound {
+		slog.Debug("get vm status: no vm found", "err", err)
+	} else if err != nil {
 		slog.Error("get vm status", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
@@ -271,6 +266,13 @@ func (s *Server) DestroyVirtualMachine(ctx echo.Context) error {
 	if err != nil {
 		slog.Error("DestroyVirtualMachine()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	slog.Debug("DestroyVirtualMachine()", "spec.Key===", spec.Key)
+	if spec.Key == nil {
+		slog.Debug("DestroyVirtualMachine()", "spec.Key is nil", 0)
+	} else {
+		slog.Debug("DestroyVirtualMachine()", "spec.Key", *spec.Key)
 	}
 
 	err = s.Ma.DestroyVM2(spec)
@@ -411,7 +413,6 @@ func (s *Server) UpdateVolumeById(ctx echo.Context, volumeId string) error {
 	slog.Debug("===", "UpdateVolumeById() is called", "===", "volumeId", volumeId)
 	var volSpec api.Volume
 	if err := ctx.Bind(&volSpec); err != nil {
-		//volSpecString, _ := json.MarshalIndent(volSpec, "", "  ")
 		slog.Error("UpdateVolumeById()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
