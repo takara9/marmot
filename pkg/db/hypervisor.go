@@ -95,11 +95,8 @@ func (d *Database) GetHypervisors(hvs *[]api.Hypervisor) error {
 		}
 		return err
 	}
-	slog.Debug("GetHypervisors()", "count", resp.Count)
-	slog.Debug("GetHypervisors()", "kvs", resp.Kvs)
 
 	for _, ev := range resp.Kvs {
-		slog.Debug("GetHypervisors()", "value", string(ev.Value))
 		var hv api.Hypervisor
 		err = json.Unmarshal([]byte(ev.Value), &hv)
 		if err != nil {
