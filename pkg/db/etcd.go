@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
-	"sync"
 	"time"
 
 	etcd "go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/client/v3/concurrency"
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/types"
@@ -25,26 +26,53 @@ const (
 	JobPrefix             = "/marmot/job"
 )
 
+var (
+	ErrNotFound       = errors.New("not found")
+	ErrUpdateConflict = errors.New("update conflict")
+)
+
 type Database struct {
-	Cli  *etcd.Client
-	Ctx  context.Context
-	Lock sync.Mutex
+	Cli     *etcd.Client
+	Ctx     context.Context
+	Session *concurrency.Session
+	Mutex   *concurrency.Mutex
 }
 
 func NewDatabase(url string) (*Database, error) {
-	var db Database
-	db.Ctx = context.Background()
-
-	conn, err := etcd.New(etcd.Config{
+	ctx := context.Background()
+	cli, err := etcd.New(etcd.Config{
 		Endpoints:   []string{url},
-		DialTimeout: 2 * time.Second,
+		DialTimeout: 10 * time.Second,
 	})
-	db.Cli = conn
-	return &db, err
+	if err != nil {
+		slog.Error("failed to connect to etcd", "err", err)
+		return nil, fmt.Errorf("failed to connect to etcd: %w", err)
+	}
+
+	// セッションの生成、分散ロックの有効化のため
+	session, err := concurrency.NewSession(cli, concurrency.WithContext(ctx))
+	if err != nil {
+		cli.Close()
+		slog.Error("failed to create etcd session", "err", err)
+		return nil, fmt.Errorf("failed to create etcd session: %w", err)
+	}
+
+	return &Database{
+		Cli:     cli,
+		Ctx:     ctx,
+		Session: session,
+		Mutex:   nil,
+	}, nil
 }
 
 func (d *Database) Close() error {
-	return d.Cli.Close()
+	if d.Session != nil {
+		_ = d.Session.Close()
+	}
+	if d.Cli != nil {
+		return d.Cli.Close()
+	}
+	return nil
 }
 
 // キーが一致した値を取得

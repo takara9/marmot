@@ -92,8 +92,8 @@ func (vc *VolumeController) RollbackVolumeCreation(volKey string) {
 
 // ボリュームの情報更新
 func (vc *VolumeController) UpdateVolume(key string, update api.Volume) error {
-	vc.Database.Lock.Lock()
-	defer vc.Database.Lock.Unlock()
+	//vc.Database.Lock.Lock()
+	//defer vc.Database.Lock.Unlock()
 
 	resp, err := vc.Database.GetByKey(key)
 	if err != nil {
