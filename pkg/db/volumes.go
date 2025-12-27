@@ -164,19 +164,8 @@ func (vc *VolumeController) ListVolumes(kind string) ([]api.Volume, error) {
 // データボリュームの情報取得
 func (vc *VolumeController) GetVolumeByKey(key string) (api.Volume, error) {
 	var vol api.Volume
-	resp, err := vc.Database.GetByKey(key)
-	if err != nil {
-		slog.Error("GetEtcdByKey() failed", "err", err, "key", key)
-		return vol, err
-	}
-	if len(resp) == 0 {
-		slog.Error("GetEtcdByKey() returned empty response", "key", key)
-		return vol, fmt.Errorf("volume not found for key: %s", key)
-	}
-
-	err = json.Unmarshal([]byte(resp), &vol)
-	if err != nil {
-		slog.Error("Unmarshal() failed", "err", err, "key", key)
+	if _, err := vc.Database.GetJSON(key, &vol); err != nil {
+		slog.Error("failed to get volume data", "err", err, "key", key)
 		return vol, err
 	}
 	return vol, nil
