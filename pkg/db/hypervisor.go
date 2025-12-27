@@ -111,35 +111,6 @@ func (d *Database) DeleteHypervisorByName(name string) error {
 	return nil
 }
 
-// ハイパーバイザーのデータを取得
-func (d *Database) GetHypervisors(hvs *[]api.Hypervisor) error {
-	resp, err := d.GetByPrefix(HvPrefix)
-	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			return nil
-		}
-		return err
-	}
-
-	fmt.Println("GetHypervisors(): found", resp.Count, "hypervisors")
-
-	for _, ev := range resp.Kvs {
-		var hv api.Hypervisor
-		slog.Debug("GetHypervisors()", "etcd value string", string(ev.Value))
-		//slog.Debug("GetHypervisors()", "etcd value raw", ev.Value)
-		//decodedValue, err := decodeBase64(ev.Value)
-		//slog.Debug("GetHypervisors()", "etcd value decoded", decodedValue)
-
-		err = json.Unmarshal([]byte(ev.Value), &hv)
-		if err != nil {
-			slog.Error("GetHypervisors()", "err", err, "etcd value", string(ev.Value))
-			return err
-		}
-		*hvs = append(*hvs, hv)
-	}
-	return nil
-}
-
 func (d *Database) CheckHvVgAllByName(nodeName string) error {
 	slog.Debug("CheckHvVgAllByName()", "nodeName", nodeName)
 
@@ -247,6 +218,35 @@ func (d *Database) CheckHvVG2ByName(nodeName string, vg string) error {
 	return nil
 }
 
+// ハイパーバイザーのデータを取得
+func (d *Database) GetHypervisors(hvs *[]api.Hypervisor) error {
+	resp, err := d.GetByPrefix(HvPrefix)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	fmt.Println("GetHypervisors(): found", resp.Count, "hypervisors")
+
+	for _, ev := range resp.Kvs {
+		var hv api.Hypervisor
+		slog.Debug("GetHypervisors()", "etcd value string", string(ev.Value))
+		//slog.Debug("GetHypervisors()", "etcd value raw", ev.Value)
+		//decodedValue, err := decodeBase64(ev.Value)
+		//slog.Debug("GetHypervisors()", "etcd value decoded", decodedValue)
+
+		err = json.Unmarshal([]byte(ev.Value), &hv)
+		if err != nil {
+			slog.Error("GetHypervisors()", "err", err, "etcd value", string(ev.Value))
+			return err
+		}
+		*hvs = append(*hvs, hv)
+	}
+	return nil
+}
+
 // ハイパーバイザーをREST-APIでアクセスして疎通を確認、DBへ反映させる
 // func (d *Database) CheckHypervisors(dbUrl string, nodeName string) ([]api.Hypervisor, error) {
 func (d *Database) CheckHypervisors() ([]api.Hypervisor, error) {
@@ -269,7 +269,7 @@ func (d *Database) CheckHypervisors() ([]api.Hypervisor, error) {
 		}()
 	*/
 
-	lockKey := HvPrefix
+	lockKey := HvPrefix + "/lock_all"
 	mutex, err := d.LockKey(lockKey)
 	if err != nil {
 		slog.Error("LockKey()", "err", err, "key", lockKey)
