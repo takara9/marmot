@@ -7,6 +7,7 @@ import (
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/client"
+	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/types"
 )
 
@@ -39,10 +40,11 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 		if spec.Name == nil {
 			return errors.New("VM Name is not set")
 		}
-		vmKey, err := m.Db.FindByHostAndClusteName(*spec.Name, *cnf.ClusterName)
-		if len(vmKey) > 0 {
-			slog.Debug("重複ホスト名のチェック NG", "err", err, "hostname", *spec.Name, "clustername", *cnf.ClusterName)
-			return fmt.Errorf("existing same name virttual machine : %v, vmkey = %v", *spec.Name, vmKey)
+		_, err := m.Db.FindByHostAndClusteName(*spec.Name, *cnf.ClusterName)
+		if err != db.ErrNotFound {
+			return fmt.Errorf("existing same name virttual machine : %v in cluster %v", *spec.Name, *cnf.ClusterName)
+		} else if err != nil {
+			return err
 		}
 		slog.Debug("CreateClusterInternal", "同一クラスにホスト名重複のチェック", "PASS")
 

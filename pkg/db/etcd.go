@@ -289,9 +289,6 @@ func (d *Database) FindByHostname(hostname string) (string, error) {
 func (d *Database) FindByHostAndClusteName(hostname string, clustername string) (string, error) {
 	resp, err := d.GetByPrefix(VmPrefix)
 	if err != nil {
-		if err == ErrNotFound {
-			return "", nil
-		}
 		slog.Error("FindByHostAndClusteName()", "err", err, "hostname", hostname, "clustername", clustername)
 		return "", err
 	}
