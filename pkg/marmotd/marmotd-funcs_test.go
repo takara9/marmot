@@ -175,11 +175,10 @@ func testMarmotFuncs() {
 			By("Loading cluster config")
 			cnf, err = config.ReadYamlClusterConfig("testdata/cluster-config.yaml")
 			Expect(err).NotTo(HaveOccurred())
-			//marmotd.PrintMarmotConfig(*cnf)
 		})
 
 		It("Create Cluster", func() {
-			err = m.CreateClusterInternal(*cnf) // VMがDBに登録されていない？
+			err = m.CreateClusterInternal(*cnf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
