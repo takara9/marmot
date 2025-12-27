@@ -22,8 +22,8 @@ func (d *Database) CreateSeq(key string, start uint64, step uint64) error {
 // シリアル番号の取得（ロックが必須）
 func (d *Database) GetSeqByKind(key string) (uint64, error) {
 	// 排他制御
-	d.Lock.Lock()
-	defer d.Lock.Unlock()
+	//d.Lock.Lock()
+	//defer d.Lock.Unlock()
 
 	// etcdキーを使ったシリアル番号の取得
 	etcdKey := SeqPrefix + "/" + key
