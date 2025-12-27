@@ -134,7 +134,6 @@ func (d *Database) GetByPrefix(prefix string) (*etcd.GetResponse, error) {
 		return nil, fmt.Errorf("etcd get prefix failed: %w", err)
 	}
 	if resp.Count == 0 {
-		slog.Debug("no results", "key", prefix)
 		return nil, ErrNotFound
 	}
 
