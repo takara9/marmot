@@ -7,6 +7,7 @@ import (
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/client"
+	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/types"
 )
 
@@ -22,7 +23,9 @@ func (m *Marmot) DestroyClusterInternal(cnf api.MarmotConfig) error {
 			return errors.New("VM Name is not set")
 		}
 		vmKey, err := m.Db.FindByHostAndClusteName(*spec.Name, *cnf.ClusterName)
-		if err != nil {
+		if err == db.ErrFound {
+			slog.Debug("Found VM for destroy", "vmKey", vmKey)
+		} else if err != nil {
 			return err
 		}
 		spec.Key = &vmKey
