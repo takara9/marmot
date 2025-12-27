@@ -92,19 +92,17 @@ func (vc *VolumeController) RollbackVolumeCreation(volKey string) {
 
 // ボリュームの情報更新
 func (vc *VolumeController) UpdateVolume(key string, update api.Volume) error {
-	//vc.Database.Lock.Lock()
-	//defer vc.Database.Lock.Unlock()
-
-	resp, err := vc.Database.GetByKey(key)
+	lockKey := "/lock/volume/" + key
+	mutex, err := vc.Database.LockKey(lockKey)
 	if err != nil {
-		slog.Error("GetByKey() failed", "err", err, "key", key)
+		slog.Error("failed to lock", "err", err, "lockkey", lockKey)
 		return err
 	}
+	defer vc.Database.UnlockKey(mutex)
 
 	var rec api.Volume
-	err = json.Unmarshal([]byte(resp), &rec)
-	if err != nil {
-		slog.Error("Unmarshal() failed", "err", err, "key", key)
+	if _, err := vc.Database.GetJSON(key, &rec); err != nil {
+		slog.Error("GetJSON() failed", "err", err, "key", key)
 		return err
 	}
 
@@ -123,7 +121,7 @@ func (vc *VolumeController) UpdateVolume(key string, update api.Volume) error {
 	util.Assign(&rec.OsVersion, update.OsVersion)
 
 	// データベースに更新
-	return vc.Database.PutDataEtcd(key, rec)
+	return vc.Database.PutJSON(key, rec)
 }
 
 // データボリュームの削除
