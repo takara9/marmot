@@ -202,3 +202,5 @@ func (d *Database) FindByHostAndClusteName(hostname string, clustername string) 
 	}
 	return "", errors.New("NotFound")
 }
+
+// ハイパーバイザーのデータを保存
