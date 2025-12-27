@@ -37,9 +37,10 @@ func (d *Database) SetHypervisors(v config.Hypervisor_yaml) error {
 	}
 	hv.StgPool = &stgpool
 
-	mutex, err := d.LockKey(key)
+	lockKey := "/lock/hv" + v.Name
+	mutex, err := d.LockKey(lockKey)
 	if err != nil {
-		slog.Error("failed to lock", "err", err, "key", key)
+		slog.Error("failed to lock", "err", err, "key", lockKey)
 		return err
 	}
 	defer d.UnlockKey(mutex)
