@@ -117,23 +117,6 @@ func (d *Database) DeleteHypervisorByName(name string) error {
 func (d *Database) CheckHvVgAllByName(nodeName string) error {
 	slog.Debug("CheckHvVgAllByName()", "nodeName", nodeName)
 
-	/*
-		mutex := concurrency.NewMutex(d.Session, "/lock/hypervisor/"+nodeName)
-		if err := mutex.Lock(d.Ctx); err != nil {
-			if errors.Is(err, rpctypes.ErrLeaseNotFound) {
-				slog.Debug("lease not found, ignoring")
-			} else {
-				slog.Error("failed to acquire lock", "err", err.Error())
-				return fmt.Errorf("failed to acquire lock: %w", err)
-			}
-		}
-		defer func() {
-			if err := mutex.Unlock(d.Ctx); err != nil {
-				slog.Error("failed to release lock", "err", err.Error())
-			}
-		}()
-	*/
-
 	lockKey := "/lock/hv/" + nodeName
 	mutex, err := d.LockKey(lockKey)
 	if err != nil {
@@ -240,7 +223,7 @@ func (d *Database) GetHypervisors(hvs *[]api.Hypervisor) error {
 		slog.Debug("GetHypervisors()", "etcd value string", string(ev.Value))
 		err = json.Unmarshal(ev.Value, &hv)
 		if err != nil {
-			slog.Error("GetHypervisors()", "err", err, "etcd value", string(ev.Value))
+			slog.Error("GetHypervisors()", "err", err)
 			return err
 		}
 		*hvs = append(*hvs, hv)

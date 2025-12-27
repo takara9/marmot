@@ -92,11 +92,11 @@ func (d *Database) UnlockKey(m *concurrency.Mutex) {
 
 // 単純 Put（ロック前提・上書きで良い場合）
 func (d *Database) PutJSON(key string, v interface{}) error {
-	byteData, err := json.Marshal(v)
+	byteJSON, err := json.Marshal(v)
 	if err != nil {
 		return fmt.Errorf("json marshal failed: %w", err)
 	}
-	_, err = d.Cli.Put(d.Ctx, key, string(byteData))
+	_, err = d.Cli.Put(d.Ctx, key, string(byteJSON))
 	if err != nil {
 		return fmt.Errorf("etcd put failed: %w", err)
 	}
