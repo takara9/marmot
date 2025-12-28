@@ -12,12 +12,17 @@ import (
 
 // VMの削除
 func (m *Marmot) DestroyVM2(spec api.VmSpec) error {
+
+	slog.Debug("DestroyVM2() called", "key ptr", spec.Key)
 	if spec.Key != nil {
 		slog.Debug("DestroyVM2()", "key", *spec.Key)
 	}
+
 	vm, err := m.Db.GetVmByVmKey(*spec.Key)
 	if err != nil {
 		slog.Error("GetVmByVmKey()", "err", err)
+	} else {
+		slog.Debug("DestroyVM2()", "vm key", *vm.Key, "vm name", vm.Name, "hv node", vm.HvNode)
 	}
 
 	// ハイパーバイザーのリソース削減保存のため値を取得
@@ -25,6 +30,7 @@ func (m *Marmot) DestroyVM2(spec api.VmSpec) error {
 	if err != nil {
 		slog.Error("GetHypervisorByName()", "err", err)
 	}
+	slog.Debug("DestroyVM2()", "hv key", *hv.Key, "hv name", hv.NodeName)
 
 	// ステータスを調べて停止中であれば、足し算しない。
 	if *vm.Status != types.STOPPED && *vm.Status != types.ERROR {
@@ -35,6 +41,7 @@ func (m *Marmot) DestroyVM2(spec api.VmSpec) error {
 			slog.Error("PutDataEtcd()", "err", err)
 		}
 	}
+	slog.Debug("DestroyVM2()", "updated hv free cpu", *hv.FreeCpu, "updated hv free memory", *hv.FreeMemory)
 
 	// データベースから削除
 	if err := m.Db.DelByKey(*spec.Key); err != nil {

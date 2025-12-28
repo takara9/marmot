@@ -17,6 +17,7 @@ import (
 
 func (d *Database) GetVmByVmKey(vmKey string) (api.VirtualMachine, error) {
 	if len(vmKey) == 0 {
+		slog.Debug("GetVmByVmKey()", "vmKey is empty then return error")
 		return api.VirtualMachine{}, errors.New("not found")
 	}
 
