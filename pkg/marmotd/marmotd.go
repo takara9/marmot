@@ -273,6 +273,7 @@ func (s *Server) DestroyVirtualMachine(ctx echo.Context) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
+	slog.Debug("DestroyVirtualMachine()", "vmKey", spec.Key)
 	err = s.Ma.DestroyVM2(spec)
 	if err != nil {
 		slog.Error("DestroyVirtualMachine()", "err", err)

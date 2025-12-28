@@ -17,7 +17,7 @@ import (
 
 func (d *Database) GetVmByVmKey(vmKey string) (api.VirtualMachine, error) {
 	if len(vmKey) == 0 {
-		slog.Debug("GetVmByVmKey()", "vmKey is empty then return error")
+		slog.Debug("GetVmByVmKey()", "vmKey is empty then return error", 0)
 		return api.VirtualMachine{}, errors.New("not found")
 	}
 
@@ -128,7 +128,7 @@ func (d *Database) AssignHvforVm(vm api.VirtualMachine) (string, string, string,
 	vm.Uuid = util.StringPtr(txId.String())
 	vm.CTime = util.TimePtr(time.Now())
 	vm.STime = util.TimePtr(time.Now())
-	vm.Status = util.Int64PtrInt32(types.PROVISIONING)       // プロビジョニング中
+	vm.Status = util.Int64PtrInt32(types.PROVISIONING)  // プロビジョニング中
 	if err := d.PutDataEtcd(*vm.Key, &vm); err != nil { // 仮想マシンのデータ登録
 		slog.Debug("=== d.PutDataEtcd failed", "vm.Key", *vm.Key, "err", err)
 		return "", "", "", txId.String(), 0, err
