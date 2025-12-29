@@ -313,7 +313,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 			}
 			for _, v := range volumes {
-				cmdDel := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "rename", *v.Key, "NEW_NAME", "--output", "json")
+				cmdDel := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "rename", v.Id, "NEW_NAME", "--output", "json")
 				stdoutStderr, err := cmdDel.CombinedOutput()
 				GinkgoWriter.Print("err=", err)
 				GinkgoWriter.Print("stdoutStderr=", string(stdoutStderr))
@@ -334,7 +334,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 			}
 			for _, v := range volumes {
-				cmdDel := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "destroy", *v.Key, "--output", "json")
+				cmdDel := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "destroy", v.Id, "--output", "json")
 				stdoutStderr, err := cmdDel.CombinedOutput()
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Print(string(stdoutStderr))
