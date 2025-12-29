@@ -205,7 +205,9 @@ func exportConfig() error {
 	//仮想マシン
 	var vms []api.VirtualMachine
 	err = d.GetVmsStatuses(&vms)
-	if err != nil {
+	if err == db.ErrNotFound {
+		slog.Debug("No virtual machines found", "error", err)
+	} else if err != nil {
 		slog.Error("Failed to get data of virtual machines", "error", err)
 		return err
 	}

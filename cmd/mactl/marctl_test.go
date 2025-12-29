@@ -21,11 +21,6 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 	var marmotServer *marmotd.Server
 
 	BeforeAll(func(ctx SpecContext) {
-		// Marmotサーバーのモック起動
-		GinkgoWriter.Println("Start marmot server mock")
-		marmotServer = startMockServer() // バックグラウンドで起動する
-		time.Sleep(5 * time.Second)      // Marmotインスタンスの生成待ち
-
 		// Dockerコンテナを起動
 		cmd := exec.Command("docker", "run", "-d", "--name", "etcd0", "-p", "3379:2379", "-p", "3380:2380", "ghcr.io/takara9/etcd:3.6.5")
 		output, err := cmd.CombinedOutput()
@@ -35,6 +30,11 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		containerID = string(output[:12]) // 最初の12文字をIDとして取得
 		fmt.Printf("Container started with ID: %s\n", containerID)
 		time.Sleep(5 * time.Second) // コンテナが起動するまで待機
+
+		// Marmotサーバーのモック起動
+		GinkgoWriter.Println("Start marmot server mock")
+		marmotServer = startMockServer() // バックグラウンドで起動する
+		time.Sleep(5 * time.Second)      // Marmotインスタンスの生成待ち
 	}, NodeTimeout(15*time.Second))
 
 	AfterAll(func(ctx SpecContext) {
@@ -115,6 +115,14 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		})
 
 		It("Marmotd のバージョン情報取得", func() {
+			cmd0 := exec.Command("pwd")
+			stdoutStderr0, err := cmd0.CombinedOutput()
+			GinkgoWriter.Println(string(stdoutStderr0))
+
+			cmd1 := exec.Command("ls", "-lR")
+			stdoutStderr1, err := cmd1.CombinedOutput()
+			GinkgoWriter.Println(string(stdoutStderr1))
+
 			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "version")
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())

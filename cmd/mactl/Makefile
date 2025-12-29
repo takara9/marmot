@@ -11,6 +11,7 @@ $(PROGRAM): $(%.go)
 	mkdir -p $(BINDIR)
 	$(GO) build -o $(BINDIR)/$@ $^
 
+.PHONY:	mactl-test
 mactl-test: $(%.go)
 	echo $(TESTBINDIR)
 	mkdir -p $(TESTBINDIR)

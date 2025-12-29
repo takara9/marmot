@@ -1,7 +1,6 @@
 package db
 
 import (
-	"encoding/json"
 	"log/slog"
 
 	"github.com/takara9/marmot/api"
@@ -9,9 +8,17 @@ import (
 
 func (d *Database) SetVersion(ver api.Version) error {
 	slog.Debug("Called SetVersion with open api")
-	err := d.PutDataEtcd(VersionKey, ver)
+
+	lockKey := "/lock/version"
+	mutex, err := d.LockKey(lockKey)
 	if err != nil {
-		slog.Error("PutDataEtcd()", "err", err, "version", ver)
+		slog.Error("LockKey()", "err", err, "key", lockKey)
+		return err
+	}
+	defer d.UnlockKey(mutex)
+
+	if err := d.PutJSON(VersionKey, ver); err != nil {
+		slog.Error("failed to write database", "err", err, "version", ver)
 		return err
 	}
 
@@ -21,15 +28,9 @@ func (d *Database) SetVersion(ver api.Version) error {
 func (d *Database) GetVersion() (*api.Version, error) {
 	var v api.Version
 
-	ver, err := d.GetByKey(VersionKey)
+	_, err := d.GetJSON(VersionKey, &v)
 	if err != nil {
-		slog.Error("GetByKey()", "err", err)
-		return nil, err
-	}
-
-	err = json.Unmarshal(ver, &v)
-	if err != nil {
-		slog.Error("json.Unmarshal()", "err", err, VersionKey, ver)
+		slog.Error("failed to read from database", "err", err)
 		return nil, err
 	}
 

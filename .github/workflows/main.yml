@@ -205,6 +205,11 @@ jobs:
     - name: Test cmd/mactl
       run: | 
         cd cmd/mactl
+        sudo -s mkdir -p bin
+        sudo -s chown ubuntu:ubuntu bin
+        sudo -s chmod 755 bin
+        sudo -s make mactl-test
+        ls -la bin
         sudo -s make test
         cd ../..
     - name: Test cmd/maadm

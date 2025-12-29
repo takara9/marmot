@@ -7,6 +7,7 @@ import (
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/client"
+	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/types"
 )
 
@@ -22,36 +23,39 @@ func (m *Marmot) DestroyClusterInternal(cnf api.MarmotConfig) error {
 			return errors.New("VM Name is not set")
 		}
 		vmKey, err := m.Db.FindByHostAndClusteName(*spec.Name, *cnf.ClusterName)
-		if err != nil {
-			slog.Error("FindByHostAndClusteName()", "err", err, "spec.Name", *spec.Name, "cnf.ClusterName", *cnf.ClusterName)
+		if err == db.ErrFound {
+			slog.Debug("Found VM for destroy", "vmKey", vmKey)
+		} else if err != nil {
 			return err
 		}
-		if len(vmKey) > 0 {
-			spec.Key = &vmKey
 
-			vm, err := m.Db.GetVmByVmKey(vmKey)
-			if err != nil {
-				slog.Error("GetVmByVmKey()", "err", err, "vmKey", vmKey)
-				continue
-			}
+		slog.Debug("DestroyClusterInternal", "vmKey==", vmKey)
 
-			hvService := fmt.Sprintf("%s:%d", *vm.HvIpAddr, *vm.HvPort)
-			marmotClient, err := client.NewMarmotdEp(
-				"http",
-				hvService,
-				"/api/v1",
-				15,
-			)
-			if err != nil {
-				continue
-			}
+		spec.Key = &vmKey
+		vm, err := m.Db.GetVmByVmKey(vmKey)
+		if err != nil {
+			slog.Error("GetVmByVmKey()", "err", err, "vmKey", vmKey)
+			continue
+		}
 
-			_, _, _, err = marmotClient.DestroyVirtualMachine(spec)
-			if err != nil {
-				slog.Error("", "remote request err", err)
-				m.Db.UpdateVmStateByKey(*vm.Key, types.ERROR) // エラー状態へ
-				continue
-			}
+		hvService := fmt.Sprintf("%s:%d", *vm.HvIpAddr, *vm.HvPort)
+		marmotClient, err := client.NewMarmotdEp(
+			"http",
+			hvService,
+			"/api/v1",
+			15,
+		)
+		if err != nil {
+			continue
+		}
+
+		slog.Debug("destroy virtual machine", "spec.key==", spec.Key)
+
+		_, _, _, err = marmotClient.DestroyVirtualMachine(spec)
+		if err != nil {
+			slog.Error("destroy virtual machine", "err", err)
+			m.Db.UpdateVmStateByKey(*vm.Key, types.ERROR) // エラー状態へ
+			continue
 		}
 	}
 	return nil

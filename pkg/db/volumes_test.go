@@ -17,17 +17,6 @@ var _ = Describe("Volumes", Ordered, func() {
 	var containerID string
 
 	BeforeAll(func(ctx SpecContext) {
-
-		/*
-			// Setup slog
-			opts := &slog.HandlerOptions{
-				AddSource: true,
-				Level:     slog.LevelDebug,
-			}
-			logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
-			slog.SetDefault(logger)
-		*/
-
 		// Dockerコンテナを起動
 		cmd := exec.Command("docker", "run", "-d", "--name", "jobEtcdDb", "-p", "6379:2379", "-p", "6380:2380", "ghcr.io/takara9/etcd:3.6.5")
 		output, err := cmd.CombinedOutput()
@@ -55,19 +44,13 @@ var _ = Describe("Volumes", Ordered, func() {
 		}
 	}, NodeTimeout(20*time.Second))
 
-	BeforeEach(func() {
-	})
-
-	AfterEach(func() {
-	})
-
 	Describe("ボリューム管理テスト", func() {
-		var v *db.VolumeController
+		var v *db.Database
 		Context("基本アクセス", func() {
 			var volSpec *api.Volume
 			var err error
 			It("データボリュームコントローラの生成", func() {
-				v, err = db.NewVolumeController(url)
+				v, err = db.NewDatabase(url)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
