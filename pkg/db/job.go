@@ -33,7 +33,6 @@ type JobEntry struct {
 	JobName   string    // ジョブの名前
 	Cmd       []string  // ジョブのコマンド
 	ExitCode  int       // ジョブ終了コード
-
 }
 
 const (

@@ -258,7 +258,7 @@ func testMarmotd() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(httpStatus).To(Equal(201))
 		err = json.Unmarshal(body, &replyVolume)
-		GinkgoWriter.Println("CreateVolume replyVolume Key = ", *replyVolume.Key)
+		GinkgoWriter.Println("CreateVolume replyVolume id = ", replyVolume.Id)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(url).To(BeNil())
 	})
@@ -280,8 +280,8 @@ func testMarmotd() {
 	})
 
 	It("DATAボリューム(qcow2)の削除", func() {
-		GinkgoWriter.Println("受信したボリュームキー = ", *replyVolume.Key)
-		httpStatus, body, url, err := marmotClient.DeleteVolumeById(*replyVolume.Key)
+		GinkgoWriter.Println("受信したボリューム Id = ", replyVolume.Id)
+		httpStatus, body, url, err := marmotClient.DeleteVolumeById(replyVolume.Id)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(httpStatus).To(Equal(200))
 		GinkgoWriter.Println("DeleteVolumeById body =", string(body))
@@ -303,7 +303,7 @@ func testMarmotd() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(httpStatus).To(Equal(201))
 		err = json.Unmarshal(body, &replyVolume)
-		GinkgoWriter.Println("CreateVolume replyVolume Key = ", *replyVolume.Key)
+		GinkgoWriter.Println("CreateVolume replyVolume Id = ", replyVolume.Id)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(url).To(BeNil())
 
@@ -313,8 +313,8 @@ func testMarmotd() {
 	})
 
 	It("OSボリューム(qcow2)の削除", func() {
-		GinkgoWriter.Println("受信したボリュームキー = ", *replyVolume.Key)
-		httpStatus, body, url, err := marmotClient.DeleteVolumeById(*replyVolume.Key)
+		GinkgoWriter.Println("受信したボリューム Id = ", replyVolume.Id)
+		httpStatus, body, url, err := marmotClient.DeleteVolumeById(replyVolume.Id)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(httpStatus).To(Equal(200))
 		GinkgoWriter.Println("DeleteVolumeById body =", string(body))
@@ -348,7 +348,7 @@ func testMarmotd() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(httpStatus).To(Equal(201))
 		err = json.Unmarshal(body, &replyVolume)
-		GinkgoWriter.Println("CreateVolume replyVolume Key = ", *replyVolume.Key)
+		GinkgoWriter.Println("CreateVolume replyVolume Id = ", replyVolume.Id)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(url).To(BeNil())
 	})
@@ -370,8 +370,8 @@ func testMarmotd() {
 	})
 
 	It("OSボリューム(LVM)の削除", func() {
-		GinkgoWriter.Println("受信したボリュームキー = ", *replyVolume.Key)
-		httpStatus, body, url, err := marmotClient.DeleteVolumeById(*replyVolume.Key)
+		GinkgoWriter.Println("受信したボリューム Id = ", replyVolume.Id)
+		httpStatus, body, url, err := marmotClient.DeleteVolumeById(replyVolume.Id)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(httpStatus).To(Equal(200))
 		GinkgoWriter.Println("DeleteVolumeById body =", string(body))
@@ -405,7 +405,7 @@ func testMarmotd() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(httpStatus).To(Equal(201))
 		err = json.Unmarshal(body, &replyVolume)
-		GinkgoWriter.Println("CreateVolume replyVolume Key = ", *replyVolume.Key)
+		GinkgoWriter.Println("CreateVolume replyVolume Id = ", replyVolume.Id)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(url).To(BeNil())
 
@@ -428,7 +428,7 @@ func testMarmotd() {
 	})
 
 	It("DATAボリューム(LVM)の詳細取得 0001", func() {
-		httpStatus, body, url, err := marmotClient.ShowVolumeById(*replyVolume.Key)
+		httpStatus, body, url, err := marmotClient.ShowVolumeById(replyVolume.Id)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(httpStatus).To(Equal(200))
 		var vol api.Volume
@@ -443,7 +443,7 @@ func testMarmotd() {
 	It("DATAボリューム(LVM)の情報更新", func() {
 		var spec api.Volume
 		spec.Name = "updated-volume-name"
-		httpStatus, body, url, err := marmotClient.UpdateVolumeById(*replyVolume.Key, spec)
+		httpStatus, body, url, err := marmotClient.UpdateVolumeById(replyVolume.Id, spec)
 		GinkgoWriter.Println("UpdateVolumeById err =", err)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(httpStatus).To(Equal(200))
@@ -452,7 +452,7 @@ func testMarmotd() {
 	})
 
 	It("DATAボリューム(LVM)の詳細取得 0002", func() {
-		httpStatus, body, url, err := marmotClient.ShowVolumeById(*replyVolume.Key)
+		httpStatus, body, url, err := marmotClient.ShowVolumeById(replyVolume.Id)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(httpStatus).To(Equal(200))
 		var vol api.Volume
@@ -467,8 +467,8 @@ func testMarmotd() {
 	})
 
 	It("DATAボリューム(LVM)の削除", func() {
-		GinkgoWriter.Println("受信したボリュームキー = ", *replyVolume.Key)
-		httpStatus, body, url, err := marmotClient.DeleteVolumeById(*replyVolume.Key)
+		GinkgoWriter.Println("受信したボリューム Id = ", replyVolume.Id)
+		httpStatus, body, url, err := marmotClient.DeleteVolumeById(replyVolume.Id)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(httpStatus).To(Equal(200))
 		GinkgoWriter.Println("DeleteVolumeById body =", string(body))

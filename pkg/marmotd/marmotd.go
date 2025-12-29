@@ -362,11 +362,11 @@ func (s *Server) CreateVolume(ctx echo.Context) error {
 }
 
 // DeleteVolumeById implements api.ServerInterface.
-func (s *Server) DeleteVolumeById(ctx echo.Context, volumeId string) error {
-	slog.Debug("===", "DeleteVolumeById() is called", "===", "volumeId", volumeId)
+func (s *Server) DeleteVolumeById(ctx echo.Context, id string) error {
+	slog.Debug("===", "DeleteVolumeById() is called", "===", "volumeId", id)
 
-	key := "/" + volumeId
-	err := s.Ma.RemoveVolume(key)
+	//key := "/" + id
+	err := s.Ma.RemoveVolume(id)
 	if err != nil {
 		slog.Error("RemoveVolume()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
@@ -417,8 +417,8 @@ func (s *Server) UpdateVolumeById(ctx echo.Context, volumeId string) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	key := "/" + volumeId
-	if _, err := s.Ma.UpdateVolumeById(key, volSpec); err != nil {
+	key := db.VolumePrefix + "/" + volumeId
+	if _, err := s.Ma.UpdateVolumeById(volumeId, volSpec); err != nil {
 		slog.Error("UpdateVolumeById()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}

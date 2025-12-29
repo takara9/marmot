@@ -12,14 +12,6 @@ import (
 	etcd "go.etcd.io/etcd/client/v3"
 )
 
-/*
-ボリュームの管理用データ構造体
-対象は、OSイメージテンプレートとデータボリューム
-*/
-type VolumeController struct {
-	Db *Database
-}
-
 const (
 	VOLUME_PROVISIONING = 0 // プロビジョニング中
 	VOLUME_INUSE        = 1 // 使用中
@@ -33,7 +25,6 @@ var VolStatus = map[int]string{
 }
 
 // 仮想マシンを生成する時にボリュームを生成して、アタッチする
-
 // OS or DATA ボリュームの作成
 func (d *Database) CreateVolumeOnDB(volName, volPath, volType, volKind string, volSize int) (*api.Volume, error) {
 	slog.Debug("CreateVolume()", "volName", volName, "volPath", volPath, "volType", volType, "volKind", volKind, "volSize", volSize)
@@ -47,17 +38,8 @@ func (d *Database) CreateVolumeOnDB(volName, volPath, volType, volKind string, v
 	}
 	defer d.UnlockKey(mutex)
 
-	var key string
 	vol.Id = uuid.New().String()
-	switch volKind {
-	case "data":
-		key = VolumePrefix + "/" + vol.Id
-	case "os":
-		key = OsImagePrefix + "/" + vol.Id
-	default:
-		return nil, fmt.Errorf("unknown volume kind: %s", volKind)
-	}
-
+	key := VolumePrefix + "/" + vol.Id // DATAボリューム
 	vol.Key = util.StringPtr(key)
 	vol.Kind = util.StringPtr(volKind)
 	vol.Type = util.StringPtr(volType)
@@ -66,7 +48,7 @@ func (d *Database) CreateVolumeOnDB(volName, volPath, volType, volKind string, v
 	vol.Path = util.StringPtr(volPath)
 	vol.Size = util.IntPtrInt(volSize)
 
-	if err := d.PutJSON(*vol.Key, vol); err != nil {
+	if err := d.PutJSON(key, vol); err != nil {
 		slog.Error("failed to write database data", "err", err, "key", *vol.Key)
 		return nil, err
 	}
@@ -74,10 +56,10 @@ func (d *Database) CreateVolumeOnDB(volName, volPath, volType, volKind string, v
 }
 
 // ボリューム作成のロールバック
-func (d *Database) RollbackVolumeCreation(volKey string) {
-	slog.Debug("Rolling back volume creation", "volKey", volKey)
+func (d *Database) RollbackVolumeCreation(id string) {
+	slog.Debug("Rolling back volume creation", "id", id)
 
-	lockKey := "/lock/volume/" + volKey
+	lockKey := "/lock/volume/" + id
 	mutex, err := d.LockKey(lockKey)
 	if err != nil {
 		slog.Error("failed to lock", "err", err, "key", lockKey)
@@ -85,14 +67,15 @@ func (d *Database) RollbackVolumeCreation(volKey string) {
 	}
 	defer d.UnlockKey(mutex)
 
-	if err := d.DeleteVolume(volKey); err != nil {
-		slog.Error("failed to rollback volume creation", "err", err, "volKey", volKey)
+	key := VolumePrefix + "/" + id
+	if err := d.DeleteVolume(key); err != nil {
+		slog.Error("failed to rollback volume creation", "err", err, "volKey", id)
 	}
 }
 
-// ボリュームの情報更新
-func (d *Database) UpdateVolume(volKey string, updateData api.Volume) error {
-	lockKey := "/lock/volume/" + volKey
+// ボリュームの情報更新 CASを持ちるべき？
+func (d *Database) UpdateVolume(id string, updateData api.Volume) error {
+	lockKey := "/lock/volume/" + id
 	mutex, err := d.LockKey(lockKey)
 	if err != nil {
 		slog.Error("failed to lock", "err", err, "lockkey", lockKey)
@@ -100,10 +83,10 @@ func (d *Database) UpdateVolume(volKey string, updateData api.Volume) error {
 	}
 	defer d.UnlockKey(mutex)
 
-
 	var rec api.Volume
-	if _, err := d.GetJSON(volKey, &rec); err != nil {
-		slog.Error("GetJSON() failed", "err", err, "key", volKey)
+	key := VolumePrefix + "/" + id
+	if _, err := d.GetJSON(key, &rec); err != nil {
+		slog.Error("GetJSON() failed", "err", err, "key", key)
 		return err
 	}
 
@@ -122,20 +105,20 @@ func (d *Database) UpdateVolume(volKey string, updateData api.Volume) error {
 	util.Assign(&rec.OsVersion, updateData.OsVersion)
 
 	// データベースに更新
-	return d.PutJSON(volKey, rec)
+	return d.PutJSON(key, rec)
 }
 
 // データボリュームの削除
-func (d *Database) DeleteVolume(volKey string) error {
-	lockKey := "/lock/volume/" + volKey
+func (d *Database) DeleteVolume(id string) error {
+	lockKey := "/lock/volume/" + id
 	mutex, err := d.LockKey(lockKey)
 	if err != nil {
 		slog.Error("failed to lock", "err", err, "lockkey", lockKey)
 		return err
 	}
 	defer d.UnlockKey(mutex)
-
-	return d.DeleteJSON(volKey)
+	key := VolumePrefix + "/" + id
+	return d.DeleteJSON(key)
 }
 
 // データボリュームの一覧取得
@@ -144,17 +127,13 @@ func (d *Database) ListVolumes(kind string) ([]api.Volume, error) {
 	var err error
 	var resp *etcd.GetResponse
 
-	switch kind {
-	case "data":
-		resp, err = d.GetByPrefix(VolumePrefix + "/")
-	case "os":
-		resp, err = d.GetByPrefix(OsImagePrefix + "/")
-	default:
-		return nil, fmt.Errorf("unknown volume kind: %s", kind)
-	}
-
-	if err != nil {
-		slog.Error("GetEtcdByPrefix() failed", "err", err, "key", VolumePrefix+"/")
+	prefix := VolumePrefix
+	resp, err = d.GetByPrefix(prefix)
+	if err == ErrNotFound {
+		slog.Debug("no volumes found", "key-prefix", prefix)
+		return volumes, nil
+	} else if err != nil {
+		slog.Error("GetByPrefix() failed", "err", err, "key-prefix", prefix)
 		return volumes, err
 	}
 	for _, kv := range resp.Kvs {
@@ -164,17 +143,21 @@ func (d *Database) ListVolumes(kind string) ([]api.Volume, error) {
 			slog.Error("Unmarshal() failed", "err", err, "key", string(kv.Key))
 			continue
 		}
-		volumes = append(volumes, vol)
+		if *vol.Kind == kind {
+			volumes = append(volumes, vol)
+		}
 	}
 
 	return volumes, nil
 }
 
 // データボリュームの情報取得
-func (d *Database) GetVolumeByKey(key string) (api.Volume, error) {
+func (d *Database) GetVolumeById(id string) (api.Volume, error) {
 	var vol api.Volume
+	key := VolumePrefix + "/" + id
+	slog.Debug("volume data", "key", key, "id", id)
 	if _, err := d.GetJSON(key, &vol); err != nil {
-		slog.Error("failed to get volume data", "err", err, "key", key)
+		slog.Error("failed to get volume data", "err", err, "key", key, "id", id)
 		return vol, err
 	}
 	return vol, nil
@@ -183,20 +166,10 @@ func (d *Database) GetVolumeByKey(key string) (api.Volume, error) {
 // データボリュームの一覧取得
 func (d *Database) FindVolumeByName(name, kind string) ([]api.Volume, error) {
 	var volumes []api.Volume
-	var key string
-
-	switch kind {
-	case "data":
-		key = VolumePrefix + "/"
-	case "os":
-		key = OsImagePrefix + "/"
-	default:
-		return nil, fmt.Errorf("unknown volume kind: %s", kind)
-	}
-
-	resp, err := d.GetByPrefix(key)
+	prefix := VolumePrefix + "/"
+	resp, err := d.GetByPrefix(prefix)
 	if err != nil {
-		slog.Error("GetEtcdByPrefix() failed", "err", err, "key", key)
+		slog.Error("GetEtcdByPrefix() failed", "err", err, "key-prefix", prefix)
 		return volumes, err
 	}
 
@@ -210,7 +183,9 @@ func (d *Database) FindVolumeByName(name, kind string) ([]api.Volume, error) {
 		if vol.Name != name {
 			continue
 		}
-		volumes = append(volumes, vol)
+		if *vol.Kind == kind {
+			volumes = append(volumes, vol)
+		}
 	}
 
 	return volumes, nil
@@ -220,7 +195,6 @@ func (d *Database) FindVolumeByName(name, kind string) ([]api.Volume, error) {
 // この関数が呼ばれているのは、以下の一箇所のみ
 // https://github.com/takara9/marmot/blob/main/pkg/marmotd/vm-create.go#L60
 func (d *Database) CreateOsLv(tempVg string, tempLv string) (string, error) {
-	// シリアルを取得
 	seq, err := d.GetSeqByKind("LVOS")
 	if err != nil {
 		return "", err
@@ -240,7 +214,6 @@ func (d *Database) CreateOsLv(tempVg string, tempLv string) (string, error) {
 // この関数が呼ばれているのは、以下の一箇所のみ
 // https://github.com/takara9/marmot/blob/main/pkg/marmotd/vm-create.go#L97
 func (d *Database) CreateDataLv(sz uint64, vg string) (string, error) {
-	// シリアルを取得
 	seq, err := d.GetSeqByKind("LVDATA")
 	if err != nil {
 		return "", err
