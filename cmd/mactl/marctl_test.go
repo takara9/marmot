@@ -315,6 +315,10 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			for _, v := range volumes {
 				cmdDel := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "rename", *v.Key, "NEW_NAME", "--output", "json")
 				stdoutStderr, err := cmdDel.CombinedOutput()
+				exitErr, ok := err.(*exec.ExitError)
+				GinkgoWriter.Println("Exit Code:", exitErr.ExitCode())
+				GinkgoWriter.Println("Exit Code ok?", ok)
+				Expect(exitErr.ExitCode()).To(Equal(0))
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Print(string(stdoutStderr))
 			}
