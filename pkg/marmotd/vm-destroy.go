@@ -43,18 +43,22 @@ func (m *Marmot) DestroyVM2(spec api.VmSpec) error {
 		}
 	}
 
-	// データベースから削除
+	slog.Debug("DestroyVM2() proceed to delete VM on database", "vmKey", *spec.Key)
+	// データベースからVMを削除
 	if err := m.Db.DeleteJSON(*spec.Key); err != nil {
 		slog.Error("DeleteJSON(", "err", err)
 	}
 
 	// 仮想マシンの停止＆削除
 	domName := strings.Split(*spec.Key, "/")
+	slog.Debug("DestroyVM2() proceed to delete VM on hypervisor", "vmKey", *spec.Key, "domName", domName[len(domName)-1])
+
 	if err := virt.DestroyVM("qemu:///system", domName[len(domName)-1]); err != nil {
 		slog.Error("DestroyVM()", "err", err, "vmKey", *spec.Key, "key", domName[len(domName)-1])
 	}
 
-	// OS LVを削除　ここで失敗している！！！！
+	// OS LVを削除
+	slog.Debug("DestroyVM2() proceed to delete OS LV", "vm.OsVg", *vm.OsVg, "vm.OsLv", *vm.OsLv)
 	if err := lvm.RemoveLV(*vm.OsVg, *vm.OsLv); err != nil {
 		slog.Error("lvm.RemoveLV()", "err", err)
 	}
@@ -65,6 +69,7 @@ func (m *Marmot) DestroyVM2(spec api.VmSpec) error {
 	// データLVを削除
 	if vm.Storage != nil {
 		for _, dd := range *vm.Storage {
+			slog.Debug("DestroyVM2() proceed to delete Data LV", "dd.Vg", *dd.Vg, "dd.Lv", *dd.Lv)
 			err = lvm.RemoveLV(*dd.Vg, *dd.Lv)
 			if err != nil {
 				slog.Error("RemoveLV()", "err", err)

@@ -19,7 +19,6 @@ const (
 	HvPrefix              = "/marmot/hypervisor"
 	VmPrefix              = "/marmot/virtualmachine"
 	OsTemplateImagePrefix = "/marmot/osTemplateImage"
-	OsImagePrefix         = "/marmot/osimage"
 	VolumePrefix          = "/marmot/volume"
 	SeqPrefix             = "/marmot/sequence"
 	VersionKey            = "/marmot/version"

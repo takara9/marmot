@@ -19,16 +19,6 @@ var _ = Describe("Etcd", Ordered, func() {
 	var containerID string
 
 	BeforeAll(func(ctx SpecContext) {
-		/*
-			// Setup slog
-			opts := &slog.HandlerOptions{
-					AddSource: true,
-					Level:     slog.LevelDebug,
-				}
-			logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
-			slog.SetDefault(logger)
-		*/
-
 		// Dockerコンテナを起動
 		url = "http://127.0.0.1:4379"
 		cmd := exec.Command("docker", "run", "-d", "--name", "etcddb", "-p", "4379:2379", "-p", "4380:2380", "ghcr.io/takara9/etcd:3.6.5")
@@ -56,12 +46,6 @@ var _ = Describe("Etcd", Ordered, func() {
 			fmt.Printf("Failed to remove container: %v\n", err)
 		}
 	}, NodeTimeout(20*time.Second))
-
-	BeforeEach(func() {
-	})
-
-	AfterEach(func() {
-	})
 
 	Describe("Test etcd", func() {
 		Context("Test Connection to etcd", func() {

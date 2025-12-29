@@ -186,10 +186,8 @@ func testMarmotVolumes() {
 			GinkgoWriter.Println("Created volume key: ", *volSpec.Key)
 		})
 
-		// ここが失敗している模様 !!!
 		It("OS論理ボリュームの削除", func() {
-			fmt.Println("================================!!!!!!!!!!!!!!")
-			err = m.RemoveVolume(*volSpec.Key)
+			err = m.RemoveVolume(volSpec.Id)
 			Expect(err).NotTo(HaveOccurred())
 
 			out, err := exec.Command("lvs", "vg1").Output()
@@ -340,7 +338,7 @@ func testMarmotVolumes() {
 		})
 
 		It("DATA論理ボリュームの削除", func() {
-			err = m.RemoveVolume(*volSpec.Key)
+			err = m.RemoveVolume(volSpec.Id)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -352,7 +350,7 @@ func testMarmotVolumes() {
 	})
 
 	Context("OSとデータの論理ボリューム生成、リスト取得、削除", func() {
-		var key []string
+		var ids []string
 		var m *marmotd.Marmot
 
 		It("Marmotインスタンスの生成", func() {
@@ -370,7 +368,7 @@ func testMarmotVolumes() {
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
 			tmpSpec, err := m.CreateNewVolume(v)
-			key = append(key, *tmpSpec.Key)
+			ids = append(ids, tmpSpec.Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Key)
 		})
@@ -384,7 +382,7 @@ func testMarmotVolumes() {
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
 			tmpSpec, err := m.CreateNewVolume(v)
-			key = append(key, *tmpSpec.Key)
+			ids = append(ids, tmpSpec.Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Key)
 		})
@@ -398,7 +396,7 @@ func testMarmotVolumes() {
 			}
 			GinkgoWriter.Println("Creating Data volume", "volume", v)
 			tmpSpec, err := m.CreateNewVolume(v)
-			key = append(key, *tmpSpec.Key)
+			ids = append(ids, tmpSpec.Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Key)
 		})
@@ -412,7 +410,7 @@ func testMarmotVolumes() {
 			}
 			GinkgoWriter.Println("Creating Data volume", "volume", v)
 			tmpSpec, err := m.CreateNewVolume(v)
-			key = append(key, *tmpSpec.Key)
+			ids = append(ids, tmpSpec.Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Key)
 		})
@@ -450,8 +448,8 @@ func testMarmotVolumes() {
 		})
 
 		It("論理ボリュームの削除", func() {
-			for _, k := range key {
-				err := m.RemoveVolume(k)
+			for _, id := range ids {
+				err := m.RemoveVolume(id)
 				Expect(err).NotTo(HaveOccurred())
 			}
 			time.Sleep(1 * time.Second)
@@ -499,7 +497,7 @@ func testMarmotVolumes() {
 	})
 
 	Context("OSボリュームの操作", func() {
-		var key []string
+		var ids []string
 		var m *marmotd.Marmot
 
 		It("Marmotインスタンスの生成", func() {
@@ -528,9 +526,8 @@ func testMarmotVolumes() {
 				Kind:   ut.StringPtr("os"),
 				OsName: ut.StringPtr("ubuntu22.04"),
 			}
-			//			GinkgoWriter.Println("Creating qcow2 volume", "volume", v.Path)
 			tmpSSpec, err := m.CreateNewVolume(v)
-			key = append(key, *tmpSSpec.Key)
+			ids = append(ids, tmpSSpec.Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created volume key: ", *tmpSSpec.Key)
 		})
@@ -552,9 +549,9 @@ func testMarmotVolumes() {
 		})
 
 		It("qcow2ボリュームの削除", func() {
-			for _, k := range key {
-				GinkgoWriter.Println("Removing qcow2 volume", "volKey", k)
-				err := m.RemoveVolume(k)
+			for _, id := range ids {
+				GinkgoWriter.Println("Removing qcow2 volume", "id", id)
+				err := m.RemoveVolume(id)
 				Expect(err).NotTo(HaveOccurred())
 			}
 			vols, err := m.GetOsVolumes()
@@ -581,7 +578,7 @@ func testMarmotVolumes() {
 	})
 
 	Context("DATAボリュームの操作", func() {
-		var key []string
+		var ids []string
 		var m *marmotd.Marmot
 
 		It("Marmotインスタンスの生成", func() {
@@ -598,9 +595,9 @@ func testMarmotVolumes() {
 				Size: ut.IntPtrInt(1),
 			}
 			tmpSpec, err := m.CreateNewVolume(v)
-			key = append(key, *tmpSpec.Key)
+			ids = append(ids, tmpSpec.Id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Key)
+			GinkgoWriter.Println("Created volume id: ", tmpSpec.Id)
 
 			out, err := exec.Command("ls", "-alh", "/var/lib/marmot/volumes").Output()
 			Expect(err).NotTo(HaveOccurred())
@@ -619,9 +616,9 @@ func testMarmotVolumes() {
 		})
 
 		It("データボリュームの削除", func() {
-			for _, k := range key {
-				GinkgoWriter.Println("Removing qcow2 volume", "volKey", k)
-				err := m.RemoveVolume(k)
+			for _, id := range ids {
+				GinkgoWriter.Println("Removing qcow2 volume", "id", id)
+				err := m.RemoveVolume(id)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
