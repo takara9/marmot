@@ -427,3 +427,88 @@ func (s *Server) UpdateVolumeById(ctx echo.Context, volumeId string) error {
 
 	return ctx.JSON(http.StatusOK, volSpec)
 }
+
+// サーバーのリストを取得、フィルターは、パラメータで指定するようにする
+func (s *Server) GetServers(ctx echo.Context) error {
+	slog.Debug("===", "GetServers() is called", "===")
+	var serverSpec api.Server
+	if err := ctx.Bind(&serverSpec); err != nil {
+		slog.Error("GetServers()", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+	_, err := s.Ma.GetServers()
+	if err != nil {
+		slog.Error("GetServers()", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	return nil
+}
+
+// サーバーの作成
+func (s *Server) CreateServer(ctx echo.Context) error {
+	slog.Debug("===", "CreateServer() is called", "===")
+
+	var serverSpec api.Server
+	if err := ctx.Bind(&serverSpec); err != nil {
+		slog.Error("CreateServer()", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+	if err := s.Ma.CreateServer(serverSpec); err != nil {
+		slog.Error("CreateServer()", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	return nil
+}
+
+// サーバーの詳細を取得
+func (s *Server) GetServerById(ctx echo.Context, id string) error {
+	slog.Debug("===", "GetServerById() is called", "===")
+	var serverSpec api.Server
+	if err := ctx.Bind(&serverSpec); err != nil {
+		slog.Error("GetServerById()", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	if err := s.Ma.GetServerById(serverSpec); err != nil {
+		slog.Error("GetServerById()", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	return nil
+}
+
+// サーバーの削除
+func (s *Server) DeleteServerById(ctx echo.Context, id string) error {
+	slog.Debug("===", "DeleteServerById() is called", "===")
+	var serverSpec api.Server
+	if err := ctx.Bind(&serverSpec); err != nil {
+		slog.Error("DeleteServerById()", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	if err := s.Ma.DeleteServerById(serverSpec.Id); err != nil {
+		slog.Error("DeleteServerById()", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	return nil
+}
+
+// サーバーの更新
+func (s *Server) UpdateServerById(ctx echo.Context, id string) error {
+	slog.Debug("===", "UpdateServerById() is called", "===")
+	var serverSpec api.Server
+	if err := ctx.Bind(&serverSpec); err != nil {
+		slog.Error("DeleteServerById()", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	if err := s.Ma.UpdateServerById(serverSpec); err != nil {
+		slog.Error("UpdateServerById()", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	return nil
+}

@@ -1,4 +1,4 @@
-package main
+package marmotd
 
 import (
 	"context"
@@ -9,10 +9,9 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/marmotd"
 )
 
-func startMockServer(ctx context.Context) *marmotd.Server {
+func StartMockServer(ctx context.Context, marmotPort int, etcdPort int) *Server {
 	/*
 		// 個別にログを確認したい場合はコメントアウトを外す
 		opts := &slog.HandlerOptions{
@@ -23,14 +22,14 @@ func startMockServer(ctx context.Context) *marmotd.Server {
 		slog.SetDefault(logger)
 	*/
 	e := echo.New()
-	server := marmotd.NewServer("hvc", "http://127.0.0.1:3379")
+	server := NewServer("hvc", "http://127.0.0.1:"+fmt.Sprintf("%d", etcdPort))
 
 	go func() {
 		api.RegisterHandlersWithBaseURL(e, server, "/api/v1")
 
 		// サーバー起動
 		go func() {
-			if err := e.Start("0.0.0.0:8080"); err != nil && err != http.ErrServerClosed {
+			if err := e.Start("0.0.0.0:" + fmt.Sprintf("%d", marmotPort)); err != nil && err != http.ErrServerClosed {
 				fmt.Println("server error:", err)
 			}
 		}()
@@ -49,7 +48,7 @@ func startMockServer(ctx context.Context) *marmotd.Server {
 	return server
 }
 
-func cleanupTestEnvironment() {
+func CleanupTestEnvironment() {
 	cmd := exec.Command("lvremove vg1/oslv0900 -y")
 	cmd.CombinedOutput()
 	cmd = exec.Command("lvremove vg1/oslv0901 -y")
@@ -64,5 +63,11 @@ func cleanupTestEnvironment() {
 	cmd = exec.Command("lvremove vg2/data0902 -y")
 	cmd.CombinedOutput()
 	cmd = exec.Command("lvremove vg2/data0903 -y")
+	cmd.CombinedOutput()
+
+	cmd = exec.Command("docker kill $(docker ps |awk 'NR>1 {print $1}')")
+	cmd.CombinedOutput()
+
+	cmd = exec.Command("docker rm $(docker ps --all |awk 'NR>1 {print $1}')")
 	cmd.CombinedOutput()
 }

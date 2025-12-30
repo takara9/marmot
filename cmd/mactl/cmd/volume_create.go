@@ -25,9 +25,9 @@ var volumeCreateCmd = &cobra.Command{
 			spec.OsName = util.StringPtr(osName)
 		}
 
-		_, byteBody, _, err2 := m.CreateVolume(spec)
-		if err2 != nil {
-			println("CreateVolume", "err", err2)
+		byteBody, _, err := m.CreateVolume(spec)
+		if err != nil {
+			println("CreateVolume", "err", err)
 			return err
 		}
 

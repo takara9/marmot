@@ -64,10 +64,62 @@ type ReplyMessage struct {
 	Message string `json:"message"`
 }
 
+// Server defines model for Server.
+type Server struct {
+	HvIpAddr    *string    `json:"HvIpAddr,omitempty"`
+	HvNode      *string    `json:"HvNode,omitempty"`
+	HvPort      *int       `json:"HvPort,omitempty"`
+	CTime       *time.Time `json:"cTime,omitempty"`
+	ClusterName *string    `json:"clusterName,omitempty"`
+	Comment     *string    `json:"comment,omitempty"`
+	Cpu         *int       `json:"cpu,omitempty"`
+	Id          string     `json:"id"`
+	Key         *string    `json:"key,omitempty"`
+	Memory      *int       `json:"memory,omitempty"`
+	Name        *string    `json:"name,omitempty"`
+	OsLv        *string    `json:"osLv,omitempty"`
+	OsVariant   *string    `json:"osVariant,omitempty"`
+	OsVg        *string    `json:"osVg,omitempty"`
+	Playbook    *string    `json:"playbook,omitempty"`
+	PrivateIp   *string    `json:"privateIp,omitempty"`
+	PublicIp    *string    `json:"publicIp,omitempty"`
+	STime       *time.Time `json:"sTime,omitempty"`
+	Status      *int       `json:"status,omitempty"`
+	Storage     *[]Volume  `json:"storage,omitempty"`
+}
+
+// Servers defines model for Servers.
+type Servers = []Server
+
+// Success defines model for Success.
+type Success struct {
+	Id      string  `json:"id"`
+	Message *string `json:"message,omitempty"`
+}
+
 // Version defines model for Version.
 type Version struct {
 	ClientVersion string  `json:"clientVersion"`
 	ServerVersion *string `json:"serverVersion,omitempty"`
+}
+
+// Volume defines model for Volume.
+type Volume struct {
+	CTime         *time.Time `json:"cTime,omitempty"`
+	Comment       *string    `json:"comment,omitempty"`
+	Id            string     `json:"id"`
+	Key           *string    `json:"key,omitempty"`
+	Kind          *string    `json:"kind,omitempty"`
+	LogicalVolume *string    `json:"logicalVolume,omitempty"`
+	MTime         *time.Time `json:"mTime,omitempty"`
+	Name          string     `json:"name"`
+	OsName        *string    `json:"osName,omitempty"`
+	OsVersion     *string    `json:"osVersion,omitempty"`
+	Path          *string    `json:"path,omitempty"`
+	Size          *int       `json:"size,omitempty"`
+	Status        *int       `json:"status,omitempty"`
+	Type          *string    `json:"type,omitempty"`
+	VolumeGroup   *string    `json:"volumeGroup,omitempty"`
 }
 
 // Storage defines model for storage.
@@ -132,25 +184,6 @@ type VmSpec struct {
 	Uuid          *string    `json:"uuid,omitempty"`
 }
 
-// Volume defines model for volume.
-type Volume struct {
-	CTime         *time.Time `json:"cTime,omitempty"`
-	Comment       *string    `json:"comment,omitempty"`
-	Id            string     `json:"id"`
-	Key           *string    `json:"key,omitempty"`
-	Kind          *string    `json:"kind,omitempty"`
-	LogicalVolume *string    `json:"logicalVolume,omitempty"`
-	MTime         *time.Time `json:"mTime,omitempty"`
-	Name          string     `json:"name"`
-	OsName        *string    `json:"osName,omitempty"`
-	OsVersion     *string    `json:"osVersion,omitempty"`
-	Path          *string    `json:"path,omitempty"`
-	Size          *int       `json:"size,omitempty"`
-	Status        *int       `json:"status,omitempty"`
-	Type          *string    `json:"type,omitempty"`
-	VolumeGroup   *string    `json:"volumeGroup,omitempty"`
-}
-
 // ListHypervisorsParams defines parameters for ListHypervisors.
 type ListHypervisorsParams struct {
 	// Limit How many items to return at one time (max 100)
@@ -168,6 +201,12 @@ type DestroyClusterJSONRequestBody = MarmotConfig
 
 // DestroyVirtualMachineJSONRequestBody defines body for DestroyVirtualMachine for application/json ContentType.
 type DestroyVirtualMachineJSONRequestBody = VmSpec
+
+// CreateServerJSONRequestBody defines body for CreateServer for application/json ContentType.
+type CreateServerJSONRequestBody = Server
+
+// UpdateServerByIdJSONRequestBody defines body for UpdateServerById for application/json ContentType.
+type UpdateServerByIdJSONRequestBody = Server
 
 // StartClusterJSONRequestBody defines body for StartCluster for application/json ContentType.
 type StartClusterJSONRequestBody = MarmotConfig
@@ -210,6 +249,21 @@ type ServerInterface interface {
 	// Alive
 	// (GET /ping)
 	ReplyPing(ctx echo.Context) error
+	// Get Server Information
+	// (GET /server)
+	GetServers(ctx echo.Context) error
+	// Create Virtual Server
+	// (POST /server)
+	CreateServer(ctx echo.Context) error
+	// Delete Server
+	// (DELETE /server/{id})
+	DeleteServerById(ctx echo.Context, id string) error
+	// Get particular server Information
+	// (GET /server/{id})
+	GetServerById(ctx echo.Context, id string) error
+	// Update Server Information by Id
+	// (PUT /server/{id})
+	UpdateServerById(ctx echo.Context, id string) error
 	// Start Cluster of Virtual Machines
 	// (POST /startCluster)
 	StartCluster(ctx echo.Context) error
@@ -326,6 +380,72 @@ func (w *ServerInterfaceWrapper) ReplyPing(ctx echo.Context) error {
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.ReplyPing(ctx)
+	return err
+}
+
+// GetServers converts echo context to params.
+func (w *ServerInterfaceWrapper) GetServers(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetServers(ctx)
+	return err
+}
+
+// CreateServer converts echo context to params.
+func (w *ServerInterfaceWrapper) CreateServer(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.CreateServer(ctx)
+	return err
+}
+
+// DeleteServerById converts echo context to params.
+func (w *ServerInterfaceWrapper) DeleteServerById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.DeleteServerById(ctx, id)
+	return err
+}
+
+// GetServerById converts echo context to params.
+func (w *ServerInterfaceWrapper) GetServerById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetServerById(ctx, id)
+	return err
+}
+
+// UpdateServerById converts echo context to params.
+func (w *ServerInterfaceWrapper) UpdateServerById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.UpdateServerById(ctx, id)
 	return err
 }
 
@@ -484,6 +604,11 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.GET(baseURL+"/hypervisor/:hypervisorId", wrapper.ShowHypervisorById)
 	router.GET(baseURL+"/hypervisors", wrapper.ListHypervisors)
 	router.GET(baseURL+"/ping", wrapper.ReplyPing)
+	router.GET(baseURL+"/server", wrapper.GetServers)
+	router.POST(baseURL+"/server", wrapper.CreateServer)
+	router.DELETE(baseURL+"/server/:id", wrapper.DeleteServerById)
+	router.GET(baseURL+"/server/:id", wrapper.GetServerById)
+	router.PUT(baseURL+"/server/:id", wrapper.UpdateServerById)
 	router.POST(baseURL+"/startCluster", wrapper.StartCluster)
 	router.POST(baseURL+"/startVm", wrapper.StartVirtualMachine)
 	router.POST(baseURL+"/stopCluster", wrapper.StopCluster)

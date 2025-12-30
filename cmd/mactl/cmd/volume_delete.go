@@ -8,7 +8,7 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-var volumeDestroyCmd = &cobra.Command{
+var volumeDeleteCmd = &cobra.Command{
 	Use:   "destroy [volume id]",
 	Short: "Destroy a volume",
 	Args:  cobra.ExactArgs(1), // 引数が1つ必要
