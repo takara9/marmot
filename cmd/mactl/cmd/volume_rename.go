@@ -20,7 +20,7 @@ var volumeRenameCmd = &cobra.Command{
 		var spec api.Volume
 		spec.Name = newName
 
-		_, byteBody, _, err := m.UpdateVolumeById(volumeId, spec)
+		byteBody, _, err := m.UpdateVolumeById(volumeId, spec)
 		if err != nil {
 			println("failed to update name of volume", "err", err)
 			return err

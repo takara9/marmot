@@ -66,6 +66,38 @@ func (m *MarmotEndpoint) httpRequest(req *http.Request) (int, []byte, *url.URL, 
 	return resp.StatusCode, byteJSON, jobURL, nil
 }
 
+func (m *MarmotEndpoint) httpRequest2(req *http.Request) ([]byte, *url.URL, error) {
+	req.Header.Set("User-Agent", "MarmotdClient/1.0")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := m.Client.Do(req)
+	if err != nil {
+		return nil, nil, err
+	} else if resp.StatusCode != http.StatusOK &&
+		resp.StatusCode != http.StatusCreated &&
+		resp.StatusCode != http.StatusAccepted &&
+		resp.StatusCode != http.StatusNoContent {
+		return nil, nil, fmt.Errorf("http status code = %d", resp.StatusCode)
+	}
+
+	byteJSON, err := io.ReadAll(resp.Body)
+	defer resp.Body.Close()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	jobURL, err := resp.Location()
+	if err != nil {
+		if err.Error() == "http: no Location header in response" {
+			return byteJSON, nil, nil
+		} else {
+			return byteJSON, nil, err
+		}
+	}
+
+	return byteJSON, jobURL, nil
+}
+
 func (m *MarmotEndpoint) Ping() (int, []byte, *url.URL, error) {
 	url, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/ping")
 	if err != nil {
@@ -326,96 +358,176 @@ func (m *MarmotEndpoint) StartVirtualMachine(spec api.VmSpec) (int, []byte, *url
 	return m.httpRequest(req)
 }
 
-func (m *MarmotEndpoint) CreateVolume(spec api.Volume) (int, []byte, *url.URL, error) {
+// ボリュームの作成
+func (m *MarmotEndpoint) CreateVolume(spec api.Volume) ([]byte, *url.URL, error) {
 	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/volume")
 	if err != nil {
-		return 0, nil, nil, err
+		return nil, nil, err
 	}
-	slog.Debug("CreateVolume", "reqURL", reqURL)
-	slog.Debug("CreateVolume", "spec", spec)
+	slog.Debug("CreateVolume", "reqURL", reqURL, "spec", spec)
 
 	byteJSON, _ := json.Marshal(spec)
 	req, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
 	if err != nil {
-		return 0, nil, nil, err
+		return nil, nil, err
 	}
-	req.Header.Set("User-Agent", "MarmotdClient/1.0")
-	req.Header.Set("Content-Type", "application/json")
-	return m.httpRequest(req)
+	return m.httpRequest2(req)
 }
 
-func (m *MarmotEndpoint) DeleteVolumeById(key string) (int, []byte, *url.URL, error) {
+// ボリュームの削除
+func (m *MarmotEndpoint) DeleteVolumeById(key string) ([]byte, *url.URL, error) {
 	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/volume", key)
 	if err != nil {
-		return 0, nil, nil, err
+		return nil, nil, err
 	}
-	slog.Debug("CreateVolume", "reqURL", reqURL)
-	slog.Debug("CreateVolume", "key", key)
+	slog.Debug("CreateVolume", "reqURL", reqURL, "key", key)
 
 	req, err := http.NewRequest("DELETE", reqURL, nil)
 	if err != nil {
-		return 0, nil, nil, err
+		return nil, nil, err
 	}
-	req.Header.Set("User-Agent", "MarmotdClient/1.0")
-	req.Header.Set("Content-Type", "application/json")
-	return m.httpRequest(req)
+	return m.httpRequest2(req)
 }
 
-func (m *MarmotEndpoint) ListVolumes() (int, []byte, *url.URL, error) {
+// ボリュームの一覧取得
+func (m *MarmotEndpoint) ListVolumes() ([]byte, *url.URL, error) {
 	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/volume")
 	if err != nil {
-		return 0, nil, nil, err
+		return nil, nil, err
 	}
 	slog.Debug("ListVolumes", "reqURL", reqURL)
 
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
-		return 0, nil, nil, err
+		return nil, nil, err
 	}
-	req.Header.Set("User-Agent", "MarmotdClient/1.0")
-	req.Header.Set("Content-Type", "application/json")
-	return m.httpRequest(req)
+	return m.httpRequest2(req)
 }
 
-
-func (m *MarmotEndpoint) ShowVolumeById(key string) (int, []byte, *url.URL, error) {
+// ボリュームの詳細取得
+func (m *MarmotEndpoint) ShowVolumeById(key string) ([]byte, *url.URL, error) {
 	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/volume", key)
 	if err != nil {
-		return 0, nil, nil, err
+		return nil, nil, err
 	}
 
 	slog.Debug("ShowVolumeById", "reqURL", reqURL)
 
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
-		return 0, nil, nil, err
+		return nil, nil, err
 	}
-	req.Header.Set("User-Agent", "MarmotdClient/1.0")
-	req.Header.Set("Content-Type", "application/json")
-	return m.httpRequest(req)
+	return m.httpRequest2(req)
 }
 
-func (m *MarmotEndpoint) UpdateVolumeById(key string, spec api.Volume) (int, []byte, *url.URL, error) {
+// ボリュームの更新
+func (m *MarmotEndpoint) UpdateVolumeById(key string, spec api.Volume) ([]byte, *url.URL, error) {
 	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/volume", key)
 	if err != nil {
-		return 0, nil, nil, err
+		return nil, nil, err
 	}
 
 	slog.Debug("UpdateVolumeById", "reqURL", reqURL)
 
 	byteJSON, err := json.Marshal(spec)
 	if err != nil {
-		return 0, nil, nil, err
+		return nil, nil, err
 	}
 
 	slog.Debug("UpdateVolumeById", "body", string(byteJSON))
 
 	req, err := http.NewRequest("PUT", reqURL, bytes.NewBuffer(byteJSON))
 	if err != nil {
-		return 0, nil, nil, err
+		return nil, nil, err
 	}
+	return m.httpRequest2(req)
+}
 
+// サーバーの作成
+func (m *MarmotEndpoint) CreateServer(spec api.Server) ([]byte, *url.URL, error) {
+	slog.Debug("===", "CreateServer is called", "===")
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/server")
+	if err != nil {
+		return nil, nil, err
+	}
+	slog.Debug("CreateServer", "reqURL", reqURL)
+
+	req, err := http.NewRequest("POST", reqURL, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	return m.httpRequest2(req)
+}
+
+// サーバーの削除
+func (m *MarmotEndpoint) DeleteServerById(id string) ([]byte, *url.URL, error) {
+	slog.Debug("===", "DeleteServerById is called", "===")
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/server/"+id)
+	if err != nil {
+		return nil, nil, err
+	}
+	slog.Debug("DeleteServerById", "reqURL", reqURL)
+
+	req, err := http.NewRequest("DELETE", reqURL, nil)
+	if err != nil {
+		return nil, nil, err
+	}
 	req.Header.Set("User-Agent", "MarmotdClient/1.0")
 	req.Header.Set("Content-Type", "application/json")
-	return m.httpRequest(req)
+	return m.httpRequest2(req)
+}
+
+// サーバーの詳細を取得
+func (m *MarmotEndpoint) GetServerById(id string) ([]byte, *url.URL, error) {
+	slog.Debug("===", "GetServerById is called", "===")
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/server/"+id)
+	if err != nil {
+		return nil, nil, err
+	}
+	slog.Debug("GetServerById", "reqURL", reqURL)
+
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	return m.httpRequest2(req)
+}
+
+// サーバーの更新
+func (m *MarmotEndpoint) UpdateServerById(spec api.Server) ([]byte, *url.URL, error) {
+	slog.Debug("===", "UpdateServerById is called", "===")
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/server/"+spec.Id)
+	if err != nil {
+		return nil, nil, err
+	}
+	slog.Debug("UpdateServerById", "reqURL", reqURL)
+
+	byteJSON, err := json.Marshal(spec)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	slog.Debug("UpdateServerById", "body", string(byteJSON))
+
+	req, err := http.NewRequest("PUT", reqURL, bytes.NewBuffer(byteJSON))
+	if err != nil {
+		return nil, nil, err
+	}
+	return m.httpRequest2(req)
+}
+
+// サーバーの一覧を取得、フィルターは、パラメータで指定するようにする
+func (m *MarmotEndpoint) GetServers() ([]byte, *url.URL, error) {
+	slog.Debug("===", "GetServers is called", "===")
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/server")
+	if err != nil {
+		return nil, nil, err
+	}
+	slog.Debug("GetServers", "reqURL", reqURL)
+
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	return m.httpRequest2(req)
 }

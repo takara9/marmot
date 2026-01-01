@@ -14,7 +14,7 @@ var volumeListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all volumes",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		_, byteBody, _, err := m.ListVolumes()
+		byteBody, _, err := m.ListVolumes()
 		if err != nil {
 			println("ListVolumes", "err", err)
 			return err
