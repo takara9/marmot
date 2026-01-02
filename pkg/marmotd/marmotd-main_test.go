@@ -220,7 +220,7 @@ var _ = Describe("関数テスト", Ordered, func() {
 		var replyVolume api.Volume
 		It("DATAボリューム(qcow2)の作成", func() {
 			var vol api.Volume
-			vol.Name = "test-volume-001"
+			vol.Name = util.StringPtr("test-volume-001")
 			vol.Type = util.StringPtr("qcow2")
 			vol.Kind = util.StringPtr("data")
 			vol.Size = util.IntPtrInt(100)
@@ -262,7 +262,7 @@ var _ = Describe("関数テスト", Ordered, func() {
 
 		It("OSボリューム(qcow2)の作成", func() {
 			var vol api.Volume
-			vol.Name = "test-volume-002"
+			vol.Name = util.StringPtr("test-volume-002")
 			vol.Type = util.StringPtr("qcow2")
 			vol.Kind = util.StringPtr("os")
 			vol.OsName = util.StringPtr("ubuntu22.04")
@@ -304,7 +304,7 @@ var _ = Describe("関数テスト", Ordered, func() {
 
 		It("OSボリューム(LVM)の作成", func() {
 			var vol api.Volume
-			vol.Name = "test-volume-002"
+			vol.Name = util.StringPtr("test-volume-002")
 			vol.Type = util.StringPtr("lvm")
 			vol.Kind = util.StringPtr("os")
 			vol.OsName = util.StringPtr("ubuntu22.04")
@@ -357,7 +357,7 @@ var _ = Describe("関数テスト", Ordered, func() {
 
 		It("DATAボリューム(LVM)の作成 0000", func() {
 			var vol api.Volume
-			vol.Name = "test-volume-002"
+			vol.Name = util.StringPtr("test-volume-002")
 			vol.Type = util.StringPtr("lvm")
 			vol.Kind = util.StringPtr("data")
 			vol.Size = util.IntPtrInt(1)
@@ -400,7 +400,7 @@ var _ = Describe("関数テスト", Ordered, func() {
 
 		It("DATAボリューム(LVM)の情報更新", func() {
 			var spec api.Volume
-			spec.Name = "updated-volume-name"
+			spec.Name = util.StringPtr("updated-volume-name")
 			body, url, err := marmotClient.UpdateVolumeById(replyVolume.Id, spec)
 			GinkgoWriter.Println("UpdateVolumeById err =", err)
 			Expect(err).NotTo(HaveOccurred())

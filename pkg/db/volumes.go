@@ -44,7 +44,7 @@ func (d *Database) CreateVolumeOnDB(volName, volPath, volType, volKind string, v
 	vol.Kind = util.StringPtr(volKind)
 	vol.Type = util.StringPtr(volType)
 	vol.Status = util.IntPtrInt(VOLUME_PROVISIONING)
-	vol.Name = volName
+	vol.Name = util.StringPtr(volName)
 	vol.Path = util.StringPtr(volPath)
 	vol.Size = util.IntPtrInt(volSize)
 
@@ -91,9 +91,7 @@ func (d *Database) UpdateVolume(id string, updateData api.Volume) error {
 	}
 
 	// 更新フィールドの反映
-	if len(updateData.Name) > 0 {
-		rec.Name = updateData.Name
-	}
+	util.Assign(&rec.Name, updateData.Name)
 	util.Assign(&rec.Path, updateData.Path)
 	util.Assign(&rec.Type, updateData.Type)
 	util.Assign(&rec.Kind, updateData.Kind)
@@ -178,9 +176,6 @@ func (d *Database) FindVolumeByName(name, kind string) ([]api.Volume, error) {
 		err := json.Unmarshal([]byte(kv.Value), &vol)
 		if err != nil {
 			slog.Error("Unmarshal() failed", "err", err, "key", string(kv.Key))
-			continue
-		}
-		if vol.Name != name {
 			continue
 		}
 		if *vol.Kind == kind {
