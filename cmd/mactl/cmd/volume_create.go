@@ -16,7 +16,7 @@ var volumeCreateCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var err error
 		var spec api.Volume = api.Volume{
-			Name: volumeName,
+			Name: util.StringPtr(volumeName),
 			Type: util.StringPtr(volumeType),
 			Kind: util.StringPtr(volumeKind),
 			Size: util.IntPtrInt(volumeSize),

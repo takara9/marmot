@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/util"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -18,7 +19,7 @@ var volumeRenameCmd = &cobra.Command{
 		newName := args[1]
 
 		var spec api.Volume
-		spec.Name = newName
+		spec.Name = util.StringPtr(newName)
 
 		byteBody, _, err := m.UpdateVolumeById(volumeId, spec)
 		if err != nil {

@@ -18,7 +18,7 @@ func (m *Marmot) CreateNewVolume(v api.Volume) (*api.Volume, error) {
 	slog.Debug("CreateVolume()", "name", v.Name, "type", *v.Type, "kind", *v.Kind)
 
 	// 内容が設定されていない時はデフォルト値をセットする
-	volName := v.Name // ボリューム名は必須 ボリューム名はラベルとして利用、ユニークである必要はない？
+	volName := util.OrDefault(v.Name, "vol1") // ボリューム名は必須 ボリューム名はラベルとして利用、ユニークである必要はない？
 	volType := util.OrDefault(v.Type, "lvm")
 	volKind := util.OrDefault(v.Kind, "os")
 	volSize := util.OrDefault(v.Size, 0)
@@ -305,10 +305,7 @@ func (m *Marmot) UpdateVolumeById(id string, volSpec api.Volume) (*api.Volume, e
 	}
 
 	slog.Debug("UpdateVolumeById()", "volumeId", id, "volSpec Name", volSpec.Name)
-	// 更新内容を構築 変更可能なのはサイズと名前のみ？
-	if len(volSpec.Name) > 0 {
-		vol.Name = volSpec.Name
-	}
+	util.Assign(&vol.Name, volSpec.Name)
 	util.Assign(&vol.Size, volSpec.Size)
 
 	// データベースを更新

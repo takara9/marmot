@@ -112,7 +112,7 @@ type Volume struct {
 	Kind          *string    `json:"kind,omitempty"`
 	LogicalVolume *string    `json:"logicalVolume,omitempty"`
 	MTime         *time.Time `json:"mTime,omitempty"`
-	Name          string     `json:"name"`
+	Name          *string    `json:"name,omitempty"`
 	OsName        *string    `json:"osName,omitempty"`
 	OsVersion     *string    `json:"osVersion,omitempty"`
 	Path          *string    `json:"path,omitempty"`
