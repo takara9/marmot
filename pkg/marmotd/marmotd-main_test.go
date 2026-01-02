@@ -415,7 +415,7 @@ var _ = Describe("関数テスト", Ordered, func() {
 			err = json.Unmarshal(body, &vol)
 			GinkgoWriter.Println("ShowVolumeById Id  =", vol.Id)
 			GinkgoWriter.Println("ShowVolumeById Key =", *vol.Key)
-			GinkgoWriter.Println("ShowVolumeById VolumeName =", vol.Name)
+			GinkgoWriter.Println("ShowVolumeById VolumeName =", *vol.Name)
 			Expect(vol.Name).To(Equal("updated-volume-name"))
 			Expect(url).To(BeNil())
 		})

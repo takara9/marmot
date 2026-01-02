@@ -63,7 +63,7 @@ var _ = Describe("Volumes", Ordered, func() {
 			It("Keyからボリューム情報を取得", func() {
 				vol, err := v.GetVolumeById(volSpec.Id)
 				Expect(err).NotTo(HaveOccurred())
-				fmt.Printf("Retrieved volume: Id=%s Key=%s Name=%s Path=%s Size=%d Status=%v\n", vol.Id, *vol.Key, vol.Name, *vol.Path, *vol.Size, db.VolStatus[*vol.Status])
+				fmt.Printf("Retrieved volume: Id=%s Key=%s Name=%s Path=%s Size=%d Status=%v\n", vol.Id, *vol.Key, *vol.Name, *vol.Path, *vol.Size, db.VolStatus[*vol.Status])
 			})
 
 			It("ボリュームの状態更新 #1", func() {
@@ -78,7 +78,7 @@ var _ = Describe("Volumes", Ordered, func() {
 			It("Keyからボリューム情報を取得", func() {
 				vol, err := v.GetVolumeById(volSpec.Id)
 				Expect(err).NotTo(HaveOccurred())
-				fmt.Printf("Retrieved volume: Id=%s Key=%s Name=%s Path=%s Size=%d Status=%v\n", vol.Id, *vol.Key, vol.Name, *vol.Path, *vol.Size, db.VolStatus[*vol.Status])
+				fmt.Printf("Retrieved volume: Id=%s Key=%s Name=%s Path=%s Size=%d Status=%v\n", vol.Id, *vol.Key, *vol.Name, *vol.Path, *vol.Size, db.VolStatus[*vol.Status])
 			})
 
 			It("ボリュームの作成 #2", func() {
@@ -99,7 +99,7 @@ var _ = Describe("Volumes", Ordered, func() {
 				Expect(len(vols)).To(Equal(3))
 				fmt.Println("データボリューム一覧:")
 				for _, vol := range vols {
-					fmt.Printf("Id=%s Key=%s Name=%s Path=%s Size=%d Status=%v\n", vol.Id, *vol.Key, vol.Name, *vol.Path, *vol.Size, db.VolStatus[*vol.Status])
+					fmt.Printf("Id=%s Key=%s Name=%s Path=%s Size=%d Status=%v\n", vol.Id, *vol.Key, *vol.Name, *vol.Path, *vol.Size, db.VolStatus[*vol.Status])
 				}
 			})
 
@@ -117,7 +117,7 @@ var _ = Describe("Volumes", Ordered, func() {
 				Expect(len(vols)).To(Equal(2))
 				fmt.Println("データボリューム一覧:")
 				for _, vol := range vols {
-					fmt.Printf("Id=%s Key=%s Name=%s Path=%s Size=%d Status=%v\n", vol.Id, *vol.Key, vol.Name, *vol.Path, *vol.Size, db.VolStatus[*vol.Status])
+					fmt.Printf("Id=%s Key=%s Name=%s Path=%s Size=%d Status=%v\n", vol.Id, *vol.Key, *vol.Name, *vol.Path, *vol.Size, db.VolStatus[*vol.Status])
 				}
 			})
 		})
