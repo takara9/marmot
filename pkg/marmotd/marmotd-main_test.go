@@ -416,7 +416,7 @@ var _ = Describe("関数テスト", Ordered, func() {
 			GinkgoWriter.Println("ShowVolumeById Id  =", vol.Id)
 			GinkgoWriter.Println("ShowVolumeById Key =", *vol.Key)
 			GinkgoWriter.Println("ShowVolumeById VolumeName =", *vol.Name)
-			Expect(vol.Name).To(Equal("updated-volume-name"))
+			Expect(*vol.Name).To(Equal("updated-volume-name"))
 			Expect(url).To(BeNil())
 		})
 

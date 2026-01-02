@@ -178,7 +178,7 @@ func (d *Database) FindVolumeByName(name, kind string) ([]api.Volume, error) {
 			slog.Error("Unmarshal() failed", "err", err, "key", string(kv.Key))
 			continue
 		}
-		if *vol.Kind == kind {
+		if *vol.Name == name && *vol.Kind == kind {
 			volumes = append(volumes, vol)
 		}
 	}
