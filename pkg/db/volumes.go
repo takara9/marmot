@@ -38,12 +38,24 @@ func (d *Database) CreateVolumeOnDB(volName, volPath, volType, volKind string, v
 	}
 	defer d.UnlockKey(mutex)
 
-	vol.Id = uuid.New().String()
-	key := VolumePrefix + "/" + vol.Id // DATAボリューム
+	//一意なIDを発行
+	var key string
+	for {
+		vol.Id = uuid.New().String()[:7]
+		key = VolumePrefix + "/" + vol.Id
+		_, err := d.GetJSON(key, &vol)
+		if err == ErrNotFound {
+			break
+		} else if err != nil {
+			slog.Error("CreateVolumeOnDB()", "err", err)
+			return nil, err
+		}
+	}
+
 	vol.Key = util.StringPtr(key)
+	vol.Status = util.IntPtrInt(VOLUME_PROVISIONING)
 	vol.Kind = util.StringPtr(volKind)
 	vol.Type = util.StringPtr(volType)
-	vol.Status = util.IntPtrInt(VOLUME_PROVISIONING)
 	vol.Name = util.StringPtr(volName)
 	vol.Path = util.StringPtr(volPath)
 	vol.Size = util.IntPtrInt(volSize)
