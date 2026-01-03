@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
+<<<<<<< HEAD
 	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/util"
 	"go.yaml.in/yaml/v3"
@@ -13,10 +14,16 @@ import (
 
 var configFilename string
 
+=======
+	"go.yaml.in/yaml/v3"
+)
+
+>>>>>>> origin/main
 var serverCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new server",
 	RunE: func(cmd *cobra.Command, args []string) error {
+<<<<<<< HEAD
 		var conf config.Server
 		err := config.ReadYamlConfig(configFilename, &conf)
 		if err != nil {
@@ -52,6 +59,10 @@ var serverCreateCmd = &cobra.Command{
 			}
 			spec.Storage = &volumes
 		}
+=======
+		var err error
+		var spec api.Server
+>>>>>>> origin/main
 
 		byteBody, _, err := m.CreateServer(spec)
 		if err != nil {
@@ -93,5 +104,15 @@ var serverCreateCmd = &cobra.Command{
 
 func init() {
 	serverCmd.AddCommand(serverCreateCmd)
+<<<<<<< HEAD
 	serverCreateCmd.Flags().StringVarP(&configFilename, "configfile", "f", "vm-spec.yaml", "Configuration file for the server")
+=======
+	//serverCreateCmd.Flags().StringVarP(&serverName, "name", "n", "", "Name of the server")
+	//serverCreateCmd.Flags().StringVarP(&serverType, "type", "t", "qcow2", "Type of the server (lvm, qcow2)")
+	//serverCreateCmd.Flags().StringVarP(&serverKind, "kind", "k", "data", "Kind of the server (os, data)")
+	//serverCreateCmd.Flags().IntVarP(&serverSize, "size", "s", 0, "Size of the server in GB")
+	//serverCreateCmd.MarkFlagRequired("name")
+	//serverCreateCmd.MarkFlagRequired("type")
+	//serverCreateCmd.MarkFlagRequired("kind")
+>>>>>>> origin/main
 }

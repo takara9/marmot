@@ -452,6 +452,7 @@ func (m *MarmotEndpoint) CreateServer(spec api.Server) ([]byte, *url.URL, error)
 	}
 	slog.Debug("CreateServer", "reqURL", reqURL)
 
+<<<<<<< HEAD
 	byteJSON, err := json.Marshal(spec)
 	if err != nil {
 		return nil, nil, err
@@ -459,6 +460,9 @@ func (m *MarmotEndpoint) CreateServer(spec api.Server) ([]byte, *url.URL, error)
 	slog.Debug("CreateServer", "body", string(byteJSON))
 
 	req, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
+=======
+	req, err := http.NewRequest("POST", reqURL, nil)
+>>>>>>> origin/main
 	if err != nil {
 		return nil, nil, err
 	}
@@ -500,9 +504,15 @@ func (m *MarmotEndpoint) GetServerById(id string) ([]byte, *url.URL, error) {
 }
 
 // サーバーの更新
+<<<<<<< HEAD
 func (m *MarmotEndpoint) UpdateServerById(id string, spec api.Server) ([]byte, *url.URL, error) {
 	slog.Debug("===", "UpdateServerById is called", "===")
 	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/server/"+id)
+=======
+func (m *MarmotEndpoint) UpdateServerById(spec api.Server) ([]byte, *url.URL, error) {
+	slog.Debug("===", "UpdateServerById is called", "===")
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/server/"+spec.Id)
+>>>>>>> origin/main
 	if err != nil {
 		return nil, nil, err
 	}

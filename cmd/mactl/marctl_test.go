@@ -18,12 +18,15 @@ import (
 
 var _ = Describe("Marmotd Test", Ordered, func() {
 	BeforeAll(func(ctx SpecContext) {
+<<<<<<< HEAD
 		opts := &slog.HandlerOptions{
 			AddSource: true,
 			Level:     slog.LevelDebug,
 		}
 		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
 		slog.SetDefault(logger)
+=======
+>>>>>>> origin/main
 		cleanupTestEnvironment()
 	})
 
@@ -95,6 +98,14 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		})
 
 		It("Marmotd のバージョン情報取得", func() {
+			cmd0 := exec.Command("pwd")
+			stdoutStderr0, err := cmd0.CombinedOutput()
+			GinkgoWriter.Println(string(stdoutStderr0))
+
+			cmd1 := exec.Command("ls", "-lR")
+			stdoutStderr1, err := cmd1.CombinedOutput()
+			GinkgoWriter.Println(string(stdoutStderr1))
+
 			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "version")
 			stdoutStderr, err := cmd.CombinedOutput()
 			GinkgoWriter.Println(string(stdoutStderr))
@@ -390,6 +401,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			}
 		})
 
+<<<<<<< HEAD
 		var id1 string
 		It("サーバーの作成-1", func() {
 			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "create", "--output", "json", "--configfile", "testdata/test-server-1.yaml")
@@ -472,13 +484,64 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "detail", id2, "--output", "yaml")
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
+=======
+		It("ハイパーバイザーのコンフィグファイルの読み取り", func() {
+			err := config.ReadYAML("testdata/hypervisor-config-hvc.yaml", &hvs)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("ハイパーバイザーの情報セット", func() {
+			for _, hv := range hvs.Hvs {
+				fmt.Println(hv)
+				err := marmotServer.Ma.Db.SetHypervisors(hv)
+				Expect(err).NotTo(HaveOccurred())
+			}
+		})
+
+		It("OSイメージテンプレート", func() {
+			for _, hd := range hvs.Imgs {
+				err := marmotServer.Ma.Db.SetImageTemplate(hd)
+				Expect(err).NotTo(HaveOccurred())
+			}
+		})
+
+		It("シーケンス番号のリセット", func() {
+			for _, sq := range hvs.Seq {
+				err := marmotServer.Ma.Db.CreateSeq(sq.Key, sq.Start, sq.Step)
+				Expect(err).NotTo(HaveOccurred())
+			}
+		})
+
+		It("サーバーの作成", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "create", "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).To(HaveOccurred())
+>>>>>>> origin/main
 			GinkgoWriter.Println(string(stdoutStderr))
 		})
 
 		It("サーバーのリスト取得", func() {
 			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "list", "--output", "json")
 			stdoutStderr, err := cmd.CombinedOutput()
+<<<<<<< HEAD
 			Expect(err).NotTo(HaveOccurred())
+=======
+			Expect(err).To(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+		})
+
+		It("サーバーの更新", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "update", "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).To(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+		})
+
+		It("サーバーの削除", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "delete", "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).To(HaveOccurred())
+>>>>>>> origin/main
 			GinkgoWriter.Println(string(stdoutStderr))
 		})
 
