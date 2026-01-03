@@ -256,8 +256,4 @@ func (d *Database) FindByHostAndClusteName(hostname string, clustername string) 
 		}
 	}
 	return "", ErrNotFound
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> origin/main

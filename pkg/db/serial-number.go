@@ -22,11 +22,7 @@ func (d *Database) CreateSeq(key string, start uint64, step uint64) error {
 }
 
 // 内部関数
-<<<<<<< HEAD
 func (d *Database) getSeqRaw(key string) (uint64, error) {	
-=======
-func (d *Database) getSeqRaw(key string) (uint64, error) {
->>>>>>> origin/main
 	etcdKey := SeqPrefix + "/" + key
 	resp, err := d.Cli.Get(d.Ctx, etcdKey, etcd.WithLimit(1))
 	if err != nil {

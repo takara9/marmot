@@ -1,10 +1,7 @@
 package marmotd
 
 import (
-<<<<<<< HEAD
 	"fmt"
-=======
->>>>>>> origin/main
 	"log/slog"
 
 	"github.com/takara9/marmot/api"
@@ -12,7 +9,6 @@ import (
 
 // 仮想マシンの生成、qcow2に対応すること、仮想マシンを識別するIDは、ホスト名ではなくUUIDであることに注意
 // volume の生成は、volumes.goに任せること！
-<<<<<<< HEAD
 func (m *Marmot) CreateServer(spec api.Server) (string, error) {
 	slog.Debug("=====CreateServer()=====", "spec", spec)
 
@@ -54,16 +50,6 @@ func (m *Marmot) CreateServer(spec api.Server) (string, error) {
 	//	//return "", err
 	//}
 	slog.Debug("CreateServer()", "id", server.Id)
-=======
-func (m *Marmot) CreateServer(spec api.Server) error {
-	slog.Debug("=====CreateServer()=====")
-	svc, err := m.Db.CreateServer(spec)
-	if err != nil {
-		slog.Error("CreateServer()", "err", err)
-		return err
-	}
-	slog.Debug("CreateServer()", "svc", svc)
->>>>>>> origin/main
 	/*
 		// 仮想マシンの定義を取得
 		var dom virt.Domain
@@ -210,11 +196,7 @@ func (m *Marmot) CreateServer(spec api.Server) error {
 	*/
 	// 仮想マシンの状態変更(未実装)
 
-<<<<<<< HEAD
 	return server.Id, nil
-=======
-	return nil
->>>>>>> origin/main
 }
 
 // 仮想マシンの削除、qcow2に対応すること、仮想マシンを識別するIDは、ホスト名ではなくUUIDであることに注意
@@ -309,7 +291,6 @@ func (m *Marmot) GetServers() (api.Servers, error) {
 }
 
 // サーバーの詳細を取得
-<<<<<<< HEAD
 func (m *Marmot) GetServerById(id string) (api.Server, error) {
 	slog.Debug("===", "GetServerById is called", "===")
 	server, err := m.Db.GetServerById(id)
@@ -326,23 +307,6 @@ func (m *Marmot) GetServerById(id string) (api.Server, error) {
 func (m *Marmot) UpdateServerById(id string, spec api.Server) error {
 	slog.Debug("===", "UpdateServerById is called", "===")
 	err := m.Db.UpdateServer(id, spec)
-=======
-func (m *Marmot) GetServerById(spec api.Server) error {
-	slog.Debug("===", "GetServerById is called", "===")
-	svc, err := m.Db.GetServerById(spec.Id)
-	if err != nil {
-		slog.Error("GetServerById()", "err", err)
-		return err
-	}
-	slog.Debug("GetServerById()", "svc", svc)
-	return nil
-}
-
-// サーバーの更新
-func (m *Marmot) UpdateServerById(spec api.Server) error {
-	slog.Debug("===", "UpdateServerById is called", "===")
-	err := m.Db.UpdateServer(spec)
->>>>>>> origin/main
 	if err != nil {
 		slog.Error("UpdateServer()", "err", err)
 		return err

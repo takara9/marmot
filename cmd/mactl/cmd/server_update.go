@@ -10,25 +10,16 @@ import (
 )
 
 var serverUpdateCmd = &cobra.Command{
-<<<<<<< HEAD
 	Use:   "update [server-id]",
-=======
-	Use:   "update",
->>>>>>> origin/main
 	Short: "Update a server",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var err error
 		var spec api.Server
-<<<<<<< HEAD
         serverId := args[0]
 		spec.Id = serverId
 		spec.Name = &serverName
 
 		byteBody, _, err := m.UpdateServerById(serverId, spec)
-=======
-
-		byteBody, _, err := m.UpdateServerById(spec)
->>>>>>> origin/main
 		if err != nil {
 			println("UpdateServerById", "err", err)
 			return err
@@ -68,11 +59,7 @@ var serverUpdateCmd = &cobra.Command{
 
 func init() {
 	serverCmd.AddCommand(serverUpdateCmd)
-<<<<<<< HEAD
 	serverUpdateCmd.Flags().StringVarP(&serverName, "name", "n", "", "New name of the server")
-=======
-	//serverCreateCmd.Flags().StringVarP(&serverName, "name", "n", "", "Name of the server")
->>>>>>> origin/main
 	//serverCreateCmd.Flags().StringVarP(&serverType, "type", "t", "qcow2", "Type of the server (lvm, qcow2)")
 	//serverCreateCmd.Flags().StringVarP(&serverKind, "kind", "k", "data", "Kind of the server (os, data)")
 	//serverCreateCmd.Flags().IntVarP(&serverSize, "size", "s", 0, "Size of the server in GB")

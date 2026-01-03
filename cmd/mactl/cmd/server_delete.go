@@ -9,20 +9,12 @@ import (
 )
 
 var serverDeleteCmd = &cobra.Command{
-<<<<<<< HEAD
 	Use:   "delete [server-id]",
 	Short: "Delete a server",
 	Args:  cobra.ExactArgs(1), // 引数が1つ必要
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var err error
 		serverId := args[0]
-=======
-	Use:   "delete",
-	Short: "Delete a server",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		var err error
-
->>>>>>> origin/main
 		byteBody, _, err := m.DeleteServerById(serverId)
 		if err != nil {
 			println("DeleteServerById", "err", err)

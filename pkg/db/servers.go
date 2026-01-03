@@ -1,7 +1,6 @@
 package db
 
 import (
-<<<<<<< HEAD
 	"encoding/json"
 	"log/slog"
 
@@ -60,22 +59,10 @@ func (d *Database) CreateServer(spec api.Server) (api.Server, error) {
 
 	return server, nil
 
-=======
-	"fmt"
-
-	"github.com/takara9/marmot/api"
-)
-
-// サーバーを登録、サーバーを一意に識別するIDを自動生成
-func (d *Database) CreateServer(spec api.Server) (api.Server, error) {
-	// サーバー作成ロジックを実装
-	return api.Server{}, fmt.Errorf("not implemented")
->>>>>>> origin/main
 }
 
 // サーバーをIDで削除
 func (d *Database) DeleteServerById(id string) error {
-<<<<<<< HEAD
 	lockKey := "/lock/server/" + id
 	mutex, err := d.LockKey(lockKey)
 	if err != nil {
@@ -85,15 +72,10 @@ func (d *Database) DeleteServerById(id string) error {
 	defer d.UnlockKey(mutex)
 	key := ServerPrefix + "/" + id
 	return d.DeleteJSON(key)
-=======
-	// サーバー削除ロジックを実装
-	return fmt.Errorf("not implemented")
->>>>>>> origin/main
 }
 
 // サーバーをIDで取得
 func (d *Database) GetServerById(id string) (api.Server, error) {
-<<<<<<< HEAD
 	key := ServerPrefix + "/" + id
 	var server api.Server
 	_, err := d.GetJSON(key, &server)
@@ -102,15 +84,10 @@ func (d *Database) GetServerById(id string) (api.Server, error) {
 		return api.Server{}, err
 	}
 	return server, nil
-=======
-	// サーバー取得ロジックを実装
-	return api.Server{}, fmt.Errorf("not implemented")
->>>>>>> origin/main
 }
 
 // サーバーのリストを取得
 func (d *Database) GetServers() (api.Servers, error) {
-<<<<<<< HEAD
 	var servers []api.Server
 	var err error
 	var resp *etcd.GetResponse
@@ -219,14 +196,4 @@ func (d *Database) updateServer(id string, spec api.Server) error {
 		return err
 	}
 	return nil
-=======
-	// サーバー一覧取得ロジックを実装
-	return nil, fmt.Errorf("not implemented")
-}
-
-// サーバーを更新
-func (d *Database) UpdateServer(spec api.Server) error {
-	// サーバー更新ロジックを実装
-	return fmt.Errorf("not implemented")
->>>>>>> origin/main
 }
