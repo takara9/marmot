@@ -6,15 +6,52 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/config"
+	"github.com/takara9/marmot/pkg/util"
 	"go.yaml.in/yaml/v3"
 )
+
+var configFilename string
 
 var serverCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new server",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var err error
+		var conf config.Server
+		err := config.ReadYamlConfig(configFilename, &conf)
+		if err != nil {
+			println("ReadYamlConfig", "err", err)
+			return err
+		}
 		var spec api.Server
+		spec.Name = util.StringPtr(conf.Name)
+		spec.Cpu = util.IntPtrInt(*conf.Cpu)
+		spec.Memory = util.IntPtrInt(*conf.Memory)
+		if conf.Nic != nil {
+			for i, nic := range *conf.Nic {
+				if i == 0 {
+					if nic.IpAddress != nil {
+						spec.PrivateIp = util.StringPtr(*nic.IpAddress)
+					}
+				}
+				if i == 1 {
+					if nic.IpAddress != nil {
+						spec.PublicIp = util.StringPtr(*nic.IpAddress)
+					}
+				}
+			}
+		}
+		spec.Comment = conf.Comment
+
+		if conf.Storage != nil {
+			volumes := make([]api.Volume, len(*conf.Storage))
+			for i, vol := range *conf.Storage {
+				volumes[i].Name = util.StringPtr(vol.Name)
+				volumes[i].Size = util.IntPtrInt(*vol.Size)
+				volumes[i].Comment = util.StringPtr(*vol.Comment)
+			}
+			spec.Storage = &volumes
+		}
 
 		byteBody, _, err := m.CreateServer(spec)
 		if err != nil {
@@ -56,11 +93,5 @@ var serverCreateCmd = &cobra.Command{
 
 func init() {
 	serverCmd.AddCommand(serverCreateCmd)
-	//serverCreateCmd.Flags().StringVarP(&serverName, "name", "n", "", "Name of the server")
-	//serverCreateCmd.Flags().StringVarP(&serverType, "type", "t", "qcow2", "Type of the server (lvm, qcow2)")
-	//serverCreateCmd.Flags().StringVarP(&serverKind, "kind", "k", "data", "Kind of the server (os, data)")
-	//serverCreateCmd.Flags().IntVarP(&serverSize, "size", "s", 0, "Size of the server in GB")
-	//serverCreateCmd.MarkFlagRequired("name")
-	//serverCreateCmd.MarkFlagRequired("type")
-	//serverCreateCmd.MarkFlagRequired("kind")
+	serverCreateCmd.Flags().StringVarP(&configFilename, "configfile", "f", "vm-spec.yaml", "Configuration file for the server")
 }

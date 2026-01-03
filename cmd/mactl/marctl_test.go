@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 
@@ -17,6 +18,12 @@ import (
 
 var _ = Describe("Marmotd Test", Ordered, func() {
 	BeforeAll(func(ctx SpecContext) {
+		opts := &slog.HandlerOptions{
+			AddSource: true,
+			Level:     slog.LevelDebug,
+		}
+		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
+		slog.SetDefault(logger)
 		cleanupTestEnvironment()
 	})
 
@@ -98,8 +105,9 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "version")
 			stdoutStderr, err := cmd.CombinedOutput()
-			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr))
+
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("mactl version JSON形式でバージョンを取得", func() {
@@ -390,58 +398,95 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			}
 		})
 
-		It("ハイパーバイザーのコンフィグファイルの読み取り", func() {
-			err := config.ReadYAML("testdata/hypervisor-config-hvc.yaml", &hvs)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("ハイパーバイザーの情報セット", func() {
-			for _, hv := range hvs.Hvs {
-				fmt.Println(hv)
-				err := marmotServer.Ma.Db.SetHypervisors(hv)
-				Expect(err).NotTo(HaveOccurred())
-			}
-		})
-
-		It("OSイメージテンプレート", func() {
-			for _, hd := range hvs.Imgs {
-				err := marmotServer.Ma.Db.SetImageTemplate(hd)
-				Expect(err).NotTo(HaveOccurred())
-			}
-		})
-
-		It("シーケンス番号のリセット", func() {
-			for _, sq := range hvs.Seq {
-				err := marmotServer.Ma.Db.CreateSeq(sq.Key, sq.Start, sq.Step)
-				Expect(err).NotTo(HaveOccurred())
-			}
-		})
-
-		It("サーバーの作成", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "create", "--output", "json")
+		var id1 string
+		It("サーバーの作成-1", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "create", "--output", "json", "--configfile", "testdata/test-server-1.yaml")
 			stdoutStderr, err := cmd.CombinedOutput()
-			Expect(err).To(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+			var resp api.Success
+			err = json.Unmarshal(stdoutStderr, &resp)
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println("server id:", resp.Id)
+			id1 = resp.Id
+		})
+
+		var id2 string
+		It("サーバーの作成-2", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "create", "--output", "json", "--configfile", "testdata/test-server-2.yaml")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+			var resp api.Success
+			err = json.Unmarshal(stdoutStderr, &resp)
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println("server id:", resp.Id)
+			id2 = resp.Id
+			fmt.Println("id2=", id2)
+		})
+
+		It("サーバーのリスト取得 json", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "list", "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+		})
+
+		It("サーバーのリスト取得 yaml", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "list", "--output", "yaml")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+		})
+
+		/*
+			It("サーバーの更新", func() {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "update", "--output", "json")
+				stdoutStderr, err := cmd.CombinedOutput()
+				Expect(err).To(HaveOccurred())
+				GinkgoWriter.Println(string(stdoutStderr))
+			})
+		*/
+
+		It("サーバーの削除", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "delete", id1, "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+		})
+
+		It("サーバーの個別詳細取得 json", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "detail", id2, "--output", "yaml")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+		})
+
+		It("サーバーの個別詳細取得 yaml", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "detail", id2, "--output", "yaml")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+		})
+
+		It("サーバーの名前変更", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "update", id2, "--name", "new-server-name", "--output", "yaml")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+		})
+
+		It("サーバーの個別詳細取得 yaml", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "detail", id2, "--output", "yaml")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr))
 		})
 
 		It("サーバーのリスト取得", func() {
 			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "list", "--output", "json")
 			stdoutStderr, err := cmd.CombinedOutput()
-			Expect(err).To(HaveOccurred())
-			GinkgoWriter.Println(string(stdoutStderr))
-		})
-
-		It("サーバーの更新", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "update", "--output", "json")
-			stdoutStderr, err := cmd.CombinedOutput()
-			Expect(err).To(HaveOccurred())
-			GinkgoWriter.Println(string(stdoutStderr))
-		})
-
-		It("サーバーの削除", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "delete", "--output", "json")
-			stdoutStderr, err := cmd.CombinedOutput()
-			Expect(err).To(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr))
 		})
 

@@ -200,7 +200,7 @@ var _ = Describe("Etcd", Ordered, func() {
 
 		Context("Read a test hypervisor config file", func() {
 			It("Read existing file", func() {
-				err := cf.ReadConfig(hypervior_config, &cn)
+				err := cf.ReadYamlConfig(hypervior_config, &cn)
 				Expect(err).NotTo(HaveOccurred())
 				for i, h := range cn.Hvs {
 					GinkgoWriter.Println(i)
@@ -235,7 +235,7 @@ var _ = Describe("Etcd", Ordered, func() {
 		Context("Test of Hypervisor management : Set up", func() {
 
 			It("Read existing file", func() {
-				err := cf.ReadConfig(hypervior_config, &cnf)
+				err := cf.ReadYamlConfig(hypervior_config, &cnf)
 				Expect(err).NotTo(HaveOccurred())
 				for i, h := range cnf.Hvs {
 					GinkgoWriter.Println(i)

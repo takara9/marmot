@@ -19,12 +19,12 @@ var _ = Describe("Config", func() {
 	Describe("Read / Write config file", func() {
 		Context("Read a test config file", func() {
 			It("Read existing file", func() {
-				err := config.ReadConfig(input1, &mc)
+				err := config.ReadYamlConfig(input1, &mc)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(*mc.Domain).To(Equal("labo.local"))
 			})
 			It("Read no existing file", func() {
-				err := config.ReadConfig(input2, &mc)
+				err := config.ReadYamlConfig(input2, &mc)
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -59,7 +59,7 @@ var _ = Describe("Config", func() {
 
 		Context("Read a test hypervisor config file", func() {
 			It("Read existing file", func() {
-				err := config.ReadConfig(hypervior_config, &cnf)
+				err := config.ReadYamlConfig(hypervior_config, &cnf)
 				Expect(err).NotTo(HaveOccurred())
 				for i, h := range cnf.Hvs {
 					GinkgoWriter.Println(i)
@@ -79,7 +79,7 @@ var _ = Describe("Config", func() {
 				_, err = os.Stat(filename)
 				Expect(errors.Is(err, os.ErrNotExist)).To(Equal(false))
 
-				err = config.ReadConfig(hypervior_config, &cnf)
+				err = config.ReadYamlConfig(hypervior_config, &cnf)
 				Expect(err).NotTo(HaveOccurred())
 				for i, h := range cnf.Hvs {
 					Expect(h.Name).To(Equal(tests[i].want.name))

@@ -27,7 +27,7 @@ func ReadHvConfig() (Hypervisors_yaml, mactlClientConfig, error) {
 	var hvs Hypervisors_yaml
 	var cnf mactlClientConfig
 
-	err := ReadConfig(filepath.Join(os.Getenv("HOME"), ".config_marmot"), &cnf)
+	err := ReadYamlConfig(filepath.Join(os.Getenv("HOME"), ".config_marmot"), &cnf)
 	if err != nil {
 		return hvs, cnf, err
 	}
@@ -46,7 +46,7 @@ func ReadHvConfig() (Hypervisors_yaml, mactlClientConfig, error) {
 func ReadHypervisorConfig(yamlFileName string) (*Hypervisors_yaml, error) {
 	var hvs Hypervisors_yaml
 
-	if err := ReadConfig(yamlFileName, &hvs); err != nil {
+	if err := ReadYamlConfig(yamlFileName, &hvs); err != nil {
 		return nil, err
 	}
 	return &hvs, nil

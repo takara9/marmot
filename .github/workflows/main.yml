@@ -1,5 +1,10 @@
-name: marmot CI on self-hosted hv1
-on: push
+name: marmot CI on self-hosted hv2
+on: 
+  push:
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+
 env:
   # Setting an environment variable with the value of a configuration variable
   env_var: ${{ vars.ENV_CONTEXT_VAR || 'MARMOT CI' }}

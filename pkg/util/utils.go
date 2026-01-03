@@ -1,6 +1,7 @@
 package util
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -27,4 +28,15 @@ func Assign[T any](dst **T, src *T) {
 	if src != nil {
 		*dst = src
 	}
+}
+
+// DeepCopy performs a deep copy of a generic type T using JSON serialization.
+func DeepCopy[T any](src T) (T, error) {
+	b, err := json.Marshal(src)
+	if err != nil {
+		return src, err
+	}
+	var dst T
+	err = json.Unmarshal(b, &dst)
+	return dst, err
 }

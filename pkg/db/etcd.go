@@ -20,6 +20,7 @@ const (
 	VmPrefix              = "/marmot/virtualmachine"
 	OsTemplateImagePrefix = "/marmot/osTemplateImage"
 	VolumePrefix          = "/marmot/volume"
+	ServerPrefix          = "/marmot/server"
 	SeqPrefix             = "/marmot/sequence"
 	VersionKey            = "/marmot/version"
 	JobPrefix             = "/marmot/job"

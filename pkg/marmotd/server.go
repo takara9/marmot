@@ -1,6 +1,7 @@
 package marmotd
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/takara9/marmot/api"
@@ -8,14 +9,47 @@ import (
 
 // 仮想マシンの生成、qcow2に対応すること、仮想マシンを識別するIDは、ホスト名ではなくUUIDであることに注意
 // volume の生成は、volumes.goに任せること！
-func (m *Marmot) CreateServer(spec api.Server) error {
-	slog.Debug("=====CreateServer()=====")
-	svc, err := m.Db.CreateServer(spec)
+func (m *Marmot) CreateServer(spec api.Server) (string, error) {
+	slog.Debug("=====CreateServer()=====", "spec", spec)
+
+	slog.Debug("仮想マシンのIDを付与")
+	server, err := m.Db.CreateServer(spec)
 	if err != nil {
 		slog.Error("CreateServer()", "err", err)
-		return err
+		return "", err
 	}
-	slog.Debug("CreateServer()", "svc", svc)
+
+	fmt.Println("New Server ID:", server.Id)
+
+	slog.Debug("仮想マシンの定義を取得")
+
+	slog.Debug("ハイパーバイザーのリソース確保")
+
+	slog.Debug("etcdのキーを設定")
+
+	slog.Debug("CPU数設定がなければ、CPU数のデフォルトを設定")
+
+	slog.Debug("メモリサイズのメモリサイズのデフォルトを設定")
+
+	slog.Debug("OS指定がなければ、OSバリアントのデフォルトを設定")
+
+	slog.Debug("ボリュームタイプの指定がなければ、qcow2を設定")
+
+	slog.Debug("ネットワークの設定")
+
+	slog.Debug("データボリュームの生成と設定")
+
+	slog.Debug("libvirtのXML定義の生成")
+
+	slog.Debug("仮想マシンの起動")
+
+	slog.Debug("データベースに登録")
+	//svc, err := m.Db.CreateServer(spec)
+	//if err != nil {
+	//	slog.Error("CreateServer()", "err", err)
+	//	//return "", err
+	//}
+	slog.Debug("CreateServer()", "id", server.Id)
 	/*
 		// 仮想マシンの定義を取得
 		var dom virt.Domain
@@ -162,7 +196,7 @@ func (m *Marmot) CreateServer(spec api.Server) error {
 	*/
 	// 仮想マシンの状態変更(未実装)
 
-	return nil
+	return server.Id, nil
 }
 
 // 仮想マシンの削除、qcow2に対応すること、仮想マシンを識別するIDは、ホスト名ではなくUUIDであることに注意
@@ -257,21 +291,22 @@ func (m *Marmot) GetServers() (api.Servers, error) {
 }
 
 // サーバーの詳細を取得
-func (m *Marmot) GetServerById(spec api.Server) error {
+func (m *Marmot) GetServerById(id string) (api.Server, error) {
 	slog.Debug("===", "GetServerById is called", "===")
-	svc, err := m.Db.GetServerById(spec.Id)
+	server, err := m.Db.GetServerById(id)
 	if err != nil {
 		slog.Error("GetServerById()", "err", err)
-		return err
+		return api.Server{}, err
 	}
-	slog.Debug("GetServerById()", "svc", svc)
-	return nil
+	slog.Debug("GetServerById()", "svc", server)
+
+	return server, nil
 }
 
 // サーバーの更新
-func (m *Marmot) UpdateServerById(spec api.Server) error {
+func (m *Marmot) UpdateServerById(id string, spec api.Server) error {
 	slog.Debug("===", "UpdateServerById is called", "===")
-	err := m.Db.UpdateServer(spec)
+	err := m.Db.UpdateServer(id, spec)
 	if err != nil {
 		slog.Error("UpdateServer()", "err", err)
 		return err

@@ -14,6 +14,7 @@ import (
 func int32Ptr(i int32) *int32 { j := int32(i); return &j }
 
 // コンフィグからVMクラスタを作成する  新APIを使用
+// 非推奨
 func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 	//if DEBUG {
 	//	printConfigJson(cnf)

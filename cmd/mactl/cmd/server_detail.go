@@ -8,16 +8,16 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-var serverDeleteCmd = &cobra.Command{
-	Use:   "delete [server-id]",
-	Short: "Delete a server",
+var serverDetailCmd = &cobra.Command{
+	Use:   "detail [server-id]",
+	Short: "Show server details",
 	Args:  cobra.ExactArgs(1), // 引数が1つ必要
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var err error
 		serverId := args[0]
-		byteBody, _, err := m.DeleteServerById(serverId)
+		byteBody, _, err := m.GetServerById(serverId)
 		if err != nil {
-			println("DeleteServerById", "err", err)
+			println("GetServerById", "err", err)
 			return err
 		}
 
@@ -54,7 +54,7 @@ var serverDeleteCmd = &cobra.Command{
 }
 
 func init() {
-	serverCmd.AddCommand(serverDeleteCmd)
+	serverCmd.AddCommand(serverDetailCmd)
 	//serverCreateCmd.Flags().StringVarP(&serverName, "name", "n", "", "Name of the server")
 	//serverCreateCmd.Flags().StringVarP(&serverType, "type", "t", "qcow2", "Type of the server (lvm, qcow2)")
 	//serverCreateCmd.Flags().StringVarP(&serverKind, "kind", "k", "data", "Kind of the server (os, data)")
