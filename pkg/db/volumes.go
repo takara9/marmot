@@ -111,8 +111,7 @@ func (d *Database) UpdateVolume(id string, updateData api.Volume) error {
 	util.Assign(&rec.Status, updateData.Status)
 	util.Assign(&rec.VolumeGroup, updateData.VolumeGroup)
 	util.Assign(&rec.LogicalVolume, updateData.LogicalVolume)
-	util.Assign(&rec.OsName, updateData.OsName)
-	util.Assign(&rec.OsVersion, updateData.OsVersion)
+	util.Assign(&rec.OsVariant, updateData.OsVariant)
 
 	// データベースに更新
 	return d.PutJSON(key, rec)

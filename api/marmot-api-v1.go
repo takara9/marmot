@@ -113,8 +113,7 @@ type Volume struct {
 	LogicalVolume *string    `json:"logicalVolume,omitempty"`
 	MTime         *time.Time `json:"mTime,omitempty"`
 	Name          *string    `json:"name,omitempty"`
-	OsName        *string    `json:"osName,omitempty"`
-	OsVersion     *string    `json:"osVersion,omitempty"`
+	OsVariant     *string    `json:"osVariant,omitempty"`
 	Path          *string    `json:"path,omitempty"`
 	Size          *int       `json:"size,omitempty"`
 	Status        *int       `json:"status,omitempty"`
