@@ -68,10 +68,10 @@ func (m *Marmot) CreateServer(spec api.Server) (string, error) {
 	fmt.Println("New Volume Type:", *volSpec.Type)
 	fmt.Println("New Volume Kind:", *volSpec.Kind)
 	fmt.Println("New Volume Size:", *volSpec.Size)
-	if volSpec.VolumeGroup != nil && volSpec.LogicalVolume != nil {
-		fmt.Println("New Volume Group:", *volSpec.VolumeGroup)
-		fmt.Println("New Volume LogicalVolume:", *volSpec.LogicalVolume)
-	}
+	//if volSpec.VolumeGroup != nil && volSpec.LogicalVolume != nil {
+	fmt.Println("New Volume Group:", *volSpec.VolumeGroup)
+	fmt.Println("New Volume LogicalVolume:", *volSpec.LogicalVolume)
+	//}
 	slog.Debug("OS指定がなければ、OSバリアントのデフォルトを設定")
 
 	slog.Debug("ボリュームタイプの指定がなければ、qcow2を設定")
