@@ -204,6 +204,7 @@ func (m *Marmot) CreateNewVolume(v api.Volume) (*api.Volume, error) {
 				return nil, err
 			}
 			slog.Debug("Dataボリュームの情報更新 成功", "volId", volId)
+			
 			return volSpec, nil
 
 		default:

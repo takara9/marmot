@@ -52,26 +52,38 @@ func (m *Marmot) CreateServer(spec api.Server) (string, error) {
 	}
 
 	slog.Debug("OSボリュームの生成と設定")
-	Name := "boot-" + server.Id
-	Path := ""
-	Type := "lvm"
-	Kind := "os"
-	Size := 0
+	var vol api.Volume
+	name := "boot-" + server.Id
+	vol.Name = &name
+	path := ""
+	vol.Path = &path
+	vtype := "lvm"
+	vol.Type = &vtype
+	kind := "os"
+	vol.Kind = &kind
+	size := 0
+	vol.Size = &size
 
 	// ボリュームの基本情報をデータベースに登録
-	volSpec, err := m.Db.CreateVolumeOnDB(Name, Path, Type, Kind, Size)
+	//volSpec, err := m.Db.CreateVolumeOnDB(Name, Path, Type, Kind, Size)
+	//if err != nil {
+	//	return "", err
+	//}
+
+	volSpec, err := m.CreateNewVolume(vol)
 	if err != nil {
 		return "", err
 	}
+
 	fmt.Println("New Volume ID:", volSpec.Id)
 	fmt.Println("New Volume Name:", *volSpec.Name)
 	fmt.Println("New Volume Type:", *volSpec.Type)
 	fmt.Println("New Volume Kind:", *volSpec.Kind)
 	fmt.Println("New Volume Size:", *volSpec.Size)
-	//if volSpec.VolumeGroup != nil && volSpec.LogicalVolume != nil {
-	fmt.Println("New Volume Group:", *volSpec.VolumeGroup)
-	fmt.Println("New Volume LogicalVolume:", *volSpec.LogicalVolume)
-	//}
+	if volSpec.VolumeGroup != nil && volSpec.LogicalVolume != nil {
+		fmt.Println("New Volume Group:", *volSpec.VolumeGroup)
+		fmt.Println("New Volume LogicalVolume:", *volSpec.LogicalVolume)
+	}
 	slog.Debug("OS指定がなければ、OSバリアントのデフォルトを設定")
 
 	slog.Debug("ボリュームタイプの指定がなければ、qcow2を設定")
