@@ -66,27 +66,28 @@ type ReplyMessage struct {
 
 // Server defines model for Server.
 type Server struct {
-	HvIpAddr    *string    `json:"HvIpAddr,omitempty"`
-	HvNode      *string    `json:"HvNode,omitempty"`
-	HvPort      *int       `json:"HvPort,omitempty"`
-	CTime       *time.Time `json:"cTime,omitempty"`
-	ClusterName *string    `json:"clusterName,omitempty"`
-	Comment     *string    `json:"comment,omitempty"`
-	Cpu         *int       `json:"cpu,omitempty"`
-	Id          string     `json:"id"`
-	Key         *string    `json:"key,omitempty"`
-	Memory      *int       `json:"memory,omitempty"`
-	Name        *string    `json:"name,omitempty"`
-	OsLv        *string    `json:"osLv,omitempty"`
-	OsVariant   *string    `json:"osVariant,omitempty"`
-	OsVg        *string    `json:"osVg,omitempty"`
-	Playbook    *string    `json:"playbook,omitempty"`
-	PrivateIp   *string    `json:"privateIp,omitempty"`
-	PublicIp    *string    `json:"publicIp,omitempty"`
-	STime       *time.Time `json:"sTime,omitempty"`
-	Status      *int       `json:"status,omitempty"`
-	Storage     *[]Volume  `json:"storage,omitempty"`
-	VolumeType  *string    `json:"volumeType,omitempty"`
+	HvIpAddr       *string    `json:"HvIpAddr,omitempty"`
+	HvNode         *string    `json:"HvNode,omitempty"`
+	HvPort         *int       `json:"HvPort,omitempty"`
+	BootVolumeId   *string    `json:"bootVolumeId,omitempty"`
+	BootVolumeType *string    `json:"bootVolumeType,omitempty"`
+	CTime          *time.Time `json:"cTime,omitempty"`
+	ClusterName    *string    `json:"clusterName,omitempty"`
+	Comment        *string    `json:"comment,omitempty"`
+	Cpu            *int       `json:"cpu,omitempty"`
+	Id             string     `json:"id"`
+	Key            *string    `json:"key,omitempty"`
+	Memory         *int       `json:"memory,omitempty"`
+	Name           *string    `json:"name,omitempty"`
+	OsLv           *string    `json:"osLv,omitempty"`
+	OsVariant      *string    `json:"osVariant,omitempty"`
+	OsVg           *string    `json:"osVg,omitempty"`
+	Playbook       *string    `json:"playbook,omitempty"`
+	PrivateIp      *string    `json:"privateIp,omitempty"`
+	PublicIp       *string    `json:"publicIp,omitempty"`
+	STime          *time.Time `json:"sTime,omitempty"`
+	Status         *int       `json:"status,omitempty"`
+	Storage        *[]Volume  `json:"storage,omitempty"`
 }
 
 // Servers defines model for Servers.

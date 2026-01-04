@@ -70,7 +70,7 @@ func (m *Marmot) CreateServer(spec api.Server) (string, error) {
 	}
 
 	slog.Debug("ボリュームタイプの指定がなければ、デフォルトqcow2を設定")
-	if spec.VolumeType == nil {
+	if spec.BootVolumeType == nil {
 		volType := "qcow2"
 		vol.Type = &volType
 		var size int
@@ -81,7 +81,7 @@ func (m *Marmot) CreateServer(spec api.Server) (string, error) {
 		}
 		vol.Size = &size
 	} else {
-		volType := *spec.VolumeType
+		volType := *spec.BootVolumeType
 		vol.Type = &volType
 	}
 
@@ -99,6 +99,7 @@ func (m *Marmot) CreateServer(spec api.Server) (string, error) {
 		fmt.Println("New Volume Group:", *volSpec.VolumeGroup)
 		fmt.Println("New Volume LogicalVolume:", *volSpec.LogicalVolume)
 	}
+	server.BootVolumeId = &volSpec.Id
 
 	slog.Debug("ネットワークの設定")
 
@@ -109,6 +110,8 @@ func (m *Marmot) CreateServer(spec api.Server) (string, error) {
 	slog.Debug("仮想マシンの起動")
 
 	slog.Debug("データベースに登録")
+	m.Db.UpdateServer(server.Id, server)
+
 	//svc, err := m.Db.CreateServer(spec)
 	//if err != nil {
 	//	slog.Error("CreateServer()", "err", err)

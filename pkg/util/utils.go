@@ -2,6 +2,7 @@ package util
 
 import (
 	"encoding/json"
+	"reflect"
 	"time"
 )
 
@@ -39,4 +40,28 @@ func DeepCopy[T any](src T) (T, error) {
 	var dst T
 	err = json.Unmarshal(b, &dst)
 	return dst, err
+}
+
+// src の非ゼロ値フィールドだけを dst にコピーする
+// dst と src は同じ型であることを想定
+func PatchStruct(dst, src interface{}) {
+	// reflect を使ってフィールドごとにコピー
+	dv := reflect.ValueOf(dst).Elem()
+	sv := reflect.ValueOf(src)
+
+	// コピーループ
+	for i := 0; i < dv.NumField(); i++ {
+		df := dv.Field(i)
+		sf := sv.Field(i)
+
+		// src がゼロ値ならスキップ
+		if reflect.Value.IsZero(sf) {
+			continue
+		}
+
+		// 書き込み可能ならコピー
+		if df.CanSet() {
+			df.Set(sf)
+		}
+	}
 }

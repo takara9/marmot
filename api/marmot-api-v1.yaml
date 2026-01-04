@@ -821,5 +821,7 @@ components:
           type: string
         osVariant:
           type: string
-        volumeType:
+        bootVolumeType:
+          type: string
+        bootVolumeId:
           type: string

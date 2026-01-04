@@ -150,45 +150,8 @@ func (d *Database) updateServer(id string, spec api.Server) error {
 	expected := resp.Kvs[0].ModRevision
 
 	rec.Id = spec.Id
-	util.Assign(&rec.HvIpAddr, spec.HvIpAddr)
-	util.Assign(&rec.HvNode, spec.HvNode)
-	util.Assign(&rec.HvPort, spec.HvPort)
-	util.Assign(&rec.CTime, spec.CTime)
-	util.Assign(&rec.ClusterName, spec.ClusterName)
-	util.Assign(&rec.Comment, spec.Comment)
-	util.Assign(&rec.Cpu, spec.Cpu)
-	util.Assign(&rec.Key, spec.Key)
-	util.Assign(&rec.Memory, spec.Memory)
-	util.Assign(&rec.Name, spec.Name)
-	util.Assign(&rec.OsLv, spec.OsLv)
-	util.Assign(&rec.OsVariant, spec.OsVariant)
-	util.Assign(&rec.OsVg, spec.OsVg)
-	util.Assign(&rec.Playbook, spec.Playbook)
-	util.Assign(&rec.PrivateIp, spec.PrivateIp)
-	util.Assign(&rec.PublicIp, spec.PublicIp)
-	util.Assign(&rec.STime, spec.STime)
-	util.Assign(&rec.Status, spec.Status)
-	/*
-		for _, vol := range *spec.Storage {
-			var stg api.Volume
-			stg.Id = vol.Id
-			util.Assign(&stg.CTime, vol.CTime)
-			util.Assign(&stg.Comment, vol.Comment)
-			util.Assign(&stg.Key, vol.Key)
-			util.Assign(&stg.Kind, vol.Kind)
-			util.Assign(&stg.LogicalVolume, vol.LogicalVolume)
-			util.Assign(&stg.MTime, vol.MTime)
-			util.Assign(&stg.Name, vol.Name)
-			util.Assign(&stg.OsName, vol.OsName)
-			util.Assign(&stg.OsVersion, vol.OsVersion)
-			util.Assign(&stg.Path, vol.Path)
-			util.Assign(&stg.Size, vol.Size)
-			util.Assign(&stg.Status, vol.Status)
-			util.Assign(&stg.Type, vol.Type)
-			util.Assign(&stg.VolumeGroup, vol.VolumeGroup)
-			*spec.Storage = append(*spec.Storage, stg)
-		}
-	*/
+	// ポインタフィールドのみパッチ適用
+	util.PatchStruct(&rec, spec)
 
 	err = d.PutJSONCAS(key, expected, &rec)
 	if err != nil {
