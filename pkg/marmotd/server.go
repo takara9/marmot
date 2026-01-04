@@ -57,16 +57,23 @@ func (m *Marmot) CreateServer(spec api.Server) (string, error) {
 	vol.Name = &name
 	path := ""
 	vol.Path = &path
-	vtype := "lvm"
-	vol.Type = &vtype
+	//vtype := "lvm"
+	//vol.Type = &vtype
 	kind := "os"
 	vol.Kind = &kind
 	size := 0
 	vol.Size = &size
 
+	slog.Debug("OS指定がなければ、OSバリアントのデフォルトを設定")
 	if spec.OsVariant != nil {
 		os := "ubuntu22.04"
 		vol.OsVariant = &os
+	}
+
+	slog.Debug("ボリュームタイプの指定がなければ、qcow2を設定")
+	if vol.Type == nil {
+		volType := "qcow2"
+		vol.Type = &volType
 	}
 
 	volSpec, err := m.CreateNewVolume(vol)
@@ -83,9 +90,7 @@ func (m *Marmot) CreateServer(spec api.Server) (string, error) {
 		fmt.Println("New Volume Group:", *volSpec.VolumeGroup)
 		fmt.Println("New Volume LogicalVolume:", *volSpec.LogicalVolume)
 	}
-	slog.Debug("OS指定がなければ、OSバリアントのデフォルトを設定")
 
-	slog.Debug("ボリュームタイプの指定がなければ、qcow2を設定")
 
 	slog.Debug("ネットワークの設定")
 
