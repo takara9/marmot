@@ -1,7 +1,7 @@
 name: test-server-2
 cpu: 2
 memory: 2048
-osVariant: ubuntu22.04
+os_variant: ubuntu22.04
 nic:
   - name: "eth0"
     network: "private-net"

@@ -5,7 +5,7 @@ type Server struct {
 	Name      string    `yaml:"name"`
 	Cpu       *int      `yaml:"cpu,omitempty"`
 	Memory    *int      `yaml:"memory,omitempty"`
-	OsVariant *string   `yaml:"osVariant,omitempty"`
+	OsVariant *string   `yaml:"os_variant,omitempty"`
 	Playbook  *string   `yaml:"playbook,omitempty"`
 	Nic       *[]Nic    `yaml:"nic,omitempty"`
 	Storage   *[]Volume `yaml:"storage,omitempty"`
