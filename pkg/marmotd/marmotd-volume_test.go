@@ -133,10 +133,10 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 		It("OS論理ボリュームの生成", func() {
 			v := api.Volume{
-				Name:   ut.StringPtr("test-os-volume-001"),
-				Type:   ut.StringPtr("lvm"),
-				Kind:   ut.StringPtr("os"),
-				OsName: ut.StringPtr("ubuntu22.04"),
+				Name:      ut.StringPtr("test-os-volume-001"),
+				Type:      ut.StringPtr("lvm"),
+				Kind:      ut.StringPtr("os"),
+				OsVariant: ut.StringPtr("ubuntu22.04"),
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
 			volSpec, err = m.CreateNewVolume(v)
@@ -179,10 +179,10 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 		It("OS論理ボリュームの生成 （失敗ケース)", func() {
 			v := api.Volume{
-				Name:   ut.StringPtr("test-os-volume-001"),
-				Type:   ut.StringPtr("lvm"),
-				Kind:   ut.StringPtr("os"),
-				OsName: ut.StringPtr("ubuntu22.NOXIST"),
+				Name:      ut.StringPtr("test-os-volume-001"),
+				Type:      ut.StringPtr("lvm"),
+				Kind:      ut.StringPtr("os"),
+				OsVariant: ut.StringPtr("ubuntu22.NOXIST"),
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
 			volSpec, err = m.CreateNewVolume(v)
@@ -191,10 +191,10 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 		It("OS論理ボリュームの生成 （失敗ケース)", func() {
 			v := api.Volume{
-				Name:   ut.StringPtr("test-os-volume-001"),
-				Type:   ut.StringPtr("noexist"),
-				Kind:   ut.StringPtr("os"),
-				OsName: ut.StringPtr("ubuntu22.04"),
+				Name:      ut.StringPtr("test-os-volume-001"),
+				Type:      ut.StringPtr("noexist"),
+				Kind:      ut.StringPtr("os"),
+				OsVariant: ut.StringPtr("ubuntu22.04"),
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
 			volSpec, err = m.CreateNewVolume(v)
@@ -302,10 +302,10 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 		It("OS論理ボリュームの生成1", func() {
 			v := api.Volume{
-				Name:   ut.StringPtr("test-os-volume-001"),
-				Type:   ut.StringPtr("lvm"),
-				Kind:   ut.StringPtr("os"),
-				OsName: ut.StringPtr("ubuntu22.04"),
+				Name:      ut.StringPtr("test-os-volume-001"),
+				Type:      ut.StringPtr("lvm"),
+				Kind:      ut.StringPtr("os"),
+				OsVariant: ut.StringPtr("ubuntu22.04"),
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
 			tmpSpec, err := m.CreateNewVolume(v)
@@ -316,10 +316,10 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 		It("OS論理ボリュームの生成2", func() {
 			v := api.Volume{
-				Name:   ut.StringPtr("test-os-volume-002"),
-				Type:   ut.StringPtr("lvm"),
-				Kind:   ut.StringPtr("os"),
-				OsName: ut.StringPtr("ubuntu22.04"),
+				Name:      ut.StringPtr("test-os-volume-002"),
+				Type:      ut.StringPtr("lvm"),
+				Kind:      ut.StringPtr("os"),
+				OsVariant: ut.StringPtr("ubuntu22.04"),
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
 			tmpSpec, err := m.CreateNewVolume(v)
@@ -462,10 +462,10 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 		It("qcow2ボリュームの生成", func() {
 			v := api.Volume{
-				Name:   ut.StringPtr("test-qcow2-volume-001"),
-				Type:   ut.StringPtr("qcow2"),
-				Kind:   ut.StringPtr("os"),
-				OsName: ut.StringPtr("ubuntu22.04"),
+				Name:      ut.StringPtr("test-qcow2-volume-001"),
+				Type:      ut.StringPtr("qcow2"),
+				Kind:      ut.StringPtr("os"),
+				OsVariant: ut.StringPtr("ubuntu22.04"),
 			}
 			tmpSSpec, err := m.CreateNewVolume(v)
 			ids = append(ids, tmpSSpec.Id)

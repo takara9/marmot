@@ -747,9 +747,7 @@ components:
         mTime:
           type: string
           format: date-time
-        osName:
-          type: string
-        osVersion:
+        osVariant:
           type: string
         comment:
           type: string

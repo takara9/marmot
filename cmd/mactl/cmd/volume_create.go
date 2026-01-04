@@ -22,7 +22,7 @@ var volumeCreateCmd = &cobra.Command{
 			Size: util.IntPtrInt(volumeSize),
 		}
 		if len(osName) > 0 {
-			spec.OsName = util.StringPtr(osName)
+			spec.OsVariant = util.StringPtr(osName)
 		}
 
 		byteBody, _, err := m.CreateVolume(spec)

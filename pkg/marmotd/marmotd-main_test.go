@@ -265,7 +265,7 @@ var _ = Describe("関数テスト", Ordered, func() {
 			vol.Name = util.StringPtr("test-volume-002")
 			vol.Type = util.StringPtr("qcow2")
 			vol.Kind = util.StringPtr("os")
-			vol.OsName = util.StringPtr("ubuntu22.04")
+			vol.OsVariant = util.StringPtr("ubuntu22.04")
 
 			body, url, err := marmotClient.CreateVolume(vol)
 			Expect(err).NotTo(HaveOccurred())
@@ -307,7 +307,7 @@ var _ = Describe("関数テスト", Ordered, func() {
 			vol.Name = util.StringPtr("test-volume-002")
 			vol.Type = util.StringPtr("lvm")
 			vol.Kind = util.StringPtr("os")
-			vol.OsName = util.StringPtr("ubuntu22.04")
+			vol.OsVariant = util.StringPtr("ubuntu22.04")
 
 			body, url, err := marmotClient.CreateVolume(vol)
 			Expect(err).NotTo(HaveOccurred())

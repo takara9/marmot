@@ -37,13 +37,13 @@ func (m *Marmot) CreateNewVolume(v api.Volume) (*api.Volume, error) {
 		switch volKind {
 		case "os":
 			slog.Debug("qcow2 OSボリュームの生成", "volKind", volKind, "volId", volId)
-			if v.OsName == nil {
-				slog.Error("OsName is required for os volume")
+			if v.OsVariant == nil {
+				slog.Error("OsVariant is required for os volume")
 				m.Db.RollbackVolumeCreation(volId)
-				return nil, errors.New("OsName is required for os volume")
+				return nil, errors.New("OsVariant is required for os volume")
 			}
 			// OS名から該当するOSイメージテンプレートを取得
-			img, err := m.Db.GetOsImgTempByOsVariant(*v.OsName)
+			img, err := m.Db.GetOsImgTempByOsVariant(*v.OsVariant)
 			if err != nil {
 				slog.Error("failed to get os image template", "err", err)
 				m.Db.RollbackVolumeCreation(volId)
@@ -127,14 +127,14 @@ func (m *Marmot) CreateNewVolume(v api.Volume) (*api.Volume, error) {
 		switch volKind {
 		case "os":
 			slog.Debug("LV OSボリュームの生成", "volKind", volKind, "volId", volId)
-			if v.OsName == nil {
-				slog.Error("OsName is required for os volume")
+			if v.OsVariant == nil {
+				slog.Error("OsVariant is required for os volume")
 				m.Db.RollbackVolumeCreation(volId)
-				return nil, errors.New("OsName is required for os volume")
+				return nil, errors.New("OsVariant is required for os volume")
 			}
-			img, err := m.Db.GetOsImgTempByOsVariant(*v.OsName)
+			img, err := m.Db.GetOsImgTempByOsVariant(*v.OsVariant)
 			if err != nil {
-				slog.Error("failed to get os image template", "err", err, "os_name", *v.OsName)
+				slog.Error("failed to get os image template", "err", err, "os_variant", *v.OsVariant)
 				m.Db.RollbackVolumeCreation(volId)
 				return nil, err
 			}
