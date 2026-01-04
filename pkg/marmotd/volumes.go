@@ -24,6 +24,14 @@ func (m *Marmot) CreateNewVolume(v api.Volume) (*api.Volume, error) {
 	volSize := util.OrDefault(v.Size, 0)
 	volPath := util.OrDefault(v.Path, "") // パスはタイプと種類で決まるため、空で初期化
 
+	fmt.Println("Name :", volName)
+	fmt.Println("Type :", volType)
+	fmt.Println("Kind :", volKind)
+	fmt.Println("Size :", volSize)
+	fmt.Println("Path :", volPath)
+	fmt.Println("OsName :", util.OrDefault(v.OsName, "none"))
+	fmt.Println("OsVersion :", util.OrDefault(v.OsVersion, "none"))
+
 	// ボリュームの基本情報をデータベースに登録
 	volSpec, err := m.Db.CreateVolumeOnDB(volName, volPath, volType, volKind, volSize)
 	if err != nil {
@@ -204,7 +212,7 @@ func (m *Marmot) CreateNewVolume(v api.Volume) (*api.Volume, error) {
 				return nil, err
 			}
 			slog.Debug("Dataボリュームの情報更新 成功", "volId", volId)
-			
+
 			return volSpec, nil
 
 		default:
