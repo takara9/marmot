@@ -22,6 +22,6 @@ type Volume struct {
 type Nic struct {
 	Name      string  `yaml:"name"`
 	Network   *string `yaml:"network,omitempty"`
-	IpAddress *string `yaml:"ipAddress,omitempty"`
+	IpAddress *string `yaml:"ip_address,omitempty"`
 	Comment   *string `yaml:"comment,omitempty"`
 }
