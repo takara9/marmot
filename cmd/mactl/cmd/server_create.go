@@ -28,7 +28,7 @@ var serverCreateCmd = &cobra.Command{
 		spec.Cpu = util.IntPtrInt(*conf.Cpu)
 		spec.Memory = util.IntPtrInt(*conf.Memory)
 		spec.OsVariant = util.StringPtr(*conf.OsVariant)
-
+		spec.VolumeType = util.StringPtr(*conf.VolumeType)
 		if conf.Nic != nil {
 			for i, nic := range *conf.Nic {
 				if i == 0 {

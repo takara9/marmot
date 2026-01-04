@@ -86,6 +86,7 @@ type Server struct {
 	STime       *time.Time `json:"sTime,omitempty"`
 	Status      *int       `json:"status,omitempty"`
 	Storage     *[]Volume  `json:"storage,omitempty"`
+	VolumeType  *string    `json:"volumeType,omitempty"`
 }
 
 // Servers defines model for Servers.

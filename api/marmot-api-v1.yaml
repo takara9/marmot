@@ -821,3 +821,5 @@ components:
           type: string
         osVariant:
           type: string
+        volumeType:
+          type: string

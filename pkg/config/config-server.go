@@ -2,15 +2,15 @@ package config
 
 // Server defines model for Server.
 type Server struct {
-	Name      string    `yaml:"name"`
-	Cpu       *int      `yaml:"cpu,omitempty"`
-	Memory    *int      `yaml:"memory,omitempty"`
-	OsVariant *string   `yaml:"os_variant,omitempty"`
-	VolType   *string   `yaml:"volume_type,omitempty"`
-	Playbook  *string   `yaml:"playbook,omitempty"`
-	Nic       *[]Nic    `yaml:"nic,omitempty"`
-	Storage   *[]Volume `yaml:"storage,omitempty"`
-	Comment   *string   `yaml:"comment,omitempty"`
+	Name       string    `yaml:"name"`
+	Cpu        *int      `yaml:"cpu,omitempty"`
+	Memory     *int      `yaml:"memory,omitempty"`
+	OsVariant  *string   `yaml:"os_variant,omitempty"`
+	VolumeType *string   `yaml:"volume_type,omitempty"`
+	Playbook   *string   `yaml:"playbook,omitempty"`
+	Nic        *[]Nic    `yaml:"nic,omitempty"`
+	Storage    *[]Volume `yaml:"storage,omitempty"`
+	Comment    *string   `yaml:"comment,omitempty"`
 }
 
 // Volume defines model for Volume.
