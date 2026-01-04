@@ -47,6 +47,8 @@ var serverCreateCmd = &cobra.Command{
 
 		if conf.VolumeType != nil {
 			spec.VolumeType = util.StringPtr(*conf.VolumeType)
+		} else {
+			spec.VolumeType = util.StringPtr("qcow2")
 		}
 
 		if conf.Nic != nil {
