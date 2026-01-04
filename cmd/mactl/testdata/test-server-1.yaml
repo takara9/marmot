@@ -1,8 +1,6 @@
 name: test-server-1
 cpu: 2
 memory: 2048
-os_variant: ubuntu22.04
-volume_type: lvm
 nic:
   - name: "eth0"
     network: "private-net"

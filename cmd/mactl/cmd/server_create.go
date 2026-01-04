@@ -24,11 +24,31 @@ var serverCreateCmd = &cobra.Command{
 			return err
 		}
 		var spec api.Server
+
+		// 名前は必須項目
+		if len(conf.Name) == 0 {
+			fmt.Println("Name is required in the configuration")
+			return fmt.Errorf("name is required in the configuration")
+		}
 		spec.Name = util.StringPtr(conf.Name)
-		spec.Cpu = util.IntPtrInt(*conf.Cpu)
-		spec.Memory = util.IntPtrInt(*conf.Memory)
-		spec.OsVariant = util.StringPtr(*conf.OsVariant)
-		spec.VolumeType = util.StringPtr(*conf.VolumeType)
+
+		// 無設定を許容、デフォルトをAPI側に任せる
+		if conf.Cpu != nil {
+			spec.Cpu = util.IntPtrInt(*conf.Cpu)
+		}
+
+		if conf.Memory != nil {
+			spec.Memory = util.IntPtrInt(*conf.Memory)
+		}
+
+		if conf.OsVariant != nil {
+			spec.OsVariant = util.StringPtr(*conf.OsVariant)
+		}
+
+		if conf.VolumeType != nil {
+			spec.VolumeType = util.StringPtr(*conf.VolumeType)
+		}
+
 		if conf.Nic != nil {
 			for i, nic := range *conf.Nic {
 				if i == 0 {
