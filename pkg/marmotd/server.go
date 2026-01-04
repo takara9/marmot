@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/virt"
 )
 
 // 仮想マシンの生成、qcow2に対応すること、仮想マシンを識別するIDは、ホスト名ではなくUUIDであることに注意
@@ -22,15 +23,55 @@ func (m *Marmot) CreateServer(spec api.Server) (string, error) {
 	fmt.Println("New Server ID:", server.Id)
 
 	slog.Debug("仮想マシンの定義を取得")
+	// 仮想マシンの定義を取得
+	var dom virt.Domain
+	if err := virt.ReadXml("temp.xml", &dom); err != nil {
+		slog.Error("virt.ReadXml()", "err", err)
+		return "", err
+	}
 
 	slog.Debug("ハイパーバイザーのリソース確保")
+	dom.Name = server.Id // VMを一意に識別する
+	dom.Uuid = server.Id // 同様
 
-	slog.Debug("etcdのキーを設定")
+	slog.Debug("割り当てるCPU数とメモリ量を設定")
+	if server.Cpu != nil {
+		dom.Vcpu.Value = *server.Cpu
+	} else {
+		dom.Vcpu.Value = 2 // デフォルト2
+	}
 
-	slog.Debug("CPU数設定がなければ、CPU数のデフォルトを設定")
+	if server.Memory != nil {
+		var mem = int(*server.Memory) * 1024 //KiB
+		dom.Memory.Value = mem
+		dom.CurrentMemory.Value = mem
+	} else {
+		var mem = 2048 * 1024 //KiB デフォルト2048MB
+		dom.Memory.Value = mem
+		dom.CurrentMemory.Value = mem
+	}
 
-	slog.Debug("メモリサイズのメモリサイズのデフォルトを設定")
+	slog.Debug("OSボリュームの生成と設定")
+	Name := "boot-" + server.Id
+	Path := ""
+	Type := "lvm"
+	Kind := "os"
+	Size := 0
 
+	// ボリュームの基本情報をデータベースに登録
+	volSpec, err := m.Db.CreateVolumeOnDB(Name, Path, Type, Kind, Size)
+	if err != nil {
+		return "", err
+	}
+	fmt.Println("New Volume ID:", volSpec.Id)
+	fmt.Println("New Volume Name:", *volSpec.Name)
+	fmt.Println("New Volume Type:", *volSpec.Type)
+	fmt.Println("New Volume Kind:", *volSpec.Kind)
+	fmt.Println("New Volume Size:", *volSpec.Size)
+	if volSpec.VolumeGroup != nil && volSpec.LogicalVolume != nil {
+		fmt.Println("New Volume Group:", *volSpec.VolumeGroup)
+		fmt.Println("New Volume LogicalVolume:", *volSpec.LogicalVolume)
+	}
 	slog.Debug("OS指定がなければ、OSバリアントのデフォルトを設定")
 
 	slog.Debug("ボリュームタイプの指定がなければ、qcow2を設定")
