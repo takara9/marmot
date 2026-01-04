@@ -120,7 +120,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 		})
 	})
 
-	Context("OSLVの生成から削除", func() {
+	Context("LV OSボリューム生成から削除", func() {
 		var m *marmotd.Marmot
 		var volSpec *api.Volume
 		var err error
@@ -250,7 +250,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 		})
 	})
 
-	Context("DATALVの生成から削除", func() {
+	Context("LV DATAボリューム生成から削除", func() {
 		var m *marmotd.Marmot
 		var volSpec *api.Volume
 		var err error
@@ -290,7 +290,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 	})
 
-	Context("OSとデータの論理ボリューム生成、リスト取得、削除", func() {
+	Context("LV OSとデータのボリューム生成、リスト取得、削除", func() {
 		var ids []string
 		var m *marmotd.Marmot
 
@@ -437,7 +437,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 		})
 	})
 
-	Context("OSボリュームの操作", func() {
+	Context("qcow2 OSボリュームの操作", func() {
 		var ids []string
 		var m *marmotd.Marmot
 
@@ -518,7 +518,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 	})
 
-	Context("DATAボリュームの操作", func() {
+	Context("qcow2 DATAボリュームの操作", func() {
 		var ids []string
 		var m *marmotd.Marmot
 
@@ -580,8 +580,8 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 		})
 	})
 
-	Context("停止", func() {
-		It("コンテナとモック", func() {
+	Context("コンテナとモックの停止", func() {
+		It("停止コマンド実行", func() {
 			cmd := exec.Command("docker", "kill", containerID)
 			_, err := cmd.CombinedOutput()
 			if err != nil {

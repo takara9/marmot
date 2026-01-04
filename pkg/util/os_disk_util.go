@@ -24,21 +24,21 @@ import (
 )
 
 // LVのパーティションをマップ
-func KpartOn(vg string, lv string) error {
+func kpartOn(vg string, lv string) error {
 	cmd := exec.Command("kpartx", "-av", fmt.Sprintf("/dev/%s/%s", vg, lv))
 	err := cmd.Run()
 	return err
 }
 
 // LVのパーティションをアンマップ
-func KpartOff(vg string, lv string) error {
+func kpartOff(vg string, lv string) error {
 	cmd := exec.Command("kpartx", "-d", fmt.Sprintf("/dev/%s/%s", vg, lv))
 	err := cmd.Run()
 	return err
 }
 
 // LVをマウントポイントへマウント
-func MountLocal(vg string, lv string, uuid string) (string, error) {
+func mountLocal(vg string, lv string, uuid string) (string, error) {
 	dev := fmt.Sprintf("/dev/mapper/%s-%sp2", vg, lv)
 	mp := fmt.Sprintf("./%s", uuid)
 	err := os.Mkdir(mp, 0750)
@@ -56,7 +56,7 @@ func MountLocal(vg string, lv string, uuid string) (string, error) {
 }
 
 // LVをアンマウント
-func UnMountLocal(uuid string) error {
+func unMountLocal(uuid string) error {
 	mp := fmt.Sprintf("./%s", uuid)
 	cmd := exec.Command("umount", mp)
 	err := cmd.Run()
@@ -64,51 +64,48 @@ func UnMountLocal(uuid string) error {
 	return err
 }
 
-// スナップショットボリュームをマウントして、 ホスト名とIPアドレスを設定
-//
-//	Ubuntu Linuxに限定
 func ConfigRootVol(spec api.VmSpec, vg string, oslv string) error {
-	err := KpartOn(vg, oslv)
+	err := kpartOn(vg, oslv)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
 	}
 	// マウント
-	vm_root, err := MountLocal(vg, oslv, *spec.Uuid)
+	vm_root, err := mountLocal(vg, oslv, *spec.Uuid)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
 	}
 
 	// ホスト名の書き込み
-	err = LinuxSetup_hostname(vm_root, *spec.Name)
+	err = linuxSetupHostname(vm_root, *spec.Name)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
 	}
 
 	// NetPlanの雛形へ書出す2
-	err = LinuxSetup_createNetplan(spec, vm_root)
+	err = linuxSetupCreateNetplan(spec, vm_root)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
 	}
 
 	// hostidの書き出し
-	err = LinuxSetup_hostid(spec, vm_root)
+	err = linuxSetupHostId(spec, vm_root)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
 	}
 
 	// 後始末
-	err = UnMountLocal(*spec.Uuid)
+	err = unMountLocal(*spec.Uuid)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
 	}
 
-	err = KpartOff(vg, oslv)
+	err = kpartOff(vg, oslv)
 	if err != nil {
 		slog.Error("", "err", err)
 		return err
@@ -118,53 +115,3 @@ func ConfigRootVol(spec api.VmSpec, vg string, oslv string) error {
 	return nil
 }
 
-func ConfigRootVol2(spec api.VmSpec, vg string, oslv string) error {
-	err := KpartOn(vg, oslv)
-	if err != nil {
-		slog.Error("", "err", err)
-		return err
-	}
-	// マウント
-	vm_root, err := MountLocal(vg, oslv, *spec.Uuid)
-	if err != nil {
-		slog.Error("", "err", err)
-		return err
-	}
-
-	// ホスト名の書き込み
-	err = LinuxSetup_hostname(vm_root, *spec.Name)
-	if err != nil {
-		slog.Error("", "err", err)
-		return err
-	}
-
-	// NetPlanの雛形へ書出す2
-	err = LinuxSetup_createNetplan2(spec, vm_root)
-	if err != nil {
-		slog.Error("", "err", err)
-		return err
-	}
-
-	// hostidの書き出し
-	err = LinuxSetup_hostid2(spec, vm_root)
-	if err != nil {
-		slog.Error("", "err", err)
-		return err
-	}
-
-	// 後始末
-	err = UnMountLocal(*spec.Uuid)
-	if err != nil {
-		slog.Error("", "err", err)
-		return err
-	}
-
-	err = KpartOff(vg, oslv)
-	if err != nil {
-		slog.Error("", "err", err)
-		return err
-	}
-
-	// 正常終了
-	return nil
-}

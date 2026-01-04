@@ -751,7 +751,8 @@ components:
           type: string
         comment:
           type: string
-
+        persistent:
+          type: boolean
     Success:
       type: object
       required:
@@ -761,7 +762,57 @@ components:
           type: string
         message:
           type: string
-
+    Network:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        uuid:
+          type: string
+        networkname:
+          type: string
+        ethernet:
+          type: string
+        mac:
+          type: string
+        dhcp4:
+          type: boolean
+        dhcp6:
+          type: boolean
+        ipv4addr:
+          type: string
+        ipv4mask:
+          type: string
+        ipv6addr:
+          type: string
+        ipv6mask:
+          type: string
+        nameservers:
+          type: array
+          maxItems: 4
+          items:
+            $ref: "#/components/schemas/Nameserver"
+        routes:
+          type: array
+          maxItems: 6
+          items:
+            $ref: "#/components/schemas/Route"    
+    Nameserver:
+      type: object
+      properties:
+        address:
+          type: string
+        search:
+          type: string
+    Route:
+      type: object
+      properties:
+        to:
+          type: string
+        via:
+          type: string
     Servers:
       type: array
       maxItems: 100
@@ -773,6 +824,8 @@ components:
         - id
       properties:
         id:
+          type: string
+        uuid:
           type: string
         name:
           type: string
@@ -803,10 +856,15 @@ components:
           type: integer
           format: int
         privateIp:
-          type: string
+           type: string
         publicIp:
-          type: string
-        storage:
+           type: string
+        Network:
+          type: array
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/Network"
+        Storage:
           type: array
           maxItems: 10
           items:
@@ -821,3 +879,5 @@ components:
           type: string
         osVariant:
           type: string
+        bootVolume:
+          $ref: "#/components/schemas/Volume"

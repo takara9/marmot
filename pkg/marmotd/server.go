@@ -1,312 +1,425 @@
 package marmotd
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 
+	"github.com/google/uuid"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/util"
+	"github.com/takara9/marmot/pkg/virt"
 )
 
 // 仮想マシンの生成、qcow2に対応すること、仮想マシンを識別するIDは、ホスト名ではなくUUIDであることに注意
 // volume の生成は、volumes.goに任せること！
-func (m *Marmot) CreateServer(spec api.Server) (string, error) {
-	slog.Debug("=====CreateServer()=====", "spec", spec)
+func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
+	slog.Debug("=====CreateServer()=====", "config spec", requestServerSpec)
 
-	slog.Debug("仮想マシンのIDを付与")
-	server, err := m.Db.CreateServer(spec)
+	var bootVol api.Volume
+	slog.Debug("OS指定がなければ、OSバリアントのデフォルトを設定")
+	if requestServerSpec.OsVariant == nil {
+		bootVol.OsVariant = util.StringPtr("ubuntu22.04")
+		requestServerSpec.OsVariant = util.StringPtr("ubuntu22.04")
+	}
+
+	slog.Debug("仮想マシンの使用を付与してDBへ登録、一意のIDを取得")
+	serverConfig, err := m.Db.CreateServer(requestServerSpec)
 	if err != nil {
 		slog.Error("CreateServer()", "err", err)
 		return "", err
 	}
 
-	fmt.Println("New Server ID:", server.Id)
+	slog.Debug("ブートボリュームの生成と設定")
+	bootVol.Name = util.StringPtr("boot-" + serverConfig.Id)
+	bootVol.Kind = util.StringPtr("os")
+	bootVol.Path = util.StringPtr("")
+	bootVol.Size = util.IntPtrInt(0)
 
-	slog.Debug("仮想マシンの定義を取得")
+	// ステータスを起動中に更新
+	serverConfig.Status = util.IntPtrInt(db.SERVER_PROVISIONING)
+	err = m.Db.UpdateServer(serverConfig.Id, serverConfig)
+	if err != nil {
+		slog.Error("UpdateServer()", "err", err)
+		return "", err
+	}
+
+	slog.Debug("** OSの種類が指定されていなければ、デフォルトを設定 ** ", "os_variant", requestServerSpec.OsVariant)
+	if requestServerSpec.OsVariant == nil {
+		serverConfig.OsVariant = util.StringPtr("ubuntu22.04")
+	}
+
+	slog.Debug("ボリュームタイプの指定がなければ、デフォルトqcow2を設定", "boot volume type", requestServerSpec.BootVolume)
+	if requestServerSpec.BootVolume == nil {
+		bootVol.Type = util.StringPtr("qcow2")
+	} else {
+		bootVol.Type = util.StringPtr(*requestServerSpec.BootVolume.Type)
+		bootVol.OsVariant = requestServerSpec.OsVariant
+	}
+
+	slog.Debug("ブートディスクにOSの指定がなければ、デフォルトのOSを設定")
+	if requestServerSpec.OsVariant == nil {
+		bootVol.OsVariant = util.StringPtr("ubuntu22.04") // デフォルトをコンフィグに持たせるべき？
+	} else {
+		bootVol.OsVariant = requestServerSpec.OsVariant
+	}
+
+	slog.Debug("ブートディスクの作成")
+	bootVolDefined, err := m.CreateNewVolume(bootVol)
+	if err != nil {
+		return "", err
+	}
+
+	slog.Debug("ブートボリュームのIDをサーバーの構成データに設定", "temp var volume id", bootVolDefined)
+	serverConfig.BootVolume = bootVolDefined
+	err = m.Db.UpdateServer(serverConfig.Id, serverConfig)
+	if err != nil {
+		slog.Error("UpdateServer()", "err", err)
+		return "", err
+	}
+	slog.Debug("ブートボリュームのIDをサーバーの構成データに設定完了", "server boot volume", serverConfig.BootVolume)
+
+	// =======================================================================
+	// ブートボリュームをマウントして、ホスト名、netplanを設定する
+	slog.Debug("ブートボリュームをマウントして、ホスト名、netplanを設定する")
+
+	// ブートボリュームをマウント
+
+	// ホスト名をセット
+
+	// ネットワーク設定
+
+	// ブートボリュームのアンマウント
+	if err := util.SetupLinux(serverConfig); err != nil {
+		slog.Error("SetupLinux()", "err", err)
+		return "", err
+	}
+
+	// ========================================================
+
+	slog.Debug("データボリュームの生成")
+	// データボリュームの作成
+	if requestServerSpec.Storage != nil {
+		for i, disk := range *requestServerSpec.Storage {
+			if len(disk.Id) > 0 {
+				slog.Debug("既存ボリュームを使用", "disk index", i, "volume id", disk.Id)
+				diskVol, err := m.GetVolumeById(disk.Id)
+				if err != nil {
+					slog.Error("GetVolumeById()", "err", err)
+					return "", err
+				}
+
+				// 永続フラグを立てる
+				var peersistent bool = true
+				diskVol.Persistent = &peersistent
+
+				slog.Debug("既存ボリュームの情報取得成功", "disk index", i, "volume id", diskVol.Id, "path", diskVol.Path, "status", diskVol.Status)
+				(*serverConfig.Storage)[i] = *diskVol
+				slog.Debug("既存ボリュームの情報設定成功", "disk index", i, "volume id", diskVol.Id, "disk", disk)
+				continue
+			}
+
+			if disk.Type != nil && *disk.Type == "qcow2" {
+				slog.Debug("qcow2ボリュームを作成", "disk index", i)
+				diskVol, err := m.CreateNewVolume(disk)
+				if err != nil {
+					slog.Error("CreateNewVolume()", "err", err)
+					return "", err
+				}
+				(*serverConfig.Storage)[i] = *diskVol
+				slog.Debug("データボリューム 作成成功", "disk index", i, "volume id", diskVol.Id)
+			}
+			if disk.Type != nil && *disk.Type == "lvm" {
+				slog.Debug("lvmボリュームを作成", "disk index", i)
+				diskVol, err := m.CreateNewVolume(disk)
+				if err != nil {
+					slog.Error("CreateNewVolume()", "err", err)
+					return "", err
+				}
+				(*serverConfig.Storage)[i] = *diskVol
+				slog.Debug("データボリューム 作成成功", "disk index", i, "volume id", diskVol.Id)
+			}
+		}
+	}
+
+	fmt.Println("=== データボリュームの情報確認2 ===", "server Id", serverConfig.Id)
+	data3, err := json.MarshalIndent(serverConfig, "", "  ")
+	if err != nil {
+		slog.Error("json.MarshalIndent()", "err", err)
+	} else {
+		fmt.Println("サーバー情報(serverConfig): ", string(data3))
+	}
+
+	// データボリュームのIDをサーバーに設定
+	err = m.Db.UpdateServer(serverConfig.Id, serverConfig)
+	if err != nil {
+		slog.Error("UpdateServer()", "err", err)
+		return "", err
+	}
+
+	slog.Debug("ネットワークインタフェースの設定")
+	/////////////////////////////
 
 	slog.Debug("ハイパーバイザーのリソース確保")
+	var vx virt.VmSpec
+	vx.UUID = *serverConfig.Uuid
+	if serverConfig.Name != nil {
+		vx.Name = *serverConfig.Name // VMを一意に識別する
+	} else {
+		vx.Name = "vm-" + serverConfig.Id
+	}
 
-	slog.Debug("etcdのキーを設定")
+	// CPUとメモリの設定
+	slog.Debug("割り当てるCPU数とメモリ量を設定")
+	if serverConfig.Cpu != nil {
+		vx.CountVCPU = uint(*serverConfig.Cpu)
+	} else {
+		vx.CountVCPU = 2 // デフォルト2
+	}
 
-	slog.Debug("CPU数設定がなければ、CPU数のデフォルトを設定")
+	if serverConfig.Memory != nil {
+		mem := uint(*serverConfig.Memory) * 1024 //MiB
+		vx.RAM = mem
+	} else {
+		mem := uint(2048 * 1024) // MiB デフォルト2048MB
+		vx.RAM = mem
+	}
+	vx.Machine = "pc-q35-4.2"
 
-	slog.Debug("メモリサイズのメモリサイズのデフォルトを設定")
+	slog.Debug("ボリュームの設定が無いときはqcow2をデフォルトとする1")
+	// ブートディスクの設定 指定が無い時は、qcow2をデフォルトとする
+	if bootVolDefined.Type == nil {
+		bootVolDefined.Type = util.StringPtr("qcow2")
+	}
+	slog.Debug("ボリュームの設定が無いときはqcow2をデフォルトとする2", "boot volume ptr", bootVolDefined)
 
-	slog.Debug("OS指定がなければ、OSバリアントのデフォルトを設定")
-
-	slog.Debug("ボリュームタイプの指定がなければ、qcow2を設定")
-
-	slog.Debug("ネットワークの設定")
-
-	slog.Debug("データボリュームの生成と設定")
-
-	slog.Debug("libvirtのXML定義の生成")
-
-	slog.Debug("仮想マシンの起動")
-
-	slog.Debug("データベースに登録")
-	//svc, err := m.Db.CreateServer(spec)
-	//if err != nil {
-	//	slog.Error("CreateServer()", "err", err)
-	//	//return "", err
-	//}
-	slog.Debug("CreateServer()", "id", server.Id)
-	/*
-		// 仮想マシンの定義を取得
-		var dom virt.Domain
-		err := virt.ReadXml("temp.xml", &dom)
-		if err != nil {
-			slog.Error("virt.ReadXml()", "err", err)
-			return err
+	switch {
+	case *bootVolDefined.Type == "qcow2":
+		vx.DiskSpecs = []virt.DiskSpec{
+			{"vda", *bootVolDefined.Path, 3, *bootVolDefined.Type},
 		}
-
-		// どこでシリアルをつけているのか、問題だ
-		if spec.Key != nil {
-			//dom.Name = *spec.Key // VMを一意に識別するキーでありhostnameではない
-			x := strings.Split(*spec.Key, "/")
-			dom.Name = x[len(x)-1] // VMを一意に識別するキーでありhostnameではない
+	case *bootVolDefined.Type == "lvm":
+		// ＊＊＊　パスは createNewVolume で設定されるべき　＊＊＊
+		lvPath := fmt.Sprintf("/dev/%s/%s", *bootVolDefined.VolumeGroup, *bootVolDefined.LogicalVolume)
+		vx.DiskSpecs = []virt.DiskSpec{
+			{"vda", lvPath, 3, "raw"},
 		}
+	default:
+		slog.Error("CreateServer()", "unsupported volume type", *bootVolDefined.Type)
+		return "", fmt.Errorf("unsupported volume type: %s", *bootVolDefined.Type)
+	}
 
-		if spec.Uuid != nil {
-			dom.Uuid = *spec.Uuid
-		}
-		if spec.Cpu != nil {
-			dom.Vcpu.Value = int(*spec.Cpu)
-		}
-		if spec.Memory != nil {
-			var mem = int(*spec.Memory) * 1024 //KiB
-			dom.Memory.Value = mem
-			dom.CurrentMemory.Value = mem
-		}
-
-		slog.Debug("CreateOsLv()", "spec", "check")
-		if spec.Ostempvg == nil || spec.Ostemplv == nil {
-			slog.Error("OS Temp VG or OS Temp LV is null", "", "")
-			return fmt.Errorf("OS Temp VG or OS Temp LV is null")
-		}
-
-		osLogicalVol, err := m.Db.CreateOsLv(*spec.Ostempvg, *spec.Ostemplv)
-		if err != nil {
-			slog.Error("util.CreateOsLv()", "err", err)
-			return err
-		}
-		slog.Debug("CreateOsLv()", "lv", osLogicalVol)
-
-		err = m.Db.UpdateOsLvByVmKey(*spec.Key, *spec.Ostempvg, osLogicalVol)
-		if err != nil {
-			slog.Error("util.CreateOsLv()", "err", err, "*spec.Key", *spec.Key)
-			return err
-		}
-
-		dom.Devices.Disk[0].Source.Dev = fmt.Sprintf("/dev/%s/%s", *spec.Ostempvg, osLogicalVol)
-
-		if err := util.ConfigRootVol2(spec, *spec.Ostempvg, osLogicalVol); err != nil {
-			slog.Error("util.CreateOsLv()", "err", err)
-			return err
-		}
-
-		slog.Debug("spec.Storage", "start", "")
-
-		if spec.Storage != nil {
-			// DATAボリュームを作成 (最大９個)
-			dev := []string{"vdb", "vdc", "vde", "vdf", "vdg", "vdh", "vdj", "vdk", "vdl"}
-			bus := []string{"0x0a", "0x0b", "0x0c", "0x0d", "0x0e", "0x0f", "0x10", "0x11", "0x12"}
-			for i, disk := range *spec.Storage {
-				if disk.Size == nil {
-					continue
-				}
-				slog.Debug("spec.Storage", "disk size", *disk.Size)
-				var dk virt.Disk
-				// ボリュームグループが指定されていない時はvg1を指定
-				var vg string = "vg1"
-				if disk.Vg != nil {
-					vg = *disk.Vg
-				}
-				dlv, err := m.Db.CreateDataLv(uint64(*disk.Size), vg)
-				if err != nil {
-					slog.Error("", "err", err)
-					return err
-				}
-				// LibVirtの設定を追加
-				dk.Type = "block"
-				dk.Device = "disk"
-				dk.Driver.Name = "qemu"
-				dk.Driver.Type = "raw"
-				dk.Driver.Cache = "none"
-				dk.Driver.Io = "native"
-				dk.Source.Dev = fmt.Sprintf("/dev/%s/%s", vg, dlv)
-				dk.Target.Dev = dev[i]
-				dk.Target.Bus = "virtio"
-				dk.Address.Type = "pci"
-				dk.Address.Domain = "0x0000"
-				dk.Address.Bus = bus[i]
-				dk.Address.Slot = "0x00"
-				dk.Address.Function = "0x0"
-				// 配列に追加
-				dom.Devices.Disk = append(dom.Devices.Disk, dk)
-				// etcdデータベースにlvを登録
-				err = m.Db.UpdateDataLvByVmKey(*spec.Key, i, *disk.Vg, dlv)
-				if err != nil {
-					slog.Error("", "err", err)
-					return err
-				}
-				// エラー発生時にロールバックが必要（未実装）
+	// データディスクの設定
+	if serverConfig.Storage != nil {
+		for i, disk := range *serverConfig.Storage {
+			if disk.Kind == nil {
+				disk.Kind = util.StringPtr("data")
 			}
-			// ストレージの更新
-			m.Db.CheckHvVG2ByName(m.NodeName, *spec.Ostempvg)
+			if disk.Type == nil {
+				disk.Type = util.StringPtr("qcow2")
+			}
+			switch {
+			case *disk.Type == "qcow2":
+				ds := virt.DiskSpec{
+					Dev:  fmt.Sprintf("vd%c", 'b'+i),
+					Src:  *disk.Path,
+					Bus:  uint(11 + i),
+					Type: "qcow2",
+				}
+				vx.DiskSpecs = append(vx.DiskSpecs, ds)
+			case *disk.Type == "lvm":
+				ds := virt.DiskSpec{
+					Dev:  fmt.Sprintf("vd%c", 'b'+i),
+					Src:  *disk.Path,
+					Bus:  uint(11 + i),
+					Type: "raw",
+				}
+				vx.DiskSpecs = append(vx.DiskSpecs, ds)
+			}
 		}
-		slog.Debug("spec.Storage", "finish", "")
+	}
 
-		if spec.PrivateIp != nil {
-			util.CreateNic("pri", &dom.Devices.Interface)
-		}
+	channelFile := "org.qemu.guest_agent.0"
+	channelPath, err := util.CreateChannelDir(vx.UUID)
 
-		if spec.PublicIp != nil {
-			util.CreateNic("pub", &dom.Devices.Interface)
-		}
-
-		textXml := virt.CreateVirtXML(dom)
-		xmlfileName := fmt.Sprintf("./%v.xml", dom.Uuid)
-		file, err := os.Create(xmlfileName)
-		if err != nil {
-			slog.Error("os.Create()", "err", err)
-			return err
-		}
-		defer file.Close()
-
-		_, err = file.Write([]byte(textXml))
-		if err != nil {
-			slog.Error("file.Write()", "err", err)
-			return err
-		}
-
-		url := "qemu:///system"
-		err = virt.CreateStartVM(url, xmlfileName)
-		if err != nil {
-			slog.Error("virt.CreateStartVM()", "err", err)
-			return err
-		}
-
-		// 仮想マシンXMLファイルを削除する
-		err = os.Remove(xmlfileName)
-		if err != nil {
-			slog.Error("os.Remove()", "err", err)
-			return err
-		}
-
+	/*
+		ネットワークの指定がなければ、デフォルトネットワークを使用する。
+		ネットワークの指定があれば、そのネットワークへ接続する。
+		ネットワークとIPアドレスの指定があれば、そのIPアドレスを使用する。
+		ネットワークの指定があっても、IPアドレスの指定がなければ、DHCPで取得する。
 	*/
-	// 仮想マシンの状態変更(未実装)
+	if requestServerSpec.Network == nil {
+		slog.Debug("ネットワーク指定なし、デフォルトネットワークを使用")
+		mac, err := util.GenerateRandomMAC()
+		if err != nil {
+			slog.Error("GenerateRandomMAC()", "err", err)
+			return "", err
+		}
+		vx.Nets = []virt.NetSpec{
+			{
+				MAC:     mac.String(),
+				Network: "default",
+				PortID:  uuid.New().String(),
+				Bridge:  "virbr0",
+				Target:  "vnet2",
+				Alias:   "net0",
+				Bus:     1,
+			},
+		}
+	} else {
+		slog.Debug("ネットワーク指定あり、指定されたネットワークを使用")
+		for i, nic := range *requestServerSpec.Network {
+			slog.Debug("ネットワーク", "index", i, "network id", nic.Id)
+			mac, err := util.GenerateRandomMAC()
+			if err != nil {
+				slog.Error("GenerateRandomMAC()", "err", err)
+				return "", err
+			}
+			busno := uint(i + 1)
+			if busno >= 3 {
+				busno += 4 // diskとバス番号が被らないようにする
+			}
+			ns := virt.NetSpec{
+				MAC:     mac.String(),
+				Network: nic.Id,
+				PortID:  uuid.New().String(),
+				Bridge:  "virbr0",
+				Target:  fmt.Sprintf("vnet%d", i),
+				Alias:   fmt.Sprintf("net%d", i),
+				Bus:     busno,
+			}
+			vx.Nets = append(vx.Nets, ns)
+		}
+	}
+	vx.ChannelSpecs = []virt.ChannelSpec{
+		{"unix", channelPath + "/" + channelFile, channelFile, "channel0", 1},
+		{"spicevmc", "", "com.redhat.spice.0", "channel1", 2},
+	}
+	vx.Clocks = []virt.ClockSpec{
+		{"rtc", "catchup", ""},
+		{"pit", "delay", ""},
+		{"hpet", "", "no"},
+	}
 
-	return server.Id, nil
+	dom := virt.CreateDomainXML(vx)
+	xml, err := dom.Marshal()
+	fmt.Println("Generated", "libvirt XML:\n", string(xml))
+
+	l, err := virt.NewLibVirtEp("qemu:///system")
+	if err != nil {
+		slog.Error("NewLibVirtEp()", "err", err)
+		return "", err
+	}
+	defer l.Close()
+
+	slog.Debug("仮想マシンの定義と起動")
+
+	err = l.DefineAndStartVM(*dom)
+	if err != nil {
+		slog.Error("DefineAndStartVM()", "err", err)
+		return "", err
+	}
+
+	// ステータスを利用可能に更新
+	serverConfig.Status = util.IntPtrInt(db.SERVER_AVAILABLE)
+	err = m.Db.UpdateServer(serverConfig.Id, serverConfig)
+	if err != nil {
+		slog.Error("UpdateServer()", "err", err)
+		return "", err
+	}
+
+	return serverConfig.Id, nil
 }
 
 // 仮想マシンの削除、qcow2に対応すること、仮想マシンを識別するIDは、ホスト名ではなくUUIDであることに注意
 // volume の生成は、volumes.goに任せること！
 func (m *Marmot) DeleteServerById(id string) error {
-	slog.Debug("===", "DeleteServerById is called", "===")
-	err := m.Db.DeleteServerById(id)
+	slog.Debug("===DeleteServerById is called===", "id", id)
+	sv, err := m.GetServerById(id)
 	if err != nil {
+		slog.Error("GetServerById()", "err", err)
+		return err
+	}
+
+	slog.Debug("DeleteServerById()", "boot volume id", sv.BootVolume.Id)
+
+	// 仮想マシンの削除
+	l, err := virt.NewLibVirtEp("qemu:///system")
+	if err != nil {
+		slog.Error("NewLibVirtEp()", "err", err)
+		return err
+	}
+	defer l.Close()
+	if err = l.DeleteDomain(*sv.Name); err != nil {
+		slog.Error("DeleteDomain()", "err", err)
+		return err
+	}
+
+	// ブートボリュームの削除
+	if err := m.RemoveVolume(sv.BootVolume.Id); err != nil {
+		slog.Error("RemoveVolume()", "err", err)
+		return err
+	}
+
+	// データボリュームを消す
+	if sv.Storage != nil {
+		slog.Debug("アタッチされているボリュームの削除", "ボリューム数", len(*sv.Storage))
+		for i, vol := range *sv.Storage {
+			slog.Debug("DeleteServerById()", "index", i, "deleting volume id", vol.Id)
+			if vol.Persistent != nil && *vol.Persistent {
+				slog.Debug("DeleteServerById()", "skipping persistent volume", vol.Id)
+				continue
+			}
+			if err := m.RemoveVolume(vol.Id); err != nil {
+				slog.Error("RemoveVolume()", "err", err)
+				return err
+			}
+		}
+	} else {
+		slog.Debug("DeleteServerById()", "no attached volumes to delete", sv.Id)
+	}
+
+	slog.Debug("DeleteServerById()", "sv", sv.Id, "name", *sv.Name)
+	if err := m.Db.DeleteServerById(sv.Id); err != nil {
 		slog.Error("DeleteServerById()", "err", err)
 		return err
 	}
-	/*
-		if spec.Key != nil {
-			slog.Debug("DestroyServer()", "key", *spec.Key)
-		}
 
-		var vm api.VirtualMachine
-		var err error
-
-		if spec.Key != nil {
-			vm, err = m.Db.GetVmByVmKey(*spec.Key)
-			if err != nil {
-				slog.Error("GetVmByVmKey()", "err", err)
-			}
-		}
-
-		// ハイパーバイザーのリソース削減保存のため値を取得
-		hv, err := m.Db.GetHypervisorByName(vm.HvNode)
-		if err != nil {
-			slog.Error("GetHypervisorByName()", "err", err)
-		}
-
-		// ステータスを調べて停止中であれば、足し算しない。
-		if *vm.Status != types.STOPPED && *vm.Status != types.ERROR {
-			*hv.FreeCpu = *hv.FreeCpu + int32(*vm.Cpu)
-			*hv.FreeMemory = *hv.FreeMemory + *vm.Memory
-			err = m.Db.PutJSON(*hv.Key, hv)
-			if err != nil {
-				slog.Error("PutDataEtcd()", "err", err)
-			}
-		}
-
-		slog.Debug("DestroyVM2() proceed to delete VM on database", "vmKey", *spec.Key)
-		// データベースからVMを削除
-		if err := m.Db.DeleteJSON(*spec.Key); err != nil {
-			slog.Error("DeleteJSON(", "err", err)
-		}
-
-		// 仮想マシンの停止＆削除
-		domName := strings.Split(*spec.Key, "/")
-		slog.Debug("DestroyVM2() proceed to delete VM on hypervisor", "vmKey", *spec.Key, "domName", domName[len(domName)-1])
-
-		if err := virt.DestroyVM("qemu:///system", domName[len(domName)-1]); err != nil {
-			slog.Error("DestroyVM()", "err", err, "vmKey", *spec.Key, "key", domName[len(domName)-1])
-		}
-
-		// OS LVを削除
-		slog.Debug("DestroyVM2() proceed to delete OS LV", "vm.OsVg", *vm.OsVg, "vm.OsLv", *vm.OsLv)
-		if err := lvm.RemoveLV(*vm.OsVg, *vm.OsLv); err != nil {
-			slog.Error("lvm.RemoveLV()", "err", err)
-		}
-
-		// ストレージの更新
-		m.Db.CheckHvVG2ByName(m.NodeName, *vm.OsVg)
-
-		// データLVを削除
-		if vm.Storage != nil {
-			for _, dd := range *vm.Storage {
-				slog.Debug("DestroyVM2() proceed to delete Data LV", "dd.Vg", *dd.Vg, "dd.Lv", *dd.Lv)
-				err = lvm.RemoveLV(*dd.Vg, *dd.Lv)
-				if err != nil {
-					slog.Error("RemoveLV()", "err", err)
-				}
-				// ストレージの更新
-				m.Db.CheckHvVG2ByName(m.NodeName, *dd.Vg)
-			}
-		}
-	*/
 	return nil
 }
 
 // サーバーのリストを取得、フィルターは、パラメータで指定するようにする
 func (m *Marmot) GetServers() (api.Servers, error) {
-	slog.Debug("===", "GetServers is called", "===")
-	svc, err := m.Db.GetServers()
+	slog.Debug("===GetServers is called===", "id", "")
+	serverSpec, err := m.Db.GetServers()
 	if err != nil {
 		slog.Error("GetServers()", "err", err)
 		return nil, err
 	}
-	slog.Debug("GetServers()", "svc", svc)
-	return svc, nil
+	slog.Debug("GetServers()", "Number of servers", len(serverSpec))
+	return serverSpec, nil
 }
 
 // サーバーの詳細を取得
 func (m *Marmot) GetServerById(id string) (api.Server, error) {
-	slog.Debug("===", "GetServerById is called", "===")
-	server, err := m.Db.GetServerById(id)
+	slog.Debug("===GetServerById is called===", "id", id)
+	serverSpec, err := m.Db.GetServerById(id)
 	if err != nil {
 		slog.Error("GetServerById()", "err", err)
 		return api.Server{}, err
 	}
-	slog.Debug("GetServerById()", "svc", server)
+	// ここで BootVolumeのIDがセットできていない理由を調べる!
+	slog.Debug("GetServerById()", "server boot volume id", serverSpec.BootVolume.Id)
+	slog.Debug("GetServerById()", "server", serverSpec)
 
-	return server, nil
+	return serverSpec, nil
 }
 
 // サーバーの更新
-func (m *Marmot) UpdateServerById(id string, spec api.Server) error {
+func (m *Marmot) UpdateServerById(id string, serverSpec api.Server) error {
 	slog.Debug("===", "UpdateServerById is called", "===")
-	err := m.Db.UpdateServer(id, spec)
+	err := m.Db.UpdateServer(id, serverSpec)
 	if err != nil {
 		slog.Error("UpdateServer()", "err", err)
 		return err

@@ -225,9 +225,9 @@ func (d *Database) CreateDataLv(sz uint64, vg string) (string, error) {
 		return "", err
 	}
 
-	// 論理ボリュームを作成
+	// 論理ボリュームを作成 MB単位でサイズ指定
 	lvName := fmt.Sprintf("data%04d", seq)
-	lvSize := 1024 * 1024 * 1024 * sz
+	lvSize := 1024 * 1024 * sz
 	err = lvm.CreateLV(vg, lvName, lvSize)
 	if err != nil {
 		return "", err

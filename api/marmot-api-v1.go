@@ -54,6 +54,29 @@ type MarmotConfig struct {
 	VmSpec            *[]VmSpec `json:"vm_spec,omitempty"`
 }
 
+// Nameserver defines model for Nameserver.
+type Nameserver struct {
+	Address *string `json:"address,omitempty"`
+	Search  *string `json:"search,omitempty"`
+}
+
+// Network defines model for Network.
+type Network struct {
+	Dhcp4       *bool         `json:"dhcp4,omitempty"`
+	Dhcp6       *bool         `json:"dhcp6,omitempty"`
+	Ethernet    *string       `json:"ethernet,omitempty"`
+	Id          string        `json:"id"`
+	Ipv4addr    *string       `json:"ipv4addr,omitempty"`
+	Ipv4mask    *string       `json:"ipv4mask,omitempty"`
+	Ipv6addr    *string       `json:"ipv6addr,omitempty"`
+	Ipv6mask    *string       `json:"ipv6mask,omitempty"`
+	Mac         *string       `json:"mac,omitempty"`
+	Nameservers *[]Nameserver `json:"nameservers,omitempty"`
+	Networkname *string       `json:"networkname,omitempty"`
+	Routes      *[]Route      `json:"routes,omitempty"`
+	Uuid        *string       `json:"uuid,omitempty"`
+}
+
 // Pong defines model for Pong.
 type Pong struct {
 	Ping string `json:"ping"`
@@ -64,11 +87,20 @@ type ReplyMessage struct {
 	Message string `json:"message"`
 }
 
+// Route defines model for Route.
+type Route struct {
+	To  *string `json:"to,omitempty"`
+	Via *string `json:"via,omitempty"`
+}
+
 // Server defines model for Server.
 type Server struct {
 	HvIpAddr    *string    `json:"HvIpAddr,omitempty"`
 	HvNode      *string    `json:"HvNode,omitempty"`
 	HvPort      *int       `json:"HvPort,omitempty"`
+	Network     *[]Network `json:"Network,omitempty"`
+	Storage     *[]Volume  `json:"Storage,omitempty"`
+	BootVolume  *Volume    `json:"bootVolume,omitempty"`
 	CTime       *time.Time `json:"cTime,omitempty"`
 	ClusterName *string    `json:"clusterName,omitempty"`
 	Comment     *string    `json:"comment,omitempty"`
@@ -85,7 +117,7 @@ type Server struct {
 	PublicIp    *string    `json:"publicIp,omitempty"`
 	STime       *time.Time `json:"sTime,omitempty"`
 	Status      *int       `json:"status,omitempty"`
-	Storage     *[]Volume  `json:"storage,omitempty"`
+	Uuid        *string    `json:"uuid,omitempty"`
 }
 
 // Servers defines model for Servers.
@@ -115,6 +147,7 @@ type Volume struct {
 	Name          *string    `json:"name,omitempty"`
 	OsVariant     *string    `json:"osVariant,omitempty"`
 	Path          *string    `json:"path,omitempty"`
+	Persistent    *bool      `json:"persistent,omitempty"`
 	Size          *int       `json:"size,omitempty"`
 	Status        *int       `json:"status,omitempty"`
 	Type          *string    `json:"type,omitempty"`

@@ -7,7 +7,7 @@
 1) OSストレージを作成
 
 ```
-# cd /var/lib/libvirt/images
+# cd /var/lib/marmot/images
 # qemu-img create -f qcow2 ubuntu22.04.qcow2 25G
 ```
 

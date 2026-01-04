@@ -25,30 +25,22 @@ import (
 )
 
 // Linux ホスト名をOS Volへ書き込み
-func LinuxSetup_hostname(vm_root string, hostname string) error {
+func linuxSetupHostname(vm_root string, hostname string) error {
 	hostname_file := filepath.Join(vm_root, "etc/hostname")
 	err := os.WriteFile(hostname_file, []byte(hostname), 0644)
 	return err
 }
 
 // Linux hostidをOS Volへ書き込み
-func LinuxSetup_hostid(spec api.VmSpec, vm_root string) error {
-	ipb := IPaddrByteArray(*spec.PrivateIp)
-	hostid_file := filepath.Join(vm_root, "etc/hostid")
-	err := os.WriteFile(hostid_file, ipb, 0644)
-	return err
-}
-
-// Linux hostidをOS Volへ書き込み
-func LinuxSetup_hostid2(spec api.VmSpec, vm_root string) error {
-	ipb := IPaddrByteArray(*spec.PrivateIp)
+func linuxSetupHostId(spec api.VmSpec, vm_root string) error {
+	ipb := ipaddrByteArray(*spec.PrivateIp)
 	hostid_file := filepath.Join(vm_root, "etc/hostid")
 	err := os.WriteFile(hostid_file, ipb, 0644)
 	return err
 }
 
 // 文字列IPアドレスをバイト配列へ変換
-func IPaddrByteArray(ip string) []byte {
+func ipaddrByteArray(ip string) []byte {
 	ipi := strings.Split(ip, ".")
 	ipb := make([]byte, 4)
 	for i, xx := range ipi {
@@ -58,71 +50,9 @@ func IPaddrByteArray(ip string) []byte {
 	return ipb
 }
 
-/*
- cnf cf.MarmotConfigは、利用していない。そのため削除したい。
- デフォルトGW,DNSなどの設定のためにコンフィグファイルからの設定を取り入れている
-*/
-// Linux Netplanのファイルへ、IPアドレスなどを設定
-func LinuxSetup_createNetplan(spec api.VmSpec, vm_root string) error {
-	var netplanFile = "etc/netplan/00-nic.yaml"
-	netplanPath := filepath.Join(vm_root, netplanFile)
-
-	f, err := os.Create(netplanPath)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	yaml(0, "network:", f)
-	yaml(1, "version: 2", f)
-	yaml(1, "ethernets:", f)
-
-	if len(*spec.PrivateIp) > 0 {
-		yaml(2, "enp6s0:", f)
-		yaml(3, "addresses:", f)
-		yaml(4, fmt.Sprintf("- %s/%d", *spec.PrivateIp, 16), f)
-		/*
-		   不安定になるので設定しない と思ったが、プライベートだけだとインターネットへのルートが必要
-		   そこで、パブリックが無い時だけ設定する
-		*/
-		if len(*spec.PublicIp) == 0 {
-			if *spec.Ostempvariant == "ubuntu18.04" {
-				yaml(3, "gateway4: 172.16.0.1", f)
-			} else {
-				yaml(3, "routes:", f)
-				yaml(4, "- to: default", f)
-				yaml(4, "  via: 172.16.0.1", f)
-			}
-		}
-		yaml(3, "nameservers:", f)
-		yaml(4, fmt.Sprintf("search: [%v]", "labo.local"), f)
-		yaml(4, fmt.Sprintf("addresses: [%v]", "172.16.0.4"), f)
-	}
-
-	if len(*spec.PublicIp) > 0 {
-		yaml(2, "enp7s0:", f)
-		yaml(3, "addresses:", f)
-		yaml(4, fmt.Sprintf("- %s/%d", *spec.PublicIp, 24), f)
-		if *spec.Ostempvariant == "ubuntu18.04" {
-			yaml(3, "gateway4: 192.168.1.1", f)
-
-		} else {
-			yaml(3, "routes:", f)
-			yaml(4, "- to: default", f)
-			yaml(4, "  via: 192.168.1.1", f)
-		}
-		// 両方を有効にできないので、プライベート側を優先する
-		if len(*spec.PrivateIp) == 0 {
-			yaml(4, fmt.Sprintf("search: [%v]", "labo.local"), f)
-			yaml(4, fmt.Sprintf("addresses: [%v]", "192.168.1.4"), f)
-		}
-	}
-	return nil
-
-}
 
 // YAMLのlevelに応じた桁下げのYAML行を出力
-func yaml(level int, txt string, f io.Writer) {
+func yamlformat(level int, txt string, f io.Writer) {
 	for i := 0; i < level; i++ {
 		fmt.Fprintf(f, "  ")
 	}
@@ -176,7 +106,7 @@ func CreateNic(netClass string, vmXml *[]virt.Interface) error {
  デフォルトGW,DNSなどの設定のためにコンフィグファイルからの設定を取り入れている
 */
 // Linux Netplanのファイルへ、IPアドレスなどを設定
-func LinuxSetup_createNetplan2(spec api.VmSpec, vm_root string) error {
+func linuxSetupCreateNetplan(spec api.VmSpec, vm_root string) error {
 	var netplanFile = "etc/netplan/00-nic.yaml"
 	netplanPath := filepath.Join(vm_root, netplanFile)
 
@@ -186,53 +116,50 @@ func LinuxSetup_createNetplan2(spec api.VmSpec, vm_root string) error {
 	}
 	defer f.Close()
 
-	yaml(0, "network:", f)
-	yaml(1, "version: 2", f)
-	yaml(1, "ethernets:", f)
+	yamlformat(0, "network:", f)
+	yamlformat(1, "version: 2", f)
+	yamlformat(1, "ethernets:", f)
 
 	if spec.PrivateIp != nil {
 		if len(*spec.PrivateIp) > 0 {
-			yaml(2, "enp6s0:", f)
-			yaml(3, "addresses:", f)
-			yaml(4, fmt.Sprintf("- %s/%d", *spec.PrivateIp, 16), f)
-			/*
-			   不安定になるので設定しない と思ったが、プライベートだけだとインターネットへのルートが必要
-			   そこで、パブリックが無い時だけ設定する
-			*/
+			yamlformat(2, "enp6s0:", f)
+			yamlformat(3, "addresses:", f)
+			yamlformat(4, fmt.Sprintf("- %s/%d", *spec.PrivateIp, 16), f)
+			//   不安定になるので設定しない と思ったが、プライベートだけだとインターネットへのルートが必要
+			//   そこで、パブリックが無い時だけ設定する
 		}
 		if spec.PublicIp != nil {
 			if len(*spec.PublicIp) == 0 {
 				if *spec.Ostempvariant == "ubuntu18.04" {
-					yaml(3, "gateway4: 172.16.0.1", f)
+					yamlformat(3, "gateway4: 172.16.0.1", f)
 				} else {
-					yaml(3, "routes:", f)
-					yaml(4, "- to: default", f)
-					yaml(4, "  via: 172.16.0.1", f)
+					yamlformat(3, "routes:", f)
+					yamlformat(4, "- to: default", f)
+					yamlformat(4, "  via: 172.16.0.1", f)
 				}
 			}
 		}
-		yaml(3, "nameservers:", f)
-		yaml(4, fmt.Sprintf("search: [%v]", "labo.local"), f)
-		yaml(4, fmt.Sprintf("addresses: [%v]", "172.16.0.4"), f)
+		yamlformat(3, "nameservers:", f)
+		yamlformat(4, fmt.Sprintf("search: [%v]", "labo.local"), f)
+		yamlformat(4, fmt.Sprintf("addresses: [%v]", "172.16.0.4"), f)
 	}
 
 	if spec.PublicIp != nil {
 		if len(*spec.PublicIp) > 0 {
-			yaml(2, "enp7s0:", f)
-			yaml(3, "addresses:", f)
-			yaml(4, fmt.Sprintf("- %s/%d", *spec.PublicIp, 24), f)
+			yamlformat(2, "enp7s0:", f)
+			yamlformat(3, "addresses:", f)
+			yamlformat(4, fmt.Sprintf("- %s/%d", *spec.PublicIp, 24), f)
 			if *spec.Ostempvariant == "ubuntu18.04" {
-				yaml(3, "gateway4: 192.168.1.1", f)
-
+				yamlformat(3, "gateway4: 192.168.1.1", f)
 			} else {
-				yaml(3, "routes:", f)
-				yaml(4, "- to: default", f)
-				yaml(4, "  via: 192.168.1.1", f)
+				yamlformat(3, "routes:", f)
+				yamlformat(4, "- to: default", f)
+				yamlformat(4, "  via: 192.168.1.1", f)
 			}
 			// 両方を有効にできないので、プライベート側を優先する
 			if len(*spec.PrivateIp) == 0 {
-				yaml(4, fmt.Sprintf("search: [%v]", "labo.local"), f)
-				yaml(4, fmt.Sprintf("addresses: [%v]", "192.168.1.4"), f)
+				yamlformat(4, fmt.Sprintf("search: [%v]", "labo.local"), f)
+				yamlformat(4, fmt.Sprintf("addresses: [%v]", "192.168.1.4"), f)
 			}
 		}
 	}

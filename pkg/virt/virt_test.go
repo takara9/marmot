@@ -1,10 +1,11 @@
-package virt
+package virt_test
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"time"
-	//"virt"
+	"github.com/takara9/marmot/pkg/virt"
 )
 
 var _ = Describe("Virt", func() {
@@ -14,32 +15,32 @@ var _ = Describe("Virt", func() {
 		Context("Lifecycle of LibVirt", func() {
 			var in string = "test-data/vm-1.xml"
 			var out string = "test-data/out-1.xml"
-			var domain Domain
+			var domain virt.Domain
 
 			It("Read config XML file", func() {
-				err := ReadXml(in, &domain)
+				err := virt.ReadXml(in, &domain)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("Domain = ", domain)
 			})
 
 			It("Set Domain Name temporaly", func() {
-				SetVmParam(&domain)
+				virt.SetVmParam(&domain)
 				GinkgoWriter.Println("Domain = ", domain)
 			})
 
 			It("Delete items in XML text file to avoid error", func() {
-				xmlText := CreateVirtXML(domain)
+				xmlText := virt.CreateVirtXML(domain)
 				GinkgoWriter.Println("xmlText = ", xmlText)
 			})
 
 			It("Write XML text file", func() {
-				err := WriteXml(out, &domain)
+				err := virt.WriteXml(out, &domain)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("List All virtual machines on same Hypervisor", func() {
 				url := "qemu:///system"
-				list, err := ListAllVm(url)
+				list, err := virt.ListAllVm(url)
 				Expect(err).NotTo(HaveOccurred())
 				for _, name := range list {
 					GinkgoWriter.Println("VM Name = ", name)
@@ -50,13 +51,13 @@ var _ = Describe("Virt", func() {
 				url := "qemu:///system"
 				fn := "test-data/vm-test.xml"
 
-				err := CreateStartVM(url, fn)
+				err := virt.CreateStartVM(url, fn)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("List All virtual machines on same Hypervisor", func() {
 				url := "qemu:///system"
-				list, err := ListAllVm(url)
+				list, err := virt.ListAllVm(url)
 				Expect(err).NotTo(HaveOccurred())
 				for _, name := range list {
 					GinkgoWriter.Println("VM Name = ", name)
@@ -69,7 +70,7 @@ var _ = Describe("Virt", func() {
 				url := "qemu:///system"
 				vm := "vm-test"
 				fn := "test-data/nic-vlan1001.xml"
-				err := AttachDev(url, fn, vm)
+				err := virt.AttachDev(url, fn, vm)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -78,13 +79,13 @@ var _ = Describe("Virt", func() {
 			It("Delete VM", func() {
 				url := "qemu:///system"
 				vm := "vm-test"
-				err := DestroyVM(url, vm)
+				err := virt.DestroyVM(url, vm)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("List All virtual machines on same Hypervisor", func() {
 				url := "qemu:///system"
-				list, err := ListAllVm(url)
+				list, err := virt.ListAllVm(url)
 				Expect(err).NotTo(HaveOccurred())
 				for _, name := range list {
 					GinkgoWriter.Println("VM Name = ", name)

@@ -6,8 +6,8 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/oapi-codegen/runtime v1.1.2
-	github.com/onsi/ginkgo/v2 v2.25.1
-	github.com/onsi/gomega v1.38.2
+	github.com/onsi/ginkgo/v2 v2.25.3
+	github.com/onsi/gomega v1.39.0
 	github.com/takara9/lvm v0.0.0-20251025114351-558f443e87d2
 	go.etcd.io/etcd/client/v3 v3.6.1
 	gopkg.in/yaml.v3 v3.0.1
@@ -19,6 +19,7 @@ require github.com/mattn/go-isatty v0.0.20 // indirect
 require (
 	github.com/spf13/cobra v1.10.1
 	go.yaml.in/yaml/v3 v3.0.4
+	libvirt.org/go/libvirtxml v1.11010.0
 )
 
 require (

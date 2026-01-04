@@ -13,8 +13,7 @@ env:
 jobs:
   # Label of the job
   marmot-package:
-    #needs: display-variables
-    runs-on: self-hosted
+    runs-on: [ self-hosted, hvc ]
     services:
       etcd:
         image: ghcr.io/takara9/etcd:3.6.5
@@ -32,26 +31,30 @@ jobs:
       #    PORT: "53"
 
     steps:
+    - uses: actions/checkout@v5
+
     - name: change permissions
       run: |
         sudo -S chown -R $USER:$USER /var/actions-runner/_work/marmot
-
-    - uses: actions/checkout@v5
 
     - name: Install ca-certificates
       run: |
         sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
         sudo update-ca-certificates
 
-    #- name: Set up Go
-    #  uses: actions/setup-go@v4
-    #  with:
-    #    go-version: '1.21'
-
     #- name: Check coredns
     #  run: |
     #    docker ps
     #    dig -p 1053 @localhost A minio.labo.local +noall +answer
+
+    - name: 環境セットアップ
+      run: |
+        whoami
+        export CI_ENVIRONMENT=true
+        cd tools
+        ls -al
+        sudo -E ./setup.sh
+        cd ..
 
     - name: Configure MinIO Client
       run: |
@@ -65,7 +68,7 @@ jobs:
         chmod 755 pkg/qcow/testdata
         sudo mkdir -p /var/lib/marmot/volumes
         sudo chmod 755 /var/lib/marmot/volumes
-        mc cp myminio/os-image/jammy-server-cloudimg-amd64.img pkg/marmotd/testdata/ubuntu22.04.qcow2
+        mc cp myminio/os-image/ubuntu22.04.img pkg/marmotd/testdata/ubuntu22.04.qcow2
 
     - name: Check etcd put
       run: |
@@ -125,8 +128,7 @@ jobs:
         cd ../..
   # Label of the job
   marmot-daemon:
-    #needs: display-variables
-    runs-on: self-hosted
+    runs-on: [ self-hosted, runner1 ]
     services:
       etcd:
         image: ghcr.io/takara9/etcd:3.6.5
@@ -134,16 +136,24 @@ jobs:
           - 2379:2379
 
     steps:
+    - uses: actions/checkout@v5
+
     - name: change permissions
       run: |
         sudo -S chown -R $USER:$USER /var/actions-runner/_work/marmot
-
-    - uses: actions/checkout@v5
 
     - name: Install ca-certificates
       run: |
         sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
         sudo update-ca-certificates
+
+    - name: ボリュームのセットアップ
+      run: |
+        whoami
+        cd tools
+        ls -al
+        sudo ./setup.sh
+        cd ..
 
     - name: Configure MinIO Client
       run: |
@@ -180,8 +190,7 @@ jobs:
         cd ../..
 
   marmot-command:
-    runs-on: self-hosted
-    #needs: display-variables
+    runs-on: [ self-hosted, runner2 ]
     steps:
     - name: change permissions
       run: |
@@ -193,6 +202,14 @@ jobs:
       run: |
         sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
         sudo update-ca-certificates
+
+    - name: ボリュームのセットアップ
+      run: |
+        whoami
+        cd tools
+        ls -al
+        sudo ./setup.sh
+        cd ..
 
     - name: Configure MinIO Client
       run: |
@@ -223,15 +240,38 @@ jobs:
         sudo -s make test
         cd ../..
 
-  #clean-up-job:
-  #  runs-on: self-hosted
-  #  needs: 
-  #    - marmot-package-job 
-  #    - marmot-command-test-job
-  #  steps:
-  #  - name: Clean up
-  #    run: |
-  #      go clean -cache -testcache -modcache -fuzzcache
-  #      sudo rm -f /var/actions-runner/_work/marmot/marmot/cmd/mactl/bin/mactl-test
-  #      sudo rm -f /var/actions-runner/_work/marmot/marmot/cmd/maadm/bin/maadm-test
-  
+  cleanup-hvc:
+    runs-on: [ self-hosted, hvc ]
+    needs: 
+      - marmot-package
+    if: always() 
+    steps:
+      - name: 各ランナーを掃除
+        run: |
+          pwd
+          ls -al
+          sudo ./tools/cleanup.sh
+
+  cleanup-runner1:
+    runs-on: [ self-hosted, runner1 ]
+    needs: 
+      - marmot-daemon
+    if: always() 
+    steps:
+      - name: 各ランナーを掃除
+        run: |
+          pwd
+          ls -al
+          sudo ./tools/cleanup.sh
+
+  cleanup-runner2:
+    runs-on: [ self-hosted, runner2 ]
+    needs: 
+      - marmot-command
+    if: always() 
+    steps:
+      - name: 各ランナーを掃除
+        run: |
+          pwd
+          ls -al
+          sudo ./tools/cleanup.sh
