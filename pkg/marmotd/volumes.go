@@ -29,8 +29,7 @@ func (m *Marmot) CreateNewVolume(v api.Volume) (*api.Volume, error) {
 	fmt.Println("Kind :", volKind)
 	fmt.Println("Size :", volSize)
 	fmt.Println("Path :", volPath)
-	fmt.Println("OsName :", util.OrDefault(v.OsName, "none"))
-	fmt.Println("OsVersion :", util.OrDefault(v.OsVersion, "none"))
+	fmt.Println("OsVersion :", util.OrDefault(v.OsVariant, "none"))
 
 	// ボリュームの基本情報をデータベースに登録
 	volSpec, err := m.Db.CreateVolumeOnDB(volName, volPath, volType, volKind, volSize)

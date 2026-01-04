@@ -66,9 +66,7 @@ func (m *Marmot) CreateServer(spec api.Server) (string, error) {
 
 	if spec.OsVariant != nil {
 		os := "ubuntu22.04"
-		vol.OsName = &os
-		osver := "22.04"
-		vol.OsVersion = &osver
+		vol.OsVariant = &os
 	}
 
 	volSpec, err := m.CreateNewVolume(vol)
