@@ -36,8 +36,22 @@ edge12.g.yimg.jp.
 # apt-get update -y
 # apt-get upgrade -y
 # apt-get install git curl gcc make kpartx
-# apt-get install virt-top  virt-manager libvirt-dev libvirt-clients libvirt-daemon qemu-kvm qemu openvswitch-switch openvswitch-common openvswitch-doc
+# apt-get install virt-top  virt-manager libvirt-dev libvirt-clients libvirt-daemon qemu-kvm qemu openvswitch-switch openvswitch-common openvswitch-doc libguestfs-tools libvirt-daemon-driver-lxc
 ```
+
+LXCを有効化するために
+```
+systemctl stop libvirtd.service
+systemctl disable libvirtd.service
+virsh -c lxc:///system list
+ Id   Name   State
+--------------------
+
+virsh list
+ Id   Name   State
+--------------------
+```
+
 
 ## LVMの設定
 

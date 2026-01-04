@@ -24,6 +24,13 @@ func (m *Marmot) CreateNewVolume(v api.Volume) (*api.Volume, error) {
 	volSize := util.OrDefault(v.Size, 0)
 	volPath := util.OrDefault(v.Path, "") // パスはタイプと種類で決まるため、空で初期化
 
+	fmt.Println("Name :", volName)
+	fmt.Println("Type :", volType)
+	fmt.Println("Kind :", volKind)
+	fmt.Println("Size :", volSize)
+	fmt.Println("Path :", volPath)
+	fmt.Println("OsVersion :", util.OrDefault(v.OsVariant, "none"))
+
 	// ボリュームの基本情報をデータベースに登録
 	volSpec, err := m.Db.CreateVolumeOnDB(volName, volPath, volType, volKind, volSize)
 	if err != nil {
@@ -73,7 +80,11 @@ func (m *Marmot) CreateNewVolume(v api.Volume) (*api.Volume, error) {
 				m.Db.RollbackVolumeCreation(volId)
 				return nil, err
 			}
+			volSpec.Path = &qcow2Path
+			volSpec.Size = &volSize
 
+			// 取得したqcow2パスで、データベースを更新
+			// 取得したLV名とサイズで、データベースを更新
 			vol := api.Volume{
 				Status: func() *int { s := db.VOLUME_AVAILABLE; return &s }(),
 				Path:   &qcow2Path,
@@ -114,6 +125,8 @@ func (m *Marmot) CreateNewVolume(v api.Volume) (*api.Volume, error) {
 				m.Db.RollbackVolumeCreation(volId)
 				return nil, err
 			}
+			volSpec.Path = &qcow2Path
+			volSpec.Size = &volSize
 
 			slog.Debug("Dataボリュームの情報更新 成功", "volId", volId)
 			return volSpec, nil
@@ -152,6 +165,8 @@ func (m *Marmot) CreateNewVolume(v api.Volume) (*api.Volume, error) {
 				m.Db.RollbackVolumeCreation(volId)
 				return nil, err
 			}
+			volSpec.VolumeGroup = &img.VolumeGroup
+			volSpec.LogicalVolume = &lvName
 
 			slog.Debug("OSボリュームののVGとLVでDBを更新", "Vol Id", volId, "LV Name", lvName, "VG Name", img.VolumeGroup) // 取得したLV名をデータベースの登録
 			vol := api.Volume{
@@ -164,6 +179,8 @@ func (m *Marmot) CreateNewVolume(v api.Volume) (*api.Volume, error) {
 				m.Db.RollbackVolumeCreation(volId)
 				return nil, err
 			}
+
+			slog.Debug("OSボリュームの情報更新 成功", "volId", volId)
 			return volSpec, nil
 
 		case "data":
@@ -176,7 +193,10 @@ func (m *Marmot) CreateNewVolume(v api.Volume) (*api.Volume, error) {
 				m.Db.RollbackVolumeCreation(volId)
 				return nil, err
 			}
+
 			slog.Debug("Dataボリュームの生成 成功", "LV Name", lvName, "VG Name", dataVg, "Size", volSize)
+			volSpec.VolumeGroup = &dataVg
+			volSpec.LogicalVolume = &lvName
 
 			// 取得したLV名とサイズで、データベースを更新
 			vol := api.Volume{
@@ -191,6 +211,7 @@ func (m *Marmot) CreateNewVolume(v api.Volume) (*api.Volume, error) {
 				return nil, err
 			}
 			slog.Debug("Dataボリュームの情報更新 成功", "volId", volId)
+
 			return volSpec, nil
 
 		default:

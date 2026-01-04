@@ -1,5 +1,7 @@
-GO=/usr/local/go/bin/go
+GO = go
 PROGRAM	= mactl
+GINKGO = /root/go/bin/ginkgo
+
 all:	$(PROGRAM)
 
 TAG := $(shell cat ../../TAG)
@@ -31,3 +33,7 @@ install:
 test: mactl-test
 	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -coverprofile cover.out
 	#$(GINKGO) -v --race --focus-file mactl_test.go
+
+.PHONY: test2
+test2: mactl-test
+	$(GINKGO) -v --focus-file mactl-new_test.go

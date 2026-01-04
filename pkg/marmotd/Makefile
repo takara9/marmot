@@ -27,6 +27,10 @@ test:
 test-volume:
 	$(GO) test -ginkgo.focus-file marmotd-volume_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
+.PHONY: test-server
+test-server:
+	$(GO) test -ginkgo.focus-file marmotd-server_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+
 .PHONY: test-func
 test-func:
 	$(GO) test -ginkgo.focus-file marmotd-funcs_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events

@@ -126,7 +126,7 @@ func (s *Server) CreateServer(ctx echo.Context) error {
 		slog.Error("CreateServer()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-	slog.Debug("Recived post body", "serverSpec=", serverSpec, "cpu=", serverSpec.Cpu, "memory=", serverSpec.Memory)
+	slog.Debug("Recived post body", "serverSpec=", serverSpec, "cpu=", serverSpec.Cpu, "memory=", serverSpec.Memory, "os", serverSpec.OsVariant)
 
 	id, err := s.Ma.CreateServer(serverSpec)
 	if err != nil {

@@ -400,6 +400,8 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 		var id1 string
 		It("サーバーの作成-1", func() {
+			// このコマンドで、marmotd側でエラーが発生する。
+			// エラーが発生する理由は、サーバー生成部分が未実装のため
 			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "create", "--output", "json", "--configfile", "testdata/test-server-1.yaml")
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
