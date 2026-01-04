@@ -42,11 +42,11 @@ func (m *Marmot) CreateServer(spec api.Server) (string, error) {
 	}
 
 	if server.Memory != nil {
-		var mem = int(*server.Memory) * 1024 //KiB
+		mem := int(*server.Memory) * 1024 //KiB
 		dom.Memory.Value = mem
 		dom.CurrentMemory.Value = mem
 	} else {
-		var mem = 2048 * 1024 //KiB デフォルト2048MB
+		mem := 2048 * 1024 //KiB デフォルト2048MB
 		dom.Memory.Value = mem
 		dom.CurrentMemory.Value = mem
 	}
@@ -59,6 +59,7 @@ func (m *Marmot) CreateServer(spec api.Server) (string, error) {
 	vol.Path = &path
 	kind := "os"
 	vol.Kind = &kind
+
 	size := 0
 	vol.Size = &size
 
@@ -72,6 +73,13 @@ func (m *Marmot) CreateServer(spec api.Server) (string, error) {
 	if spec.VolumeType == nil {
 		volType := "qcow2"
 		vol.Type = &volType
+		var size int
+		if *vol.Kind == "os" {
+			size = 16
+		} else {
+			size = 1
+		}
+		vol.Size = &size
 	} else {
 		volType := *spec.VolumeType
 		vol.Type = &volType
