@@ -64,11 +64,12 @@ func (m *Marmot) CreateServer(spec api.Server) (string, error) {
 	size := 0
 	vol.Size = &size
 
-	// ボリュームの基本情報をデータベースに登録
-	//volSpec, err := m.Db.CreateVolumeOnDB(Name, Path, Type, Kind, Size)
-	//if err != nil {
-	//	return "", err
-	//}
+	if spec.OsVariant != nil {
+		os := "ubuntu22.04"
+		vol.OsName = &os
+		osver := "22.04"
+		vol.OsVersion = &osver
+	}
 
 	volSpec, err := m.CreateNewVolume(vol)
 	if err != nil {
