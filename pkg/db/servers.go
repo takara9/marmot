@@ -150,7 +150,7 @@ func (d *Database) updateServer(id string, spec api.Server) error {
 	expected := resp.Kvs[0].ModRevision
 
 	rec.Id = spec.Id
-	// ポインタフィールドのみパッチ適用
+	// パッチ適用
 	util.PatchStruct(&rec, spec)
 
 	err = d.PutJSONCAS(key, expected, &rec)
