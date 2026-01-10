@@ -47,8 +47,6 @@ func LinuxSetup_hostid2(spec api.VmSpec, vm_root string) error {
 	return err
 }
 
-
-
 // 文字列IPアドレスをバイト配列へ変換
 func IPaddrByteArray(ip string) []byte {
 	ipi := strings.Split(ip, ".")
@@ -240,7 +238,6 @@ func LinuxSetup_createNetplan2(spec api.VmSpec, vm_root string) error {
 	}
 	return nil
 }
-
 
 // Linux hostidをOS Volへ書き込み
 func LinuxSetup_hostid3(spec api.Server, vm_root string) error {

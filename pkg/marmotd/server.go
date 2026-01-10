@@ -3,10 +3,8 @@ package marmotd
 import (
 	"fmt"
 	"log/slog"
-	"os"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/util"
 	"github.com/takara9/marmot/pkg/virt"
 )
 
@@ -92,113 +90,117 @@ func (m *Marmot) CreateServer(spec api.Server) (string, error) {
 		return "", err
 	}
 
-	server.BootVolumeId = &volSpec.Id
+	fmt.Println("New Boot Volume ID:", volSpec.Id)
 
-	slog.Debug("データボリュームの生成と設定")
-	dom.Devices.Disk[0].Source.Dev = fmt.Sprintf("/dev/%s/%s", *volSpec.VolumeGroup, *volSpec.LogicalVolume)
+	/*
+		server.BootVolumeId = &volSpec.Id
 
-	if err := util.ConfigRootVol3(spec, *volSpec.VolumeGroup, *volSpec.LogicalVolume); err != nil {
-		slog.Error("util.CreateOsLv()", "err", err)
-		return "", err
-	}
+		slog.Debug("データボリュームの生成と設定")
+		dom.Devices.Disk[0].Source.Dev = fmt.Sprintf("/dev/%s/%s", *volSpec.VolumeGroup, *volSpec.LogicalVolume)
 
-	slog.Debug("spec.Storage", "start", "")
-
-	if spec.Storage != nil {
-		// DATAボリュームを作成 (最大９個)
-		dev := []string{"vdb", "vdc", "vde", "vdf", "vdg", "vdh", "vdj", "vdk", "vdl"}
-		bus := []string{"0x0a", "0x0b", "0x0c", "0x0d", "0x0e", "0x0f", "0x10", "0x11", "0x12"}
-		for i, disk := range *spec.Storage {
-			if disk.Size == nil {
-				continue
-			}
-			slog.Debug("spec.Storage", "disk size", *disk.Size)
-			var dk virt.Disk
-			// ボリュームグループが指定されていない時はvg1を指定
-			var vg string = "vg1"
-			if disk.VolumeGroup != nil {
-				vg = *disk.VolumeGroup
-			}
-			dlv, err := m.Db.CreateDataLv(uint64(*disk.Size), vg)
-			if err != nil {
-				slog.Error("", "err", err)
-				return "", err
-			}
-			// LibVirtの設定を追加
-			dk.Type = "block"
-			dk.Device = "disk"
-			dk.Driver.Name = "qemu"
-			dk.Driver.Type = "raw"
-			dk.Driver.Cache = "none"
-			dk.Driver.Io = "native"
-			dk.Source.Dev = fmt.Sprintf("/dev/%s/%s", vg, dlv)
-			dk.Target.Dev = dev[i]
-			dk.Target.Bus = "virtio"
-			dk.Address.Type = "pci"
-			dk.Address.Domain = "0x0000"
-			dk.Address.Bus = bus[i]
-			dk.Address.Slot = "0x00"
-			dk.Address.Function = "0x0"
-			// 配列に追加
-			dom.Devices.Disk = append(dom.Devices.Disk, dk)
-			// etcdデータベースにlvを登録
-			err = m.Db.UpdateDataLvByVmKey(*spec.Key, i, *disk.VolumeGroup, dlv)
-			if err != nil {
-				slog.Error("", "err", err)
-				return "", err
-			}
-			// エラー発生時にロールバックが必要（未実装）
+		if err := util.ConfigRootVol3(spec, *volSpec.VolumeGroup, *volSpec.LogicalVolume); err != nil {
+			slog.Error("util.CreateOsLv()", "err", err)
+			return "", err
 		}
-		// ストレージの更新
-		//m.Db.CheckHvVG2ByName(m.NodeName, *spec.Ostempvg) //??? 後で見直し
-	}
 
-	slog.Debug("ネットワークの設定")
+		slog.Debug("spec.Storage", "start", "")
 
-	if spec.PrivateIp != nil {
-		util.CreateNic("pri", &dom.Devices.Interface)
-	}
+		if spec.Storage != nil {
+			// DATAボリュームを作成 (最大９個)
+			dev := []string{"vdb", "vdc", "vde", "vdf", "vdg", "vdh", "vdj", "vdk", "vdl"}
+			bus := []string{"0x0a", "0x0b", "0x0c", "0x0d", "0x0e", "0x0f", "0x10", "0x11", "0x12"}
+			for i, disk := range *spec.Storage {
+				if disk.Size == nil {
+					continue
+				}
+				slog.Debug("spec.Storage", "disk size", *disk.Size)
+				var dk virt.Disk
+				// ボリュームグループが指定されていない時はvg1を指定
+				var vg string = "vg1"
+				if disk.VolumeGroup != nil {
+					vg = *disk.VolumeGroup
+				}
+				dlv, err := m.Db.CreateDataLv(uint64(*disk.Size), vg)
+				if err != nil {
+					slog.Error("", "err", err)
+					return "", err
+				}
+				// LibVirtの設定を追加
+				dk.Type = "block"
+				dk.Device = "disk"
+				dk.Driver.Name = "qemu"
+				dk.Driver.Type = "raw"
+				dk.Driver.Cache = "none"
+				dk.Driver.Io = "native"
+				dk.Source.Dev = fmt.Sprintf("/dev/%s/%s", vg, dlv)
+				dk.Target.Dev = dev[i]
+				dk.Target.Bus = "virtio"
+				dk.Address.Type = "pci"
+				dk.Address.Domain = "0x0000"
+				dk.Address.Bus = bus[i]
+				dk.Address.Slot = "0x00"
+				dk.Address.Function = "0x0"
+				// 配列に追加
+				dom.Devices.Disk = append(dom.Devices.Disk, dk)
+				// etcdデータベースにlvを登録
+				err = m.Db.UpdateDataLvByVmKey(*spec.Key, i, *disk.VolumeGroup, dlv)
+				if err != nil {
+					slog.Error("", "err", err)
+					return "", err
+				}
+				// エラー発生時にロールバックが必要（未実装）
+			}
+			// ストレージの更新
+			//m.Db.CheckHvVG2ByName(m.NodeName, *spec.Ostempvg) //??? 後で見直し
+		}
 
-	if spec.PublicIp != nil {
-		util.CreateNic("pub", &dom.Devices.Interface)
-	}
+		slog.Debug("ネットワークの設定")
 
-	slog.Debug("libvirtのXML定義の生成")
-	textXml := virt.CreateVirtXML(dom)
-	xmlfileName := fmt.Sprintf("./%v.xml", dom.Uuid)
-	file, err := os.Create(xmlfileName)
-	if err != nil {
-		slog.Error("os.Create()", "err", err)
-		return "", err
-	}
-	defer file.Close()
+		if spec.PrivateIp != nil {
+			util.CreateNic("pri", &dom.Devices.Interface)
+		}
 
-	_, err = file.Write([]byte(textXml))
-	if err != nil {
-		slog.Error("file.Write()", "err", err)
-		return "", err
-	}
+		if spec.PublicIp != nil {
+			util.CreateNic("pub", &dom.Devices.Interface)
+		}
 
-	slog.Debug("仮想マシンの起動")
-	url := "qemu:///system"
-	err = virt.CreateStartVM(url, xmlfileName)
-	if err != nil {
-		slog.Error("virt.CreateStartVM()", "err", err)
-		return "", err
-	}
+		slog.Debug("libvirtのXML定義の生成")
+		textXml := virt.CreateVirtXML(dom)
+		xmlfileName := fmt.Sprintf("./%v.xml", dom.Uuid)
+		file, err := os.Create(xmlfileName)
+		if err != nil {
+			slog.Error("os.Create()", "err", err)
+			return "", err
+		}
+		defer file.Close()
 
-	// 仮想マシンXMLファイルを削除する
-	err = os.Remove(xmlfileName)
-	if err != nil {
-		slog.Error("os.Remove()", "err", err)
-		return "", err
-	}
+		_, err = file.Write([]byte(textXml))
+		if err != nil {
+			slog.Error("file.Write()", "err", err)
+			return "", err
+		}
 
-	slog.Debug("データベースに登録")
-	if err := m.Db.UpdateServer(server.Id, server); err != nil {
-		slog.Error("UpdateServer()", "err", err)
-		return "", err
-	}
+		slog.Debug("仮想マシンの起動")
+		url := "qemu:///system"
+		err = virt.CreateStartVM(url, xmlfileName)
+		if err != nil {
+			slog.Error("virt.CreateStartVM()", "err", err)
+			return "", err
+		}
+
+		// 仮想マシンXMLファイルを削除する
+		err = os.Remove(xmlfileName)
+		if err != nil {
+			slog.Error("os.Remove()", "err", err)
+			return "", err
+		}
+
+		slog.Debug("データベースに登録")
+		if err := m.Db.UpdateServer(server.Id, server); err != nil {
+			slog.Error("UpdateServer()", "err", err)
+			return "", err
+		}
+	*/
 
 	//	slog.Debug("CreateServer()", "id", server.Id)
 	/*

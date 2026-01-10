@@ -3,6 +3,7 @@ package virt
 import (
 	"fmt"
 
+	"libvirt.org/go/libvirt"
 	"libvirt.org/go/libvirtxml"
 )
 
@@ -16,14 +17,14 @@ func pciAddr(b, s, f uint) *libvirtxml.DomainAddress {
 }
 func stringPtr(s string) *string { return &s }
 
-type diskSpec struct {
+type DiskSpec struct {
 	Dev  string
 	Src  string
 	Bus  uint
 	Type string
 }
 
-type netSpec struct {
+type NetSpec struct {
 	MAC         string
 	Network     string
 	PortID      string
@@ -35,7 +36,7 @@ type netSpec struct {
 	IsTrunk     bool
 	Bus         uint
 }
-type channelSpec struct {
+type ChannelSpec struct {
 	Type  string
 	Path  string
 	Name  string
@@ -43,38 +44,59 @@ type channelSpec struct {
 	Port  uint
 }
 
-type clockSpec struct {
+type ClockSpec struct {
 	Name       string
 	TickPolicy string
 	Present    string
 }
 
-type vmSpec struct {
-	uuid         string
-	name         string
-	ram          uint
-	countVCPU    uint
-	machine      string
-	diskSpecs    []diskSpec
-	nets         []netSpec
-	channelSpecs []channelSpec
-	clocks       []clockSpec
+type VmSpec struct {
+	UUID         string
+	Name         string
+	RAM          uint
+	CountVCPU    uint
+	Machine      string
+	DiskSpecs    []DiskSpec
+	Nets         []NetSpec
+	ChannelSpecs []ChannelSpec
+	Clocks       []ClockSpec
+}
+
+type LibVirtEp struct {
+	Url string
+	Com *libvirt.Connect
+}
+
+func NewLibVirtEp(url string) (*LibVirtEp, error) {
+	conn, err := libvirt.NewConnect(url)
+	if err != nil {
+		return nil, err
+	}
+
+	return &LibVirtEp{
+		Url: url,
+		Com: conn,
+	}, nil
+}
+
+func (lve *LibVirtEp) Close() {
+	lve.Com.Close()
 }
 
 // libvirt XMLを生成する関数
-func createDomainXML(vs vmSpec) (string, error) {
+func CreateDomainXML(vs VmSpec) *libvirtxml.Domain {
 	// This function is intentionally left blank.
 	dom := &libvirtxml.Domain{
-		Type: "kvm", ID: intPtr(1), Name: vs.name, UUID: vs.uuid,
-		Memory:        &libvirtxml.DomainMemory{Value: vs.ram, Unit: "KiB"},
-		CurrentMemory: &libvirtxml.DomainCurrentMemory{Value: vs.ram, Unit: "KiB"},
-		VCPU:          &libvirtxml.DomainVCPU{Placement: "static", Value: vs.countVCPU},
+		Type: "kvm", ID: intPtr(1), Name: vs.Name, UUID: vs.UUID,
+		Memory:        &libvirtxml.DomainMemory{Value: vs.RAM, Unit: "KiB"},
+		CurrentMemory: &libvirtxml.DomainCurrentMemory{Value: vs.RAM, Unit: "KiB"},
+		VCPU:          &libvirtxml.DomainVCPU{Placement: "static", Value: vs.CountVCPU},
 		// ライフサイクル設定
 		OnPoweroff: "destroy",
 		OnReboot:   "restart",
 		OnCrash:    "destroy",
 		OS: &libvirtxml.DomainOS{
-			Type:        &libvirtxml.DomainOSType{Arch: "x86_64", Machine: vs.machine, Type: "hvm"},
+			Type:        &libvirtxml.DomainOSType{Arch: "x86_64", Machine: vs.Machine, Type: "hvm"},
 			BootDevices: []libvirtxml.DomainBootDevice{{Dev: "hd"}},
 		},
 		Features: &libvirtxml.DomainFeatureList{
@@ -104,7 +126,7 @@ func createDomainXML(vs vmSpec) (string, error) {
 	}
 
 	// --- ディスクの生成 ---
-	for i, d := range vs.diskSpecs {
+	for i, d := range vs.DiskSpecs {
 		disk := libvirtxml.DomainDisk{
 			Device: "disk",
 			Driver: &libvirtxml.DomainDiskDriver{
@@ -152,7 +174,7 @@ func createDomainXML(vs vmSpec) (string, error) {
 	}
 
 	// ネットワークインターフェースの生成
-	for _, n := range vs.nets {
+	for _, n := range vs.Nets {
 		iface := libvirtxml.DomainInterface{
 			MAC:   &libvirtxml.DomainInterfaceMAC{Address: n.MAC},
 			Model: &libvirtxml.DomainInterfaceModel{Type: "virtio"},
@@ -214,7 +236,7 @@ func createDomainXML(vs vmSpec) (string, error) {
 	}
 
 	// チャンネルの生成
-	for _, c := range vs.channelSpecs {
+	for _, c := range vs.ChannelSpecs {
 		channel := libvirtxml.DomainChannel{
 			Target: &libvirtxml.DomainChannelTarget{
 				VirtIO: &libvirtxml.DomainChannelTargetVirtIO{
@@ -286,7 +308,7 @@ func createDomainXML(vs vmSpec) (string, error) {
 	}
 
 	// 2. タイマーの生成ループ
-	for _, t := range vs.clocks {
+	for _, t := range vs.Clocks {
 		timer := libvirtxml.DomainTimer{Name: t.Name}
 
 		if t.TickPolicy != "" {
@@ -301,12 +323,74 @@ func createDomainXML(vs vmSpec) (string, error) {
 		dom.Clock.Timer = append(dom.Clock.Timer, timer)
 	}
 
-	// XML出力
-	xml, err := dom.Marshal()
+	return dom
+}
+
+// 構造体で渡すのが良い
+func (l *LibVirtEp) DefineAndStartVM(domain libvirtxml.Domain) error {
+	xmlString, err := domain.Marshal()
 	if err != nil {
-		// エラーハンドリング
 		fmt.Println("Error marshaling domain XML:", err)
-		return "", err
+		return err
 	}
-	return string(xml), nil
+
+	// Create VM
+	dom, err := l.Com.DomainDefineXML(xmlString)
+	if err != nil {
+		return err
+	}
+
+	// Start VM
+	err = dom.Create()
+	if err != nil {
+		return err
+	}
+
+	//オートスタートを設定しないと、HVの再起動からの復帰時、停止している。
+	err = dom.SetAutostart(true)
+	if err != nil {
+		return err
+	}
+	defer dom.Free()
+
+	return nil
+}
+
+func (l *LibVirtEp) ListDomains() ([]string, error) {
+	var nameList []string
+
+	doms, err := l.Com.ListAllDomains(libvirt.ConnectListAllDomainsFlags(libvirt.CONNECT_LIST_DOMAINS_ACTIVE))
+	if err != nil {
+		return nameList, err
+	}
+
+	for _, dom := range doms {
+		name, err := dom.GetName()
+		if err != nil {
+			return nameList, err
+		}
+		nameList = append(nameList, name)
+	}
+	return nameList, nil
+}
+
+func (l *LibVirtEp) DestroyDomain(vmname string) error {
+	domain, err := l.Com.LookupDomainByName(vmname)
+	if err != nil {
+		return err
+	}
+
+	// ドメインの停止
+	err = domain.Destroy()
+	if err != nil {
+		return err
+	}
+
+	// ドメインの削除
+	err = domain.Undefine()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -1,7 +1,10 @@
 package util
 
 import (
+	"crypto/rand"
 	"encoding/json"
+	"net"
+	"os"
 	"reflect"
 	"time"
 )
@@ -64,4 +67,38 @@ func PatchStruct(dst, src interface{}) {
 			df.Set(sf)
 		}
 	}
+}
+
+// GenerateRandomMAC はランダムなMACアドレスを生成します
+func GenerateRandomMAC() (net.HardwareAddr, error) {
+	buf := make([]byte, 6)
+	_, err := rand.Read(buf)
+	if err != nil {
+		return nil, err
+	}
+
+	// 最初のバイトの特定のビットを操作して「ローカル管理アドレス」に設定します
+	// 0x02 ビットを立てることで、ユニバーサル管理ではなくローカル管理であることを示します
+	// 0x01 ビットを落とすことで、マルチキャストではなくユニキャストであることを示します
+	buf[0] = (buf[0] | 2) & 0xfe
+
+	return net.HardwareAddr(buf), nil
+}
+
+const channelBasePath = "/run/libvirt/qemu/channel/"
+
+// ホストのチャネル用ディレクトリを作成
+func CreateChannelDir(hostname string) (string, error) {
+	dirPath := channelBasePath + "/" + hostname
+	err := os.MkdirAll(dirPath, 0755)
+	if err != nil {
+		return "", err
+	}
+	return dirPath, nil
+}
+
+// ホストのチャネル用ディレクトリを削除
+func RemoveChannelDir(hostname string) error {
+	dirPath := channelBasePath + "/" + hostname
+	return os.RemoveAll(dirPath)
 }

@@ -106,13 +106,15 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 
 	Context("APIテスト", func() {
 		It("Marmotd のバージョン情報取得", func() {
-			GinkgoWriter.Println(string("test"))
+			// 中身は未実装
+			GinkgoWriter.Println(string("未実装"))
 		})
 	})
 
 	Context("API内部関数テスト", func() {
 		It("Marmotd のバージョン情報取得", func() {
-			GinkgoWriter.Println(string("test"))
+			// 中身は未実装
+			GinkgoWriter.Println(string("未実装"))
 		})
 
 	})
