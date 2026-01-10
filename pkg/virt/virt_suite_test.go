@@ -9,5 +9,5 @@ import (
 
 func TestVirt(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Virt Suite")
+	RunSpecs(t, "libvirtをラップする関数群のテスト Suite")
 }

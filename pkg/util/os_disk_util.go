@@ -168,3 +168,55 @@ func ConfigRootVol2(spec api.VmSpec, vg string, oslv string) error {
 	// 正常終了
 	return nil
 }
+
+
+func ConfigRootVol3(spec api.Server, vg string, oslv string) error {
+	err := KpartOn(vg, oslv)
+	if err != nil {
+		slog.Error("", "err", err)
+		return err
+	}
+	// マウント
+	vm_root, err := MountLocal(vg, oslv, spec.Id)
+	if err != nil {
+		slog.Error("", "err", err)
+		return err
+	}
+
+	// ホスト名の書き込み
+	err = LinuxSetup_hostname(vm_root, *spec.Name)
+	if err != nil {
+		slog.Error("", "err", err)
+		return err
+	}
+
+	// NetPlanの雛形へ書出す2
+	err = LinuxSetup_createNetplan3(spec, vm_root)
+	if err != nil {
+		slog.Error("", "err", err)
+		return err
+	}
+
+	// hostidの書き出し
+	err = LinuxSetup_hostid3(spec, vm_root)
+	if err != nil {
+		slog.Error("", "err", err)
+		return err
+	}
+
+	// 後始末
+	err = UnMountLocal(spec.Id)
+	if err != nil {
+		slog.Error("", "err", err)
+		return err
+	}
+
+	err = KpartOff(vg, oslv)
+	if err != nil {
+		slog.Error("", "err", err)
+		return err
+	}
+
+	// 正常終了
+	return nil
+}
