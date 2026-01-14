@@ -1,10 +1,7 @@
 #!/bin/bash
 
 echo "VM一覧:"
-virsh list --name --all > domain_list.txt
-
-echo "LXC一覧:"
-virsh -c lxc:///system list --name --all > lxc_domain_list.txt
+virsh list --name --all |tee domain_list.txt
 
 while read domain; do
     if [ -n "$domain" ]; then
@@ -13,6 +10,18 @@ while read domain; do
         virsh undefine "$domain"
     fi
 done < domain_list.txt
+
+echo "LXC一覧:"
+virsh -c lxc:///system list --name --all |tee lxc_domain_list.txt
+while read domain; do
+    if [ -n "$domain" ]; then
+        echo "Destroying and undefining domain: $domain"
+        virsh -c lxc:///system shutdown "$domain"
+        sleep 2
+        virsh -c lxc:///system undefine "$domain"
+    fi
+done < lxc_domain_list.txt
+
 
 qemu-nbd --disconnect /dev/nbd0
 
