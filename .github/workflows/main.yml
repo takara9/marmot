@@ -31,11 +31,11 @@ jobs:
       #    PORT: "53"
 
     steps:
+    - uses: actions/checkout@v5
+
     - name: change permissions
       run: |
         sudo -S chown -R $USER:$USER /var/actions-runner/_work/marmot
-
-    - uses: actions/checkout@v5
 
     - name: Install ca-certificates
       run: |
@@ -135,16 +135,24 @@ jobs:
           - 2379:2379
 
     steps:
+    - uses: actions/checkout@v5
+
     - name: change permissions
       run: |
         sudo -S chown -R $USER:$USER /var/actions-runner/_work/marmot
-
-    - uses: actions/checkout@v5
 
     - name: Install ca-certificates
       run: |
         sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
         sudo update-ca-certificates
+
+    - name: ボリュームのセットアップ
+      run: |
+        whoami
+        cd tools
+        ls -al
+        sudo ./setup.sh
+        cd ..
 
     - name: Configure MinIO Client
       run: |
@@ -193,6 +201,14 @@ jobs:
       run: |
         sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
         sudo update-ca-certificates
+
+    - name: ボリュームのセットアップ
+      run: |
+        whoami
+        cd tools
+        ls -al
+        sudo ./setup.sh
+        cd ..
 
     - name: Configure MinIO Client
       run: |
