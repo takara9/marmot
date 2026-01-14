@@ -68,6 +68,9 @@ echo "LXC用のrootfsを作成する"
 mkdir -p /var/lib/lxc/rootfs/lxc-test-1
 mount /dev/vg1/boot01 /var/lib/lxc/rootfs/lxc-test-1
 
+echo "LXC用のデータファイルシステムを作成する"
+mkdir -p /var/lib/lxc/shared-data
+
 echo "LXC用のネットワーク設定を行う"
 cat << EOF | sudo tee /var/lib/lxc/rootfs/lxc-test-1/etc/netplan/00-nic.yaml
 network:

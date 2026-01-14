@@ -29,6 +29,7 @@ rm -f /var/lib/libvirt/images/jammy-server-cloudimg-amd64.img
 
 umount /var/lib/lxc/rootfs/lxc-test-1
 rm -rf /var/lib/lxc/rootfs
+rm -fr /var/lib/lxc/shared-data
                               
 lvs --reportformat json | tee  lv_list.json
 cat lv_list.json | /usr/bin/jq -r '.report[].lv[] | .vg_name + "/" + .lv_name' | sed 's/vg1\/lv01//g' | sed '/^$/d' > lv_to_remove.txt
