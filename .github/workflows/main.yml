@@ -13,7 +13,7 @@ env:
 jobs:
   # Label of the job
   marmot-package:
-    runs-on: self-hosted
+    runs-on: [ self-hosted, hvc ]
     services:
       etcd:
         image: ghcr.io/takara9/etcd:3.6.5
@@ -127,7 +127,7 @@ jobs:
         cd ../..
   # Label of the job
   marmot-daemon:
-    runs-on: self-hosted
+    runs-on: [ self-hosted, runner1 ]
     services:
       etcd:
         image: ghcr.io/takara9/etcd:3.6.5
@@ -189,7 +189,7 @@ jobs:
         cd ../..
 
   marmot-command:
-    runs-on: self-hosted
+    runs-on: [ self-hosted, runner2 ]
     steps:
     - name: change permissions
       run: |
@@ -239,15 +239,34 @@ jobs:
         sudo -s make test
         cd ../..
 
-  cleanup-all:
-    runs-on: self-hosted
-    strategy:
-      matrix:
-        runner-label: [hvc, runner1, runner2]
+  cleanup-hvc:
+    runs-on: [ self-hosted, hvc ]
     needs: 
       - marmot-package
-      - marmot-command
+    if: always() 
+    steps:
+      - name: 各ランナーを掃除
+        run: |
+          pwd
+          ls -al
+          sudo ./tools/cleanup.sh
+
+  cleanup-runner1:
+    runs-on: [ self-hosted, runner1 ]
+    needs: 
       - marmot-daemon
+    if: always() 
+    steps:
+      - name: 各ランナーを掃除
+        run: |
+          pwd
+          ls -al
+          sudo ./tools/cleanup.sh
+
+  cleanup-runner2:
+    runs-on: [ self-hosted, runner2 ]
+    needs: 
+      - marmot-command
     if: always() 
     steps:
       - name: 各ランナーを掃除
