@@ -67,7 +67,7 @@ jobs:
         chmod 755 pkg/qcow/testdata
         sudo mkdir -p /var/lib/marmot/volumes
         sudo chmod 755 /var/lib/marmot/volumes
-        mc cp myminio/os-image/jammy-server-cloudimg-amd64.img pkg/marmotd/testdata/ubuntu22.04.qcow2
+        mc cp myminio/os-image/ubuntu22.04.img pkg/marmotd/testdata/ubuntu22.04.qcow2
 
     - name: Check etcd put
       run: |

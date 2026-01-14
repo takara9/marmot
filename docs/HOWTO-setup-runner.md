@@ -36,7 +36,7 @@ edge12.g.yimg.jp.
 # apt-get update -y
 # apt-get upgrade -y
 # apt-get install git curl gcc make kpartx
-# apt-get install virt-top  virt-manager libvirt-dev libvirt-clients libvirt-daemon qemu-kvm qemu openvswitch-switch openvswitch-common openvswitch-doc libguestfs-tools libvirt-daemon-driver-lxc
+# apt-get install virt-top  virt-manager libvirt-dev libvirt-clients libvirt-daemon qemu-kvm qemu openvswitch-switch openvswitch-common openvswitch-doc libguestfs-tools libvirt-daemon-driver-lxc lxcfs
 ```
 
 LXCを有効化するために
@@ -50,6 +50,9 @@ virsh -c lxc:///system list
 virsh list
  Id   Name   State
 --------------------
+
+# lxcfsを追加
+systemctl start lxcfs
 ```
 
 

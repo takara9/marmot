@@ -1,7 +1,12 @@
 #!/bin/bash -e
 
 echo "Ubuntu 22.04 (jammy) のcloud imageをダウンロードしてカスタマイズする"
-curl -OL https://cloud-images.ubuntu.com/jammy/20251216/jammy-server-cloudimg-amd64.img
+#curl -OL https://cloud-images.ubuntu.com/jammy/20251216/jammy-server-cloudimg-amd64.img
+mc alias set myminio ${{ secrets.MINIO_ENDPOINT }} \
+  ${{ secrets.MINIO_ACCESS_KEY }} \
+  ${{ secrets.MINIO_SECRET_KEY }}
+
+mc cp myminio/os-image/jammy-server-cloudimg-amd64.img jammy-server-cloudimg-amd64.img
 
 echo "cloud imageのカスタマイズを行う"
 virt-customize -a jammy-server-cloudimg-amd64.img --root-password password:ubuntu
