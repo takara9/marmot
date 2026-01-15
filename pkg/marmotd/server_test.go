@@ -8,8 +8,10 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/marmotd"
+	"github.com/takara9/marmot/pkg/util"
 )
 
 var _ = Describe("サーバーテスト", Ordered, func() {
@@ -105,9 +107,26 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 	})
 
 	Context("APIテスト", func() {
-		It("Marmotd のバージョン情報取得", func() {
-			// 中身は未実装
-			GinkgoWriter.Println(string("未実装"))
+		var id string
+		It("仮想サーバーの生成（１）：最小構成", func() {
+			var spec api.Server
+			var err error
+			spec.Name = util.StringPtr("test-vm-1")
+			// 他設定はデフォルトで
+			id, err = marmotServer.Ma.CreateServer(spec)
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println("Created VM ID:", id)
+		})
+
+		It("稼働中仮想サーバー（１）のリスト取得", func() {
+			sv, err := marmotServer.Ma.GetServerById(id)
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println("取得した仮想サーバー情報:", sv)
+		})
+
+		It("仮想サーバーの削除（２）", func() {
+			err := marmotServer.Ma.DeleteServerById(id)
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 
@@ -116,7 +135,6 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			// 中身は未実装
 			GinkgoWriter.Println(string("未実装"))
 		})
-
 	})
 
 	Context("停止", func() {
