@@ -183,6 +183,79 @@ hmc-nfs:/exports/nfs/golang /nfs nfs defaults 0 0
 ```
 
 
+## ネットワークの設定
+
+#### netplan でのブリッジの追加とIPアドレス設定の移動
+bridge インターフェースを設定して、IPアドレスを付与して、インターフェースと結び付ける。
+ブリッジのmacアドレスは、デフォルトでは同じ値となるため、
+他の仮想マシンのブリッジIFのMACアドレスと衝突しないように、設定する。
+
+```
+root@runner1:/etc/netplan# cat 00-nic.yaml 
+network:
+  version: 2
+  ethernets:
+    enp6s0:
+      addresses:
+        - 172.16.0.21/16
+      routes:
+        - to: 10.0.0.0/8
+          via: 172.16.0.1
+      nameservers:
+        search: [labo.local]
+        addresses: [172.16.0.4]
+    enp7s0:
+      dhcp4: no
+      dhcp6: no
+    enp8s0:
+      dhcp4: no
+      dhcp6: no
+
+  bridges:
+    br0:
+      interfaces: [enp7s0]
+      macaddress: b6:bd:d8:c5:d3:52  # デフォルトでは同じMACアドレスとなるので、衝突しないように指定する。
+      addresses:
+        - 192.168.1.211/24      # ホストの固定IP
+      routes:
+        - to: default
+          via: 192.168.1.1       # デフォルトゲートウェイ
+      nameservers:
+         addresses:
+           - 192.168.1.9
+         search:
+           - labo.local
+      parameters:
+        stp: false               # 一般的な家庭・小規模環境では false でOK
+      dhcp4: no
+      dhcp6: yes
+```
+
+#### virtのブリッジ設定
+
+
+```
+root@runner1:/etc/netplan# virsh net-list
+ Name          State    Autostart   Persistent
+------------------------------------------------
+ default       active   yes         yes  　　　　NATで内部から外部への通信可能
+ host-bridge   active   yes         yes          ホストのNICにIPアドレスを確保して外部からのアクセスを可能
+ ovs-network   active   yes         yes          L2スイッチと連携してトランクVLAN設定を実施
+```
+
+以下の設定を行い、libvirt のドメイン（仮想マシン）からネットワーク名を指定して、ネットワークに接続できる。
+
+```
+root@runner1:/etc/netplan# virsh net-dumpxml host-bridge
+<network>
+  <name>host-bridge</name>
+  <uuid>0ff20643-71de-40ed-ba59-07a340130690</uuid>
+  <forward mode='bridge'/>
+  <bridge name='br0'/>
+</network>
+```
+
+
 ## ネットワークの設定（ホスト側のハイパーバイザーの設定）
 
   - https://github.com/takara9/marmot/blob/main/docs/network-setup-nested-vm.md#%E3%83%99%E3%82%A2%E3%83%A1%E3%82%BF%E3%83%AB%E3%81%AE%E3%83%8F%E3%82%A4%E3%83%91%E3%83%BC%E3%83%90%E3%82%A4%E3%82%B6%E3%83%BC%E5%81%B4
