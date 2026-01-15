@@ -46,7 +46,7 @@ func (m *Marmot) CreateServer(spec api.Server) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	slog.Debug("New Boot Volume ID:", volSpec.Id)
+	slog.Debug("New Boot", "Volume ID:", volSpec.Id)
 
 	slog.Debug("データボリュームの生成と設定")
 
@@ -72,17 +72,17 @@ func (m *Marmot) CreateServer(spec api.Server) (string, error) {
 
 	if spec.PrivateIp != nil {
 		slog.Debug("プライベートIPのNICを作成")
-		slog.Debug("spec.PrivateIp", "value", *spec.PrivateIp)	
+		slog.Debug("spec.PrivateIp", "value", *spec.PrivateIp)
 		//util.CreateNic("pri", &dom.Devices.Interface)
 	}
 
 	if spec.PublicIp != nil {
 		slog.Debug("パブリックIPのNICを作成")
-		slog.Debug("spec.PublicIp", "value", *spec.PublicIp)	
+		slog.Debug("spec.PublicIp", "value", *spec.PublicIp)
 		//util.CreateNic("pub", &dom.Devices.Interface)
 	}
 	/////////////////////////////////
-	
+
 	slog.Debug("ハイパーバイザーのリソース確保")
 	var vx virt.VmSpec
 	vx.UUID = server.Id // 同様
@@ -141,7 +141,7 @@ func (m *Marmot) CreateServer(spec api.Server) (string, error) {
 
 	dom := virt.CreateDomainXML(vx)
 	xml, err := dom.Marshal()
-	slog.Debug("Generated libvirt XML:\n", xml)
+	slog.Debug("Generated", "libvirt XML:\n", xml)
 
 	l, err := virt.NewLibVirtEp("qemu:///system")
 	if err != nil {
