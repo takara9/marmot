@@ -751,7 +751,6 @@ components:
           type: string
         comment:
           type: string
-
     Success:
       type: object
       required:
@@ -760,6 +759,27 @@ components:
         id:
           type: string
         message:
+          type: string
+    Network:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        uuid:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        mac:
+          type: string
+        ipAddr:
+          type: string
+        gw:
+          type: string
+        dns:
           type: string
 
     Servers:
@@ -773,6 +793,8 @@ components:
         - id
       properties:
         id:
+          type: string
+        uuid:
           type: string
         name:
           type: string
@@ -803,10 +825,15 @@ components:
           type: integer
           format: int
         privateIp:
-          type: string
+           type: string
         publicIp:
-          type: string
-        storage:
+           type: string
+        Network:
+          type: array
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/Network"
+        Storage:
           type: array
           maxItems: 10
           items:
@@ -820,4 +847,8 @@ components:
         osVg:
           type: string
         osVariant:
+          type: string
+        bootVolumeType:
+          type: string
+        bootVolumeId:
           type: string

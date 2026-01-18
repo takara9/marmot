@@ -15,8 +15,8 @@ hv_spec:
 image_template:
   - name: "ubuntu22.04"
     volumegroup: "vg1"
-    logicalvolume: "lv01"
-    qcow2_path: "testdata/ubuntu22.04.qcow2"
+    logicalvolume: "lvos_temp"
+    qcow2_path: "/var/lib/libvirt/images/jammy-server-cloudimg-amd64.img"
 #
 # シリアル番号管理
 #

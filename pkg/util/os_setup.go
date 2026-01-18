@@ -238,3 +238,76 @@ func LinuxSetup_createNetplan2(spec api.VmSpec, vm_root string) error {
 	}
 	return nil
 }
+
+// Linux hostidをOS Volへ書き込み
+func LinuxSetup_hostid3(spec api.Server, vm_root string) error {
+	//ipb := IPaddrByteArray(*spec.PrivateIp)
+	ipb := IPaddrByteArray(spec.Id)
+	hostid_file := filepath.Join(vm_root, "etc/hostid")
+	err := os.WriteFile(hostid_file, ipb, 0644)
+	return err
+}
+
+// Linux Netplanのファイルへ、IPアドレスなどを設定 （書き換え候補）
+func LinuxSetup_createNetplan3(spec api.Server, vm_root string) error {
+	var netplanFile = "etc/netplan/00-nic.yaml"
+	netplanPath := filepath.Join(vm_root, netplanFile)
+
+	f, err := os.Create(netplanPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	yaml(0, "network:", f)
+	yaml(1, "version: 2", f)
+	yaml(1, "ethernets:", f)
+
+	if spec.PrivateIp != nil {
+		if len(*spec.PrivateIp) > 0 {
+			yaml(2, "enp6s0:", f)
+			yaml(3, "addresses:", f)
+			yaml(4, fmt.Sprintf("- %s/%d", *spec.PrivateIp, 16), f)
+			/*
+			   不安定になるので設定しない と思ったが、プライベートだけだとインターネットへのルートが必要
+			   そこで、パブリックが無い時だけ設定する
+			*/
+		}
+		if spec.PublicIp != nil {
+			if len(*spec.PublicIp) == 0 {
+				if *spec.OsVariant == "ubuntu18.04" {
+					yaml(3, "gateway4: 172.16.0.1", f)
+				} else {
+					yaml(3, "routes:", f)
+					yaml(4, "- to: default", f)
+					yaml(4, "  via: 172.16.0.1", f)
+				}
+			}
+		}
+		yaml(3, "nameservers:", f)
+		yaml(4, fmt.Sprintf("search: [%v]", "labo.local"), f)
+		yaml(4, fmt.Sprintf("addresses: [%v]", "172.16.0.4"), f)
+	}
+
+	if spec.PublicIp != nil {
+		if len(*spec.PublicIp) > 0 {
+			yaml(2, "enp7s0:", f)
+			yaml(3, "addresses:", f)
+			yaml(4, fmt.Sprintf("- %s/%d", *spec.PublicIp, 24), f)
+			if *spec.OsVariant == "ubuntu18.04" {
+				yaml(3, "gateway4: 192.168.1.1", f)
+
+			} else {
+				yaml(3, "routes:", f)
+				yaml(4, "- to: default", f)
+				yaml(4, "  via: 192.168.1.1", f)
+			}
+			// 両方を有効にできないので、プライベート側を優先する
+			if len(*spec.PrivateIp) == 0 {
+				yaml(4, fmt.Sprintf("search: [%v]", "labo.local"), f)
+				yaml(4, fmt.Sprintf("addresses: [%v]", "192.168.1.4"), f)
+			}
+		}
+	}
+	return nil
+}

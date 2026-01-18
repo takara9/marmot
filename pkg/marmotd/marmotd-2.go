@@ -12,6 +12,7 @@ import (
 	"github.com/takara9/marmot/pkg/util"
 )
 
+
 // ＝＝＝＝＝＝＝＝＝＝＝＝＝＝　新 API 関数群  ＝＝＝＝＝＝＝＝＝＝＝＝＝＝
 // ボリュームの生成 implements api.ServerInterface.
 func (s *Server) CreateVolume(ctx echo.Context) error {
@@ -126,7 +127,7 @@ func (s *Server) CreateServer(ctx echo.Context) error {
 		slog.Error("CreateServer()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-	slog.Debug("Recived post body", "serverSpec=", serverSpec, "cpu=", serverSpec.Cpu, "memory=", serverSpec.Memory)
+	slog.Debug("Recived post body", "serverSpec=", serverSpec, "cpu=", serverSpec.Cpu, "memory=", serverSpec.Memory, "os", serverSpec.OsVariant)
 
 	id, err := s.Ma.CreateServer(serverSpec)
 	if err != nil {

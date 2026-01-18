@@ -25,7 +25,11 @@ test:
 
 .PHONY: test-volume
 test-volume:
-	$(GO) test -ginkgo.focus-file marmotd-volume_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+	$(GO) test -ginkgo.focus-file volume_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+
+.PHONY: test-server
+test-server:
+	$(GO) test -ginkgo.focus-file server_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
 .PHONY: test-func
 test-func:
@@ -34,3 +38,7 @@ test-func:
 .PHONY:	set-version
 set-version:
 	sed s/MARMOT_VERSION/${TAG}/ cmd/version._ > cmd/version.go
+
+.PHONY:	download-image
+download-image:
+	mc cp myminio/os-image/ubuntu22.04.img testdata/ubuntu22.04.qcow2
