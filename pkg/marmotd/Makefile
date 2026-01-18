@@ -38,3 +38,7 @@ test-func:
 .PHONY:	set-version
 set-version:
 	sed s/MARMOT_VERSION/${TAG}/ cmd/version._ > cmd/version.go
+
+.PHONY:	download-image
+download-image:
+	mc cp myminio/os-image/ubuntu22.04.img testdata/ubuntu22.04.qcow2

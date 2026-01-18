@@ -19,7 +19,7 @@ func (m *Marmot) CreateNewVolume(v api.Volume) (*api.Volume, error) {
 
 	// 内容が設定されていない時はデフォルト値をセットする
 	volName := util.OrDefault(v.Name, "vol1") // ボリューム名は必須 ボリューム名はラベルとして利用、ユニークである必要はない？
-	volType := util.OrDefault(v.Type, "lvm")
+	volType := util.OrDefault(v.Type, "lvm") // 正しいのか？
 	volKind := util.OrDefault(v.Kind, "os")
 	volSize := util.OrDefault(v.Size, 0)
 	volPath := util.OrDefault(v.Path, "") // パスはタイプと種類で決まるため、空で初期化

@@ -241,7 +241,8 @@ func LinuxSetup_createNetplan2(spec api.VmSpec, vm_root string) error {
 
 // Linux hostidをOS Volへ書き込み
 func LinuxSetup_hostid3(spec api.Server, vm_root string) error {
-	ipb := IPaddrByteArray(*spec.PrivateIp)
+	//ipb := IPaddrByteArray(*spec.PrivateIp)
+	ipb := IPaddrByteArray(spec.Id)
 	hostid_file := filepath.Join(vm_root, "etc/hostid")
 	err := os.WriteFile(hostid_file, ipb, 0644)
 	return err

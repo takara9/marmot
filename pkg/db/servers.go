@@ -11,16 +11,16 @@ import (
 )
 
 const (
-	SERVER_PROVISIONING = 0 // プロビジョニング中
-	SERVER_INUSE        = 1 // 使用中
-	SERVER_AVAILABLE    = 2 // 利用可能
+	SERVER_PROVISIONING = 1 // プロビジョニング中
+	SERVER_INUSE        = 2 // 使用中
+	SERVER_AVAILABLE    = 3 // 利用可能
 )
 
-var ServerStatus = map[int]string{
-	0: "PROVISIONING",
-	1: "INUSE",
-	2: "AVAILABLE",
-}
+//var ServerStatus = map[int]string{
+//	0: "PROVISIONING",
+//	1: "INUSE",
+//	2: "AVAILABLE",
+//}
 
 // サーバーを登録、サーバーを一意に識別するIDを自動生成
 func (d *Database) CreateServer(spec api.Server) (api.Server, error) {
@@ -37,7 +37,8 @@ func (d *Database) CreateServer(spec api.Server) (api.Server, error) {
 	//一意なIDを発行
 	var key string
 	for {
-		server.Id = uuid.New().String()[:8]
+		server.Uuid = util.StringPtr(uuid.New().String())
+		server.Id = (*server.Uuid)[:8]
 		key = ServerPrefix + "/" + server.Id
 		_, err := d.GetJSON(key, &server)
 		if err == ErrNotFound {

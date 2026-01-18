@@ -374,7 +374,7 @@ func (l *LibVirtEp) ListDomains() ([]string, error) {
 	return nameList, nil
 }
 
-func (l *LibVirtEp) DestroyDomain(vmname string) error {
+func (l *LibVirtEp) DeleteDomain(vmname string) error {
 	domain, err := l.Com.LookupDomainByName(vmname)
 	if err != nil {
 		return err
