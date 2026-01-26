@@ -1,7 +1,9 @@
 name: test-server-2
 cpu: 2
 memory: 2048
-osVariant: ubuntu22.04
+os_variant: ubuntu22.04
+boot_volume:
+  type: lvm
 nic:
   - name: "eth0"
     network: "private-net"
@@ -15,9 +17,10 @@ nic:
     comment: "public network interface"
 storage:
   - name: "data-disk-3"
-    size: 2
+    size: 20
+    type: lvm
     comment: "data volume"
   - name: "data-disk-4"
-    size: 2
+    size: 20
     comment: "backup volume"
 comment: "This is a test server#2 configuration"

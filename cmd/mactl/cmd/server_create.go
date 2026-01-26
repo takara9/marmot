@@ -24,9 +24,34 @@ var serverCreateCmd = &cobra.Command{
 			return err
 		}
 		var spec api.Server
+		var volSpec api.Volume
+
+		// 名前は必須項目
+		if len(conf.Name) == 0 {
+			fmt.Println("Name is required in the configuration")
+			return fmt.Errorf("name is required in the configuration")
+		}
 		spec.Name = util.StringPtr(conf.Name)
-		spec.Cpu = util.IntPtrInt(*conf.Cpu)
-		spec.Memory = util.IntPtrInt(*conf.Memory)
+
+		// 無設定を許容、デフォルトをAPI側に任せる
+		if conf.Cpu != nil {
+			spec.Cpu = util.IntPtrInt(*conf.Cpu)
+		}
+
+		if conf.Memory != nil {
+			spec.Memory = util.IntPtrInt(*conf.Memory)
+		}
+
+		if conf.OsVariant != nil {
+			spec.OsVariant = util.StringPtr(*conf.OsVariant)
+		}
+
+		if conf.BootVolume != nil {
+			volSpec.Name = util.StringPtr("boot")
+			volSpec.Type = util.StringPtr(*conf.BootVolume.Type)
+		}
+		spec.BootVolume = &volSpec
+
 		if conf.Nic != nil {
 			for i, nic := range *conf.Nic {
 				if i == 0 {
@@ -49,6 +74,16 @@ var serverCreateCmd = &cobra.Command{
 				volumes[i].Name = util.StringPtr(vol.Name)
 				volumes[i].Size = util.IntPtrInt(*vol.Size)
 				volumes[i].Comment = util.StringPtr(*vol.Comment)
+				if vol.Type == nil {
+					volumes[i].Type = util.StringPtr("qcow2")
+				} else {
+					volumes[i].Type = util.StringPtr(*vol.Type)
+				}
+				if vol.Kind == nil {
+					volumes[i].Kind = util.StringPtr("data")
+				} else {
+					volumes[i].Kind = util.StringPtr(*vol.Kind)
+				}
 			}
 			spec.Storage = &volumes
 		}

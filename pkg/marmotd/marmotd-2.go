@@ -12,6 +12,7 @@ import (
 	"github.com/takara9/marmot/pkg/util"
 )
 
+
 // ＝＝＝＝＝＝＝＝＝＝＝＝＝＝　新 API 関数群  ＝＝＝＝＝＝＝＝＝＝＝＝＝＝
 // ボリュームの生成 implements api.ServerInterface.
 func (s *Server) CreateVolume(ctx echo.Context) error {
@@ -71,7 +72,7 @@ func (s *Server) ListVolumes(ctx echo.Context) error {
 // IDを指定してボリュームの詳細を取得 implements api.ServerInterface.
 func (s *Server) ShowVolumeById(ctx echo.Context, volumeId string) error {
 	slog.Debug("===", "ShowVolumeById() is called", "===", "volumeId", volumeId)
-	vol, err := s.Ma.ShowVolumeById(volumeId)
+	vol, err := s.Ma.GetVolumeById(volumeId)
 	if err != nil {
 		slog.Error("ShowVolumeById()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
@@ -126,7 +127,7 @@ func (s *Server) CreateServer(ctx echo.Context) error {
 		slog.Error("CreateServer()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-	slog.Debug("Recived post body", "serverSpec=", serverSpec, "cpu=", serverSpec.Cpu, "memory=", serverSpec.Memory)
+	slog.Debug("Recived post body", "serverSpec=", serverSpec, "cpu=", serverSpec.Cpu, "memory=", serverSpec.Memory, "os", serverSpec.OsVariant)
 
 	id, err := s.Ma.CreateServer(serverSpec)
 	if err != nil {

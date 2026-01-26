@@ -1,23 +1,26 @@
 name: test-server-1
 cpu: 2
 memory: 2048
-osVariant: ubuntu22.04
+volume_type: qcow2
+os_variant: ubuntu22.04
+boot_volume:
+  type: qcow2
+storage:
+  - name: "data-disk-1"
+    size: 100
+    comment: "data volume"
+  - name: "data-disk-2"
+    size: 100
+    comment: "backup volume"
 nic:
   - name: "eth0"
     network: "private-net"
-    ipAddress: "172.16.0.100"
-    macAddress: "52:54:00:ab:cd:ef"
+    ip_address: "172.16.0.100"
+    mac_address: "52:54:00:ab:cd:ef"
     comment: "private network interface"
   - name: "eth1"
     network: "public-net"
-    ipAddress: "192.168.1.90"
-    macAddress: "52:54:00:12:34:56"
+    ip_address: "192.168.1.90"
+    mac_address: "52:54:00:12:34:56"
     comment: "public network interface"
-storage:
-  - name: "data-disk-1"
-    size: 1
-    comment: "data volume"
-  - name: "data-disk-2"
-    size: 1
-    comment: "backup volume"
 comment: "This is a test server configuration"

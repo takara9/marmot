@@ -18,10 +18,10 @@ func IsExist(path string) error {
 	return nil
 }
 
-// QCOW2リュームの作成、サイズはGB単位
+// QCOW2リュームの作成、サイズはMB単位
 func CreateQcow(path string, size int) error {
 	slog.Debug("Creating QCOW2 volume", "path", path)
-	cmd := exec.Command("qemu-img", "create", "-f", "qcow2", path, fmt.Sprintf("%dG", size))
+	cmd := exec.Command("qemu-img", "create", "-f", "qcow2", path, fmt.Sprintf("%dM", size))
 	//err := cmd.Run()
 	output, err := cmd.CombinedOutput()
 	if err != nil {

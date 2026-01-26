@@ -69,7 +69,7 @@ func (m *Marmot) CreateVM(spec api.VmSpec) error {
 
 	dom.Devices.Disk[0].Source.Dev = fmt.Sprintf("/dev/%s/%s", *spec.Ostempvg, osLogicalVol)
 
-	if err := util.ConfigRootVol2(spec, *spec.Ostempvg, osLogicalVol); err != nil {
+	if err := util.ConfigRootVol(spec, *spec.Ostempvg, osLogicalVol); err != nil {
 		slog.Error("util.CreateOsLv()", "err", err)
 		return err
 	}

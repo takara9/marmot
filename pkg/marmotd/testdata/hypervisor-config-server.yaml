@@ -15,18 +15,18 @@ hv_spec:
 image_template:
   - name: "ubuntu22.04"
     volumegroup: "vg1"
-    logicalvolume: "lv01"
-    qcow2_path: "testdata/ubuntu22.04.qcow2"
+    logicalvolume: "lvos_temp"
+    qcow2_path: "/var/lib/marmot/volumes/jammy-server-cloudimg-amd64.img"
 #
 # シリアル番号管理
 #
 seqno:
   - name: "LVOS"
-    start: 900
+    start: 000
     step:  1
   - name: "LVDATA"
-    start: 900
+    start: 300
     step:  1
   - name: "VM"
-    start: 900
+    start: 700
     step:  1
