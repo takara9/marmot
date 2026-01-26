@@ -164,6 +164,7 @@ func (s *Server) CreateCluster(ctx echo.Context) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
+	slog.Debug("checkHypervisor", "node", s.Ma.NodeName)
 	// ハイパーバイザーの稼働チェック 結果はDBへ反映
 	_, err = d.CheckHypervisors(s.Ma.EtcdUrl, s.Ma.NodeName)
 	if err != nil {

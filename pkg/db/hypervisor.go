@@ -202,7 +202,7 @@ func (d *Database) CheckHypervisors(dbUrl string, node string) ([]api.Hypervisor
 
 	var hvs []api.Hypervisor
 	if err := d.GetHypervisors(&hvs); err != nil {
-		slog.Error("failed to get hypervisors", "err", err)
+		slog.Error("failed to get hypervisors", "err", err, "node", node)
 		return nil, err
 	}
 
