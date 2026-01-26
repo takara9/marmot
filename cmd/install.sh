@@ -14,7 +14,7 @@ install -m 0644 ${BINDIR}/temp.xml ${DISTDIR}
 
 rm -f /etc/systemd/system/marmot.service
 HOSTNAME=`hostname`
-sed -i s/XXXHOSTXXXX/${HOSTNAME} ${BINDIR}/marmot.service
+sed -i s/XXXHOSTXXXX/${HOSTNAME}/ ${BINDIR}/marmot.service
 install -m 0644 ${BINDIR}/marmot.service /etc/systemd/system
 
 rm -f /usr/local/bin/${CLIENT_CMD}
