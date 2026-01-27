@@ -261,7 +261,7 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 		var ni api.Network
 		ni.Id = vx.Nets[0].Network
 		ni.Mac = &vx.Nets[0].MAC
-		requestServerSpec.Network = &[]api.Network{ni}
+		serverConfig.Network = &[]api.Network{ni}
 	} else {
 		slog.Debug("ネットワーク指定あり、指定されたネットワークを使用")
 		for i, nic := range *requestServerSpec.Network {
@@ -288,8 +288,14 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 			vx.Nets = append(vx.Nets, ns)
 			ni.Id = ns.Network
 			ni.Mac = &ns.MAC
-			*requestServerSpec.Network = append(*requestServerSpec.Network, ni)
+			*serverConfig.Network = append(*serverConfig.Network, ni)
 		}
+	}
+	// サーバーのネットワーク情報を更新
+	err = m.Db.UpdateServer(serverConfig.Id, serverConfig)
+	if err != nil {
+		slog.Error("UpdateServer()", "err", err)
+		return "", err
 	}
 
 	vx.ChannelSpecs = []virt.ChannelSpec{
