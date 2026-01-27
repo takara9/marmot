@@ -31,7 +31,11 @@ var serverListCmd = &cobra.Command{
 				serverMap := server.(map[string]interface{})
 				fmt.Printf("Server %d:", idx+1)
 				fmt.Printf("  ID: %v", serverMap["id"])
-				fmt.Printf("  Name: %v\n", serverMap["name"])
+				fmt.Printf("  Name: %v", serverMap["name"])
+				fmt.Printf("  Status: %v", serverMap["status"])
+				fmt.Printf("  CPU: %v", serverMap["cpu"])
+				fmt.Printf("  Memory: %v MB", serverMap["memory"])
+				fmt.Println()
 			}
 			return nil
 
@@ -71,11 +75,4 @@ var serverListCmd = &cobra.Command{
 
 func init() {
 	serverCmd.AddCommand(serverListCmd)
-	//serverCreateCmd.Flags().StringVarP(&serverName, "name", "n", "", "Name of the server")
-	//serverCreateCmd.Flags().StringVarP(&serverType, "type", "t", "qcow2", "Type of the server (lvm, qcow2)")
-	//serverCreateCmd.Flags().StringVarP(&serverKind, "kind", "k", "data", "Kind of the server (os, data)")
-	//serverCreateCmd.Flags().IntVarP(&serverSize, "size", "s", 0, "Size of the server in GB")
-	//serverCreateCmd.MarkFlagRequired("name")
-	//serverCreateCmd.MarkFlagRequired("type")
-	//serverCreateCmd.MarkFlagRequired("kind")
 }
