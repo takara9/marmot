@@ -23,3 +23,7 @@ go.work
 
 bin
 cover.outmaadm
+tools/domain_list.txt
+tools/lv_list.json
+tools/lv_to_remove.txt
+tools/lxc_domain_list.txt
