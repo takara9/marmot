@@ -429,6 +429,13 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			Expect(len(resp.Id)).To(BeNumerically(">", 0))
 		})
 
+		It("サーバーのリスト取得 text", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "list", "--output", "text")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+		})
+
 		It("サーバーのリスト取得 json", func() {
 			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "list", "--output", "json")
 			stdoutStderr, err := cmd.CombinedOutput()

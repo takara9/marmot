@@ -20,13 +20,34 @@ var serverListCmd = &cobra.Command{
 			return err
 		}
 
+		var data interface{}
 		switch outputStyle {
 		case "text":
-			println("Not implemented for text output")
-			println(string(byteBody))
+			if err := json.Unmarshal(byteBody, &data); err != nil {
+				println("Failed to Unmarshal", err)
+				return err
+			}
+			for idx, server := range data.([]interface{}) {
+				serverMap := server.(map[string]interface{})
+				fmt.Printf("Server %d:", idx+1)
+				fmt.Printf("  ID: %v", serverMap["id"])
+				fmt.Printf("  Name: %v", serverMap["name"])
+				fmt.Printf("  Status: %v", serverMap["status"])
+				fmt.Printf("  CPU: %v", serverMap["cpu"])
+				fmt.Printf("  Memory: %v MB", serverMap["memory"])
+				fmt.Println()
+			}
 			return nil
 
 		case "json":
+			if err := json.Unmarshal(byteBody, &data); err != nil {
+				println("Failed to Unmarshal", err)
+				return err
+			}
+			byteBody, err := json.MarshalIndent(data, "", "  ")
+			if err != nil {
+				println("Failed to Marshal", err)
+			}
 			println(string(byteBody))
 			return nil
 
@@ -54,11 +75,4 @@ var serverListCmd = &cobra.Command{
 
 func init() {
 	serverCmd.AddCommand(serverListCmd)
-	//serverCreateCmd.Flags().StringVarP(&serverName, "name", "n", "", "Name of the server")
-	//serverCreateCmd.Flags().StringVarP(&serverType, "type", "t", "qcow2", "Type of the server (lvm, qcow2)")
-	//serverCreateCmd.Flags().StringVarP(&serverKind, "kind", "k", "data", "Kind of the server (os, data)")
-	//serverCreateCmd.Flags().IntVarP(&serverSize, "size", "s", 0, "Size of the server in GB")
-	//serverCreateCmd.MarkFlagRequired("name")
-	//serverCreateCmd.MarkFlagRequired("type")
-	//serverCreateCmd.MarkFlagRequired("kind")
 }
