@@ -80,23 +80,14 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 	}
 	slog.Debug("ブートボリュームのIDをサーバーの構成データに設定完了", "server boot volume", serverConfig.BootVolume)
 
-	// =======================================================================
 	// ブートボリュームをマウントして、ホスト名、netplanを設定する
 	slog.Debug("ブートボリュームをマウントして、ホスト名、netplanを設定する")
 
-	// ブートボリュームをマウント
-
-	// ホスト名をセット
-
-	// ネットワーク設定
-
-	// ブートボリュームのアンマウント
+	// Linux OSの設定
 	if err := util.SetupLinux(serverConfig); err != nil {
 		slog.Error("SetupLinux()", "err", err)
 		return "", err
 	}
-
-	// ========================================================
 
 	slog.Debug("データボリュームの生成")
 	// データボリュームの作成
@@ -267,6 +258,10 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 				Bus:     1,
 			},
 		}
+		var ni api.Network
+		ni.Id = vx.Nets[0].Network
+		ni.Mac = &vx.Nets[0].MAC
+		requestServerSpec.Network = &[]api.Network{ni}
 	} else {
 		slog.Debug("ネットワーク指定あり、指定されたネットワークを使用")
 		for i, nic := range *requestServerSpec.Network {
@@ -289,9 +284,14 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 				Alias:   fmt.Sprintf("net%d", i),
 				Bus:     busno,
 			}
+			var ni api.Network
 			vx.Nets = append(vx.Nets, ns)
+			ni.Id = ns.Network
+			ni.Mac = &ns.MAC
+			*requestServerSpec.Network = append(*requestServerSpec.Network, ni)
 		}
 	}
+
 	vx.ChannelSpecs = []virt.ChannelSpec{
 		{"unix", channelPath + "/" + channelFile, channelFile, "channel0", 1},
 		{"spicevmc", "", "com.redhat.spice.0", "channel1", 2},
