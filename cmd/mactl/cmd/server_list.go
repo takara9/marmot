@@ -20,13 +20,30 @@ var serverListCmd = &cobra.Command{
 			return err
 		}
 
+		var data interface{}
 		switch outputStyle {
 		case "text":
-			println("Not implemented for text output")
-			println(string(byteBody))
+			if err := json.Unmarshal(byteBody, &data); err != nil {
+				println("Failed to Unmarshal", err)
+				return err
+			}
+			for idx, server := range data.([]interface{}) {
+				serverMap := server.(map[string]interface{})
+				fmt.Printf("Server %d:", idx+1)
+				fmt.Printf("  ID: %v", serverMap["id"])
+				fmt.Printf("  Name: %v\n", serverMap["name"])
+			}
 			return nil
 
 		case "json":
+			if err := json.Unmarshal(byteBody, &data); err != nil {
+				println("Failed to Unmarshal", err)
+				return err
+			}
+			byteBody, err := json.MarshalIndent(data, "", "  ")
+			if err != nil {
+				println("Failed to Marshal", err)
+			}
 			println(string(byteBody))
 			return nil
 
