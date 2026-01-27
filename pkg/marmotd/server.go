@@ -82,15 +82,13 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 
 	// ブートボリュームをマウントして、ホスト名、netplanを設定する
 	slog.Debug("ブートボリュームをマウントして、ホスト名、netplanを設定する")
-
-	// Linux OSの設定
 	if err := util.SetupLinux(serverConfig); err != nil {
 		slog.Error("SetupLinux()", "err", err)
 		return "", err
 	}
 
-	slog.Debug("データボリュームの生成")
 	// データボリュームの作成
+	slog.Debug("データボリュームの生成")
 	if requestServerSpec.Storage != nil {
 		for i, disk := range *requestServerSpec.Storage {
 			if len(disk.Id) > 0 {
@@ -149,9 +147,6 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 		return "", err
 	}
 
-	slog.Debug("ネットワークインタフェースの設定")
-	/////////////////////////////
-
 	slog.Debug("ハイパーバイザーのリソース確保")
 	var vx virt.VmSpec
 	vx.UUID = *serverConfig.Uuid
@@ -179,7 +174,6 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 	vx.Machine = "pc-q35-4.2"
 
 	slog.Debug("ボリュームの設定が無いときはqcow2をデフォルトとする1")
-	// ブートディスクの設定 指定が無い時は、qcow2をデフォルトとする
 	if bootVolDefined.Type == nil {
 		bootVolDefined.Type = util.StringPtr("qcow2")
 	}
@@ -288,6 +282,12 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 			vx.Nets = append(vx.Nets, ns)
 			ni.Id = ns.Network
 			ni.Mac = &ns.MAC
+			// netplanで静的IPアドレスを設定する場合のために、IPアドレス情報もサーバーに保存しておく
+			ni.Ipv4addr = nic.Ipv4addr
+			ni.Ipv4mask = nic.Ipv4mask
+			ni.Ipv6addr = nic.Ipv6addr
+			ni.Ipv6mask = nic.Ipv6mask
+
 			*serverConfig.Network = append(*serverConfig.Network, ni)
 		}
 	}
