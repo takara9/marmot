@@ -401,7 +401,7 @@ func (m *Marmot) DeleteServerById(id string) error {
 
 // サーバーのリストを取得、フィルターは、パラメータで指定するようにする
 func (m *Marmot) GetServers() (api.Servers, error) {
-	slog.Debug("===GetServers is called===", "id", "")
+	slog.Debug("===GetServers is called===", "none", "none")
 	serverSpec, err := m.Db.GetServers()
 	if err != nil {
 		slog.Error("GetServers()", "err", err)
