@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/takara9/marmot/pkg/db"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -33,7 +32,7 @@ var serverListCmd = &cobra.Command{
 				fmt.Printf("Server %d:", idx+1)
 				fmt.Printf("  ID: %v", serverMap["id"])
 				fmt.Printf("  Name: %v", serverMap["name"])
-				fmt.Printf("  Status: %v", db.ServerStatus[int(serverMap["status"].(int))])
+				fmt.Printf("  Status: %v", serverMap["status"].(int))
 				fmt.Printf("  CPU: %v", serverMap["cpu"])
 				fmt.Printf("  Memory: %v MB", serverMap["memory"])
 				fmt.Println()
