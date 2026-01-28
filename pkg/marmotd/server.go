@@ -358,8 +358,12 @@ func (m *Marmot) DeleteServerById(id string) error {
 	}
 	defer l.Close()
 	if err = l.DeleteDomain(*sv.Name); err != nil {
-		slog.Error("DeleteDomain()", "err", err)
-		return err
+		if *sv.Status != db.SERVER_PROVISIONING {
+			slog.Error("DeleteDomain()", "err", err)
+			return err
+		}
+		slog.Debug("DeleteServerById()", "server is in PROVISIONING state, skipping domain deletion", *sv.Name)
+		return nil
 	}
 
 	// ブートボリュームの削除

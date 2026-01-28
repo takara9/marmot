@@ -17,11 +17,11 @@ const (
 	SERVER_AVAILABLE    = 3 // 利用可能
 )
 
-//var ServerStatus = map[int]string{
-//	0: "PROVISIONING",
-//	1: "INUSE",
-//	2: "AVAILABLE",
-//}
+var ServerStatus = map[int]string{
+	0: "PROVISIONING",
+	1: "INUSE",
+	2: "AVAILABLE",
+}
 
 // サーバーを登録、サーバーを一意に識別するIDを自動生成
 func (d *Database) CreateServer(spec api.Server) (api.Server, error) {
