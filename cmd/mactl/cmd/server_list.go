@@ -16,8 +16,8 @@ var serverListCmd = &cobra.Command{
 
 		byteBody, _, err := m.GetServers()
 		if err != nil {
-			println("GetServers", "err", err)
-			return err
+			println("エラー応答が返されました。", "err", err)
+			return nil
 		}
 
 		var data interface{}

@@ -358,8 +358,12 @@ func (m *Marmot) DeleteServerById(id string) error {
 	}
 	defer l.Close()
 	if err = l.DeleteDomain(*sv.Name); err != nil {
-		slog.Error("DeleteDomain()", "err", err)
-		return err
+		if *sv.Status != db.SERVER_PROVISIONING {
+			slog.Error("DeleteDomain()", "err", err)
+			return err
+		}
+		slog.Debug("DeleteServerById()", "server is in PROVISIONING state, skipping domain deletion", *sv.Name)
+		return nil
 	}
 
 	// ブートボリュームの削除
@@ -397,7 +401,7 @@ func (m *Marmot) DeleteServerById(id string) error {
 
 // サーバーのリストを取得、フィルターは、パラメータで指定するようにする
 func (m *Marmot) GetServers() (api.Servers, error) {
-	slog.Debug("===GetServers is called===", "id", "")
+	slog.Debug("===GetServers is called===", "none", "none")
 	serverSpec, err := m.Db.GetServers()
 	if err != nil {
 		slog.Error("GetServers()", "err", err)
