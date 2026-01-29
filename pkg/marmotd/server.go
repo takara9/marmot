@@ -54,7 +54,7 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 	if requestServerSpec.BootVolume == nil {
 		bootVol.Type = util.StringPtr("qcow2")
 	} else {
-		bootVol.Type = util.StringPtr(*requestServerSpec.BootVolume.Type)
+		bootVol.Type = requestServerSpec.BootVolume.Type
 		bootVol.OsVariant = requestServerSpec.OsVariant
 	}
 
@@ -151,10 +151,12 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 	var vx virt.VmSpec
 	vx.UUID = *serverConfig.Uuid
 	if serverConfig.Name != nil {
-		vx.Name = *serverConfig.Name // VMを一意に識別する
+		vx.Name = *serverConfig.Name + "-" + serverConfig.Id // VMを一意に識別する
 	} else {
 		vx.Name = "vm-" + serverConfig.Id
 	}
+	// サーバーのVM名前をセットし、今後の操作のためにDBを更新する必要がある
+	serverConfig.InstanceName = util.StringPtr(vx.Name)
 
 	// CPUとメモリの設定
 	slog.Debug("割り当てるCPU数とメモリ量を設定")
@@ -247,9 +249,9 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 				Network: "default",
 				PortID:  uuid.New().String(),
 				Bridge:  "virbr0",
-				Target:  "vnet2",
-				Alias:   "net0",
-				Bus:     1,
+				//Target:  "vnet2",
+				//Alias:   "net0",
+				Bus: 1,
 			},
 		}
 		var ni api.Network
@@ -274,9 +276,9 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 				Network: nic.Id,
 				PortID:  uuid.New().String(),
 				Bridge:  "virbr0",
-				Target:  fmt.Sprintf("vnet%d", i),
-				Alias:   fmt.Sprintf("net%d", i),
-				Bus:     busno,
+				//Target:  fmt.Sprintf("vnet%d", i),
+				//Alias:   fmt.Sprintf("net%d", i),
+				Bus: busno,
 			}
 			var ni api.Network
 			vx.Nets = append(vx.Nets, ns)
@@ -357,19 +359,24 @@ func (m *Marmot) DeleteServerById(id string) error {
 		return err
 	}
 	defer l.Close()
-	if err = l.DeleteDomain(*sv.Name); err != nil {
-		if *sv.Status != db.SERVER_PROVISIONING {
-			slog.Error("DeleteDomain()", "err", err)
-			return err
-		}
+	if err = l.DeleteDomain(*sv.InstanceName); err != nil {
+		// ドメインが存在しない場合はスキップしたいが、区別が難しいので意図的にスキップする
+		//if *sv.Status != db.SERVER_PROVISIONING {
+		//	slog.Error("DeleteDomain()", "err", err)
+		//	return err
+		//}
 		slog.Debug("DeleteServerById()", "server is in PROVISIONING state, skipping domain deletion", *sv.Name)
-		return nil
+		// return nil 戻さず、削除処理を続行する
 	}
 
 	// ブートボリュームの削除
 	if err := m.RemoveVolume(sv.BootVolume.Id); err != nil {
-		slog.Error("RemoveVolume()", "err", err)
-		return err
+		if err == db.ErrNotFound {
+			slog.Debug("RemoveVolume()", "boot volume already deleted", "volume id", sv.BootVolume.Id)
+		} else {
+			slog.Error("RemoveVolume()", "err", err)
+			return err
+		}
 	}
 
 	// データボリュームを消す
@@ -382,8 +389,13 @@ func (m *Marmot) DeleteServerById(id string) error {
 				continue
 			}
 			if err := m.RemoveVolume(vol.Id); err != nil {
-				slog.Error("RemoveVolume()", "err", err)
-				return err
+				if err == db.ErrNotFound {
+					slog.Debug("RemoveVolume()", "data volume already deleted", "volume id", vol.Id)
+					continue
+				} else {
+					slog.Error("RemoveVolume()", "err", err)
+					return err
+				}
 			}
 		}
 	} else {

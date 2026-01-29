@@ -23,10 +23,16 @@ var serverListCmd = &cobra.Command{
 		var data interface{}
 		switch outputStyle {
 		case "text":
+			if string(byteBody) == "null\n" {
+				fmt.Println("サーバーが見つかりません。")
+				return nil
+			}
+
 			if err := json.Unmarshal(byteBody, &data); err != nil {
 				println("Failed to Unmarshal", err)
 				return err
 			}
+
 			for idx, server := range data.([]interface{}) {
 				serverMap := server.(map[string]interface{})
 				fmt.Printf("Server %d:", idx+1)

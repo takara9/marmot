@@ -829,6 +829,8 @@ components:
           type: string
         name:
           type: string
+        instanceName:
+          type: string
         clusterName:
           type: string
         key:

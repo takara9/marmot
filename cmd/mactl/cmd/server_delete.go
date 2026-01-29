@@ -23,12 +23,16 @@ var serverDeleteCmd = &cobra.Command{
 
 		switch outputStyle {
 		case "text":
-			println("Not implemented for text output")
-			println(string(byteBody))
+			var data interface{}
+			if err := json.Unmarshal(byteBody, &data); err != nil {
+				println("Failed to Unmarshal", err)
+				return err
+			}
+			fmt.Println("サーバーが削除されました。ID:", data.(map[string]interface{})["id"])
 			return nil
 
 		case "json":
-			println(string(byteBody))
+			fmt.Println(string(byteBody))
 			return nil
 
 		case "yaml":
