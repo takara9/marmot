@@ -21,14 +21,54 @@ var serverDetailCmd = &cobra.Command{
 			return err
 		}
 
+		var data interface{}
 		switch outputStyle {
 		case "text":
-			println("Not implemented for text output")
-			println(string(byteBody))
+			if err := json.Unmarshal(byteBody, &data); err != nil {
+				println("Failed to Unmarshal", err)
+				return err
+			}
+			serverMap := data.(map[string]interface{})
+			fmt.Printf("Server Details:\n")
+			fmt.Printf("  ID: %v\n", serverMap["id"])
+			fmt.Printf("  Name: %v\n", serverMap["name"])
+			fmt.Printf("  Status: %v\n", serverMap["status"])
+			fmt.Printf("  CPU: %v\n", serverMap["cpu"])
+			fmt.Printf("  Memory: %v MB\n", serverMap["memory"])
+			fmt.Printf("  Created At: %v\n", serverMap["created_at"])
+			fmt.Printf("  Updated At: %v\n", serverMap["updated_at"])
+			fmt.Printf("  Instance Name: %v\n", serverMap["instanceName"])
+			fmt.Printf("  Type: %v\n", serverMap["type"])
+			fmt.Printf("  Kind: %v\n", serverMap["kind"])
+			for idx, disk := range serverMap["disks"].([]interface{}) {
+				diskMap := disk.(map[string]interface{})
+				fmt.Printf("  Disk %d:\n", idx+1)
+				fmt.Printf("    ID: %v\n", diskMap["id"])
+				fmt.Printf("    Size: %v GB\n", diskMap["size"])
+				fmt.Printf("    Status: %v\n", diskMap["status"])
+			}
+			for idx, nic := range serverMap["nics"].([]interface{}) {
+				nicMap := nic.(map[string]interface{})
+				fmt.Printf("  NIC %d:\n", idx+1)
+				fmt.Printf("    ID: %v\n", nicMap["id"])
+				fmt.Printf("    MAC Address: %v\n", nicMap["mac_address"])
+				fmt.Printf("    IP Address: %v\n", nicMap["ip_address"])
+				fmt.Printf("    Network ID: %v\n", nicMap["network_id"])
+			}
 			return nil
 
 		case "json":
-			println(string(byteBody))
+			err := json.Unmarshal(byteBody, &data)
+			if err != nil {
+				println("Failed to Unmarshal", err)
+				return nil
+			}
+			byteJson, err := json.MarshalIndent(data, "", "  ")
+			if err != nil {
+				println("Failed to Marshal", err)
+				return nil
+			}
+			println(string(byteJson))
 			return nil
 
 		case "yaml":

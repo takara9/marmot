@@ -39,10 +39,10 @@ func SetupLinux(spec api.Server) error {
 	}
 
 	// ホストIDの設定
-	hostidFile := filepath.Join(mountPoint, "etc/hostid")
+	hostidFile := filepath.Join(mountPoint, "etc/machine-id")
 	err = os.WriteFile(hostidFile, []byte(spec.Id), 0644)
 	if err != nil {
-		slog.Error("WriteFile hostid failed", "error", err)
+		slog.Error("WriteFile /etc/machine-id failed", "error", err)
 		return err
 	}
 

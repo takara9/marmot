@@ -28,7 +28,7 @@ test: setup
 	staticcheck ./...
 
 .PHONY:	package
-package: clean all
+package: clean all setup
 	@echo $(TAG)
 	cp cmd/install.sh $(BINDIR)/install.sh
 	cp cmd/mactl/config_marmot $(BINDIR)/config_marmot
