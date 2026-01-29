@@ -372,7 +372,7 @@ func (m *Marmot) DeleteServerById(id string) error {
 	// ブートボリュームの削除
 	if err := m.RemoveVolume(sv.BootVolume.Id); err != nil {
 		if err == db.ErrNotFound {
-			slog.Debug("RemoveVolume()", "boot volume already deleted", "volume id", sv.BootVolume.Id)
+			slog.Debug("RemoveVolume() boot volume already deleted", "volume id", sv.BootVolume.Id)
 		} else {
 			slog.Error("RemoveVolume()", "err", err)
 			return err
@@ -390,7 +390,7 @@ func (m *Marmot) DeleteServerById(id string) error {
 			}
 			if err := m.RemoveVolume(vol.Id); err != nil {
 				if err == db.ErrNotFound {
-					slog.Debug("RemoveVolume()", "data volume already deleted", "volume id", vol.Id)
+					slog.Debug("RemoveVolume() data volume already deleted", "volume id", vol.Id)
 					continue
 				} else {
 					slog.Error("RemoveVolume()", "err", err)
