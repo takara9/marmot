@@ -73,7 +73,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 		})
 
 		It("Linux hostid設定のチェック", func() {
-			data, err := os.ReadFile(mountPoint + "/etc/hostid")
+			data, err := os.ReadFile(mountPoint + "/etc/machine-id")
 			Expect(err).To(BeNil())
 			Expect(string(data)).To(Equal(testSpec.Id))
 		})
