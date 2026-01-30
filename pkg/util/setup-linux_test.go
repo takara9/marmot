@@ -218,21 +218,21 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 				},
 				{
 					Id: "host-bridge",
-					Nameservers: &[]api.Nameserver{
-						{
-							Address: util.StringPtr("8.8.8.8"),
-							Search:  util.StringPtr("test.com"),
+					Nameservers: &api.Nameservers{
+						Addresses: &[]string{
+							"8.8.8.8",
+							"8.8.4.4",
 						},
-						{
-							Address: util.StringPtr("8.8.4.4"),
-							Search:  util.StringPtr("test2.org"),
+						Search: &[]string{
+							"test.com",
+							"test2.org",
 						},
 					},
 				},
 				{
-					Id:       "host-bridge",
-					Ipv4addr: util.StringPtr("1.2.3.4"),
-					Ipv4mask: util.StringPtr("24"),
+					Id:      "host-bridge",
+					Address: util.StringPtr("1.2.3.4"),
+					Netmask: util.StringPtr("24"),
 					Routes: &[]api.Route{
 						{
 							To:  util.StringPtr("default"),
@@ -241,23 +241,23 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 					},
 				},
 				{
-					Id:       "host-bridge",
-					Ipv6addr: util.StringPtr("2001:db8::1"),
-					Ipv6mask: util.StringPtr("64"),
+					Id:      "host-bridge",
+					Address: util.StringPtr("2001:db8::1"),
+					Netmask: util.StringPtr("64"),
 					Routes: &[]api.Route{
 						{
 							To:  util.StringPtr("2001:db8::/64"),
 							Via: util.StringPtr("2001:db8::ff"),
 						},
 					},
-					Nameservers: &[]api.Nameserver{
-						{
-							Address: util.StringPtr("2001:4860:4860::8888"),
-							Search:  util.StringPtr("test.com"),
+					Nameservers: &api.Nameservers{
+						Addresses: &[]string{
+							"2001:4860:4860::8888",
+							"2001:4860:4860::8844",
 						},
-						{
-							Address: util.StringPtr("2001:4860:4860::8844"),
-							Search:  util.StringPtr("test2.org"),
+						Search: &[]string{
+							"test.com",
+							"test2.org",
 						},
 					},
 				},

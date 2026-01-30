@@ -781,31 +781,31 @@ components:
           type: boolean
         dhcp6:
           type: boolean
-        ipv4addr:
+        address:
           type: string
-        ipv4mask:
-          type: string
-        ipv6addr:
-          type: string
-        ipv6mask:
+        netmask:
           type: string
         nameservers:
-          type: array
-          maxItems: 4
-          items:
-            $ref: "#/components/schemas/Nameserver"
+          type: object
+          $ref: "#/components/schemas/Nameservers"
         routes:
           type: array
           maxItems: 6
           items:
             $ref: "#/components/schemas/Route"    
-    Nameserver:
+    Nameservers:
       type: object
       properties:
-        address:
-          type: string
+        addresses:
+          type: array
+          maxItems: 4
+          items:
+            type: string
         search:
-          type: string
+          type: array
+          maxItems: 4
+          items:
+            type: string
     Route:
       type: object
       properties:
@@ -857,10 +857,6 @@ components:
         memory:
           type: integer
           format: int
-        privateIp:
-           type: string
-        publicIp:
-           type: string
         Network:
           type: array
           maxItems: 10

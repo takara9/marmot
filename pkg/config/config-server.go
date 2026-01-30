@@ -2,16 +2,15 @@ package config
 
 // Server defines model for Server.
 type Server struct {
-	Name       string  `yaml:"name"`
-	Cpu        *int    `yaml:"cpu,omitempty"`
-	Memory     *int    `yaml:"memory,omitempty"`
-	OsVariant  *string `yaml:"os_variant,omitempty"`
-	BootVolume *Volume `yaml:"boot_volume,omitempty"`
-	//VolumeType *string   `yaml:"volume_type,omitempty"`
-	Playbook *string   `yaml:"playbook,omitempty"`
-	Nic      *[]Nic    `yaml:"nic,omitempty"`
-	Storage  *[]Volume `yaml:"storage,omitempty"`
-	Comment  *string   `yaml:"comment,omitempty"`
+	Name       string     `yaml:"name"`
+	Cpu        *int       `yaml:"cpu,omitempty"`
+	Memory     *int       `yaml:"memory,omitempty"`
+	OsVariant  *string    `yaml:"os_variant,omitempty"`
+	BootVolume *Volume    `yaml:"boot_volume,omitempty"`
+	Playbook   *string    `yaml:"playbook,omitempty"`
+	Network    *[]Network `yaml:"network,omitempty"`
+	Storage    *[]Volume  `yaml:"storage,omitempty"`
+	Comment    *string    `yaml:"comment,omitempty"`
 }
 
 // Volume defines model for Volume.
@@ -23,9 +22,22 @@ type Volume struct {
 	Kind    *string `yaml:"kind,omitempty"`
 }
 
-type Nic struct {
-	Name      string  `yaml:"name"`
-	Network   *string `yaml:"network,omitempty"`
-	IpAddress *string `yaml:"ip_address,omitempty"`
-	Comment   *string `yaml:"comment,omitempty"`
+type Route struct {
+	Destination string  `yaml:"destination"`
+	Gateway     string  `yaml:"gateway"`
+	Comment     *string `yaml:"comment,omitempty"`
+}
+
+type Nameservers struct {
+	Addresses *[]string `yaml:"addresses,omitempty"`
+	Search    *[]string `yaml:"search,omitempty"`
+}
+
+type Network struct {
+	Name        string       `yaml:"name"`
+	Address     *string      `yaml:"address,omitempty"`
+	Netmask     *string      `yaml:"netmask,omitempty"`
+	Routes      *[]Route     `yaml:"routes,omitempty"`
+	Nameservers *Nameservers `yaml:"nameservers,omitempty"`
+	Comment     *string      `yaml:"comment,omitempty"`
 }

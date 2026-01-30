@@ -230,11 +230,11 @@ type Network struct {
 }
 
 type Ethernet struct {
-	Addresses   []string     `yaml:"addresses,omitempty"`
-	DHCP4       bool         `yaml:"dhcp4"`
-	DHCP6       bool         `yaml:"dhcp6"`
-	Routes      []Route      `yaml:"routes,omitempty"`
-	Nameservers []Nameserver `yaml:"nameservers,omitempty"`
+	Addresses   []string   `yaml:"addresses,omitempty"`
+	DHCP4       bool       `yaml:"dhcp4"`
+	DHCP6       bool       `yaml:"dhcp6"`
+	Routes      []Route    `yaml:"routes,omitempty"`
+	Nameservers Nameserver `yaml:"nameservers,omitempty"`
 }
 
 type Route struct {
@@ -243,8 +243,8 @@ type Route struct {
 }
 
 type Nameserver struct {
-	Address string `yaml:"address,omitempty"`
-	Search  string `yaml:"search,omitempty"`
+	Addresses []string `yaml:"addresses,omitempty"`
+	Search    []string `yaml:"search,omitempty"`
 }
 
 // NICの設定
@@ -259,24 +259,10 @@ func CreateNetplanInterfaces(requestConfig []api.Network, mountPoint string) err
 		},
 	}
 
-	var netplanBase []api.Network
-	if len(requestConfig) == 0 {
-		// ネットワーク設定がない場合は、デフォルトネットワークにつないで、 DHCPでIPアドレスを取得する設定にする
-		defaultNic := api.Network{
-			Networkname: StringPtr("default"),
-			Dhcp4:       BoolPtr(true),
-			Dhcp6:       BoolPtr(true),
-		}
-		netplanBase = append(netplanBase, defaultNic)
-	} else {
-		netplanBase = requestConfig
-	}
-
-	for idx, nic := range netplanBase {
+	for idx, nic := range requestConfig {
+		ethCfg := Ethernet{}
 		ifaceName := nicName[idx]
 		slog.Debug("Configuring interface", "ifaceName", ifaceName, "nic", nic)
-
-		ethCfg := Ethernet{}
 
 		// DHCP設定
 		if nic.Dhcp4 != nil {
@@ -291,14 +277,10 @@ func CreateNetplanInterfaces(requestConfig []api.Network, mountPoint string) err
 		}
 
 		// IPアドレス設定 これでは複数のIPを持てない。（それでも良いのか？）
-		if nic.Ipv4addr != nil && nic.Ipv4mask != nil {
+		if nic.Address != nil && nic.Netmask != nil {
 			ethCfg.DHCP4 = false
-			addr := *nic.Ipv4addr + "/" + *nic.Ipv4mask
-			ethCfg.Addresses = append(ethCfg.Addresses, addr)
-		}
-		if nic.Ipv6addr != nil && nic.Ipv6mask != nil {
 			ethCfg.DHCP6 = false
-			addr := *nic.Ipv6addr + "/" + *nic.Ipv6mask
+			addr := *nic.Address + "/" + *nic.Netmask
 			ethCfg.Addresses = append(ethCfg.Addresses, addr)
 		}
 
@@ -318,19 +300,15 @@ func CreateNetplanInterfaces(requestConfig []api.Network, mountPoint string) err
 
 		// ネームサーバ設定 (IPv4/IPv6共通)
 		if nic.Nameservers != nil {
-			for _, ns := range *nic.Nameservers {
-				var nss Nameserver
-				if ns.Address != nil || ns.Search != nil {
-					nss = Nameserver{
-						Address: *ns.Address,
-						Search:  *ns.Search,
-					}
-				} else if ns.Address != nil {
-					nss = Nameserver{
-						Address: *ns.Address,
-					}
+			if nic.Nameservers.Addresses != nil {
+				for _, addr := range *nic.Nameservers.Addresses {
+					ethCfg.Nameservers.Addresses = append(ethCfg.Nameservers.Addresses, addr)
 				}
-				ethCfg.Nameservers = append(ethCfg.Nameservers, nss)
+			}
+			if nic.Nameservers.Search != nil {
+				for _, search := range *nic.Nameservers.Search {
+					ethCfg.Nameservers.Search = append(ethCfg.Nameservers.Search, search)
+				}
 			}
 		}
 
@@ -338,6 +316,15 @@ func CreateNetplanInterfaces(requestConfig []api.Network, mountPoint string) err
 			config.Network.Ethernets = make(map[string]Ethernet)
 		}
 		config.Network.Ethernets[ifaceName] = ethCfg
+	}
+
+	// ネットワーク設定がない場合は、デフォルトネットワークにつないで、 DHCPでIPアドレスを取得する設定にする
+	if len(requestConfig) == 0 {
+		ethCfg := Ethernet{}
+		ethCfg.DHCP4 = true
+		ethCfg.DHCP6 = true
+		config.Network.Ethernets = make(map[string]Ethernet)
+		config.Network.Ethernets[nicName[0]] = ethCfg
 	}
 
 	// YAML への変換

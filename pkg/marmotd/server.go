@@ -148,32 +148,32 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 	}
 
 	slog.Debug("ハイパーバイザーのリソース確保")
-	var vx virt.VmSpec
-	vx.UUID = *serverConfig.Uuid
+	var virtSpec virt.VmSpec
+	virtSpec.UUID = *serverConfig.Uuid
 	if serverConfig.Name != nil {
-		vx.Name = *serverConfig.Name + "-" + serverConfig.Id // VMを一意に識別する
+		virtSpec.Name = *serverConfig.Name + "-" + serverConfig.Id // VMを一意に識別する
 	} else {
-		vx.Name = "vm-" + serverConfig.Id
+		virtSpec.Name = "vm-" + serverConfig.Id
 	}
 	// サーバーのVM名前をセットし、今後の操作のためにDBを更新する必要がある
-	serverConfig.InstanceName = util.StringPtr(vx.Name)
+	serverConfig.InstanceName = util.StringPtr(virtSpec.Name)
 
 	// CPUとメモリの設定
 	slog.Debug("割り当てるCPU数とメモリ量を設定")
 	if serverConfig.Cpu != nil {
-		vx.CountVCPU = uint(*serverConfig.Cpu)
+		virtSpec.CountVCPU = uint(*serverConfig.Cpu)
 	} else {
-		vx.CountVCPU = 2 // デフォルト2
+		virtSpec.CountVCPU = 2 // デフォルト2
 	}
 
 	if serverConfig.Memory != nil {
 		mem := uint(*serverConfig.Memory) * 1024 //MiB
-		vx.RAM = mem
+		virtSpec.RAM = mem
 	} else {
 		mem := uint(2048 * 1024) // MiB デフォルト2048MB
-		vx.RAM = mem
+		virtSpec.RAM = mem
 	}
-	vx.Machine = "pc-q35-4.2"
+	virtSpec.Machine = "pc-q35-4.2"
 
 	slog.Debug("ボリュームの設定が無いときはqcow2をデフォルトとする1")
 	if bootVolDefined.Type == nil {
@@ -183,13 +183,13 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 
 	switch {
 	case *bootVolDefined.Type == "qcow2":
-		vx.DiskSpecs = []virt.DiskSpec{
+		virtSpec.DiskSpecs = []virt.DiskSpec{
 			{"vda", *bootVolDefined.Path, 3, *bootVolDefined.Type},
 		}
 	case *bootVolDefined.Type == "lvm":
 		// ＊＊＊　パスは createNewVolume で設定されるべき　＊＊＊
 		lvPath := fmt.Sprintf("/dev/%s/%s", *bootVolDefined.VolumeGroup, *bootVolDefined.LogicalVolume)
-		vx.DiskSpecs = []virt.DiskSpec{
+		virtSpec.DiskSpecs = []virt.DiskSpec{
 			{"vda", lvPath, 3, "raw"},
 		}
 	default:
@@ -214,7 +214,7 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 					Bus:  uint(11 + i),
 					Type: "qcow2",
 				}
-				vx.DiskSpecs = append(vx.DiskSpecs, ds)
+				virtSpec.DiskSpecs = append(virtSpec.DiskSpecs, ds)
 			case *disk.Type == "lvm":
 				ds := virt.DiskSpec{
 					Dev:  fmt.Sprintf("vd%c", 'b'+i),
@@ -222,42 +222,36 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 					Bus:  uint(11 + i),
 					Type: "raw",
 				}
-				vx.DiskSpecs = append(vx.DiskSpecs, ds)
+				virtSpec.DiskSpecs = append(virtSpec.DiskSpecs, ds)
 			}
 		}
 	}
 
 	channelFile := "org.qemu.guest_agent.0"
-	channelPath, err := util.CreateChannelDir(vx.UUID)
+	channelPath, err := util.CreateChannelDir(virtSpec.UUID)
 
-	/*
-		ネットワークの指定がなければ、デフォルトネットワークを使用する。
-		ネットワークの指定があれば、そのネットワークへ接続する。
-		ネットワークとIPアドレスの指定があれば、そのIPアドレスを使用する。
-		ネットワークの指定があっても、IPアドレスの指定がなければ、DHCPで取得する。
-	*/
-	if requestServerSpec.Network == nil {
+	// ネットワークの設定
+	if len(*requestServerSpec.Network) == 0 {
 		slog.Debug("ネットワーク指定なし、デフォルトネットワークを使用")
 		mac, err := util.GenerateRandomMAC()
 		if err != nil {
 			slog.Error("GenerateRandomMAC()", "err", err)
 			return "", err
 		}
-		vx.Nets = []virt.NetSpec{
+		virtSpec.Nets = []virt.NetSpec{
 			{
 				MAC:     mac.String(),
 				Network: "default",
 				PortID:  uuid.New().String(),
 				Bridge:  "virbr0",
-				//Target:  "vnet2",
-				//Alias:   "net0",
-				Bus: 1,
+				Bus:     1,
 			},
 		}
-		var ni api.Network
-		ni.Id = vx.Nets[0].Network
-		ni.Mac = &vx.Nets[0].MAC
-		serverConfig.Network = &[]api.Network{ni}
+		// サーバーのネットワーク情報を更新
+		var net api.Network
+		net.Id = virtSpec.Nets[0].Network
+		net.Mac = &virtSpec.Nets[0].MAC
+		serverConfig.Network = &[]api.Network{net}
 	} else {
 		slog.Debug("ネットワーク指定あり、指定されたネットワークを使用")
 		for i, nic := range *requestServerSpec.Network {
@@ -276,21 +270,18 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 				Network: nic.Id,
 				PortID:  uuid.New().String(),
 				Bridge:  "virbr0",
-				//Target:  fmt.Sprintf("vnet%d", i),
-				//Alias:   fmt.Sprintf("net%d", i),
-				Bus: busno,
+				Bus:     busno,
 			}
 			var ni api.Network
-			vx.Nets = append(vx.Nets, ns)
+			virtSpec.Nets = append(virtSpec.Nets, ns)
 			ni.Id = ns.Network
 			ni.Mac = &ns.MAC
 			// netplanで静的IPアドレスを設定する場合のために、IPアドレス情報もサーバーに保存しておく
-			ni.Ipv4addr = nic.Ipv4addr
-			ni.Ipv4mask = nic.Ipv4mask
-			ni.Ipv6addr = nic.Ipv6addr
-			ni.Ipv6mask = nic.Ipv6mask
-
-			*serverConfig.Network = append(*serverConfig.Network, ni)
+			ni.Address = nic.Address
+			ni.Netmask = nic.Netmask
+			ni.Routes = nic.Routes
+			(*serverConfig.Network)[i] = ni
+			//*serverConfig.Network = append(*serverConfig.Network, ni)
 		}
 	}
 	// サーバーのネットワーク情報を更新
@@ -300,17 +291,17 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 		return "", err
 	}
 
-	vx.ChannelSpecs = []virt.ChannelSpec{
+	virtSpec.ChannelSpecs = []virt.ChannelSpec{
 		{"unix", channelPath + "/" + channelFile, channelFile, "channel0", 1},
 		{"spicevmc", "", "com.redhat.spice.0", "channel1", 2},
 	}
-	vx.Clocks = []virt.ClockSpec{
+	virtSpec.Clocks = []virt.ClockSpec{
 		{"rtc", "catchup", ""},
 		{"pit", "delay", ""},
 		{"hpet", "", "no"},
 	}
 
-	dom := virt.CreateDomainXML(vx)
+	dom := virt.CreateDomainXML(virtSpec)
 	xml, err := dom.Marshal()
 	fmt.Println("Generated", "libvirt XML:\n", string(xml))
 
@@ -359,14 +350,20 @@ func (m *Marmot) DeleteServerById(id string) error {
 		return err
 	}
 	defer l.Close()
-	if err = l.DeleteDomain(*sv.InstanceName); err != nil {
-		// ドメインが存在しない場合はスキップしたいが、区別が難しいので意図的にスキップする
-		//if *sv.Status != db.SERVER_PROVISIONING {
-		//	slog.Error("DeleteDomain()", "err", err)
-		//	return err
-		//}
-		slog.Debug("DeleteServerById()", "server is in PROVISIONING state, skipping domain deletion", *sv.Name)
-		// return nil 戻さず、削除処理を続行する
+
+	if sv.InstanceName != nil {
+		slog.Debug("DeleteServerById()", "deleting domain", *sv.InstanceName)
+		if err = l.DeleteDomain(*sv.InstanceName); err != nil {
+			// ドメインが存在しない場合はスキップしたいが、区別が難しいので意図的にスキップする
+			//if *sv.Status != db.SERVER_PROVISIONING {
+			//	slog.Error("DeleteDomain()", "err", err)
+			//	return err
+			//}
+			slog.Debug("DeleteServerById()", "server is in PROVISIONING state, skipping domain deletion", *sv.Name)
+			// return nil 戻さず、削除処理を続行する
+		}
+	} else {
+		slog.Debug("DeleteServerById()", "no instance name set, skipping domain deletion", "server name", *sv.Name)
 	}
 
 	// ブートボリュームの削除

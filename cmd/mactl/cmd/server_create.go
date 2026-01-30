@@ -51,19 +51,45 @@ var serverCreateCmd = &cobra.Command{
 			volSpec.Type = util.StringPtr(*conf.BootVolume.Type)
 		}
 		spec.BootVolume = &volSpec
+		spec.Network = &[]api.Network{}
+		if conf.Network != nil {
+			for _, nic := range *conf.Network {
+				var n api.Network
+				n.Id = nic.Name
+				if nic.Address != nil {
+					n.Address = util.StringPtr(*nic.Address)
+					n.Dhcp4 = util.BoolPtr(false)
+					n.Dhcp6 = util.BoolPtr(false)
+				}
+				if nic.Netmask != nil {
+					n.Netmask = util.StringPtr(*nic.Netmask)
+				}
+				if nic.Routes != nil {
+					routes := make([]api.Route, len(*nic.Routes))
+					for i, r := range *nic.Routes {
+						routes[i].To = util.StringPtr(r.Destination)
+						routes[i].Via = util.StringPtr(r.Gateway)
+					}
+					n.Routes = &routes
+				}
 
-		if conf.Nic != nil {
-			for i, nic := range *conf.Nic {
-				if i == 0 {
-					if nic.IpAddress != nil {
-						spec.PrivateIp = util.StringPtr(*nic.IpAddress)
+				if nic.Nameservers != nil {
+					n.Nameservers = &api.Nameservers{}
+					if nic.Nameservers.Addresses != nil {
+						n.Nameservers.Addresses = &[]string{}
+						for _, addr := range *nic.Nameservers.Addresses {
+							fmt.Println("addr", addr)
+							*n.Nameservers.Addresses = append(*n.Nameservers.Addresses, addr)
+						}
+					}
+					if nic.Nameservers.Search != nil {
+						n.Nameservers.Search = &[]string{}
+						for _, search := range *nic.Nameservers.Search {
+							*n.Nameservers.Search = append(*n.Nameservers.Search, search)
+						}
 					}
 				}
-				if i == 1 {
-					if nic.IpAddress != nil {
-						spec.PublicIp = util.StringPtr(*nic.IpAddress)
-					}
-				}
+				*spec.Network = append(*spec.Network, n)
 			}
 		}
 		spec.Comment = conf.Comment
