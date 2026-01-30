@@ -363,7 +363,7 @@ func (m *Marmot) DeleteServerById(id string) error {
 			// return nil 戻さず、削除処理を続行する
 		}
 	} else {
-		slog.Debug("DeleteServerById()", "no instance name set, skipping domain deletion", "server name", *sv.Name)
+		slog.Debug("DeleteServerById() no instance name set, skipping domain deletion", "server name", *sv.Name)
 	}
 
 	// ブートボリュームの削除
