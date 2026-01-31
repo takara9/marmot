@@ -78,7 +78,6 @@ var serverCreateCmd = &cobra.Command{
 					if nic.Nameservers.Addresses != nil {
 						n.Nameservers.Addresses = &[]string{}
 						for _, addr := range *nic.Nameservers.Addresses {
-							fmt.Println("addr", addr)
 							*n.Nameservers.Addresses = append(*n.Nameservers.Addresses, addr)
 						}
 					}
@@ -116,29 +115,34 @@ var serverCreateCmd = &cobra.Command{
 
 		byteBody, _, err := m.CreateServer(spec)
 		if err != nil {
-			println("CreateServer", "err", err)
+			fmt.Println("CreateServer", "err", err)
 			return err
 		}
 
 		switch outputStyle {
 		case "text":
-			println("Not implemented for text output")
-			println(string(byteBody))
+			var data interface{}
+			if err := json.Unmarshal(byteBody, &data); err != nil {
+				fmt.Println("Failed to Unmarshal", err)
+				return err
+			}
+			serverMap := data.(map[string]interface{})
+			fmt.Printf("サーバーが作成されました。ID: %v\n", serverMap["id"])
 			return nil
 
 		case "json":
-			println(string(byteBody))
+			fmt.Println(string(byteBody))
 			return nil
 
 		case "yaml":
 			var data interface{}
 			if err := json.Unmarshal(byteBody, &data); err != nil {
-				println("Failed to Unmarshal", err)
+				fmt.Println("Failed to Unmarshal", err)
 				return err
 			}
 			yamlBytes, err := yaml.Marshal(data)
 			if err != nil {
-				println("Failed to Marshal", err)
+				fmt.Println("Failed to Marshal", err)
 				return err
 			}
 			fmt.Println(string(yamlBytes))

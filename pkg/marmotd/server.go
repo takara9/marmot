@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/takara9/marmot/api"
@@ -280,8 +281,8 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 			ni.Address = nic.Address
 			ni.Netmask = nic.Netmask
 			ni.Routes = nic.Routes
+			ni.Nameservers = nic.Nameservers
 			(*serverConfig.Network)[i] = ni
-			//*serverConfig.Network = append(*serverConfig.Network, ni)
 		}
 	}
 	// サーバーのネットワーク情報を更新
@@ -319,6 +320,8 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 		slog.Error("DefineAndStartVM()", "err", err)
 		return "", err
 	}
+	createTime := time.Now()
+	serverConfig.CTime = &createTime
 
 	// ステータスを利用可能に更新
 	serverConfig.Status = util.IntPtrInt(db.SERVER_AVAILABLE)

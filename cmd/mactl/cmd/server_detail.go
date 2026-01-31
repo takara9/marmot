@@ -3,8 +3,11 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/db"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -22,36 +25,35 @@ var serverDetailCmd = &cobra.Command{
 		}
 
 		var data interface{}
+		var server api.Server
 		switch outputStyle {
 		case "text":
-			if err := json.Unmarshal(byteBody, &data); err != nil {
+			if err := json.Unmarshal(byteBody, &server); err != nil {
 				println("Failed to Unmarshal", err)
 				return err
 			}
-			serverMap := data.(map[string]interface{})
 			fmt.Printf("Server Details:\n")
-			fmt.Printf("  ID: %v\n", serverMap["id"])
-			fmt.Printf("  Name: %v\n", serverMap["name"])
-			fmt.Printf("  Status: %v\n", serverMap["status"])
-			fmt.Printf("  CPU: %v\n", serverMap["cpu"])
-			fmt.Printf("  Memory: %v MB\n", serverMap["memory"])
-			/*
-				for idx, disk := range serverMap["disks"].([]interface{}) {
-					diskMap := disk.(map[string]interface{})
-					fmt.Printf("  Disk %d:\n", idx+1)
-					fmt.Printf("    ID: %v\n", diskMap["id"])
-					fmt.Printf("    Size: %v GB\n", diskMap["size"])
-					fmt.Printf("    Status: %v\n", diskMap["status"])
-				}
-				for idx, nic := range serverMap["nics"].([]interface{}) {
-					nicMap := nic.(map[string]interface{})
-					fmt.Printf("  NIC %d:\n", idx+1)
-					fmt.Printf("    ID: %v\n", nicMap["id"])
-					fmt.Printf("    MAC Address: %v\n", nicMap["mac_address"])
-					fmt.Printf("    IP Address: %v\n", nicMap["ip_address"])
-					fmt.Printf("    Network ID: %v\n", nicMap["network_id"])
-				}
-			*/
+			fmt.Printf("  Id: %v\n", server.Id)
+			fmt.Printf("  UUID: %v\n", *server.Uuid)
+			fmt.Printf("  Name: %v\n", *server.Name)
+			if server.CTime != nil {
+				tm := server.CTime.Format(time.RFC3339)
+				fmt.Printf("  Create Time: %v\n", tm)
+			} else {
+				fmt.Printf("  Create Time: N/A\n")
+			}
+			if server.CTime != nil {
+				tm := time.Since(*server.CTime).Hours()
+				fmt.Printf("  Running Time: %.1f hours\n", tm)
+			} else {
+				fmt.Printf("  Running Time: N/A\n")
+			}
+			fmt.Printf("  OS: %v\n", *server.OsVariant)
+			fmt.Printf("  Status: %v\n", db.ServerStatus[*server.Status])
+			fmt.Printf("  CPU: %v\n", *server.Cpu)
+			fmt.Printf("  Memory: %v MB\n", *server.Memory)
+			fmt.Printf("  Boot Volume Path: %v\n", *server.BootVolume.Path)
+
 			return nil
 
 		case "json":

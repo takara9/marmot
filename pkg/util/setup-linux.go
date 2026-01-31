@@ -32,6 +32,8 @@ func SetupLinux(spec api.Server) error {
 
 	// ホスト名設定
 	hostnameFile := filepath.Join(mountPoint, "etc/hostname")
+	slog.Debug("Setting hostname", "file", hostnameFile, "hostname", *spec.Name)
+
 	err = os.WriteFile(hostnameFile, []byte(*spec.Name), 0644)
 	if err != nil {
 		slog.Error("WriteFile hostname failed", "error", err)
@@ -97,6 +99,7 @@ func MountVolume(v api.Volume) (string, string, error) {
 		return "", "", err
 	}
 	slog.Debug("Created mount point", "mountPoint", mountPoint)
+	//defer os.RemoveAll(mountPoint)
 
 	var nbdDevice string
 
@@ -145,18 +148,22 @@ func MountVolume(v api.Volume) (string, string, error) {
 
 	case "lvm":
 		lvPath := fmt.Sprintf("/dev/%s/%s", *v.VolumeGroup, *v.LogicalVolume)
+		slog.Debug("Using volume", "lvPath", lvPath)
 		lvdev, err := findTargertPartition(lvPath)
 		if err != nil {
 			slog.Error("FindTargertPartition failed", "error", err)
+			os.RemoveAll(mountPoint)
 			return "", "", err
 		}
 		cmd := exec.Command("mount", "-t", "ext4", lvdev, mountPoint)
 		err = cmd.Run()
 		if err != nil {
 			err := errors.New("mount failed to setup OS-Disk")
+			os.RemoveAll(mountPoint)
 			return "", "", err
 		}
 	default:
+		os.RemoveAll(mountPoint)
 		return "", "", fmt.Errorf("unsupported volume type: %s", *v.Type)
 	}
 
@@ -408,6 +415,14 @@ func findTargertPartition(lvPath string) (string, error) {
 		slog.Error("kpartx -av command failed", "error", err)
 		return "", err
 	}
+
+	slog.Debug("kpartx output", "output", string(out))
+	if len(out) == 0 {
+		slog.Error("kpartx -av command returned empty output")
+		//exec.Command("kpartx", "-d", lvPath).CombinedOutput()
+		return "", fmt.Errorf("kpartx -av command returned empty output")
+	}
+
 	// 最後に後片付け としてデバイスマップを削除は、ここで実行しない。unmount時に実行する
 	//defer exec.Command("kpartx", "-d", lvPath).Run()
 
@@ -424,6 +439,7 @@ func findTargertPartition(lvPath string) (string, error) {
 			if err != nil {
 				continue
 			}
+			slog.Debug("Found partition", "deviceNode", deviceNode, "fsType", strings.TrimSpace(string(fsType)))
 
 			if strings.TrimSpace(string(fsType)) == "ext4" {
 				return deviceNode, nil
