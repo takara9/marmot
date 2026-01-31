@@ -18,9 +18,10 @@ const (
 )
 
 var ServerStatus = map[int]string{
-	0: "PROVISIONING",
-	1: "INUSE",
-	2: "AVAILABLE",
+	0: "UNKNOWN",
+	1: "PROVISIONING",
+	2: "INUSE",
+	3: "RUNNING",
 }
 
 // サーバーを登録、サーバーを一意に識別するIDを自動生成

@@ -51,19 +51,44 @@ var serverCreateCmd = &cobra.Command{
 			volSpec.Type = util.StringPtr(*conf.BootVolume.Type)
 		}
 		spec.BootVolume = &volSpec
+		spec.Network = &[]api.Network{}
+		if conf.Network != nil {
+			for _, nic := range *conf.Network {
+				var n api.Network
+				n.Id = nic.Name
+				if nic.Address != nil {
+					n.Address = util.StringPtr(*nic.Address)
+					n.Dhcp4 = util.BoolPtr(false)
+					n.Dhcp6 = util.BoolPtr(false)
+				}
+				if nic.Netmask != nil {
+					n.Netmask = util.StringPtr(*nic.Netmask)
+				}
+				if nic.Routes != nil {
+					routes := make([]api.Route, len(*nic.Routes))
+					for i, r := range *nic.Routes {
+						routes[i].To = util.StringPtr(r.Destination)
+						routes[i].Via = util.StringPtr(r.Gateway)
+					}
+					n.Routes = &routes
+				}
 
-		if conf.Nic != nil {
-			for i, nic := range *conf.Nic {
-				if i == 0 {
-					if nic.IpAddress != nil {
-						spec.PrivateIp = util.StringPtr(*nic.IpAddress)
+				if nic.Nameservers != nil {
+					n.Nameservers = &api.Nameservers{}
+					if nic.Nameservers.Addresses != nil {
+						n.Nameservers.Addresses = &[]string{}
+						for _, addr := range *nic.Nameservers.Addresses {
+							*n.Nameservers.Addresses = append(*n.Nameservers.Addresses, addr)
+						}
+					}
+					if nic.Nameservers.Search != nil {
+						n.Nameservers.Search = &[]string{}
+						for _, search := range *nic.Nameservers.Search {
+							*n.Nameservers.Search = append(*n.Nameservers.Search, search)
+						}
 					}
 				}
-				if i == 1 {
-					if nic.IpAddress != nil {
-						spec.PublicIp = util.StringPtr(*nic.IpAddress)
-					}
-				}
+				*spec.Network = append(*spec.Network, n)
 			}
 		}
 		spec.Comment = conf.Comment
@@ -90,29 +115,34 @@ var serverCreateCmd = &cobra.Command{
 
 		byteBody, _, err := m.CreateServer(spec)
 		if err != nil {
-			println("CreateServer", "err", err)
+			fmt.Println("CreateServer", "err", err)
 			return err
 		}
 
 		switch outputStyle {
 		case "text":
-			println("Not implemented for text output")
-			println(string(byteBody))
+			var data interface{}
+			if err := json.Unmarshal(byteBody, &data); err != nil {
+				fmt.Println("Failed to Unmarshal", err)
+				return err
+			}
+			serverMap := data.(map[string]interface{})
+			fmt.Printf("サーバーが作成されました。ID: %v\n", serverMap["id"])
 			return nil
 
 		case "json":
-			println(string(byteBody))
+			fmt.Println(string(byteBody))
 			return nil
 
 		case "yaml":
 			var data interface{}
 			if err := json.Unmarshal(byteBody, &data); err != nil {
-				println("Failed to Unmarshal", err)
+				fmt.Println("Failed to Unmarshal", err)
 				return err
 			}
 			yamlBytes, err := yaml.Marshal(data)
 			if err != nil {
-				println("Failed to Marshal", err)
+				fmt.Println("Failed to Marshal", err)
 				return err
 			}
 			fmt.Println(string(yamlBytes))

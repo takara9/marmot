@@ -54,27 +54,25 @@ type MarmotConfig struct {
 	VmSpec            *[]VmSpec `json:"vm_spec,omitempty"`
 }
 
-// Nameserver defines model for Nameserver.
-type Nameserver struct {
-	Address *string `json:"address,omitempty"`
-	Search  *string `json:"search,omitempty"`
+// Nameservers defines model for Nameservers.
+type Nameservers struct {
+	Addresses *[]string `json:"addresses,omitempty"`
+	Search    *[]string `json:"search,omitempty"`
 }
 
 // Network defines model for Network.
 type Network struct {
-	Dhcp4       *bool         `json:"dhcp4,omitempty"`
-	Dhcp6       *bool         `json:"dhcp6,omitempty"`
-	Ethernet    *string       `json:"ethernet,omitempty"`
-	Id          string        `json:"id"`
-	Ipv4addr    *string       `json:"ipv4addr,omitempty"`
-	Ipv4mask    *string       `json:"ipv4mask,omitempty"`
-	Ipv6addr    *string       `json:"ipv6addr,omitempty"`
-	Ipv6mask    *string       `json:"ipv6mask,omitempty"`
-	Mac         *string       `json:"mac,omitempty"`
-	Nameservers *[]Nameserver `json:"nameservers,omitempty"`
-	Networkname *string       `json:"networkname,omitempty"`
-	Routes      *[]Route      `json:"routes,omitempty"`
-	Uuid        *string       `json:"uuid,omitempty"`
+	Address     *string      `json:"address,omitempty"`
+	Dhcp4       *bool        `json:"dhcp4,omitempty"`
+	Dhcp6       *bool        `json:"dhcp6,omitempty"`
+	Ethernet    *string      `json:"ethernet,omitempty"`
+	Id          string       `json:"id"`
+	Mac         *string      `json:"mac,omitempty"`
+	Nameservers *Nameservers `json:"nameservers,omitempty"`
+	Netmask     *string      `json:"netmask,omitempty"`
+	Networkname *string      `json:"networkname,omitempty"`
+	Routes      *[]Route     `json:"routes,omitempty"`
+	Uuid        *string      `json:"uuid,omitempty"`
 }
 
 // Pong defines model for Pong.
@@ -114,8 +112,6 @@ type Server struct {
 	OsVariant    *string    `json:"osVariant,omitempty"`
 	OsVg         *string    `json:"osVg,omitempty"`
 	Playbook     *string    `json:"playbook,omitempty"`
-	PrivateIp    *string    `json:"privateIp,omitempty"`
-	PublicIp     *string    `json:"publicIp,omitempty"`
 	STime        *time.Time `json:"sTime,omitempty"`
 	Status       *int       `json:"status,omitempty"`
 	Uuid         *string    `json:"uuid,omitempty"`

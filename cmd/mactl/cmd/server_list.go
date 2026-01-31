@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/db"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -20,7 +22,8 @@ var serverListCmd = &cobra.Command{
 			return nil
 		}
 
-		var data interface{}
+		//var data interface{}
+		var data []api.Server
 		switch outputStyle {
 		case "text":
 			if string(byteBody) == "null\n" {
@@ -33,14 +36,27 @@ var serverListCmd = &cobra.Command{
 				return err
 			}
 
-			for idx, server := range data.([]interface{}) {
-				serverMap := server.(map[string]interface{})
-				fmt.Printf("Server %d:", idx+1)
-				fmt.Printf("  ID: %v", serverMap["id"])
-				fmt.Printf("  Name: %v", serverMap["name"])
-				fmt.Printf("  Status: %v", serverMap["status"])
-				fmt.Printf("  CPU: %v", serverMap["cpu"])
-				fmt.Printf("  Memory: %v MB", serverMap["memory"])
+			fmt.Printf("  %2s  %-10s  %-20s  %-12s  %-3s  %-8s  %-15s\n", "No", "Server-ID", "Server-Name", "Status", "CPU", "RAM(MB)", "IP-Address")
+			for i, server := range data {
+				fmt.Printf("  %2d", i+1)
+				fmt.Printf("  %-10v", server.Id)
+				fmt.Printf("  %-20v", *server.Name)
+				fmt.Printf("  %-12v", db.ServerStatus[*server.Status])
+				fmt.Printf("  %-3v", *server.Cpu)
+				fmt.Printf("  %-8v", *server.Memory)
+				if server.Network != nil {
+					for j, nic := range *server.Network {
+						if j == 0 {
+							if nic.Address != nil {
+								fmt.Printf("  %-15v", *nic.Address)
+							} else {
+								fmt.Printf("  %-15s", "N/A")
+							}
+						}
+					}
+				} else {
+					fmt.Printf("  %-15s", "N/A")
+				}
 				fmt.Println()
 			}
 			return nil
