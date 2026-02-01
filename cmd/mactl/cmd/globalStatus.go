@@ -64,12 +64,28 @@ var globalStatusCmd = &cobra.Command{
 		for dec.More() {
 			var vm api.VirtualMachine
 			err := dec.Decode(&vm)
+			nodata := "N/A"
 			if err != nil {
 				slog.Error("getting vm status", "err", err)
 			}
+			if vm.PrivateIp == nil {
+				vm.PrivateIp = &nodata
+			}
+			if vm.PublicIp == nil {
+				vm.PublicIp = &nodata
+			}
+			k := strings.Split(*vm.Key, "/")
+
 			fmt.Printf("%-10s %-16s %-6s %-5s %-20s %-4v  %-6v %-15v %-15v ",
-				*vm.ClusterName, vm.Name, vm.HvNode, StateDsp[*vm.Status],
-				*vm.Key, *vm.Cpu, *vm.Memory, *vm.PrivateIp, *vm.PublicIp)
+				*vm.ClusterName,
+				vm.Name, vm.HvNode,
+				StateDsp[*vm.Status],
+				k[len(k)-1],
+				*vm.Cpu,
+				*vm.Memory,
+				*vm.PrivateIp,
+				*vm.PublicIp)
+
 			if vm.Storage != nil {
 				for _, dv := range *vm.Storage {
 					fmt.Printf("%-4d", *dv.Size)
