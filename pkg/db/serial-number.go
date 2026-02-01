@@ -22,7 +22,7 @@ func (d *Database) CreateSeq(key string, start uint64, step uint64) error {
 }
 
 // 内部関数
-func (d *Database) getSeqRaw(key string) (uint64, error) {	
+func (d *Database) getSeqRaw(key string) (uint64, error) {
 	etcdKey := SeqPrefix + "/" + key
 	resp, err := d.Cli.Get(d.Ctx, etcdKey, etcd.WithLimit(1))
 	if err != nil {
@@ -55,6 +55,11 @@ func (d *Database) getSeqRaw(key string) (uint64, error) {
 
 // シリアル番号の取得（CASロック）
 func (d *Database) GetSeqByKind(key string) (uint64, error) {
+	if len(key) == 0 {
+		slog.Error("GetSeqByKind() key is empty")
+		return 0, errors.New("key is empty")
+	}
+
 	lockKey := "/lock/seq/" + key
 	mutex, err := d.LockKey(lockKey)
 	if err != nil {
