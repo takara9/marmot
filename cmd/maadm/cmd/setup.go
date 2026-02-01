@@ -83,6 +83,7 @@ func setHypervisorConfig(hvs config.Hypervisors_yaml, kvsurl string) error {
 
 	// シーケンス番号の初期値をDBへセット
 	for _, sq := range hvs.Seq {
+		slog.Debug("Creating sequence", "key", sq.Key, "start", sq.Start, "step", sq.Step)
 		if err := d.CreateSeq(sq.Key, sq.Start, sq.Step); err != nil {
 			slog.Error("Failed to create sequence", "error", err)
 			return err

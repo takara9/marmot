@@ -94,7 +94,18 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			GinkgoWriter.Println("command messeag: ", string(stdoutStderr))
 		})
 
+		// marmotd を介さずに、DB操作で内容をチェックする
+		It("データベースと接続", func() {
+			var err error
+			d1, err = db.NewDatabase("http://localhost:3379")
+			Expect(err).NotTo(HaveOccurred())
+		})
+
 		It("OSイメージ、LVOS、LVDATA、VMのシーケンス番号をチェック", func() {
+			out, err := exec.Command("etcdctl", "--endpoints", "http://localhost:3379", "get", "/marmot/sequence", "--prefix").CombinedOutput()
+			GinkgoWriter.Println("etcdctl output: ", string(out))
+			Expect(err).NotTo(HaveOccurred())
+
 			// OSイメージのシーケンス番号をチェック
 			seq, err := d1.GetSeqByKind("LVOS")
 			Expect(err).NotTo(HaveOccurred())

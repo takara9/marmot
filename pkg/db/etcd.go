@@ -77,6 +77,8 @@ func (d *Database) Close() error {
 
 // LockKey: 指定キーに対する分散ロックを取得
 func (d *Database) LockKey(lockName string) (*concurrency.Mutex, error) {
+	slog.Debug("LockKey()", "lockName", lockName)
+	slog.Debug("LockKey()", "ctx", d.Ctx)
 	ctx, _ := context.WithTimeout(d.Ctx, 5*time.Second)
 	d.Mutex = concurrency.NewMutex(d.Session, lockName)
 	if err := d.Mutex.Lock(ctx); err != nil {
@@ -87,6 +89,7 @@ func (d *Database) LockKey(lockName string) (*concurrency.Mutex, error) {
 
 // UnlockKey: エラーを無視してでも必ず呼ぶ想定
 func (d *Database) UnlockKey(m *concurrency.Mutex) {
+	slog.Debug("UnlockKey()")
 	_ = m.Unlock(d.Ctx)
 }
 

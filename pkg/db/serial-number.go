@@ -24,6 +24,7 @@ func (d *Database) CreateSeq(key string, start uint64, step uint64) error {
 // 内部関数
 func (d *Database) getSeqRaw(key string) (uint64, error) {
 	etcdKey := SeqPrefix + "/" + key
+	slog.Debug("getSeqRaw()", "etcdKey", etcdKey)
 	resp, err := d.Cli.Get(d.Ctx, etcdKey, etcd.WithLimit(1))
 	if err != nil {
 		slog.Error("GetSeqByKind()", "err", err, "etcdKey", etcdKey)
@@ -61,12 +62,16 @@ func (d *Database) GetSeqByKind(key string) (uint64, error) {
 	}
 
 	lockKey := "/lock/seq/" + key
+	slog.Debug("GetSeqByKind() locking", "lockKey", lockKey)
+
 	mutex, err := d.LockKey(lockKey)
 	if err != nil {
 		slog.Error("failed to lock", "err", err, "key", lockKey)
 		return 0, err
 	}
 	defer d.UnlockKey(mutex)
+	slog.Debug("GetSeqByKind() locked", "lockKey", lockKey)
+
 	for retry := 0; retry < 5; retry++ {
 		if seqno, err := d.getSeqRaw(key); err == nil {
 			return seqno, nil
@@ -75,6 +80,7 @@ func (d *Database) GetSeqByKind(key string) (uint64, error) {
 			time.Sleep(100 * time.Millisecond) // 少し待ってからリトライ
 		}
 	}
+
 	slog.Error("GetSeqByKind() exceeded retry limit", "key", key)
 	return 0, errors.New("GetSeqByKind() exceeded retry limit")
 }
