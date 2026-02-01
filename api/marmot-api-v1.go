@@ -71,8 +71,10 @@ type Network struct {
 	Nameservers *Nameservers `json:"nameservers,omitempty"`
 	Netmask     *string      `json:"netmask,omitempty"`
 	Networkname *string      `json:"networkname,omitempty"`
+	Portgroup   *string      `json:"portgroup,omitempty"`
 	Routes      *[]Route     `json:"routes,omitempty"`
 	Uuid        *string      `json:"uuid,omitempty"`
+	Vlans       *[]uint      `json:"vlans,omitempty"`
 }
 
 // Pong defines model for Pong.

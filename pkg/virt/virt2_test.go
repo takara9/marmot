@@ -48,7 +48,7 @@ var _ = Describe("仮想サーバー生成から終了までのライフサイ�
 
 		mac, err := util.GenerateRandomMAC()
 		Expect(err).NotTo(HaveOccurred())
-		vs.Nets = []virt.NetSpec{
+		vs.NetSpecs = []virt.NetSpec{
 			{
 				MAC:     mac.String(),
 				Network: "default",
@@ -93,7 +93,7 @@ var _ = Describe("仮想サーバー生成から終了までのライフサイ�
 
 		mac, err := util.GenerateRandomMAC()
 		Expect(err).NotTo(HaveOccurred())
-		vs.Nets = []virt.NetSpec{
+		vs.NetSpecs = []virt.NetSpec{
 			{
 				MAC:     mac.String(),
 				Network: "default",
