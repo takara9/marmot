@@ -73,6 +73,18 @@ var serverCreateCmd = &cobra.Command{
 					n.Routes = &routes
 				}
 
+				// VLAN対応
+				if nic.Portgroup != nil {
+					n.Portgroup = util.StringPtr(*nic.Portgroup)
+				}
+				if nic.Vlans != nil {
+					vlans := make([]uint, len(*nic.Vlans))
+					for i, v := range *nic.Vlans {
+						vlans[i] = uint(v)
+					}
+					n.Vlans = &vlans
+				}
+
 				if nic.Nameservers != nil {
 					n.Nameservers = &api.Nameservers{}
 					if nic.Nameservers.Addresses != nil {

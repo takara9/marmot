@@ -255,8 +255,8 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 		serverConfig.Network = &[]api.Network{net}
 	} else {
 		slog.Debug("ネットワーク指定あり、指定されたネットワークを使用")
-		for i, nic := range *requestServerSpec.Network {
-			slog.Debug("ネットワーク", "index", i, "network id", nic.Id)
+		for i, reqNic := range *requestServerSpec.Network {
+			slog.Debug("ネットワーク", "index", i, "network id", reqNic.Id)
 			mac, err := util.GenerateRandomMAC()
 			if err != nil {
 				slog.Error("GenerateRandomMAC()", "err", err)
@@ -268,20 +268,31 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 			}
 			ns := virt.NetSpec{
 				MAC:     mac.String(),
-				Network: nic.Id,
+				Network: reqNic.Id,
 				PortID:  uuid.New().String(),
 				Bridge:  "virbr0",
 				Bus:     busno,
 			}
-			var ni api.Network
+
+			// VLAN対応
+			if reqNic.Portgroup != nil {
+				ns.PortGroup = *reqNic.Portgroup
+			}
+			if reqNic.Vlans != nil && len(*reqNic.Vlans) > 0 {
+				for _, v := range *reqNic.Vlans {
+					ns.Vlans = append(ns.Vlans, v)
+				}
+			}
 			virtSpec.NetSpecs = append(virtSpec.NetSpecs, ns)
+
+			var ni api.Network
 			ni.Id = ns.Network
 			ni.Mac = &ns.MAC
 			// netplanで静的IPアドレスを設定する場合のために、IPアドレス情報もサーバーに保存しておく
-			ni.Address = nic.Address
-			ni.Netmask = nic.Netmask
-			ni.Routes = nic.Routes
-			ni.Nameservers = nic.Nameservers
+			ni.Address = reqNic.Address
+			ni.Netmask = reqNic.Netmask
+			ni.Routes = reqNic.Routes
+			ni.Nameservers = reqNic.Nameservers
 			(*serverConfig.Network)[i] = ni
 		}
 	}
