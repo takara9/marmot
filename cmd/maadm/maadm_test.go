@@ -102,7 +102,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		})
 
 		It("OSイメージ、LVOS、LVDATA、VMのシーケンス番号をチェック", func() {
-			out, err := exec.Command("etcdctl", "--endpoints", "http://localhost:3379", "get", "/marmot/sequence", "--prefix").CombinedOutput()
+			out, err := exec.Command("ETCDCTL_API=3", "etcdctl", "--endpoints", "http://localhost:3379", "get", "/marmot/sequence", "--prefix").CombinedOutput()
 			GinkgoWriter.Println("etcdctl output: ", string(out))
 			//Expect(err).NotTo(HaveOccurred())
 
