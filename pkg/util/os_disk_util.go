@@ -16,11 +16,8 @@ package util
 import (
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"os/exec"
-
-	"github.com/takara9/marmot/api"
 )
 
 // LVのパーティションをマップ
@@ -64,6 +61,7 @@ func unMountLocal(uuid string) error {
 	return err
 }
 
+/*
 func ConfigRootVol(spec api.VmSpec, vg string, oslv string) error {
 	err := kpartOn(vg, oslv)
 	if err != nil {
@@ -115,3 +113,4 @@ func ConfigRootVol(spec api.VmSpec, vg string, oslv string) error {
 	return nil
 }
 
+*/

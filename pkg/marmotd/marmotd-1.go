@@ -86,6 +86,7 @@ func (s *Server) GetVersion(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, v)
 }
 
+/*
 // ハイパーバイザーのリスト
 func (s *Server) ListHypervisors(ctx echo.Context, params api.ListHypervisorsParams) error {
 	slog.Debug("===", "ListHypervisors() is called", "===")
@@ -345,3 +346,4 @@ func (s *Server) ShowHypervisorById(ctx echo.Context, hypervisorId string) error
 	}
 	return ctx.JSON(http.StatusNotFound, api.ReplyMessage{Message: "Hypervisor " + hypervisorId + " not found"})
 }
+*/

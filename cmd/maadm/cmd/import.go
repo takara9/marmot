@@ -5,7 +5,6 @@ package cmd
 
 import (
 	"archive/zip"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -15,7 +14,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/types"
 )
 
 // importCmd represents the migrate command
@@ -108,39 +106,43 @@ func importConfig() error {
 		return err
 	}
 
-	// ハイパーバイザー
-	// read marmot-hv.json
-	path := filepath.Join(workDir, "marmot-hv.json")
-	jsonBytes, err := os.ReadFile(path)
-	if err != nil {
-		slog.Error("Failed to read json file in working dir", "error", err)
-		return err
-	}
-	var buf []api.Hypervisor
-	if err := json.Unmarshal(jsonBytes, &buf); err != nil {
-		slog.Error("Failed to unmarshal", "error", err)
-		return err
-	}
-	for _, v := range buf {
-		d.PutJSON(*v.Key, v)
+	/*
+		// ハイパーバイザー
+		// read marmot-hv.json
+		path := filepath.Join(workDir, "marmot-hv.json")
+		jsonBytes, err := os.ReadFile(path)
+		if err != nil {
+			slog.Error("Failed to read json file in working dir", "error", err)
+			return err
+		}
+		var buf []api.Hypervisor
+		if err := json.Unmarshal(jsonBytes, &buf); err != nil {
+			slog.Error("Failed to unmarshal", "error", err)
+			return err
+		}
+		for _, v := range buf {
+			d.PutJSON(*v.Key, v)
 
-	}
+		}
+	*/
 
-	// バージョン
-	// marmot-version.json
-	path = filepath.Join(workDir, "marmot-version.json")
-	jsonBytes, err = os.ReadFile(path)
-	if err != nil {
-		slog.Error("Failed to read json file in working dir", "error", err)
-		return err
-	}
-	var bufVer api.Version
-	if err := json.Unmarshal(jsonBytes, &bufVer); err != nil {
-		slog.Error("Failed to unmarshal", "error", err)
-		return err
-	}
-	slog.Info("Imported version information", "importedVersion", bufVer)
-	// TODO: バージョンの整合性チェックと移行処理を実装する
+	/*
+		// バージョン
+		// marmot-version.json
+		path = filepath.Join(workDir, "marmot-version.json")
+		jsonBytes, err = os.ReadFile(path)
+		if err != nil {
+			slog.Error("Failed to read json file in working dir", "error", err)
+			return err
+		}
+		var bufVer api.Version
+		if err := json.Unmarshal(jsonBytes, &bufVer); err != nil {
+			slog.Error("Failed to unmarshal", "error", err)
+			return err
+		}
+		slog.Info("Imported version information", "importedVersion", bufVer)
+		// TODO: バージョンの整合性チェックと移行処理を実装する
+	*/
 
 	// データベースへバージョンの書き込み
 	serverVersion := version
@@ -154,60 +156,66 @@ func importConfig() error {
 
 	// OSイメージテンプレート
 	// marmot-os-temp.json
-	path = filepath.Join(workDir, "marmot-os-temp.json")
-	jsonBytes, err = os.ReadFile(path)
-	if err != nil {
-		slog.Error("Failed to read json file in working dir", "error", err)
-		return err
-	}
-	var buf2 []types.OsImageTemplate
-	if err := json.Unmarshal(jsonBytes, &buf2); err != nil {
-		slog.Error("Failed to unmarshal", "error", err)
-		return err
-	}
-	// 配列データを1件ずつ登録している。正しいのか？
-
-	for _, v := range buf2 {
-		slog.Debug("marmot-os-temp.json", "key", v.Key)
-		if err := d.PutJSON(v.Key, v); err != nil {
-			slog.Error("Failed to put OS image template data", "error", err, "key", v.Key)
+	/*
+		path = filepath.Join(workDir, "marmot-os-temp.json")
+		jsonBytes, err = os.ReadFile(path)
+		if err != nil {
+			slog.Error("Failed to read json file in working dir", "error", err)
 			return err
 		}
-	}
+		var buf2 []types.OsImageTemplate
+		if err := json.Unmarshal(jsonBytes, &buf2); err != nil {
+			slog.Error("Failed to unmarshal", "error", err)
+			return err
+		}
+		// 配列データを1件ずつ登録している。正しいのか？
+
+		for _, v := range buf2 {
+			slog.Debug("marmot-os-temp.json", "key", v.Key)
+			if err := d.PutJSON(v.Key, v); err != nil {
+				slog.Error("Failed to put OS image template data", "error", err, "key", v.Key)
+				return err
+			}
+		}
+	*/
 
 	// シーケンス番号
 	// marmot-seq-data.json
-	path = filepath.Join(workDir, "marmot-seq-data.json")
-	jsonBytes, err = os.ReadFile(path)
-	if err != nil {
-		slog.Error("Failed to read json file in working dir", "error", err)
-		return err
-	}
-	var buf3 []types.VmSerial
-	if err := json.Unmarshal(jsonBytes, &buf3); err != nil {
-		slog.Error("Failed to unmarshal", "error", err)
-		return err
-	}
-	for _, v := range buf3 {
-		d.PutJSON(v.Key, v)
-	}
+	/*
+		path = filepath.Join(workDir, "marmot-seq-data.json")
+		jsonBytes, err = os.ReadFile(path)
+		if err != nil {
+			slog.Error("Failed to read json file in working dir", "error", err)
+			return err
+		}
+		var buf3 []types.VmSerial
+		if err := json.Unmarshal(jsonBytes, &buf3); err != nil {
+			slog.Error("Failed to unmarshal", "error", err)
+			return err
+		}
+		for _, v := range buf3 {
+			d.PutJSON(v.Key, v)
+		}
+	*/
 
-	//Read 仮想マシン
-	// marmot-vm-data.json
-	path = filepath.Join(workDir, "marmot-vm-data.json")
-	jsonBytes, err = os.ReadFile(path)
-	if err != nil {
-		slog.Error("Failed to read json file in working dir", "error", err)
-		return err
-	}
-	var buf4 []api.VirtualMachine
-	if err := json.Unmarshal(jsonBytes, &buf4); err != nil {
-		slog.Error("Failed to unmarshal", "error", err)
-		return err
-	}
-	for _, v := range buf4 {
-		d.PutJSON(*v.Key, v)
-	}
+	/*
+		//Read 仮想マシン
+		// marmot-vm-data.json
+		path = filepath.Join(workDir, "marmot-vm-data.json")
+		jsonBytes, err = os.ReadFile(path)
+		if err != nil {
+			slog.Error("Failed to read json file in working dir", "error", err)
+			return err
+		}
+		var buf4 []api.VirtualMachine
+		if err := json.Unmarshal(jsonBytes, &buf4); err != nil {
+			slog.Error("Failed to unmarshal", "error", err)
+			return err
+		}
+		for _, v := range buf4 {
+			d.PutJSON(*v.Key, v)
+		}
+	*/
 
 	return nil
 }

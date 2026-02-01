@@ -1,18 +1,8 @@
 package marmotd
 
-import (
-	"errors"
-	"fmt"
-	"log/slog"
-
-	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/client"
-	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/types"
-)
-
 func int32Ptr(i int32) *int32 { j := int32(i); return &j }
 
+/*
 // コンフィグからVMクラスタを作成する  新APIを使用
 // 非推奨
 func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
@@ -74,9 +64,6 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 
 	slog.Debug("CreateClusterInternal", "仮想マシンの設定と起動", "")
 
-	/*
-		NewVMの登録が無いみたい。
-	*/
 
 	for _, spec := range *cnf.VmSpec {
 		// ホスト名とクラスタ名でVMキーを取得する
@@ -194,3 +181,4 @@ func (m *Marmot) CreateClusterInternal(cnf api.MarmotConfig) error {
 	slog.Debug("CreateClusterInternal()", "break_err", break_err)
 	return nil
 }
+*/

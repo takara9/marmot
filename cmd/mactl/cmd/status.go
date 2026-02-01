@@ -1,17 +1,6 @@
 package cmd
 
-import (
-	"encoding/json"
-	"fmt"
-	"log/slog"
-	"strings"
-	"time"
-
-	"github.com/spf13/cobra"
-	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/config"
-)
-
+/*
 func nilToEmptyString(s *string) string {
 	if s == nil {
 		return ""
@@ -102,3 +91,4 @@ func init() {
 	rootCmd.AddCommand(statusCmd)
 	statusCmd.PersistentFlags().StringVarP(&clusterConfigFilename, "cluster-config", "c", "cluster-config.yaml", "仮想サーバークラスタの構成ファイル")
 }
+*/

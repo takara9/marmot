@@ -72,13 +72,15 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("ハイパーバイザーの情報セット", func() {
-			for _, hv := range hvs.Hvs {
-				fmt.Println(hv)
-				err := marmotServer.Ma.Db.SetHypervisors(hv)
-				Expect(err).NotTo(HaveOccurred())
-			}
-		})
+		/*
+			It("ハイパーバイザーの情報セット", func() {
+				for _, hv := range hvs.Hvs {
+					fmt.Println(hv)
+					err := marmotServer.Ma.Db.SetHypervisors(hv)
+					Expect(err).NotTo(HaveOccurred())
+				}
+			})
+		*/
 
 		It("OSイメージテンプレート", func() {
 			for _, hd := range hvs.Imgs {
@@ -376,13 +378,15 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("ハイパーバイザーの情報セット", func() {
-			for _, hv := range hvs.Hvs {
-				fmt.Println(hv)
-				err := marmotServer.Ma.Db.SetHypervisors(hv)
-				Expect(err).NotTo(HaveOccurred())
-			}
-		})
+		/*
+			It("ハイパーバイザーの情報セット", func() {
+				for _, hv := range hvs.Hvs {
+					fmt.Println(hv)
+					err := marmotServer.Ma.Db.SetHypervisors(hv)
+					Expect(err).NotTo(HaveOccurred())
+				}
+			})
+		*/
 
 		It("OSイメージテンプレート", func() {
 			for _, hd := range hvs.Imgs {

@@ -199,6 +199,7 @@ func (m *MarmotEndpoint) ListVirtualMachines(params map[string]string) (int, []b
 	return m.httpRequest(req)
 }
 
+/*
 func (m *MarmotEndpoint) CreateCluster(params api.MarmotConfig) (int, []byte, *url.URL, error) {
 	slog.Debug("=====", "mactl CreateCluster", "=====")
 	jsonBytes, err := json.Marshal(params)
@@ -289,7 +290,9 @@ func (m *MarmotEndpoint) StartCluster(params api.MarmotConfig) (int, []byte, *ur
 	req.Header.Set("Content-Type", "application/json")
 	return m.httpRequest(req)
 }
+*/
 
+/*
 func (m *MarmotEndpoint) CreateVirtualMachine(spec api.VmSpec) (int, []byte, *url.URL, error) {
 	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/createVm")
 	if err != nil {
@@ -357,6 +360,7 @@ func (m *MarmotEndpoint) StartVirtualMachine(spec api.VmSpec) (int, []byte, *url
 	req.Header.Set("Content-Type", "application/json")
 	return m.httpRequest(req)
 }
+*/
 
 // ボリュームの作成
 func (m *MarmotEndpoint) CreateVolume(spec api.Volume) ([]byte, *url.URL, error) {

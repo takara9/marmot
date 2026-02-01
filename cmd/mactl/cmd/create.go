@@ -1,12 +1,6 @@
 package cmd
 
-import (
-	"log/slog"
-
-	"github.com/spf13/cobra"
-	"github.com/takara9/marmot/pkg/config"
-)
-
+/*
 var createCmd = &cobra.Command{
 	Use:   "create",
 	Short: "仮想マシンの生成と起動",
@@ -32,3 +26,4 @@ func init() {
 	rootCmd.AddCommand(createCmd)
 	createCmd.PersistentFlags().StringVarP(&clusterConfigFilename, "config", "c", "cluster-config.yaml", "")
 }
+*/

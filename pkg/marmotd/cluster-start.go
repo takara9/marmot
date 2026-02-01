@@ -1,15 +1,6 @@
 package marmotd
 
-import (
-	"errors"
-	"fmt"
-	"log/slog"
-
-	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/client"
-	"github.com/takara9/marmot/pkg/types"
-)
-
+/*
 // クラスタ開始
 func (m *Marmot) StartClusterInternal(cnf api.MarmotConfig) error {
 	slog.Debug("StartClusterInternal", "cnf", "")
@@ -51,3 +42,4 @@ func (m *Marmot) StartClusterInternal(cnf api.MarmotConfig) error {
 	}
 	return nil
 }
+*/

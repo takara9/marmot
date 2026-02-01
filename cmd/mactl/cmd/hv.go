@@ -1,15 +1,6 @@
 package cmd
 
-import (
-	"encoding/json"
-	"fmt"
-	"log/slog"
-	"strings"
-
-	"github.com/spf13/cobra"
-	"github.com/takara9/marmot/api"
-)
-
+/*
 var hvCmd = &cobra.Command{
 	Use:   "hv",
 	Short: "ハイパーバイザー（仮想マシンのホスト）を表示",
@@ -45,3 +36,4 @@ var hvCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(hvCmd)
 }
+*/

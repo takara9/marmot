@@ -1,16 +1,6 @@
 package cmd
 
-import (
-	"encoding/json"
-	"fmt"
-	"log/slog"
-	"strings"
-
-	"github.com/spf13/cobra"
-	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/config"
-)
-
+/*
 var ClusterName string
 var VirtualMachineName string
 
@@ -102,3 +92,4 @@ func init() {
 	vmCmd.MarkFlagRequired("cluster")
 	vmCmd.MarkFlagRequired("vmname")
 }
+*/

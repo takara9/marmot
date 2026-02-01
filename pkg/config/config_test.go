@@ -1,9 +1,6 @@
 package config_test
 
 import (
-	"errors"
-	"os"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/takara9/marmot/pkg/config"
@@ -28,16 +25,18 @@ var _ = Describe("Config", func() {
 				Expect(err).To(HaveOccurred())
 			})
 		})
-		Context("Write a test config file", func() {
-			It("Write file", func() {
-				err := config.WriteConfig(output1, mc)
-				Expect(err).NotTo(HaveOccurred())
+		/*
+			Context("Write a test config file", func() {
+				It("Write file", func() {
+					err := config.WriteConfig(output1, mc)
+					Expect(err).NotTo(HaveOccurred())
+				})
+				It("Write file, but can not", func() {
+					err := config.WriteConfig("testdata", mc)
+					Expect(err).To(HaveOccurred())
+				})
 			})
-			It("Write file, but can not", func() {
-				err := config.WriteConfig("testdata", mc)
-				Expect(err).To(HaveOccurred())
-			})
-		})
+		*/
 	})
 
 	Describe("Read Hypervisor Config file and Check", func() {
@@ -71,22 +70,24 @@ var _ = Describe("Config", func() {
 				}
 			})
 
-			It("Write new file", func() {
-				filename := "testdata/out-hypervisor-config.yaml"
-				os.Remove(filename)
-				err := config.WriteConfig(filename, cnf)
-				Expect(err).NotTo(HaveOccurred())
-				_, err = os.Stat(filename)
-				Expect(errors.Is(err, os.ErrNotExist)).To(Equal(false))
+			/*
+				It("Write new file", func() {
+					filename := "testdata/out-hypervisor-config.yaml"
+					os.Remove(filename)
+					err := config.WriteConfig(filename, cnf)
+					Expect(err).NotTo(HaveOccurred())
+					_, err = os.Stat(filename)
+					Expect(errors.Is(err, os.ErrNotExist)).To(Equal(false))
 
-				err = config.ReadYamlConfig(hypervior_config, &cnf)
-				Expect(err).NotTo(HaveOccurred())
-				for i, h := range cnf.Hvs {
-					Expect(h.Name).To(Equal(tests[i].want.name))
-					Expect(h.Cpu).To(Equal(tests[i].want.cpu))
-					Expect(h.Ram).To(Equal(tests[i].want.ram))
-				}
-			})
+					err = config.ReadYamlConfig(hypervior_config, &cnf)
+					Expect(err).NotTo(HaveOccurred())
+					for i, h := range cnf.Hvs {
+						Expect(h.Name).To(Equal(tests[i].want.name))
+						Expect(h.Cpu).To(Equal(tests[i].want.cpu))
+						Expect(h.Ram).To(Equal(tests[i].want.ram))
+					}
+				})
+			*/
 		})
 	})
 })

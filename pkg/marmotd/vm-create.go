@@ -1,16 +1,6 @@
 package marmotd
 
-import (
-	"fmt"
-	"log/slog"
-	"os"
-	"strings"
-
-	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/util"
-	"github.com/takara9/marmot/pkg/virt"
-)
-
+/*
 // VMを生成する
 func (m *Marmot) CreateVM(spec api.VmSpec) error {
 	slog.Debug("=====", "CreateVM()", "=====")
@@ -167,3 +157,4 @@ func (m *Marmot) CreateVM(spec api.VmSpec) error {
 	slog.Debug("CreateVM()", "finish", err)
 	return nil
 }
+*/

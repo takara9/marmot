@@ -1,12 +1,6 @@
 package cmd
 
-import (
-	"log/slog"
-
-	"github.com/spf13/cobra"
-	"github.com/takara9/marmot/pkg/config"
-)
-
+/*
 var destroyCmd = &cobra.Command{
 	Use:   "destroy",
 	Short: "仮想マシンをシャットダウンして定義を削除します",
@@ -30,3 +24,4 @@ func init() {
 	rootCmd.AddCommand(destroyCmd)
 	destroyCmd.PersistentFlags().StringVarP(&clusterConfigFilename, "cluster-config", "c", "cluster-config.yaml", "仮想サーバークラスタの構成ファイル")
 }
+*/

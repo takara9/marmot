@@ -1,20 +1,6 @@
 package db
 
-import (
-	"encoding/json"
-	"errors"
-	"fmt"
-	"log/slog"
-	"sort"
-	"time"
-
-	"github.com/google/uuid"
-
-	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/types"
-	"github.com/takara9/marmot/pkg/util"
-)
-
+/*
 func (d *Database) GetVmByVmKey(vmKey string) (api.VirtualMachine, error) {
 	var vm api.VirtualMachine
 	if _, err := d.GetJSON(vmKey, &vm); err != nil {
@@ -163,3 +149,4 @@ func (d *Database) UpdateVmStateByKey(vmKey string, state int) error {
 	err = d.PutJSON(vmKey, vm)
 	return err
 }
+*/

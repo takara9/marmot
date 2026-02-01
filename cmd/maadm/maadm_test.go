@@ -86,28 +86,12 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 	Context("maadm setup の動作テスト", func() {
 		var d1 *db.Database
-		var h api.Hypervisor
 		It("Marmotd の初期データを、etcdに直接セット", func() {
 			cmd := exec.Command("./bin/maadm-test", "setup", "--hvconfig", "testdata/hypervisor-config-hvc.yaml", "--etcdurl", "http://localhost:3379")
 			stdoutStderr, err := cmd.CombinedOutput()
 			GinkgoWriter.Println("err: ", err)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("command messeag: ", string(stdoutStderr))
-		})
-
-		// marmotd を介さずに、DB操作で内容をチェックする
-		It("キーでハイパーバイザーのセットした情報を取得", func() {
-			var err error
-			d1, err = db.NewDatabase("http://localhost:3379")
-			Expect(err).NotTo(HaveOccurred())
-			h, err = d1.GetHypervisorByName("hvc")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(h.NodeName).To(Equal("hvc"))
-			Expect(*h.IpAddr).To(Equal("127.0.0.1"))
-			Expect(h.Cpu).To(Equal(int32(4)))
-			Expect(*h.Memory).To(Equal(int64(16384)))
-			Expect(*(*h.StgPool)[0].VolGroup).To(Equal("vg1"))
-			Expect(*(*h.StgPool)[1].VolGroup).To(Equal("vg2"))
 		})
 
 		It("OSイメージ、LVOS、LVDATA、VMのシーケンス番号をチェック", func() {
@@ -205,23 +189,6 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		})
 
 		var d2 *db.Database
-		var h api.Hypervisor
-
-		// marmotd を介さずに、DB操作で内容をチェックする
-		It("キーでハイパーバイザーのセットした情報を取得", func() {
-			var err error
-			d2, err = db.NewDatabase("http://localhost:4379")
-			Expect(err).NotTo(HaveOccurred())
-			h, err = d2.GetHypervisorByName("hvc")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(h.NodeName).To(Equal("hvc"))
-			Expect(*h.IpAddr).To(Equal("127.0.0.1"))
-			Expect(h.Cpu).To(Equal(int32(4)))
-			GinkgoWriter.Println("Memory:", *h.Memory)
-			Expect(*h.Memory).To(Equal(int64(16384)))
-			Expect(*(*h.StgPool)[0].VolGroup).To(Equal("vg1"))
-			Expect(*(*h.StgPool)[1].VolGroup).To(Equal("vg2"))
-		})
 
 		It("OSイメージ、LVOS、LVDATA、VMのシーケンス番号をチェック", func() {
 			By("OSイメージのシーケンス番号をチェック")

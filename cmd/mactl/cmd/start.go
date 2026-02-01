@@ -1,12 +1,6 @@
 package cmd
 
-import (
-	"log/slog"
-
-	"github.com/spf13/cobra"
-	"github.com/takara9/marmot/pkg/config"
-)
-
+/*
 var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "停止中の仮想マシンを開始します。",
@@ -31,3 +25,4 @@ func init() {
 	rootCmd.AddCommand(startCmd)
 	startCmd.PersistentFlags().StringVarP(&clusterConfigFilename, "cluster-config", "c", "cluster-config.yaml", "仮想サーバークラスタの構成ファイル")
 }
+*/

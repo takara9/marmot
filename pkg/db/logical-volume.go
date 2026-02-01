@@ -6,9 +6,9 @@ import (
 
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/types"
-	"github.com/takara9/marmot/pkg/util"
 )
 
+/*
 // api.VirtualMachineに、OSボリュームのタイプ情報を追加する
 // この関数で登録された場合は、OSボリュームはLV形式であることをセットする
 func (d *Database) UpdateOsLvByVmKey(vmKey string, osVg string, osLv string) error {
@@ -69,6 +69,7 @@ func (d *Database) UpdateDataLvByVmKey(vmKey string, idx int, dataVg string, dat
 	(*vm.Storage)[idx].Vg = util.StringPtr(dataVg)
 	return d.PutVmByVmKey(vmKey, vm)
 }
+*/
 
 // イメージテンプレート
 func (d *Database) SetImageTemplate(v cf.Image_yaml) error {

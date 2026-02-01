@@ -1,15 +1,6 @@
 package cmd
 
-import (
-	"encoding/json"
-	"fmt"
-	"log/slog"
-	"strings"
-
-	"github.com/spf13/cobra"
-	"github.com/takara9/marmot/api"
-)
-
+/*
 var globalStatusCmd = &cobra.Command{
 	Use:   "globalStatus",
 	Short: "管理下のハイパーバイザーと仮想マシンをリストします。",
@@ -101,3 +92,4 @@ var globalStatusCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(globalStatusCmd)
 }
+*/

@@ -1,27 +1,16 @@
 package marmotd_test
 
-import (
-	"context"
-	"fmt"
-	"os"
-	"os/exec"
-	"time"
+//. "github.com/onsi/ginkgo/v2"
+//. "github.com/onsi/gomega"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
-	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/marmotd"
-)
-
+/*
 var _ = Describe("関数テスト", Ordered, func() {
 	const (
-		marmotPort = 8090
-		etcdPort   = 5379
-		etcdctlExe = "/usr/bin/etcdctl"
-		nodeName   = "hvc"
-		etcdImage  = "ghcr.io/takara9/etcd:3.6.5"
+		marmotPort        = 8090
+		etcdPort          = 5379
+		etcdctlExe        = "/usr/bin/etcdctl"
+		nodeName          = "hvc"
+		etcdImage         = "ghcr.io/takara9/etcd:3.6.5"
 		etcdContainerName = "etcd-func"
 	)
 	var (
@@ -226,3 +215,4 @@ var _ = Describe("関数テスト", Ordered, func() {
 		})
 	})
 })
+*/

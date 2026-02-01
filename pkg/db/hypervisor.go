@@ -1,15 +1,6 @@
 package db
 
-import (
-	"encoding/json"
-	"log/slog"
-
-	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/lvm"
-	"github.com/takara9/marmot/pkg/util"
-)
-
+/*
 // ハイパーバイザーの設定
 func (d *Database) SetHypervisors(v config.Hypervisor_yaml) error {
 	key := HvPrefix + "/" + v.Name
@@ -26,7 +17,7 @@ func (d *Database) SetHypervisors(v config.Hypervisor_yaml) error {
 	hv.Port = util.Int64PtrInt32(v.Port)
 	hv.Key = &key
 	hv.IpAddr = &v.IpAddr
-	hv.Cpu = int32(v.Cpu) 
+	hv.Cpu = int32(v.Cpu)
 	hv.FreeCpu = util.Int64PtrInt32(v.Cpu)
 	hv.Memory = util.Int64PtrConvMB(v.Ram)
 	hv.FreeMemory = util.Int64PtrConvMB(v.Ram)
@@ -214,3 +205,4 @@ func (d *Database) CheckHypervisors(dbUrl string, node string) ([]api.Hypervisor
 	}
 	return hvs, nil
 }
+*/

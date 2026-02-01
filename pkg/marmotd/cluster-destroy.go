@@ -1,16 +1,6 @@
 package marmotd
 
-import (
-	"errors"
-	"fmt"
-	"log/slog"
-
-	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/client"
-	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/types"
-)
-
+/*
 // クラスタ削除
 func (m *Marmot) DestroyClusterInternal(cnf api.MarmotConfig) error {
 	if cnf.VmSpec == nil || cnf.ClusterName == nil {
@@ -60,3 +50,4 @@ func (m *Marmot) DestroyClusterInternal(cnf api.MarmotConfig) error {
 	}
 	return nil
 }
+*/

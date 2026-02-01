@@ -1,15 +1,6 @@
 package marmotd
 
-import (
-	"log/slog"
-	"strings"
-
-	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/lvm"
-	"github.com/takara9/marmot/pkg/types"
-	"github.com/takara9/marmot/pkg/virt"
-)
-
+/*
 // VMの削除
 func (m *Marmot) DestroyVM2(spec api.VmSpec) error {
 	slog.Debug("===", "DestroyVM2 is called", "===")
@@ -81,3 +72,4 @@ func (m *Marmot) DestroyVM2(spec api.VmSpec) error {
 
 	return nil
 }
+*/

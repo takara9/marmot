@@ -21,7 +21,8 @@ func (d *Database) UpdateOsQcow2ByVmKey(vmKey string, osVg string, osLv string) 
 	}
 	defer d.UnlockKey(mutex)
 
-	var vm api.VirtualMachine
+	//var vm api.VirtualMachine
+	var vm api.Server
 	if _, err := d.GetJSON(key, &vm); err != nil {
 		return err
 	}
@@ -43,13 +44,13 @@ func (d *Database) UpdateDataQcow2LvByVmKey(vmKey string, idx int, dataVg string
 	}
 	defer d.UnlockKey(mutex)
 
-	var vm api.VirtualMachine
+	var vm api.Server
 	if _, err := d.GetJSON(key, &vm); err != nil {
 		return err
 	}
 
-	(*vm.Storage)[idx].Lv = util.StringPtr(dataLv)
-	(*vm.Storage)[idx].Vg = util.StringPtr(dataVg)
+	(*vm.Storage)[idx].LogicalVolume = util.StringPtr(dataLv)
+	(*vm.Storage)[idx].VolumeGroup = util.StringPtr(dataVg)
 
 	return d.PutJSON(key, vm)
 }
