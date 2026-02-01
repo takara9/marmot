@@ -239,7 +239,7 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 			slog.Error("GenerateRandomMAC()", "err", err)
 			return "", err
 		}
-		virtSpec.Nets = []virt.NetSpec{
+		virtSpec.NetSpecs = []virt.NetSpec{
 			{
 				MAC:     mac.String(),
 				Network: "default",
@@ -250,8 +250,8 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 		}
 		// サーバーのネットワーク情報を更新
 		var net api.Network
-		net.Id = virtSpec.Nets[0].Network
-		net.Mac = &virtSpec.Nets[0].MAC
+		net.Id = virtSpec.NetSpecs[0].Network
+		net.Mac = &virtSpec.NetSpecs[0].MAC
 		serverConfig.Network = &[]api.Network{net}
 	} else {
 		slog.Debug("ネットワーク指定あり、指定されたネットワークを使用")
@@ -274,7 +274,7 @@ func (m *Marmot) CreateServer(requestServerSpec api.Server) (string, error) {
 				Bus:     busno,
 			}
 			var ni api.Network
-			virtSpec.Nets = append(virtSpec.Nets, ns)
+			virtSpec.NetSpecs = append(virtSpec.NetSpecs, ns)
 			ni.Id = ns.Network
 			ni.Mac = &ns.MAC
 			// netplanで静的IPアドレスを設定する場合のために、IPアドレス情報もサーバーに保存しておく

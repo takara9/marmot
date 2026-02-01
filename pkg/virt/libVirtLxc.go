@@ -102,10 +102,10 @@ func MakeLxcDefinition(vs LxcSpec) *libvirtxml.Domain {
 		}
 
 		// VLAN / Trunk 設定
-		if len(n.VlanIDs) > 0 {
+		if len(n.Vlans) > 0 {
 			tags := []libvirtxml.DomainInterfaceVLanTag{}
-			for _, id := range n.VlanIDs {
-				tags = append(tags, libvirtxml.DomainInterfaceVLanTag{ID: uint(id)})
+			for _, id := range n.Vlans {
+				tags = append(tags, libvirtxml.DomainInterfaceVLanTag{ID: id})
 			}
 			trunk := ""
 			if n.IsTrunk {

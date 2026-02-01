@@ -792,7 +792,15 @@ components:
           type: array
           maxItems: 6
           items:
-            $ref: "#/components/schemas/Route"    
+            $ref: "#/components/schemas/Route"
+        portgroup:
+          type: string
+        vlans:
+          type: array
+          maxItems: 4
+          items:
+            type: integer
+            format: uint
     Nameservers:
       type: object
       properties:

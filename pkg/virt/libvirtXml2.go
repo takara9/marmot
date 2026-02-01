@@ -27,12 +27,13 @@ type DiskSpec struct {
 type NetSpec struct {
 	MAC         string
 	Network     string
+	PortGroup   string
 	PortID      string
 	Bridge      string //source内にbridge属性がある場合
 	Target      string
 	InterfaceID string
 	Alias       string
-	VlanIDs     []int
+	Vlans       []uint
 	IsTrunk     bool
 	Bus         uint
 }
@@ -57,7 +58,7 @@ type VmSpec struct {
 	CountVCPU    uint
 	Machine      string
 	DiskSpecs    []DiskSpec
-	Nets         []NetSpec
+	NetSpecs     []NetSpec
 	ChannelSpecs []ChannelSpec
 	Clocks       []ClockSpec
 }
@@ -174,7 +175,7 @@ func CreateDomainXML(vs VmSpec) *libvirtxml.Domain {
 	}
 
 	// ネットワークインターフェースの生成
-	for _, n := range vs.Nets {
+	for _, n := range vs.NetSpecs {
 		iface := libvirtxml.DomainInterface{
 			MAC:   &libvirtxml.DomainInterfaceMAC{Address: n.MAC},
 			Model: &libvirtxml.DomainInterfaceModel{Type: "virtio"},
@@ -186,15 +187,18 @@ func CreateDomainXML(vs VmSpec) *libvirtxml.Domain {
 			// <interface type='network'> の場合
 			iface.Source = &libvirtxml.DomainInterfaceSource{
 				Network: &libvirtxml.DomainInterfaceSourceNetwork{
-					Network: n.Network,
-					PortID:  n.PortID,
-					Bridge:  n.Bridge,
+					Network:   n.Network,
+					PortGroup: n.PortGroup,
+					PortID:    n.PortID,
+					Bridge:    n.Bridge,
 				},
 			}
 		} else if n.Bridge != "" {
 			// <interface type='bridge'> の場合
 			iface.Source = &libvirtxml.DomainInterfaceSource{
-				Bridge: &libvirtxml.DomainInterfaceSourceBridge{Bridge: n.Bridge},
+				Bridge: &libvirtxml.DomainInterfaceSourceBridge{
+					Bridge: n.Bridge,
+				},
 			}
 		}
 
@@ -204,10 +208,10 @@ func CreateDomainXML(vs VmSpec) *libvirtxml.Domain {
 		}
 
 		// VLAN / Trunk 設定
-		if len(n.VlanIDs) > 0 {
+		if len(n.Vlans) > 0 {
 			tags := []libvirtxml.DomainInterfaceVLanTag{}
-			for _, id := range n.VlanIDs {
-				tags = append(tags, libvirtxml.DomainInterfaceVLanTag{ID: uint(id)})
+			for _, id := range n.Vlans {
+				tags = append(tags, libvirtxml.DomainInterfaceVLanTag{ID: id})
 			}
 			trunk := ""
 			if n.IsTrunk {
