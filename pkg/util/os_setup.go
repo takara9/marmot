@@ -20,7 +20,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/virt"
 )
 
@@ -31,6 +30,7 @@ func linuxSetupHostname(vm_root string, hostname string) error {
 	return err
 }
 
+/*
 // Linux hostidをOS Volへ書き込み
 func linuxSetupHostId(spec api.VmSpec, vm_root string) error {
 	ipb := ipaddrByteArray(*spec.PrivateIp)
@@ -38,6 +38,7 @@ func linuxSetupHostId(spec api.VmSpec, vm_root string) error {
 	err := os.WriteFile(hostid_file, ipb, 0644)
 	return err
 }
+*/
 
 // 文字列IPアドレスをバイト配列へ変換
 func ipaddrByteArray(ip string) []byte {
@@ -49,7 +50,6 @@ func ipaddrByteArray(ip string) []byte {
 	}
 	return ipb
 }
-
 
 // YAMLのlevelに応じた桁下げのYAML行を出力
 func yamlformat(level int, txt string, f io.Writer) {
@@ -106,6 +106,7 @@ func CreateNic(netClass string, vmXml *[]virt.Interface) error {
  デフォルトGW,DNSなどの設定のためにコンフィグファイルからの設定を取り入れている
 */
 // Linux Netplanのファイルへ、IPアドレスなどを設定
+/*
 func linuxSetupCreateNetplan(spec api.VmSpec, vm_root string) error {
 	var netplanFile = "etc/netplan/00-nic.yaml"
 	netplanPath := filepath.Join(vm_root, netplanFile)
@@ -165,3 +166,4 @@ func linuxSetupCreateNetplan(spec api.VmSpec, vm_root string) error {
 	}
 	return nil
 }
+*/

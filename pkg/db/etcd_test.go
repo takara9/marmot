@@ -55,31 +55,33 @@ var _ = Describe("Etcd", Ordered, func() {
 			})
 		})
 
-		Context("Test access etcd", func() {
-			var hvNode = "hv01"
-			data_hv1 := db.TestHvData1()
+		/*
+			Context("Test access etcd", func() {
+				var hvNode = "hv01"
+				data_hv1 := db.TestHvData1()
 
-			It("Create Hypervisor", func() {
-				err := d.NewHypervisor(hvNode, data_hv1)
-				Expect(err).NotTo(HaveOccurred())
-			})
+				It("Create Hypervisor", func() {
+					err := d.NewHypervisor(hvNode, data_hv1)
+					Expect(err).NotTo(HaveOccurred())
+				})
 
-			It("Get Hypervisor by key", func() {
-				data_get, err := d.GetHypervisorByName(hvNode)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(data_get.Cpu).To(Equal(data_hv1.Cpu))
-			})
+				It("Get Hypervisor by key", func() {
+					data_get, err := d.GetHypervisorByName(hvNode)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(data_get.Cpu).To(Equal(data_hv1.Cpu))
+				})
 
-			It("Delete Hypervisor by name", func() {
-				err = d.DeleteHypervisorByName(hvNode)
-				Expect(err).NotTo(HaveOccurred())
-			})
+				It("Delete Hypervisor by name", func() {
+					err = d.DeleteHypervisorByName(hvNode)
+					Expect(err).NotTo(HaveOccurred())
+				})
 
-			It("Check deleted data", func() {
-				_, err := d.GetHypervisorByName(hvNode)
-				Expect(err).To(HaveOccurred())
+				It("Check deleted data", func() {
+					_, err := d.GetHypervisorByName(hvNode)
+					Expect(err).To(HaveOccurred())
+				})
 			})
-		})
+		*/
 
 		Context("Test Version", func() {
 			It("Set version", func() {
@@ -249,16 +251,17 @@ var _ = Describe("Etcd", Ordered, func() {
 
 			It("PUT Hypervisor node data #2", func() {
 				// ハイパーバイザー
-				for _, hv := range cnf.Hvs {
-					//GinkgoWriter.Println(hv)
-					GinkgoWriter.Println("Name=", hv.Name)
-					GinkgoWriter.Println("CPU=", hv.Cpu)
-					GinkgoWriter.Println("RAM=", hv.Ram)
-					err = d.SetHypervisors(hv)
-					Expect(err).NotTo(HaveOccurred())
-					GinkgoWriter.Println("Set Hypervisor data into ETCD:", hv.Name)
-				}
-
+				/*
+					for _, hv := range cnf.Hvs {
+						//GinkgoWriter.Println(hv)
+						GinkgoWriter.Println("Name=", hv.Name)
+						GinkgoWriter.Println("CPU=", hv.Cpu)
+						GinkgoWriter.Println("RAM=", hv.Ram)
+						err = d.SetHypervisors(hv)
+						Expect(err).NotTo(HaveOccurred())
+						GinkgoWriter.Println("Set Hypervisor data into ETCD:", hv.Name)
+					}
+				*/
 				// OSイメージテンプレート
 				for _, hd := range cnf.Imgs {
 					d.SetImageTemplate(hd)
@@ -270,159 +273,163 @@ var _ = Describe("Etcd", Ordered, func() {
 				}
 			})
 
-			It("Get Hypervisors status", func() {
-				var hvs []api.Hypervisor
-				err = d.GetHypervisors(&hvs)
-				Expect(err).NotTo(HaveOccurred())
-				for _, h := range hvs {
-					GinkgoWriter.Println("Nodename     ", h.NodeName)
-					GinkgoWriter.Println("  PORT       ", *h.Port)
-					GinkgoWriter.Println("  CPU        ", h.Cpu)
-					GinkgoWriter.Println("  Memory     ", *h.Memory)
-					GinkgoWriter.Println("  FreeCpu    ", *h.FreeCpu)
-					GinkgoWriter.Println("  FreeMemory ", *h.FreeMemory)
-				}
-			})
+			/*
+				It("Get Hypervisors status", func() {
+					var hvs []api.Hypervisor
+					err = d.GetHypervisors(&hvs)
+					Expect(err).NotTo(HaveOccurred())
+					for _, h := range hvs {
+						GinkgoWriter.Println("Nodename     ", h.NodeName)
+						GinkgoWriter.Println("  PORT       ", *h.Port)
+						GinkgoWriter.Println("  CPU        ", h.Cpu)
+						GinkgoWriter.Println("  Memory     ", *h.Memory)
+						GinkgoWriter.Println("  FreeCpu    ", *h.FreeCpu)
+						GinkgoWriter.Println("  FreeMemory ", *h.FreeMemory)
+					}
+				})
+			*/
 		})
 
-		Context("Test of Hypervisor management : Schedule of virtual machines", func() {
-			type vmReq struct {
-				name string
-				cpu  int
-				ram  int
-			}
-			tests := []struct {
-				name string
-				req  vmReq
-				want string
-				cpu  int
-				ram  int
-			}{
-				{name: "1st", req: vmReq{name: "node1", cpu: 4, ram: 8}, want: "hv1", cpu: 6, ram: 56},
-				{name: "2nd", req: vmReq{name: "node2", cpu: 4, ram: 8}, want: "hv1", cpu: 2, ram: 48},
-				{name: "3rd", req: vmReq{name: "node3", cpu: 4, ram: 8}, want: "hv2", cpu: 6, ram: 56},
-				{name: "4th", req: vmReq{name: "node4", cpu: 4, ram: 8}, want: "hv2", cpu: 2, ram: 48},
-				{name: "5th", req: vmReq{name: "node5", cpu: 4, ram: 8}, want: "", cpu: 0, ram: 0},
-				{name: "6th", req: vmReq{name: "node6", cpu: 2, ram: 8}, want: "hv1", cpu: 0, ram: 40},
-				{name: "7th", req: vmReq{name: "node7", cpu: 1, ram: 8}, want: "hv2", cpu: 1, ram: 40},
-				{name: "8th", req: vmReq{name: "node8", cpu: 1, ram: 8}, want: "hv2", cpu: 0, ram: 32},
-			}
-
-			It("Get Hypervisors status", func() {
-				var hvs []api.Hypervisor
-				err = d.GetHypervisors(&hvs)
-				Expect(err).NotTo(HaveOccurred())
-
-				for _, h := range hvs {
-					GinkgoWriter.Println("Nodename     ", h.NodeName)
-					GinkgoWriter.Println("  CPU        ", h.Cpu)
-					GinkgoWriter.Println("  Memory     ", *h.Memory)
-					GinkgoWriter.Println("  FreeCpu    ", *h.FreeCpu)
-					GinkgoWriter.Println("  FreeMemory ", *h.FreeMemory)
-					GinkgoWriter.Println("  Status     ", *h.Status)
+		/*
+			Context("Test of Hypervisor management : Schedule of virtual machines", func() {
+				type vmReq struct {
+					name string
+					cpu  int
+					ram  int
 				}
-			})
+				tests := []struct {
+					name string
+					req  vmReq
+					want string
+					cpu  int
+					ram  int
+				}{
+					{name: "1st", req: vmReq{name: "node1", cpu: 4, ram: 8}, want: "hv1", cpu: 6, ram: 56},
+					{name: "2nd", req: vmReq{name: "node2", cpu: 4, ram: 8}, want: "hv1", cpu: 2, ram: 48},
+					{name: "3rd", req: vmReq{name: "node3", cpu: 4, ram: 8}, want: "hv2", cpu: 6, ram: 56},
+					{name: "4th", req: vmReq{name: "node4", cpu: 4, ram: 8}, want: "hv2", cpu: 2, ram: 48},
+					{name: "5th", req: vmReq{name: "node5", cpu: 4, ram: 8}, want: "", cpu: 0, ram: 0},
+					{name: "6th", req: vmReq{name: "node6", cpu: 2, ram: 8}, want: "hv1", cpu: 0, ram: 40},
+					{name: "7th", req: vmReq{name: "node7", cpu: 1, ram: 8}, want: "hv2", cpu: 1, ram: 40},
+					{name: "8th", req: vmReq{name: "node8", cpu: 1, ram: 8}, want: "hv2", cpu: 0, ram: 32},
+				}
 
-			It("Scheduling a virtual machine to Hypervisor #1", func() {
-				GinkgoWriter.Println("test-1 ")
-				td := tests[0]
-				GinkgoWriter.Println("test-2 ")
-				vm := db.TestVmCreate(td.req.name, td.req.cpu, td.req.ram)
-				GinkgoWriter.Println("test-3 ")
-				hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
-				GinkgoWriter.Println("test-4 ")
-				Expect(err).NotTo(HaveOccurred())
+				It("Get Hypervisors status", func() {
+					var hvs []api.Hypervisor
+					err = d.GetHypervisors(&hvs)
+					Expect(err).NotTo(HaveOccurred())
 
-				GinkgoWriter.Println("hvName ", hvName)
-				GinkgoWriter.Println("hvIp.  ", hvIp)
-				GinkgoWriter.Println("port  ", port)
-				GinkgoWriter.Println("key   ", key)
-				GinkgoWriter.Println("txid  ", txid)
-			})
+					for _, h := range hvs {
+						GinkgoWriter.Println("Nodename     ", h.NodeName)
+						GinkgoWriter.Println("  CPU        ", h.Cpu)
+						GinkgoWriter.Println("  Memory     ", *h.Memory)
+						GinkgoWriter.Println("  FreeCpu    ", *h.FreeCpu)
+						GinkgoWriter.Println("  FreeMemory ", *h.FreeMemory)
+						GinkgoWriter.Println("  Status     ", *h.Status)
+					}
+				})
 
-			It("Scheduling a virtual machine to Hypervisor #2", func() {
-				td := tests[1]
-				vm := db.TestVmCreate(td.req.name, td.req.cpu, td.req.ram)
-				hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("hvName ", hvName)
-				GinkgoWriter.Println("hvIp.  ", hvIp)
-				GinkgoWriter.Println("port  ", port)
-				GinkgoWriter.Println("key   ", key)
-				GinkgoWriter.Println("txid  ", txid)
-			})
+				It("Scheduling a virtual machine to Hypervisor #1", func() {
+					GinkgoWriter.Println("test-1 ")
+					td := tests[0]
+					GinkgoWriter.Println("test-2 ")
+					vm := db.TestVmCreate(td.req.name, td.req.cpu, td.req.ram)
+					GinkgoWriter.Println("test-3 ")
+					hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
+					GinkgoWriter.Println("test-4 ")
+					Expect(err).NotTo(HaveOccurred())
 
-			It("Scheduling a virtual machine to Hypervisor #3", func() {
-				td := tests[2]
-				vm := db.TestVmCreate(td.req.name, td.req.cpu, td.req.ram)
-				hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("hvName ", hvName)
-				GinkgoWriter.Println("hvIp  ", hvIp)
-				GinkgoWriter.Println("port  ", port)
-				GinkgoWriter.Println("key   ", key)
-				GinkgoWriter.Println("txid  ", txid)
-			})
+					GinkgoWriter.Println("hvName ", hvName)
+					GinkgoWriter.Println("hvIp.  ", hvIp)
+					GinkgoWriter.Println("port  ", port)
+					GinkgoWriter.Println("key   ", key)
+					GinkgoWriter.Println("txid  ", txid)
+				})
 
-			It("Scheduling a virtual machine to Hypervisor #4", func() {
-				td := tests[3]
-				vm := db.TestVmCreate(td.req.name, td.req.cpu, td.req.ram)
-				hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("hvName ", hvName)
-				GinkgoWriter.Println("hvIp  ", hvIp)
-				GinkgoWriter.Println("port  ", port)
-				GinkgoWriter.Println("key   ", key)
-				GinkgoWriter.Println("txid  ", txid)
-			})
+				It("Scheduling a virtual machine to Hypervisor #2", func() {
+					td := tests[1]
+					vm := db.TestVmCreate(td.req.name, td.req.cpu, td.req.ram)
+					hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
+					Expect(err).NotTo(HaveOccurred())
+					GinkgoWriter.Println("hvName ", hvName)
+					GinkgoWriter.Println("hvIp.  ", hvIp)
+					GinkgoWriter.Println("port  ", port)
+					GinkgoWriter.Println("key   ", key)
+					GinkgoWriter.Println("txid  ", txid)
+				})
 
-			It("Scheduling a virtual machine to Hypervisor #5", func() {
-				td := tests[4]
-				vm := db.TestVmCreate(td.req.name, td.req.cpu, td.req.ram)
-				hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
-				Expect(err).To(HaveOccurred())
-				GinkgoWriter.Println("hvName ", hvName)
-				GinkgoWriter.Println("hvIp  ", hvIp)
-				GinkgoWriter.Println("port  ", port)
-				GinkgoWriter.Println("key   ", key)
-				GinkgoWriter.Println("txid  ", txid)
-			})
+				It("Scheduling a virtual machine to Hypervisor #3", func() {
+					td := tests[2]
+					vm := db.TestVmCreate(td.req.name, td.req.cpu, td.req.ram)
+					hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
+					Expect(err).NotTo(HaveOccurred())
+					GinkgoWriter.Println("hvName ", hvName)
+					GinkgoWriter.Println("hvIp  ", hvIp)
+					GinkgoWriter.Println("port  ", port)
+					GinkgoWriter.Println("key   ", key)
+					GinkgoWriter.Println("txid  ", txid)
+				})
 
-			It("Scheduling a virtual machine to Hypervisor #6", func() {
-				td := tests[5]
-				vm := db.TestVmCreate(td.req.name, td.req.cpu, td.req.ram)
-				hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("hvName ", hvName)
-				GinkgoWriter.Println("hvIp  ", hvIp)
-				GinkgoWriter.Println("port  ", port)
-				GinkgoWriter.Println("key   ", key)
-				GinkgoWriter.Println("txid  ", txid)
-			})
+				It("Scheduling a virtual machine to Hypervisor #4", func() {
+					td := tests[3]
+					vm := db.TestVmCreate(td.req.name, td.req.cpu, td.req.ram)
+					hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
+					Expect(err).NotTo(HaveOccurred())
+					GinkgoWriter.Println("hvName ", hvName)
+					GinkgoWriter.Println("hvIp  ", hvIp)
+					GinkgoWriter.Println("port  ", port)
+					GinkgoWriter.Println("key   ", key)
+					GinkgoWriter.Println("txid  ", txid)
+				})
 
-			It("Scheduling a virtual machine to Hypervisor #7", func() {
-				td := tests[6]
-				vm := db.TestVmCreate(td.req.name, td.req.cpu, td.req.ram)
-				hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("hvName ", hvName)
-				GinkgoWriter.Println("hvIp  ", hvIp)
-				GinkgoWriter.Println("port  ", port)
-				GinkgoWriter.Println("key   ", key)
-				GinkgoWriter.Println("txid  ", txid)
-			})
+				It("Scheduling a virtual machine to Hypervisor #5", func() {
+					td := tests[4]
+					vm := db.TestVmCreate(td.req.name, td.req.cpu, td.req.ram)
+					hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
+					Expect(err).To(HaveOccurred())
+					GinkgoWriter.Println("hvName ", hvName)
+					GinkgoWriter.Println("hvIp  ", hvIp)
+					GinkgoWriter.Println("port  ", port)
+					GinkgoWriter.Println("key   ", key)
+					GinkgoWriter.Println("txid  ", txid)
+				})
 
-			It("Scheduling a virtual machine to Hypervisor #8", func() {
-				td := tests[7]
-				vm := db.TestVmCreate(td.req.name, td.req.cpu, td.req.ram)
-				hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("hvName ", hvName)
-				GinkgoWriter.Println("hvIp.  ", hvIp)
-				GinkgoWriter.Println("port  ", port)
-				GinkgoWriter.Println("key   ", key)
-				GinkgoWriter.Println("txid  ", txid)
+				It("Scheduling a virtual machine to Hypervisor #6", func() {
+					td := tests[5]
+					vm := db.TestVmCreate(td.req.name, td.req.cpu, td.req.ram)
+					hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
+					Expect(err).NotTo(HaveOccurred())
+					GinkgoWriter.Println("hvName ", hvName)
+					GinkgoWriter.Println("hvIp  ", hvIp)
+					GinkgoWriter.Println("port  ", port)
+					GinkgoWriter.Println("key   ", key)
+					GinkgoWriter.Println("txid  ", txid)
+				})
+
+				It("Scheduling a virtual machine to Hypervisor #7", func() {
+					td := tests[6]
+					vm := db.TestVmCreate(td.req.name, td.req.cpu, td.req.ram)
+					hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
+					Expect(err).NotTo(HaveOccurred())
+					GinkgoWriter.Println("hvName ", hvName)
+					GinkgoWriter.Println("hvIp  ", hvIp)
+					GinkgoWriter.Println("port  ", port)
+					GinkgoWriter.Println("key   ", key)
+					GinkgoWriter.Println("txid  ", txid)
+				})
+
+				It("Scheduling a virtual machine to Hypervisor #8", func() {
+					td := tests[7]
+					vm := db.TestVmCreate(td.req.name, td.req.cpu, td.req.ram)
+					hvName, hvIp, key, txid, port, err := d.AssignHvforVm(vm)
+					Expect(err).NotTo(HaveOccurred())
+					GinkgoWriter.Println("hvName ", hvName)
+					GinkgoWriter.Println("hvIp.  ", hvIp)
+					GinkgoWriter.Println("port  ", port)
+					GinkgoWriter.Println("key   ", key)
+					GinkgoWriter.Println("txid  ", txid)
+				})
 			})
-		})
+		*/
 	})
 })

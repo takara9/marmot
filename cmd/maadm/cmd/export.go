@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/types"
 )
@@ -165,17 +164,19 @@ func exportConfig() error {
 		return err
 	}
 
-	// ハイパーバイザー
-	var hvs []api.Hypervisor
-	err = d.GetHypervisors(&hvs)
-	if err != nil {
-		slog.Error("Failed to get hypervisor data", "error", err)
-		return err
-	}
-	if err := writeJsonFile(filepath.Join(workDir, "marmot-hv.json"), hvs); err != nil {
-		slog.Error("Failed to write hypervisor data", "error", err)
-		return err
-	}
+	/*
+		// ハイパーバイザー
+		var hvs []api.Hypervisor
+		err = d.GetHypervisors(&hvs)
+		if err != nil {
+			slog.Error("Failed to get hypervisor data", "error", err)
+			return err
+		}
+		if err := writeJsonFile(filepath.Join(workDir, "marmot-hv.json"), hvs); err != nil {
+			slog.Error("Failed to write hypervisor data", "error", err)
+			return err
+		}
+	*/
 
 	// OSイメージテンプレート
 	var osit []types.OsImageTemplate
@@ -202,19 +203,21 @@ func exportConfig() error {
 		return err
 	}
 
-	//仮想マシン
-	var vms []api.VirtualMachine
-	err = d.GetVmsStatuses(&vms)
-	if err == db.ErrNotFound {
-		slog.Debug("No virtual machines found", "error", err)
-	} else if err != nil {
-		slog.Error("Failed to get data of virtual machines", "error", err)
-		return err
-	}
-	if err := writeJsonFile(filepath.Join(workDir, "marmot-vm-data.json"), vms); err != nil {
-		slog.Error("Failed to write data of virtual machines data", "error", err)
-		return err
-	}
+	/*
+		//仮想マシン
+		var vms []api.VirtualMachine
+		err = d.GetVmsStatuses(&vms)
+		if err == db.ErrNotFound {
+			slog.Debug("No virtual machines found", "error", err)
+		} else if err != nil {
+			slog.Error("Failed to get data of virtual machines", "error", err)
+			return err
+		}
+		if err := writeJsonFile(filepath.Join(workDir, "marmot-vm-data.json"), vms); err != nil {
+			slog.Error("Failed to write data of virtual machines data", "error", err)
+			return err
+		}
+	*/
 
 	// 圧縮ファイルを作成
 	if err := createZip(exportFilename, workDir); err != nil {

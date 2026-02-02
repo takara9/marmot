@@ -4,7 +4,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/takara9/marmot/api"
 	"gopkg.in/yaml.v3"
 )
 
@@ -28,6 +27,7 @@ func ReadYamlConfig(fn string, yamlConfig interface{}) error {
 	return nil
 }
 
+/*
 func ReadYamlClusterConfig(configYamlFile string) (*api.MarmotConfig, error) {
 	var configYaml MarmotConfig
 	fd, err := os.Open(configYamlFile)
@@ -122,3 +122,4 @@ func convConfYaml2Json(c MarmotConfig) api.MarmotConfig {
 	a.VmSpec = &vmSpec
 	return a
 }
+*/

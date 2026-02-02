@@ -4,55 +4,9 @@ import (
 	"encoding/json"
 	"log/slog"
 
-	"github.com/takara9/marmot/api"
 	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/types"
-	"github.com/takara9/marmot/pkg/util"
 )
-
-// OS qcow2ボリューム情報をetcdへ登録
-func (d *Database) UpdateOsQcow2ByVmKey(vmKey string, osVg string, osLv string) error {
-	key := vmKey
-	lockKey := "/lock/hv/" + vmKey
-	mutex, err := d.LockKey(lockKey)
-	if err != nil {
-		slog.Error("failed to lock", "err", err, "key", lockKey)
-		return err
-	}
-	defer d.UnlockKey(mutex)
-
-	var vm api.VirtualMachine
-	if _, err := d.GetJSON(key, &vm); err != nil {
-		return err
-	}
-
-	vm.OsLv = util.StringPtr(osLv)
-	vm.OsVg = util.StringPtr(osVg)
-
-	return d.PutJSON(key, vm)
-}
-
-// データqcow2ボリュームをetcdへ登録
-func (d *Database) UpdateDataQcow2LvByVmKey(vmKey string, idx int, dataVg string, dataLv string) error {
-	key := vmKey
-	lockKey := "/lock/hv/" + vmKey
-	mutex, err := d.LockKey(lockKey)
-	if err != nil {
-		slog.Error("failed to lock", "err", err, "key", lockKey)
-		return err
-	}
-	defer d.UnlockKey(mutex)
-
-	var vm api.VirtualMachine
-	if _, err := d.GetJSON(key, &vm); err != nil {
-		return err
-	}
-
-	(*vm.Storage)[idx].Lv = util.StringPtr(dataLv)
-	(*vm.Storage)[idx].Vg = util.StringPtr(dataVg)
-
-	return d.PutJSON(key, vm)
-}
 
 // qcow2イメージテンプレート
 func (d *Database) SetImageQcow2Template(v cf.Image_yaml) error {

@@ -18,42 +18,6 @@ type Error struct {
 	Message string `json:"message"`
 }
 
-// Hypervisor defines model for Hypervisor.
-type Hypervisor struct {
-	Cpu        int32          `json:"cpu"`
-	FreeCpu    *int32         `json:"freeCpu,omitempty"`
-	FreeMemory *int64         `json:"freeMemory,omitempty"`
-	IpAddr     *string        `json:"ipAddr,omitempty"`
-	Key        *string        `json:"key,omitempty"`
-	Memory     *int64         `json:"memory,omitempty"`
-	NodeName   string         `json:"nodeName"`
-	Port       *int32         `json:"port,omitempty"`
-	Status     *int32         `json:"status,omitempty"`
-	StgPool    *[]StoragePool `json:"stgPool,omitempty"`
-}
-
-// Hypervisors defines model for Hypervisors.
-type Hypervisors = []Hypervisor
-
-// MarmotConfig defines model for MarmotConfig.
-type MarmotConfig struct {
-	ClusterName       *string   `json:"cluster_name,omitempty"`
-	Domain            *string   `json:"domain,omitempty"`
-	Hypervisor        *string   `json:"hypervisor,omitempty"`
-	ImageDefaultPath  *string   `json:"image_default_path,omitempty"`
-	ImgaeTemplatePath *string   `json:"imgae_template_path,omitempty"`
-	NetDevDefault     *string   `json:"net_dev_default,omitempty"`
-	NetDevPrivate     *string   `json:"net_dev_private,omitempty"`
-	NetDevPublic      *string   `json:"net_dev_public,omitempty"`
-	OsVariant         *string   `json:"os_variant,omitempty"`
-	PrivateIpSubnet   *string   `json:"private_ip_subnet,omitempty"`
-	PublicIpDns       *string   `json:"public_ip_dns,omitempty"`
-	PublicIpGw        *string   `json:"public_ip_gw,omitempty"`
-	PublicIpSubnet    *string   `json:"public_ip_subnet,omitempty"`
-	Qcow2Image        *string   `json:"qcow2_image,omitempty"`
-	VmSpec            *[]VmSpec `json:"vm_spec,omitempty"`
-}
-
 // Nameservers defines model for Nameservers.
 type Nameservers struct {
 	Addresses *[]string `json:"addresses,omitempty"`
@@ -151,68 +115,6 @@ type Volume struct {
 	Status        *int       `json:"status,omitempty"`
 	Type          *string    `json:"type,omitempty"`
 	VolumeGroup   *string    `json:"volumeGroup,omitempty"`
-}
-
-// Storage defines model for storage.
-type Storage struct {
-	Lv   *string `json:"lv,omitempty"`
-	Name *string `json:"name,omitempty"`
-	Path *string `json:"path,omitempty"`
-	Size *int64  `json:"size,omitempty"`
-	Type *string `json:"type,omitempty"`
-	Vg   *string `json:"vg,omitempty"`
-}
-
-// StoragePool defines model for storagePool.
-type StoragePool struct {
-	FreeCap  *int64  `json:"freeCap,omitempty"`
-	Type     *string `json:"type,omitempty"`
-	VgCap    *int64  `json:"vgCap,omitempty"`
-	VolGroup *string `json:"volGroup,omitempty"`
-}
-
-// VirtualMachine defines model for virtualMachine.
-type VirtualMachine struct {
-	HvIpAddr    *string    `json:"HvIpAddr,omitempty"`
-	HvNode      string     `json:"HvNode"`
-	HvPort      *int32     `json:"HvPort,omitempty"`
-	CTime       *time.Time `json:"cTime,omitempty"`
-	ClusterName *string    `json:"clusterName,omitempty"`
-	Comment     *string    `json:"comment,omitempty"`
-	Cpu         *int32     `json:"cpu,omitempty"`
-	Key         *string    `json:"key,omitempty"`
-	Memory      *int64     `json:"memory,omitempty"`
-	Name        string     `json:"name"`
-	OsLv        *string    `json:"osLv,omitempty"`
-	OsVariant   *string    `json:"osVariant,omitempty"`
-	OsVg        *string    `json:"osVg,omitempty"`
-	Playbook    *string    `json:"playbook,omitempty"`
-	PrivateIp   *string    `json:"privateIp,omitempty"`
-	PublicIp    *string    `json:"publicIp,omitempty"`
-	STime       *time.Time `json:"sTime,omitempty"`
-	Status      *int32     `json:"status,omitempty"`
-	Storage     *[]Storage `json:"storage,omitempty"`
-	Uuid        *string    `json:"uuid,omitempty"`
-}
-
-// VirtualMachines defines model for virtualMachines.
-type VirtualMachines = []VirtualMachine
-
-// VmSpec defines model for vmSpec.
-type VmSpec struct {
-	Comment       *string    `json:"comment,omitempty"`
-	Cpu           *int32     `json:"cpu,omitempty"`
-	Key           *string    `json:"key,omitempty"`
-	Memory        *int64     `json:"memory,omitempty"`
-	Name          *string    `json:"name,omitempty"`
-	Ostemplv      *string    `json:"ostemplv,omitempty"`
-	Ostempvariant *string    `json:"ostempvariant,omitempty"`
-	Ostempvg      *string    `json:"ostempvg,omitempty"`
-	Playbook      *string    `json:"playbook,omitempty"`
-	PrivateIp     *string    `json:"private_ip,omitempty"`
-	PublicIp      *string    `json:"public_ip,omitempty"`
-	Storage       *[]Storage `json:"storage,omitempty"`
-	Uuid          *string    `json:"uuid,omitempty"`
 }
 
 // CreateServerJSONRequestBody defines body for CreateServer for application/json ContentType.
