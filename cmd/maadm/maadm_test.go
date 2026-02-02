@@ -111,6 +111,11 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 				Expect(*(*h.StgPool)[1].VolGroup).To(Equal("vg2"))
 			})
 		*/
+		It("データベースに接続", func() {
+			var err error
+			d1, err = db.NewDatabase("http://localhost:3379")
+			Expect(err).NotTo(HaveOccurred())
+		})
 
 		It("OSイメージ、LVOS、LVDATA、VMのシーケンス番号をチェック", func() {
 			// OSイメージのシーケンス番号をチェック
