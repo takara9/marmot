@@ -24,7 +24,7 @@ var versionCmd = &cobra.Command{
 	Long:  `maadm クライアントのバージョンを表示します。`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		slog.Debug("===", "versionCmd is called", "===")
-		m, err := config.GetClientConfig2(apiConfigFilename)
+		m, err := config.GetClientConfig(apiConfigFilename)
 		if err != nil {
 			slog.Error("version", "err", err)
 			return err

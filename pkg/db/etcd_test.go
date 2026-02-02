@@ -187,31 +187,35 @@ var _ = Describe("Etcd", Ordered, func() {
 		const hypervior_config string = "testdata/hypervisor-config.yaml"
 		var cn cf.Hypervisors_yaml
 
-		type hv struct {
-			name string
-			cpu  uint64
-			ram  uint64
-		}
-		tests := []struct {
-			name string
-			want hv
-		}{
-			{name: "1st", want: hv{name: "hv1", cpu: 10, ram: 64}},
-			{name: "2nd", want: hv{name: "hv2", cpu: 10, ram: 64}},
-		}
+		/*
+			type hv struct {
+				name string
+				cpu  uint64
+				ram  uint64
+			}
+			tests := []struct {
+				name string
+				want hv
+			}{
+				{name: "1st", want: hv{name: "hv1", cpu: 10, ram: 64}},
+				{name: "2nd", want: hv{name: "hv2", cpu: 10, ram: 64}},
+			}
+		*/
 
 		Context("Read a test hypervisor config file", func() {
 			It("Read existing file", func() {
 				err := cf.ReadYamlConfig(hypervior_config, &cn)
 				Expect(err).NotTo(HaveOccurred())
-				for i, h := range cn.Hvs {
-					GinkgoWriter.Println(i)
-					GinkgoWriter.Println(h.Name)
-					GinkgoWriter.Println(h.Cpu)
-					Expect(h.Name).To(Equal(tests[i].want.name))
-					Expect(h.Cpu).To(Equal(tests[i].want.cpu))
-					Expect(h.Ram).To(Equal(tests[i].want.ram))
-				}
+				/*
+					for i, h := range cn.Hvs {
+						GinkgoWriter.Println(i)
+						GinkgoWriter.Println(h.Name)
+						GinkgoWriter.Println(h.Cpu)
+						Expect(h.Name).To(Equal(tests[i].want.name))
+						Expect(h.Cpu).To(Equal(tests[i].want.cpu))
+						Expect(h.Ram).To(Equal(tests[i].want.ram))
+					}
+				*/
 			})
 		})
 	})

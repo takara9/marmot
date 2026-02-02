@@ -11,7 +11,6 @@ import (
 
 var apiConfigFilename string
 var mactlConfig config.ClientConfig
-var clusterConfigFilename string
 var outputStyle string
 var m *client.MarmotEndpoint
 

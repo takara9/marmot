@@ -12,7 +12,6 @@ import (
 	"github.com/takara9/marmot/pkg/util"
 )
 
-
 // ＝＝＝＝＝＝＝＝＝＝＝＝＝＝　新 API 関数群  ＝＝＝＝＝＝＝＝＝＝＝＝＝＝
 // ボリュームの生成 implements api.ServerInterface.
 func (s *Server) CreateVolume(ctx echo.Context) error {
@@ -52,19 +51,21 @@ func (s *Server) DeleteVolumeById(ctx echo.Context, id string) error {
 // ボリュームのリストを取得 implements api.ServerInterface.
 func (s *Server) ListVolumes(ctx echo.Context) error {
 	slog.Debug("===", "ListVolumes() is called", "===")
-	vols, err := s.Ma.GetDataVolumes()
+	var dataVols, osVols []api.Volume
+	var err error
+	dataVols, err = s.Ma.GetDataVolumes()
 	if err != nil {
 		slog.Error("ListVolumes()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	vols2, err := s.Ma.GetOsVolumes()
+	osVols, err = s.Ma.GetOsVolumes()
 	if err != nil {
 		slog.Error("ListVolumes()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	vols = append(vols, vols2...)
+	vols := append(dataVols, osVols...)
 
 	return ctx.JSON(http.StatusOK, vols)
 }

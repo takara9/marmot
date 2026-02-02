@@ -48,13 +48,11 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			}
 			containerID = string(output[:12]) // 最初の12文字をIDとして取得
 			fmt.Printf("Container started with ID: %s\n", containerID)
-			//time.Sleep(5 * time.Second) // コンテナが起動するまで待機
 		})
 
 		It("モックサーバーの起動", func() {
 			ctx, cancel = context.WithCancel(context.Background())
 			marmotServer = startMockServer(ctx)
-			//time.Sleep(5 * time.Second) // Marmotインスタンスの生成待ち
 		})
 
 		It("モックサーバー起動の確認", func() {
@@ -71,16 +69,6 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			err := config.ReadYAML("testdata/hypervisor-config-hvc.yaml", &hvs)
 			Expect(err).NotTo(HaveOccurred())
 		})
-
-		/*
-			It("ハイパーバイザーの情報セット", func() {
-				for _, hv := range hvs.Hvs {
-					fmt.Println(hv)
-					err := marmotServer.Ma.Db.SetHypervisors(hv)
-					Expect(err).NotTo(HaveOccurred())
-				}
-			})
-		*/
 
 		It("OSイメージテンプレート", func() {
 			for _, hd := range hvs.Imgs {
@@ -113,7 +101,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		})
 
 		It("mactl version JSON形式でバージョンを取得", func() {
-			cmd := exec.Command("./bin/mactl-test", "version", "--output", "json", "--api", "testdata/config_marmot.conf")
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "version", "--output", "json", "--api", "testdata/config_marmot.conf")
 			stdoutStderr, err := cmd.CombinedOutput()
 			GinkgoWriter.Println("err: ", err)
 			GinkgoWriter.Println(string(stdoutStderr))
@@ -121,7 +109,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		})
 
 		It("mactl version TEXT形式でバージョンを取得", func() {
-			cmd := exec.Command("./bin/mactl-test", "version", "--output", "text", "--api", "testdata/config_marmot.conf")
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "version", "--output", "text")
 			stdoutStderr, err := cmd.CombinedOutput()
 			GinkgoWriter.Println("err: ", err)
 			GinkgoWriter.Println(string(stdoutStderr))
@@ -129,109 +117,18 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		})
 
 		It("mactl version YAML形式でバージョンを取得", func() {
-			cmd := exec.Command("./bin/mactl-test", "version", "--output", "yaml", "--api", "testdata/config_marmot.conf")
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "version", "--output", "yaml")
 			stdoutStderr, err := cmd.CombinedOutput()
 			GinkgoWriter.Println("err: ", err)
 			GinkgoWriter.Println(string(stdoutStderr))
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		/*
-			It("ハイパーバイザーの一覧取得", func() {
-				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "hv")
-				stdoutStderr, err := cmd.CombinedOutput()
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println(string(stdoutStderr))
-			})
-
-			It("グローバルステータス取得", func() {
-				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "globalStatus")
-				stdoutStderr, err := cmd.CombinedOutput()
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println(string(stdoutStderr))
-			})
-
-			It("クラスタ 1 の生成", func() {
-				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "create", "-c", "testdata/cluster-config1.yaml")
-				stdoutStderr, err := cmd.CombinedOutput()
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println(string(stdoutStderr))
-			})
-
-			It("仮想マシンの一覧取得-1", func() {
-				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "status", "-c", "testdata/cluster-config1.yaml")
-				stdoutStderr, err := cmd.CombinedOutput()
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println(string(stdoutStderr))
-			})
-
-			It("クラスタ1の削除", func() {
-				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "destroy", "-c", "testdata/cluster-config1.yaml")
-				stdoutStderr, err := cmd.CombinedOutput()
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println(string(stdoutStderr))
-			})
-
-			It("クラスタ2の生成", func() {
-				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "create", "-c", "testdata/cluster-config2.yaml")
-				stdoutStderr, err := cmd.CombinedOutput()
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println(string(stdoutStderr))
-			})
-
-			It("仮想マシンの一覧取得-2", func() {
-				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "status", "-c", "testdata/cluster-config2.yaml")
-				stdoutStderr, err := cmd.CombinedOutput()
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println(string(stdoutStderr))
-			})
-
-			It("クラスタ2の一時停止", func() {
-				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "stop", "-c", "testdata/cluster-config2.yaml")
-				stdoutStderr, err := cmd.CombinedOutput()
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println(string(stdoutStderr))
-			})
-
-			It("仮想マシンの一覧取得-3", func() {
-				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "status", "-c", "testdata/cluster-config2.yaml")
-				stdoutStderr, err := cmd.CombinedOutput()
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println(string(stdoutStderr))
-			})
-
-			It("クラスタ2の再スタート", func() {
-				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "start", "-c", "testdata/cluster-config2.yaml")
-				stdoutStderr, err := cmd.CombinedOutput()
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println(string(stdoutStderr))
-			})
-
-			It("仮想マシンの一覧取得-4", func() {
-				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "status", "-c", "testdata/cluster-config2.yaml")
-				stdoutStderr, err := cmd.CombinedOutput()
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println(string(stdoutStderr))
-			})
-
-			It("クラスタ2の削除", func() {
-				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "destroy", "-c", "testdata/cluster-config2.yaml")
-				stdoutStderr, err := cmd.CombinedOutput()
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println(string(stdoutStderr))
-			})
-
-			It("仮想マシンの一覧取得-5", func() {
-				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "status", "-c", "testdata/cluster-config2.yaml")
-				stdoutStderr, err := cmd.CombinedOutput()
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println(string(stdoutStderr))
-			})
-		*/
-
 		It("ボリュームのリスト取得  00", func() {
+			fmt.Println("わからん ボリュームのリスト取得  00")
 			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "list")
 			stdoutStderr, err := cmd.CombinedOutput()
+			GinkgoWriter.Println(string(err.Error()))
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr))
 		})
@@ -317,7 +214,8 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 			}
 			for _, v := range volumes {
-				cmdDel := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "destroy", v.Id, "--output", "json")
+				GinkgoWriter.Printf("Deleteing id=%v", v.Id)
+				cmdDel := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "delete", v.Id, "--output", "json")
 				stdoutStderr, err := cmdDel.CombinedOutput()
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Print(string(stdoutStderr))
@@ -356,13 +254,11 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			}
 			containerID = string(output[:12]) // 最初の12文字をIDとして取得
 			fmt.Printf("Container started with ID: %s\n", containerID)
-			//time.Sleep(5 * time.Second) // コンテナが起動するまで待機
 		})
 
 		It("モックサーバーの起動", func() {
 			ctx, cancel = context.WithCancel(context.Background())
 			marmotServer = startMockServer(ctx)
-			//time.Sleep(5 * time.Second) // Marmotインスタンスの生成待ち
 		})
 
 		It("モックサーバー起動の確認", func() {
@@ -379,16 +275,6 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			err := config.ReadYAML("testdata/hypervisor-config-hvc.yaml", &hvs)
 			Expect(err).NotTo(HaveOccurred())
 		})
-
-		/*
-			It("ハイパーバイザーの情報セット", func() {
-				for _, hv := range hvs.Hvs {
-					fmt.Println(hv)
-					err := marmotServer.Ma.Db.SetHypervisors(hv)
-					Expect(err).NotTo(HaveOccurred())
-				}
-			})
-		*/
 
 		It("OSイメージテンプレート", func() {
 			for _, hd := range hvs.Imgs {
@@ -414,7 +300,6 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			var resp api.Success
 			err := json.Unmarshal(stdoutStderr, &resp)
 			Expect(err).NotTo(HaveOccurred())
-			//Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("server id:", resp.Id)
 			id1 = resp.Id
 			Expect(len(resp.Id)).To(BeNumerically(">", 0))
@@ -496,6 +381,13 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 		It("サーバーのリスト取得", func() {
 			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "list", "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+		})
+
+		It("サーバーの削除 yaml", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "delete", id2)
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr))

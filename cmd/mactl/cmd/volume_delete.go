@@ -53,5 +53,5 @@ var volumeDeleteCmd = &cobra.Command{
 }
 
 func init() {
-	volumeCmd.AddCommand(volumeDestroyCmd)
+	volumeCmd.AddCommand(volumeDeleteCmd)
 }

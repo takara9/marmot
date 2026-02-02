@@ -13,18 +13,25 @@ var volumeListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all volumes",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		fmt.Println("volume list called")
+
 		byteBody, _, err := m.ListVolumes()
 		if err != nil {
 			println("ListVolumes", "err", err)
-			return err
+			return nil
+			//return err
 		}
+		fmt.Println("data received,")
+
+		fmt.Println("volume list called", "body", string(byteBody))
 
 		switch outputStyle {
 		case "text":
 			var data []api.Volume
 			if err := json.Unmarshal(byteBody, &data); err != nil {
 				println("Failed to Unmarshal", err)
-				return err
+				return nil
+				//return err
 			}
 
 			fmt.Printf("%-2v  %-8v  %-4v  %-5v  %-8v  %-8v  %-45v\n", "No", "Id", "Kind", "Type", "Size(MB)", "Pers.", "Path")

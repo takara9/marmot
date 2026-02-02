@@ -10,7 +10,8 @@ import (
 )
 
 // コンフィグからエンドポイントを取り出してセットする
-func GetClientConfig2(apiConfigFilename string) (*client.MarmotEndpoint, error) {
+
+func GetClientConfig(apiConfigFilename string) (*client.MarmotEndpoint, error) {
 	var configFn string
 	if len(apiConfigFilename) == 0 {
 		configFn = filepath.Join(os.Getenv("HOME"), ".config_marmot")

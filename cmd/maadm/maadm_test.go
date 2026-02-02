@@ -102,10 +102,6 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		})
 
 		It("OSイメージ、LVOS、LVDATA、VMのシーケンス番号をチェック", func() {
-			out, err := exec.Command("ETCDCTL_API=3", "etcdctl", "--endpoints", "http://localhost:3379", "get", "/marmot/sequence", "--prefix").CombinedOutput()
-			GinkgoWriter.Println("etcdctl output: ", string(out))
-			//Expect(err).NotTo(HaveOccurred())
-
 			// OSイメージのシーケンス番号をチェック
 			seq, err := d1.GetSeqByKind("LVOS")
 			Expect(err).NotTo(HaveOccurred())
@@ -182,57 +178,61 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 	})
 
-	/*
-		Context("maadm export/import の動作テスト", func() {
-			It("maadm export 取得", func() {
-				cmd := exec.Command("./bin/maadm-test", "export", "--etcdurl", "http://localhost:3379", "--filename", "/tmp/marmot-backup.zip")
-				stdout, err := cmd.CombinedOutput()
-				GinkgoWriter.Println("err: ", err)
-				GinkgoWriter.Println("stdout: ", string(stdout))
-				Expect(err).NotTo(HaveOccurred())
-			})
-
-			It("maadm import インポート", func() {
-				cmd := exec.Command("./bin/maadm-test", "import", "--etcdurl", "http://localhost:4379", "--filename", "/tmp/marmot-backup.zip")
-				stdout, err := cmd.CombinedOutput()
-				GinkgoWriter.Println("err: ", err)
-				GinkgoWriter.Println("stdout: ", string(stdout))
-				Expect(err).NotTo(HaveOccurred())
-			})
-
-			var d2 *db.Database
-
-			It("OSイメージ、LVOS、LVDATA、VMのシーケンス番号をチェック", func() {
-				By("OSイメージのシーケンス番号をチェック")
-				seq, err := d2.GetSeqByKind("LVOS")
-				Expect(err).NotTo(HaveOccurred())
-				Expect(seq).To(Equal(uint64(902)))
-				By("DATAボリュームのシーケンス番号をチェック")
-				seq, err = d2.GetSeqByKind("LVDATA")
-				Expect(err).NotTo(HaveOccurred())
-				Expect(seq).To(Equal(uint64(902)))
-				By("VM番号のシーケンス番号をチェック")
-				seq, err = d2.GetSeqByKind("VM")
-				Expect(err).NotTo(HaveOccurred())
-				Expect(seq).To(Equal(uint64(902)))
-			})
-
-			It("OSイメージのデータ取得チェック", func() {
-				v, err := d2.GetOsImgTempByOsVariant("ubuntu22.04")
-				Expect(err).NotTo(HaveOccurred())
-				Expect(v.VolumeGroup).To(Equal("vg1"))
-				Expect(v.LogicalVolume).To(Equal("lv02"))
-			})
-
-			It("OSイメージのKey経由でのデータ取得チェック", func() {
-				key := db.OsTemplateImagePrefix + "/" + "ubuntu22.04"
-				osit, err := d2.GetOsImgTempByKey(key)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(osit.Key).To(Equal(key))
-				Expect(osit.VolumeGroup).To(Equal("vg1"))
-				Expect(osit.LogicalVolume).To(Equal("lv02"))
-			})
-
+	Context("maadm export/import の動作テスト", func() {
+		It("maadm export 取得", func() {
+			cmd := exec.Command("./bin/maadm-test", "export", "--etcdurl", "http://localhost:3379", "--filename", "/tmp/marmot-backup.zip")
+			stdout, err := cmd.CombinedOutput()
+			GinkgoWriter.Println("err: ", err)
+			GinkgoWriter.Println("stdout: ", string(stdout))
+			Expect(err).NotTo(HaveOccurred())
 		})
-	*/
+
+		It("maadm import インポート", func() {
+			cmd := exec.Command("./bin/maadm-test", "import", "--etcdurl", "http://localhost:4379", "--filename", "/tmp/marmot-backup.zip")
+			stdout, err := cmd.CombinedOutput()
+			GinkgoWriter.Println("err: ", err)
+			GinkgoWriter.Println("stdout: ", string(stdout))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		var d2 *db.Database
+		// marmotd を介さずに、DB操作で内容をチェックする
+		It("データベースと接続", func() {
+			var err error
+			d2, err = db.NewDatabase("http://localhost:3379")
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("OSイメージ、LVOS、LVDATA、VMのシーケンス番号をチェック", func() {
+			By("OSイメージのシーケンス番号をチェック")
+			seq, err := d2.GetSeqByKind("LVOS")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(seq).To(Equal(uint64(902)))
+			By("DATAボリュームのシーケンス番号をチェック")
+			seq, err = d2.GetSeqByKind("LVDATA")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(seq).To(Equal(uint64(902)))
+			By("VM番号のシーケンス番号をチェック")
+			seq, err = d2.GetSeqByKind("VM")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(seq).To(Equal(uint64(902)))
+		})
+
+		It("OSイメージのデータ取得チェック", func() {
+			v, err := d2.GetOsImgTempByOsVariant("ubuntu22.04")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(v.VolumeGroup).To(Equal("vg1"))
+			Expect(v.LogicalVolume).To(Equal("lv02"))
+		})
+
+		It("OSイメージのKey経由でのデータ取得チェック", func() {
+			key := db.OsTemplateImagePrefix + "/" + "ubuntu22.04"
+			osit, err := d2.GetOsImgTempByKey(key)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(osit.Key).To(Equal(key))
+			Expect(osit.VolumeGroup).To(Equal("vg1"))
+			Expect(osit.LogicalVolume).To(Equal("lv02"))
+		})
+
+	})
 })
