@@ -215,41 +215,11 @@ type VmSpec struct {
 	Uuid          *string    `json:"uuid,omitempty"`
 }
 
-// ListHypervisorsParams defines parameters for ListHypervisors.
-type ListHypervisorsParams struct {
-	// Limit How many items to return at one time (max 100)
-	Limit *int32 `form:"limit,omitempty" json:"limit,omitempty"`
-}
-
-// CreateClusterJSONRequestBody defines body for CreateCluster for application/json ContentType.
-type CreateClusterJSONRequestBody = MarmotConfig
-
-// CreateVirtualMachineJSONRequestBody defines body for CreateVirtualMachine for application/json ContentType.
-type CreateVirtualMachineJSONRequestBody = VmSpec
-
-// DestroyClusterJSONRequestBody defines body for DestroyCluster for application/json ContentType.
-type DestroyClusterJSONRequestBody = MarmotConfig
-
-// DestroyVirtualMachineJSONRequestBody defines body for DestroyVirtualMachine for application/json ContentType.
-type DestroyVirtualMachineJSONRequestBody = VmSpec
-
 // CreateServerJSONRequestBody defines body for CreateServer for application/json ContentType.
 type CreateServerJSONRequestBody = Server
 
 // UpdateServerByIdJSONRequestBody defines body for UpdateServerById for application/json ContentType.
 type UpdateServerByIdJSONRequestBody = Server
-
-// StartClusterJSONRequestBody defines body for StartCluster for application/json ContentType.
-type StartClusterJSONRequestBody = MarmotConfig
-
-// StartVirtualMachineJSONRequestBody defines body for StartVirtualMachine for application/json ContentType.
-type StartVirtualMachineJSONRequestBody = VmSpec
-
-// StopClusterJSONRequestBody defines body for StopCluster for application/json ContentType.
-type StopClusterJSONRequestBody = MarmotConfig
-
-// StopVirtualMachineJSONRequestBody defines body for StopVirtualMachine for application/json ContentType.
-type StopVirtualMachineJSONRequestBody = VmSpec
 
 // CreateVolumeJSONRequestBody defines body for CreateVolume for application/json ContentType.
 type CreateVolumeJSONRequestBody = Volume
@@ -259,24 +229,6 @@ type UpdateVolumeByIdJSONRequestBody = Volume
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// Create Cluster of Virtual Machines
-	// (POST /createCluster)
-	CreateCluster(ctx echo.Context) error
-	// Create Virtual Machine
-	// (POST /createVm)
-	CreateVirtualMachine(ctx echo.Context) error
-	// Destroy Cluster of Virtual Machines
-	// (POST /destroyCluster)
-	DestroyCluster(ctx echo.Context) error
-	// Destroy Virtual Machines
-	// (POST /destroyVm)
-	DestroyVirtualMachine(ctx echo.Context) error
-	// Info for a specific hypervisor
-	// (GET /hypervisor/{hypervisorId})
-	ShowHypervisorById(ctx echo.Context, hypervisorId string) error
-	// List Hypervisors
-	// (GET /hypervisors)
-	ListHypervisors(ctx echo.Context, params ListHypervisorsParams) error
 	// Alive
 	// (GET /ping)
 	ReplyPing(ctx echo.Context) error
@@ -295,24 +247,9 @@ type ServerInterface interface {
 	// Update Server Information by Id
 	// (PUT /server/{id})
 	UpdateServerById(ctx echo.Context, id string) error
-	// Start Cluster of Virtual Machines
-	// (POST /startCluster)
-	StartCluster(ctx echo.Context) error
-	// Start Virtual Machine
-	// (POST /startVm)
-	StartVirtualMachine(ctx echo.Context) error
-	// Stop Cluster of Virtual Machines
-	// (POST /stopCluster)
-	StopCluster(ctx echo.Context) error
-	// Stop Virtual Machines
-	// (POST /stopVm)
-	StopVirtualMachine(ctx echo.Context) error
 	// Get Version
 	// (GET /version)
 	GetVersion(ctx echo.Context) error
-	// List Virtual Machines
-	// (GET /virtualMachines)
-	ListVirtualMachines(ctx echo.Context) error
 	// List Volumes
 	// (GET /volume)
 	ListVolumes(ctx echo.Context) error
@@ -333,76 +270,6 @@ type ServerInterface interface {
 // ServerInterfaceWrapper converts echo contexts to parameters.
 type ServerInterfaceWrapper struct {
 	Handler ServerInterface
-}
-
-// CreateCluster converts echo context to params.
-func (w *ServerInterfaceWrapper) CreateCluster(ctx echo.Context) error {
-	var err error
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.CreateCluster(ctx)
-	return err
-}
-
-// CreateVirtualMachine converts echo context to params.
-func (w *ServerInterfaceWrapper) CreateVirtualMachine(ctx echo.Context) error {
-	var err error
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.CreateVirtualMachine(ctx)
-	return err
-}
-
-// DestroyCluster converts echo context to params.
-func (w *ServerInterfaceWrapper) DestroyCluster(ctx echo.Context) error {
-	var err error
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.DestroyCluster(ctx)
-	return err
-}
-
-// DestroyVirtualMachine converts echo context to params.
-func (w *ServerInterfaceWrapper) DestroyVirtualMachine(ctx echo.Context) error {
-	var err error
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.DestroyVirtualMachine(ctx)
-	return err
-}
-
-// ShowHypervisorById converts echo context to params.
-func (w *ServerInterfaceWrapper) ShowHypervisorById(ctx echo.Context) error {
-	var err error
-	// ------------- Path parameter "hypervisorId" -------------
-	var hypervisorId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "hypervisorId", ctx.Param("hypervisorId"), &hypervisorId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter hypervisorId: %s", err))
-	}
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.ShowHypervisorById(ctx, hypervisorId)
-	return err
-}
-
-// ListHypervisors converts echo context to params.
-func (w *ServerInterfaceWrapper) ListHypervisors(ctx echo.Context) error {
-	var err error
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params ListHypervisorsParams
-	// ------------- Optional query parameter "limit" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "limit", ctx.QueryParams(), &params.Limit)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter limit: %s", err))
-	}
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.ListHypervisors(ctx, params)
-	return err
 }
 
 // ReplyPing converts echo context to params.
@@ -480,57 +347,12 @@ func (w *ServerInterfaceWrapper) UpdateServerById(ctx echo.Context) error {
 	return err
 }
 
-// StartCluster converts echo context to params.
-func (w *ServerInterfaceWrapper) StartCluster(ctx echo.Context) error {
-	var err error
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.StartCluster(ctx)
-	return err
-}
-
-// StartVirtualMachine converts echo context to params.
-func (w *ServerInterfaceWrapper) StartVirtualMachine(ctx echo.Context) error {
-	var err error
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.StartVirtualMachine(ctx)
-	return err
-}
-
-// StopCluster converts echo context to params.
-func (w *ServerInterfaceWrapper) StopCluster(ctx echo.Context) error {
-	var err error
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.StopCluster(ctx)
-	return err
-}
-
-// StopVirtualMachine converts echo context to params.
-func (w *ServerInterfaceWrapper) StopVirtualMachine(ctx echo.Context) error {
-	var err error
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.StopVirtualMachine(ctx)
-	return err
-}
-
 // GetVersion converts echo context to params.
 func (w *ServerInterfaceWrapper) GetVersion(ctx echo.Context) error {
 	var err error
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.GetVersion(ctx)
-	return err
-}
-
-// ListVirtualMachines converts echo context to params.
-func (w *ServerInterfaceWrapper) ListVirtualMachines(ctx echo.Context) error {
-	var err error
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.ListVirtualMachines(ctx)
 	return err
 }
 
@@ -628,24 +450,13 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 		Handler: si,
 	}
 
-	router.POST(baseURL+"/createCluster", wrapper.CreateCluster)
-	router.POST(baseURL+"/createVm", wrapper.CreateVirtualMachine)
-	router.POST(baseURL+"/destroyCluster", wrapper.DestroyCluster)
-	router.POST(baseURL+"/destroyVm", wrapper.DestroyVirtualMachine)
-	router.GET(baseURL+"/hypervisor/:hypervisorId", wrapper.ShowHypervisorById)
-	router.GET(baseURL+"/hypervisors", wrapper.ListHypervisors)
 	router.GET(baseURL+"/ping", wrapper.ReplyPing)
 	router.GET(baseURL+"/server", wrapper.GetServers)
 	router.POST(baseURL+"/server", wrapper.CreateServer)
 	router.DELETE(baseURL+"/server/:id", wrapper.DeleteServerById)
 	router.GET(baseURL+"/server/:id", wrapper.GetServerById)
 	router.PUT(baseURL+"/server/:id", wrapper.UpdateServerById)
-	router.POST(baseURL+"/startCluster", wrapper.StartCluster)
-	router.POST(baseURL+"/startVm", wrapper.StartVirtualMachine)
-	router.POST(baseURL+"/stopCluster", wrapper.StopCluster)
-	router.POST(baseURL+"/stopVm", wrapper.StopVirtualMachine)
 	router.GET(baseURL+"/version", wrapper.GetVersion)
-	router.GET(baseURL+"/virtualMachines", wrapper.ListVirtualMachines)
 	router.GET(baseURL+"/volume", wrapper.ListVolumes)
 	router.POST(baseURL+"/volume", wrapper.CreateVolume)
 	router.DELETE(baseURL+"/volume/:volumeId", wrapper.DeleteVolumeById)
