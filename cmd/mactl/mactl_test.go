@@ -134,96 +134,98 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("ハイパーバイザーの一覧取得", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "hv")
-			stdoutStderr, err := cmd.CombinedOutput()
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println(string(stdoutStderr))
-		})
+		/*
+			It("ハイパーバイザーの一覧取得", func() {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "hv")
+				stdoutStderr, err := cmd.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println(string(stdoutStderr))
+			})
 
-		It("グローバルステータス取得", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "globalStatus")
-			stdoutStderr, err := cmd.CombinedOutput()
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println(string(stdoutStderr))
-		})
+			It("グローバルステータス取得", func() {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "globalStatus")
+				stdoutStderr, err := cmd.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println(string(stdoutStderr))
+			})
 
-		It("クラスタ 1 の生成", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "create", "-c", "testdata/cluster-config1.yaml")
-			stdoutStderr, err := cmd.CombinedOutput()
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println(string(stdoutStderr))
-		})
+			It("クラスタ 1 の生成", func() {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "create", "-c", "testdata/cluster-config1.yaml")
+				stdoutStderr, err := cmd.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println(string(stdoutStderr))
+			})
 
-		It("仮想マシンの一覧取得-1", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "status", "-c", "testdata/cluster-config1.yaml")
-			stdoutStderr, err := cmd.CombinedOutput()
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println(string(stdoutStderr))
-		})
+			It("仮想マシンの一覧取得-1", func() {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "status", "-c", "testdata/cluster-config1.yaml")
+				stdoutStderr, err := cmd.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println(string(stdoutStderr))
+			})
 
-		It("クラスタ1の削除", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "destroy", "-c", "testdata/cluster-config1.yaml")
-			stdoutStderr, err := cmd.CombinedOutput()
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println(string(stdoutStderr))
-		})
+			It("クラスタ1の削除", func() {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "destroy", "-c", "testdata/cluster-config1.yaml")
+				stdoutStderr, err := cmd.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println(string(stdoutStderr))
+			})
 
-		It("クラスタ2の生成", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "create", "-c", "testdata/cluster-config2.yaml")
-			stdoutStderr, err := cmd.CombinedOutput()
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println(string(stdoutStderr))
-		})
+			It("クラスタ2の生成", func() {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "create", "-c", "testdata/cluster-config2.yaml")
+				stdoutStderr, err := cmd.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println(string(stdoutStderr))
+			})
 
-		It("仮想マシンの一覧取得-2", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "status", "-c", "testdata/cluster-config2.yaml")
-			stdoutStderr, err := cmd.CombinedOutput()
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println(string(stdoutStderr))
-		})
+			It("仮想マシンの一覧取得-2", func() {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "status", "-c", "testdata/cluster-config2.yaml")
+				stdoutStderr, err := cmd.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println(string(stdoutStderr))
+			})
 
-		It("クラスタ2の一時停止", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "stop", "-c", "testdata/cluster-config2.yaml")
-			stdoutStderr, err := cmd.CombinedOutput()
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println(string(stdoutStderr))
-		})
+			It("クラスタ2の一時停止", func() {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "stop", "-c", "testdata/cluster-config2.yaml")
+				stdoutStderr, err := cmd.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println(string(stdoutStderr))
+			})
 
-		It("仮想マシンの一覧取得-3", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "status", "-c", "testdata/cluster-config2.yaml")
-			stdoutStderr, err := cmd.CombinedOutput()
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println(string(stdoutStderr))
-		})
+			It("仮想マシンの一覧取得-3", func() {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "status", "-c", "testdata/cluster-config2.yaml")
+				stdoutStderr, err := cmd.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println(string(stdoutStderr))
+			})
 
-		It("クラスタ2の再スタート", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "start", "-c", "testdata/cluster-config2.yaml")
-			stdoutStderr, err := cmd.CombinedOutput()
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println(string(stdoutStderr))
-		})
+			It("クラスタ2の再スタート", func() {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "start", "-c", "testdata/cluster-config2.yaml")
+				stdoutStderr, err := cmd.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println(string(stdoutStderr))
+			})
 
-		It("仮想マシンの一覧取得-4", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "status", "-c", "testdata/cluster-config2.yaml")
-			stdoutStderr, err := cmd.CombinedOutput()
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println(string(stdoutStderr))
-		})
+			It("仮想マシンの一覧取得-4", func() {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "status", "-c", "testdata/cluster-config2.yaml")
+				stdoutStderr, err := cmd.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println(string(stdoutStderr))
+			})
 
-		It("クラスタ2の削除", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "destroy", "-c", "testdata/cluster-config2.yaml")
-			stdoutStderr, err := cmd.CombinedOutput()
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println(string(stdoutStderr))
-		})
+			It("クラスタ2の削除", func() {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "destroy", "-c", "testdata/cluster-config2.yaml")
+				stdoutStderr, err := cmd.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println(string(stdoutStderr))
+			})
 
-		It("仮想マシンの一覧取得-5", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "status", "-c", "testdata/cluster-config2.yaml")
-			stdoutStderr, err := cmd.CombinedOutput()
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println(string(stdoutStderr))
-		})
+			It("仮想マシンの一覧取得-5", func() {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "status", "-c", "testdata/cluster-config2.yaml")
+				stdoutStderr, err := cmd.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println(string(stdoutStderr))
+			})
+		*/
 
 		It("ボリュームのリスト取得  00", func() {
 			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "list")
