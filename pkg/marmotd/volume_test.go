@@ -64,13 +64,15 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("ハイパーバイザーの情報セット", func() {
-			for _, hv := range hvs.Hvs {
-				fmt.Println(hv)
-				err := marmotServer.Ma.Db.SetHypervisors(hv)
-				Expect(err).NotTo(HaveOccurred())
-			}
-		})
+		/*
+			It("ハイパーバイザーの情報セット", func() {
+				for _, hv := range hvs.Hvs {
+					fmt.Println(hv)
+					err := marmotServer.Ma.Db.SetHypervisors(hv)
+					Expect(err).NotTo(HaveOccurred())
+				}
+			})
+		*/
 
 		It("OSイメージテンプレート", func() {
 			for _, hd := range hvs.Imgs {
@@ -96,20 +98,22 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			}).Should(Succeed())
 		})
 
-		It("動作確認 CheckHypervisors()", func() {
-			GinkgoWriter.Println(nodeName)
-			hv, err := marmotServer.Ma.Db.CheckHypervisors(etcdUrl, nodeName)
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("xxxxxx array size == ", len(hv))
-			for i, v := range hv {
-				GinkgoWriter.Println("xxxxxx hv index    == ", i)
-				GinkgoWriter.Println("xxxxxx hv nodename == ", v.NodeName)
-				GinkgoWriter.Println("xxxxxx hv port     == ", *v.Port)
-				GinkgoWriter.Println("xxxxxx hv CPU      == ", v.Cpu)
-				GinkgoWriter.Println("xxxxxx hv Mem      == ", *v.Memory)
-				GinkgoWriter.Println("xxxxxx hv IP addr  == ", *v.IpAddr)
-			}
-		})
+		/*
+			It("動作確認 CheckHypervisors()", func() {
+				GinkgoWriter.Println(nodeName)
+				hv, err := marmotServer.Ma.Db.CheckHypervisors(etcdUrl, nodeName)
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println("xxxxxx array size == ", len(hv))
+				for i, v := range hv {
+					GinkgoWriter.Println("xxxxxx hv index    == ", i)
+					GinkgoWriter.Println("xxxxxx hv nodename == ", v.NodeName)
+					GinkgoWriter.Println("xxxxxx hv port     == ", *v.Port)
+					GinkgoWriter.Println("xxxxxx hv CPU      == ", v.Cpu)
+					GinkgoWriter.Println("xxxxxx hv Mem      == ", *v.Memory)
+					GinkgoWriter.Println("xxxxxx hv IP addr  == ", *v.IpAddr)
+				}
+			})
+		*/
 
 		It("Check the config file to directly etcd", func() {
 			cmd := exec.Command(etcdctlExe, "--endpoints=localhost:7379", "get", "hvc")

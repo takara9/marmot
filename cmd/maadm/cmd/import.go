@@ -110,26 +110,28 @@ func importConfig() error {
 
 	// ハイパーバイザー
 	// read marmot-hv.json
-	path := filepath.Join(workDir, "marmot-hv.json")
-	jsonBytes, err := os.ReadFile(path)
-	if err != nil {
-		slog.Error("Failed to read json file in working dir", "error", err)
-		return err
-	}
-	var buf []api.Hypervisor
-	if err := json.Unmarshal(jsonBytes, &buf); err != nil {
-		slog.Error("Failed to unmarshal", "error", err)
-		return err
-	}
-	for _, v := range buf {
-		d.PutJSON(*v.Key, v)
+	/*
+		path := filepath.Join(workDir, "marmot-hv.json")
+		jsonBytes, err := os.ReadFile(path)
+		if err != nil {
+			slog.Error("Failed to read json file in working dir", "error", err)
+			return err
+		}
+		var buf []api.Hypervisor
+		if err := json.Unmarshal(jsonBytes, &buf); err != nil {
+			slog.Error("Failed to unmarshal", "error", err)
+			return err
+		}
+		for _, v := range buf {
+			d.PutJSON(*v.Key, v)
 
-	}
+		}
+	*/
 
 	// バージョン
 	// marmot-version.json
-	path = filepath.Join(workDir, "marmot-version.json")
-	jsonBytes, err = os.ReadFile(path)
+	path := filepath.Join(workDir, "marmot-version.json")
+	jsonBytes, err := os.ReadFile(path)
 	if err != nil {
 		slog.Error("Failed to read json file in working dir", "error", err)
 		return err
@@ -151,7 +153,6 @@ func importConfig() error {
 		slog.Error("Failed to set version", "error", err)
 		return err
 	}
-
 	// OSイメージテンプレート
 	// marmot-os-temp.json
 	path = filepath.Join(workDir, "marmot-os-temp.json")
@@ -174,7 +175,6 @@ func importConfig() error {
 			return err
 		}
 	}
-
 	// シーケンス番号
 	// marmot-seq-data.json
 	path = filepath.Join(workDir, "marmot-seq-data.json")
@@ -194,20 +194,22 @@ func importConfig() error {
 
 	//Read 仮想マシン
 	// marmot-vm-data.json
-	path = filepath.Join(workDir, "marmot-vm-data.json")
-	jsonBytes, err = os.ReadFile(path)
-	if err != nil {
-		slog.Error("Failed to read json file in working dir", "error", err)
-		return err
-	}
-	var buf4 []api.VirtualMachine
-	if err := json.Unmarshal(jsonBytes, &buf4); err != nil {
-		slog.Error("Failed to unmarshal", "error", err)
-		return err
-	}
-	for _, v := range buf4 {
-		d.PutJSON(*v.Key, v)
-	}
+	/*
+		path = filepath.Join(workDir, "marmot-vm-data.json")
+		jsonBytes, err = os.ReadFile(path)
+		if err != nil {
+			slog.Error("Failed to read json file in working dir", "error", err)
+			return err
+		}
+		var buf4 []api.VirtualMachine
+		if err := json.Unmarshal(jsonBytes, &buf4); err != nil {
+			slog.Error("Failed to unmarshal", "error", err)
+			return err
+		}
+		for _, v := range buf4 {
+			d.PutJSON(*v.Key, v)
+		}
+	*/
 
 	return nil
 }

@@ -1,10 +1,6 @@
 package db
 
-import (
-	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/util"
-)
-
+/*
 func TestHvData1() api.Hypervisor {
 	var hv api.Hypervisor
 	hv.NodeName = "hv01"
@@ -53,3 +49,4 @@ func TestVmCreate(hostname string, cpu int, ram int) api.VirtualMachine {
 
 	return vm
 }
+*/

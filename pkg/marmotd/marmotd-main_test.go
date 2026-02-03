@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"os/exec"
 	"time"
 
@@ -77,13 +76,15 @@ var _ = Describe("関数テスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("ハイパーバイザーの情報セット", func() {
-			for _, hv := range hvs.Hvs {
-				fmt.Println(hv)
-				err := marmotServer.Ma.Db.SetHypervisors(hv)
-				Expect(err).NotTo(HaveOccurred())
-			}
-		})
+		/*
+			It("ハイパーバイザーの情報セット", func() {
+				for _, hv := range hvs.Hvs {
+					fmt.Println(hv)
+					err := marmotServer.Ma.Db.SetHypervisors(hv)
+					Expect(err).NotTo(HaveOccurred())
+				}
+			})
+		*/
 
 		It("OSイメージテンプレート", func() {
 			for _, hd := range hvs.Imgs {
@@ -114,107 +115,6 @@ var _ = Describe("関数テスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(fmt.Sprintln(string(*serverVer.ServerVersion))).To(Equal(fmt.Sprintln(marmotd.Version)))
 			GinkgoWriter.Println("Version : ", string(*serverVer.ServerVersion))
-		})
-
-		It("ハイパーバイザーの一覧取得", func() {
-			httpStatus, body, url, err := marmotClient.ListHypervisors(nil)
-			var hvs []api.Hypervisor
-			Expect(err).NotTo(HaveOccurred())
-			Expect(httpStatus).To(Equal(200))
-			err = json.Unmarshal(body, &hvs)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(len(hvs)).To(Equal(1))
-			Expect(hvs[0].NodeName).To(Equal("hvc"))
-			Expect(*hvs[0].FreeCpu).To(Equal(int32(4)))
-			Expect(url).To(BeNil())
-		})
-
-		It("ハイパーバイザーの情報取得", func() {
-			httpStatus, body, url, err := marmotClient.GetHypervisor("hvc")
-			var hv api.Hypervisor
-			Expect(err).NotTo(HaveOccurred())
-			Expect(httpStatus).To(Equal(http.StatusOK))
-			err = json.Unmarshal(body, &hv)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(hv.NodeName).To(Equal("hvc"))
-			Expect(*hv.FreeCpu).To(Equal(int32(4)))
-			Expect(url).To(BeNil())
-		})
-
-		It("存在しないハイパーバイザーの情報取得", func() {
-			httpStatus, body, url, err := marmotClient.GetHypervisor("hvc-noexist")
-			var replyMessage api.ReplyMessage
-			Expect(err).NotTo(HaveOccurred())
-			Expect(httpStatus).To(Equal(http.StatusNotFound))
-			err = json.Unmarshal(body, &replyMessage)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(replyMessage.Message).To(Equal("Hypervisor hvc-noexist not found"))
-			Expect(url).To(BeNil())
-		})
-
-		It("クラスタの生成", func() {
-			cnf, err := config.ReadYamlClusterConfig("testdata/cluster-config.yaml")
-			Expect(err).NotTo(HaveOccurred())
-			httpStatus, body, url, err := marmotClient.CreateCluster(*cnf)
-			GinkgoWriter.Println("CreateCluster ERR = ", err)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(httpStatus).To(Equal(201))
-			var replyMessage api.ReplyMessage
-			err = json.Unmarshal(body, &replyMessage)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(url).To(BeNil())
-		})
-
-		It("仮想マシンの一覧取得", func() {
-			httpStatus, body, url, err := marmotClient.ListVirtualMachines(nil)
-			var vms []api.VirtualMachine
-			Expect(err).NotTo(HaveOccurred())
-			Expect(httpStatus).To(Equal(200))
-			err = json.Unmarshal(body, &vms)
-			GinkgoWriter.Println("err = ", err)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(len(vms)).To(Equal(2))
-			Expect(url).To(BeNil())
-		})
-
-		It("クラスタの一時停止", func() {
-			cnf, err := config.ReadYamlClusterConfig("testdata/cluster-config.yaml")
-			Expect(err).NotTo(HaveOccurred())
-			httpStatus, body, url, err := marmotClient.StopCluster(*cnf)
-			GinkgoWriter.Println("StopCluster ERR = ", err)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(httpStatus).To(Equal(201))
-			var replyMessage api.ReplyMessage
-			err = json.Unmarshal(body, &replyMessage)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(url).To(BeNil())
-			time.Sleep(time.Second * 20)
-		})
-
-		It("クラスタの再スタート", func() {
-			cnf, err := config.ReadYamlClusterConfig("testdata/cluster-config.yaml")
-			Expect(err).NotTo(HaveOccurred())
-			httpStatus, body, url, err := marmotClient.StartCluster(*cnf)
-			GinkgoWriter.Println("StartCluster ERR = ", err)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(httpStatus).To(Equal(201))
-			var replyMessage api.ReplyMessage
-			err = json.Unmarshal(body, &replyMessage)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(url).To(BeNil())
-		})
-
-		It("クラスタの削除", func() {
-			cnf, err := config.ReadYamlClusterConfig("testdata/cluster-config.yaml")
-			Expect(err).NotTo(HaveOccurred())
-			httpStatus, body, url, err := marmotClient.DestroyCluster(*cnf)
-			GinkgoWriter.Println("DestroyCluster ERR = ", err)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(httpStatus).To(Equal(200))
-			var replyMessage api.ReplyMessage
-			err = json.Unmarshal(body, &replyMessage)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(url).To(BeNil())
 		})
 
 		var replyVolume api.Volume

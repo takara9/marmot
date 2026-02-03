@@ -11,7 +11,6 @@ import (
 	etcd "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/concurrency"
 
-	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/types"
 )
 
@@ -197,6 +196,7 @@ func (d *Database) GetDnsByKey(path string) (types.DNSEntry, error) {
 	return entry, nil
 }
 
+/*
 // パブリックIPアドレスが一致するインスタンスを探す
 func (d *Database) FindByPublicIPaddress(ipAddress string) error {
 	resp, err := d.GetByPrefix(VmPrefix)
@@ -216,7 +216,8 @@ func (d *Database) FindByPublicIPaddress(ipAddress string) error {
 	}
 	return ErrNotFound
 }
-
+*/
+/*
 // プライベートIPアドレスが一致するインスンスを探す
 func (d *Database) FindByPrivateIPaddress(ipAddress string) error {
 	resp, err := d.GetByPrefix(VmPrefix)
@@ -237,7 +238,9 @@ func (d *Database) FindByPrivateIPaddress(ipAddress string) error {
 	}
 	return ErrNotFound
 }
+*/
 
+/*
 // ホスト名とクラスタ名でVMキーを取得する
 func (d *Database) FindByHostAndClusteName(hostname string, clustername string) (string, error) {
 	resp, err := d.GetByPrefix(VmPrefix)
@@ -257,3 +260,4 @@ func (d *Database) FindByHostAndClusteName(hostname string, clustername string) 
 	}
 	return "", ErrNotFound
 }
+*/

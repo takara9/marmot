@@ -20,16 +20,6 @@ jobs:
         ports:
           - 2379:2379
 
-      #coredns:
-      #  image: maho/coredns:1.11.1
-      #  ports: 
-      #    - 1053:53/udp
-      #  volumes:
-      #    -  /var/actions-runner/_work/marmot/marmot/pkg/dns/testconf:/conf
-      #  env:
-      #    CONF: "/conf/Corefile"
-      #    PORT: "53"
-
     steps:
     - uses: actions/checkout@v5
 
@@ -41,11 +31,6 @@ jobs:
       run: |
         sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
         sudo update-ca-certificates
-
-    #- name: Check coredns
-    #  run: |
-    #    docker ps
-    #    dig -p 1053 @localhost A minio.labo.local +noall +answer
 
     - name: 環境セットアップ
       run: |
@@ -74,31 +59,28 @@ jobs:
       run: |
         export ETCDCTL_API=3 
         etcdctl put --endpoints=127.0.0.1:2379 /skydns/local/labo/a/hoge '{"host":"192.168.1.5","ttl":60}'
+
     - name: Check etcd get
       run: |
         export ETCDCTL_API=3 
         etcdctl get --endpoints=127.0.0.1:2379 /skydns/local/labo/a/hoge
-    #- name: Check resolve by coredns and etcd 
-    #  run: |
-    #    dig -p 1053 @localhost A hoge.a.labo.local +noall +answer
+
     - name: Setup for build
       run: |
         make setup
+
     - name: Test pkg/config
       run: | 
         cd pkg/config
         sudo -s make test
         cd ../..
+
     - name: Test pkg/db
       run: | 
         cd pkg/db
         sudo -s make test
         cd ../..
-    #- name: Test pkg/dns
-    #  run: | 
-    #    cd pkg/dns
-    #    sudo -s make test
-    #    cd ../..
+
     - name: Test pkg/lvm
       run: | 
         cd pkg/lvm
@@ -116,16 +98,19 @@ jobs:
         cd pkg/util
         sudo -s make test
         cd ../..
+
     - name: Test pkg/virt
       run: | 
         cd pkg/virt
         sudo -s make test
         cd ../..
+
     - name: Test pkg/marmotd ボリューム機能テスト
       run: |
         cd pkg/marmotd
         sudo -s make test-volume
         cd ../..
+
   # Label of the job
   marmot-daemon:
     runs-on: [ self-hosted, runner1 ]
@@ -234,6 +219,7 @@ jobs:
         ls -la bin
         sudo -s make test
         cd ../..
+
     - name: Test cmd/maadm
       run: | 
         cd cmd/maadm
