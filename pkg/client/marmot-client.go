@@ -141,64 +141,6 @@ func (m *MarmotEndpoint) GetVersion() (*api.Version, error) {
 	return &ret, nil
 }
 
-func (m *MarmotEndpoint) ListHypervisors(params map[string]string) (int, []byte, *url.URL, error) {
-	url, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/hypervisors")
-	if err != nil {
-		return 0, nil, nil, err
-	}
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return 0, nil, nil, err
-	}
-	req.Header.Set("User-Agent", "MarmotdClient/1.0")
-	req.Header.Set("Content-Type", "application/json")
-
-	q := req.URL.Query()
-	for k, v := range params {
-		q.Add(k, v)
-	}
-	req.URL.RawQuery = q.Encode()
-
-	return m.httpRequest(req)
-}
-
-func (m *MarmotEndpoint) GetHypervisor(nodeName string) (int, []byte, *url.URL, error) {
-	url, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/hypervisor/"+nodeName)
-	if err != nil {
-		return 0, nil, nil, err
-	}
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return 0, nil, nil, err
-	}
-	req.Header.Set("User-Agent", "MarmotdClient/1.0")
-	req.Header.Set("Content-Type", "application/json")
-
-	return m.httpRequest(req)
-}
-
-func (m *MarmotEndpoint) ListVirtualMachines(params map[string]string) (int, []byte, *url.URL, error) {
-	slog.Debug("=====", "mactl ListVirtualMachines", "=====")
-	url, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/virtualMachines")
-	if err != nil {
-		return 0, nil, nil, err
-	}
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return 0, nil, nil, err
-	}
-	req.Header.Set("User-Agent", "MarmotdClient/1.0")
-	req.Header.Set("Content-Type", "application/json")
-
-	q := req.URL.Query()
-	for k, v := range params {
-		q.Add(k, v)
-	}
-	req.URL.RawQuery = q.Encode()
-
-	return m.httpRequest(req)
-}
-
 // ボリュームの作成
 func (m *MarmotEndpoint) CreateVolume(spec api.Volume) ([]byte, *url.URL, error) {
 	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/volume")

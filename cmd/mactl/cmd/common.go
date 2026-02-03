@@ -1,13 +1,10 @@
 package cmd
 
 import (
-	"fmt"
 	"log/slog"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"time"
 
 	"github.com/takara9/marmot/pkg/client"
 	"github.com/takara9/marmot/pkg/config"
@@ -41,6 +38,7 @@ func getClientConfig() (*client.MarmotEndpoint, error) {
 	)
 }
 
+/*
 // Ansible Playbook の適用
 func apply_playbook(cnf config.MarmotConfig) {
 	for {
@@ -64,3 +62,4 @@ func apply_playbook(cnf config.MarmotConfig) {
 		}
 	}
 }
+*/

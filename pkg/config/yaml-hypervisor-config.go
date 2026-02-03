@@ -10,6 +10,7 @@ type StgPool_yaml struct {
 }
 
 // ハイパーバイザー
+/*
 type Hypervisor_yaml struct {
 	Name    string         `yaml:"name"`
 	IpAddr  string         `yaml:"ip_addr"`
@@ -20,18 +21,19 @@ type Hypervisor_yaml struct {
 	RamFree uint64         `yaml:"free_ram"`
 	Storage []StgPool_yaml `yaml:"storage_pool"`
 }
+*/
 
 type Hypervisors_yaml struct {
-	Hvs  []Hypervisor_yaml `yaml:"hv_spec"`
-	Imgs []Image_yaml      `yaml:"image_template"`
-	Seq  []SeqNo_yaml      `yaml:"seqno"`
+	//Hvs  []Hypervisor_yaml `yaml:"hv_spec"`
+	Imgs []Image_yaml `yaml:"image_template"`
+	Seq  []SeqNo_yaml `yaml:"seqno"`
 }
 
 // OSイメージ　テンプレート
 type Image_yaml struct {
-	Name          string `yaml:"name"`
-	VolumeGroup   string `yaml:"volumegroup"`
-	LogicalVolume string `yaml:"logicalvolume"`
+	Name           string `yaml:"name"`
+	VolumeGroup    string `yaml:"volumegroup"`
+	LogicalVolume  string `yaml:"logicalvolume"`
 	Qcow2ImagePath string `yaml:"qcow2_path"`
 }
 
