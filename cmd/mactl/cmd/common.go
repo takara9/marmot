@@ -38,28 +38,3 @@ func getClientConfig() (*client.MarmotEndpoint, error) {
 	)
 }
 
-/*
-// Ansible Playbook の適用
-func apply_playbook(cnf config.MarmotConfig) {
-	for {
-		out, err := exec.Command("ansible", "-i", "hosts_kvm", "-m", "ping", "all").Output()
-		if err != nil {
-			slog.Error("待機中", "...", "")
-			time.Sleep(500 * time.Millisecond)
-		} else {
-			fmt.Println(string(out))
-			break
-		}
-	}
-
-	for _, spec := range *cnf.VmSpec {
-		path := fmt.Sprintf("playbook/%v", *spec.Playbook)
-		out, err := exec.Command("ansible-playbook", "-i", "hosts_kvm", path).Output()
-		if err != nil {
-			slog.Error("問題発生", "err", err)
-		} else {
-			fmt.Println(string(out))
-		}
-	}
-}
-*/
