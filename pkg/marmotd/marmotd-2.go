@@ -12,8 +12,6 @@ import (
 	"github.com/takara9/marmot/pkg/util"
 )
 
-
-// ＝＝＝＝＝＝＝＝＝＝＝＝＝＝　新 API 関数群  ＝＝＝＝＝＝＝＝＝＝＝＝＝＝
 // ボリュームの生成 implements api.ServerInterface.
 func (s *Server) CreateVolume(ctx echo.Context) error {
 	slog.Debug("===", "CreateVolume() is called", "===")
@@ -129,16 +127,26 @@ func (s *Server) CreateServer(ctx echo.Context) error {
 	}
 	slog.Debug("Recived post body", "serverSpec=", serverSpec, "cpu=", serverSpec.Cpu, "memory=", serverSpec.Memory, "os", serverSpec.OsVariant)
 
-	id, err := s.Ma.CreateServer(serverSpec)
+	// リクエストをetcdに登録し、正常応答を返す
+	slog.Debug("仮想マシンの使用を付与してDBへ登録、一意のIDを取得")
+	vm, err := s.Ma.Db.CreateServer(serverSpec)
 	if err != nil {
 		slog.Error("CreateServer()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+		//return "", err
 	}
 
-	slog.Debug("CreateServer()", "Server Id", id)
+	// これはコントローラー側にもっていく
+	//id, err := s.Ma.CreateServer(serverSpec)
+	//if err != nil {
+	//	slog.Error("CreateServer()", "err", err)
+	//	return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	//}
+
+	slog.Debug("CreateServer()", "Server Id", vm.Id)
 
 	var resp api.Success
-	resp.Id = id
+	resp.Id = vm.Id
 	resp.Message = util.StringPtr("Server created successfully")
 	return ctx.JSON(http.StatusOK, resp)
 }
@@ -157,14 +165,18 @@ func (s *Server) GetServerById(ctx echo.Context, id string) error {
 // サーバーの削除
 func (s *Server) DeleteServerById(ctx echo.Context, id string) error {
 	slog.Debug("===DeleteServerById() is called ===", "id", id)
-	if err := s.Ma.DeleteServerById(id); err != nil {
-		slog.Error("DeleteServerById()", "err", err)
+
+	// ステータスを削除中に更新　ここでステータを変更するのは正しくないかも
+	var req api.Server
+	req.Status = util.IntPtrInt(db.SERVER_DELETING)
+	if err := s.Ma.Db.UpdateServer(id, req); err != nil {
+		slog.Error("UpdateServer()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
 	var resp api.Success
 	resp.Id = id
-	resp.Message = util.StringPtr("Server deleted successfully")
+	resp.Message = util.StringPtr("Accepted the request to delete the server")
 	return ctx.JSON(http.StatusOK, resp)
 }
 

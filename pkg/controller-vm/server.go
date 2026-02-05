@@ -74,6 +74,7 @@ func (c *controller) controllerLoop() {
 		fmt.Println(string(json))
 
 		// サーバーの状態チェックと処理
+		// ここでワークキューに積むなどの処理を行う
 		switch *spec.Status {
 		case db.SERVER_RUNNING:
 			slog.Debug("稼働中のサーバー検出", "SERVER", spec.Name)
@@ -98,5 +99,7 @@ func (c *controller) controllerLoop() {
 		}
 	}
 
-	// データベースを検索してVMの状態をチェックし、必要に応じてアクションを実行する
+	// ワークキューから処理を取り出して、処理を実行する
+
+
 }

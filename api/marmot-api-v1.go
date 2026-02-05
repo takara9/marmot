@@ -59,9 +59,6 @@ type Route struct {
 
 // Server defines model for Server.
 type Server struct {
-	HvIpAddr     *string    `json:"HvIpAddr,omitempty"`
-	HvNode       *string    `json:"HvNode,omitempty"`
-	HvPort       *int       `json:"HvPort,omitempty"`
 	Network      *[]Network `json:"Network,omitempty"`
 	Storage      *[]Volume  `json:"Storage,omitempty"`
 	BootVolume   *Volume    `json:"bootVolume,omitempty"`

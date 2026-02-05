@@ -299,6 +299,15 @@ components:
           format: int32
         message:
           type: string
+    Success:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        message:
+          type: string
     ReplyMessage:
       type: object
       properties:
@@ -346,15 +355,6 @@ components:
           type: string
         persistent:
           type: boolean
-    Success:
-      type: object
-      required:
-        - id
-      properties:
-        id:
-          type: string
-        message:
-          type: string
     Network:
       type: object
       required:
@@ -436,13 +436,6 @@ components:
           type: string
         key:
           type: string
-        HvNode:
-          type: string
-        HvIpAddr:
-          type: string
-        HvPort:
-          type: integer
-          format: int
         cTime:
           type: string
           format: date-time

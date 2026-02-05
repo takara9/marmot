@@ -131,7 +131,9 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				},
 			}
 			// 他すべてデフォルト
-			id, err = marmotServer.Ma.CreateServer(spec)
+			vm, err := marmotServer.Ma.Db.CreateServer(spec)
+			Expect(err).NotTo(HaveOccurred())
+			id, err = marmotServer.Ma.CreateServer2(vm.Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created VM ID:", id)
 		})
@@ -158,7 +160,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status)
-				g.Expect(*sv.Status).To(Equal(db.SERVER_AVAILABLE))
+				g.Expect(*sv.Status).To(Equal(db.SERVER_RUNNING))
 			}, "120s", "10s").Should(Succeed())
 		})
 
@@ -201,7 +203,9 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			}
 
 			By("他すべてデフォルトで、仮想サーバーを作成")
-			id, err = marmotServer.Ma.CreateServer(spec)
+			vm, err := marmotServer.Ma.Db.CreateServer(spec)
+			Expect(err).NotTo(HaveOccurred())
+			id, err = marmotServer.Ma.CreateServer2(vm.Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created VM ID:", id)
 		})
@@ -228,7 +232,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status)
-				g.Expect(*sv.Status).To(Equal(db.SERVER_AVAILABLE))
+				g.Expect(*sv.Status).To(Equal(db.SERVER_RUNNING))
 			}, "60s", "10s").Should(Succeed())
 		})
 
@@ -254,7 +258,9 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			}
 			// 他すべてデフォルト
 			// この中で、ブートボリュームのIDがセットされていない可能性がある？？？
-			id, err = marmotServer.Ma.CreateServer(spec)
+			vm, err := marmotServer.Ma.Db.CreateServer(spec)
+			Expect(err).NotTo(HaveOccurred())
+			id, err = marmotServer.Ma.CreateServer2(vm.Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created VM ID:", id)
 		})
@@ -281,7 +287,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status)
-				g.Expect(*sv.Status).To(Equal(db.SERVER_AVAILABLE))
+				g.Expect(*sv.Status).To(Equal(db.SERVER_RUNNING))
 			}, "120s", "10s").Should(Succeed())
 		})
 
@@ -329,7 +335,9 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			}
 
 			By("他すべてデフォルトで、仮想サーバーを作成")
-			id, err = marmotServer.Ma.CreateServer(spec)
+			vm, err := marmotServer.Ma.Db.CreateServer(spec)
+			Expect(err).NotTo(HaveOccurred())
+			id, err = marmotServer.Ma.CreateServer2(vm.Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created VM ID:", id)
 		})
@@ -353,7 +361,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status)
-				g.Expect(*sv.Status).To(Equal(db.SERVER_AVAILABLE))
+				g.Expect(*sv.Status).To(Equal(db.SERVER_RUNNING))
 			}, "120s", "10s").Should(Succeed())
 		})
 
@@ -400,7 +408,9 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			}
 
 			By("他すべてデフォルトで、仮想サーバーを作成")
-			id, err = marmotServer.Ma.CreateServer(spec)
+			vm, err := marmotServer.Ma.Db.CreateServer(spec)
+			Expect(err).NotTo(HaveOccurred())
+			id, err = marmotServer.Ma.CreateServer2(vm.Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created VM ID:", id)
 		})
@@ -424,7 +434,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status)
-				g.Expect(*sv.Status).To(Equal(db.SERVER_AVAILABLE))
+				g.Expect(*sv.Status).To(Equal(db.SERVER_RUNNING))
 			}, "120s", "10s").Should(Succeed())
 		})
 
@@ -508,7 +518,9 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				},
 			}
 			By("他すべてデフォルトで、仮想サーバーを作成")
-			id, err = marmotServer.Ma.CreateServer(spec)
+			vm, err := marmotServer.Ma.Db.CreateServer(spec)
+			Expect(err).NotTo(HaveOccurred())
+			id, err = marmotServer.Ma.CreateServer2(vm.Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created VM ID:", id)
 		})
@@ -532,7 +544,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status)
-				g.Expect(*sv.Status).To(Equal(db.SERVER_AVAILABLE))
+				g.Expect(*sv.Status).To(Equal(db.SERVER_RUNNING))
 			}, "120s", "10s").Should(Succeed())
 		})
 
@@ -626,7 +638,9 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				},
 			}
 			By("他すべてデフォルトで、仮想サーバーを作成")
-			id, err = marmotServer.Ma.CreateServer(spec)
+			vm, err := marmotServer.Ma.Db.CreateServer(spec)
+			Expect(err).NotTo(HaveOccurred())
+			id, err = marmotServer.Ma.CreateServer2(vm.Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created VM ID:", id)
 		})
@@ -650,7 +664,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status)
-				g.Expect(*sv.Status).To(Equal(db.SERVER_AVAILABLE))
+				g.Expect(*sv.Status).To(Equal(db.SERVER_RUNNING))
 			}, "120s", "10s").Should(Succeed())
 		})
 
@@ -714,9 +728,11 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			}
 
 			By("他すべてデフォルトで、仮想サーバーを作成")
-			serverId, err = marmotServer.Ma.CreateServer(spec)
+			vm, err := marmotServer.Ma.Db.CreateServer(spec)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created VM ID:", serverId)
+			id, err := marmotServer.Ma.CreateServer2(vm.Id)
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println("Created VM ID:", id)
 		})
 
 		It("稼働中仮想サーバーの取得", func() {
@@ -738,7 +754,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				sv, err := marmotServer.Ma.GetServerById(serverId)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status)
-				g.Expect(*sv.Status).To(Equal(db.SERVER_AVAILABLE))
+				g.Expect(*sv.Status).To(Equal(db.SERVER_RUNNING))
 			}, "60s", "10s").Should(Succeed())
 		})
 
@@ -791,7 +807,9 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			}
 
 			// 他すべてデフォルト
-			id, err = marmotServer.Ma.CreateServer(spec)
+			vm, err := marmotServer.Ma.Db.CreateServer(spec)
+			Expect(err).NotTo(HaveOccurred())
+			id, err := marmotServer.Ma.CreateServer2(vm.Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created VM ID:", id)
 		})
@@ -818,7 +836,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status)
-				g.Expect(*sv.Status).To(Equal(db.SERVER_AVAILABLE))
+				g.Expect(*sv.Status).To(Equal(db.SERVER_RUNNING))
 			}, "120s", "10s").Should(Succeed())
 		})
 
