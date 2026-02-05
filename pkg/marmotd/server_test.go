@@ -732,6 +732,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			id, err := marmotServer.Ma.CreateServer2(vm.Id)
 			Expect(err).NotTo(HaveOccurred())
+			serverId = vm.Id
 			GinkgoWriter.Println("Created VM ID:", id)
 		})
 
