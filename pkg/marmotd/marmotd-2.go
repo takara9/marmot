@@ -168,7 +168,9 @@ func (s *Server) DeleteServerById(ctx echo.Context, id string) error {
 
 	// ステータスを削除中に更新　ここでステータを変更するのは正しくないかも
 	var req api.Server
-	req.Status = util.IntPtrInt(db.SERVER_DELETING)
+	req.Status2 = &api.Status{
+		Status: util.IntPtrInt(db.SERVER_DELETING),
+	}
 	if err := s.Ma.Db.UpdateServer(id, req); err != nil {
 		slog.Error("UpdateServer()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})

@@ -1,6 +1,6 @@
 openapi: "3.0.3"
 info:
-  version: 0.0.5
+  version: 0.1.0
   title: REST API of Marmot Server
 servers:
   - url: http://0.0.0.0:{port}{basePath}
@@ -465,6 +465,69 @@ components:
           type: string
         comment:
           type: string
+        osLv:
+          type: string
+        osVg:
+          type: string
+        osVariant:
+          type: string
+        bootVolume:
+          $ref: "#/components/schemas/Volume"
+        Metadata:
+          $ref: "#/components/schemas/Metadata"
+        Spec:
+          $ref: "#/components/schemas/VmSpec"
+        Status2:
+          $ref: "#/components/schemas/Status"
+    Status:
+      type: object
+      properties:
+        status:
+          type: integer
+          format: int
+        creationTimeStamp:
+          type: string
+          format: date-time
+        deletionTimeStamp:
+          type: string
+          format: date-time
+        lastUpdateTimeStamp:
+          type: string
+          format: date-time
+        message:
+          type: string
+    Metadata:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        uuid:
+          type: string
+        key:
+          type: string
+        comment:
+          type: string
+    VmSpec:
+      type: object
+      properties:
+        cpu:
+          type: integer
+          format: int
+        memory:
+          type: integer
+          format: int
+        Network:
+          type: array
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/Network"
+        Storage:
+          type: array
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/Volume"
         osLv:
           type: string
         osVg:

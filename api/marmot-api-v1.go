@@ -18,6 +18,15 @@ type Error struct {
 	Message string `json:"message"`
 }
 
+// Metadata defines model for Metadata.
+type Metadata struct {
+	Comment *string `json:"comment,omitempty"`
+	Id      *string `json:"id,omitempty"`
+	Key     *string `json:"key,omitempty"`
+	Name    *string `json:"name,omitempty"`
+	Uuid    *string `json:"uuid,omitempty"`
+}
+
 // Nameservers defines model for Nameservers.
 type Nameservers struct {
 	Addresses *[]string `json:"addresses,omitempty"`
@@ -59,7 +68,10 @@ type Route struct {
 
 // Server defines model for Server.
 type Server struct {
+	Metadata     *Metadata  `json:"Metadata,omitempty"`
 	Network      *[]Network `json:"Network,omitempty"`
+	Spec         *VmSpec    `json:"Spec,omitempty"`
+	Status2      *Status    `json:"Status2,omitempty"`
 	Storage      *[]Volume  `json:"Storage,omitempty"`
 	BootVolume   *Volume    `json:"bootVolume,omitempty"`
 	CTime        *time.Time `json:"cTime,omitempty"`
@@ -76,12 +88,21 @@ type Server struct {
 	OsVg         *string    `json:"osVg,omitempty"`
 	Playbook     *string    `json:"playbook,omitempty"`
 	STime        *time.Time `json:"sTime,omitempty"`
-	Status       *int       `json:"status,omitempty"`
+	//Status       *int       `json:"status,omitempty"`
 	Uuid         *string    `json:"uuid,omitempty"`
 }
 
 // Servers defines model for Servers.
 type Servers = []Server
+
+// Status defines model for Status.
+type Status struct {
+	CreationTimeStamp   *time.Time `json:"creationTimeStamp,omitempty"`
+	DeletionTimeStamp   *time.Time `json:"deletionTimeStamp,omitempty"`
+	LastUpdateTimeStamp *time.Time `json:"lastUpdateTimeStamp,omitempty"`
+	Message             *string    `json:"message,omitempty"`
+	Status              *int       `json:"status,omitempty"`
+}
 
 // Success defines model for Success.
 type Success struct {
@@ -93,6 +114,18 @@ type Success struct {
 type Version struct {
 	ClientVersion string  `json:"clientVersion"`
 	ServerVersion *string `json:"serverVersion,omitempty"`
+}
+
+// VmSpec defines model for VmSpec.
+type VmSpec struct {
+	Network    *[]Network `json:"Network,omitempty"`
+	Storage    *[]Volume  `json:"Storage,omitempty"`
+	BootVolume *Volume    `json:"bootVolume,omitempty"`
+	Cpu        *int       `json:"cpu,omitempty"`
+	Memory     *int       `json:"memory,omitempty"`
+	OsLv       *string    `json:"osLv,omitempty"`
+	OsVariant  *string    `json:"osVariant,omitempty"`
+	OsVg       *string    `json:"osVg,omitempty"`
 }
 
 // Volume defines model for Volume.

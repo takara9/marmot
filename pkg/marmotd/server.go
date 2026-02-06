@@ -37,7 +37,9 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 	bootVol.Size = util.IntPtrInt(0)
 
 	// ステータスを起動中に更新
-	serverConfig.Status = util.IntPtrInt(db.SERVER_PROVISIONING)
+	serverConfig.Status2 = &api.Status{
+		Status: util.IntPtrInt(db.SERVER_PROVISIONING),
+	}
 	err = m.Db.UpdateServer(serverConfig.Id, serverConfig)
 	if err != nil {
 		slog.Error("UpdateServer()", "err", err)
@@ -333,7 +335,10 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 	serverConfig.CTime = &createTime
 
 	// ステータスを利用可能に更新
-	serverConfig.Status = util.IntPtrInt(db.SERVER_RUNNING)
+	serverConfig.Status2 = &api.Status{
+		Status: util.IntPtrInt(db.SERVER_RUNNING),
+	}
+
 	err = m.Db.UpdateServer(serverConfig.Id, serverConfig)
 	if err != nil {
 		slog.Error("UpdateServer()", "err", err)
