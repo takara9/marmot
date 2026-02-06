@@ -58,12 +58,10 @@ func (d *Database) CreateServer(spec api.Server) (api.Server, error) {
 		}
 	}
 
-	// ステータスセット
-	var status api.Status
-	status.Status = util.IntPtrInt(SERVER_PROVISIONING)
-	server.Status2 = &status
-
-	// データベースに登録
+	// ステータスセット、タイムスタンプセット
+	var s api.Status
+	s.Status = util.IntPtrInt(SERVER_PROVISIONING)
+	server.Status2 = &s
 	if err := d.PutJSON(key, server); err != nil {
 		slog.Error("failed to write database data", "err", err, "key", key)
 		return api.Server{}, err

@@ -39,6 +39,8 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 	// ステータスを起動中に更新
 	serverConfig.Status2 = &api.Status{
 		Status: util.IntPtrInt(db.SERVER_PROVISIONING),
+		LastUpdateTimeStamp: util.TimePtr(time.Now()),
+		CreationTimeStamp: util.TimePtr(time.Now()),
 	}
 	err = m.Db.UpdateServer(serverConfig.Id, serverConfig)
 	if err != nil {
@@ -331,14 +333,10 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 		slog.Error("DefineAndStartVM()", "err", err)
 		return "", err
 	}
-	createTime := time.Now()
-	serverConfig.CTime = &createTime
 
-	// ステータスを利用可能に更新
-	serverConfig.Status2 = &api.Status{
-		Status: util.IntPtrInt(db.SERVER_RUNNING),
-	}
-
+	// ステータスを利用可能に更新、更新日時もセット
+	serverConfig.Status2.Status = util.IntPtrInt(db.SERVER_RUNNING)
+	serverConfig.Status2.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	err = m.Db.UpdateServer(serverConfig.Id, serverConfig)
 	if err != nil {
 		slog.Error("UpdateServer()", "err", err)

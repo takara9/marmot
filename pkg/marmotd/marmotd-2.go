@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
@@ -133,16 +134,7 @@ func (s *Server) CreateServer(ctx echo.Context) error {
 	if err != nil {
 		slog.Error("CreateServer()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
-		//return "", err
 	}
-
-	// これはコントローラー側にもっていく
-	//id, err := s.Ma.CreateServer(serverSpec)
-	//if err != nil {
-	//	slog.Error("CreateServer()", "err", err)
-	//	return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
-	//}
-
 	slog.Debug("CreateServer()", "Server Id", vm.Id)
 
 	var resp api.Success
@@ -166,12 +158,15 @@ func (s *Server) GetServerById(ctx echo.Context, id string) error {
 func (s *Server) DeleteServerById(ctx echo.Context, id string) error {
 	slog.Debug("===DeleteServerById() is called ===", "id", id)
 
-	// ステータスを削除中に更新　ここでステータを変更するのは正しくないかも
-	var req api.Server
-	req.Status2 = &api.Status{
-		Status: util.IntPtrInt(db.SERVER_DELETING),
+	// ステータスを削除中に更新
+	svc, err := s.Ma.GetServerById(id)
+	if err != nil {
+		slog.Error("GetServerById()", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-	if err := s.Ma.Db.UpdateServer(id, req); err != nil {
+	svc.Status2.Status = util.IntPtrInt(db.SERVER_DELETING)
+	svc.Status2.DeletionTimeStamp = util.TimePtr(time.Now())
+	if err := s.Ma.Db.UpdateServer(id, svc); err != nil {
 		slog.Error("UpdateServer()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
