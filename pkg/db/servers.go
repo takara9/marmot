@@ -59,7 +59,9 @@ func (d *Database) CreateServer(spec api.Server) (api.Server, error) {
 	}
 
 	// ステータスセット
-	server.Status2.Status = util.IntPtrInt(SERVER_PROVISIONING)
+	var status api.Status
+	status.Status = util.IntPtrInt(SERVER_PROVISIONING)
+	server.Status2 = &status
 
 	// データベースに登録
 	if err := d.PutJSON(key, server); err != nil {
