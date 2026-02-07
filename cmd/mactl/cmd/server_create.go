@@ -27,6 +27,7 @@ var serverCreateCmd = &cobra.Command{
 		var bootVolSpec api.Volume
 		var meta api.Metadata
 		var spec api.VmSpec
+		//var net api.Network
 
 		// 名前は必須項目
 		if len(conf.Name) == 0 {
@@ -57,7 +58,7 @@ var serverCreateCmd = &cobra.Command{
 
 		virtualServer.Spec = &spec
 		virtualServer.Spec.BootVolume = &bootVolSpec
-		virtualServer.Network = &[]api.Network{}
+		virtualServer.Spec.Network = &[]api.Network{}
 		if conf.Network != nil {
 			for _, nic := range *conf.Network {
 				var n api.Network
@@ -106,7 +107,7 @@ var serverCreateCmd = &cobra.Command{
 						}
 					}
 				}
-				*virtualServer.Network = append(*virtualServer.Network, n)
+				*virtualServer.Spec.Network = append(*virtualServer.Spec.Network, n)
 			}
 		}
 

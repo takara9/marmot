@@ -426,16 +426,6 @@ components:
       properties:
         id:
           type: string
-        Network:
-          type: array
-          maxItems: 10
-          items:
-            $ref: "#/components/schemas/Network"
-        Storage:
-          type: array
-          maxItems: 10
-          items:
-            $ref: "#/components/schemas/Volume"
         Metadata:
           $ref: "#/components/schemas/Metadata"
         Spec:

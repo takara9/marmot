@@ -234,7 +234,7 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 	channelPath, err := util.CreateChannelDir(virtSpec.UUID)
 
 	// ネットワークの設定
-	if serverConfig.Network == nil {
+	if serverConfig.Spec.Network == nil {
 		slog.Debug("ネットワーク指定なし、デフォルトネットワークを使用")
 		mac, err := util.GenerateRandomMAC()
 		if err != nil {
@@ -254,10 +254,10 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 		var net api.Network
 		net.Id = virtSpec.NetSpecs[0].Network
 		net.Mac = &virtSpec.NetSpecs[0].MAC
-		serverConfig.Network = &[]api.Network{net}
+		serverConfig.Spec.Network = &[]api.Network{net}
 	} else {
 		slog.Debug("ネットワーク指定あり、指定されたネットワークを使用")
-		for i, reqNic := range *serverConfig.Network {
+		for i, reqNic := range *serverConfig.Spec.Network {
 			slog.Debug("ネットワーク", "index", i, "network id", reqNic.Id)
 			mac, err := util.GenerateRandomMAC()
 			if err != nil {
@@ -295,7 +295,7 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 			ni.Netmask = reqNic.Netmask
 			ni.Routes = reqNic.Routes
 			ni.Nameservers = reqNic.Nameservers
-			(*serverConfig.Network)[i] = ni
+			(*serverConfig.Spec.Network)[i] = ni
 		}
 	}
 	// サーバーのネットワーク情報を更新

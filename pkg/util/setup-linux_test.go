@@ -164,13 +164,13 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 					VolumeGroup:   util.StringPtr("vg1"),
 					LogicalVolume: util.StringPtr("lvos_test2"),
 				},
-			},
-			Network: &[]api.Network{
-				{
-					Id: "default",
-				},
-				{
-					Id: "host-bridge",
+				Network: &[]api.Network{
+					{
+						Id: "default",
+					},
+					{
+						Id: "host-bridge",
+					},
 				},
 			},
 		}
@@ -227,63 +227,63 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 					VolumeGroup:   util.StringPtr("vg1"),
 					LogicalVolume: util.StringPtr("lvos_test2"),
 				},
-			},
-			Network: &[]api.Network{
-				{
-					Id: "default",
-				},
-				{
-					Id: "host-bridge",
-					Nameservers: &api.Nameservers{
-						Addresses: &[]string{
-							"8.8.8.8",
-							"8.8.4.4",
-						},
-						Search: &[]string{
-							"test.com",
-							"test2.org",
+				Network: &[]api.Network{
+					{
+						Id: "default",
+					},
+					{
+						Id: "host-bridge",
+						Nameservers: &api.Nameservers{
+							Addresses: &[]string{
+								"8.8.8.8",
+								"8.8.4.4",
+							},
+							Search: &[]string{
+								"test.com",
+								"test2.org",
+							},
 						},
 					},
-				},
-				{
-					Id:      "host-bridge",
-					Address: util.StringPtr("1.2.3.4"),
-					Netmask: util.StringPtr("24"),
-					Routes: &[]api.Route{
-						{
-							To:  util.StringPtr("default"),
-							Via: util.StringPtr("1.2.3.1"),
+					{
+						Id:      "host-bridge",
+						Address: util.StringPtr("1.2.3.4"),
+						Netmask: util.StringPtr("24"),
+						Routes: &[]api.Route{
+							{
+								To:  util.StringPtr("default"),
+								Via: util.StringPtr("1.2.3.1"),
+							},
 						},
 					},
-				},
-				{
-					Id:      "host-bridge",
-					Address: util.StringPtr("2001:db8::1"),
-					Netmask: util.StringPtr("64"),
-					Routes: &[]api.Route{
-						{
-							To:  util.StringPtr("2001:db8::/64"),
-							Via: util.StringPtr("2001:db8::ff"),
+					{
+						Id:      "host-bridge",
+						Address: util.StringPtr("2001:db8::1"),
+						Netmask: util.StringPtr("64"),
+						Routes: &[]api.Route{
+							{
+								To:  util.StringPtr("2001:db8::/64"),
+								Via: util.StringPtr("2001:db8::ff"),
+							},
+						},
+						Nameservers: &api.Nameservers{
+							Addresses: &[]string{
+								"2001:4860:4860::8888",
+								"2001:4860:4860::8844",
+							},
+							Search: &[]string{
+								"test.com",
+								"test2.org",
+							},
 						},
 					},
-					Nameservers: &api.Nameservers{
-						Addresses: &[]string{
-							"2001:4860:4860::8888",
-							"2001:4860:4860::8844",
-						},
-						Search: &[]string{
-							"test.com",
-							"test2.org",
-						},
+					{
+						Id:    "host-bridge",
+						Dhcp4: util.BoolPtr(false),
+						Dhcp6: util.BoolPtr(false),
 					},
-				},
-				{
-					Id:    "host-bridge",
-					Dhcp4: util.BoolPtr(false),
-					Dhcp6: util.BoolPtr(false),
-				},
-				{
-					Id: "host-bridge",
+					{
+						Id: "host-bridge",
+					},
 				},
 			},
 		}

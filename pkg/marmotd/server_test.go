@@ -180,15 +180,17 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			var virtualServer api.Server
 			var meta api.Metadata
 			var spec api.VmSpec
+			//var net []api.Network
 			var err error
 			virtualServer.Spec = &spec
+			//virtualServer.Spec.Network = &net
 
 			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
 			meta.Name = util.StringPtr("test-vm-2")
 			virtualServer.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
-			virtualServer.Network = &[]api.Network{
+			virtualServer.Spec.Network = &[]api.Network{
 				{
 					Id: "default",
 				},
@@ -267,7 +269,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			spec.BootVolume = &bootVol
 			virtualServer.Spec.BootVolume = &bootVol // ここだけqcow2と違う
 
-			virtualServer.Network = &[]api.Network{
+			virtualServer.Spec.Network = &[]api.Network{
 				{
 					Id: "default",
 				},
@@ -328,7 +330,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			virtualServer.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
-			virtualServer.Network = &[]api.Network{
+			virtualServer.Spec.Network = &[]api.Network{
 				{
 					Id: "default",
 				},
@@ -406,7 +408,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			virtualServer.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
-			virtualServer.Network = &[]api.Network{
+			virtualServer.Spec.Network = &[]api.Network{
 				{
 					Id: "default",
 				},
@@ -483,7 +485,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			virtualServer.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
-			virtualServer.Network = &[]api.Network{
+			virtualServer.Spec.Network = &[]api.Network{
 				{
 					Id: "default",
 				},
@@ -597,7 +599,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			virtualServer.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
-			virtualServer.Network = &[]api.Network{
+			virtualServer.Spec.Network = &[]api.Network{
 				{
 					Id: "default",
 				},
