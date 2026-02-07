@@ -122,18 +122,20 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 	Context("最小構成 QCOW2 仮想サーバーの起動と終了のテスト", func() {
 		var id string
 		It("仮想サーバー生成:bootはqcow2 で最小構成", func() {
-			var spec api.Server
+			var virtualServer api.Server
 			var meta api.Metadata
+			var spec api.VmSpec
 			var err error
 			meta.Name = util.StringPtr("test-vm-1")
-			spec.Metadata = &meta
-			spec.Network = &[]api.Network{
+			virtualServer.Metadata = &meta
+			virtualServer.Spec = &spec
+			virtualServer.Spec.Network = &[]api.Network{
 				{
 					Id: "default",
 				},
 			}
 			// 他すべてデフォルト
-			vm, err := marmotServer.Ma.Db.CreateServer(spec)
+			vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
 			Expect(err).NotTo(HaveOccurred())
 			id, err = marmotServer.Ma.CreateServer2(vm.Id)
 			Expect(err).NotTo(HaveOccurred())
@@ -259,6 +261,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 
 			meta.Name = util.StringPtr("test-vm-3")
 			virtualServer.Metadata = &meta
+			virtualServer.Spec = &spec
 
 			bootVol.Type = util.StringPtr("lvm")
 			spec.BootVolume = &bootVol
