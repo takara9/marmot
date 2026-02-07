@@ -719,10 +719,12 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 
 		It("仮想サーバー生成:bootはqcow2 でデータディスク２本構成", func() {
 			var spec api.Server
+			var meta api.Metadata
 			var err error
 
 			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
-			spec.Metadata.Name = util.StringPtr(hostname)
+			meta.Name = util.StringPtr(hostname)
+			spec.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
 			spec.Network = &[]api.Network{
