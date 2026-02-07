@@ -123,8 +123,10 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		var id string
 		It("仮想サーバー生成:bootはqcow2 で最小構成", func() {
 			var spec api.Server
+			var meta api.Metadata
 			var err error
-			spec.Name = util.StringPtr("test-vm-1")
+			meta.Name = util.StringPtr("test-vm-1")
+			spec.Metadata = &meta
 			spec.Network = &[]api.Network{
 				{
 					Id: "default",
@@ -142,8 +144,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			GinkgoWriter.Println("取得する仮想サーバーID:", id)
 			sv, err := marmotServer.Ma.GetServerById(id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("サーバー名: ", *sv.Name)
-			Expect(*sv.Name).To(Equal("test-vm-1"))
+			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
+			Expect(*sv.Metadata.Name).To(Equal("test-vm-1"))
 			data, err := json.MarshalIndent(sv, "", "  ")
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("サーバー情報: ", string(data))
@@ -174,10 +176,12 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		var id string
 		It("仮想サーバー生成:bootはqcow2 でデータディスク２本構成", func() {
 			var spec api.Server
+			var meta api.Metadata
 			var err error
 
 			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
-			spec.Name = util.StringPtr("test-vm-2")
+			meta.Name = util.StringPtr("test-vm-2")
+			spec.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
 			spec.Network = &[]api.Network{
@@ -214,8 +218,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			GinkgoWriter.Println("取得する仮想サーバーID:", id)
 			sv, err := marmotServer.Ma.GetServerById(id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("サーバー名: ", *sv.Name)
-			Expect(*sv.Name).To(Equal("test-vm-2"))
+			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
+			Expect(*sv.Metadata.Name).To(Equal("test-vm-2"))
 			data, err := json.MarshalIndent(sv, "", "  ")
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("サーバー情報: ", string(data))
@@ -246,9 +250,11 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		var id string
 		It("仮想サーバー生成:bootはlv で最小構成", func() {
 			var spec api.Server
-			var err error
 			var vol api.Volume
-			spec.Name = util.StringPtr("test-vm-3")
+			var meta api.Metadata
+			var err error
+			meta.Name = util.StringPtr("test-vm-3")
+			spec.Metadata = &meta
 			vol.Type = util.StringPtr("lvm")
 			spec.BootVolume = &vol // ここだけqcow2と違う
 			spec.Network = &[]api.Network{
@@ -269,11 +275,11 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			GinkgoWriter.Println("取得する仮想サーバーID:", id)
 			sv, err := marmotServer.Ma.GetServerById(id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("サーバー名: ", *sv.Name)
+			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
 			data, err := json.MarshalIndent(sv, "", "  ")
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("サーバー情報: ", string(data))
-			Expect(*sv.Name).To(Equal("test-vm-3"))
+			Expect(*sv.Metadata.Name).To(Equal("test-vm-3"))
 			GinkgoWriter.Println("サーバーステータス: ", *sv.Status2.Status)
 		})
 
@@ -302,10 +308,12 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		It("仮想サーバー生成:bootはlv で最小構成", func() {
 			var spec api.Server
 			var volspec api.Volume
+			var meta api.Metadata
 			var err error
 
 			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
-			spec.Name = util.StringPtr("test-vm-4")
+			meta.Name = util.StringPtr("test-vm-4")
+			spec.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
 			spec.Network = &[]api.Network{
@@ -313,10 +321,10 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Id: "default",
 				},
 			}
+
 			By("ブートディスクのタイプ(LVM)を設定")
 			volspec.Type = util.StringPtr("lvm") // ここだけqcow2と違う
 			spec.BootVolume = &volspec
-			//spec.BootVolume.Type = util.StringPtr("lvm")
 
 			By("データディスクのスペックを設定")
 			spec.Storage = &[]api.Volume{
@@ -346,8 +354,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			GinkgoWriter.Println("取得する仮想サーバーID:", id)
 			sv, err := marmotServer.Ma.GetServerById(id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("サーバー名: ", *sv.Name)
-			Expect(*sv.Name).To(Equal("test-vm-4"))
+			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
+			Expect(*sv.Metadata.Name).To(Equal("test-vm-4"))
 			GinkgoWriter.Println("サーバーステータス: ", *sv.Status2.Status)
 		})
 
@@ -376,10 +384,12 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		It("仮想サーバー生成:bootはlv で最小構成", func() {
 			var spec api.Server
 			var volspec api.Volume
+			var meta api.Metadata
 			var err error
 
 			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
-			spec.Name = util.StringPtr("test-vm-5")
+			meta.Name = util.StringPtr("test-vm-5")
+			spec.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
 			spec.Network = &[]api.Network{
@@ -419,8 +429,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			GinkgoWriter.Println("取得する仮想サーバーID:", id)
 			sv, err := marmotServer.Ma.GetServerById(id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("サーバー名: ", *sv.Name)
-			Expect(*sv.Name).To(Equal("test-vm-5"))
+			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
+			Expect(*sv.Metadata.Name).To(Equal("test-vm-5"))
 			GinkgoWriter.Println("サーバーステータス: ", *sv.Status2.Status)
 		})
 
@@ -449,10 +459,12 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		It("仮想サーバー生成:最大構成", func() {
 			var spec api.Server
 			var volspec api.Volume
+			var meta api.Metadata
 			var err error
 
 			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
-			spec.Name = util.StringPtr("test-vm-6")
+			meta.Name = util.StringPtr("test-vm-6")
+			spec.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
 			spec.Network = &[]api.Network{
@@ -529,8 +541,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			GinkgoWriter.Println("取得する仮想サーバーID:", id)
 			sv, err := marmotServer.Ma.GetServerById(id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("サーバー名: ", *sv.Name)
-			Expect(*sv.Name).To(Equal("test-vm-6"))
+			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
+			Expect(*sv.Metadata.Name).To(Equal("test-vm-6"))
 			GinkgoWriter.Println("サーバーステータス: ", *sv.Status2.Status)
 		})
 
@@ -559,10 +571,12 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		It("仮想サーバー生成 最大最小構成", func() {
 			var spec api.Server
 			var volspec api.Volume
+			var meta api.Metadata
 			var err error
 
 			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
-			spec.Name = util.StringPtr("test-vm-7")
+			meta.Name = util.StringPtr("test-vm-7")
+			spec.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
 			spec.Network = &[]api.Network{
@@ -649,8 +663,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			GinkgoWriter.Println("取得する仮想サーバーID:", id)
 			sv, err := marmotServer.Ma.GetServerById(id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("サーバー名: ", *sv.Name)
-			Expect(*sv.Name).To(Equal("test-vm-7"))
+			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
+			Expect(*sv.Metadata.Name).To(Equal("test-vm-7"))
 			GinkgoWriter.Println("サーバーステータス: ", *sv.Status2)
 		})
 
@@ -708,7 +722,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			var err error
 
 			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
-			spec.Name = util.StringPtr(hostname)
+			spec.Metadata.Name = util.StringPtr(hostname)
 
 			By("NICの接続先ネットワークを設定")
 			spec.Network = &[]api.Network{
@@ -740,8 +754,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			GinkgoWriter.Println("取得する仮想サーバーID:", serverId)
 			sv, err := marmotServer.Ma.GetServerById(serverId)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("サーバー名: ", *sv.Name)
-			Expect(*sv.Name).To(Equal(hostname))
+			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
+			Expect(*sv.Metadata.Name).To(Equal(hostname))
 			GinkgoWriter.Println("サーバーステータス: ", *sv.Status2.Status)
 		})
 
@@ -776,8 +790,11 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		var id string
 		It("仮想サーバー生成:bootはqcow2 で構成", func() {
 			var spec api.Server
+			var meta api.Metadata
 			var err error
-			spec.Name = util.StringPtr("test-vm-9")
+
+			meta.Name = util.StringPtr("test-vm-9")
+			spec.Metadata = &meta
 			spec.Network = &[]api.Network{
 				{
 					Id: "default",
@@ -819,8 +836,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			GinkgoWriter.Println("取得する仮想サーバーID:", id)
 			sv, err := marmotServer.Ma.GetServerById(id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("サーバー名: ", *sv.Name)
-			Expect(*sv.Name).To(Equal("test-vm-9"))
+			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
+			Expect(*sv.Metadata.Name).To(Equal("test-vm-9"))
 			data, err := json.MarshalIndent(sv, "", "  ")
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("サーバー情報: ", string(data))

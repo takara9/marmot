@@ -32,9 +32,9 @@ func SetupLinux(spec api.Server) error {
 
 	// ホスト名設定
 	hostnameFile := filepath.Join(mountPoint, "etc/hostname")
-	slog.Debug("Setting hostname", "file", hostnameFile, "hostname", *spec.Name)
+	slog.Debug("Setting hostname", "file", hostnameFile, "hostname", *spec.Metadata.Name)
 
-	err = os.WriteFile(hostnameFile, []byte(*spec.Name), 0644)
+	err = os.WriteFile(hostnameFile, []byte(*spec.Metadata.Name), 0644)
 	if err != nil {
 		slog.Error("WriteFile hostname failed", "error", err)
 		return err

@@ -25,13 +25,16 @@ var serverCreateCmd = &cobra.Command{
 		}
 		var spec api.Server
 		var volSpec api.Volume
+		var meta api.Metadata
 
 		// 名前は必須項目
 		if len(conf.Name) == 0 {
 			fmt.Println("Name is required in the configuration")
 			return fmt.Errorf("name is required in the configuration")
 		}
-		spec.Name = util.StringPtr(conf.Name)
+		meta.Name = util.StringPtr(conf.Name)
+		meta.Comment = conf.Comment
+		spec.Metadata = &meta
 
 		// 無設定を許容、デフォルトをAPI側に任せる
 		if conf.Cpu != nil {
@@ -103,7 +106,6 @@ var serverCreateCmd = &cobra.Command{
 				*spec.Network = append(*spec.Network, n)
 			}
 		}
-		spec.Comment = conf.Comment
 
 		if conf.Storage != nil {
 			volumes := make([]api.Volume, len(*conf.Storage))

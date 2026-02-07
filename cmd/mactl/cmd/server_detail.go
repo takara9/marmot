@@ -34,8 +34,8 @@ var serverDetailCmd = &cobra.Command{
 			}
 			fmt.Printf("Server Details:\n")
 			fmt.Printf("  Id: %v\n", server.Id)
-			fmt.Printf("  UUID: %v\n", *server.Uuid)
-			fmt.Printf("  Name: %v\n", *server.Name)
+			fmt.Printf("  UUID: %v\n", *server.Metadata.Uuid)
+			fmt.Printf("  Name: %v\n", *server.Metadata.Name)
 			if server.CTime != nil {
 				tm := server.CTime.Format(time.RFC3339)
 				fmt.Printf("  Create Time: %v\n", tm)

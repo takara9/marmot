@@ -77,29 +77,28 @@ func (c *controller) controllerLoop() {
 		// ここでワークキューに積むなどの処理を行う
 		switch *spec.Status2.Status {
 		case db.SERVER_RUNNING:
-			slog.Debug("稼働中のサーバー検出", "SERVER", spec.Name)
+			slog.Debug("稼働中のサーバー検出", "SERVER", spec.Id)
 		case db.SERVER_STOPPED:
-			slog.Debug("停止中のサーバー検出", "SERVER", spec.Name)
+			slog.Debug("停止中のサーバー検出", "SERVER", spec.Id)
 		case db.SERVER_ERROR:
-			slog.Debug("エラー状態のサーバー検出", "SERVER", spec.Name)
+			slog.Debug("エラー状態のサーバー検出", "SERVER", spec.Id)
 		case db.SERVER_DELETING:
-			slog.Debug("削除中のサーバー検出", "SERVER", spec.Name)
+			slog.Debug("削除中のサーバー検出", "SERVER", spec.Id)
 			// 削除処理の実行
 			c.marmot.DeleteServerById(spec.Id)
 		case db.SERVER_DELETED:
-			slog.Debug("削除済みのサーバー検出", "SERVER", spec.Name)
+			slog.Debug("削除済みのサーバー検出", "SERVER", spec.Id)
 		case db.SERVER_PROVISIONING:
-			slog.Debug("プロビジョニング中のサーバー検出", "SERVER", spec.Name)
+			slog.Debug("プロビジョニング中のサーバー検出", "SERVER", spec.Id)
 			// プロビジョニング処理の実行
 			// ワークキューの処理を実装する
 			c.marmot.CreateServer2(spec.Id)
 
 		default:
-			slog.Warn("不明な状態のサーバー検出", "SERVER", *spec.Name, "STATUS", *spec.Status2.Status)
+			slog.Warn("不明な状態のサーバー検出", "SERVER", spec.Id, "STATUS", *spec.Status2.Status)
 		}
 	}
 
 	// ワークキューから処理を取り出して、処理を実行する
-
 
 }

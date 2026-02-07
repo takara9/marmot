@@ -430,8 +430,6 @@ components:
           type: string
         name:
           type: string
-        instanceName:
-          type: string
         clusterName:
           type: string
         key:
@@ -506,6 +504,8 @@ components:
         uuid:
           type: string
         key:
+          type: string
+        instanceName:
           type: string
         comment:
           type: string

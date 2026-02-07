@@ -46,8 +46,8 @@ func (d *Database) CreateServer(spec api.Server) (api.Server, error) {
 	//一意なIDを発行
 	var key string
 	for {
-		server.Uuid = util.StringPtr(uuid.New().String())
-		server.Id = (*server.Uuid)[:8]
+		server.Metadata.Uuid = util.StringPtr(uuid.New().String())
+		server.Id = (*server.Metadata.Uuid)[:8]
 		key = ServerPrefix + "/" + server.Id
 		_, err := d.GetJSON(key, &server)
 		if err == ErrNotFound {

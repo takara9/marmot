@@ -38,9 +38,9 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 
 	// ステータスを起動中に更新
 	serverConfig.Status2 = &api.Status{
-		Status: util.IntPtrInt(db.SERVER_PROVISIONING),
+		Status:              util.IntPtrInt(db.SERVER_PROVISIONING),
 		LastUpdateTimeStamp: util.TimePtr(time.Now()),
-		CreationTimeStamp: util.TimePtr(time.Now()),
+		CreationTimeStamp:   util.TimePtr(time.Now()),
 	}
 	err = m.Db.UpdateServer(serverConfig.Id, serverConfig)
 	if err != nil {
@@ -152,14 +152,14 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 
 	slog.Debug("ハイパーバイザーのリソース確保")
 	var virtSpec virt.VmSpec
-	virtSpec.UUID = *serverConfig.Uuid
-	if serverConfig.Name != nil {
-		virtSpec.Name = *serverConfig.Name + "-" + serverConfig.Id // VMを一意に識別する
+	virtSpec.UUID = *serverConfig.Metadata.Uuid
+	if serverConfig.Metadata != nil && serverConfig.Metadata.Name != nil {
+		virtSpec.Name = *serverConfig.Metadata.Name + "-" + serverConfig.Id // VMを一意に識別する
 	} else {
 		virtSpec.Name = "vm-" + serverConfig.Id
 	}
 	// サーバーのVM名前をセットし、今後の操作のためにDBを更新する必要がある
-	serverConfig.InstanceName = util.StringPtr(virtSpec.Name)
+	serverConfig.Metadata.InstanceName = util.StringPtr(virtSpec.Name)
 
 	// CPUとメモリの設定
 	slog.Debug("割り当てるCPU数とメモリ量を設定")
@@ -365,19 +365,19 @@ func (m *Marmot) DeleteServerById(id string) error {
 	}
 	defer l.Close()
 
-	if sv.InstanceName != nil {
-		slog.Debug("DeleteServerById()", "deleting domain", *sv.InstanceName)
-		if err = l.DeleteDomain(*sv.InstanceName); err != nil {
+	if sv.Metadata.InstanceName != nil {
+		slog.Debug("DeleteServerById()", "deleting domain", *sv.Metadata.InstanceName)
+		if err = l.DeleteDomain(*sv.Metadata.InstanceName); err != nil {
 			// ドメインが存在しない場合はスキップしたいが、区別が難しいので意図的にスキップする
 			//if *sv.Status != db.SERVER_PROVISIONING {
 			//	slog.Error("DeleteDomain()", "err", err)
 			//	return err
 			//}
-			slog.Debug("DeleteServerById()", "server is in PROVISIONING state, skipping domain deletion", *sv.Name)
+			slog.Debug("DeleteServerById()", "server is in PROVISIONING state, skipping domain deletion", *sv.Metadata.Name)
 			// return nil 戻さず、削除処理を続行する
 		}
 	} else {
-		slog.Debug("DeleteServerById() no instance name set, skipping domain deletion", "server name", *sv.Name)
+		slog.Debug("DeleteServerById() no instance name set, skipping domain deletion", "server name", *sv.Metadata.Name)
 	}
 
 	// ブートボリュームの削除
@@ -413,7 +413,7 @@ func (m *Marmot) DeleteServerById(id string) error {
 		slog.Debug("DeleteServerById()", "no attached volumes to delete", sv.Id)
 	}
 
-	slog.Debug("DeleteServerById()", "sv", sv.Id, "name", *sv.Name)
+	slog.Debug("DeleteServerById()", "sv", sv.Id, "name", *sv.Metadata.Name)
 	if err := m.Db.DeleteServerById(sv.Id); err != nil {
 		slog.Error("DeleteServerById()", "err", err)
 		return err

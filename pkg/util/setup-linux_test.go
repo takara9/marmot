@@ -44,8 +44,10 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 	Context("qcow2 ブートデバイス設定のテスト", func() {
 		// テスト用のサーバースペックを定義
 		testSpec := api.Server{
-			Id:   "a123456",
-			Name: util.StringPtr("test-linux"),
+			Id: "a123456",
+			Metadata: &api.Metadata{
+				Name: util.StringPtr("test-linux"),
+			},
 			BootVolume: &api.Volume{
 				Id:   "test-linux-boot",
 				Type: util.StringPtr("qcow2"),
@@ -69,7 +71,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 		It("ホスト名設定のチェック", func() {
 			data, err := os.ReadFile(mountPoint + "/etc/hostname")
 			Expect(err).To(BeNil())
-			Expect(string(data)).To(Equal(*testSpec.Name))
+			Expect(string(data)).To(Equal(*testSpec.Metadata.Name))
 		})
 
 		It("Linux hostid設定のチェック", func() {
@@ -93,8 +95,10 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 	Context("lvm ブートデバイス設定のテスト", func() {
 		// テスト用のサーバースペックを定義
 		testSpec := api.Server{
-			Id:   "b123456",
-			Name: util.StringPtr("test-linux-lvm"),
+			Id: "b123456",
+			Metadata: &api.Metadata{
+				Name: util.StringPtr("test-linux-lvm"),
+			},
 			BootVolume: &api.Volume{
 				Id:            "test-linux-boot2",
 				Type:          util.StringPtr("lvm"),
@@ -120,7 +124,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 		It("ホスト名設定のチェック", func() {
 			data, err := os.ReadFile(mountPoint + "/etc/hostname")
 			Expect(err).To(BeNil())
-			Expect(string(data)).To(Equal(*testSpec.Name))
+			Expect(string(data)).To(Equal(*testSpec.Metadata.Name))
 		})
 
 		It("Linux hostid設定のチェック", func() {
@@ -144,8 +148,10 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 
 	Context("複数NIC設定のテスト", func() {
 		testSpec := api.Server{
-			Id:   "c123456",
-			Name: util.StringPtr("test-linux-mh"),
+			Id: "c123456",
+			Metadata: &api.Metadata{
+				Name: util.StringPtr("test-linux-mh"),
+			},
 			BootVolume: &api.Volume{
 				Id:            "test-linux-boot3",
 				Type:          util.StringPtr("lvm"),
@@ -179,7 +185,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 		It("ホスト名設定のチェック", func() {
 			data, err := os.ReadFile(mountPoint + "/etc/hostname")
 			Expect(err).To(BeNil())
-			Expect(string(data)).To(Equal(*testSpec.Name))
+			Expect(string(data)).To(Equal(*testSpec.Metadata.Name))
 		})
 
 		It("Linux hostid設定のチェック", func() {
@@ -203,8 +209,10 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 
 	Context("最大NIC設定のテスト", func() {
 		testSpec := api.Server{
-			Id:   "d123456",
-			Name: util.StringPtr("test-linux-mh"),
+			Id: "d123456",
+			Metadata: &api.Metadata{
+				Name: util.StringPtr("test-linux-mh"),
+			},
 			BootVolume: &api.Volume{
 				Id:            "test-linux-boot4",
 				Type:          util.StringPtr("lvm"),
@@ -288,7 +296,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 		It("ホスト名設定のチェック", func() {
 			data, err := os.ReadFile(mountPoint + "/etc/hostname")
 			Expect(err).To(BeNil())
-			Expect(string(data)).To(Equal(*testSpec.Name))
+			Expect(string(data)).To(Equal(*testSpec.Metadata.Name))
 		})
 
 		It("Linux hostid設定のチェック", func() {
