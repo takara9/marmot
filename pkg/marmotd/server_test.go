@@ -175,23 +175,25 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 	Context("QCOW2のデータディスクが複数存在する仮想サーバーの起動と終了のテスト", func() {
 		var id string
 		It("仮想サーバー生成:bootはqcow2 でデータディスク２本構成", func() {
-			var spec api.Server
+			var virtualServer api.Server
 			var meta api.Metadata
+			var spec api.VmSpec
 			var err error
+			virtualServer.Spec = &spec
 
 			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
 			meta.Name = util.StringPtr("test-vm-2")
-			spec.Metadata = &meta
+			virtualServer.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
-			spec.Network = &[]api.Network{
+			virtualServer.Network = &[]api.Network{
 				{
 					Id: "default",
 				},
 			}
 
 			By("データディスクのスペックを設定")
-			spec.Storage = &[]api.Volume{
+			virtualServer.Spec.Storage = &[]api.Volume{
 				{
 					Type: util.StringPtr("qcow2"),
 					Kind: util.StringPtr("data"),
@@ -207,7 +209,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			}
 
 			By("他すべてデフォルトで、仮想サーバーを作成")
-			vm, err := marmotServer.Ma.Db.CreateServer(spec)
+			vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
 			Expect(err).NotTo(HaveOccurred())
 			id, err = marmotServer.Ma.CreateServer2(vm.Id)
 			Expect(err).NotTo(HaveOccurred())
@@ -249,22 +251,27 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 	Context("最小構成 LV 仮想サーバーの起動と終了のテスト", func() {
 		var id string
 		It("仮想サーバー生成:bootはlv で最小構成", func() {
-			var spec api.Server
-			var vol api.Volume
+			var virtualServer api.Server
+			var bootVol api.Volume
 			var meta api.Metadata
+			var spec api.VmSpec
 			var err error
+
 			meta.Name = util.StringPtr("test-vm-3")
-			spec.Metadata = &meta
-			vol.Type = util.StringPtr("lvm")
-			spec.BootVolume = &vol // ここだけqcow2と違う
-			spec.Network = &[]api.Network{
+			virtualServer.Metadata = &meta
+
+			bootVol.Type = util.StringPtr("lvm")
+			spec.BootVolume = &bootVol
+			virtualServer.Spec.BootVolume = &bootVol // ここだけqcow2と違う
+
+			virtualServer.Network = &[]api.Network{
 				{
 					Id: "default",
 				},
 			}
 			// 他すべてデフォルト
 			// この中で、ブートボリュームのIDがセットされていない可能性がある？？？
-			vm, err := marmotServer.Ma.Db.CreateServer(spec)
+			vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
 			Expect(err).NotTo(HaveOccurred())
 			id, err = marmotServer.Ma.CreateServer2(vm.Id)
 			Expect(err).NotTo(HaveOccurred())
@@ -306,28 +313,30 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 	Context("LVのデータディスクが複数存在する仮想サーバーの起動と終了のテスト", func() {
 		var id string
 		It("仮想サーバー生成:bootはlv で最小構成", func() {
-			var spec api.Server
-			var volspec api.Volume
+			var virtualServer api.Server
+			var bootVol api.Volume
 			var meta api.Metadata
+			var spec api.VmSpec
 			var err error
+			virtualServer.Spec = &spec
 
 			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
 			meta.Name = util.StringPtr("test-vm-4")
-			spec.Metadata = &meta
+			virtualServer.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
-			spec.Network = &[]api.Network{
+			virtualServer.Network = &[]api.Network{
 				{
 					Id: "default",
 				},
 			}
 
 			By("ブートディスクのタイプ(LVM)を設定")
-			volspec.Type = util.StringPtr("lvm") // ここだけqcow2と違う
-			spec.BootVolume = &volspec
+			bootVol.Type = util.StringPtr("lvm") // ここだけqcow2と違う
+			virtualServer.Spec.BootVolume = &bootVol
 
 			By("データディスクのスペックを設定")
-			spec.Storage = &[]api.Volume{
+			virtualServer.Spec.Storage = &[]api.Volume{
 				{
 					Type: util.StringPtr("lvm"),
 					Kind: util.StringPtr("data"),
@@ -343,7 +352,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			}
 
 			By("他すべてデフォルトで、仮想サーバーを作成")
-			vm, err := marmotServer.Ma.Db.CreateServer(spec)
+			vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
 			Expect(err).NotTo(HaveOccurred())
 			id, err = marmotServer.Ma.CreateServer2(vm.Id)
 			Expect(err).NotTo(HaveOccurred())
@@ -382,27 +391,29 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 	Context("LVとQCOW2のデータディスクが複数存在する仮想サーバーの起動と終了のテスト", func() {
 		var id string
 		It("仮想サーバー生成:bootはlv で最小構成", func() {
-			var spec api.Server
-			var volspec api.Volume
+			var virtualServer api.Server
+			var bootVol api.Volume
 			var meta api.Metadata
+			var spec api.VmSpec
 			var err error
+			virtualServer.Spec = &spec
 
 			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
 			meta.Name = util.StringPtr("test-vm-5")
-			spec.Metadata = &meta
+			virtualServer.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
-			spec.Network = &[]api.Network{
+			virtualServer.Network = &[]api.Network{
 				{
 					Id: "default",
 				},
 			}
 			By("ブートディスクのタイプ(LVM)を設定")
-			volspec.Type = util.StringPtr("lvm") // ここだけqcow2と違う
-			spec.BootVolume = &volspec
+			bootVol.Type = util.StringPtr("lvm") // ここだけqcow2と違う
+			virtualServer.Spec.BootVolume = &bootVol
 
 			By("データディスクのスペックを設定")
-			spec.Storage = &[]api.Volume{
+			virtualServer.Spec.Storage = &[]api.Volume{
 				{
 					Type: util.StringPtr("lvm"),
 					Kind: util.StringPtr("data"),
@@ -418,7 +429,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			}
 
 			By("他すべてデフォルトで、仮想サーバーを作成")
-			vm, err := marmotServer.Ma.Db.CreateServer(spec)
+			vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
 			Expect(err).NotTo(HaveOccurred())
 			id, err = marmotServer.Ma.CreateServer2(vm.Id)
 			Expect(err).NotTo(HaveOccurred())
@@ -457,27 +468,29 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 	Context("qcow2x10データディスクが複数存在する仮想サーバーの起動と終了のテスト", func() {
 		var id string
 		It("仮想サーバー生成:最大構成", func() {
-			var spec api.Server
-			var volspec api.Volume
+			var virtualServer api.Server
+			var bootVol api.Volume
 			var meta api.Metadata
+			var spec api.VmSpec
 			var err error
+			virtualServer.Spec = &spec
 
 			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
 			meta.Name = util.StringPtr("test-vm-6")
-			spec.Metadata = &meta
+			virtualServer.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
-			spec.Network = &[]api.Network{
+			virtualServer.Network = &[]api.Network{
 				{
 					Id: "default",
 				},
 			}
 			By("ブートディスクのタイプ(LVM)を設定")
-			volspec.Type = util.StringPtr("lvm") // ここだけqcow2と違う
-			spec.BootVolume = &volspec
+			bootVol.Type = util.StringPtr("lvm") // ここだけqcow2と違う
+			virtualServer.Spec.BootVolume = &bootVol
 
 			By("データディスクのスペックを設定")
-			spec.Storage = &[]api.Volume{
+			virtualServer.Spec.Storage = &[]api.Volume{
 				{
 					Type: util.StringPtr("qcow2"),
 					Name: util.StringPtr("data-disk-1"),
@@ -530,7 +543,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				},
 			}
 			By("他すべてデフォルトで、仮想サーバーを作成")
-			vm, err := marmotServer.Ma.Db.CreateServer(spec)
+			vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
 			Expect(err).NotTo(HaveOccurred())
 			id, err = marmotServer.Ma.CreateServer2(vm.Id)
 			Expect(err).NotTo(HaveOccurred())
@@ -569,90 +582,82 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 	Context("LVx10データディスクが複数存在する仮想サーバーの起動と終了のテスト", func() {
 		var id string
 		It("仮想サーバー生成 最大最小構成", func() {
-			var spec api.Server
-			var volspec api.Volume
+			var virtualServer api.Server
+			var bootVol api.Volume
 			var meta api.Metadata
+			var spec api.VmSpec
 			var err error
+			virtualServer.Spec = &spec
 
 			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
 			meta.Name = util.StringPtr("test-vm-7")
-			spec.Metadata = &meta
+			virtualServer.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
-			spec.Network = &[]api.Network{
+			virtualServer.Network = &[]api.Network{
 				{
 					Id: "default",
 				},
 			}
 			By("ブートディスクのタイプ(LVM)を設定")
-			volspec.Type = util.StringPtr("lvm") // ここだけqcow2と違う
-			spec.BootVolume = &volspec
+			bootVol.Type = util.StringPtr("lvm") // ここだけqcow2と違う
+			virtualServer.Spec.BootVolume = &bootVol
 
 			By("データディスクのスペックを設定")
-			spec.Storage = &[]api.Volume{
+			virtualServer.Spec.Storage = &[]api.Volume{
 				{
 					Type: util.StringPtr("lvm"),
-					//Kind: util.StringPtr("data"),
 					Name: util.StringPtr("data-disk-1"),
 					Size: util.IntPtrInt(101), //MB
 				},
 				{
 					Type: util.StringPtr("lvm"),
-					//Kind: util.StringPtr("data"),
 					Name: util.StringPtr("data-disk-2"),
 					Size: util.IntPtrInt(102), //MB
 				},
 				{
 					Type: util.StringPtr("lvm"),
-					//Kind: util.StringPtr("data"),
 					Name: util.StringPtr("data-disk-3"),
 					Size: util.IntPtrInt(103), //MB
 				},
 				{
 					Type: util.StringPtr("lvm"),
-					//Kind: util.StringPtr("data"),
 					Name: util.StringPtr("data-disk-4"),
 					Size: util.IntPtrInt(104), //MB
 				},
 				{
 					Type: util.StringPtr("lvm"),
-					//Kind: util.StringPtr("data"),
 					Name: util.StringPtr("data-disk-5"),
 					Size: util.IntPtrInt(105), //MB
 				},
 				{
 					Type: util.StringPtr("lvm"),
-					//Kind: util.StringPtr("data"),
 					Name: util.StringPtr("data-disk-6"),
 					Size: util.IntPtrInt(106), //MB
 				},
 				{
 					Type: util.StringPtr("lvm"),
-					//Kind: util.StringPtr("data"),
 					Name: util.StringPtr("data-disk-7"),
 					Size: util.IntPtrInt(107), //MB
 				},
 				{
 					Type: util.StringPtr("lvm"),
-					//Kind: util.StringPtr("data"),
 					Name: util.StringPtr("data-disk-8"),
 					Size: util.IntPtrInt(108), //MB
 				},
 				{
 					Type: util.StringPtr("lvm"),
-					//Kind: util.StringPtr("data"),
 					Name: util.StringPtr("data-disk-9"),
 					Size: util.IntPtrInt(109), //MB
 				},
 				{
 					Type: util.StringPtr("lvm"),
-					//Kind: util.StringPtr("data"),
 					Name: util.StringPtr("data-disk-10"),
 					Size: util.IntPtrInt(110), //MB
 				},
 			}
 			By("他すべてデフォルトで、仮想サーバーを作成")
-			vm, err := marmotServer.Ma.Db.CreateServer(spec)
+			vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
 			Expect(err).NotTo(HaveOccurred())
 			id, err = marmotServer.Ma.CreateServer2(vm.Id)
 			Expect(err).NotTo(HaveOccurred())
@@ -718,23 +723,26 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		})
 
 		It("仮想サーバー生成:bootはqcow2 でデータディスク２本構成", func() {
-			var spec api.Server
+			var virtualServer api.Server
 			var meta api.Metadata
+			var spec api.VmSpec
+			virtualServer.Spec = &spec
+
 			var err error
 
 			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
 			meta.Name = util.StringPtr(hostname)
-			spec.Metadata = &meta
+			virtualServer.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
-			spec.Network = &[]api.Network{
+			virtualServer.Spec.Network = &[]api.Network{
 				{
 					Id: "default",
 				},
 			}
 
 			By("データディスクのスペックを設定")
-			spec.Storage = &[]api.Volume{
+			virtualServer.Spec.Storage = &[]api.Volume{
 				{
 					Id: volumeIds[0],
 				},
@@ -744,7 +752,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			}
 
 			By("他すべてデフォルトで、仮想サーバーを作成")
-			vm, err := marmotServer.Ma.Db.CreateServer(spec)
+			vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
 			Expect(err).NotTo(HaveOccurred())
 			id, err := marmotServer.Ma.CreateServer2(vm.Id)
 			Expect(err).NotTo(HaveOccurred())
@@ -791,13 +799,15 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 	Context("複数インターフェース仮想サーバーの起動と終了のテスト", func() {
 		var id string
 		It("仮想サーバー生成:bootはqcow2 で構成", func() {
-			var spec api.Server
+			var virtualServer api.Server
 			var meta api.Metadata
+			var spec api.VmSpec
+			virtualServer.Spec = &spec
 			var err error
 
 			meta.Name = util.StringPtr("test-vm-9")
-			spec.Metadata = &meta
-			spec.Network = &[]api.Network{
+			virtualServer.Metadata = &meta
+			virtualServer.Spec.Network = &[]api.Network{
 				{
 					Id: "default",
 				},
@@ -827,7 +837,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			}
 
 			// 他すべてデフォルト
-			vm, err := marmotServer.Ma.Db.CreateServer(spec)
+			vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
 			Expect(err).NotTo(HaveOccurred())
 			id, err = marmotServer.Ma.CreateServer2(vm.Id)
 			Expect(err).NotTo(HaveOccurred())

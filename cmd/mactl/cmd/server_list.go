@@ -42,8 +42,8 @@ var serverListCmd = &cobra.Command{
 				fmt.Printf("  %-10v", server.Id)
 				fmt.Printf("  %-20v", *server.Metadata.Name)
 				fmt.Printf("  %-12v", db.ServerStatus[*server.Status2.Status])
-				fmt.Printf("  %-3v", *server.Cpu)
-				fmt.Printf("  %-8v", *server.Memory)
+				fmt.Printf("  %-3v", *server.Spec.Cpu)
+				fmt.Printf("  %-8v", *server.Spec.Memory)
 				if server.Network != nil {
 					for j, nic := range *server.Network {
 						if j == 0 {

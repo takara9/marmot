@@ -426,12 +426,6 @@ components:
       properties:
         id:
           type: string
-        cpu:
-          type: integer
-          format: int
-        memory:
-          type: integer
-          format: int
         Network:
           type: array
           maxItems: 10
@@ -442,10 +436,6 @@ components:
           maxItems: 10
           items:
             $ref: "#/components/schemas/Volume"
-        osVariant:
-          type: string
-        bootVolume:
-          $ref: "#/components/schemas/Volume"
         Metadata:
           $ref: "#/components/schemas/Metadata"
         Spec:

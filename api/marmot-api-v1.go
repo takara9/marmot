@@ -69,16 +69,12 @@ type Route struct {
 
 // Server defines model for Server.
 type Server struct {
-	Metadata   *Metadata  `json:"Metadata,omitempty"`
-	Network    *[]Network `json:"Network,omitempty"`
-	Spec       *VmSpec    `json:"Spec,omitempty"`
-	Status2    *Status    `json:"Status2,omitempty"`
-	Storage    *[]Volume  `json:"Storage,omitempty"`
-	BootVolume *Volume    `json:"bootVolume,omitempty"`
-	Cpu        *int       `json:"cpu,omitempty"`
-	Id         string     `json:"id"`
-	Memory     *int       `json:"memory,omitempty"`
-	OsVariant  *string    `json:"osVariant,omitempty"`
+	Metadata *Metadata  `json:"Metadata,omitempty"`
+	Network  *[]Network `json:"Network,omitempty"`
+	Spec     *VmSpec    `json:"Spec,omitempty"`
+	Status2  *Status    `json:"Status2,omitempty"`
+	Storage  *[]Volume  `json:"Storage,omitempty"`
+	Id       string     `json:"id"`
 }
 
 // Servers defines model for Servers.

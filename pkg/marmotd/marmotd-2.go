@@ -121,16 +121,17 @@ func (s *Server) GetServers(ctx echo.Context) error {
 func (s *Server) CreateServer(ctx echo.Context) error {
 	slog.Debug("===CreateServer() is called===", "err", 0)
 
-	var serverSpec api.Server
-	if err := ctx.Bind(&serverSpec); err != nil {
+	//var serverSpec api.Server
+	var virtualServer api.Server
+	if err := ctx.Bind(&virtualServer); err != nil {
 		slog.Error("CreateServer()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-	slog.Debug("Recived post body", "serverSpec=", serverSpec, "cpu=", serverSpec.Cpu, "memory=", serverSpec.Memory, "os", serverSpec.OsVariant)
+	slog.Debug("Recived post body", "serverSpec=", virtualServer, "cpu=", virtualServer.Spec.Cpu, "memory=", virtualServer.Spec.Memory, "os", virtualServer.Spec.OsVariant)
 
 	// リクエストをetcdに登録し、正常応答を返す
 	slog.Debug("仮想マシンの使用を付与してDBへ登録、一意のIDを取得")
-	vm, err := s.Ma.Db.CreateServer(serverSpec)
+	vm, err := s.Ma.Db.CreateServer(virtualServer)
 	if err != nil {
 		slog.Error("CreateServer()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})

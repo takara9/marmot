@@ -18,17 +18,17 @@ import (
 )
 
 func SetupLinux(spec api.Server) error {
-	if spec.BootVolume == nil {
+	if spec.Spec.BootVolume == nil {
 		return fmt.Errorf("BootVolume is nil")
 	}
 
 	// ブートボリュームをマウント
-	mountPoint, nbdDev, err := MountVolume(*spec.BootVolume)
+	mountPoint, nbdDev, err := MountVolume(*spec.Spec.BootVolume)
 	if err != nil {
 		slog.Error("MountVolume failed", "error", err)
 		return err
 	}
-	defer UnMountVolume(*spec.BootVolume, mountPoint, nbdDev)
+	defer UnMountVolume(*spec.Spec.BootVolume, mountPoint, nbdDev)
 
 	// ホスト名設定
 	hostnameFile := filepath.Join(mountPoint, "etc/hostname")

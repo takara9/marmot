@@ -48,10 +48,12 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 			Metadata: &api.Metadata{
 				Name: util.StringPtr("test-linux"),
 			},
-			BootVolume: &api.Volume{
-				Id:   "test-linux-boot",
-				Type: util.StringPtr("qcow2"),
-				Path: util.StringPtr("/var/lib/marmot/volumes/test-linux-qcow2.img"),
+			Spec: &api.VmSpec{
+				BootVolume: &api.Volume{
+					Id:   "test-linux-boot",
+					Type: util.StringPtr("qcow2"),
+					Path: util.StringPtr("/var/lib/marmot/volumes/test-linux-qcow2.img"),
+				},
 			},
 		}
 		var mountPoint string
@@ -64,7 +66,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 		})
 
 		It("チェックのためのマウント", func() {
-			mountPoint, nbdDev, err = util.MountVolume(*testSpec.BootVolume)
+			mountPoint, nbdDev, err = util.MountVolume(*testSpec.Spec.BootVolume)
 			Expect(err).To(BeNil())
 		})
 
@@ -88,7 +90,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 
 		It("アンマウントLinuxホスト名設定のチェック", func() {
 			fmt.Println("Unmounting volume...", mountPoint, nbdDev)
-			util.UnMountVolume(*testSpec.BootVolume, mountPoint, nbdDev)
+			util.UnMountVolume(*testSpec.Spec.BootVolume, mountPoint, nbdDev)
 		})
 	})
 
@@ -99,12 +101,14 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 			Metadata: &api.Metadata{
 				Name: util.StringPtr("test-linux-lvm"),
 			},
-			BootVolume: &api.Volume{
-				Id:            "test-linux-boot2",
-				Type:          util.StringPtr("lvm"),
-				Path:          util.StringPtr("/dev/mapper/vg1-lvos_test1"),
-				VolumeGroup:   util.StringPtr("vg1"),
-				LogicalVolume: util.StringPtr("lvos_test1"),
+			Spec: &api.VmSpec{
+				BootVolume: &api.Volume{
+					Id:            "test-linux-boot2",
+					Type:          util.StringPtr("lvm"),
+					Path:          util.StringPtr("/dev/mapper/vg1-lvos_test1"),
+					VolumeGroup:   util.StringPtr("vg1"),
+					LogicalVolume: util.StringPtr("lvos_test1"),
+				},
 			},
 		}
 		var mountPoint string
@@ -117,7 +121,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 		})
 
 		It("チェックのためのマウント", func() {
-			mountPoint, nbdDev, err = util.MountVolume(*testSpec.BootVolume)
+			mountPoint, nbdDev, err = util.MountVolume(*testSpec.Spec.BootVolume)
 			Expect(err).To(BeNil())
 		})
 
@@ -141,7 +145,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 
 		It("アンマウントLinuxホスト名設定のチェック", func() {
 			fmt.Println("Unmounting volume...", mountPoint, nbdDev)
-			err := util.UnMountVolume(*testSpec.BootVolume, mountPoint, nbdDev)
+			err := util.UnMountVolume(*testSpec.Spec.BootVolume, mountPoint, nbdDev)
 			Expect(err).To(BeNil())
 		})
 	})
@@ -152,12 +156,14 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 			Metadata: &api.Metadata{
 				Name: util.StringPtr("test-linux-mh"),
 			},
-			BootVolume: &api.Volume{
-				Id:            "test-linux-boot3",
-				Type:          util.StringPtr("lvm"),
-				Path:          util.StringPtr("/dev/mapper/vg1-lvos_test2"),
-				VolumeGroup:   util.StringPtr("vg1"),
-				LogicalVolume: util.StringPtr("lvos_test2"),
+			Spec: &api.VmSpec{
+				BootVolume: &api.Volume{
+					Id:            "test-linux-boot3",
+					Type:          util.StringPtr("lvm"),
+					Path:          util.StringPtr("/dev/mapper/vg1-lvos_test2"),
+					VolumeGroup:   util.StringPtr("vg1"),
+					LogicalVolume: util.StringPtr("lvos_test2"),
+				},
 			},
 			Network: &[]api.Network{
 				{
@@ -178,7 +184,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 		})
 
 		It("チェックのためのマウント", func() {
-			mountPoint, nbdDev, err = util.MountVolume(*testSpec.BootVolume)
+			mountPoint, nbdDev, err = util.MountVolume(*testSpec.Spec.BootVolume)
 			Expect(err).To(BeNil())
 		})
 
@@ -202,7 +208,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 
 		It("アンマウントLinuxホスト名設定のチェック", func() {
 			fmt.Println("Unmounting volume...", mountPoint, nbdDev)
-			err := util.UnMountVolume(*testSpec.BootVolume, mountPoint, nbdDev)
+			err := util.UnMountVolume(*testSpec.Spec.BootVolume, mountPoint, nbdDev)
 			Expect(err).To(BeNil())
 		})
 	})
@@ -213,12 +219,14 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 			Metadata: &api.Metadata{
 				Name: util.StringPtr("test-linux-mh"),
 			},
-			BootVolume: &api.Volume{
-				Id:            "test-linux-boot4",
-				Type:          util.StringPtr("lvm"),
-				Path:          util.StringPtr("/dev/mapper/vg1-lvos_test2"),
-				VolumeGroup:   util.StringPtr("vg1"),
-				LogicalVolume: util.StringPtr("lvos_test2"),
+			Spec: &api.VmSpec{
+				BootVolume: &api.Volume{
+					Id:            "test-linux-boot4",
+					Type:          util.StringPtr("lvm"),
+					Path:          util.StringPtr("/dev/mapper/vg1-lvos_test2"),
+					VolumeGroup:   util.StringPtr("vg1"),
+					LogicalVolume: util.StringPtr("lvos_test2"),
+				},
 			},
 			Network: &[]api.Network{
 				{
@@ -289,7 +297,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 		})
 
 		It("チェックのためのマウント", func() {
-			mountPoint, nbdDev, err = util.MountVolume(*testSpec.BootVolume)
+			mountPoint, nbdDev, err = util.MountVolume(*testSpec.Spec.BootVolume)
 			Expect(err).To(BeNil())
 		})
 
@@ -313,7 +321,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 
 		It("アンマウントLinuxホスト名設定のチェック", func() {
 			fmt.Println("Unmounting volume...", mountPoint, nbdDev)
-			err := util.UnMountVolume(*testSpec.BootVolume, mountPoint, nbdDev)
+			err := util.UnMountVolume(*testSpec.Spec.BootVolume, mountPoint, nbdDev)
 			Expect(err).To(BeNil())
 		})
 	})

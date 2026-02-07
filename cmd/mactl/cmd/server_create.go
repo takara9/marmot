@@ -23,9 +23,10 @@ var serverCreateCmd = &cobra.Command{
 			println("ReadYamlConfig", "err", err)
 			return err
 		}
-		var spec api.Server
-		var volSpec api.Volume
+		var virtualServer api.Server
+		var bootVolSpec api.Volume
 		var meta api.Metadata
+		var spec api.VmSpec
 
 		// 名前は必須項目
 		if len(conf.Name) == 0 {
@@ -34,7 +35,7 @@ var serverCreateCmd = &cobra.Command{
 		}
 		meta.Name = util.StringPtr(conf.Name)
 		meta.Comment = conf.Comment
-		spec.Metadata = &meta
+		virtualServer.Metadata = &meta
 
 		// 無設定を許容、デフォルトをAPI側に任せる
 		if conf.Cpu != nil {
@@ -50,11 +51,13 @@ var serverCreateCmd = &cobra.Command{
 		}
 
 		if conf.BootVolume != nil {
-			volSpec.Name = util.StringPtr("boot")
-			volSpec.Type = util.StringPtr(*conf.BootVolume.Type)
+			bootVolSpec.Name = util.StringPtr("boot")
+			bootVolSpec.Type = util.StringPtr(*conf.BootVolume.Type)
 		}
-		spec.BootVolume = &volSpec
-		spec.Network = &[]api.Network{}
+
+		virtualServer.Spec = &spec
+		virtualServer.Spec.BootVolume = &bootVolSpec
+		virtualServer.Network = &[]api.Network{}
 		if conf.Network != nil {
 			for _, nic := range *conf.Network {
 				var n api.Network
@@ -103,7 +106,7 @@ var serverCreateCmd = &cobra.Command{
 						}
 					}
 				}
-				*spec.Network = append(*spec.Network, n)
+				*virtualServer.Network = append(*virtualServer.Network, n)
 			}
 		}
 
@@ -124,10 +127,10 @@ var serverCreateCmd = &cobra.Command{
 					volumes[i].Kind = util.StringPtr(*vol.Kind)
 				}
 			}
-			spec.Storage = &volumes
+			virtualServer.Spec.Storage = &volumes
 		}
 
-		byteBody, _, err := m.CreateServer(spec)
+		byteBody, _, err := m.CreateServer(virtualServer)
 		if err != nil {
 			fmt.Println("CreateServer", "err", err)
 			return err
@@ -172,5 +175,5 @@ var serverCreateCmd = &cobra.Command{
 
 func init() {
 	serverCmd.AddCommand(serverCreateCmd)
-	serverCreateCmd.Flags().StringVarP(&configFilename, "configfile", "f", "vm-spec.yaml", "Configuration file for the server")
+	serverCreateCmd.Flags().StringVarP(&configFilename, "configfile", "f", "vm-server.yaml", "Configuration file for the server")
 }

@@ -48,11 +48,11 @@ var serverDetailCmd = &cobra.Command{
 			} else {
 				fmt.Printf("  Running Time: N/A\n")
 			}
-			fmt.Printf("  OS: %v\n", *server.OsVariant)
+			fmt.Printf("  OS: %v\n", *server.Spec.OsVariant)
 			fmt.Printf("  Status: %v\n", db.ServerStatus[*server.Status2.Status])
-			fmt.Printf("  CPU: %v\n", *server.Cpu)
-			fmt.Printf("  Memory: %v MB\n", *server.Memory)
-			fmt.Printf("  Boot Volume Path: %v\n", *server.BootVolume.Path)
+			fmt.Printf("  CPU: %v\n", *server.Spec.Cpu)
+			fmt.Printf("  Memory: %v MB\n", *server.Spec.Memory)
+			fmt.Printf("  Boot Volume Path: %v\n", *server.Spec.BootVolume.Path)
 
 			return nil
 
