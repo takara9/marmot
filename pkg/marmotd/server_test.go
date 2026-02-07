@@ -151,7 +151,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			data, err := json.MarshalIndent(sv, "", "  ")
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("サーバー情報: ", string(data))
-			GinkgoWriter.Println("サーバーステータス: ", *sv.Status2.Status)
+			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 		})
 
 		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
@@ -163,8 +163,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			Eventually(func(g Gomega) {
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("サーバーステータス: ", *sv.Status2.Status)
-				g.Expect(*sv.Status2.Status).To(Equal(db.SERVER_RUNNING))
+				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
 			}, "120s", "10s").Should(Succeed())
 		})
 
@@ -229,7 +229,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			data, err := json.MarshalIndent(sv, "", "  ")
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("サーバー情報: ", string(data))
-			GinkgoWriter.Println("サーバーステータス: ", *sv.Status2.Status)
+			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 		})
 
 		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
@@ -241,8 +241,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			Eventually(func(g Gomega) {
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("サーバーステータス: ", *sv.Status2.Status)
-				g.Expect(*sv.Status2.Status).To(Equal(db.SERVER_RUNNING))
+				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
 			}, "60s", "10s").Should(Succeed())
 		})
 
@@ -292,7 +292,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("サーバー情報: ", string(data))
 			Expect(*sv.Metadata.Name).To(Equal("test-vm-3"))
-			GinkgoWriter.Println("サーバーステータス: ", *sv.Status2.Status)
+			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 		})
 
 		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
@@ -304,8 +304,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			Eventually(func(g Gomega) {
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("サーバーステータス: ", *sv.Status2.Status)
-				g.Expect(*sv.Status2.Status).To(Equal(db.SERVER_RUNNING))
+				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
 			}, "120s", "10s").Should(Succeed())
 		})
 
@@ -370,7 +370,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
 			Expect(*sv.Metadata.Name).To(Equal("test-vm-4"))
-			GinkgoWriter.Println("サーバーステータス: ", *sv.Status2.Status)
+			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 		})
 
 		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
@@ -382,8 +382,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			Eventually(func(g Gomega) {
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("サーバーステータス: ", *sv.Status2.Status)
-				g.Expect(*sv.Status2.Status).To(Equal(db.SERVER_RUNNING))
+				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
 			}, "120s", "10s").Should(Succeed())
 		})
 
@@ -447,7 +447,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
 			Expect(*sv.Metadata.Name).To(Equal("test-vm-5"))
-			GinkgoWriter.Println("サーバーステータス: ", *sv.Status2.Status)
+			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 		})
 
 		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
@@ -459,8 +459,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			Eventually(func(g Gomega) {
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("サーバーステータス: ", *sv.Status2.Status)
-				g.Expect(*sv.Status2.Status).To(Equal(db.SERVER_RUNNING))
+				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
 			}, "120s", "10s").Should(Succeed())
 		})
 
@@ -561,7 +561,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
 			Expect(*sv.Metadata.Name).To(Equal("test-vm-6"))
-			GinkgoWriter.Println("サーバーステータス: ", *sv.Status2.Status)
+			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 		})
 
 		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
@@ -573,8 +573,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			Eventually(func(g Gomega) {
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("サーバーステータス: ", *sv.Status2.Status)
-				g.Expect(*sv.Status2.Status).To(Equal(db.SERVER_RUNNING))
+				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
 			}, "120s", "10s").Should(Succeed())
 		})
 
@@ -675,7 +675,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
 			Expect(*sv.Metadata.Name).To(Equal("test-vm-7"))
-			GinkgoWriter.Println("サーバーステータス: ", *sv.Status2)
+			GinkgoWriter.Println("サーバーステータス: ", *sv.Status)
 		})
 
 		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
@@ -687,8 +687,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			Eventually(func(g Gomega) {
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("サーバーステータス: ", *sv.Status2.Status)
-				g.Expect(*sv.Status2.Status).To(Equal(db.SERVER_RUNNING))
+				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
 			}, "120s", "10s").Should(Succeed())
 		})
 
@@ -771,7 +771,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
 			Expect(*sv.Metadata.Name).To(Equal(hostname))
-			GinkgoWriter.Println("サーバーステータス: ", *sv.Status2.Status)
+			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 		})
 
 		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
@@ -783,8 +783,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			Eventually(func(g Gomega) {
 				sv, err := marmotServer.Ma.GetServerById(serverId)
 				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("サーバーステータス: ", *sv.Status2.Status)
-				g.Expect(*sv.Status2.Status).To(Equal(db.SERVER_RUNNING))
+				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
 			}, "60s", "10s").Should(Succeed())
 		})
 
@@ -858,7 +858,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			data, err := json.MarshalIndent(sv, "", "  ")
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("サーバー情報: ", string(data))
-			GinkgoWriter.Println("サーバーステータス: ", *sv.Status2.Status)
+			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 		})
 
 		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
@@ -870,8 +870,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			Eventually(func(g Gomega) {
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("サーバーステータス: ", *sv.Status2.Status)
-				g.Expect(*sv.Status2.Status).To(Equal(db.SERVER_RUNNING))
+				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
 			}, "120s", "10s").Should(Succeed())
 		})
 

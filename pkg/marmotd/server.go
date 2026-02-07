@@ -37,7 +37,7 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 	bootVol.Size = util.IntPtrInt(0)
 
 	// ステータスを起動中に更新
-	serverConfig.Status2 = &api.Status{
+	serverConfig.Status = &api.Status{
 		Status:              util.IntPtrInt(db.SERVER_PROVISIONING),
 		LastUpdateTimeStamp: util.TimePtr(time.Now()),
 		CreationTimeStamp:   util.TimePtr(time.Now()),
@@ -335,8 +335,8 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 	}
 
 	// ステータスを利用可能に更新、更新日時もセット
-	serverConfig.Status2.Status = util.IntPtrInt(db.SERVER_RUNNING)
-	serverConfig.Status2.LastUpdateTimeStamp = util.TimePtr(time.Now())
+	serverConfig.Status.Status = util.IntPtrInt(db.SERVER_RUNNING)
+	serverConfig.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	err = m.Db.UpdateServer(serverConfig.Id, serverConfig)
 	if err != nil {
 		slog.Error("UpdateServer()", "err", err)

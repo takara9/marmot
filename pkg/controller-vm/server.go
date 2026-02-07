@@ -75,7 +75,7 @@ func (c *controller) controllerLoop() {
 
 		// サーバーの状態チェックと処理
 		// ここでワークキューに積むなどの処理を行う
-		switch *spec.Status2.Status {
+		switch *spec.Status.Status {
 		case db.SERVER_RUNNING:
 			slog.Debug("稼働中のサーバー検出", "SERVER", spec.Id)
 		case db.SERVER_STOPPED:
@@ -95,7 +95,7 @@ func (c *controller) controllerLoop() {
 			c.marmot.CreateServer2(spec.Id)
 
 		default:
-			slog.Warn("不明な状態のサーバー検出", "SERVER", spec.Id, "STATUS", *spec.Status2.Status)
+			slog.Warn("不明な状態のサーバー検出", "SERVER", spec.Id, "STATUS", *spec.Status.Status)
 		}
 	}
 

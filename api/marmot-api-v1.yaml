@@ -430,7 +430,7 @@ components:
           $ref: "#/components/schemas/Metadata"
         Spec:
           $ref: "#/components/schemas/VmSpec"
-        Status2:
+        Status:
           $ref: "#/components/schemas/Status"
     Status:
       type: object

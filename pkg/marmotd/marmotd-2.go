@@ -165,8 +165,8 @@ func (s *Server) DeleteServerById(ctx echo.Context, id string) error {
 		slog.Error("GetServerById()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-	svc.Status2.Status = util.IntPtrInt(db.SERVER_DELETING)
-	svc.Status2.DeletionTimeStamp = util.TimePtr(time.Now())
+	svc.Status.Status = util.IntPtrInt(db.SERVER_DELETING)
+	svc.Status.DeletionTimeStamp = util.TimePtr(time.Now())
 	if err := s.Ma.Db.UpdateServer(id, svc); err != nil {
 		slog.Error("UpdateServer()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})

@@ -71,7 +71,7 @@ type Route struct {
 type Server struct {
 	Metadata *Metadata `json:"Metadata,omitempty"`
 	Spec     *VmSpec   `json:"Spec,omitempty"`
-	Status2  *Status   `json:"Status2,omitempty"`
+	Status   *Status   `json:"Status,omitempty"`
 	Id       string    `json:"id"`
 }
 
