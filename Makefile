@@ -16,9 +16,6 @@ generate:
 	go mod tidy
 
 setup:
-	cp TAG pkg/marmotd/version.txt
-	cp TAG cmd/mactl/cmd/version.txt
-	cp TAG cmd/maadm/cmd/version.txt
 	env GOFLAGS= go install golang.org/x/tools/cmd/goimports@latest
 	env GOFLAGS= go install honnef.co/go/tools/cmd/staticcheck@latest
 	env GOFLAGS= go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
@@ -30,6 +27,9 @@ test: setup
 .PHONY:	package
 package: clean all setup
 	@echo $(TAG)
+	cp TAG pkg/marmotd/version.txt
+	cp TAG cmd/mactl/cmd/version.txt
+	cp TAG cmd/maadm/cmd/version.txt
 	cp cmd/install.sh $(BINDIR)/install.sh
 	cp cmd/mactl/config_marmot $(BINDIR)/config_marmot
 	cp cmd/marmotd/temp.xml $(BINDIR)/temp.xml

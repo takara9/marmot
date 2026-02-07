@@ -15,9 +15,11 @@ var serverUpdateCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var err error
 		var spec api.Server
+		var meta api.Metadata
         serverId := args[0]
 		spec.Id = serverId
-		spec.Name = &serverName
+		meta.Name = &serverName
+		spec.Metadata = &meta
 
 		byteBody, _, err := m.UpdateServerById(serverId, spec)
 		if err != nil {

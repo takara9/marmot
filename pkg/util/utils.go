@@ -48,22 +48,42 @@ func DeepCopy[T any](src T) (T, error) {
 // src の非ゼロ値フィールドだけを dst にコピーする
 // dst と src は同じ型であることを想定
 func PatchStruct(dst, src interface{}) {
-	// reflect を使ってフィールドごとにコピー
-	dv := reflect.ValueOf(dst).Elem()
+	dv := reflect.ValueOf(dst)
 	sv := reflect.ValueOf(src)
 
-	// コピーループ
-	for i := 0; i < dv.NumField(); i++ {
-		df := dv.Field(i)
-		sf := sv.Field(i)
+	// ポインタの中身を取得
+	if dv.Kind() == reflect.Ptr {
+		dv = dv.Elem()
+	}
+	if sv.Kind() == reflect.Ptr {
+		sv = sv.Elem()
+	}
 
-		// src がゼロ値ならスキップ
-		if reflect.Value.IsZero(sf) {
+	// 構造体でない場合は何もしない
+	if dv.Kind() != reflect.Struct || sv.Kind() != reflect.Struct {
+		return
+	}
+
+	for i := 0; i < sv.NumField(); i++ {
+		sf := sv.Field(i)
+		df := dv.FieldByName(sv.Type().Field(i).Name) // 名前でフィールドを特定
+
+		// フィールドが存在しない、または書き込み不可ならスキップ
+		if !df.IsValid() || !df.CanSet() {
 			continue
 		}
 
-		// 書き込み可能ならコピー
-		if df.CanSet() {
+		// srcのフィールドがゼロ値ならスキップ（オプション）
+		if sf.IsZero() {
+			continue
+		}
+
+		// 再帰処理の判定
+		if sf.Kind() == reflect.Struct {
+			// 構造体同士なら再帰的にパッチ
+			PatchStruct(df.Addr().Interface(), sf.Interface())
+		} else {
+			// 基本型ならそのままコピー
 			df.Set(sf)
 		}
 	}

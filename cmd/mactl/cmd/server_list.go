@@ -40,12 +40,12 @@ var serverListCmd = &cobra.Command{
 			for i, server := range data {
 				fmt.Printf("  %2d", i+1)
 				fmt.Printf("  %-10v", server.Id)
-				fmt.Printf("  %-20v", *server.Name)
-				fmt.Printf("  %-12v", db.ServerStatus[*server.Status])
-				fmt.Printf("  %-3v", *server.Cpu)
-				fmt.Printf("  %-8v", *server.Memory)
-				if server.Network != nil {
-					for j, nic := range *server.Network {
+				fmt.Printf("  %-20v", *server.Metadata.Name)
+				fmt.Printf("  %-12v", db.ServerStatus[*server.Status.Status])
+				fmt.Printf("  %-3v", *server.Spec.Cpu)
+				fmt.Printf("  %-8v", *server.Spec.Memory)
+				if server.Spec.Network != nil {
+					for j, nic := range *server.Spec.Network {
 						if j == 0 {
 							if nic.Address != nil {
 								fmt.Printf("  %-15v", *nic.Address)

@@ -18,23 +18,23 @@ import (
 )
 
 func SetupLinux(spec api.Server) error {
-	if spec.BootVolume == nil {
+	if spec.Spec.BootVolume == nil {
 		return fmt.Errorf("BootVolume is nil")
 	}
 
 	// ブートボリュームをマウント
-	mountPoint, nbdDev, err := MountVolume(*spec.BootVolume)
+	mountPoint, nbdDev, err := MountVolume(*spec.Spec.BootVolume)
 	if err != nil {
 		slog.Error("MountVolume failed", "error", err)
 		return err
 	}
-	defer UnMountVolume(*spec.BootVolume, mountPoint, nbdDev)
+	defer UnMountVolume(*spec.Spec.BootVolume, mountPoint, nbdDev)
 
 	// ホスト名設定
 	hostnameFile := filepath.Join(mountPoint, "etc/hostname")
-	slog.Debug("Setting hostname", "file", hostnameFile, "hostname", *spec.Name)
+	slog.Debug("Setting hostname", "file", hostnameFile, "hostname", *spec.Metadata.Name)
 
-	err = os.WriteFile(hostnameFile, []byte(*spec.Name), 0644)
+	err = os.WriteFile(hostnameFile, []byte(*spec.Metadata.Name), 0644)
 	if err != nil {
 		slog.Error("WriteFile hostname failed", "error", err)
 		return err
@@ -49,17 +49,17 @@ func SetupLinux(spec api.Server) error {
 	}
 
 	// ネットワーク設定
-	if spec.Network == nil {
+	if spec.Spec.Network == nil {
 		// ネットワーク設定がない場合は、デフォルトネットワークにつないで、 DHCPでIPアドレスを取得する設定にする
 		defaultNic := api.Network{
 			Networkname: StringPtr("default"),
 			Dhcp4:       BoolPtr(true),
 			Dhcp6:       BoolPtr(false),
 		}
-		spec.Network = &[]api.Network{defaultNic}
+		spec.Spec.Network = &[]api.Network{defaultNic}
 	}
 
-	if err := CreateNetplanInterfaces(*spec.Network, mountPoint); err != nil {
+	if err := CreateNetplanInterfaces(*spec.Spec.Network, mountPoint); err != nil {
 		slog.Error("CreateNetplanInterfaces failed", "error", err)
 		return err
 	}

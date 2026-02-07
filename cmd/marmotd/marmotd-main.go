@@ -9,8 +9,11 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/controller-vm"
 	"github.com/takara9/marmot/pkg/marmotd"
 )
+
+var controllerCounter uint64 = 0
 
 // 定期的に実行したい関数
 func dispatchJobTask() {
@@ -18,7 +21,7 @@ func dispatchJobTask() {
 }
 
 func startDispatcher() {
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(15 * time.Second)
 	// TODO: 停止処理を加えること
 	go func() {
 		for {
@@ -47,6 +50,11 @@ func main() {
 	e := echo.New()
 	Server := marmotd.NewServer(*node, *etcd)
 	api.RegisterHandlersWithBaseURL(e, Server, "/api/v1")
+	_, err := controller.StartController(*node, *etcd) // VMコントローラーの開始
+	if err != nil {
+		slog.Error("Failed to start controller", "err", err)
+		return
+	}
 	startDispatcher()
 	// And we serve HTTP until the world ends.
 	fmt.Println(e.Start("0.0.0.0:8750"))

@@ -18,6 +18,16 @@ type Error struct {
 	Message string `json:"message"`
 }
 
+// Metadata defines model for Metadata.
+type Metadata struct {
+	Comment      *string `json:"comment,omitempty"`
+	Id           *string `json:"id,omitempty"`
+	InstanceName *string `json:"instanceName,omitempty"`
+	Key          *string `json:"key,omitempty"`
+	Name         *string `json:"name,omitempty"`
+	Uuid         *string `json:"uuid,omitempty"`
+}
+
 // Nameservers defines model for Nameservers.
 type Nameservers struct {
 	Addresses *[]string `json:"addresses,omitempty"`
@@ -59,32 +69,23 @@ type Route struct {
 
 // Server defines model for Server.
 type Server struct {
-	HvIpAddr     *string    `json:"HvIpAddr,omitempty"`
-	HvNode       *string    `json:"HvNode,omitempty"`
-	HvPort       *int       `json:"HvPort,omitempty"`
-	Network      *[]Network `json:"Network,omitempty"`
-	Storage      *[]Volume  `json:"Storage,omitempty"`
-	BootVolume   *Volume    `json:"bootVolume,omitempty"`
-	CTime        *time.Time `json:"cTime,omitempty"`
-	ClusterName  *string    `json:"clusterName,omitempty"`
-	Comment      *string    `json:"comment,omitempty"`
-	Cpu          *int       `json:"cpu,omitempty"`
-	Id           string     `json:"id"`
-	InstanceName *string    `json:"instanceName,omitempty"`
-	Key          *string    `json:"key,omitempty"`
-	Memory       *int       `json:"memory,omitempty"`
-	Name         *string    `json:"name,omitempty"`
-	OsLv         *string    `json:"osLv,omitempty"`
-	OsVariant    *string    `json:"osVariant,omitempty"`
-	OsVg         *string    `json:"osVg,omitempty"`
-	Playbook     *string    `json:"playbook,omitempty"`
-	STime        *time.Time `json:"sTime,omitempty"`
-	Status       *int       `json:"status,omitempty"`
-	Uuid         *string    `json:"uuid,omitempty"`
+	Metadata *Metadata `json:"Metadata,omitempty"`
+	Spec     *VmSpec   `json:"Spec,omitempty"`
+	Status   *Status   `json:"Status,omitempty"`
+	Id       string    `json:"id"`
 }
 
 // Servers defines model for Servers.
 type Servers = []Server
+
+// Status defines model for Status.
+type Status struct {
+	CreationTimeStamp   *time.Time `json:"creationTimeStamp,omitempty"`
+	DeletionTimeStamp   *time.Time `json:"deletionTimeStamp,omitempty"`
+	LastUpdateTimeStamp *time.Time `json:"lastUpdateTimeStamp,omitempty"`
+	Message             *string    `json:"message,omitempty"`
+	Status              *int       `json:"status,omitempty"`
+}
 
 // Success defines model for Success.
 type Success struct {
@@ -96,6 +97,18 @@ type Success struct {
 type Version struct {
 	ClientVersion string  `json:"clientVersion"`
 	ServerVersion *string `json:"serverVersion,omitempty"`
+}
+
+// VmSpec defines model for VmSpec.
+type VmSpec struct {
+	Network    *[]Network `json:"Network,omitempty"`
+	Storage    *[]Volume  `json:"Storage,omitempty"`
+	BootVolume *Volume    `json:"bootVolume,omitempty"`
+	Cpu        *int       `json:"cpu,omitempty"`
+	Memory     *int       `json:"memory,omitempty"`
+	OsLv       *string    `json:"osLv,omitempty"`
+	OsVariant  *string    `json:"osVariant,omitempty"`
+	OsVg       *string    `json:"osVg,omitempty"`
 }
 
 // Volume defines model for Volume.

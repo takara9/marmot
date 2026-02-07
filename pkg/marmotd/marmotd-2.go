@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
@@ -12,8 +13,6 @@ import (
 	"github.com/takara9/marmot/pkg/util"
 )
 
-
-// ＝＝＝＝＝＝＝＝＝＝＝＝＝＝　新 API 関数群  ＝＝＝＝＝＝＝＝＝＝＝＝＝＝
 // ボリュームの生成 implements api.ServerInterface.
 func (s *Server) CreateVolume(ctx echo.Context) error {
 	slog.Debug("===", "CreateVolume() is called", "===")
@@ -122,23 +121,25 @@ func (s *Server) GetServers(ctx echo.Context) error {
 func (s *Server) CreateServer(ctx echo.Context) error {
 	slog.Debug("===CreateServer() is called===", "err", 0)
 
-	var serverSpec api.Server
-	if err := ctx.Bind(&serverSpec); err != nil {
+	//var serverSpec api.Server
+	var virtualServer api.Server
+	if err := ctx.Bind(&virtualServer); err != nil {
 		slog.Error("CreateServer()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-	slog.Debug("Recived post body", "serverSpec=", serverSpec, "cpu=", serverSpec.Cpu, "memory=", serverSpec.Memory, "os", serverSpec.OsVariant)
+	slog.Debug("Recived post body", "serverSpec=", virtualServer, "cpu=", virtualServer.Spec.Cpu, "memory=", virtualServer.Spec.Memory, "os", virtualServer.Spec.OsVariant)
 
-	id, err := s.Ma.CreateServer(serverSpec)
+	// リクエストをetcdに登録し、正常応答を返す
+	slog.Debug("仮想マシンの使用を付与してDBへ登録、一意のIDを取得")
+	vm, err := s.Ma.Db.CreateServer(virtualServer)
 	if err != nil {
 		slog.Error("CreateServer()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-
-	slog.Debug("CreateServer()", "Server Id", id)
+	slog.Debug("CreateServer()", "Server Id", vm.Id)
 
 	var resp api.Success
-	resp.Id = id
+	resp.Id = vm.Id
 	resp.Message = util.StringPtr("Server created successfully")
 	return ctx.JSON(http.StatusOK, resp)
 }
@@ -157,14 +158,23 @@ func (s *Server) GetServerById(ctx echo.Context, id string) error {
 // サーバーの削除
 func (s *Server) DeleteServerById(ctx echo.Context, id string) error {
 	slog.Debug("===DeleteServerById() is called ===", "id", id)
-	if err := s.Ma.DeleteServerById(id); err != nil {
-		slog.Error("DeleteServerById()", "err", err)
+
+	// ステータスを削除中に更新
+	svc, err := s.Ma.GetServerById(id)
+	if err != nil {
+		slog.Error("GetServerById()", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+	svc.Status.Status = util.IntPtrInt(db.SERVER_DELETING)
+	svc.Status.DeletionTimeStamp = util.TimePtr(time.Now())
+	if err := s.Ma.Db.UpdateServer(id, svc); err != nil {
+		slog.Error("UpdateServer()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
 	var resp api.Success
 	resp.Id = id
-	resp.Message = util.StringPtr("Server deleted successfully")
+	resp.Message = util.StringPtr("Accepted the request to delete the server")
 	return ctx.JSON(http.StatusOK, resp)
 }
 

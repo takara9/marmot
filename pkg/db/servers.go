@@ -12,16 +12,23 @@ import (
 )
 
 const (
+	SERVER_UNKNOWN      = 0 // 不明
 	SERVER_PROVISIONING = 1 // プロビジョニング中
-	SERVER_INUSE        = 2 // 使用中
-	SERVER_AVAILABLE    = 3 // 利用可能
+	SERVER_RUNNING      = 2 // 実行中
+	SERVER_STOPPED      = 3 // 停止中
+	SERVER_ERROR        = 4 // エラー状態
+	SERVER_DELETING     = 5 // 削除中
+	SERVER_DELETED      = 6 // 削除済み
 )
 
 var ServerStatus = map[int]string{
 	0: "UNKNOWN",
 	1: "PROVISIONING",
-	2: "INUSE",
-	3: "RUNNING",
+	2: "RUNNING",
+	3: "STOPPED",
+	4: "ERROR",
+	5: "DELETING",
+	6: "DELETED",
 }
 
 // サーバーを登録、サーバーを一意に識別するIDを自動生成
@@ -39,8 +46,8 @@ func (d *Database) CreateServer(spec api.Server) (api.Server, error) {
 	//一意なIDを発行
 	var key string
 	for {
-		server.Uuid = util.StringPtr(uuid.New().String())
-		server.Id = (*server.Uuid)[:8]
+		server.Metadata.Uuid = util.StringPtr(uuid.New().String())
+		server.Id = (*server.Metadata.Uuid)[:8]
 		key = ServerPrefix + "/" + server.Id
 		_, err := d.GetJSON(key, &server)
 		if err == ErrNotFound {
@@ -51,10 +58,10 @@ func (d *Database) CreateServer(spec api.Server) (api.Server, error) {
 		}
 	}
 
-	// ステータスセット
-	server.Status = util.IntPtrInt(SERVER_PROVISIONING)
-
-	// データベースに登録
+	// ステータスセット、タイムスタンプセット
+	var s api.Status
+	s.Status = util.IntPtrInt(SERVER_PROVISIONING)
+	server.Status = &s
 	if err := d.PutJSON(key, server); err != nil {
 		slog.Error("failed to write database data", "err", err, "key", key)
 		return api.Server{}, err
@@ -95,6 +102,7 @@ func (d *Database) GetServers() (api.Servers, error) {
 	var err error
 	var resp *etcd.GetResponse
 
+	slog.Debug("GetServers()", "key-prefix", ServerPrefix)
 	resp, err = d.GetByPrefix(ServerPrefix)
 	if err == ErrNotFound {
 		slog.Debug("no volumes found", "key-prefix", ServerPrefix)
@@ -161,7 +169,7 @@ func (d *Database) updateServer(id string, spec api.Server) error {
 	}
 	expected := resp.Kvs[0].ModRevision
 
-	rec.Id = spec.Id
+	rec.Id = id
 	// パッチ適用
 	util.PatchStruct(&rec, spec)
 

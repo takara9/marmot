@@ -34,25 +34,25 @@ var serverDetailCmd = &cobra.Command{
 			}
 			fmt.Printf("Server Details:\n")
 			fmt.Printf("  Id: %v\n", server.Id)
-			fmt.Printf("  UUID: %v\n", *server.Uuid)
-			fmt.Printf("  Name: %v\n", *server.Name)
-			if server.CTime != nil {
-				tm := server.CTime.Format(time.RFC3339)
+			fmt.Printf("  UUID: %v\n", *server.Metadata.Uuid)
+			fmt.Printf("  Name: %v\n", *server.Metadata.Name)
+			if server.Status.CreationTimeStamp != nil {
+				tm := server.Status.CreationTimeStamp.Format(time.RFC3339)
 				fmt.Printf("  Create Time: %v\n", tm)
 			} else {
 				fmt.Printf("  Create Time: N/A\n")
 			}
-			if server.CTime != nil {
-				tm := time.Since(*server.CTime).Hours()
+			if server.Status.LastUpdateTimeStamp != nil {
+				tm := time.Since(*server.Status.LastUpdateTimeStamp).Hours()
 				fmt.Printf("  Running Time: %.1f hours\n", tm)
 			} else {
 				fmt.Printf("  Running Time: N/A\n")
 			}
-			fmt.Printf("  OS: %v\n", *server.OsVariant)
-			fmt.Printf("  Status: %v\n", db.ServerStatus[*server.Status])
-			fmt.Printf("  CPU: %v\n", *server.Cpu)
-			fmt.Printf("  Memory: %v MB\n", *server.Memory)
-			fmt.Printf("  Boot Volume Path: %v\n", *server.BootVolume.Path)
+			fmt.Printf("  OS: %v\n", *server.Spec.OsVariant)
+			fmt.Printf("  Status: %v\n", db.ServerStatus[*server.Status.Status])
+			fmt.Printf("  CPU: %v\n", *server.Spec.Cpu)
+			fmt.Printf("  Memory: %v MB\n", *server.Spec.Memory)
+			fmt.Printf("  Boot Volume Path: %v\n", *server.Spec.BootVolume.Path)
 
 			return nil
 
