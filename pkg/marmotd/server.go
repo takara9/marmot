@@ -234,7 +234,7 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 	channelPath, err := util.CreateChannelDir(virtSpec.UUID)
 
 	// ネットワークの設定
-	if len(*serverConfig.Network) == 0 {
+	if serverConfig.Network == nil {
 		slog.Debug("ネットワーク指定なし、デフォルトネットワークを使用")
 		mac, err := util.GenerateRandomMAC()
 		if err != nil {
