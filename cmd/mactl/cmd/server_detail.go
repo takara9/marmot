@@ -36,14 +36,14 @@ var serverDetailCmd = &cobra.Command{
 			fmt.Printf("  Id: %v\n", server.Id)
 			fmt.Printf("  UUID: %v\n", *server.Metadata.Uuid)
 			fmt.Printf("  Name: %v\n", *server.Metadata.Name)
-			if server.CTime != nil {
-				tm := server.CTime.Format(time.RFC3339)
+			if server.Status2.CreationTimeStamp != nil {
+				tm := server.Status2.CreationTimeStamp.Format(time.RFC3339)
 				fmt.Printf("  Create Time: %v\n", tm)
 			} else {
 				fmt.Printf("  Create Time: N/A\n")
 			}
-			if server.CTime != nil {
-				tm := time.Since(*server.CTime).Hours()
+			if server.Status2.LastUpdateTimeStamp != nil {
+				tm := time.Since(*server.Status2.LastUpdateTimeStamp).Hours()
 				fmt.Printf("  Running Time: %.1f hours\n", tm)
 			} else {
 				fmt.Printf("  Running Time: N/A\n")

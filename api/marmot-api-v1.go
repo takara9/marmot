@@ -69,27 +69,16 @@ type Route struct {
 
 // Server defines model for Server.
 type Server struct {
-	Metadata    *Metadata  `json:"Metadata,omitempty"`
-	Network     *[]Network `json:"Network,omitempty"`
-	Spec        *VmSpec    `json:"Spec,omitempty"`
-	Status2     *Status    `json:"Status2,omitempty"`
-	Storage     *[]Volume  `json:"Storage,omitempty"`
-	BootVolume  *Volume    `json:"bootVolume,omitempty"`
-	CTime       *time.Time `json:"cTime,omitempty"`
-	ClusterName *string    `json:"clusterName,omitempty"`
-	Comment     *string    `json:"comment,omitempty"`
-	Cpu         *int       `json:"cpu,omitempty"`
-	Id          string     `json:"id"`
-	Key         *string    `json:"key,omitempty"`
-	Memory      *int       `json:"memory,omitempty"`
-	Name        *string    `json:"name,omitempty"`
-	OsLv        *string    `json:"osLv,omitempty"`
-	OsVariant   *string    `json:"osVariant,omitempty"`
-	OsVg        *string    `json:"osVg,omitempty"`
-	Playbook    *string    `json:"playbook,omitempty"`
-	STime       *time.Time `json:"sTime,omitempty"`
-	Status      *int       `json:"status,omitempty"`
-	Uuid        *string    `json:"uuid,omitempty"`
+	Metadata   *Metadata  `json:"Metadata,omitempty"`
+	Network    *[]Network `json:"Network,omitempty"`
+	Spec       *VmSpec    `json:"Spec,omitempty"`
+	Status2    *Status    `json:"Status2,omitempty"`
+	Storage    *[]Volume  `json:"Storage,omitempty"`
+	BootVolume *Volume    `json:"bootVolume,omitempty"`
+	Cpu        *int       `json:"cpu,omitempty"`
+	Id         string     `json:"id"`
+	Memory     *int       `json:"memory,omitempty"`
+	OsVariant  *string    `json:"osVariant,omitempty"`
 }
 
 // Servers defines model for Servers.

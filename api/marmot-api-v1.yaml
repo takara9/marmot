@@ -426,23 +426,6 @@ components:
       properties:
         id:
           type: string
-        uuid:
-          type: string
-        name:
-          type: string
-        clusterName:
-          type: string
-        key:
-          type: string
-        cTime:
-          type: string
-          format: date-time
-        sTime:
-          type: string
-          format: date-time
-        status:
-          type: integer
-          format: int
         cpu:
           type: integer
           format: int
@@ -459,14 +442,6 @@ components:
           maxItems: 10
           items:
             $ref: "#/components/schemas/Volume"
-        playbook:
-          type: string
-        comment:
-          type: string
-        osLv:
-          type: string
-        osVg:
-          type: string
         osVariant:
           type: string
         bootVolume:
