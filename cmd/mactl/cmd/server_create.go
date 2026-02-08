@@ -23,54 +23,64 @@ var serverCreateCmd = &cobra.Command{
 			println("ReadYamlConfig", "err", err)
 			return err
 		}
-		var virtualServer api.Server
-		var bootVolSpec api.Volume
-		var meta api.Metadata
-		var spec api.VmSpec
-		//var net api.Network
 
 		// 名前は必須項目
 		if len(conf.Name) == 0 {
 			fmt.Println("Name is required in the configuration")
 			return fmt.Errorf("name is required in the configuration")
 		}
-		meta.Name = util.StringPtr(conf.Name)
-		meta.Comment = conf.Comment
-		virtualServer.Metadata = &meta
 
+		var virtualServer api.Server
+		virtualServer.Metadata = &api.Metadata{
+			Name: util.StringPtr(conf.Name),
+		}
+		virtualServer.Spec = &api.VmSpec{}
+		virtualServer.Spec.BootVolume = &api.Volume{}
+		virtualServer.Spec.Storage = &[]api.Volume{}
+		virtualServer.Spec.BootVolume.Spec = &api.VolSpec{}
+		virtualServer.Spec.BootVolume.Metadata = &api.Metadata{}
+		virtualServer.Spec.Network = &[]api.Network{}
+
+		if conf.Comment != nil {
+			virtualServer.Metadata.Comment = util.StringPtr(*conf.Comment)
+		}
 		// 無設定を許容、デフォルトをAPI側に任せる
 		if conf.Cpu != nil {
-			spec.Cpu = util.IntPtrInt(*conf.Cpu)
+			virtualServer.Spec.Cpu = util.IntPtrInt(*conf.Cpu)
 		}
 
 		if conf.Memory != nil {
-			spec.Memory = util.IntPtrInt(*conf.Memory)
+			virtualServer.Spec.Memory = util.IntPtrInt(*conf.Memory)
 		}
 
 		if conf.OsVariant != nil {
-			spec.OsVariant = util.StringPtr(*conf.OsVariant)
+			virtualServer.Spec.OsVariant = util.StringPtr(*conf.OsVariant)
 		}
 
 		if conf.BootVolume != nil {
-			bootVolSpec.Name = util.StringPtr("boot")
-			bootVolSpec.Type = util.StringPtr(*conf.BootVolume.Type)
+			virtualServer.Spec.BootVolume.Metadata.Name = util.StringPtr("boot")
+			virtualServer.Spec.BootVolume.Spec.Type = util.StringPtr(*conf.BootVolume.Type)
+			if conf.BootVolume.Size != nil {
+				virtualServer.Spec.BootVolume.Spec.Size = util.IntPtrInt(*conf.BootVolume.Size)
+			}
 		}
 
-		virtualServer.Spec = &spec
-		virtualServer.Spec.BootVolume = &bootVolSpec
-		virtualServer.Spec.Network = &[]api.Network{}
 		if conf.Network != nil {
 			for _, nic := range *conf.Network {
+				// ネットワークの設定があるときの追加設定
 				var n api.Network
-				n.Id = nic.Name
+				n.Id = nic.Name // NameをIDとして使用
+				// 設定があれば固定IP設定
 				if nic.Address != nil {
 					n.Address = util.StringPtr(*nic.Address)
 					n.Dhcp4 = util.BoolPtr(false)
 					n.Dhcp6 = util.BoolPtr(false)
 				}
+				// 設定があればネットマスク設定
 				if nic.Netmask != nil {
 					n.Netmask = util.StringPtr(*nic.Netmask)
 				}
+				// 設定があればルート設定
 				if nic.Routes != nil {
 					routes := make([]api.Route, len(*nic.Routes))
 					for i, r := range *nic.Routes {
@@ -80,10 +90,11 @@ var serverCreateCmd = &cobra.Command{
 					n.Routes = &routes
 				}
 
-				// VLAN対応
+				// VLANの設定があれば対応
 				if nic.Portgroup != nil {
 					n.Portgroup = util.StringPtr(*nic.Portgroup)
 				}
+				// VLANの設定があれば対応
 				if nic.Vlans != nil {
 					vlans := make([]uint, len(*nic.Vlans))
 					for i, v := range *nic.Vlans {
@@ -91,7 +102,7 @@ var serverCreateCmd = &cobra.Command{
 					}
 					n.Vlans = &vlans
 				}
-
+				// ネームサーバーの設定があれば対応
 				if nic.Nameservers != nil {
 					n.Nameservers = &api.Nameservers{}
 					if nic.Nameservers.Addresses != nil {
@@ -107,25 +118,31 @@ var serverCreateCmd = &cobra.Command{
 						}
 					}
 				}
+				// インターフェースの設定追加
 				*virtualServer.Spec.Network = append(*virtualServer.Spec.Network, n)
 			}
 		}
 
+		// ストレージの追加設定
 		if conf.Storage != nil {
 			volumes := make([]api.Volume, len(*conf.Storage))
 			for i, vol := range *conf.Storage {
-				volumes[i].Name = util.StringPtr(vol.Name)
-				volumes[i].Size = util.IntPtrInt(*vol.Size)
-				volumes[i].Comment = util.StringPtr(*vol.Comment)
+				meta := api.Metadata{}
+				volumes[i].Metadata = &meta
+				volumes[i].Metadata.Name = util.StringPtr(vol.Name)
+				volumes[i].Metadata.Comment = util.StringPtr(*vol.Comment)
+				spec := api.VolSpec{}
+				volumes[i].Spec = &spec
+				volumes[i].Spec.Size = util.IntPtrInt(*vol.Size)
 				if vol.Type == nil {
-					volumes[i].Type = util.StringPtr("qcow2")
+					volumes[i].Spec.Type = util.StringPtr("qcow2")
 				} else {
-					volumes[i].Type = util.StringPtr(*vol.Type)
+					volumes[i].Spec.Type = util.StringPtr(*vol.Type)
 				}
 				if vol.Kind == nil {
-					volumes[i].Kind = util.StringPtr("data")
+					volumes[i].Spec.Kind = util.StringPtr("data")
 				} else {
-					volumes[i].Kind = util.StringPtr(*vol.Kind)
+					volumes[i].Spec.Kind = util.StringPtr(*vol.Kind)
 				}
 			}
 			virtualServer.Spec.Storage = &volumes

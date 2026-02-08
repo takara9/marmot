@@ -17,11 +17,12 @@ var volumeRenameCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		volumeId := args[0]
 		newName := args[1]
+		var volume api.Volume
+		var meta api.Metadata
+		volume.Metadata = &meta
+		volume.Metadata.Name = util.StringPtr(newName)
 
-		var spec api.Volume
-		spec.Name = util.StringPtr(newName)
-
-		byteBody, _, err := m.UpdateVolumeById(volumeId, spec)
+		byteBody, _, err := m.UpdateVolumeById(volumeId, volume)
 		if err != nil {
 			println("failed to update name of volume", "err", err)
 			return err
