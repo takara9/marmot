@@ -1,6 +1,7 @@
 package db_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"time"
@@ -82,8 +83,9 @@ var _ = Describe("Volumes", Ordered, func() {
 			It("Keyからボリューム情報を取得", func() {
 				vol, err := v.GetVolumeById(volSpec.Id)
 				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("ボリューム情報取得後:", vol)
-				//fmt.Printf("Retrieved volume: Id=%s Key=%s Name=%s Path=%s Size=%d Status=%v\n", vol.Id, *vol.Metadata.Key, *vol.Metadata.Name, *vol.Spec.Path, *vol.Spec.Size, db.VolStatus[*vol.Status2.Status])
+				jsonData, err := json.MarshalIndent(vol, "", "  ")
+				Expect(err).NotTo(HaveOccurred())
+				fmt.Println(string(jsonData))
 			})
 
 			It("ボリュームの作成 #2", func() {
@@ -104,7 +106,9 @@ var _ = Describe("Volumes", Ordered, func() {
 				Expect(len(vols)).To(Equal(3))
 				fmt.Println("データボリューム一覧:")
 				for _, vol := range vols {
-					fmt.Printf("Id=%s Key=%s Name=%s Path=%s Size=%d Status=%v\n", vol.Id, *vol.Metadata.Key, *vol.Metadata.Name, *vol.Spec.Path, *vol.Spec.Size, db.VolStatus[*vol.Status2.Status])
+					jsonData, err := json.MarshalIndent(vol, "", "  ")
+					Expect(err).NotTo(HaveOccurred())
+					fmt.Println(string(jsonData))
 				}
 			})
 
@@ -122,7 +126,9 @@ var _ = Describe("Volumes", Ordered, func() {
 				Expect(len(vols)).To(Equal(2))
 				fmt.Println("データボリューム一覧:")
 				for _, vol := range vols {
-					fmt.Printf("Id=%s Key=%s Name=%s Path=%s Size=%d Status=%v\n", vol.Id, *vol.Metadata.Key, *vol.Metadata.Name, *vol.Spec.Path, *vol.Spec.Size, db.VolStatus[*vol.Status2.Status])
+					jsonData, err := json.MarshalIndent(vol, "", "  ")
+					Expect(err).NotTo(HaveOccurred())
+					fmt.Println(string(jsonData))
 				}
 			})
 		})
