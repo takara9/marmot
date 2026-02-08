@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/db"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -27,19 +28,16 @@ var volumeListCmd = &cobra.Command{
 				return err
 			}
 
-			fmt.Printf("%-2v  %-8v  %-4v  %-5v  %-8v  %-8v  %-45v\n", "No", "Id", "Kind", "Type", "Size(MB)", "Pers.", "Path")
+			fmt.Printf("%-2v  %-6v  %-16v  %-4v  %-5v  %-8v  %-12v  %-20v\n", "No", "Id", "Name", "Kind", "Type", "Size(GB)", "Status", "Path")
 			for i, v := range data {
 				fmt.Printf("%2d", i+1)
-				fmt.Printf("  %-8v", v.Id)
-				fmt.Printf("  %-4v", *v.Kind)
-				fmt.Printf("  %-5v", *v.Type)
-				fmt.Printf("  %-8v", *v.Size)
-				if v.Persistent != nil {
-					fmt.Printf("  %-8v", *v.Persistent)
-				} else {
-					fmt.Printf("  %-8v", "N/A")
-				}
-				fmt.Printf("  %-45v", *v.Path)
+				fmt.Printf("  %-6v", v.Id)
+				fmt.Printf("  %-16v", *v.Metadata.Name)
+				fmt.Printf("  %-4v", *v.Spec.Kind)
+				fmt.Printf("  %-5v", *v.Spec.Type)
+				fmt.Printf("  %-8v", *v.Spec.Size)
+				fmt.Printf("  %-12v", db.VolStatus[*v.Status2.Status])
+				fmt.Printf("  %-20v", *v.Spec.Path)
 				fmt.Println()
 			}
 			return nil

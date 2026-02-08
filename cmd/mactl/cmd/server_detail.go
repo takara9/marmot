@@ -52,7 +52,7 @@ var serverDetailCmd = &cobra.Command{
 			fmt.Printf("  Status: %v\n", db.ServerStatus[*server.Status.Status])
 			fmt.Printf("  CPU: %v\n", *server.Spec.Cpu)
 			fmt.Printf("  Memory: %v MB\n", *server.Spec.Memory)
-			fmt.Printf("  Boot Volume Path: %v\n", *server.Spec.BootVolume.Path)
+			fmt.Printf("  Boot Volume Path: %v\n", *server.Spec.BootVolume.Spec.Path)
 
 			return nil
 

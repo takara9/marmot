@@ -15,17 +15,21 @@ var volumeCreateCmd = &cobra.Command{
 	Short: "Create a new volume",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var err error
-		var spec api.Volume = api.Volume{
-			Name: util.StringPtr(volumeName),
-			Type: util.StringPtr(volumeType),
-			Kind: util.StringPtr(volumeKind),
-			Size: util.IntPtrInt(volumeSize),
+		var volume api.Volume = api.Volume{
+			Metadata: &api.Metadata{
+				Name: util.StringPtr(volumeName),
+			},
+			Spec: &api.VolSpec{
+				Type: util.StringPtr(volumeType),
+				Kind: util.StringPtr(volumeKind),
+				Size: util.IntPtrInt(volumeSize),
+			},
 		}
 		if len(osName) > 0 {
-			spec.OsVariant = util.StringPtr(osName)
+			volume.Spec.OsVariant = util.StringPtr(osName)
 		}
 
-		byteBody, _, err := m.CreateVolume(spec)
+		byteBody, _, err := m.CreateVolume(volume)
 		if err != nil {
 			println("CreateVolume", "err", err)
 			return err
@@ -33,8 +37,13 @@ var volumeCreateCmd = &cobra.Command{
 
 		switch outputStyle {
 		case "text":
-			println("Not implemented for text output")
-			println(string(byteBody))
+			var data any
+			if err := json.Unmarshal(byteBody, &data); err != nil {
+				println("Failed to Unmarshal", err)
+				return err
+			}
+			serveMap := data.(map[string]any)
+			fmt.Printf("ボリュームが作成されました。 ID: %v\n", serveMap["id"])
 			return nil
 
 		case "json":
