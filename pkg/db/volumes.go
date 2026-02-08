@@ -26,52 +26,6 @@ var VolStatus = map[int]string{
 
 // 仮想マシンを生成する時にボリュームを生成して、アタッチする
 // OS or DATA ボリュームの作成
-func (d *Database) CreateVolumeOnDB(volName, volPath, volType, volKind string, volSize int) (*api.Volume, error) {
-	slog.Debug("CreateVolume()", "volName", volName, "volPath", volPath, "volType", volType, "volKind", volKind, "volSize", volSize)
-	var vol api.Volume
-	var meta api.Metadata
-	vol.Metadata = &meta
-	var spec api.VolSpec
-	vol.Spec = &spec
-	var Status api.Status
-	vol.Status2 = &Status
-
-	lockKey := "/lock/volume/" + volName
-	mutex, err := d.LockKey(lockKey)
-	if err != nil {
-		slog.Error("failed to lock", "err", err, "key", lockKey)
-		return &vol, err
-	}
-	defer d.UnlockKey(mutex)
-
-	//一意なIDを発行
-	var key string
-	for {
-		vol.Id = uuid.New().String()[:7]
-		key = VolumePrefix + "/" + vol.Id
-		_, err := d.GetJSON(key, &vol)
-		if err == ErrNotFound {
-			break
-		} else if err != nil {
-			slog.Error("CreateVolumeOnDB()", "err", err)
-			return nil, err
-		}
-	}
-
-	vol.Metadata.Key = util.StringPtr(key)
-	vol.Metadata.Name = util.StringPtr(volName)
-	vol.Status2.Status = util.IntPtrInt(VOLUME_PROVISIONING)
-	vol.Spec.Kind = util.StringPtr(volKind)
-	vol.Spec.Type = util.StringPtr(volType)
-	vol.Spec.Path = util.StringPtr(volPath)
-	vol.Spec.Size = util.IntPtrInt(volSize)
-	if err := d.PutJSON(key, vol); err != nil {
-		slog.Error("failed to write database data", "err", err, "key", *vol.Metadata.Key)
-		return nil, err
-	}
-	return &vol, nil
-}
-
 func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 	slog.Debug("CreateVolume2()", "vol", inputVol)
 

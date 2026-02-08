@@ -47,8 +47,8 @@ var _ = Describe("Volumes", Ordered, func() {
 
 	Describe("ボリューム管理テスト", func() {
 		var v *db.Database
+		var volSpec *api.Volume
 		Context("基本アクセス", func() {
-			var volSpec *api.Volume
 			var err error
 			It("データボリュームコントローラの生成", func() {
 				v, err = db.NewDatabase(url)
@@ -56,7 +56,18 @@ var _ = Describe("Volumes", Ordered, func() {
 			})
 
 			It("ボリュームの作成 #1", func() {
-				volSpec, err = v.CreateVolumeOnDB("data01", "/var/lib/marmot/volumes/data01.qcow2", "qcow2", "data", 10)
+				vol := &api.Volume{
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data01"),
+					},
+					Spec: &api.VolSpec{
+						Path: util.StringPtr("/var/lib/marmot/volumes/data01.qcow2"),
+						Type: util.StringPtr("qcow2"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1),
+					},
+				}
+				volSpec, err = v.CreateVolumeOnDB2(*vol)
 				Expect(err).NotTo(HaveOccurred())
 				fmt.Println("Created data volume with ID:", volSpec.Id)
 			})
@@ -69,9 +80,6 @@ var _ = Describe("Volumes", Ordered, func() {
 
 			It("ボリュームの状態更新 #1", func() {
 				vol := api.Volume{
-					Metadata: &api.Metadata{
-						Key: volSpec.Metadata.Key,
-					},
 					Status2: &api.Status{
 						Status: util.IntPtrInt(db.VOLUME_AVAILABLE),
 					},
@@ -89,13 +97,35 @@ var _ = Describe("Volumes", Ordered, func() {
 			})
 
 			It("ボリュームの作成 #2", func() {
-				volSpec, err := v.CreateVolumeOnDB("data02", "/var/lib/marmot/volumes/data02.qcow2", "qcow2", "data", 10)
+				vol := &api.Volume{
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data02"),
+					},
+					Spec: &api.VolSpec{
+						Path: util.StringPtr("/var/lib/marmot/volumes/data02.qcow2"),
+						Type: util.StringPtr("qcow2"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(2),
+					},
+				}
+				volSpec, err := v.CreateVolumeOnDB2(*vol)
 				Expect(err).NotTo(HaveOccurred())
 				fmt.Println("Created data volume with ID:", volSpec.Id)
 			})
 
 			It("ボリュームの作成 #3", func() {
-				volSpec, err := v.CreateVolumeOnDB("data03", "/dev/mapper/vg2/datalv0100", "lvm", "data", 10)
+				vol := &api.Volume{
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data03"),
+					},
+					Spec: &api.VolSpec{
+						Path: util.StringPtr("/var/lib/marmot/volumes/data03.qcow2"),
+						Type: util.StringPtr("qcow2"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(3),
+					},
+				}
+				volSpec, err := v.CreateVolumeOnDB2(*vol)
 				Expect(err).NotTo(HaveOccurred())
 				fmt.Println("Created data volume with ID:", volSpec.Id)
 			})
