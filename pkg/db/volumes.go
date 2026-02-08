@@ -311,11 +311,12 @@ func (d *Database) FindVolumeByName(name, kind string) ([]api.Volume, error) {
 			slog.Error("Unmarshal() failed", "err", err, "key", string(kv.Key))
 			continue
 		}
-		if *vol.Metadata.Name == name && *vol.Spec.Kind == kind {
-			volumes = append(volumes, vol)
+		if vol.Metadata.Name != nil && *vol.Metadata.Name == name {
+			if vol.Spec.Kind != nil && *vol.Spec.Kind == kind {
+				volumes = append(volumes, vol)
+			}
 		}
 	}
-
 	return volumes, nil
 }
 
