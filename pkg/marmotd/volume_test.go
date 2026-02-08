@@ -289,7 +289,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 				Spec: &api.VolSpec{
 					Type: ut.StringPtr("lvm"),
 					Kind: ut.StringPtr("data"),
-					Size: ut.IntPtrInt(1),
+					Size: ut.IntPtrInt(1), // 1GB
 				},
 			}
 			GinkgoWriter.Println("Creating DATA 論理ボリューム", "volume", v)
