@@ -282,9 +282,12 @@ func (m *Marmot) UpdateVolumeById(id string, volSpec api.Volume) (*api.Volume, e
 		return nil, err
 	}
 
-	slog.Debug("UpdateVolumeById()", "volumeId", id, "volSpec Name", volSpec.Metadata.Name)
-	util.Assign(&vol.Metadata.Name, volSpec.Metadata.Name)
-	util.Assign(&vol.Spec.Size, volSpec.Spec.Size)
+	//slog.Debug("UpdateVolumeById()", "volumeId", id, "volSpec Name", volSpec.Metadata.Name)
+	//util.Assign(&vol.Metadata.Name, volSpec.Metadata.Name)
+	//util.Assign(&vol.Spec.Size, volSpec.Spec.Size)
+
+	util.PatchStruct(vol, volSpec)
+	vol.Id = id
 
 	// データベースを更新
 	if err := m.Db.UpdateVolume(id, vol); err != nil {

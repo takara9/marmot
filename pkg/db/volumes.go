@@ -285,7 +285,7 @@ func (d *Database) CreateOsLv(tempVg string, tempLv string) (string, error) {
 
 	// スナップショットで、OS用論理ボリュームを作成
 	lvName := fmt.Sprintf("oslv%04d", seq)
-	byteSize := uint64(16 * 1024 * 1024 * 1024) // スナップショットのサイズ 16GB
+	byteSize := uint64(4 * 1024 * 1024 * 1024) // スナップショットのサイズ 4GB
 	err = lvm.CreateSnapshot(tempVg, tempLv, lvName, byteSize)
 	if err != nil {
 		return "", err

@@ -22,7 +22,7 @@ func IsExist(vgx string, lvx string) error {
 }
 
 // 論理ボリュームの作成
-func CreateLV(vgx string, lvx string, size uint64) error {
+func CreateLV(vgx string, lvx string, sizeInByte uint64) error {
 	tlvm.Verbose = false
 
 	vg, err := tlvm.LookupVolumeGroup(vgx)
@@ -30,7 +30,7 @@ func CreateLV(vgx string, lvx string, size uint64) error {
 		return err
 	}
 
-	_, err = vg.CreateLogicalVolume(lvx, size, nil)
+	_, err = vg.CreateLogicalVolume(lvx, sizeInByte, nil)
 	if err != nil {
 		return err
 	}
@@ -59,7 +59,7 @@ func RemoveLV(vgx string, lvx string) error {
 }
 
 // スナップショットの作成、OSボリューム作成用
-func CreateSnapshot(vgx string, lvx string, svx string, size uint64) error {
+func CreateSnapshot(vgx string, lvx string, svx string, sizeInByte uint64) error {
 	tlvm.Verbose = false
 
 	tags := []string{"snapshot", "marmot"}
@@ -68,7 +68,7 @@ func CreateSnapshot(vgx string, lvx string, svx string, size uint64) error {
 		return err
 	}
 
-	_, err = vg.CreateLogicalVolumeSnapshot(svx, size, tags, lvx)
+	_, err = vg.CreateLogicalVolumeSnapshot(svx, sizeInByte, tags, lvx)
 	if err == nil {
 		return err
 	}
