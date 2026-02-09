@@ -360,7 +360,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("lvm"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(100), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 				{
@@ -370,7 +370,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("lvm"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(200), //MB
+						Size: util.IntPtrInt(2), //GB
 					},
 				},
 			}
@@ -451,7 +451,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("lvm"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(100), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 				{
@@ -461,7 +461,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("qcow2"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(200), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 			}
@@ -542,7 +542,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("qcow2"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(101), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 				{
@@ -552,7 +552,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("qcow2"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(102), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 				{
@@ -562,7 +562,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("qcow2"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(103), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 				{
@@ -572,7 +572,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("qcow2"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(104), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 				{
@@ -582,7 +582,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("qcow2"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(105), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 				{
@@ -592,7 +592,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("qcow2"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(106), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 				{
@@ -602,7 +602,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("qcow2"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(107), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 				{
@@ -612,7 +612,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("qcow2"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(108), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 				{
@@ -622,7 +622,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("qcow2"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(109), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 				{
@@ -632,7 +632,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("qcow2"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(110), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 			}
@@ -706,7 +706,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("lvm"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(101), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 				{
@@ -716,7 +716,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("lvm"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(102), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 				{
@@ -726,7 +726,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("lvm"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(103), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 				{
@@ -736,7 +736,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("lvm"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(104), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 				{
@@ -746,7 +746,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("lvm"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(105), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 				{
@@ -756,7 +756,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("lvm"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(106), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 				{
@@ -766,7 +766,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("lvm"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(107), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 				{
@@ -776,7 +776,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("lvm"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(108), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 				{
@@ -786,7 +786,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("lvm"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(109), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 				{
@@ -796,7 +796,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("lvm"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(110), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 			}
@@ -978,7 +978,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("lvm"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(101), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 				{
@@ -988,7 +988,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("lvm"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(102), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 				{
@@ -998,7 +998,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("lvm"),
 						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(103), //MB
+						Size: util.IntPtrInt(1), //GB
 					},
 				},
 			}
