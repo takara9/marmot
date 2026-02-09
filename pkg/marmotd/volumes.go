@@ -121,7 +121,8 @@ func (m *Marmot) CreateNewVolume(v api.Volume) (*api.Volume, error) {
 			}
 
 			slog.Debug("OSボリュームをスナップショットで生成", "volKind", *volSpec.Spec.Kind)
-			err = lvm.CreateSnapshot(img.VolumeGroup, img.LogicalVolume, *volSpec.Spec.LogicalVolume, 16)
+			size := uint64(4 * 1024 * 1024 * 1024) // スナップショットサイズは4GB固定
+			err = lvm.CreateSnapshot(img.VolumeGroup, img.LogicalVolume, *volSpec.Spec.LogicalVolume, size)
 			if err != nil {
 				slog.Error("failed to create OS logical volume", "err", err, "vg", img.VolumeGroup, "lv", img.LogicalVolume)
 				m.Db.RollbackVolumeCreation(volSpec.Id)
