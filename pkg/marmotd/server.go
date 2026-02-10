@@ -335,7 +335,7 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 
 	err = l.DefineAndStartVM(*dom)
 	if err != nil {
-		slog.Error("DefineAndStartVM()", "err", err)
+		slog.Error("DefineAndStartVM()", "err", err)  // ここで No such file or directory エラーになる
 		return "", err
 	}
 

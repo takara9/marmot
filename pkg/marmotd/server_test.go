@@ -384,7 +384,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
 			Expect(err).NotTo(HaveOccurred())
 			id, err = marmotServer.Ma.CreateServer2(vm.Id)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())  //////////////////////// ここで失敗　続きはここから
 			GinkgoWriter.Println("Created VM ID:", id)
 		})
 
