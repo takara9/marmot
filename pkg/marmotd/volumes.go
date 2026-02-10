@@ -145,8 +145,7 @@ func (m *Marmot) CreateNewVolume(v api.Volume) (*api.Volume, error) {
 			return volSpec, nil
 
 		case "data":
-			size := uint64(uint64(*volSpec.Spec.Size) * 1024 * 1024 * 1024) // BからGBへ変換
-			lvName, err := m.Db.CreateDataLv(size, *volSpec.Spec.VolumeGroup)
+			lvName, err := m.Db.CreateDataLv(uint64(*volSpec.Spec.Size), *volSpec.Spec.VolumeGroup)
 			if err != nil {
 				slog.Error("failed to create Data logical volume", "err", err)
 				m.Db.RollbackVolumeCreation(volSpec.Id)
