@@ -286,7 +286,7 @@ func (m *Marmot) UpdateVolumeById(id string, volSpec api.Volume) (*api.Volume, e
 	//util.Assign(&vol.Metadata.Name, volSpec.Metadata.Name)
 	//util.Assign(&vol.Spec.Size, volSpec.Spec.Size)
 
-	util.PatchStruct(vol, volSpec)
+	util.PatchStruct(&vol, &volSpec)
 	vol.Id = id
 
 	// データベースを更新

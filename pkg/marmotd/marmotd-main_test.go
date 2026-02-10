@@ -318,11 +318,11 @@ var _ = Describe("関数テスト", Ordered, func() {
 		})
 
 		It("DATAボリューム(LVM)の情報更新", func() {
-			var spec api.Volume
+			var vol api.Volume
 			var meta api.Metadata
-			spec.Metadata = &meta
-			spec.Metadata.Name = util.StringPtr("updated-volume-name")
-			body, url, err := marmotClient.UpdateVolumeById(replyVolume.Id, spec)
+			vol.Metadata = &meta
+			vol.Metadata.Name = util.StringPtr("updated-volume-name")
+			body, url, err := marmotClient.UpdateVolumeById(replyVolume.Id, vol)
 			GinkgoWriter.Println("UpdateVolumeById err =", err)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("UpdateVolumeById body =", string(body))
