@@ -43,6 +43,8 @@ while read lv; do
     lvremove -y /dev/$lv
 done < lv_to_remove.txt
 
+lvremove -y /dev/vg1/lvos_temp
+
 ids=$(docker ps -q); [ -n "$ids" ] && docker kill $ids
 ids=$(docker ps -aq); [ -n "$ids" ] && docker rm $ids
 
