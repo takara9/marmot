@@ -147,7 +147,9 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 				},
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
-			volSpec, err = m.CreateNewVolume(v)
+			vol, err := m.Db.CreateVolumeOnDB2(v)
+			Expect(err).NotTo(HaveOccurred())
+			volSpec, err = m.CreateNewVolume(vol.Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created volume key: ", *volSpec.Metadata.Name)
 		})
@@ -197,7 +199,9 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 				},
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
-			volSpec, err = m.CreateNewVolume(v)
+			vol, err := m.Db.CreateVolumeOnDB2(v)
+			Expect(err).NotTo(HaveOccurred())
+			volSpec, err = m.CreateNewVolume(vol.Id)
 			Expect(err).To(HaveOccurred())
 		})
 
@@ -213,7 +217,9 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 				},
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
-			volSpec, err = m.CreateNewVolume(v)
+			vol, err := m.Db.CreateVolumeOnDB2(v)
+			Expect(err).NotTo(HaveOccurred())
+			volSpec, err = m.CreateNewVolume(vol.Id)
 			GinkgoWriter.Println("err=", err)
 			Expect(err).To(HaveOccurred())
 		})
@@ -293,7 +299,9 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 				},
 			}
 			GinkgoWriter.Println("Creating DATA 論理ボリューム", "volume", v)
-			volSpec, err = m.CreateNewVolume(v)
+			vol, err := m.Db.CreateVolumeOnDB2(v)
+			Expect(err).NotTo(HaveOccurred())
+			volSpec, err = m.CreateNewVolume(vol.Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created volume key: ", *volSpec.Metadata.Key)
 		})
@@ -332,7 +340,12 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 				},
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
-			tmpSpec, err := m.CreateNewVolume(v)
+			//tmpSpec, err := m.CreateNewVolume(v)
+
+			volSpec, err := m.Db.CreateVolumeOnDB2(v)
+			Expect(err).NotTo(HaveOccurred())
+			tmpSpec, err := m.CreateNewVolume(volSpec.Id)
+			Expect(err).NotTo(HaveOccurred())
 			ids = append(ids, tmpSpec.Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Metadata.Key)
@@ -350,7 +363,10 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 				},
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
-			tmpSpec, err := m.CreateNewVolume(v)
+			volSpec, err := m.Db.CreateVolumeOnDB2(v)
+			Expect(err).NotTo(HaveOccurred())
+			tmpSpec, err := m.CreateNewVolume(volSpec.Id)
+			Expect(err).NotTo(HaveOccurred())
 			ids = append(ids, tmpSpec.Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Metadata.Key)
@@ -368,7 +384,12 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 				},
 			}
 			GinkgoWriter.Println("Creating Data volume", "volume", v)
-			tmpSpec, err := m.CreateNewVolume(v)
+			//tmpSpec, err := m.CreateNewVolume(v)
+			volSpec, err := m.Db.CreateVolumeOnDB2(v)
+			Expect(err).NotTo(HaveOccurred())
+			tmpSpec, err := m.CreateNewVolume(volSpec.Id)
+			Expect(err).NotTo(HaveOccurred())
+
 			ids = append(ids, tmpSpec.Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Metadata.Key)
@@ -386,7 +407,13 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 				},
 			}
 			GinkgoWriter.Println("Creating Data volume", "volume", v)
-			tmpSpec, err := m.CreateNewVolume(v)
+			//tmpSpec, err := m.CreateNewVolume(v)
+
+			volSpec, err := m.Db.CreateVolumeOnDB2(v)
+			Expect(err).NotTo(HaveOccurred())
+			tmpSpec, err := m.CreateNewVolume(volSpec.Id)
+			Expect(err).NotTo(HaveOccurred())
+
 			ids = append(ids, tmpSpec.Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Metadata.Key)
@@ -508,7 +535,11 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 				},
 			}
 			GinkgoWriter.Println("Creating qcow2 volume", "volume", v)
-			tmpSSpec, err := m.CreateNewVolume(v)
+			//tmpSSpec, err := m.CreateNewVolume(v)
+			volSpec, err := m.Db.CreateVolumeOnDB2(v)
+			Expect(err).NotTo(HaveOccurred())
+			tmpSSpec, err := m.CreateNewVolume(volSpec.Id)
+			Expect(err).NotTo(HaveOccurred())
 			ids = append(ids, tmpSSpec.Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created volume key: ", *tmpSSpec.Metadata.Key)
@@ -580,7 +611,12 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 					Size: ut.IntPtrInt(1),
 				},
 			}
-			tmpSpec, err := m.CreateNewVolume(v)
+			//tmpSpec, err := m.CreateNewVolume(v)
+			volSpec, err := m.Db.CreateVolumeOnDB2(v)
+			Expect(err).NotTo(HaveOccurred())
+			tmpSpec, err := m.CreateNewVolume(volSpec.Id)
+			Expect(err).NotTo(HaveOccurred())
+
 			ids = append(ids, tmpSpec.Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created volume id: ", tmpSpec.Id)

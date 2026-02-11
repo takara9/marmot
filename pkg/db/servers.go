@@ -47,7 +47,7 @@ func (d *Database) CreateServer(spec api.Server) (api.Server, error) {
 	var key string
 	for {
 		server.Metadata.Uuid = util.StringPtr(uuid.New().String())
-		server.Id = (*server.Metadata.Uuid)[:8]
+		server.Id = (*server.Metadata.Uuid)[:5]
 		key = ServerPrefix + "/" + server.Id
 		_, err := d.GetJSON(key, &server)
 		if err == ErrNotFound {

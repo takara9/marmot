@@ -384,7 +384,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
 			Expect(err).NotTo(HaveOccurred())
 			id, err = marmotServer.Ma.CreateServer2(vm.Id)
-			Expect(err).NotTo(HaveOccurred())  //////////////////////// ここで失敗　続きはここから
+			Expect(err).NotTo(HaveOccurred()) //////////////////////// ここで失敗　続きはここから
 			GinkgoWriter.Println("Created VM ID:", id)
 		})
 
@@ -862,7 +862,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				},
 			}
 			GinkgoWriter.Println("Creating Data volume", "volume", v)
-			tmpSpec, err := marmotServer.Ma.CreateNewVolume(v)
+			tmpSpec, err := marmotServer.Ma.CreateNewVolumeWithWait(v)
 			volumeIds = append(volumeIds, tmpSpec.Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Metadata.Key)
@@ -878,7 +878,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				},
 			}
 			GinkgoWriter.Println("Creating Data volume", "volume", v)
-			tmpSpec, err := marmotServer.Ma.CreateNewVolume(v)
+			tmpSpec, err := marmotServer.Ma.CreateNewVolumeWithWait(v)
 			volumeIds = append(volumeIds, tmpSpec.Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Metadata.Key)

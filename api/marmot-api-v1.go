@@ -125,24 +125,10 @@ type VolSpec struct {
 
 // Volume defines model for Volume.
 type Volume struct {
-	Metadata      *Metadata  `json:"Metadata,omitempty"`
-	Spec          *VolSpec   `json:"Spec,omitempty"`
-	Status2       *Status    `json:"Status2,omitempty"`
-	//CTime         *time.Time `json:"cTime,omitempty"`
-	//Comment       *string    `json:"comment,omitempty"`
-	Id            string     `json:"id"`
-	//Key           *string    `json:"key,omitempty"`
-	//Kind          *string    `json:"kind,omitempty"`
-	//LogicalVolume *string    `json:"logicalVolume,omitempty"`
-	//MTime         *time.Time `json:"mTime,omitempty"`
-	//Name          *string    `json:"name,omitempty"`
-	//OsVariant     *string    `json:"osVariant,omitempty"`
-	//Path          *string    `json:"path,omitempty"`
-	//Persistent    *bool      `json:"persistent,omitempty"`
-	//Size          *int       `json:"size,omitempty"`
-	//Status        *int       `json:"status,omitempty"`
-	//Type          *string    `json:"type,omitempty"`
-	//VolumeGroup   *string    `json:"volumeGroup,omitempty"`
+	Metadata *Metadata `json:"Metadata,omitempty"`
+	Spec     *VolSpec  `json:"Spec,omitempty"`
+	Status2  *Status   `json:"Status2,omitempty"`
+	Id       string    `json:"id"`
 }
 
 // CreateServerJSONRequestBody defines body for CreateServer for application/json ContentType.

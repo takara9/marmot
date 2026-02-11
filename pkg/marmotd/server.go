@@ -73,14 +73,47 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 		bootVol.Spec.OsVariant = serverConfig.Spec.OsVariant
 	}
 
+	/*
+		slog.Debug("ブートディスクの作成")
+		vol, err := m.Db.CreateVolumeOnDB2(bootVol)
+		if err != nil {
+			slog.Error("CreateVolumeOnDB2()", "err", err)
+			// サーバーとボリュームのステータスをエラーに更新する処理を追加するべき
+			return "", err
+		}
+
+		bootVolDefined, err := m.CreateNewVolume(vol.Id)
+		if err != nil {
+			slog.Error("CreateNewVolume()", "err", err)
+			// サーバーとボリュームのステータスをエラーに更新する処理を追加するべき
+			return "", err
+		}
+
+		for {
+			vol, err := m.GetVolumeById(vol.Id)
+			if err != nil {
+				slog.Error("GetVolumeById()", "err", err)
+				// サーバーとボリュームのステータスをエラーに更新する処理を追加するべき
+				return "", err
+			}
+			slog.Debug("ブートボリュームのステータス確認ループ", "volume id", bootVolDefined.Id, "status", bootVolDefined.Status2.Status)
+			if *vol.Status2.Status == db.VOLUME_AVAILABLE {
+				slog.Debug("ブートボリュームのステータスがAVAILABLEになった", "volume id", bootVolDefined.Id)
+				break
+			}
+			time.Sleep(1 * time.Second)
+		}
+	*/
+
 	slog.Debug("ブートディスクの作成")
-	bootVolDefined, err := m.CreateNewVolume(bootVol)
+	bootVolDefined, err := m.CreateNewVolumeWithWait(bootVol)
 	if err != nil {
+		slog.Error("CreateNewVolumeWithWait()", "err", err)
 		return "", err
 	}
 
-	slog.Debug("ブートボリュームのIDをサーバーの構成データに設定", "temp var volume id", bootVolDefined)
-	serverConfig.Spec.BootVolume = bootVolDefined
+	slog.Debug("ブートボリュームのIDをサーバーの構成データに設定", "temp var volume id", bootVolDefined.Id)
+	serverConfig.Spec.BootVolume = &bootVolDefined
 	err = m.Db.UpdateServer(serverConfig.Id, serverConfig)
 	if err != nil {
 		slog.Error("UpdateServer()", "err", err)
@@ -119,22 +152,22 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 
 			if disk.Spec.Type != nil && *disk.Spec.Type == "qcow2" {
 				slog.Debug("qcow2ボリュームを作成", "disk index", i)
-				diskVol, err := m.CreateNewVolume(disk)
+				diskVol, err := m.CreateNewVolumeWithWait(disk)
 				if err != nil {
-					slog.Error("CreateNewVolume()", "err", err)
+					slog.Error("CreateNewVolumeWithWait()", "err", err)
 					return "", err
 				}
-				(*serverConfig.Spec.Storage)[i] = *diskVol
+				(*serverConfig.Spec.Storage)[i] = diskVol
 				slog.Debug("データボリューム 作成成功", "disk index", i, "volume id", diskVol.Id)
 			}
 			if disk.Spec.Type != nil && *disk.Spec.Type == "lvm" {
 				slog.Debug("lvmボリュームを作成", "disk index", i)
-				diskVol, err := m.CreateNewVolume(disk)
+				diskVol, err := m.CreateNewVolumeWithWait(disk)
 				if err != nil {
-					slog.Error("CreateNewVolume()", "err", err)
+					slog.Error("CreateNewVolumeWithWait()", "err", err)
 					return "", err
 				}
-				(*serverConfig.Spec.Storage)[i] = *diskVol
+				(*serverConfig.Spec.Storage)[i] = diskVol
 				slog.Debug("データボリューム 作成成功", "disk index", i, "volume id", diskVol.Id)
 			}
 		}
@@ -335,7 +368,7 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 
 	err = l.DefineAndStartVM(*dom)
 	if err != nil {
-		slog.Error("DefineAndStartVM()", "err", err)  // ここで No such file or directory エラーになる
+		slog.Error("DefineAndStartVM()", "err", err) // ここで No such file or directory エラーになる
 		return "", err
 	}
 
@@ -464,4 +497,40 @@ func (m *Marmot) UpdateServerById(id string, serverSpec api.Server) error {
 	}
 	slog.Debug("UpdateServerById()", "svc", nil)
 	return nil
+}
+
+// ボリュームリクエストに基づいて、新しいボリュームを作成する
+func (m *Marmot) CreateNewVolumeWithWait(volReq api.Volume) (api.Volume, error) {
+	slog.Debug("===CreateNewVolume is called===", "volume request", volReq)
+
+	vol, err := m.Db.CreateVolumeOnDB2(volReq)
+	if err != nil {
+		slog.Error("CreateVolumeOnDB2()", "err", err)
+		// サーバーとボリュームのステータスをエラーに更新する処理を追加するべき
+		return api.Volume{}, err
+	}
+
+	volDefined, err := m.CreateNewVolume(vol.Id)
+	if err != nil {
+		slog.Error("CreateNewVolume()", "err", err)
+		//
+		return api.Volume{}, err
+	}
+
+	for {
+		vol, err := m.GetVolumeById(vol.Id)
+		if err != nil {
+			slog.Error("GetVolumeById()", "err", err)
+			// サーバーとボリュームのステータスをエラーに更新する処理を追加するべき
+			return api.Volume{}, err
+		}
+		slog.Debug("ブートボリュームのステータス確認ループ", "volume id", vol.Id, "status", vol.Status2.Status)
+		if *vol.Status2.Status == db.VOLUME_AVAILABLE {
+			slog.Debug("ブートボリュームのステータスがAVAILABLEになった", "volume id", vol.Id)
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	return *volDefined, nil
 }
