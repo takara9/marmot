@@ -18,16 +18,6 @@ import (
 func (m *Marmot) CreateNewVolume(v api.Volume) (*api.Volume, error) {
 	slog.Debug("CreateNewVolume()", "name", v.Metadata.Name, "type", v.Spec.Type, "kind", v.Spec.Kind)
 
-	// デバッグ
-	/*
-		byteBody, err := json.MarshalIndent(v, "", "    ")
-		if err != nil {
-			slog.Error("failed to marshal volume", "err", err)
-			return nil, err
-		}
-		fmt.Println("Volume JSON :\n", string(byteBody))
-	*/
-
 	volSpec, err := m.Db.CreateVolumeOnDB2(v)
 	if err != nil {
 		return nil, err
@@ -146,13 +136,6 @@ func (m *Marmot) CreateNewVolume(v api.Volume) (*api.Volume, error) {
 
 		case "data":
 			lvSize := uint64(*volSpec.Spec.Size) * 1024 * 1024 * 1024
-
-			//lvName, err := m.Db.CreateDataLv(uint64(*volSpec.Spec.Size), *volSpec.Spec.VolumeGroup)
-			//if err != nil {
-			//	slog.Error("failed to create Data logical volume", "err", err)
-			//	m.Db.RollbackVolumeCreation(volSpec.Id)
-			//	return nil, err
-			//}
 
 			err = lvm.CreateLV(*volSpec.Spec.VolumeGroup, *volSpec.Spec.LogicalVolume, lvSize)
 			if err != nil {
@@ -288,10 +271,6 @@ func (m *Marmot) UpdateVolumeById(id string, volSpec api.Volume) (*api.Volume, e
 		slog.Error("failed to get volume by key", "err", err, "volume id", id)
 		return nil, err
 	}
-
-	//slog.Debug("UpdateVolumeById()", "volumeId", id, "volSpec Name", volSpec.Metadata.Name)
-	//util.Assign(&vol.Metadata.Name, volSpec.Metadata.Name)
-	//util.Assign(&vol.Spec.Size, volSpec.Spec.Size)
 
 	util.PatchStruct(&vol, &volSpec)
 	vol.Id = id
