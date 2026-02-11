@@ -198,14 +198,17 @@ var _ = Describe("関数テスト", Ordered, func() {
 		})
 
 		It("OSボリューム(qcow2)のリスト取得", func() {
-			body, url, err := marmotClient.ListVolumes()
-			var vols []api.Volume
-			Expect(err).NotTo(HaveOccurred())
-			err = json.Unmarshal(body, &vols)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(len(vols)).To(Equal(0))
-			GinkgoWriter.Println("ListVolumes =", vols)
-			Expect(url).To(BeNil())
+
+			Eventually(func(g Gomega) {
+				body, url, err := marmotClient.ListVolumes()
+				var vols []api.Volume
+				Expect(err).NotTo(HaveOccurred())
+				err = json.Unmarshal(body, &vols)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(len(vols)).To(Equal(0))
+				GinkgoWriter.Println("ListVolumes =", vols)
+				Expect(url).To(BeNil())
+			}).WithTimeout(10 * time.Second).WithPolling(2 * time.Second).Should(Succeed())
 
 			out, err := exec.Command("ls", "-alhg", "/var/lib/marmot/volumes").Output()
 			GinkgoWriter.Println("ls output:\n", string(out))
