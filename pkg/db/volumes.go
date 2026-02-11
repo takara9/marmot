@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/lvm"
 	"github.com/takara9/marmot/pkg/util"
 	etcd "go.etcd.io/etcd/client/v3"
 )
@@ -107,12 +106,12 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 	// LVMボリュームの場合、パスを決定する
 	if *volume.Spec.Type == "lvm" {
 		if *volume.Spec.Kind == "os" {
-			volume.Spec.Path = util.StringPtr(fmt.Sprintf("/dev/%s/oslv%s", "vg1", volume.Id))
-			volume.Spec.LogicalVolume = util.StringPtr(fmt.Sprintf("oslv%s", volume.Id))
+			volume.Spec.Path = util.StringPtr(fmt.Sprintf("/dev/%s/oslv-%s", "vg1", volume.Id))
+			volume.Spec.LogicalVolume = util.StringPtr(fmt.Sprintf("oslv-%s", volume.Id))
 			volume.Spec.VolumeGroup = util.StringPtr("vg1")
 		} else {
-			volume.Spec.Path = util.StringPtr(fmt.Sprintf("/dev/%s/datalv%s", "vg2", volume.Id))
-			volume.Spec.LogicalVolume = util.StringPtr(fmt.Sprintf("datalv%s", volume.Id))
+			volume.Spec.Path = util.StringPtr(fmt.Sprintf("/dev/%s/datalv-%s", "vg2", volume.Id))
+			volume.Spec.LogicalVolume = util.StringPtr(fmt.Sprintf("datalv-%s", volume.Id))
 			volume.Spec.VolumeGroup = util.StringPtr("vg2")
 		}
 	}
@@ -277,14 +276,15 @@ func (d *Database) FindVolumeByName(name, kind string) ([]api.Volume, error) {
 // OSテンプVolのスナップショットを作成してデバイス名を返す
 // この関数が呼ばれているのは、以下の一箇所のみ
 // https://github.com/takara9/marmot/blob/main/pkg/marmotd/vm-create.go#L60
-func (d *Database) CreateOsLv(tempVg string, tempLv string) (string, error) {
+/*
+func (d *Database) CreateOsLv00(tempVg string, tempLv string) (string, error) {
 	seq, err := d.GetSeqByKind("LVOS")
 	if err != nil {
 		return "", err
 	}
 
 	// スナップショットで、OS用論理ボリュームを作成
-	lvName := fmt.Sprintf("oslv%04d", seq)
+	lvName := fmt.Sprintf("oslv-%04d", seq)
 	byteSize := uint64(4 * 1024 * 1024 * 1024) // スナップショットのサイズ 4GB
 	err = lvm.CreateSnapshot(tempVg, tempLv, lvName, byteSize)
 	if err != nil {
@@ -292,11 +292,13 @@ func (d *Database) CreateOsLv(tempVg string, tempLv string) (string, error) {
 	}
 	return lvName, err
 }
+*/
 
 // データボリュームの作成
 // この関数が呼ばれているのは、以下の一箇所のみ
 // https://github.com/takara9/marmot/blob/main/pkg/marmotd/vm-create.go#L97
-func (d *Database) CreateDataLv(sz uint64, vg string) (string, error) {
+/*
+func (d *Database) CreateDataLv00(sz uint64, vg string) (string, error) {
 	seq, err := d.GetSeqByKind("LVDATA")
 	if err != nil {
 		return "", err
@@ -304,13 +306,14 @@ func (d *Database) CreateDataLv(sz uint64, vg string) (string, error) {
 
 	byteSize := sz * 1024 * 1024 * 1024
 	// 論理ボリュームを作成 MB単位でサイズ指定
-	lvName := fmt.Sprintf("data%04d", seq)
+	lvName := fmt.Sprintf("data-%04d", seq)
 	err = lvm.CreateLV(vg, lvName, byteSize)
 	if err != nil {
 		return "", err
 	}
 	return lvName, err
 }
+*/
 
 // イメージテンプレートの登録
 func registerImageTemplate() {

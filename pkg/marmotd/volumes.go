@@ -145,14 +145,21 @@ func (m *Marmot) CreateNewVolume(v api.Volume) (*api.Volume, error) {
 			return volSpec, nil
 
 		case "data":
-			lvName, err := m.Db.CreateDataLv(uint64(*volSpec.Spec.Size), *volSpec.Spec.VolumeGroup)
+			lvSize := uint64(*volSpec.Spec.Size) * 1024 * 1024 * 1024
+
+			//lvName, err := m.Db.CreateDataLv(uint64(*volSpec.Spec.Size), *volSpec.Spec.VolumeGroup)
+			//if err != nil {
+			//	slog.Error("failed to create Data logical volume", "err", err)
+			//	m.Db.RollbackVolumeCreation(volSpec.Id)
+			//	return nil, err
+			//}
+
+			err = lvm.CreateLV(*volSpec.Spec.VolumeGroup, *volSpec.Spec.LogicalVolume, lvSize)
 			if err != nil {
-				slog.Error("failed to create Data logical volume", "err", err)
-				m.Db.RollbackVolumeCreation(volSpec.Id)
 				return nil, err
 			}
 
-			slog.Debug("Dataボリュームの生成 成功", "LV Name", lvName, "VG Name", *volSpec.Spec.VolumeGroup, "Size", *volSpec.Spec.Size, "volId", volSpec.Id)
+			slog.Debug("Dataボリュームの生成 成功", "LV Name", *volSpec.Spec.LogicalVolume, "VG Name", *volSpec.Spec.VolumeGroup, "Size", *volSpec.Spec.Size, "volId", volSpec.Id)
 
 			// 取得したLV名とサイズで、データベースを更新
 			vol := api.Volume{
