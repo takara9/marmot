@@ -119,13 +119,18 @@ var _ = Describe("関数テスト", Ordered, func() {
 
 		var replyVolume api.Volume
 		It("DATAボリューム(qcow2)の作成", func() {
-			var vol api.Volume
-			vol.Name = util.StringPtr("test-volume-001")
-			vol.Type = util.StringPtr("qcow2")
-			vol.Kind = util.StringPtr("data")
-			vol.Size = util.IntPtrInt(100)
+			var volume api.Volume
+			var spec api.VolSpec
+			volume.Spec = &spec
+			var meta api.Metadata
+			volume.Metadata = &meta
 
-			body, url, err := marmotClient.CreateVolume(vol)
+			volume.Metadata.Name = util.StringPtr("test-volume-001")
+			volume.Spec.Type = util.StringPtr("qcow2")
+			volume.Spec.Kind = util.StringPtr("data")
+			volume.Spec.Size = util.IntPtrInt(100)
+
+			body, url, err := marmotClient.CreateVolume(volume)
 			Expect(err).NotTo(HaveOccurred())
 			err = json.Unmarshal(body, &replyVolume)
 			GinkgoWriter.Println("CreateVolume replyVolume id = ", replyVolume.Id)
@@ -162,10 +167,15 @@ var _ = Describe("関数テスト", Ordered, func() {
 
 		It("OSボリューム(qcow2)の作成", func() {
 			var vol api.Volume
-			vol.Name = util.StringPtr("test-volume-002")
-			vol.Type = util.StringPtr("qcow2")
-			vol.Kind = util.StringPtr("os")
-			vol.OsVariant = util.StringPtr("ubuntu22.04")
+			var meta api.Metadata
+			vol.Metadata = &meta
+			var spec api.VolSpec
+			vol.Spec = &spec
+
+			vol.Metadata.Name = util.StringPtr("test-volume-002")
+			vol.Spec.Type = util.StringPtr("qcow2")
+			vol.Spec.Kind = util.StringPtr("os")
+			vol.Spec.OsVariant = util.StringPtr("ubuntu22.04")
 
 			body, url, err := marmotClient.CreateVolume(vol)
 			Expect(err).NotTo(HaveOccurred())
@@ -203,13 +213,17 @@ var _ = Describe("関数テスト", Ordered, func() {
 		})
 
 		It("OSボリューム(LVM)の作成", func() {
-			var vol api.Volume
-			vol.Name = util.StringPtr("test-volume-002")
-			vol.Type = util.StringPtr("lvm")
-			vol.Kind = util.StringPtr("os")
-			vol.OsVariant = util.StringPtr("ubuntu22.04")
+			var volume api.Volume
+			var spec api.VolSpec
+			volume.Spec = &spec
+			var meta api.Metadata
+			volume.Metadata = &meta
 
-			body, url, err := marmotClient.CreateVolume(vol)
+			volume.Metadata.Name = util.StringPtr("test-volume-002")
+			volume.Spec.Type = util.StringPtr("lvm")
+			volume.Spec.Kind = util.StringPtr("os")
+			volume.Spec.OsVariant = util.StringPtr("ubuntu22.04")
+			body, url, err := marmotClient.CreateVolume(volume)
 			Expect(err).NotTo(HaveOccurred())
 			err = json.Unmarshal(body, &replyVolume)
 			GinkgoWriter.Println("CreateVolume replyVolume Id = ", replyVolume.Id)
@@ -256,13 +270,18 @@ var _ = Describe("関数テスト", Ordered, func() {
 		})
 
 		It("DATAボリューム(LVM)の作成 0000", func() {
-			var vol api.Volume
-			vol.Name = util.StringPtr("test-volume-002")
-			vol.Type = util.StringPtr("lvm")
-			vol.Kind = util.StringPtr("data")
-			vol.Size = util.IntPtrInt(1)
+			var volume api.Volume
+			var spec api.VolSpec
+			volume.Spec = &spec
+			var meta api.Metadata
+			volume.Metadata = &meta
 
-			body, url, err := marmotClient.CreateVolume(vol)
+			volume.Metadata.Name = util.StringPtr("test-volume-002")
+			volume.Spec.Type = util.StringPtr("lvm")
+			volume.Spec.Kind = util.StringPtr("data")
+			volume.Spec.Size = util.IntPtrInt(1)
+
+			body, url, err := marmotClient.CreateVolume(volume)
 			Expect(err).NotTo(HaveOccurred())
 			err = json.Unmarshal(body, &replyVolume)
 			GinkgoWriter.Println("CreateVolume replyVolume Id = ", replyVolume.Id)
@@ -293,15 +312,17 @@ var _ = Describe("関数テスト", Ordered, func() {
 			err = json.Unmarshal(body, &vol)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("ShowVolumeById Id  =", vol.Id)
-			GinkgoWriter.Println("ShowVolumeById Key =", *vol.Key)
-			GinkgoWriter.Println("ShowVolumeById VolumeName =", vol.Name)
+			GinkgoWriter.Println("ShowVolumeById Key =", *vol.Metadata.Key)
+			GinkgoWriter.Println("ShowVolumeById VolumeName =", *vol.Metadata.Name)
 			Expect(url).To(BeNil())
 		})
 
 		It("DATAボリューム(LVM)の情報更新", func() {
-			var spec api.Volume
-			spec.Name = util.StringPtr("updated-volume-name")
-			body, url, err := marmotClient.UpdateVolumeById(replyVolume.Id, spec)
+			var vol api.Volume
+			var meta api.Metadata
+			vol.Metadata = &meta
+			vol.Metadata.Name = util.StringPtr("updated-volume-name")
+			body, url, err := marmotClient.UpdateVolumeById(replyVolume.Id, vol)
 			GinkgoWriter.Println("UpdateVolumeById err =", err)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("UpdateVolumeById body =", string(body))
@@ -314,9 +335,9 @@ var _ = Describe("関数テスト", Ordered, func() {
 			var vol api.Volume
 			err = json.Unmarshal(body, &vol)
 			GinkgoWriter.Println("ShowVolumeById Id  =", vol.Id)
-			GinkgoWriter.Println("ShowVolumeById Key =", *vol.Key)
-			GinkgoWriter.Println("ShowVolumeById VolumeName =", *vol.Name)
-			Expect(*vol.Name).To(Equal("updated-volume-name"))
+			//GinkgoWriter.Println("ShowVolumeById Key =", *vol.Metadata.Key)
+			GinkgoWriter.Println("ShowVolumeById VolumeName =", *vol.Metadata.Name)
+			Expect(*vol.Metadata.Name).To(Equal("updated-volume-name"))
 			Expect(url).To(BeNil())
 		})
 

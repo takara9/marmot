@@ -3,6 +3,7 @@ package marmotd
 // ボリュームの情報管理の関数群
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -15,230 +16,159 @@ import (
 )
 
 func (m *Marmot) CreateNewVolume(v api.Volume) (*api.Volume, error) {
-	slog.Debug("CreateVolume()", "name", v.Name, "type", v.Type, "kind", v.Kind)
+	slog.Debug("CreateNewVolume()", "name", v.Metadata.Name, "type", v.Spec.Type, "kind", v.Spec.Kind)
 
-	// 内容が設定されていない時はデフォルト値をセットする
-	volName := util.OrDefault(v.Name, "vol")   // ボリューム名は必須 ボリューム名はラベルとして利用、ユニークである必要はない？
-	volType := util.OrDefault(v.Type, "qcow2") // 正しいのか？
-	volKind := util.OrDefault(v.Kind, "data")
-	volSize := util.OrDefault(v.Size, 0)
-	volPath := util.OrDefault(v.Path, "") // パスはタイプと種類で決まるため、空で初期化
-
-	fmt.Println("Name :", volName)
-	fmt.Println("Type :", volType)
-	fmt.Println("Kind :", volKind)
-	fmt.Println("Size :", volSize)
-	fmt.Println("Path :", volPath)
-	//fmt.Println("OsVersion :", util.OrDefault(v.OsVariant, "none"))
-
-	// ボリュームの基本情報をデータベースに登録
-	volSpec, err := m.Db.CreateVolumeOnDB(volName, volPath, volType, volKind, volSize)
+	volSpec, err := m.Db.CreateVolumeOnDB2(v)
 	if err != nil {
 		return nil, err
 	}
-	volId := volSpec.Id
+
+	// デバッグ
+	byteBody2, err := json.MarshalIndent(volSpec, "", "    ")
+	if err != nil {
+		slog.Error("failed to marshal volume", "err", err)
+		return nil, err
+	}
+	fmt.Println("*** Volume JSON :\n", string(byteBody2))
 
 	// ボリュームの実体を作成
-	switch volType {
+	switch *volSpec.Spec.Type {
 	case "qcow2":
-		switch volKind {
+		switch *volSpec.Spec.Kind {
 		case "os":
-			slog.Debug("qcow2 OSボリュームの生成", "volKind", volKind, "volId", volId)
-			if v.OsVariant == nil {
-				slog.Error("OsVariant is required for os volume")
-				m.Db.RollbackVolumeCreation(volId)
-				return nil, errors.New("OsVariant is required for os volume")
-			}
-			// OS名から該当するOSイメージテンプレートを取得
-			img, err := m.Db.GetOsImgTempByOsVariant(*v.OsVariant)
+			slog.Debug("qcow2 OSボリュームの生成", "volKind", *volSpec.Spec.Kind, "volId", volSpec.Id, "osVariant", volSpec.Spec.OsVariant)
+			img, err := m.Db.GetOsImgTempByOsVariant(*volSpec.Spec.OsVariant)
 			if err != nil {
 				slog.Error("failed to get os image template", "err", err)
-				m.Db.RollbackVolumeCreation(volId)
+				m.Db.RollbackVolumeCreation(volSpec.Id)
 				return nil, err
 			}
 			if len(img.Qcow2Path) == 0 {
 				slog.Error("os image template has no qcow2 path", "len(img.Qcow2Path)", len(img.Qcow2Path))
-				m.Db.RollbackVolumeCreation(volId)
+				m.Db.RollbackVolumeCreation(volSpec.Id)
 				return nil, errors.New("os image template has no qcow2 path")
 			}
 
 			slog.Debug("qcow2 OSボリュームをテンプレートから生成", "テンプレートパス", img.Qcow2Path)
-			// テンプレートからOSボリュームを生成する
-			seq, err := m.Db.GetSeqByKind("LVOS")
+			err = qcow.CopyQcow(img.Qcow2Path, *volSpec.Spec.Path)
 			if err != nil {
+				slog.Error("failed to copy qcow2 image template", "err", err, "src", img.Qcow2Path, "dst", *volSpec.Spec.Path)
+				m.Db.RollbackVolumeCreation(volSpec.Id)
 				return nil, err
 			}
-			qcow2Name := fmt.Sprintf("boot-%07s-%04d", volId, seq)
 
-			// パスを設定する場所を作るべきか？
-			qcow2Path := fmt.Sprintf("/var/lib/marmot/volumes/%s.qcow2", qcow2Name)
-			slog.Debug("新規qcow2ボリュームのパス決定", "qcow2Path", qcow2Path)
-
-			err = qcow.CopyQcow(img.Qcow2Path, qcow2Path)
-			if err != nil {
-				slog.Error("failed to copy qcow2 image template", "err", err, "src", img.Qcow2Path, "dst", qcow2Path)
-				m.Db.RollbackVolumeCreation(volId)
-				return nil, err
-			}
-			volSpec.Path = &qcow2Path
-			volSpec.Size = &volSize
-
-			// 取得したqcow2パスで、データベースを更新
 			// 取得したLV名とサイズで、データベースを更新
-			slog.Debug("qcow2ボリュームの状態変更", "volId", volId)
+			slog.Debug("qcow2ボリュームの状態変更", "volId", volSpec.Id)
 			vol := api.Volume{
-				Status: func() *int { s := db.VOLUME_AVAILABLE; return &s }(),
-				Path:   &qcow2Path,
+				Status2: &api.Status{
+					Status: util.IntPtrInt(db.VOLUME_AVAILABLE),
+				},
 			}
-			slog.Debug("qcow2ボリュームの情報セット", "volId", volId)
-			if err = m.Db.UpdateVolume(volId, vol); err != nil {
-				slog.Error("failed to update volume", "err", err, "volId", volId)
-				m.Db.RollbackVolumeCreation(volId)
+			if err = m.Db.UpdateVolume(volSpec.Id, vol); err != nil {
+				slog.Error("failed to update volume", "err", err, "volId", volSpec.Id)
+				m.Db.RollbackVolumeCreation(volSpec.Id)
 				return nil, err
 			}
-			slog.Debug("qcow2ボリュームの更新完了", "volId", volId)
+			slog.Debug("qcow2ボリュームの更新完了", "volId", volSpec.Id)
 
 			return volSpec, nil
 		case "data":
-			slog.Debug("qcow2 Dataボリュームの生成", "volKind", volKind, "volId", volId)
+			slog.Debug("qcow2 Dataボリュームの生成", "volKind", *volSpec.Spec.Kind, "volId", volSpec.Id)
+			err = qcow.CreateQcow(*volSpec.Spec.Path, *volSpec.Spec.Size)
+			if err != nil {
+				slog.Error("failed to create qcow2 data volume", "err", err, "path", *volSpec.Spec.Path)
+				m.Db.RollbackVolumeCreation(volSpec.Id)
+				return nil, err
+			}
+			slog.Debug("Dataボリュームの情報更新 成功", "volId", volSpec.Id)
 
-			// データベースへの登録は済んでいるので、qcow2ファイルを新規作成
-			seq, err := m.Db.GetSeqByKind("LVDATA")
-			if err != nil {
-				return nil, err
-			}
-			qcow2Name := fmt.Sprintf("data-%07s-%04d", volId, seq)
-			qcow2Path := fmt.Sprintf("/var/lib/marmot/volumes/%s.qcow2", qcow2Name)
-			slog.Debug("新規qcow2ボリュームのパス決定", "qcow2Path", qcow2Path)
-			err = qcow.CreateQcow(qcow2Path, volSize)
-			if err != nil {
-				slog.Error("failed to create qcow2 data volume", "err", err, "path", qcow2Path)
-				m.Db.RollbackVolumeCreation(volId)
-				return nil, err
-			}
-			// 取得したqcow2パスで、データベースを更新
-			// 取得したLV名とサイズで、データベースを更新
+			// 状態を更新
 			vol := api.Volume{
-				Status: func() *int { s := db.VOLUME_AVAILABLE; return &s }(),
-				Path:   &qcow2Path,
-				Size:   &volSize,
+				Status2: &api.Status{
+					Status: util.IntPtrInt(db.VOLUME_AVAILABLE),
+				},
 			}
-			if err = m.Db.UpdateVolume(volId, vol); err != nil {
-				slog.Error("failed to update volume", "err", err, "volId", volId)
-				m.Db.RollbackVolumeCreation(volId)
+			if err = m.Db.UpdateVolume(volSpec.Id, vol); err != nil {
+				slog.Error("failed to update volume", "err", err, "volId", volSpec.Id)
 				return nil, err
 			}
-			volSpec.Path = &qcow2Path
-			volSpec.Size = &volSize
-
-			slog.Debug("Dataボリュームの情報更新 成功", "volId", volId)
 			return volSpec, nil
 
 		default:
 			err := errors.New("unsupported unknown volume kind and type")
-			m.Db.RollbackVolumeCreation(volId)
+			m.Db.RollbackVolumeCreation(volSpec.Id)
 			return nil, err
 		}
 	case "lvm":
-		switch volKind {
+		switch *volSpec.Spec.Kind {
 		case "os":
-			slog.Debug("LV OSボリュームの生成", "volKind", volKind, "volId", volId)
-			if v.OsVariant == nil {
-				slog.Error("OsVariant is required for os volume")
-				m.Db.RollbackVolumeCreation(volId)
-				return nil, errors.New("OsVariant is required for os volume")
-			}
-			img, err := m.Db.GetOsImgTempByOsVariant(*v.OsVariant)
+			slog.Debug("LV OSボリュームの生成", "volKind", *volSpec.Spec.Kind, "volId", volSpec.Id)
+			img, err := m.Db.GetOsImgTempByOsVariant(*volSpec.Spec.OsVariant)
 			if err != nil {
-				slog.Error("failed to get os image template", "err", err, "os_variant", *v.OsVariant)
-				m.Db.RollbackVolumeCreation(volId)
+				slog.Error("failed to get os image template", "err", err, "os_variant", *volSpec.Spec.OsVariant)
+				m.Db.RollbackVolumeCreation(volSpec.Id)
 				return nil, err
 			}
 
-			slog.Debug("OSボリュームをスナップショットで生成", "volKind", volKind)
-			seq, err := m.Db.GetSeqByKind("LVOS")
-			if err != nil {
-				return nil, err
-			}
-			lvName := fmt.Sprintf("oslv%04d", seq)
-			var lvSize uint64 = 1024 * 1024 * 1024 * 16 // 8GB 修正が必要
-			err = lvm.CreateSnapshot(img.VolumeGroup, img.LogicalVolume, lvName, lvSize)
+			slog.Debug("OSボリュームをスナップショットで生成", "volKind", *volSpec.Spec.Kind)
+			size := uint64(4 * 1024 * 1024 * 1024) // スナップショットサイズは4GB固定
+			err = lvm.CreateSnapshot(img.VolumeGroup, img.LogicalVolume, *volSpec.Spec.LogicalVolume, size)
 			if err != nil {
 				slog.Error("failed to create OS logical volume", "err", err, "vg", img.VolumeGroup, "lv", img.LogicalVolume)
-				m.Db.RollbackVolumeCreation(volId)
+				m.Db.RollbackVolumeCreation(volSpec.Id)
 				return nil, err
 			}
-			volSpec.VolumeGroup = &img.VolumeGroup
-			volSpec.LogicalVolume = &lvName
-			//LVのパスを設定
-			lvPath := fmt.Sprintf("/dev/%s/%s", img.VolumeGroup, lvName)
-			volSpec.Path = &lvPath
-			volSpec.Size = &volSize
 
-			slog.Debug("OSボリュームののVGとLVでDBを更新", "Vol Id", volId, "LV Name", lvName, "VG Name", img.VolumeGroup) // 取得したLV名をデータベースの登録
+			slog.Debug("OSボリュームののVGとLVでDBを更新", "Vol Id", volSpec.Id) // 取得したLV名をデータベースの登録
 			vol := api.Volume{
-				VolumeGroup:   &img.VolumeGroup,
-				LogicalVolume: &lvName,
-				Size:          &volSize,
-				Path:          &lvPath,
-				Status:        func() *int { s := db.VOLUME_AVAILABLE; return &s }(),
+				Status2: &api.Status{
+					Status: util.IntPtrInt(db.VOLUME_AVAILABLE),
+				},
 			}
-			if err := m.Db.UpdateVolume(volId, vol); err != nil {
-				slog.Error("failed to update volume", "err", err, "volId", volId)
-				m.Db.RollbackVolumeCreation(volId)
+			if err := m.Db.UpdateVolume(volSpec.Id, vol); err != nil {
+				slog.Error("failed to update volume", "err", err, "volId", volSpec.Id)
+				m.Db.RollbackVolumeCreation(volSpec.Id)
 				return nil, err
 			}
 
-			slog.Debug("OSボリュームの情報更新 成功", "volId", volId)
+			slog.Debug("OSボリュームの情報更新 成功", "volId", volSpec.Id)
 			return volSpec, nil
 
 		case "data":
-			dataVg := "vg2" // データボリューム用のボリュームグループ名を指定　現在は固定値
-			slog.Info("LV Dataボリュームグループを使用", "vg", dataVg)
+			lvSize := uint64(*volSpec.Spec.Size) * 1024 * 1024 * 1024
 
-			lvName, err := m.Db.CreateDataLv(uint64(volSize), dataVg)
+			err = lvm.CreateLV(*volSpec.Spec.VolumeGroup, *volSpec.Spec.LogicalVolume, lvSize)
 			if err != nil {
-				slog.Error("failed to create Data logical volume", "err", err, "vg", dataVg, "size", volSize)
-				m.Db.RollbackVolumeCreation(volId)
 				return nil, err
 			}
 
-			slog.Debug("Dataボリュームの生成 成功", "LV Name", lvName, "VG Name", dataVg, "Size", volSize)
-			volSpec.VolumeGroup = &dataVg
-			volSpec.LogicalVolume = &lvName
-			lvPath := fmt.Sprintf("/dev/%s/%s", dataVg, lvName)
-			volSpec.Path = &lvPath
-			volSpec.Size = &volSize
-
-			slog.Debug("DataボリュームののVGとLVでDBを更新", "Vol Id", volId, "LV Name", lvName, "VG Name", dataVg)
+			slog.Debug("Dataボリュームの生成 成功", "LV Name", *volSpec.Spec.LogicalVolume, "VG Name", *volSpec.Spec.VolumeGroup, "Size", *volSpec.Spec.Size, "volId", volSpec.Id)
 
 			// 取得したLV名とサイズで、データベースを更新
 			vol := api.Volume{
-				Status:        func() *int { s := db.VOLUME_AVAILABLE; return &s }(),
-				VolumeGroup:   &dataVg,
-				LogicalVolume: &lvName,
-				Size:          &volSize,
-				Path:          &lvPath,
+				Status2: &api.Status{
+					Status: util.IntPtrInt(db.VOLUME_AVAILABLE),
+				},
 			}
-			if err = m.Db.UpdateVolume(volId, vol); err != nil {
-				slog.Error("failed to update volume", "err", err, "volId", volId)
-				m.Db.RollbackVolumeCreation(volId)
+			if err = m.Db.UpdateVolume(volSpec.Id, vol); err != nil {
+				slog.Error("failed to update volume", "err", err, "volId", volSpec.Id)
+				m.Db.RollbackVolumeCreation(volSpec.Id)
 				return nil, err
 			}
-			slog.Debug("Dataボリュームの情報更新 成功", "volId", volId)
+			slog.Debug("Dataボリュームの情報更新 成功", "volId", volSpec.Id)
 
 			return volSpec, nil
 
 		default:
-			m.Db.RollbackVolumeCreation(volId)
+			m.Db.RollbackVolumeCreation(volSpec.Id)
 			return nil, errors.New("unsupported volume kind")
 		}
 
 	case "raw":
-		m.Db.RollbackVolumeCreation(volId)
+		m.Db.RollbackVolumeCreation(volSpec.Id)
 		return nil, errors.New("unsupported volume type")
 	default:
-		m.Db.RollbackVolumeCreation(volId)
+		m.Db.RollbackVolumeCreation(volSpec.Id)
 		return nil, errors.New("unsupported volume type")
 	}
 }
@@ -251,26 +181,28 @@ func (m *Marmot) RemoveVolume(id string) error {
 		return err
 	}
 
-	slog.Debug("RemoveVolume()", "volId", id, "volType", *vol.Type, "volKind", *vol.Kind)
+	slog.Debug("RemoveVolume()", "volId", id, "volType", *vol.Spec.Type, "volKind", *vol.Spec.Kind)
 
 	// LV と qcow2ファイルの判断
-	if *vol.Type == "lvm" {
+	if *vol.Spec.Type == "lvm" {
 		slog.Debug("Removing Logical volume", "id", id)
 		// 物理的なボリュームの削除
-		if err := lvm.RemoveLV(*vol.VolumeGroup, *vol.LogicalVolume); err != nil {
-			slog.Error("lvm.RemoveLV()", "err", err)
+		if vol.Spec.VolumeGroup != nil && vol.Spec.LogicalVolume != nil {
+			if err := lvm.RemoveLV(*vol.Spec.VolumeGroup, *vol.Spec.LogicalVolume); err != nil {
+				slog.Error("lvm.RemoveLV()", "err", err)
+			}
 		}
-	} else if *vol.Type == "qcow2" {
+	} else if *vol.Spec.Type == "qcow2" {
 		// qcow2ファイルの削除
-		slog.Debug("Removing qcow2 file", "id", id, "qcow2Path", *vol.Path)
-
-		// 物理的なボリュームの削除
-		if err := qcow.RemoveQcow(*vol.Path); err != nil {
-			slog.Error("qcow.RemoveQcow()", "err", err)
+		if vol.Spec.Path != nil {
+			// 物理的なボリュームの削除
+			if err := qcow.RemoveQcow(*vol.Spec.Path); err != nil {
+				slog.Error("qcow.RemoveQcow()", "err", err)
+			}
 		}
 	} else {
+		// 未知のタイプの場合データベースからのみ削除する
 		slog.Error("Unknown volume type", "id", id)
-		return errors.New("Unknown volume type")
 	}
 
 	// データベースからボリューム情報を削除
@@ -340,9 +272,8 @@ func (m *Marmot) UpdateVolumeById(id string, volSpec api.Volume) (*api.Volume, e
 		return nil, err
 	}
 
-	slog.Debug("UpdateVolumeById()", "volumeId", id, "volSpec Name", volSpec.Name)
-	util.Assign(&vol.Name, volSpec.Name)
-	util.Assign(&vol.Size, volSpec.Size)
+	util.PatchStruct(&vol, &volSpec)
+	vol.Id = id
 
 	// データベースを更新
 	if err := m.Db.UpdateVolume(id, vol); err != nil {

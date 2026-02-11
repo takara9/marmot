@@ -18,6 +18,11 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 	slog.Debug("=====CreateServer2()=====", "", "")
 
 	var bootVol api.Volume
+	var bootVolSpec api.VolSpec
+	var bootVolMeta api.Metadata
+	bootVol.Spec = &bootVolSpec
+	bootVol.Metadata = &bootVolMeta
+
 	serverConfig, err := m.Db.GetServerById(id)
 	if err != nil {
 		slog.Error("GetServerById()", "err", err)
@@ -26,15 +31,15 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 
 	slog.Debug("OS指定がなければ、OSバリアントのデフォルトを設定")
 	if serverConfig.Spec.OsVariant == nil {
-		bootVol.OsVariant = util.StringPtr("ubuntu22.04")
+		bootVol.Spec.OsVariant = util.StringPtr("ubuntu22.04")
 		serverConfig.Spec.OsVariant = util.StringPtr("ubuntu22.04")
 	}
 
 	slog.Debug("ブートボリュームの生成と設定")
-	bootVol.Name = util.StringPtr("boot-" + serverConfig.Id)
-	bootVol.Kind = util.StringPtr("os")
-	bootVol.Path = util.StringPtr("")
-	bootVol.Size = util.IntPtrInt(0)
+	bootVol.Metadata.Name = util.StringPtr("boot-" + serverConfig.Id)
+	bootVol.Spec.Kind = util.StringPtr("os")
+	bootVol.Spec.Path = util.StringPtr("")
+	bootVol.Spec.Size = util.IntPtrInt(0)
 
 	// ステータスを起動中に更新
 	serverConfig.Status = &api.Status{
@@ -55,17 +60,17 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 
 	slog.Debug("ボリュームタイプの指定がなければ、デフォルトqcow2を設定", "boot volume type", serverConfig.Spec.BootVolume)
 	if serverConfig.Spec.BootVolume == nil {
-		bootVol.Type = util.StringPtr("qcow2")
+		bootVol.Spec.Type = util.StringPtr("qcow2")
 	} else {
-		bootVol.Type = serverConfig.Spec.BootVolume.Type
-		bootVol.OsVariant = serverConfig.Spec.OsVariant
+		bootVol.Spec.Type = serverConfig.Spec.BootVolume.Spec.Type
+		bootVol.Spec.OsVariant = serverConfig.Spec.OsVariant
 	}
 
 	slog.Debug("ブートディスクにOSの指定がなければ、デフォルトのOSを設定")
 	if serverConfig.Spec.OsVariant == nil {
-		bootVol.OsVariant = util.StringPtr("ubuntu22.04") // デフォルトをコンフィグに持たせるべき？
+		bootVol.Spec.OsVariant = util.StringPtr("ubuntu22.04") // デフォルトをコンフィグに持たせるべき？
 	} else {
-		bootVol.OsVariant = serverConfig.Spec.OsVariant
+		bootVol.Spec.OsVariant = serverConfig.Spec.OsVariant
 	}
 
 	slog.Debug("ブートディスクの作成")
@@ -104,15 +109,15 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 
 				// 永続フラグを立てる
 				var peersistent bool = true
-				diskVol.Persistent = &peersistent
+				diskVol.Spec.Persistent = &peersistent
 
-				slog.Debug("既存ボリュームの情報取得成功", "disk index", i, "volume id", diskVol.Id, "path", diskVol.Path, "status", diskVol.Status)
+				slog.Debug("既存ボリュームの情報取得成功", "disk index", i, "volume id", diskVol.Id, "path", diskVol.Spec.Path, "status", diskVol.Status2.Status)
 				(*serverConfig.Spec.Storage)[i] = *diskVol
 				slog.Debug("既存ボリュームの情報設定成功", "disk index", i, "volume id", diskVol.Id, "disk", disk)
 				continue
 			}
 
-			if disk.Type != nil && *disk.Type == "qcow2" {
+			if disk.Spec.Type != nil && *disk.Spec.Type == "qcow2" {
 				slog.Debug("qcow2ボリュームを作成", "disk index", i)
 				diskVol, err := m.CreateNewVolume(disk)
 				if err != nil {
@@ -122,7 +127,7 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 				(*serverConfig.Spec.Storage)[i] = *diskVol
 				slog.Debug("データボリューム 作成成功", "disk index", i, "volume id", diskVol.Id)
 			}
-			if disk.Type != nil && *disk.Type == "lvm" {
+			if disk.Spec.Type != nil && *disk.Spec.Type == "lvm" {
 				slog.Debug("lvmボリュームを作成", "disk index", i)
 				diskVol, err := m.CreateNewVolume(disk)
 				if err != nil {
@@ -179,49 +184,49 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 	virtSpec.Machine = "pc-q35-4.2"
 
 	slog.Debug("ボリュームの設定が無いときはqcow2をデフォルトとする1")
-	if bootVolDefined.Type == nil {
-		bootVolDefined.Type = util.StringPtr("qcow2")
+	if bootVolDefined.Spec.Type == nil {
+		bootVolDefined.Spec.Type = util.StringPtr("qcow2")
 	}
 	slog.Debug("ボリュームの設定が無いときはqcow2をデフォルトとする2", "boot volume ptr", bootVolDefined)
 
 	switch {
-	case *bootVolDefined.Type == "qcow2":
+	case *bootVolDefined.Spec.Type == "qcow2":
 		virtSpec.DiskSpecs = []virt.DiskSpec{
-			{"vda", *bootVolDefined.Path, 3, *bootVolDefined.Type},
+			{"vda", *bootVolDefined.Spec.Path, 3, *bootVolDefined.Spec.Type},
 		}
-	case *bootVolDefined.Type == "lvm":
+	case *bootVolDefined.Spec.Type == "lvm":
 		// ＊＊＊　パスは createNewVolume で設定されるべき　＊＊＊
-		lvPath := fmt.Sprintf("/dev/%s/%s", *bootVolDefined.VolumeGroup, *bootVolDefined.LogicalVolume)
+		lvPath := fmt.Sprintf("/dev/%s/%s", *bootVolDefined.Spec.VolumeGroup, *bootVolDefined.Spec.LogicalVolume)
 		virtSpec.DiskSpecs = []virt.DiskSpec{
 			{"vda", lvPath, 3, "raw"},
 		}
 	default:
-		slog.Error("CreateServer()", "unsupported volume type", *bootVolDefined.Type)
-		return "", fmt.Errorf("unsupported volume type: %s", *bootVolDefined.Type)
+		slog.Error("CreateServer()", "unsupported volume type", *bootVolDefined.Spec.Type)
+		return "", fmt.Errorf("unsupported volume type: %s", *bootVolDefined.Spec.Type)
 	}
 
 	// データディスクの設定
 	if serverConfig.Spec.Storage != nil {
 		for i, disk := range *serverConfig.Spec.Storage {
-			if disk.Kind == nil {
-				disk.Kind = util.StringPtr("data")
+			if disk.Spec.Kind == nil {
+				disk.Spec.Kind = util.StringPtr("data")
 			}
-			if disk.Type == nil {
-				disk.Type = util.StringPtr("qcow2")
+			if disk.Spec.Type == nil {
+				disk.Spec.Type = util.StringPtr("qcow2")
 			}
 			switch {
-			case *disk.Type == "qcow2":
+			case *disk.Spec.Type == "qcow2":
 				ds := virt.DiskSpec{
 					Dev:  fmt.Sprintf("vd%c", 'b'+i),
-					Src:  *disk.Path,
+					Src:  *disk.Spec.Path,
 					Bus:  uint(11 + i),
 					Type: "qcow2",
 				}
 				virtSpec.DiskSpecs = append(virtSpec.DiskSpecs, ds)
-			case *disk.Type == "lvm":
+			case *disk.Spec.Type == "lvm":
 				ds := virt.DiskSpec{
 					Dev:  fmt.Sprintf("vd%c", 'b'+i),
-					Src:  *disk.Path,
+					Src:  *disk.Spec.Path,
 					Bus:  uint(11 + i),
 					Type: "raw",
 				}
@@ -330,7 +335,7 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 
 	err = l.DefineAndStartVM(*dom)
 	if err != nil {
-		slog.Error("DefineAndStartVM()", "err", err)
+		slog.Error("DefineAndStartVM()", "err", err)  // ここで No such file or directory エラーになる
 		return "", err
 	}
 
@@ -395,7 +400,7 @@ func (m *Marmot) DeleteServerById(id string) error {
 		slog.Debug("アタッチされているボリュームの削除", "ボリューム数", len(*sv.Spec.Storage))
 		for i, vol := range *sv.Spec.Storage {
 			slog.Debug("DeleteServerById()", "index", i, "deleting volume id", vol.Id)
-			if vol.Persistent != nil && *vol.Persistent {
+			if vol.Spec.Persistent != nil && *vol.Spec.Persistent {
 				slog.Debug("DeleteServerById()", "skipping persistent volume", vol.Id)
 				continue
 			}

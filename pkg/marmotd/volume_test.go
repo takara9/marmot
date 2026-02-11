@@ -137,15 +137,19 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 		It("OS論理ボリュームの生成", func() {
 			v := api.Volume{
-				Name:      ut.StringPtr("test-os-volume-001"),
-				Type:      ut.StringPtr("lvm"),
-				Kind:      ut.StringPtr("os"),
-				OsVariant: ut.StringPtr("ubuntu22.04"),
+				Metadata: &api.Metadata{
+					Name: ut.StringPtr("test-os-volume-001"),
+				},
+				Spec: &api.VolSpec{
+					Type:      ut.StringPtr("lvm"),
+					Kind:      ut.StringPtr("os"),
+					OsVariant: ut.StringPtr("ubuntu22.04"),
+				},
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
 			volSpec, err = m.CreateNewVolume(v)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created volume key: ", *volSpec.Key)
+			GinkgoWriter.Println("Created volume key: ", *volSpec.Metadata.Name)
 		})
 
 		It("OS論理ボリュームの削除", func() {
@@ -162,7 +166,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("ボリューム のリスト数:", "volume count=", len(vols))
 			for i, v := range vols {
-				GinkgoWriter.Println("index=", i, "volKey=", *v.Key)
+				GinkgoWriter.Println("index=", i, "volKey=", *v.Metadata.Name)
 			}
 			out, err := exec.Command("lvs").Output()
 			GinkgoWriter.Println("lvs output:\n", string(out))
@@ -174,7 +178,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("DATA 論理ボリューム のリスト数:", "volume count=", len(vols))
 			for i, v := range vols {
-				GinkgoWriter.Println("index=", i, "volKey=", *v.Key)
+				GinkgoWriter.Println("index=", i, "volKey=", *v.Metadata.Name)
 			}
 			out, err := exec.Command("lvs").Output()
 			GinkgoWriter.Println("lvs output:\n", string(out))
@@ -183,10 +187,14 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 		It("OS論理ボリュームの生成 （失敗ケース)", func() {
 			v := api.Volume{
-				Name:      ut.StringPtr("test-os-volume-001"),
-				Type:      ut.StringPtr("lvm"),
-				Kind:      ut.StringPtr("os"),
-				OsVariant: ut.StringPtr("ubuntu22.NOXIST"),
+				Metadata: &api.Metadata{
+					Name: ut.StringPtr("test-os-volume-001"),
+				},
+				Spec: &api.VolSpec{
+					Type:      ut.StringPtr("lvm"),
+					Kind:      ut.StringPtr("os"),
+					OsVariant: ut.StringPtr("ubuntu22.NOXIST"),
+				},
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
 			volSpec, err = m.CreateNewVolume(v)
@@ -195,10 +203,14 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 		It("OS論理ボリュームの生成 （失敗ケース)", func() {
 			v := api.Volume{
-				Name:      ut.StringPtr("test-os-volume-001"),
-				Type:      ut.StringPtr("noexist"),
-				Kind:      ut.StringPtr("os"),
-				OsVariant: ut.StringPtr("ubuntu22.04"),
+				Metadata: &api.Metadata{
+					Name: ut.StringPtr("test-os-volume-001"),
+				},
+				Spec: &api.VolSpec{
+					Type:      ut.StringPtr("noexist"),
+					Kind:      ut.StringPtr("os"),
+					OsVariant: ut.StringPtr("ubuntu22.04"),
+				},
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
 			volSpec, err = m.CreateNewVolume(v)
@@ -211,8 +223,8 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("ボリュームリストの取得:", "volume count=", len(vols))
 			for i, v := range vols {
-				if v.Status != nil {
-					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status)
+				if v.Status2.Status != nil {
+					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status2.Status)
 				} else {
 					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=<nil>")
 				}
@@ -227,8 +239,8 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("DATA 論理ボリュームリストの取得:", "volume count=", len(vols))
 			for i, v := range vols {
-				if v.Status != nil {
-					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status)
+				if v.Status2.Status != nil {
+					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status2.Status)
 				} else {
 					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=<nil>", 0)
 				}
@@ -243,8 +255,8 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("ボリュームリストの取得:", "volume count=", len(vols))
 			for _, v := range vols {
-				if v.Status != nil {
-					m.RemoveVolume(*v.Key)
+				if v.Status2.Status != nil {
+					m.RemoveVolume(*v.Metadata.Key)
 				}
 			}
 
@@ -271,15 +283,19 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			v := api.Volume{
-				Name: ut.StringPtr("test-data-volume-001"),
-				Type: ut.StringPtr("lvm"),
-				Kind: ut.StringPtr("data"),
-				Size: ut.IntPtrInt(1),
+				Metadata: &api.Metadata{
+					Name: ut.StringPtr("test-data-volume-001"),
+				},
+				Spec: &api.VolSpec{
+					Type: ut.StringPtr("lvm"),
+					Kind: ut.StringPtr("data"),
+					Size: ut.IntPtrInt(1), // 1GB
+				},
 			}
 			GinkgoWriter.Println("Creating DATA 論理ボリューム", "volume", v)
 			volSpec, err = m.CreateNewVolume(v)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created volume key: ", *volSpec.Key)
+			GinkgoWriter.Println("Created volume key: ", *volSpec.Metadata.Key)
 		})
 
 		It("DATA論理ボリュームの削除", func() {
@@ -306,58 +322,74 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 		It("OS論理ボリュームの生成1", func() {
 			v := api.Volume{
-				Name:      ut.StringPtr("test-os-volume-001"),
-				Type:      ut.StringPtr("lvm"),
-				Kind:      ut.StringPtr("os"),
-				OsVariant: ut.StringPtr("ubuntu22.04"),
+				Metadata: &api.Metadata{
+					Name: ut.StringPtr("test-os-volume-001"),
+				},
+				Spec: &api.VolSpec{
+					Type:      ut.StringPtr("lvm"),
+					Kind:      ut.StringPtr("os"),
+					OsVariant: ut.StringPtr("ubuntu22.04"),
+				},
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
 			tmpSpec, err := m.CreateNewVolume(v)
 			ids = append(ids, tmpSpec.Id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Key)
+			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Metadata.Key)
 		})
 
 		It("OS論理ボリュームの生成2", func() {
 			v := api.Volume{
-				Name:      ut.StringPtr("test-os-volume-002"),
-				Type:      ut.StringPtr("lvm"),
-				Kind:      ut.StringPtr("os"),
-				OsVariant: ut.StringPtr("ubuntu22.04"),
+				Metadata: &api.Metadata{
+					Name: ut.StringPtr("test-os-volume-002"),
+				},
+				Spec: &api.VolSpec{
+					Type:      ut.StringPtr("lvm"),
+					Kind:      ut.StringPtr("os"),
+					OsVariant: ut.StringPtr("ubuntu22.04"),
+				},
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
 			tmpSpec, err := m.CreateNewVolume(v)
 			ids = append(ids, tmpSpec.Id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Key)
+			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Metadata.Key)
 		})
 
 		It("DATA論理ボリュームの生成1", func() {
 			v := api.Volume{
-				Name: ut.StringPtr("test-data-volume-001"),
-				Type: ut.StringPtr("lvm"),
-				Kind: ut.StringPtr("data"),
-				Size: ut.IntPtrInt(1),
+				Metadata: &api.Metadata{
+					Name: ut.StringPtr("test-data-volume-001"),
+				},
+				Spec: &api.VolSpec{
+					Type: ut.StringPtr("lvm"),
+					Kind: ut.StringPtr("data"),
+					Size: ut.IntPtrInt(1),
+				},
 			}
 			GinkgoWriter.Println("Creating Data volume", "volume", v)
 			tmpSpec, err := m.CreateNewVolume(v)
 			ids = append(ids, tmpSpec.Id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Key)
+			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Metadata.Key)
 		})
 
 		It("DATA論理ボリュームの生成2", func() {
 			v := api.Volume{
-				Name: ut.StringPtr("test-data-volume-002"),
-				Type: ut.StringPtr("lvm"),
-				Kind: ut.StringPtr("data"),
-				Size: ut.IntPtrInt(1),
+				Metadata: &api.Metadata{
+					Name: ut.StringPtr("test-data-volume-002"),
+				},
+				Spec: &api.VolSpec{
+					Type: ut.StringPtr("lvm"),
+					Kind: ut.StringPtr("data"),
+					Size: ut.IntPtrInt(1),
+				},
 			}
 			GinkgoWriter.Println("Creating Data volume", "volume", v)
 			tmpSpec, err := m.CreateNewVolume(v)
 			ids = append(ids, tmpSpec.Id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Key)
+			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Metadata.Key)
 		})
 
 		It("OS論理ボリュームリストの取得", func() {
@@ -365,8 +397,8 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("論理ボリュームリストの取得:", "volume count=", len(vols))
 			for i, v := range vols {
-				if v.Status != nil {
-					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status)
+				if v.Status2 != nil {
+					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status2.Status)
 				} else {
 					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=<nil>")
 				}
@@ -381,8 +413,8 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("DATA 論理ボリュームリストの取得:", "volume count=", len(vols))
 			for i, v := range vols {
-				if v.Status != nil {
-					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status)
+				if v.Status2 != nil {
+					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status2.Status)
 				} else {
 					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=<nil>")
 				}
@@ -408,8 +440,8 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("論理ボリューム のリスト数:", "volume count=", len(vols))
 			for i, v := range vols {
-				if v.Status != nil {
-					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status)
+				if v.Status2 != nil {
+					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status2.Status)
 				} else {
 					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=<nil>")
 				}
@@ -424,8 +456,8 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("DATA 論理ボリュームリストの取得:", "volume count=", len(vols))
 			for i, v := range vols {
-				if v.Status != nil {
-					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status)
+				if v.Status2 != nil {
+					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status2.Status)
 				} else {
 					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=<nil>")
 				}
@@ -456,8 +488,8 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("生成前qcow2ボリュームリストの取得:", "volume count=", len(vols))
 			for i, v := range vols {
-				if v.Status != nil {
-					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status)
+				if v.Status2 != nil {
+					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status2.Status)
 				} else {
 					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=<nil>")
 				}
@@ -466,15 +498,20 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 		It("qcow2ボリュームの生成", func() {
 			v := api.Volume{
-				Name:      ut.StringPtr("test-qcow2-volume-001"),
-				Type:      ut.StringPtr("qcow2"),
-				Kind:      ut.StringPtr("os"),
-				OsVariant: ut.StringPtr("ubuntu22.04"),
+				Metadata: &api.Metadata{
+					Name: ut.StringPtr("test-qcow2-volume-001"),
+				},
+				Spec: &api.VolSpec{
+					Type:      ut.StringPtr("qcow2"),
+					Kind:      ut.StringPtr("os"),
+					OsVariant: ut.StringPtr("ubuntu22.04"),
+				},
 			}
+			GinkgoWriter.Println("Creating qcow2 volume", "volume", v)
 			tmpSSpec, err := m.CreateNewVolume(v)
 			ids = append(ids, tmpSSpec.Id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created volume key: ", *tmpSSpec.Key)
+			GinkgoWriter.Println("Created volume key: ", *tmpSSpec.Metadata.Key)
 		})
 
 		It("qcow2ボリュームリストの取得", func() {
@@ -482,8 +519,8 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("qcow2ボリュームリストの取得:", "volume count=", len(vols))
 			for i, v := range vols {
-				if v.Status != nil {
-					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status)
+				if v.Status2 != nil {
+					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status2.Status)
 				} else {
 					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=<nil>")
 				}
@@ -504,8 +541,8 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 			GinkgoWriter.Println("削除後のqcow2ボリュームリストの取得:", "volume count=", len(vols))
 			for i, v := range vols {
-				if v.Status != nil {
-					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status)
+				if v.Status2 != nil {
+					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status2.Status)
 				} else {
 					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=<nil>")
 				}
@@ -534,10 +571,14 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 		It("データボリュームの生成と削除", func() {
 			v := api.Volume{
-				Name: ut.StringPtr("test-qcow2-volume-003"),
-				Type: ut.StringPtr("qcow2"),
-				Kind: ut.StringPtr("data"),
-				Size: ut.IntPtrInt(1),
+				Metadata: &api.Metadata{
+					Name: ut.StringPtr("test-qcow2-volume-003"),
+				},
+				Spec: &api.VolSpec{
+					Type: ut.StringPtr("qcow2"),
+					Kind: ut.StringPtr("data"),
+					Size: ut.IntPtrInt(1),
+				},
 			}
 			tmpSpec, err := m.CreateNewVolume(v)
 			ids = append(ids, tmpSpec.Id)

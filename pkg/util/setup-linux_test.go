@@ -50,9 +50,11 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 			},
 			Spec: &api.VmSpec{
 				BootVolume: &api.Volume{
-					Id:   "test-linux-boot",
-					Type: util.StringPtr("qcow2"),
-					Path: util.StringPtr("/var/lib/marmot/volumes/test-linux-qcow2.img"),
+					Id: "test-linux-boot",
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("qcow2"),
+						Path: util.StringPtr("/var/lib/marmot/volumes/test-linux-qcow2.img"),
+					},
 				},
 			},
 		}
@@ -104,10 +106,12 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 			Spec: &api.VmSpec{
 				BootVolume: &api.Volume{
 					Id:            "test-linux-boot2",
-					Type:          util.StringPtr("lvm"),
-					Path:          util.StringPtr("/dev/mapper/vg1-lvos_test1"),
-					VolumeGroup:   util.StringPtr("vg1"),
-					LogicalVolume: util.StringPtr("lvos_test1"),
+					Spec: &api.VolSpec{
+						Type:          util.StringPtr("lvm"),
+						Path:          util.StringPtr("/dev/mapper/vg1-lvos_test1"),
+						VolumeGroup:   util.StringPtr("vg1"),
+						LogicalVolume: util.StringPtr("lvos_test1"),
+					},
 				},
 			},
 		}
@@ -159,10 +163,12 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 			Spec: &api.VmSpec{
 				BootVolume: &api.Volume{
 					Id:            "test-linux-boot3",
-					Type:          util.StringPtr("lvm"),
-					Path:          util.StringPtr("/dev/mapper/vg1-lvos_test2"),
-					VolumeGroup:   util.StringPtr("vg1"),
-					LogicalVolume: util.StringPtr("lvos_test2"),
+					Spec: &api.VolSpec{
+						Type:          util.StringPtr("lvm"),
+						Path:          util.StringPtr("/dev/mapper/vg1-lvos_test2"),
+						VolumeGroup:   util.StringPtr("vg1"),
+						LogicalVolume: util.StringPtr("lvos_test2"),
+					},
 				},
 				Network: &[]api.Network{
 					{
@@ -222,10 +228,12 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 			Spec: &api.VmSpec{
 				BootVolume: &api.Volume{
 					Id:            "test-linux-boot4",
-					Type:          util.StringPtr("lvm"),
-					Path:          util.StringPtr("/dev/mapper/vg1-lvos_test2"),
-					VolumeGroup:   util.StringPtr("vg1"),
-					LogicalVolume: util.StringPtr("lvos_test2"),
+					Spec: &api.VolSpec{
+						Type:          util.StringPtr("lvm"),
+						Path:          util.StringPtr("/dev/mapper/vg1-lvos_test2"),
+						VolumeGroup:   util.StringPtr("vg1"),
+						LogicalVolume: util.StringPtr("lvos_test2"),
+					},
 				},
 				Network: &[]api.Network{
 					{

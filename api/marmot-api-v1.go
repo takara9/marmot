@@ -111,23 +111,38 @@ type VmSpec struct {
 	OsVg       *string    `json:"osVg,omitempty"`
 }
 
+// VolSpec defines model for VolSpec.
+type VolSpec struct {
+	Kind          *string `json:"kind,omitempty"`
+	LogicalVolume *string `json:"logicalVolume,omitempty"`
+	OsVariant     *string `json:"osVariant,omitempty"`
+	Path          *string `json:"path,omitempty"`
+	Persistent    *bool   `json:"persistent,omitempty"`
+	Size          *int    `json:"size,omitempty"`
+	Type          *string `json:"type,omitempty"`
+	VolumeGroup   *string `json:"volumeGroup,omitempty"`
+}
+
 // Volume defines model for Volume.
 type Volume struct {
-	CTime         *time.Time `json:"cTime,omitempty"`
-	Comment       *string    `json:"comment,omitempty"`
+	Metadata      *Metadata  `json:"Metadata,omitempty"`
+	Spec          *VolSpec   `json:"Spec,omitempty"`
+	Status2       *Status    `json:"Status2,omitempty"`
+	//CTime         *time.Time `json:"cTime,omitempty"`
+	//Comment       *string    `json:"comment,omitempty"`
 	Id            string     `json:"id"`
-	Key           *string    `json:"key,omitempty"`
-	Kind          *string    `json:"kind,omitempty"`
-	LogicalVolume *string    `json:"logicalVolume,omitempty"`
-	MTime         *time.Time `json:"mTime,omitempty"`
-	Name          *string    `json:"name,omitempty"`
-	OsVariant     *string    `json:"osVariant,omitempty"`
-	Path          *string    `json:"path,omitempty"`
-	Persistent    *bool      `json:"persistent,omitempty"`
-	Size          *int       `json:"size,omitempty"`
-	Status        *int       `json:"status,omitempty"`
-	Type          *string    `json:"type,omitempty"`
-	VolumeGroup   *string    `json:"volumeGroup,omitempty"`
+	//Key           *string    `json:"key,omitempty"`
+	//Kind          *string    `json:"kind,omitempty"`
+	//LogicalVolume *string    `json:"logicalVolume,omitempty"`
+	//MTime         *time.Time `json:"mTime,omitempty"`
+	//Name          *string    `json:"name,omitempty"`
+	//OsVariant     *string    `json:"osVariant,omitempty"`
+	//Path          *string    `json:"path,omitempty"`
+	//Persistent    *bool      `json:"persistent,omitempty"`
+	//Size          *int       `json:"size,omitempty"`
+	//Status        *int       `json:"status,omitempty"`
+	//Type          *string    `json:"type,omitempty"`
+	//VolumeGroup   *string    `json:"volumeGroup,omitempty"`
 }
 
 // CreateServerJSONRequestBody defines body for CreateServer for application/json ContentType.

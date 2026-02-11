@@ -199,16 +199,24 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			By("データディスクのスペックを設定")
 			virtualServer.Spec.Storage = &[]api.Volume{
 				{
-					Type: util.StringPtr("qcow2"),
-					Kind: util.StringPtr("data"),
-					Name: util.StringPtr("data-disk-1"),
-					Size: util.IntPtrInt(100), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-1"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("qcow2"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(100), //MB
+					},
 				},
 				{
-					Type: util.StringPtr("qcow2"),
-					Kind: util.StringPtr("data"),
-					Name: util.StringPtr("data-disk-2"),
-					Size: util.IntPtrInt(200), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-2"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("qcow2"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(200), //MB
+					},
 				},
 			}
 
@@ -256,24 +264,27 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		var id string
 		It("仮想サーバー生成:bootはlv で最小構成", func() {
 			var virtualServer api.Server
-			var bootVol api.Volume
 			var meta api.Metadata
 			var spec api.VmSpec
-			var err error
-
-			meta.Name = util.StringPtr("test-vm-3")
 			virtualServer.Metadata = &meta
 			virtualServer.Spec = &spec
 
-			bootVol.Type = util.StringPtr("lvm")
-			spec.BootVolume = &bootVol
-			virtualServer.Spec.BootVolume = &bootVol // ここだけqcow2と違う
+			var bootVol api.Volume
+			var specVol api.VolSpec
+			var metaVol api.Metadata
+			bootVol.Metadata = &metaVol
+			bootVol.Spec = &specVol
+			virtualServer.Spec.BootVolume = &bootVol
+			var err error
 
+			virtualServer.Metadata.Name = util.StringPtr("test-vm-3")
+			virtualServer.Spec.BootVolume.Spec.Type = util.StringPtr("lvm")
 			virtualServer.Spec.Network = &[]api.Network{
 				{
 					Id: "default",
 				},
 			}
+
 			// 他すべてデフォルト
 			// この中で、ブートボリュームのIDがセットされていない可能性がある？？？
 			vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
@@ -319,11 +330,16 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		var id string
 		It("仮想サーバー生成:bootはlv で最小構成", func() {
 			var virtualServer api.Server
-			var bootVol api.Volume
 			var meta api.Metadata
 			var spec api.VmSpec
 			var err error
 			virtualServer.Spec = &spec
+
+			var bootVol api.Volume
+			var specVol api.VolSpec
+			var metaVol api.Metadata
+			bootVol.Metadata = &metaVol
+			bootVol.Spec = &specVol
 
 			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
 			meta.Name = util.StringPtr("test-vm-4")
@@ -337,22 +353,30 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			}
 
 			By("ブートディスクのタイプ(LVM)を設定")
-			bootVol.Type = util.StringPtr("lvm") // ここだけqcow2と違う
+			bootVol.Spec.Type = util.StringPtr("lvm") // ここだけqcow2と違う
 			virtualServer.Spec.BootVolume = &bootVol
 
 			By("データディスクのスペックを設定")
 			virtualServer.Spec.Storage = &[]api.Volume{
 				{
-					Type: util.StringPtr("lvm"),
-					Kind: util.StringPtr("data"),
-					Name: util.StringPtr("data-disk-1"),
-					Size: util.IntPtrInt(100), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-1"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("lvm"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 				{
-					Type: util.StringPtr("lvm"),
-					Kind: util.StringPtr("data"),
-					Name: util.StringPtr("data-disk-2"),
-					Size: util.IntPtrInt(200), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-2"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("lvm"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(2), //GB
+					},
 				},
 			}
 
@@ -360,7 +384,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
 			Expect(err).NotTo(HaveOccurred())
 			id, err = marmotServer.Ma.CreateServer2(vm.Id)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())  //////////////////////// ここで失敗　続きはここから
 			GinkgoWriter.Println("Created VM ID:", id)
 		})
 
@@ -397,15 +421,20 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		var id string
 		It("仮想サーバー生成:bootはlv で最小構成", func() {
 			var virtualServer api.Server
-			var bootVol api.Volume
 			var meta api.Metadata
 			var spec api.VmSpec
 			var err error
 			virtualServer.Spec = &spec
+			virtualServer.Metadata = &meta
+
+			var bootVol api.Volume
+			var specVol api.VolSpec
+			var metaVol api.Metadata
+			bootVol.Metadata = &metaVol
+			bootVol.Spec = &specVol
 
 			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
-			meta.Name = util.StringPtr("test-vm-5")
-			virtualServer.Metadata = &meta
+			virtualServer.Metadata.Name = util.StringPtr("test-vm-5")
 
 			By("NICの接続先ネットワークを設定")
 			virtualServer.Spec.Network = &[]api.Network{
@@ -413,23 +442,32 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					Id: "default",
 				},
 			}
+
 			By("ブートディスクのタイプ(LVM)を設定")
-			bootVol.Type = util.StringPtr("lvm") // ここだけqcow2と違う
+			bootVol.Spec.Type = util.StringPtr("lvm") // ここだけqcow2と違う
 			virtualServer.Spec.BootVolume = &bootVol
 
 			By("データディスクのスペックを設定")
 			virtualServer.Spec.Storage = &[]api.Volume{
 				{
-					Type: util.StringPtr("lvm"),
-					Kind: util.StringPtr("data"),
-					Name: util.StringPtr("data-disk-1"),
-					Size: util.IntPtrInt(100), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-1"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("lvm"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 				{
-					Type: util.StringPtr("qcow2"),
-					Kind: util.StringPtr("data"),
-					Name: util.StringPtr("data-disk-2"),
-					Size: util.IntPtrInt(200), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-2"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("qcow2"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 			}
 
@@ -473,12 +511,18 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 	Context("qcow2x10データディスクが複数存在する仮想サーバーの起動と終了のテスト", func() {
 		var id string
 		It("仮想サーバー生成:最大構成", func() {
+			var err error
 			var virtualServer api.Server
-			var bootVol api.Volume
 			var meta api.Metadata
 			var spec api.VmSpec
-			var err error
 			virtualServer.Spec = &spec
+
+			var bootVol api.Volume
+			var specVol api.VolSpec
+			var metaVol api.Metadata
+			bootVol.Metadata = &metaVol
+			bootVol.Spec = &specVol
+			virtualServer.Spec.BootVolume = &bootVol
 
 			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
 			meta.Name = util.StringPtr("test-vm-6")
@@ -491,60 +535,110 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				},
 			}
 			By("ブートディスクのタイプ(LVM)を設定")
-			bootVol.Type = util.StringPtr("lvm") // ここだけqcow2と違う
+			bootVol.Spec.Type = util.StringPtr("lvm") // ここだけqcow2と違う
 			virtualServer.Spec.BootVolume = &bootVol
 
 			By("データディスクのスペックを設定")
 			virtualServer.Spec.Storage = &[]api.Volume{
 				{
-					Type: util.StringPtr("qcow2"),
-					Name: util.StringPtr("data-disk-1"),
-					Size: util.IntPtrInt(101), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-1"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("qcow2"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 				{
-					Type: util.StringPtr("qcow2"),
-					Name: util.StringPtr("data-disk-2"),
-					Size: util.IntPtrInt(102), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-2"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("qcow2"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 				{
-					Type: util.StringPtr("qcow2"),
-					Name: util.StringPtr("data-disk-3"),
-					Size: util.IntPtrInt(103), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-3"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("qcow2"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 				{
-					Type: util.StringPtr("qcow2"),
-					Name: util.StringPtr("data-disk-4"),
-					Size: util.IntPtrInt(104), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-4"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("qcow2"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 				{
-					Type: util.StringPtr("qcow2"),
-					Name: util.StringPtr("data-disk-5"),
-					Size: util.IntPtrInt(105), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-5"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("qcow2"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 				{
-					Type: util.StringPtr("qcow2"),
-					Name: util.StringPtr("data-disk-6"),
-					Size: util.IntPtrInt(106), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-6"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("qcow2"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 				{
-					Type: util.StringPtr("qcow2"),
-					Name: util.StringPtr("data-disk-7"),
-					Size: util.IntPtrInt(107), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-7"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("qcow2"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 				{
-					Type: util.StringPtr("qcow2"),
-					Name: util.StringPtr("data-disk-8"),
-					Size: util.IntPtrInt(108), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-8"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("qcow2"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 				{
-					Type: util.StringPtr("qcow2"),
-					Name: util.StringPtr("data-disk-9"),
-					Size: util.IntPtrInt(109), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-9"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("qcow2"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 				{
-					Type: util.StringPtr("qcow2"),
-					Name: util.StringPtr("data-disk-10"),
-					Size: util.IntPtrInt(110), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-10"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("qcow2"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 			}
 			By("他すべてデフォルトで、仮想サーバーを作成")
@@ -588,11 +682,17 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		var id string
 		It("仮想サーバー生成 最大最小構成", func() {
 			var virtualServer api.Server
-			var bootVol api.Volume
 			var meta api.Metadata
 			var spec api.VmSpec
 			var err error
 			virtualServer.Spec = &spec
+
+			var bootVol api.Volume
+			var specVol api.VolSpec
+			var metaVol api.Metadata
+			bootVol.Metadata = &metaVol
+			bootVol.Spec = &specVol
+			virtualServer.Spec.BootVolume = &bootVol
 
 			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
 			meta.Name = util.StringPtr("test-vm-7")
@@ -605,60 +705,109 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				},
 			}
 			By("ブートディスクのタイプ(LVM)を設定")
-			bootVol.Type = util.StringPtr("lvm") // ここだけqcow2と違う
-			virtualServer.Spec.BootVolume = &bootVol
+			bootVol.Spec.Type = util.StringPtr("lvm") // ここだけqcow2と違う
 
 			By("データディスクのスペックを設定")
 			virtualServer.Spec.Storage = &[]api.Volume{
 				{
-					Type: util.StringPtr("lvm"),
-					Name: util.StringPtr("data-disk-1"),
-					Size: util.IntPtrInt(101), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-1"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("lvm"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 				{
-					Type: util.StringPtr("lvm"),
-					Name: util.StringPtr("data-disk-2"),
-					Size: util.IntPtrInt(102), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-2"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("lvm"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 				{
-					Type: util.StringPtr("lvm"),
-					Name: util.StringPtr("data-disk-3"),
-					Size: util.IntPtrInt(103), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-3"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("lvm"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 				{
-					Type: util.StringPtr("lvm"),
-					Name: util.StringPtr("data-disk-4"),
-					Size: util.IntPtrInt(104), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-4"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("lvm"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 				{
-					Type: util.StringPtr("lvm"),
-					Name: util.StringPtr("data-disk-5"),
-					Size: util.IntPtrInt(105), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-5"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("lvm"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 				{
-					Type: util.StringPtr("lvm"),
-					Name: util.StringPtr("data-disk-6"),
-					Size: util.IntPtrInt(106), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-6"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("lvm"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 				{
-					Type: util.StringPtr("lvm"),
-					Name: util.StringPtr("data-disk-7"),
-					Size: util.IntPtrInt(107), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-7"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("lvm"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 				{
-					Type: util.StringPtr("lvm"),
-					Name: util.StringPtr("data-disk-8"),
-					Size: util.IntPtrInt(108), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-8"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("lvm"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 				{
-					Type: util.StringPtr("lvm"),
-					Name: util.StringPtr("data-disk-9"),
-					Size: util.IntPtrInt(109), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-9"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("lvm"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 				{
-					Type: util.StringPtr("lvm"),
-					Name: util.StringPtr("data-disk-10"),
-					Size: util.IntPtrInt(110), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-10"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("lvm"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 			}
 			By("他すべてデフォルトで、仮想サーバーを作成")
@@ -705,26 +854,34 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 
 		It("DATA論理ボリュームの生成1", func() {
 			v := api.Volume{
-				Name: ut.StringPtr("precreated-volume-001"),
-				Size: ut.IntPtrInt(100),
+				Metadata: &api.Metadata{
+					Name: ut.StringPtr("precreated-volume-001"),
+				},
+				Spec: &api.VolSpec{
+					Size: ut.IntPtrInt(100),
+				},
 			}
 			GinkgoWriter.Println("Creating Data volume", "volume", v)
 			tmpSpec, err := marmotServer.Ma.CreateNewVolume(v)
 			volumeIds = append(volumeIds, tmpSpec.Id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Key)
+			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Metadata.Key)
 		})
 
 		It("DATA論理ボリュームの生成2", func() {
 			v := api.Volume{
-				Name: ut.StringPtr("precreated-volume-002"),
-				Size: ut.IntPtrInt(200),
+				Metadata: &api.Metadata{
+					Name: ut.StringPtr("precreated-volume-002"),
+				},
+				Spec: &api.VolSpec{
+					Size: ut.IntPtrInt(200),
+				},
 			}
 			GinkgoWriter.Println("Creating Data volume", "volume", v)
 			tmpSpec, err := marmotServer.Ma.CreateNewVolume(v)
 			volumeIds = append(volumeIds, tmpSpec.Id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Key)
+			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Metadata.Key)
 		})
 
 		It("仮想サーバー生成:bootはqcow2 でデータディスク２本構成", func() {
@@ -825,19 +982,34 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			}
 			spec.Storage = &[]api.Volume{
 				{
-					Type: util.StringPtr("lvm"),
-					Name: util.StringPtr("data-disk-1"),
-					Size: util.IntPtrInt(101), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-1"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("lvm"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 				{
-					Type: util.StringPtr("lvm"),
-					Name: util.StringPtr("data-disk-2"),
-					Size: util.IntPtrInt(102), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-2"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("lvm"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 				{
-					Type: util.StringPtr("lvm"),
-					Name: util.StringPtr("data-disk-3"),
-					Size: util.IntPtrInt(103), //MB
+					Metadata: &api.Metadata{
+						Name: util.StringPtr("data-disk-3"),
+					},
+					Spec: &api.VolSpec{
+						Type: util.StringPtr("lvm"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1), //GB
+					},
 				},
 			}
 

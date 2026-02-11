@@ -73,20 +73,20 @@ func SetupLinux(spec api.Server) error {
 //	マウンポイントの絶対パス、使用しているループバックデバイス、エラー
 func MountVolume(v api.Volume) (string, string, error) {
 	// パラメータチェック
-	if v.Type == nil {
+	if v.Spec.Type == nil {
 		return "", "", errors.New("volume type is nil")
 	}
 	if v.Id == "" {
 		return "", "", errors.New("volume id is empty")
 	}
-	if v.Path == nil {
+	if v.Spec.Path == nil {
 		return "", "", errors.New("volume path is nil")
 	}
-	if *v.Type == "lvm" {
-		if v.VolumeGroup == nil {
+	if *v.Spec.Type == "lvm" {
+		if v.Spec.VolumeGroup == nil {
 			return "", "", errors.New("volume volumeGroup is nil")
 		}
-		if v.LogicalVolume == nil {
+		if v.Spec.LogicalVolume == nil {
 			return "", "", errors.New("volume logicalVolume is nil")
 		}
 	}
@@ -103,7 +103,7 @@ func MountVolume(v api.Volume) (string, string, error) {
 
 	var nbdDevice string
 
-	switch *v.Type {
+	switch *v.Spec.Type {
 	case "qcow2":
 		// nbdモジュールの存在チェック
 		if !isNbdLoaded() {
@@ -123,13 +123,13 @@ func MountVolume(v api.Volume) (string, string, error) {
 			err := errors.New("failed to find free nbd device to setup OS-Disk")
 			return "", "", err
 		}
-		slog.Debug("Using volume", "dev", nbdDevice, "path", *v.Path)
+		slog.Debug("Using volume", "dev", nbdDevice, "path", *v.Spec.Path)
 
 		// QCOW2イメージをループバックデバイスに接続
-		cmd := exec.Command("qemu-nbd", "-c", nbdDevice, *v.Path)
+		cmd := exec.Command("qemu-nbd", "-c", nbdDevice, *v.Spec.Path)
 		err = cmd.Run()
 		if err != nil {
-			slog.Error("qemu-nbd command failed", "error", err, "nbdDevice", nbdDevice, "path", *v.Path)
+			slog.Error("qemu-nbd command failed", "error", err, "nbdDevice", nbdDevice, "path", *v.Spec.Path)
 			err := errors.New("qemu-nbd failed to setup OS-Disk")
 			return "", "", err
 		}
@@ -147,7 +147,7 @@ func MountVolume(v api.Volume) (string, string, error) {
 		}
 
 	case "lvm":
-		lvPath := fmt.Sprintf("/dev/%s/%s", *v.VolumeGroup, *v.LogicalVolume)
+		lvPath := fmt.Sprintf("/dev/%s/%s", *v.Spec.VolumeGroup, *v.Spec.LogicalVolume)
 		slog.Debug("Using volume", "lvPath", lvPath)
 		lvdev, err := findTargertPartition(lvPath)
 		if err != nil {
@@ -164,17 +164,17 @@ func MountVolume(v api.Volume) (string, string, error) {
 		}
 	default:
 		os.RemoveAll(mountPoint)
-		return "", "", fmt.Errorf("unsupported volume type: %s", *v.Type)
+		return "", "", fmt.Errorf("unsupported volume type: %s", *v.Spec.Type)
 	}
 
-	slog.Debug("Mounted volume", "type", *v.Type, "mountPoint", mountPoint, "nbdDevice", nbdDevice)
+	slog.Debug("Mounted volume", "type", *v.Spec.Type, "mountPoint", mountPoint, "nbdDevice", nbdDevice)
 	return mountPoint, nbdDevice, nil
 }
 
 // LVをアンマウント
 func UnMountVolume(v api.Volume, mountPoint string, nbdDevice string) error {
 	// パラメータチェック
-	if v.Type == nil {
+	if v.Spec.Type == nil {
 		slog.Error("volume type is nil")
 		return errors.New("volume type is nil")
 	}
@@ -187,7 +187,7 @@ func UnMountVolume(v api.Volume, mountPoint string, nbdDevice string) error {
 		return err
 	}
 
-	switch *v.Type {
+	switch *v.Spec.Type {
 	case "qcow2":
 		// デバイスの削除
 		cmd = exec.Command("qemu-nbd", "--disconnect", nbdDevice)
@@ -206,14 +206,14 @@ func UnMountVolume(v api.Volume, mountPoint string, nbdDevice string) error {
 		}
 
 	case "lvm":
-		lvPath := fmt.Sprintf("/dev/mapper/%s-%s", *v.VolumeGroup, *v.LogicalVolume)
+		lvPath := fmt.Sprintf("/dev/mapper/%s-%s", *v.Spec.VolumeGroup, *v.Spec.LogicalVolume)
 		if _, err := exec.Command("kpartx", "-d", lvPath).CombinedOutput(); err != nil {
 			slog.Error("kpartx -d command failed", "error", err)
 			return err
 		}
 
 	default:
-		return fmt.Errorf("unsupported volume type: %s", *v.Type)
+		return fmt.Errorf("unsupported volume type: %s", *v.Spec.Type)
 	}
 
 	// マウントポイント削除
