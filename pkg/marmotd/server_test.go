@@ -682,11 +682,17 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		var id string
 		It("仮想サーバー生成 最大最小構成", func() {
 			var virtualServer api.Server
-			var bootVol api.Volume
 			var meta api.Metadata
 			var spec api.VmSpec
 			var err error
 			virtualServer.Spec = &spec
+
+			var bootVol api.Volume
+			var specVol api.VolSpec
+			var metaVol api.Metadata
+			bootVol.Metadata = &metaVol
+			bootVol.Spec = &specVol
+			virtualServer.Spec.BootVolume = &bootVol
 
 			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
 			meta.Name = util.StringPtr("test-vm-7")
@@ -700,7 +706,6 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			}
 			By("ブートディスクのタイプ(LVM)を設定")
 			bootVol.Spec.Type = util.StringPtr("lvm") // ここだけqcow2と違う
-			virtualServer.Spec.BootVolume = &bootVol
 
 			By("データディスクのスペックを設定")
 			virtualServer.Spec.Storage = &[]api.Volume{
