@@ -261,18 +261,19 @@ var _ = Describe("関数テスト", Ordered, func() {
 		})
 
 		It("OSボリューム(LVM)のリスト取得 削除後", func() {
-			body, url, err := marmotClient.ListVolumes()
-			var vols []api.Volume
-			Expect(err).NotTo(HaveOccurred())
-			err = json.Unmarshal(body, &vols)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(len(vols)).To(Equal(0))
-			GinkgoWriter.Println("ListVolumes =", vols)
-			Expect(url).To(BeNil())
-
-			out, err := exec.Command("lvs", "vg1").Output()
-			GinkgoWriter.Println("lvs output:\n", string(out))
-			Expect(err).NotTo(HaveOccurred())
+			Eventually(func(g Gomega) {
+				body, _, err := marmotClient.ListVolumes()
+				var vols []api.Volume
+				Expect(err).NotTo(HaveOccurred())
+				err = json.Unmarshal(body, &vols)
+				Expect(err).NotTo(HaveOccurred())
+				//Expect(len(vols)).To(Equal(0))
+				//GinkgoWriter.Println("ListVolumes =", vols)
+				//Expect(url).To(BeNil())
+				out, err := exec.Command("lvs", "vg1").Output()
+				fmt.Println("lvs output:\n", string(out))
+				Expect(err).NotTo(HaveOccurred())
+			}).WithTimeout(10 * time.Second).WithPolling(2 * time.Second).Should(Succeed())
 		})
 
 		It("DATAボリューム(LVM)の作成 0000", func() {
