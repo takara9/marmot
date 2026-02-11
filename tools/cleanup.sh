@@ -39,6 +39,7 @@ lvs --reportformat json | tee  lv_list.json
 cat lv_list.json | /usr/bin/jq -r '.report[].lv[] | .vg_name + "/" + .lv_name' | sed 's/vg1\/lv01//g' | sed 's/vg1\/lv02//g' | sed 's/vg1\/lv03//g' | sed '/^$/d' > lv_to_remove.txt
 
 while read lv; do
+    kpartx -d /dev/$lv
     lvremove -y /dev/$lv
 done < lv_to_remove.txt
 
