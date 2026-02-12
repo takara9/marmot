@@ -127,7 +127,7 @@ type VolSpec struct {
 type Volume struct {
 	Metadata *Metadata `json:"Metadata,omitempty"`
 	Spec     *VolSpec  `json:"Spec,omitempty"`
-	Status2  *Status   `json:"Status2,omitempty"`
+	Status   *Status   `json:"Status,omitempty"`
 	Id       string    `json:"id"`
 }
 

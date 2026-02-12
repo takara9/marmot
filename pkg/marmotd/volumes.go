@@ -52,7 +52,7 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 			// 取得したLV名とサイズで、データベースを更新
 			slog.Debug("qcow2ボリュームの状態変更", "volId", volSpec.Id)
 			vol := api.Volume{
-				Status2: &api.Status{
+				Status: &api.Status{
 					Status:              util.IntPtrInt(db.VOLUME_AVAILABLE),
 					LastUpdateTimeStamp: util.TimePtr(time.Now()),
 					CreationTimeStamp:   util.TimePtr(time.Now()),
@@ -78,7 +78,7 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 
 			// 状態を更新
 			vol := api.Volume{
-				Status2: &api.Status{
+				Status: &api.Status{
 					CreationTimeStamp:   util.TimePtr(time.Now()),
 					LastUpdateTimeStamp: util.TimePtr(time.Now()),
 					Status:              util.IntPtrInt(db.VOLUME_AVAILABLE),
@@ -117,7 +117,7 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 
 			slog.Debug("OSボリュームののVGとLVでDBを更新", "Vol Id", volSpec.Id) // 取得したLV名をデータベースの登録
 			vol := api.Volume{
-				Status2: &api.Status{
+				Status: &api.Status{
 					CreationTimeStamp:   util.TimePtr(time.Now()),
 					LastUpdateTimeStamp: util.TimePtr(time.Now()),
 					Status:              util.IntPtrInt(db.VOLUME_AVAILABLE),
@@ -144,7 +144,7 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 
 			// 取得したLV名とサイズで、データベースを更新
 			vol := api.Volume{
-				Status2: &api.Status{
+				Status: &api.Status{
 					LastUpdateTimeStamp: util.TimePtr(time.Now()),
 					CreationTimeStamp:   util.TimePtr(time.Now()),
 					Status:              util.IntPtrInt(db.VOLUME_AVAILABLE),

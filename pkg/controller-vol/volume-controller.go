@@ -69,14 +69,14 @@ func (c *controller) controllerLoop() {
 			fmt.Println("ボリュームのJSON情報", "json", string(byte))
 		}
 
-		slog.Debug("ボリュームの情報", "volId", vol.Id, "volName", *vol.Metadata.Name, "volStatus", *vol.Status2.Status)
-		switch *vol.Status2.Status {
+		slog.Debug("ボリュームの情報", "volId", vol.Id, "volName", *vol.Metadata.Name, "volStatus", *vol.Status.Status)
+		switch *vol.Status.Status {
 		case db.VOLUME_PROVISIONING:
 			slog.Debug("プロビジョニング中のボリュームを処理", "volId", vol.Id)
 			v, err := c.marmot.CreateNewVolume(vol.Id)
 			if err != nil {
 				slog.Error("CreateNewVolume()", "err", err)
-				vol.Status2.Status = util.IntPtrInt(db.VOLUME_ERROR)
+				vol.Status.Status = util.IntPtrInt(db.VOLUME_ERROR)
 				if err2 := c.db.UpdateVolume(vol.Id, vol); err2 != nil {
 					slog.Error("UpdateVolumeStatus() failed", "err", err2, "volId", vol.Id)
 				}
@@ -91,7 +91,7 @@ func (c *controller) controllerLoop() {
 			} else {
 				slog.Info("ボリュームの削除完了", "volId", vol.Id)
 				// ボリュームの状態をDELETEDに更新
-				vol.Status2.Status = util.IntPtrInt(db.VOLUME_DELETED)
+				vol.Status.Status = util.IntPtrInt(db.VOLUME_DELETED)
 				if err2 := c.db.UpdateVolume(vol.Id, vol); err2 != nil {
 					slog.Error("UpdateVolumeStatus() failed", "err", err2, "volId", vol.Id)
 				}
@@ -103,7 +103,7 @@ func (c *controller) controllerLoop() {
 			slog.Debug("利用可能なボリュームを処理", "volId", vol.Id)
 			// 利用可能なボリュームを処理するコードをここに追加
 		default:
-			slog.Warn("不明なステータスのボリュームをスキップ", "volId", vol.Id, "status", *vol.Status2.Status)
+			slog.Warn("不明なステータスのボリュームをスキップ", "volId", vol.Id, "status", *vol.Status.Status)
 		}
 	}
 	// ワークキューから処理を取り出して、処理を実行する

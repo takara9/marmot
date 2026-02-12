@@ -325,7 +325,7 @@ components:
           type: string
         Metadata:
           $ref: "#/components/schemas/Metadata"
-        Status2:
+        Status:
           $ref: "#/components/schemas/Status"
         Spec:
           $ref: "#/components/schemas/VolSpec"
