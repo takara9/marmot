@@ -229,8 +229,8 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("ボリュームリストの取得:", "volume count=", len(vols))
 			for i, v := range vols {
-				if v.Status2.Status != nil {
-					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status2.Status)
+				if v.Status.Status != nil {
+					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status.Status)
 				} else {
 					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=<nil>")
 				}
@@ -245,8 +245,8 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("DATA 論理ボリュームリストの取得:", "volume count=", len(vols))
 			for i, v := range vols {
-				if v.Status2.Status != nil {
-					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status2.Status)
+				if v.Status.Status != nil {
+					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status.Status)
 				} else {
 					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=<nil>", 0)
 				}
@@ -261,7 +261,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("ボリュームリストの取得:", "volume count=", len(vols))
 			for _, v := range vols {
-				if v.Status2.Status != nil {
+				if v.Status.Status != nil {
 					m.RemoveVolume(*v.Metadata.Key)
 				}
 			}
@@ -424,8 +424,8 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("論理ボリュームリストの取得:", "volume count=", len(vols))
 			for i, v := range vols {
-				if v.Status2 != nil {
-					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status2.Status)
+				if v.Status != nil {
+					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status.Status)
 				} else {
 					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=<nil>")
 				}
@@ -440,8 +440,8 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("DATA 論理ボリュームリストの取得:", "volume count=", len(vols))
 			for i, v := range vols {
-				if v.Status2 != nil {
-					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status2.Status)
+				if v.Status != nil {
+					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status.Status)
 				} else {
 					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=<nil>")
 				}
@@ -467,8 +467,8 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("論理ボリューム のリスト数:", "volume count=", len(vols))
 			for i, v := range vols {
-				if v.Status2 != nil {
-					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status2.Status)
+				if v.Status != nil {
+					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status.Status)
 				} else {
 					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=<nil>")
 				}
@@ -483,8 +483,8 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("DATA 論理ボリュームリストの取得:", "volume count=", len(vols))
 			for i, v := range vols {
-				if v.Status2 != nil {
-					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status2.Status)
+				if v.Status != nil {
+					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status.Status)
 				} else {
 					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=<nil>")
 				}
@@ -515,8 +515,8 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("生成前qcow2ボリュームリストの取得:", "volume count=", len(vols))
 			for i, v := range vols {
-				if v.Status2 != nil {
-					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status2.Status)
+				if v.Status != nil {
+					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status.Status)
 				} else {
 					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=<nil>")
 				}
@@ -550,8 +550,8 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("qcow2ボリュームリストの取得:", "volume count=", len(vols))
 			for i, v := range vols {
-				if v.Status2 != nil {
-					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status2.Status)
+				if v.Status != nil {
+					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status.Status)
 				} else {
 					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=<nil>")
 				}
@@ -572,8 +572,8 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 			GinkgoWriter.Println("削除後のqcow2ボリュームリストの取得:", "volume count=", len(vols))
 			for i, v := range vols {
-				if v.Status2 != nil {
-					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status2.Status)
+				if v.Status != nil {
+					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=", *v.Status.Status)
 				} else {
 					GinkgoWriter.Println("index=", i, "id=", v.Id, "status=<nil>")
 				}

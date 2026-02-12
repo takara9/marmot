@@ -36,7 +36,7 @@ var volumeListCmd = &cobra.Command{
 				fmt.Printf("  %-4v", *v.Spec.Kind)
 				fmt.Printf("  %-5v", *v.Spec.Type)
 				fmt.Printf("  %-8v", *v.Spec.Size)
-				fmt.Printf("  %-12v", db.VolStatus[*v.Status2.Status])
+				fmt.Printf("  %-12v", db.VolStatus[*v.Status.Status])
 				fmt.Printf("  %-20v", *v.Spec.Path)
 				fmt.Println()
 			}

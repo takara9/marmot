@@ -73,38 +73,6 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 		bootVol.Spec.OsVariant = serverConfig.Spec.OsVariant
 	}
 
-	/*
-		slog.Debug("ブートディスクの作成")
-		vol, err := m.Db.CreateVolumeOnDB2(bootVol)
-		if err != nil {
-			slog.Error("CreateVolumeOnDB2()", "err", err)
-			// サーバーとボリュームのステータスをエラーに更新する処理を追加するべき
-			return "", err
-		}
-
-		bootVolDefined, err := m.CreateNewVolume(vol.Id)
-		if err != nil {
-			slog.Error("CreateNewVolume()", "err", err)
-			// サーバーとボリュームのステータスをエラーに更新する処理を追加するべき
-			return "", err
-		}
-
-		for {
-			vol, err := m.GetVolumeById(vol.Id)
-			if err != nil {
-				slog.Error("GetVolumeById()", "err", err)
-				// サーバーとボリュームのステータスをエラーに更新する処理を追加するべき
-				return "", err
-			}
-			slog.Debug("ブートボリュームのステータス確認ループ", "volume id", bootVolDefined.Id, "status", bootVolDefined.Status2.Status)
-			if *vol.Status2.Status == db.VOLUME_AVAILABLE {
-				slog.Debug("ブートボリュームのステータスがAVAILABLEになった", "volume id", bootVolDefined.Id)
-				break
-			}
-			time.Sleep(1 * time.Second)
-		}
-	*/
-
 	slog.Debug("ブートディスクの作成")
 	bootVolDefined, err := m.CreateNewVolumeWithWait(bootVol)
 	if err != nil {
@@ -144,7 +112,7 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 				var peersistent bool = true
 				diskVol.Spec.Persistent = &peersistent
 
-				slog.Debug("既存ボリュームの情報取得成功", "disk index", i, "volume id", diskVol.Id, "path", diskVol.Spec.Path, "status", diskVol.Status2.Status)
+				slog.Debug("既存ボリュームの情報取得成功", "disk index", i, "volume id", diskVol.Id, "path", diskVol.Spec.Path, "status", diskVol.Status.Status)
 				(*serverConfig.Spec.Storage)[i] = *diskVol
 				slog.Debug("既存ボリュームの情報設定成功", "disk index", i, "volume id", diskVol.Id, "disk", disk)
 				continue
@@ -524,8 +492,8 @@ func (m *Marmot) CreateNewVolumeWithWait(volReq api.Volume) (api.Volume, error) 
 			// サーバーとボリュームのステータスをエラーに更新する処理を追加するべき
 			return api.Volume{}, err
 		}
-		slog.Debug("ブートボリュームのステータス確認ループ", "volume id", vol.Id, "status", vol.Status2.Status)
-		if *vol.Status2.Status == db.VOLUME_AVAILABLE {
+		slog.Debug("ブートボリュームのステータス確認ループ", "volume id", vol.Id, "status", vol.Status.Status)
+		if *vol.Status.Status == db.VOLUME_AVAILABLE {
 			slog.Debug("ブートボリュームのステータスがAVAILABLEになった", "volume id", vol.Id)
 			break
 		}

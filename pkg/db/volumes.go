@@ -75,16 +75,16 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 		var spec api.VolSpec
 		volume.Spec = &spec
 	}
-	if volume.Status2 == nil {
+	if volume.Status == nil {
 		var status api.Status
-		volume.Status2 = &status
+		volume.Status = &status
 	}
 
 	volume.Id = id
 	volume.Metadata.Key = util.StringPtr(key)
-	volume.Status2.CreationTimeStamp = util.TimePtr(time.Now())
-	volume.Status2.LastUpdateTimeStamp = util.TimePtr(time.Now())
-	volume.Status2.Status = util.IntPtrInt(VOLUME_PROVISIONING)
+	volume.Status.CreationTimeStamp = util.TimePtr(time.Now())
+	volume.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+	volume.Status.Status = util.IntPtrInt(VOLUME_PROVISIONING)
 
 	// 指定が無い項目についてデフォルト値を設定する
 	if volume.Metadata.Name == nil {
@@ -226,7 +226,7 @@ func (d *Database) GetVolumes() ([]api.Volume, error) {
 		var Metadata api.Metadata
 		vol.Metadata = &Metadata
 		var Status api.Status
-		vol.Status2 = &Status
+		vol.Status = &Status
 
 		err := json.Unmarshal([]byte(kv.Value), &vol)
 		if err != nil {
@@ -261,7 +261,7 @@ func (d *Database) ListVolumes(kind string) ([]api.Volume, error) {
 		var Metadata api.Metadata
 		vol.Metadata = &Metadata
 		var Status api.Status
-		vol.Status2 = &Status
+		vol.Status = &Status
 
 		err := json.Unmarshal([]byte(kv.Value), &vol)
 		if err != nil {
@@ -313,48 +313,6 @@ func (d *Database) FindVolumeByName(name, kind string) ([]api.Volume, error) {
 	}
 	return volumes, nil
 }
-
-// OSテンプVolのスナップショットを作成してデバイス名を返す
-// この関数が呼ばれているのは、以下の一箇所のみ
-// https://github.com/takara9/marmot/blob/main/pkg/marmotd/vm-create.go#L60
-/*
-func (d *Database) CreateOsLv00(tempVg string, tempLv string) (string, error) {
-	seq, err := d.GetSeqByKind("LVOS")
-	if err != nil {
-		return "", err
-	}
-
-	// スナップショットで、OS用論理ボリュームを作成
-	lvName := fmt.Sprintf("oslv-%04d", seq)
-	byteSize := uint64(4 * 1024 * 1024 * 1024) // スナップショットのサイズ 4GB
-	err = lvm.CreateSnapshot(tempVg, tempLv, lvName, byteSize)
-	if err != nil {
-		return "", err
-	}
-	return lvName, err
-}
-*/
-
-// データボリュームの作成
-// この関数が呼ばれているのは、以下の一箇所のみ
-// https://github.com/takara9/marmot/blob/main/pkg/marmotd/vm-create.go#L97
-/*
-func (d *Database) CreateDataLv00(sz uint64, vg string) (string, error) {
-	seq, err := d.GetSeqByKind("LVDATA")
-	if err != nil {
-		return "", err
-	}
-
-	byteSize := sz * 1024 * 1024 * 1024
-	// 論理ボリュームを作成 MB単位でサイズ指定
-	lvName := fmt.Sprintf("data-%04d", seq)
-	err = lvm.CreateLV(vg, lvName, byteSize)
-	if err != nil {
-		return "", err
-	}
-	return lvName, err
-}
-*/
 
 // イメージテンプレートの登録
 func registerImageTemplate() {
