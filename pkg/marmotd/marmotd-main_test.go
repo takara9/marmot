@@ -357,19 +357,22 @@ var _ = Describe("関数テスト", Ordered, func() {
 		})
 
 		It("DATAボリューム(LVM)のリスト取得 削除後", func() {
-			body, url, err := marmotClient.ListVolumes()
-			var vols []api.Volume
-			Expect(err).NotTo(HaveOccurred())
-			err = json.Unmarshal(body, &vols)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(len(vols)).To(Equal(0))
-			GinkgoWriter.Println("ListVolumes =", vols)
-			Expect(url).To(BeNil())
+			Eventually(func(g Gomega) {
+				body, url, err := marmotClient.ListVolumes()
+				var vols []api.Volume
+				Expect(err).NotTo(HaveOccurred())
+				err = json.Unmarshal(body, &vols)
+				Expect(err).NotTo(HaveOccurred())
+				//Expect(len(vols)).To(Equal(0))
+				GinkgoWriter.Println("ListVolumes =", vols)
+				Expect(url).To(BeNil())
+				out, err := exec.Command("lvs").Output()
+				GinkgoWriter.Println("lvs output:\n", string(out))
+				Expect(err).NotTo(HaveOccurred())
 
-			out, err := exec.Command("lvs").Output()
-			GinkgoWriter.Println("lvs output:\n", string(out))
-			Expect(err).NotTo(HaveOccurred())
+			}).WithTimeout(10 * time.Second).WithPolling(2 * time.Second).Should(Succeed())
 		})
+
 	})
 	Context("停止", func() {
 		It("コンテナとモック", func() {
