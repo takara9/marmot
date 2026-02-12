@@ -329,38 +329,6 @@ components:
           $ref: "#/components/schemas/Status"
         Spec:
           $ref: "#/components/schemas/VolSpec"
-        type:
-          type: string
-        kind:
-          type: string
-        key:
-          type: string
-        name:
-          type: string
-        volumeGroup:
-          type: string
-        logicalVolume:
-          type: string
-        size:
-          type: integer
-          format: int
-        path:
-          type: string
-        status:
-          type: integer
-          format: int
-        cTime:
-          type: string
-          format: date-time
-        mTime:
-          type: string
-          format: date-time
-        osVariant:
-          type: string
-        comment:
-          type: string
-        persistent:
-          type: boolean
     VolSpec:
       type: object
       properties:

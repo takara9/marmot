@@ -1,4 +1,4 @@
-package controller
+package controller_vm
 
 import (
 	"encoding/json"
@@ -24,7 +24,7 @@ type controller struct {
 }
 
 // VMコントローラーの開始
-func StartController(node string, etcdUrl string) (*controller, error) {
+func StartVmController(node string, etcdUrl string) (*controller, error) {
 	var c controller
 	var err error
 

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/takara9/marmot/api"
@@ -15,12 +16,16 @@ const (
 	VOLUME_PROVISIONING = 0 // プロビジョニング中
 	VOLUME_ERROR        = 1 // 問題発生
 	VOLUME_AVAILABLE    = 2 // 利用可能
+	VOLUME_DELETING     = 3 // 削除中
+	VOLUME_DELETED      = 4 // 削除済み
 )
 
 var VolStatus = map[int]string{
 	0: "PROVISIONING",
 	1: "ERROR",
 	2: "AVAILABLE",
+	3: "DELETING",
+	4: "DELETED",
 }
 
 // 仮想マシンを生成する時にボリュームを生成して、アタッチする
@@ -77,6 +82,8 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 
 	volume.Id = id
 	volume.Metadata.Key = util.StringPtr(key)
+	volume.Status2.CreationTimeStamp = util.TimePtr(time.Now())
+	volume.Status2.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	volume.Status2.Status = util.IntPtrInt(VOLUME_PROVISIONING)
 
 	// 指定が無い項目についてデフォルト値を設定する
@@ -196,6 +203,40 @@ func (d *Database) DeleteVolume(id string) error {
 	defer d.UnlockKey(mutex)
 	key := VolumePrefix + "/" + id
 	return d.DeleteJSON(key)
+}
+
+// データボリュームの一覧取得
+func (d *Database) GetVolumes() ([]api.Volume, error) {
+	var volumes []api.Volume
+	var err error
+	var resp *etcd.GetResponse
+
+	resp, err = d.GetByPrefix(VolumePrefix)
+	if err == ErrNotFound {
+		slog.Debug("no volumes found", "key-prefix", VolumePrefix)
+		return volumes, nil
+	} else if err != nil {
+		slog.Error("GetByPrefix() failed", "err", err, "key-prefix", VolumePrefix)
+		return volumes, err
+	}
+	for _, kv := range resp.Kvs {
+		var vol api.Volume
+		var volSpec api.VolSpec
+		vol.Spec = &volSpec
+		var Metadata api.Metadata
+		vol.Metadata = &Metadata
+		var Status api.Status
+		vol.Status2 = &Status
+
+		err := json.Unmarshal([]byte(kv.Value), &vol)
+		if err != nil {
+			slog.Error("Unmarshal() failed", "err", err, "key", string(kv.Key))
+			continue
+		}
+		volumes = append(volumes, vol)
+	}
+
+	return volumes, nil
 }
 
 // データボリュームの一覧取得

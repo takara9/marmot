@@ -25,22 +25,32 @@ func (s *Server) CreateVolume(ctx echo.Context) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	// キーだけでなく、スペック全体を返すようにする
-	spec, err := s.Ma.CreateNewVolume(volume)
+	// etcdへの登録と状態の変更だけにして、実際のボリュームの作成はコントローラーが実施する
+	requestedVolume, err := s.Ma.Db.CreateVolumeOnDB2(volume)
 	if err != nil {
-		slog.Error("CreateNewVolume()", "err", err)
+		slog.Error("CreateVolumeOnDB2()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-	slog.Debug("CreateVolume()", "volKey", *spec.Metadata.Key)
+	slog.Debug("CreateVolume()", "volKey", *requestedVolume.Metadata.Key)
 
-	return ctx.JSON(http.StatusCreated, spec)
+	return ctx.JSON(http.StatusCreated, requestedVolume)
+
 }
 
 // IDを指定してボリュームを削除 implements api.ServerInterface.
 func (s *Server) DeleteVolumeById(ctx echo.Context, id string) error {
 	slog.Debug("===", "DeleteVolumeById() is called", "===", "volumeId", id)
-	if err := s.Ma.RemoveVolume(id); err != nil {
-		slog.Error("RemoveVolume()", "err", err)
+
+	// レコードは状態だけを変更して、実際の削除はコントローラーが実施する
+	v := api.Volume{
+		Status2: &api.Status{
+			Status:              util.IntPtrInt(db.VOLUME_DELETING),
+			DeletionTimeStamp:   util.TimePtr(time.Now()),
+			LastUpdateTimeStamp: util.TimePtr(time.Now()),
+		},
+	}
+	if err := s.Ma.Db.UpdateVolume(id, v); err != nil {
+		slog.Error("UpdateVolumeById()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 

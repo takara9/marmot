@@ -68,20 +68,20 @@ var serverListCmd = &cobra.Command{
 			}
 			byteBody, err := json.MarshalIndent(data, "", "  ")
 			if err != nil {
-				println("Failed to Marshal", err)
+				fmt.Println("Failed to Marshal", err)
 			}
-			println(string(byteBody))
+			fmt.Println(string(byteBody))
 			return nil
 
 		case "yaml":
 			var data interface{}
 			if err := json.Unmarshal(byteBody, &data); err != nil {
-				println("Failed to Unmarshal", err)
+				fmt.Println("Failed to Unmarshal", err)
 				return err
 			}
 			yamlBytes, err := yaml.Marshal(data)
 			if err != nil {
-				println("Failed to Marshal", err)
+				fmt.Println("Failed to Marshal", err)
 				return err
 			}
 			fmt.Println(string(yamlBytes))
