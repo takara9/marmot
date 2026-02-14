@@ -5,7 +5,6 @@ package marmotd
 import (
 	"errors"
 	"log/slog"
-	"time"
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
@@ -32,12 +31,12 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 			img, err := m.Db.GetOsImgTempByOsVariant(*volSpec.Spec.OsVariant)
 			if err != nil {
 				slog.Error("failed to get os image template", "err", err)
-				m.Db.RollbackVolumeCreation(volSpec.Id)
+				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
 				return nil, err
 			}
 			if len(img.Qcow2Path) == 0 {
 				slog.Error("os image template has no qcow2 path", "len(img.Qcow2Path)", len(img.Qcow2Path))
-				m.Db.RollbackVolumeCreation(volSpec.Id)
+				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
 				return nil, errors.New("os image template has no qcow2 path")
 			}
 
@@ -45,24 +44,35 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 			err = qcow.CopyQcow(img.Qcow2Path, *volSpec.Spec.Path)
 			if err != nil {
 				slog.Error("failed to copy qcow2 image template", "err", err, "src", img.Qcow2Path, "dst", *volSpec.Spec.Path)
-				m.Db.RollbackVolumeCreation(volSpec.Id)
+				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
 				return nil, err
+			}
+
+			// qcow2ボリュームの情報取得
+			info, err := qcow.GetQcowInfo(*volSpec.Spec.Path)
+			if err != nil {
+				slog.Error("failed to get qcow2 volume info", "err", err, "path", *volSpec.Spec.Path)
+				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
+				return nil, err
+			}
+			slog.Debug("qcow2ボリュームの情報取得成功", "info", info)
+
+			// qcow2ボリュームのリサイズ
+			incSize := *volSpec.Spec.Size - int(info["virtual-size"].(float64)/1024/1024/1024)
+			if incSize > 0 {
+				slog.Debug("qcow2ボリュームのリサイズ開始", "現在のサイズGB", int(info["virtual-size"].(float64)/1024/1024/1024), "希望サイズGB", *volSpec.Spec.Size)
+				err = qcow.ResizeQcow(*volSpec.Spec.Path, incSize)
+				if err != nil {
+					slog.Error("failed to resize qcow2 volume", "err", err, "path", *volSpec.Spec.Path)
+					m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
+					return nil, err
+				}
+				slog.Debug("qcow2ボリュームのリサイズ成功", "新しいサイズGB", *volSpec.Spec.Size)
 			}
 
 			// 取得したLV名とサイズで、データベースを更新
 			slog.Debug("qcow2ボリュームの状態変更", "volId", volSpec.Id)
-			vol := api.Volume{
-				Status: &api.Status{
-					Status:              util.IntPtrInt(db.VOLUME_AVAILABLE),
-					LastUpdateTimeStamp: util.TimePtr(time.Now()),
-					CreationTimeStamp:   util.TimePtr(time.Now()),
-				},
-			}
-			if err = m.Db.UpdateVolume(volSpec.Id, vol); err != nil {
-				slog.Error("failed to update volume", "err", err, "volId", volSpec.Id)
-				m.Db.RollbackVolumeCreation(volSpec.Id)
-				return nil, err
-			}
+			m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_AVAILABLE)
 			slog.Debug("qcow2ボリュームの更新完了", "volId", volSpec.Id)
 
 			return &volSpec, nil
@@ -71,28 +81,15 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 			err = qcow.CreateQcow(*volSpec.Spec.Path, *volSpec.Spec.Size)
 			if err != nil {
 				slog.Error("failed to create qcow2 data volume", "err", err, "path", *volSpec.Spec.Path)
-				m.Db.RollbackVolumeCreation(volSpec.Id)
+				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
 				return nil, err
 			}
 			slog.Debug("Dataボリュームの情報更新 成功", "volId", volSpec.Id)
-
-			// 状態を更新
-			vol := api.Volume{
-				Status: &api.Status{
-					CreationTimeStamp:   util.TimePtr(time.Now()),
-					LastUpdateTimeStamp: util.TimePtr(time.Now()),
-					Status:              util.IntPtrInt(db.VOLUME_AVAILABLE),
-				},
-			}
-			if err = m.Db.UpdateVolume(volSpec.Id, vol); err != nil {
-				slog.Error("failed to update volume", "err", err, "volId", volSpec.Id)
-				return nil, err
-			}
+			m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_AVAILABLE)
 			return &volSpec, nil
-
 		default:
 			err := errors.New("unsupported unknown volume kind and type")
-			m.Db.RollbackVolumeCreation(volSpec.Id)
+			m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
 			return nil, err
 		}
 	case "lvm":
@@ -102,7 +99,7 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 			img, err := m.Db.GetOsImgTempByOsVariant(*volSpec.Spec.OsVariant)
 			if err != nil {
 				slog.Error("failed to get os image template", "err", err, "os_variant", *volSpec.Spec.OsVariant)
-				m.Db.RollbackVolumeCreation(volSpec.Id)
+				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
 				return nil, err
 			}
 
@@ -111,64 +108,36 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 			err = lvm.CreateSnapshot(img.VolumeGroup, img.LogicalVolume, *volSpec.Spec.LogicalVolume, size)
 			if err != nil {
 				slog.Error("failed to create OS logical volume", "err", err, "vg", img.VolumeGroup, "lv", img.LogicalVolume)
-				m.Db.RollbackVolumeCreation(volSpec.Id)
+				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
 				return nil, err
 			}
 
 			slog.Debug("OSボリュームののVGとLVでDBを更新", "Vol Id", volSpec.Id) // 取得したLV名をデータベースの登録
-			vol := api.Volume{
-				Status: &api.Status{
-					CreationTimeStamp:   util.TimePtr(time.Now()),
-					LastUpdateTimeStamp: util.TimePtr(time.Now()),
-					Status:              util.IntPtrInt(db.VOLUME_AVAILABLE),
-				},
-			}
-			if err := m.Db.UpdateVolume(volSpec.Id, vol); err != nil {
-				slog.Error("failed to update volume", "err", err, "volId", volSpec.Id)
-				m.Db.RollbackVolumeCreation(volSpec.Id)
-				return nil, err
-			}
-
+			m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_AVAILABLE)
 			slog.Debug("OSボリュームの情報更新 成功", "volId", volSpec.Id)
 			return &volSpec, nil
 
 		case "data":
 			lvSize := uint64(*volSpec.Spec.Size) * 1024 * 1024 * 1024
-
 			err = lvm.CreateLV(*volSpec.Spec.VolumeGroup, *volSpec.Spec.LogicalVolume, lvSize)
 			if err != nil {
+				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
 				return nil, err
 			}
 
 			slog.Debug("Dataボリュームの生成 成功", "LV Name", *volSpec.Spec.LogicalVolume, "VG Name", *volSpec.Spec.VolumeGroup, "Size", *volSpec.Spec.Size, "volId", volSpec.Id)
-
-			// 取得したLV名とサイズで、データベースを更新
-			vol := api.Volume{
-				Status: &api.Status{
-					LastUpdateTimeStamp: util.TimePtr(time.Now()),
-					CreationTimeStamp:   util.TimePtr(time.Now()),
-					Status:              util.IntPtrInt(db.VOLUME_AVAILABLE),
-				},
-			}
-			if err = m.Db.UpdateVolume(volSpec.Id, vol); err != nil {
-				slog.Error("failed to update volume", "err", err, "volId", volSpec.Id)
-				m.Db.RollbackVolumeCreation(volSpec.Id)
-				return nil, err
-			}
+			m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_AVAILABLE)
 			slog.Debug("Dataボリュームの情報更新 成功", "volId", volSpec.Id)
-
 			return &volSpec, nil
-
 		default:
-			m.Db.RollbackVolumeCreation(volSpec.Id)
+			m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
 			return nil, errors.New("unsupported volume kind")
 		}
-
 	case "raw":
-		m.Db.RollbackVolumeCreation(volSpec.Id)
+		m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
 		return nil, errors.New("unsupported volume type")
 	default:
-		m.Db.RollbackVolumeCreation(volSpec.Id)
+		m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
 		return nil, errors.New("unsupported volume type")
 	}
 }
@@ -206,12 +175,24 @@ func (m *Marmot) RemoveVolume(id string) error {
 	}
 
 	// データベースからボリューム情報を削除
-	if err := m.Db.DeleteVolume(id); err != nil {
-		slog.Error("vc.DeleteVolume()", "err", err)
-		return err
-	}
+	//if err := m.Db.DeleteVolume(id); err != nil {
+	//	slog.Error("vc.DeleteVolume()", "err", err)
+	//	return err
+	//}
 
 	return nil
+}
+
+// 全てのボリュームを取得する関数,API, GetVolumes()
+func (m *Marmot) GetVolumes() ([]api.Volume, error) {
+	vols, err := m.Db.GetVolumes()
+	if err == db.ErrNotFound {
+		return []api.Volume{}, nil
+	} else if err != nil {
+		return nil, err
+	}
+
+	return vols, nil
 }
 
 // ボリュームのリスト,API, GetVolumes(volType)
@@ -226,6 +207,7 @@ func (m *Marmot) GetOsVolumes() ([]api.Volume, error) {
 	return vols, nil
 }
 
+// データボリュームの一覧取得,API, GetDataVolumes()
 func (m *Marmot) GetDataVolumes() ([]api.Volume, error) {
 	vols, err := m.Db.ListVolumes("data")
 	if err == db.ErrNotFound {
@@ -237,16 +219,36 @@ func (m *Marmot) GetDataVolumes() ([]api.Volume, error) {
 	return vols, nil
 }
 
-func (m *Marmot) GetVolumes() ([]api.Volume, error) {
-	vols, err := m.Db.GetVolumes()
-	if err == db.ErrNotFound {
-		return []api.Volume{}, nil
-	} else if err != nil {
+// IDでボリュームの情報を取得する関数,API, GetVolumeById(volId)
+func (m *Marmot) GetVolumeById(id string) (*api.Volume, error) {
+	vol, err := m.Db.GetVolumeById(id)
+	if err != nil {
 		return nil, err
 	}
 
-	return vols, nil
+	return &vol, nil
 }
+
+// IDでボリュームの情報を更新する関数,API, UpdateVolumeById(volId, volSpec)
+func (m *Marmot) UpdateVolumeById(id string, volSpec api.Volume) (*api.Volume, error) {
+	vol, err := m.Db.GetVolumeById(id)
+	if err != nil {
+		slog.Error("failed to get volume by key", "err", err, "volume id", id)
+		return nil, err
+	}
+
+	util.PatchStruct(&vol, &volSpec)
+	vol.Id = id
+
+	// データベースを更新
+	if err := m.Db.UpdateVolume(id, vol); err != nil {
+		return nil, err
+	}
+
+	return &vol, nil
+}
+
+// 以下は未実装
 
 // ボリュームの拡張,API, ExpandVolume(volId, newSize)
 func ExpandVolume(volId string, newSize int) error {
@@ -265,31 +267,4 @@ func DetachVol(vmId string, volId string) error {
 // ボリュームの複製,API, CopyVolume(volId)
 func CopyVolume(volId string) error {
 	return errors.New("not implemented")
-}
-
-func (m *Marmot) GetVolumeById(id string) (*api.Volume, error) {
-	vol, err := m.Db.GetVolumeById(id)
-	if err != nil {
-		return nil, err
-	}
-
-	return &vol, nil
-}
-
-func (m *Marmot) UpdateVolumeById(id string, volSpec api.Volume) (*api.Volume, error) {
-	vol, err := m.Db.GetVolumeById(id)
-	if err != nil {
-		slog.Error("failed to get volume by key", "err", err, "volume id", id)
-		return nil, err
-	}
-
-	util.PatchStruct(&vol, &volSpec)
-	vol.Id = id
-
-	// データベースを更新
-	if err := m.Db.UpdateVolume(id, vol); err != nil {
-		return nil, err
-	}
-
-	return &vol, nil
 }

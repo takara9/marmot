@@ -9,7 +9,6 @@ import (
 
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
-	"github.com/takara9/marmot/pkg/util"
 )
 
 const (
@@ -68,34 +67,40 @@ func (c *controller) controllerLoop() {
 		} else {
 			fmt.Println("ボリュームのJSON情報", "json", string(byte))
 		}
+		// 削除タイムスタンプが設定されて一定時間経過したボリュームのステータスをDELETINGに更新する
+		if vol.Status != nil && vol.Status.DeletionTimeStamp != nil {
+			deletionTime := *vol.Status.DeletionTimeStamp
+			if time.Since(deletionTime) > 10*time.Second {
+				slog.Debug("削除のタイムスタンプが一定時間以上経過しているボリューム検出", "volId", vol.Id)
+				c.marmot.Db.UpdateVolumeStatus(vol.Id, db.VOLUME_DELETING)
+			}
+		}
 
 		slog.Debug("ボリュームの情報", "volId", vol.Id, "volName", *vol.Metadata.Name, "volStatus", *vol.Status.Status)
 		switch *vol.Status.Status {
+		case db.VOLUME_PENDING:
+			slog.Debug("待ち状態のボリュームを処理", "volId", vol.Id)
+			// 待ち状態のボリュームを処理するコードをここに追加
+			c.db.UpdateVolumeStatus(vol.Id, db.VOLUME_PROVISIONING)
+			if _, err := c.marmot.CreateNewVolume(vol.Id); err != nil {
+				slog.Error("CreateNewVolume()", "err", err)
+				c.db.UpdateVolumeStatus(vol.Id, db.VOLUME_ERROR)
+				continue
+			}
+			c.db.UpdateVolumeStatus(vol.Id, db.VOLUME_AVAILABLE)
 		case db.VOLUME_PROVISIONING:
 			slog.Debug("プロビジョニング中のボリュームを処理", "volId", vol.Id)
-			v, err := c.marmot.CreateNewVolume(vol.Id)
-			if err != nil {
-				slog.Error("CreateNewVolume()", "err", err)
-				vol.Status.Status = util.IntPtrInt(db.VOLUME_ERROR)
-				if err2 := c.db.UpdateVolume(vol.Id, vol); err2 != nil {
-					slog.Error("UpdateVolumeStatus() failed", "err", err2, "volId", vol.Id)
-				}
-			} else {
-				slog.Info("ボリュームのプロビジョニング完了", "volId", v.Id, "volPath", *v.Spec.Path)
-			}
+
 		case db.VOLUME_DELETING:
 			slog.Debug("削除中のボリュームを処理", "volId", vol.Id)
-			err := c.marmot.RemoveVolume(vol.Id)
-			if err != nil {
+			if err := c.marmot.RemoveVolume(vol.Id); err != nil {
 				slog.Error("RemoveVolume()", "err", err)
-			} else {
-				slog.Info("ボリュームの削除完了", "volId", vol.Id)
-				// ボリュームの状態をDELETEDに更新
-				vol.Status.Status = util.IntPtrInt(db.VOLUME_DELETED)
-				if err2 := c.db.UpdateVolume(vol.Id, vol); err2 != nil {
-					slog.Error("UpdateVolumeStatus() failed", "err", err2, "volId", vol.Id)
-				}
+				c.db.UpdateVolumeStatus(vol.Id, db.VOLUME_ERROR)
+				continue
 			}
+			c.db.DeleteVolume(vol.Id)
+			slog.Debug("ボリュームの削除成功", "volId", vol.Id)
+
 		case db.VOLUME_ERROR:
 			slog.Debug("エラー状態のボリュームを処理", "volId", vol.Id)
 			// エラー状態のボリュームを処理するコードをここに追加

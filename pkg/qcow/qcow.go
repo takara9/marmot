@@ -43,6 +43,36 @@ func CopyQcow(srcPath string, destPath string) error {
 	return nil
 }
 
+// QCOW2ボリュームの情報取得
+func GetQcowInfo(path string) (map[string]interface{}, error) {
+	slog.Debug("Getting QCOW2 volume info", "path", path)
+	cmd := exec.Command("qemu-img", "info", "--output=json", path)
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get QCOW2 volume info at path: %s, error: %v", path, err)
+	}
+
+	var info map[string]interface{}
+	err = json.Unmarshal(output, &info)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to parse QCOW2 volume info JSON at path: %s, error: %v", path, err)
+	}
+
+	return info, nil
+}
+
+// QCOW2ボリュームのリサイズ、サイズはGB単位
+func ResizeQcow(path string, newSize int) error {
+	slog.Debug("Resizing QCOW2 volume", "path", path, "newSize +", newSize)
+	cmd := exec.Command("qemu-img", "resize", path, fmt.Sprintf("+ %dG", newSize))
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.Error("qemu-img resize failed", "output", string(output))
+		return fmt.Errorf("Failed to resize QCOW2 volume at path: %s, error: %v", path, err)
+	}
+	return nil
+}
+
 // QCOW2ボリュームの削除
 func RemoveQcow(path string) error {
 	slog.Debug("Removing QCOW2 volume", "path", path)

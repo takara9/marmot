@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/takara9/marmot/api"
@@ -12,23 +13,23 @@ import (
 )
 
 const (
-	SERVER_UNKNOWN      = 0 // 不明
+	SERVER_PENDING      = 0 // 待ち状態
 	SERVER_PROVISIONING = 1 // プロビジョニング中
 	SERVER_RUNNING      = 2 // 実行中
 	SERVER_STOPPED      = 3 // 停止中
 	SERVER_ERROR        = 4 // エラー状態
 	SERVER_DELETING     = 5 // 削除中
-	SERVER_DELETED      = 6 // 削除済み
+	//SERVER_DELETED      = 6 // 削除済み
 )
 
 var ServerStatus = map[int]string{
-	0: "UNKNOWN",
+	0: "PENDING",
 	1: "PROVISIONING",
 	2: "RUNNING",
 	3: "STOPPED",
 	4: "ERROR",
 	5: "DELETING",
-	6: "DELETED",
+	//6: "DELETED",
 }
 
 // サーバーを登録、サーバーを一意に識別するIDを自動生成
@@ -60,7 +61,9 @@ func (d *Database) CreateServer(spec api.Server) (api.Server, error) {
 
 	// ステータスセット、タイムスタンプセット
 	var s api.Status
-	s.Status = util.IntPtrInt(SERVER_PROVISIONING)
+	s.Status = util.IntPtrInt(SERVER_PENDING)
+	s.CreationTimeStamp = util.TimePtr(time.Now())
+	s.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	server.Status = &s
 	if err := d.PutJSON(key, server); err != nil {
 		slog.Error("failed to write database data", "err", err, "key", key)
@@ -176,6 +179,35 @@ func (d *Database) updateServer(id string, spec api.Server) error {
 	err = d.PutJSONCAS(key, expected, &rec)
 	if err != nil {
 		slog.Error("PutJSONCAS() failed", "err", err, "key", key, "expected", expected)
+		return err
+	}
+	return nil
+}
+
+// サーバーオブジェクトのステータスを更新
+func (d *Database) UpdateServerStatus(id string, status int) {
+	server, err := d.GetServerById(id)
+	if err != nil {
+		slog.Error("UpdateServerStatus() GetServerById() failed", "err", err, "serverId", id)
+		panic(err)
+	}
+	server.Status.Status = util.IntPtrInt(status)
+	server.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+	if err := d.UpdateServer(id, server); err != nil {
+		slog.Error("UpdateServerStatus() UpdateServer() failed", "err", err, "serverId", id)
+		panic(err)
+	}
+}
+
+func (d *Database) SetDeleteTimestamp(id string) error {
+	server, err := d.GetServerById(id)
+	if err != nil {
+		slog.Error("SetDeleteTimestamp() GetServerById() failed", "err", err, "serverId", id)
+		return err
+	}
+	server.Status.DeletionTimeStamp = util.TimePtr(time.Now())
+	if err := d.UpdateServer(id, server); err != nil {
+		slog.Error("SetDeleteTimestamp() UpdateServer() failed", "err", err, "serverId", id)
 		return err
 	}
 	return nil

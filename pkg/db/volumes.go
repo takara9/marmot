@@ -13,19 +13,21 @@ import (
 )
 
 const (
-	VOLUME_PROVISIONING = 0 // プロビジョニング中
-	VOLUME_ERROR        = 1 // 問題発生
-	VOLUME_AVAILABLE    = 2 // 利用可能
-	VOLUME_DELETING     = 3 // 削除中
-	VOLUME_DELETED      = 4 // 削除済み
+	VOLUME_PENDING      = 0 // 待ち状態
+	VOLUME_PROVISIONING = 1 // プロビジョニング中
+	VOLUME_ERROR        = 2 // 問題発生
+	VOLUME_AVAILABLE    = 3 // 利用可能
+	VOLUME_DELETING     = 4 // 削除中
+	VOLUME_DELETED      = 5 // 削除済み
 )
 
 var VolStatus = map[int]string{
-	0: "PROVISIONING",
-	1: "ERROR",
-	2: "AVAILABLE",
-	3: "DELETING",
-	4: "DELETED",
+	0: "PENDING",
+	1: "PROVISIONING",
+	2: "ERROR",
+	3: "AVAILABLE",
+	4: "DELETING",
+	5: "DELETED",
 }
 
 // 仮想マシンを生成する時にボリュームを生成して、アタッチする
@@ -314,6 +316,39 @@ func (d *Database) FindVolumeByName(name, kind string) ([]api.Volume, error) {
 	return volumes, nil
 }
 
+// OSボリュームの状態更新
+// エラーが出る場合、パニックして停止させるべき
+func (d *Database) UpdateVolumeStatus(id string, status int) {
+	vol, err := d.GetVolumeById(id)
+	if err != nil {
+		slog.Error("failed to get volume by id", "err", err, "id", id)
+		panic(fmt.Sprintf("failed to get volume by id: %s", id))
+	}
+	vol.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+	vol.Status.Status = util.IntPtrInt(status)
+	if err = d.UpdateVolume(id, vol); err != nil {
+		slog.Error("failed to update volume", "err", err, "volId", id)
+		panic(fmt.Sprintf("failed to update volume: %s", id))
+	}
+}
+
+// 削除タイムスタンプのセット
+func (d *Database) SetVolumeDeletionTimestamp(id string) {
+	vol, err := d.GetVolumeById(id)
+	if err != nil {
+		slog.Error("failed to get volume by id", "err", err, "id", id)
+		panic(fmt.Sprintf("failed to get volume by id: %s", id))
+	}
+	vol.Status.DeletionTimeStamp = util.TimePtr(time.Now())
+	if err = d.UpdateVolume(id, vol); err != nil {
+		slog.Error("failed to update volume", "err", err, "volId", id)
+		panic(fmt.Sprintf("failed to update volume: %s", id))
+	}
+}
+
+
+// 以下は未実装
+
 // イメージテンプレートの登録
 func registerImageTemplate() {
 
@@ -330,7 +365,6 @@ func listImageTemplates() {
 }
 
 // イメージテンプレートの情報取得
-// 仮想マシンからイメージテンプレートを作成
 func createImageTemplatefromVm() {
 
 }
