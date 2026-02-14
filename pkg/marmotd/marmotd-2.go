@@ -168,16 +168,8 @@ func (s *Server) GetServerById(ctx echo.Context, id string) error {
 func (s *Server) DeleteServerById(ctx echo.Context, id string) error {
 	slog.Debug("===DeleteServerById() is called ===", "id", id)
 
-	// ステータスを削除中に更新
-	svc, err := s.Ma.GetServerById(id)
-	if err != nil {
-		slog.Error("GetServerById()", "err", err)
-		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
-	}
-	svc.Status.Status = util.IntPtrInt(db.SERVER_DELETING)
-	svc.Status.DeletionTimeStamp = util.TimePtr(time.Now())
-	if err := s.Ma.Db.UpdateServer(id, svc); err != nil {
-		slog.Error("UpdateServer()", "err", err)
+	if err := s.Ma.Db.SetDeleteTimestamp(id); err != nil {
+		slog.Error("SetDeleteTimestamp()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 

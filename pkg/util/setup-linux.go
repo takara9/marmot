@@ -137,6 +137,17 @@ func MountVolume(v api.Volume) (string, string, error) {
 		fmt.Println("Mounting", "mount", "-t", "ext4", fmt.Sprintf("%sp1", nbdDevice), mountPoint)
 		time.Sleep(3 * time.Second) // 少し待つ
 
+		// ファイルシステムを拡張
+		cmd = exec.Command("resize2fs", fmt.Sprintf("%sp1", nbdDevice))
+		err = cmd.Run()
+		if err != nil {
+			slog.Error("resize2fs command failed", "error", err, "device", fmt.Sprintf("%sp1", nbdDevice))
+			err := errors.New("resize2fs failed to setup OS-Disk")
+			return "", "", err
+		}
+
+		time.Sleep(1 * time.Second) // 少し待つ
+
 		// ループバックデバイスの2番パーティションをマウント
 		cmd = exec.Command("mount", "-t", "ext4", fmt.Sprintf("%sp1", nbdDevice), mountPoint)
 		err = cmd.Run()

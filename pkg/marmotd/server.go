@@ -41,18 +41,6 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 	bootVol.Spec.Path = util.StringPtr("")
 	bootVol.Spec.Size = util.IntPtrInt(0)
 
-	// ステータスを起動中に更新
-	serverConfig.Status = &api.Status{
-		Status:              util.IntPtrInt(db.SERVER_PROVISIONING),
-		LastUpdateTimeStamp: util.TimePtr(time.Now()),
-		CreationTimeStamp:   util.TimePtr(time.Now()),
-	}
-	err = m.Db.UpdateServer(serverConfig.Id, serverConfig)
-	if err != nil {
-		slog.Error("UpdateServer()", "err", err)
-		return "", err
-	}
-
 	slog.Debug("** OSの種類が指定されていなければ、デフォルトを設定 ** ", "os_variant", serverConfig.Spec.OsVariant)
 	if serverConfig.Spec.OsVariant == nil {
 		serverConfig.Spec.OsVariant = util.StringPtr("ubuntu22.04")
@@ -349,7 +337,7 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 		return "", err
 	}
 
-	return serverConfig.Id, nil
+	return id, nil
 }
 
 // サーバーの削除
@@ -361,17 +349,15 @@ func (m *Marmot) DeleteServerById(id string) error {
 		return err
 	}
 
-	slog.Debug("DeleteServerById()", "boot volume id", sv.Spec.BootVolume.Id)
-
-	// サーバーの削除
-	l, err := virt.NewLibVirtEp("qemu:///system")
-	if err != nil {
-		slog.Error("NewLibVirtEp()", "err", err)
-		return err
-	}
-	defer l.Close()
-
 	if sv.Metadata.InstanceName != nil {
+		// サーバーの削除
+		l, err := virt.NewLibVirtEp("qemu:///system")
+		if err != nil {
+			slog.Error("NewLibVirtEp()", "err", err)
+			return err
+		}
+		defer l.Close()
+
 		slog.Debug("DeleteServerById()", "deleting domain", *sv.Metadata.InstanceName)
 		if err = l.DeleteDomain(*sv.Metadata.InstanceName); err != nil {
 			// ドメインが存在しない場合はスキップしたいが、区別が難しいので意図的にスキップする
@@ -382,21 +368,12 @@ func (m *Marmot) DeleteServerById(id string) error {
 			slog.Debug("DeleteServerById()", "server is in PROVISIONING state, skipping domain deletion", *sv.Metadata.Name)
 			// return nil 戻さず、削除処理を続行する
 		}
-	} else {
-		slog.Debug("DeleteServerById() no instance name set, skipping domain deletion", "server name", *sv.Metadata.Name)
 	}
 
-	// ブートボリュームの削除
-	if err := m.RemoveVolume(sv.Spec.BootVolume.Id); err != nil {
-		if err == db.ErrNotFound {
-			slog.Debug("RemoveVolume() boot volume already deleted", "volume id", sv.Spec.BootVolume.Id)
-		} else {
-			slog.Error("RemoveVolume()", "err", err)
-			return err
-		}
-	}
+	// ブートボリュームの削除タイムスタンプのセット
+	m.Db.SetVolumeDeletionTimestamp(sv.Spec.BootVolume.Id)
 
-	// データボリュームを消す
+	// データボリュームの削除タイムスタンプのセット
 	if sv.Spec.Storage != nil {
 		slog.Debug("アタッチされているボリュームの削除", "ボリューム数", len(*sv.Spec.Storage))
 		for i, vol := range *sv.Spec.Storage {
@@ -405,24 +382,8 @@ func (m *Marmot) DeleteServerById(id string) error {
 				slog.Debug("DeleteServerById()", "skipping persistent volume", vol.Id)
 				continue
 			}
-			if err := m.RemoveVolume(vol.Id); err != nil {
-				if err == db.ErrNotFound {
-					slog.Debug("RemoveVolume() data volume already deleted", "volume id", vol.Id)
-					continue
-				} else {
-					slog.Error("RemoveVolume()", "err", err)
-					return err
-				}
-			}
+			m.Db.SetVolumeDeletionTimestamp(vol.Id)
 		}
-	} else {
-		slog.Debug("DeleteServerById()", "no attached volumes to delete", sv.Id)
-	}
-
-	slog.Debug("DeleteServerById()", "sv", sv.Id, "name", *sv.Metadata.Name)
-	if err := m.Db.DeleteServerById(sv.Id); err != nil {
-		slog.Error("DeleteServerById()", "err", err)
-		return err
 	}
 
 	return nil
@@ -475,6 +436,7 @@ func (m *Marmot) CreateNewVolumeWithWait(volReq api.Volume) (api.Volume, error) 
 	if err != nil {
 		slog.Error("CreateVolumeOnDB2()", "err", err)
 		// サーバーとボリュームのステータスをエラーに更新する処理を追加するべき
+
 		return api.Volume{}, err
 	}
 
