@@ -122,7 +122,7 @@ vdd    252:48   0   100G  0 disk
 ```
 # vi /etc/fstab
 # cat /etc/fstab
-hmc-nfs:/exports/nfs/golang /nfs nfs defaults 0 0
+hmc2-nfs:/exports /nfs nfs defaults 0 0
 # mkdir /nfs
 # mount /nfs
 # df -h
@@ -136,10 +136,10 @@ tmpfs                        7.9G     0  7.9G   0% /run/qemu
 hmc-nfs:/exports/nfs/golang  110G   91G   14G  87% /nfs
 ```
 
-## マウントポイントの追加
+## マウントポイントの追加(不用)
 
 ```
-# mount -t nfs hmc-nfs:/backup /mnt
+# mount -t nfs hmc2-nfs:/backup /mnt
 # df -h
 Filesystem                   Size  Used Avail Use% Mounted on
 tmpfs                        1.6G  1.4M  1.6G   1% /run
@@ -155,7 +155,7 @@ hmc-nfs:/backup              110G   51G   54G  49% /mnt
 ## NFSサーバー上のディスクイメージをコピー
 
 ```
-# dd if=/mnt/lv03.img of=/dev/vg1/lv01 bs=4294967296
+# dd if=/nfs/lv03.img of=/dev/vg1/lv01 bs=4294967296
 0+9 records in
 0+9 records out
 17179869184 bytes (17 GB, 16 GiB) copied, 157.197 s, 109 MB/s
@@ -177,7 +177,7 @@ hmc-nfs:/exports/nfs/golang /nfs nfs defaults 0 0
 # mkdir /var
 # mount /var
 # df -h
-# tar xvf /mnt/var.tar 
+# tar xvf /nfs/var.tar 
 # cd /
 # rm -fr var.backup/
 ```
@@ -232,7 +232,33 @@ network:
 ```
 
 #### virtのブリッジ設定
+nfs ドライブ上にダウンしておいたXMLファイルから、仮想ネットワークを定義しておく。
 
+```
+root@runner2:/nfs# virsh net-define host-bridge.xml 
+Network host-bridge defined from host-bridge.xml
+
+root@runner2:/nfs# virsh net-define ovs-network.xml 
+Network ovs-network defined from ovs-network.xml
+```
+
+
+
+## ネットワークの設定（ホスト側のハイパーバイザーの設定）
+  - https://github.com/takara9/marmot/blob/main/docs/network-setup-nested-vm.md#%E3%83%99%E3%82%A2%E3%83%A1%E3%82%BF%E3%83%AB%E3%81%AE%E3%83%8F%E3%82%A4%E3%83%91%E3%83%BC%E3%83%90%E3%82%A4%E3%82%B6%E3%83%BC%E5%81%B4
+
+## ネットワークの設定（ランナー側の設定）
+  - https://github.com/takara9/marmot/blob/main/docs/network-setup-nested-vm.md#open-vswitch%E3%81%AE%E8%A8%AD%E5%AE%9A
+  - https://github.com/takara9/marmot/blob/main/docs/network-setup-nested-vm.md#%E3%83%99%E3%82%A2%E3%83%A1%E3%82%BF%E3%83%AB%E3%81%AE%E3%83%8F%E3%82%A4%E3%83%91%E3%83%BC%E3%83%90%E3%82%A4%E3%82%B6%E3%83%BC%E5%81%B4
+
+
+先に作成した仮想ネットワークを有効化する。
+
+virsh net-start host-bridge
+virsh net-autostart host-bridge
+virsh net-start ovs-network
+virsh net-autostart ovs-network
+virsh net-list
 
 ```
 root@runner1:/etc/netplan# virsh net-list
@@ -243,26 +269,6 @@ root@runner1:/etc/netplan# virsh net-list
  ovs-network   active   yes         yes          L2スイッチと連携してトランクVLAN設定を実施
 ```
 
-以下の設定を行い、libvirt のドメイン（仮想マシン）からネットワーク名を指定して、ネットワークに接続できる。
-
-```
-root@runner1:/etc/netplan# virsh net-dumpxml host-bridge
-<network>
-  <name>host-bridge</name>
-  <uuid>0ff20643-71de-40ed-ba59-07a340130690</uuid>
-  <forward mode='bridge'/>
-  <bridge name='br0'/>
-</network>
-```
-
-
-## ネットワークの設定（ホスト側のハイパーバイザーの設定）
-
-  - https://github.com/takara9/marmot/blob/main/docs/network-setup-nested-vm.md#%E3%83%99%E3%82%A2%E3%83%A1%E3%82%BF%E3%83%AB%E3%81%AE%E3%83%8F%E3%82%A4%E3%83%91%E3%83%BC%E3%83%90%E3%82%A4%E3%82%B6%E3%83%BC%E5%81%B4
-
-## ネットワークの設定（ランナー側の設定）
-  - https://github.com/takara9/marmot/blob/main/docs/network-setup-nested-vm.md#open-vswitch%E3%81%AE%E8%A8%AD%E5%AE%9A
-  - https://github.com/takara9/marmot/blob/main/docs/network-setup-nested-vm.md#%E3%83%99%E3%82%A2%E3%83%A1%E3%82%BF%E3%83%AB%E3%81%AE%E3%83%8F%E3%82%A4%E3%83%91%E3%83%BC%E3%83%90%E3%82%A4%E3%82%B6%E3%83%BC%E5%81%B4
 
 ## Dockerのインストール
   - インストール https://docs.docker.com/engine/install/ubuntu/
@@ -272,6 +278,13 @@ root@runner1:/etc/netplan# virsh net-dumpxml host-bridge
   - ダウンロードとインストール https://go.dev/doc/install
 　- パスの設定 https://github.com/takara9/marmot/blob/main/docs/HOWTO-install-golang.md
   - rootのホームにも設定すること
+
+
+## Minioクライアント
+  - wget https://dl.min.io/client/mc/release/linux-amd64/mc
+  - chmod +x mc
+  - sudo mv mc /usr/local/bin/
+  - mc --help  
 
 
 ## systemdから起動できるように設定

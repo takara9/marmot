@@ -1,4 +1,4 @@
-GO=/usr/local/go/bin/go
+GO ?= go
 PROGRAM	= maadm
 all:	$(PROGRAM)
 

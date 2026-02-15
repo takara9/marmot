@@ -1,4 +1,4 @@
-GO = go
+GO ?= go
 PROGRAM	= mactl
 GINKGO = /root/go/bin/ginkgo
 

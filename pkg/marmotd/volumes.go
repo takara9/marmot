@@ -48,28 +48,6 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 				return nil, err
 			}
 
-			// qcow2ボリュームの情報取得
-			info, err := qcow.GetQcowInfo(*volSpec.Spec.Path)
-			if err != nil {
-				slog.Error("failed to get qcow2 volume info", "err", err, "path", *volSpec.Spec.Path)
-				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
-				return nil, err
-			}
-			slog.Debug("qcow2ボリュームの情報取得成功", "info", info)
-
-			// qcow2ボリュームのリサイズ
-			incSize := *volSpec.Spec.Size - int(info["virtual-size"].(float64)/1024/1024/1024)
-			if incSize > 0 {
-				slog.Debug("qcow2ボリュームのリサイズ開始", "現在のサイズGB", int(info["virtual-size"].(float64)/1024/1024/1024), "希望サイズGB", *volSpec.Spec.Size)
-				err = qcow.ResizeQcow(*volSpec.Spec.Path, incSize)
-				if err != nil {
-					slog.Error("failed to resize qcow2 volume", "err", err, "path", *volSpec.Spec.Path)
-					m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
-					return nil, err
-				}
-				slog.Debug("qcow2ボリュームのリサイズ成功", "新しいサイズGB", *volSpec.Spec.Size)
-			}
-
 			// 取得したLV名とサイズで、データベースを更新
 			slog.Debug("qcow2ボリュームの状態変更", "volId", volSpec.Id)
 			m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_AVAILABLE)
@@ -173,12 +151,6 @@ func (m *Marmot) RemoveVolume(id string) error {
 		// 未知のタイプの場合データベースからのみ削除する
 		slog.Error("Unknown volume type", "id", id)
 	}
-
-	// データベースからボリューム情報を削除
-	//if err := m.Db.DeleteVolume(id); err != nil {
-	//	slog.Error("vc.DeleteVolume()", "err", err)
-	//	return err
-	//}
 
 	return nil
 }
