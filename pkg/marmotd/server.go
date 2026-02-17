@@ -228,7 +228,7 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 	channelPath, err := util.CreateChannelDir(virtSpec.UUID)
 
 	// ネットワークの設定
-	if serverConfig.Spec.Network == nil {
+	if serverConfig.Spec.NetworkInterface == nil {
 		slog.Debug("ネットワーク指定なし、デフォルトネットワークを使用")
 		mac, err := util.GenerateRandomMAC()
 		if err != nil {
@@ -245,13 +245,13 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 			},
 		}
 		// サーバーのネットワーク情報を更新
-		var net api.Network
+		var net api.NetworkInterface
 		net.Id = virtSpec.NetSpecs[0].Network
 		net.Mac = &virtSpec.NetSpecs[0].MAC
-		serverConfig.Spec.Network = &[]api.Network{net}
+		serverConfig.Spec.NetworkInterface = &[]api.NetworkInterface{net}
 	} else {
 		slog.Debug("ネットワーク指定あり、指定されたネットワークを使用")
-		for i, reqNic := range *serverConfig.Spec.Network {
+		for i, reqNic := range *serverConfig.Spec.NetworkInterface {
 			slog.Debug("ネットワーク", "index", i, "network id", reqNic.Id)
 			mac, err := util.GenerateRandomMAC()
 			if err != nil {
@@ -281,7 +281,7 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 			}
 			virtSpec.NetSpecs = append(virtSpec.NetSpecs, ns)
 
-			var ni api.Network
+			var ni api.NetworkInterface
 			ni.Id = ns.Network
 			ni.Mac = &ns.MAC
 			// netplanで静的IPアドレスを設定する場合のために、IPアドレス情報もサーバーに保存しておく
@@ -289,7 +289,7 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 			ni.Netmask = reqNic.Netmask
 			ni.Routes = reqNic.Routes
 			ni.Nameservers = reqNic.Nameservers
-			(*serverConfig.Spec.Network)[i] = ni
+			(*serverConfig.Spec.NetworkInterface)[i] = ni
 		}
 	}
 	// サーバーのネットワーク情報を更新

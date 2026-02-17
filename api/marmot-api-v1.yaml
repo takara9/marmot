@@ -268,6 +268,142 @@ paths:
               application/json:
                 schema:
                   $ref: "#/components/schemas/Error"
+  /network:
+    post:
+      summary: "Create Virtual Network"
+      description: |
+        Create a new virtual network. The virtual network specifications are specified in the request body.
+        If the virtual network is successfully created, the information of the created virtual network is returned in the response.
+        The virtual network specifications include network name, IP address range, DHCP settings, and more.
+        If an error occurs during virtual network creation, an appropriate error message is returned.
+      operationId: createNetwork
+      tags:
+        - network
+        - virtual-network
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VirtualNetwork"
+      responses:
+        "201":
+          description: "Successfully created the virtual network."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Success"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      summary: "Get Network Information"
+      description: |
+        Retrieve information about existing virtual networks. A list of virtual networks is returned in the response.
+        Each virtual network's information includes network ID, status, IP address range, DHCP settings, and more.
+        If no virtual networks exist or an error occurs while retrieving information, an appropriate error message is returned.
+      operationId: getNetworks
+      tags:
+        - network
+      responses:
+        "200":
+          description: "Successfully retrieved the list of networks."
+          content:
+            application/json:
+              schema:
+                  $ref: "#/components/schemas/VirtualNetwork"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error" 
+  /network/{id}:
+      get:
+        summary: "Get particular virtual network Information"
+        operationId: getNetworkById
+        tags:
+          - network
+          - virtual-network
+        parameters:
+          - name: id
+            in: path
+            required: true
+            description: The ID identifies the virtual network.
+            schema:
+              type: string
+        responses:
+          "200":
+            description: "Successfully retrieved the virtual network information."
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/VirtualNetwork"
+          default:
+            description: "An error occurred."
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Error"
+      put:
+        summary: "Update Virtual Network Information by Id"
+        operationId: updateNetworkById
+        tags:
+          - network
+          - virtual-network
+        parameters:
+          - name: id
+            in: path
+            required: true
+            description: The id of the virtual network to update
+            schema:
+              type: string
+        requestBody:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VirtualNetwork"
+        responses:
+          "200":
+            description: Updated the Virtual Network
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Success"
+          default:
+            description: unexpected error
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Error"
+      delete:
+        summary: "Delete Virtual Network"
+        operationId: deleteNetworkById
+        tags:
+          - network
+          - virtual-network
+        parameters:
+          - name: id
+            in: path
+            required: true
+            description: The id of the virtual network to delete
+            schema:
+              type: string
+        responses:
+          "200":
+            description: Deleted the Virtual Network
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Success"
+          default:
+            description: unexpected error
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Error"
 
 components:
   schemas:
@@ -349,7 +485,7 @@ components:
           type: string
         persistent:
           type: boolean
-    Network:
+    NetworkInterface:
       type: object
       required:
         - id
@@ -467,11 +603,11 @@ components:
         memory:
           type: integer
           format: int
-        Network:
+        NetworkInterface:
           type: array
           maxItems: 10
           items:
-            $ref: "#/components/schemas/Network"
+            $ref: "#/components/schemas/NetworkInterface"
         Storage:
           type: array
           maxItems: 10
@@ -485,3 +621,38 @@ components:
           type: string
         bootVolume:
           $ref: "#/components/schemas/Volume"
+    VirtualNetwork:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        Metadata:
+          $ref: "#/components/schemas/Metadata"
+        Spec:
+          $ref: "#/components/schemas/VlanSpec"
+        Status:
+          $ref: "#/components/schemas/Status"
+    VlanSpec:
+      type: object
+      properties:
+        forwardMode:
+          type: string
+        bridgeName:
+          type: string
+        macAddress:
+          type: string
+        stp:
+          type: boolean
+        ipAddress:
+          type: string
+        netmask:
+          type: string
+        dhcpStartAddress:
+          type: string
+        dhcpEndAddress:
+          type: string
+        virshNetXml:
+          type: string
+

@@ -66,6 +66,11 @@ func main() {
 		return
 	}
 
+	// ネットワークコントローラー
+
+
+	
+
 	//startDispatcher()
 	// And we serve HTTP until the world ends.
 	fmt.Println(e.Start("0.0.0.0:8750"))

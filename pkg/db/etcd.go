@@ -15,11 +15,12 @@ import (
 )
 
 const (
-	HvPrefix              = "/marmot/hypervisor"
-	VmPrefix              = "/marmot/virtualmachine"
+	//HvPrefix              = "/marmot/hypervisor"
+	//VmPrefix              = "/marmot/virtualmachine"
 	OsTemplateImagePrefix = "/marmot/osTemplateImage"
 	VolumePrefix          = "/marmot/volume"
 	ServerPrefix          = "/marmot/server"
+	NetworkPrefix         = "/marmot/network"
 	SeqPrefix             = "/marmot/sequence"
 	VersionKey            = "/marmot/version"
 	JobPrefix             = "/marmot/job"

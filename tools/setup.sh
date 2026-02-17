@@ -15,6 +15,7 @@ fi
 echo "Ubuntu 22.04 (jammy) のcloud imageをダウンロードしてカスタマイズする"
 
 cd /var/lib/marmot/volumes
+echo "====" ${CI_ENVIRONMENT} "===="
 if [ ${CI_ENVIRONMENT} = "true" ]; then
   curl -OL http://10.1.0.12/${IMAGE}
 else

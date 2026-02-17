@@ -129,7 +129,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			meta.Name = util.StringPtr("test-vm-1")
 			virtualServer.Metadata = &meta
 			virtualServer.Spec = &spec
-			virtualServer.Spec.Network = &[]api.Network{
+			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
 				{
 					Id: "default",
 				},
@@ -190,7 +190,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			virtualServer.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
-			virtualServer.Spec.Network = &[]api.Network{
+			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
 				{
 					Id: "default",
 				},
@@ -279,7 +279,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 
 			virtualServer.Metadata.Name = util.StringPtr("test-vm-3")
 			virtualServer.Spec.BootVolume.Spec.Type = util.StringPtr("lvm")
-			virtualServer.Spec.Network = &[]api.Network{
+			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
 				{
 					Id: "default",
 				},
@@ -346,7 +346,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			virtualServer.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
-			virtualServer.Spec.Network = &[]api.Network{
+			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
 				{
 					Id: "default",
 				},
@@ -437,7 +437,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			virtualServer.Metadata.Name = util.StringPtr("test-vm-5")
 
 			By("NICの接続先ネットワークを設定")
-			virtualServer.Spec.Network = &[]api.Network{
+			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
 				{
 					Id: "default",
 				},
@@ -529,7 +529,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			virtualServer.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
-			virtualServer.Spec.Network = &[]api.Network{
+			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
 				{
 					Id: "default",
 				},
@@ -699,7 +699,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			virtualServer.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
-			virtualServer.Spec.Network = &[]api.Network{
+			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
 				{
 					Id: "default",
 				},
@@ -897,7 +897,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			virtualServer.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
-			virtualServer.Spec.Network = &[]api.Network{
+			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
 				{
 					Id: "default",
 				},
@@ -969,7 +969,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 
 			meta.Name = util.StringPtr("test-vm-9")
 			virtualServer.Metadata = &meta
-			virtualServer.Spec.Network = &[]api.Network{
+			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
 				{
 					Id: "default",
 				},
