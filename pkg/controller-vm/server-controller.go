@@ -73,9 +73,28 @@ func (c *controller) controllerLoop() {
 		}
 		fmt.Println(string(json))
 
+		// 削除のタイムスタンプが一定時間以上経過しているかをチェックして、削除処理を実行するとするのが良さそう
+		if spec.Status != nil && spec.Status.DeletionTimeStamp != nil {
+			deletionTime := *spec.Status.DeletionTimeStamp
+			if time.Since(deletionTime) > 10*time.Second {
+				slog.Debug("削除のタイムスタンプが一定時間以上経過しているサーバー検出", "SERVER", spec.Id)
+				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_DELETING)
+			}
+		}
+
 		// サーバーの状態チェックと処理
 		// ここでワークキューに積むなどの処理を行う
 		switch *spec.Status.Status {
+		case db.SERVER_PENDING:
+			slog.Debug("待ち状態のサーバー検出", "SERVER", spec.Id)
+			c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_PROVISIONING)
+			_, err := c.marmot.CreateServer2(spec.Id)
+			if err != nil {
+				slog.Error("CreateServer2()", "err", err)
+				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR)
+				continue
+			}
+			c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_RUNNING)
 		case db.SERVER_RUNNING:
 			slog.Debug("稼働中のサーバー検出", "SERVER", spec.Id)
 		case db.SERVER_STOPPED:
@@ -83,16 +102,19 @@ func (c *controller) controllerLoop() {
 		case db.SERVER_ERROR:
 			slog.Debug("エラー状態のサーバー検出", "SERVER", spec.Id)
 		case db.SERVER_DELETING:
+			// 削除のタイムスタンプが一定時間以上経過しているかをチェックして、削除処理を実行するとするのが良さそう
 			slog.Debug("削除中のサーバー検出", "SERVER", spec.Id)
+
 			// 削除処理の実行
-			c.marmot.DeleteServerById(spec.Id)
-		case db.SERVER_DELETED:
-			slog.Debug("削除済みのサーバー検出", "SERVER", spec.Id)
+			if err := c.marmot.DeleteServerById(spec.Id); err != nil {
+				slog.Error("DeleteServerById()", "err", err)
+				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR)
+				continue
+			}
+			c.marmot.Db.DeleteServerById(spec.Id)
+
 		case db.SERVER_PROVISIONING:
 			slog.Debug("プロビジョニング中のサーバー検出", "SERVER", spec.Id)
-			// プロビジョニング処理の実行
-			// ワークキューの処理を実装する
-			c.marmot.CreateServer2(spec.Id)
 
 		default:
 			slog.Warn("不明な状態のサーバー検出", "SERVER", spec.Id, "STATUS", *spec.Status.Status)

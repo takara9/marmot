@@ -34,13 +34,32 @@ func CreateQcow(path string, size int) error {
 // QCOW2 ボリュームのコピー
 func CopyQcow(srcPath string, destPath string) error {
 	slog.Debug("Copying QCOW2 volume", "srcPath", srcPath, "destPath", destPath)
-	cmd := exec.Command("qemu-img", "convert", "-O", "qcow2", srcPath, destPath)
+	//cmd := exec.Command("qemu-img", "convert", "-f", "qcow2", "-O", "qcow2", srcPath, destPath)
+	cmd := exec.Command("cp", srcPath, destPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		slog.Error("qemu-img copy failed", "output", string(output))
 		return fmt.Errorf("Failed to copy QCOW2 volume from %s to %s, error: %v", srcPath, destPath, err)
 	}
 	return nil
+}
+
+// QCOW2ボリュームの情報取得
+func GetQcowInfo(path string) (map[string]interface{}, error) {
+	slog.Debug("Getting QCOW2 volume info", "path", path)
+	cmd := exec.Command("qemu-img", "info", "--output=json", path)
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get QCOW2 volume info at path: %s, error: %v", path, err)
+	}
+
+	var info map[string]interface{}
+	err = json.Unmarshal(output, &info)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to parse QCOW2 volume info JSON at path: %s, error: %v", path, err)
+	}
+
+	return info, nil
 }
 
 // QCOW2ボリュームの削除

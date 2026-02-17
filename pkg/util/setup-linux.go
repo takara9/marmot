@@ -133,11 +133,10 @@ func MountVolume(v api.Volume) (string, string, error) {
 			err := errors.New("qemu-nbd failed to setup OS-Disk")
 			return "", "", err
 		}
-
-		fmt.Println("Mounting", "mount", "-t", "ext4", fmt.Sprintf("%sp1", nbdDevice), mountPoint)
 		time.Sleep(3 * time.Second) // 少し待つ
 
 		// ループバックデバイスの2番パーティションをマウント
+		fmt.Println("Mounting", "mount", "-t", "ext4", fmt.Sprintf("%sp1", nbdDevice), mountPoint)
 		cmd = exec.Command("mount", "-t", "ext4", fmt.Sprintf("%sp1", nbdDevice), mountPoint)
 		err = cmd.Run()
 		if err != nil {

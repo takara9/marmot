@@ -2,6 +2,8 @@
 
 #QCOW2POOL="/var/lib/libvirt/images"
 QCOW2POOL="/var/lib/marmot/volumes"
+IMAGE="jammy-server-cloudimg-amd64.img"
+IMAGE_TEMPLATE="ubuntu-22.04-template.qcow2"
 
 if [ -d "${QCOW2POOL}" ]; then
   echo "${QCOW2POOL} ディレクトリは存在します。"
@@ -12,26 +14,24 @@ fi
 
 echo "Ubuntu 22.04 (jammy) のcloud imageをダウンロードしてカスタマイズする"
 
+cd /var/lib/marmot/volumes
 if [ ${CI_ENVIRONMENT} = "true" ]; then
-  curl -OL http://10.1.0.12/jammy-server-cloudimg-amd64.img
+  curl -OL http://10.1.0.12/${IMAGE}
 else
-  curl -OL https://cloud-images.ubuntu.com/jammy/20251216/jammy-server-cloudimg-amd64.img
+  curl -OL https://cloud-images.ubuntu.com/jammy/20251216/${IMAGE}
 fi
 
 echo "cloud imageのカスタマイズを行う"
-virt-customize -a jammy-server-cloudimg-amd64.img --root-password password:ubuntu
-
-virt-customize -a jammy-server-cloudimg-amd64.img \
+#qemu-img convert -f qcow2 -O qcow2 ${IMAGE} ${IMAGE_TEMPLATE}
+cp ${IMAGE} ${IMAGE_TEMPLATE}
+virt-customize -a ${IMAGE_TEMPLATE} \
+  --root-password password:ubuntu \
   --edit '/etc/ssh/sshd_config: s/^#?PermitRootLogin.*/PermitRootLogin yes/' \
   --edit '/etc/ssh/sshd_config: s/^#?PasswordAuthentication.*/PasswordAuthentication yes/' \
-  --run-command 'rm /etc/ssh/sshd_config.d/60-cloudimg-settings.conf'
-
-virt-customize -a jammy-server-cloudimg-amd64.img \
+  --run-command 'rm /etc/ssh/sshd_config.d/60-cloudimg-settings.conf' \
   --run-command "ssh-keygen -A" \
   --run-command "systemctl enable ssh" \
-  --run-command "systemctl restart ssh"
-
-virt-customize -a jammy-server-cloudimg-amd64.img \
+  --run-command "systemctl restart ssh" \
   --write /etc/netplan/00-nic.yaml:'network:
   version: 2
   ethernets:
@@ -48,11 +48,33 @@ virt-customize -a jammy-server-cloudimg-amd64.img \
       dhcp4: false
       dhcp6: false
 '
+echo "imageのリサイズとパーティションの拡張を実施する"
+modprobe nbd max_part=8
+qemu-img resize ${IMAGE_TEMPLATE} 16G
+qemu-nbd -c /dev/nbd1 ${IMAGE_TEMPLATE}
+sleep 3
+lsblk
+parted /dev/nbd1 --fix --script 'resizepart 1 17.2G quit'
+sleep 3
+e2fsck -f /dev/nbd1p1 -y 
+resize2fs /dev/nbd1p1
+#
+qemu-nbd -d /dev/nbd1 
+sleep 3
+qemu-img info ${IMAGE_TEMPLATE} 
+
+
+echo "ｑcow2イメージを移動"
+#mv ${IMAGE_TEMPLATE} ${QCOW2POOL}/${IMAGE_TEMPLATE}
+chown libvirt-qemu:kvm ${QCOW2POOL}/${IMAGE_TEMPLATE}
+chmod 644 ${QCOW2POOL}/${IMAGE_TEMPLATE}
+
+
 
 echo "LVMボリュームを作成してcloud imageをコピーする"
 lvcreate -L 2.2G -n lvos_temp -y vg1
 modprobe nbd max_part=8
-qemu-nbd --connect=/dev/nbd0 jammy-server-cloudimg-amd64.img
+qemu-nbd --connect=/dev/nbd0 ${IMAGE}
 sleep 3
 dd if=/dev/nbd0 of=/dev/vg1/lvos_temp bs=1M status=progress
 sleep 3
@@ -84,11 +106,6 @@ qemu-nbd --disconnect /dev/nbd0
 echo "lxc用のスナップショットを作成"
 lvcreate -s -L 1G -n boot01 -y /dev/vg1/temp01
 
-
-echo "ｑcow2イメージを移動"
-mv jammy-server-cloudimg-amd64.img ${QCOW2POOL}/
-chown libvirt-qemu:kvm ${QCOW2POOL}/jammy-server-cloudimg-amd64.img
-chmod 644 ${QCOW2POOL}/jammy-server-cloudimg-amd64.img
 
 echo "LXC用のrootfsを作成する"
 mkdir -p /var/lib/lxc/rootfs/lxc-test-1

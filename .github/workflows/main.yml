@@ -13,7 +13,7 @@ env:
 jobs:
   # Label of the job
   marmot-package:
-    runs-on: [ self-hosted, hvc ]
+    runs-on: [ self-hosted, runner3 ]
     services:
       etcd:
         image: ghcr.io/takara9/etcd:3.6.5
@@ -176,12 +176,21 @@ jobs:
 
   marmot-command:
     runs-on: [ self-hosted, runner2 ]
+    strategy:
+      matrix:
+        go-version: [ '1.26.0' ]
     steps:
+    - uses: actions/checkout@v5
+    - name: Setup Go ${{ matrix.go-version }}
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+    - name: Display Go version
+      run: go version
+
     - name: change permissions
       run: |
         sudo -S chown -R $USER:$USER /var/actions-runner/_work/marmot
-
-    - uses: actions/checkout@v5
 
     - name: Install ca-certificates
       run: |
@@ -215,19 +224,24 @@ jobs:
         sudo -s mkdir -p bin
         sudo -s chown ubuntu:ubuntu bin
         sudo -s chmod 755 bin
-        sudo -s make mactl-test
+        sudo -E env "PATH=$PATH" make mactl-test
         ls -la bin
-        sudo -s make test
+        sudo -E env "PATH=$PATH" make test
+        sudo rm -fr bin
         cd ../..
 
     - name: Test cmd/maadm
       run: | 
         cd cmd/maadm
-        sudo -s make test
+        sudo -s mkdir -p bin
+        sudo -s chown ubuntu:ubuntu bin
+        sudo -s chmod 755 bin
+        sudo -E env "PATH=$PATH" make test
+        sudo rm -fr bin
         cd ../..
 
-  cleanup-hvc:
-    runs-on: [ self-hosted, hvc ]
+  cleanup-runner3:
+    runs-on: [ self-hosted, runner3 ]
     needs: 
       - marmot-package
     if: always() 
