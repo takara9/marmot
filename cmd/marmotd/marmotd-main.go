@@ -8,6 +8,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
+	controller_net "github.com/takara9/marmot/pkg/contorller-net"
 	controller_vm "github.com/takara9/marmot/pkg/controller-vm"
 	controller_vol "github.com/takara9/marmot/pkg/controller-vol"
 	"github.com/takara9/marmot/pkg/marmotd"
@@ -61,6 +62,13 @@ func main() {
 	}
 	// ボリュームコントローラー
 	_, err = controller_vol.StartVolController(*node, *etcd) // ボリュームコントローラーの開始
+	if err != nil {
+		slog.Error("Failed to start controller", "err", err)
+		return
+	}
+
+	// ネットワークコントローラー
+	_, err = controller_net.StartNetController(*node, *etcd) // ネットワークコントローラーの開始
 	if err != nil {
 		slog.Error("Failed to start controller", "err", err)
 		return

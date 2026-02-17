@@ -120,18 +120,36 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 	})
 
 	Context("最小構成 QCOW2 仮想サーバーの起動と終了のテスト", func() {
+		It("既存ネットワークの取得", func() {
+			var err error
+			vnets, err := marmotServer.Ma.GetVirtualNetworksAndPutDB()
+			Expect(err).NotTo(HaveOccurred())
+			for _, name := range vnets {
+				byteJson, err := json.MarshalIndent(name, "", "  ")
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println("Found Network:", string(byteJson))
+			}
+		})
+		It("仮想ネットワークの取得", func() {
+			net, err := marmotServer.Ma.Db.GetVirtualNetworks()
+			Expect(err).NotTo(HaveOccurred())
+			data, err := json.MarshalIndent(net, "", "  ")
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Println("ネットワーク情報: ", string(data))
+		})
+
 		var id string
 		It("仮想サーバー生成:bootはqcow2 で最小構成", func() {
 			var virtualServer api.Server
 			var meta api.Metadata
-			var spec api.VmSpec
+			var spec api.ServerSpec
 			var err error
 			meta.Name = util.StringPtr("test-vm-1")
 			virtualServer.Metadata = &meta
 			virtualServer.Spec = &spec
-			virtualServer.Spec.Network = &[]api.Network{
+			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
 				{
-					Id: "default",
+					Networkname: "default",
 				},
 			}
 			// 他すべてデフォルト
@@ -179,7 +197,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		It("仮想サーバー生成:bootはqcow2 でデータディスク２本構成", func() {
 			var virtualServer api.Server
 			var meta api.Metadata
-			var spec api.VmSpec
+			var spec api.ServerSpec
 			//var net []api.Network
 			var err error
 			virtualServer.Spec = &spec
@@ -190,9 +208,9 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			virtualServer.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
-			virtualServer.Spec.Network = &[]api.Network{
+			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
 				{
-					Id: "default",
+					Networkname: "default",
 				},
 			}
 
@@ -265,7 +283,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		It("仮想サーバー生成:bootはlv で最小構成", func() {
 			var virtualServer api.Server
 			var meta api.Metadata
-			var spec api.VmSpec
+			var spec api.ServerSpec
 			virtualServer.Metadata = &meta
 			virtualServer.Spec = &spec
 
@@ -279,9 +297,9 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 
 			virtualServer.Metadata.Name = util.StringPtr("test-vm-3")
 			virtualServer.Spec.BootVolume.Spec.Type = util.StringPtr("lvm")
-			virtualServer.Spec.Network = &[]api.Network{
+			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
 				{
-					Id: "default",
+					Networkname: "default",
 				},
 			}
 
@@ -331,7 +349,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		It("仮想サーバー生成:bootはlv で最小構成", func() {
 			var virtualServer api.Server
 			var meta api.Metadata
-			var spec api.VmSpec
+			var spec api.ServerSpec
 			var err error
 			virtualServer.Spec = &spec
 
@@ -346,9 +364,9 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			virtualServer.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
-			virtualServer.Spec.Network = &[]api.Network{
+			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
 				{
-					Id: "default",
+					Networkname: "default",
 				},
 			}
 
@@ -422,7 +440,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		It("仮想サーバー生成:bootはlv で最小構成", func() {
 			var virtualServer api.Server
 			var meta api.Metadata
-			var spec api.VmSpec
+			var spec api.ServerSpec
 			var err error
 			virtualServer.Spec = &spec
 			virtualServer.Metadata = &meta
@@ -437,9 +455,9 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			virtualServer.Metadata.Name = util.StringPtr("test-vm-5")
 
 			By("NICの接続先ネットワークを設定")
-			virtualServer.Spec.Network = &[]api.Network{
+			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
 				{
-					Id: "default",
+					Networkname: "default",
 				},
 			}
 
@@ -514,7 +532,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			var err error
 			var virtualServer api.Server
 			var meta api.Metadata
-			var spec api.VmSpec
+			var spec api.ServerSpec
 			virtualServer.Spec = &spec
 
 			var bootVol api.Volume
@@ -529,9 +547,9 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			virtualServer.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
-			virtualServer.Spec.Network = &[]api.Network{
+			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
 				{
-					Id: "default",
+					Networkname: "default",
 				},
 			}
 			By("ブートディスクのタイプ(LVM)を設定")
@@ -683,7 +701,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		It("仮想サーバー生成 最大最小構成", func() {
 			var virtualServer api.Server
 			var meta api.Metadata
-			var spec api.VmSpec
+			var spec api.ServerSpec
 			var err error
 			virtualServer.Spec = &spec
 
@@ -699,9 +717,9 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			virtualServer.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
-			virtualServer.Spec.Network = &[]api.Network{
+			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
 				{
-					Id: "default",
+					Networkname: "default",
 				},
 			}
 			By("ブートディスクのタイプ(LVM)を設定")
@@ -887,7 +905,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		It("仮想サーバー生成:bootはqcow2 でデータディスク２本構成", func() {
 			var virtualServer api.Server
 			var meta api.Metadata
-			var spec api.VmSpec
+			var spec api.ServerSpec
 			virtualServer.Spec = &spec
 
 			var err error
@@ -897,9 +915,9 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			virtualServer.Metadata = &meta
 
 			By("NICの接続先ネットワークを設定")
-			virtualServer.Spec.Network = &[]api.Network{
+			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
 				{
-					Id: "default",
+					Networkname: "default",
 				},
 			}
 
@@ -963,21 +981,21 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		It("仮想サーバー生成:bootはqcow2 で構成", func() {
 			var virtualServer api.Server
 			var meta api.Metadata
-			var spec api.VmSpec
+			var spec api.ServerSpec
 			virtualServer.Spec = &spec
 			var err error
 
 			meta.Name = util.StringPtr("test-vm-9")
 			virtualServer.Metadata = &meta
-			virtualServer.Spec.Network = &[]api.Network{
+			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
 				{
-					Id: "default",
+					Networkname: "default",
 				},
 				{
-					Id: "host-bridge",
+					Networkname: "host-bridge",
 				},
 				{
-					Id: "ovs-network",
+					Networkname: "ovs-network",
 				},
 			}
 			spec.Storage = &[]api.Volume{

@@ -23,7 +23,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 		slog.SetDefault(logger)
 
 		// テスト用のqcow2ボリュームの準備
-		cmd := exec.Command("cp", "/var/lib/marmot/volumes/jammy-server-cloudimg-amd64.img", "/var/lib/marmot/volumes/test-linux-qcow2.img")
+		cmd := exec.Command("cp", "/var/lib/marmot/volumes/ubuntu-22.04-server-cloudimg-amd64.img", "/var/lib/marmot/volumes/test-linux-qcow2.img")
 		err := cmd.Run()
 		Expect(err).To(BeNil())
 
@@ -48,7 +48,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 			Metadata: &api.Metadata{
 				Name: util.StringPtr("test-linux"),
 			},
-			Spec: &api.VmSpec{
+			Spec: &api.ServerSpec{
 				BootVolume: &api.Volume{
 					Id: "test-linux-boot",
 					Spec: &api.VolSpec{
@@ -103,9 +103,9 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 			Metadata: &api.Metadata{
 				Name: util.StringPtr("test-linux-lvm"),
 			},
-			Spec: &api.VmSpec{
+			Spec: &api.ServerSpec{
 				BootVolume: &api.Volume{
-					Id:            "test-linux-boot2",
+					Id: "test-linux-boot2",
 					Spec: &api.VolSpec{
 						Type:          util.StringPtr("lvm"),
 						Path:          util.StringPtr("/dev/mapper/vg1-lvos_test1"),
@@ -160,9 +160,9 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 			Metadata: &api.Metadata{
 				Name: util.StringPtr("test-linux-mh"),
 			},
-			Spec: &api.VmSpec{
+			Spec: &api.ServerSpec{
 				BootVolume: &api.Volume{
-					Id:            "test-linux-boot3",
+					Id: "test-linux-boot3",
 					Spec: &api.VolSpec{
 						Type:          util.StringPtr("lvm"),
 						Path:          util.StringPtr("/dev/mapper/vg1-lvos_test2"),
@@ -170,12 +170,12 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 						LogicalVolume: util.StringPtr("lvos_test2"),
 					},
 				},
-				Network: &[]api.Network{
+				NetworkInterface: &[]api.NetworkInterface{
 					{
-						Id: "default",
+						Networkname: "default",
 					},
 					{
-						Id: "host-bridge",
+						Networkname: "host-bridge",
 					},
 				},
 			},
@@ -225,9 +225,9 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 			Metadata: &api.Metadata{
 				Name: util.StringPtr("test-linux-mh"),
 			},
-			Spec: &api.VmSpec{
+			Spec: &api.ServerSpec{
 				BootVolume: &api.Volume{
-					Id:            "test-linux-boot4",
+					Id: "test-linux-boot4",
 					Spec: &api.VolSpec{
 						Type:          util.StringPtr("lvm"),
 						Path:          util.StringPtr("/dev/mapper/vg1-lvos_test2"),
@@ -235,12 +235,12 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 						LogicalVolume: util.StringPtr("lvos_test2"),
 					},
 				},
-				Network: &[]api.Network{
+				NetworkInterface: &[]api.NetworkInterface{
 					{
-						Id: "default",
+						Networkname: "default",
 					},
 					{
-						Id: "host-bridge",
+						Networkname: "host-bridge",
 						Nameservers: &api.Nameservers{
 							Addresses: &[]string{
 								"8.8.8.8",
@@ -253,9 +253,10 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 						},
 					},
 					{
-						Id:      "host-bridge",
-						Address: util.StringPtr("1.2.3.4"),
-						Netmask: util.StringPtr("24"),
+						Networkname: "host-bridge",
+						Address:     util.StringPtr("1.2.3.4"),
+						Netmask:     util.StringPtr("255.255.255.0"),
+						Netmasklen:  util.IntPtrInt(24),
 						Routes: &[]api.Route{
 							{
 								To:  util.StringPtr("default"),
@@ -264,9 +265,10 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 						},
 					},
 					{
-						Id:      "host-bridge",
-						Address: util.StringPtr("2001:db8::1"),
-						Netmask: util.StringPtr("64"),
+						Networkname: "host-bridge",
+						Address:     util.StringPtr("2001:db8::1"),
+						Netmask:     util.StringPtr("ffff:ffff:ffff:ffff::"),
+						Netmasklen:  util.IntPtrInt(64),
 						Routes: &[]api.Route{
 							{
 								To:  util.StringPtr("2001:db8::/64"),
@@ -285,12 +287,12 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 						},
 					},
 					{
-						Id:    "host-bridge",
-						Dhcp4: util.BoolPtr(false),
-						Dhcp6: util.BoolPtr(false),
+						Networkname: "host-bridge",
+						Dhcp4:       util.BoolPtr(false),
+						Dhcp6:       util.BoolPtr(false),
 					},
 					{
-						Id: "host-bridge",
+						Networkname: "host-bridge",
 					},
 				},
 			},

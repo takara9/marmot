@@ -29,7 +29,7 @@ qemu-nbd --disconnect /dev/nbd0
 kpartx -d /dev/mapper/vg1-lvos_test
 
 
-rm -f ${QCOW2POOL}/jammy-server-cloudimg-amd64.img
+rm -f ${QCOW2POOL}/ubuntu-22.04-server-cloudimg-amd64.img
 
 umount /var/lib/lxc/rootfs/lxc-test-1
 rm -rf /var/lib/lxc/rootfs

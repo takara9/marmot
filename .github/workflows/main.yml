@@ -38,7 +38,7 @@ jobs:
         export CI_ENVIRONMENT=true
         cd tools
         ls -al
-        sudo -E ./setup.sh
+        sudo -E env "PATH=$PATH" ./setup.sh
         cd ..
 
     - name: Configure MinIO Client
@@ -135,9 +135,10 @@ jobs:
     - name: ボリュームのセットアップ
       run: |
         whoami
+        export CI_ENVIRONMENT=true
         cd tools
         ls -al
-        sudo ./setup.sh
+        sudo -E env "PATH=$PATH" ./setup.sh
         cd ..
 
     - name: Configure MinIO Client
@@ -152,7 +153,7 @@ jobs:
         chmod 755 pkg/qcow/testdata
         sudo mkdir -p /var/lib/marmot/volumes
         sudo chmod 755 /var/lib/marmot/volumes
-        mc cp myminio/os-image/jammy-server-cloudimg-amd64.img pkg/marmotd/testdata/ubuntu22.04.qcow2
+        mc cp myminio/os-image/ubuntu-22.04-server-cloudimg-amd64.img pkg/marmotd/testdata/ubuntu22.04.qcow2
 
     - name: Check etcd put
       run: |
@@ -200,9 +201,10 @@ jobs:
     - name: ボリュームのセットアップ
       run: |
         whoami
+        export CI_ENVIRONMENT=true
         cd tools
         ls -al
-        sudo ./setup.sh
+        sudo -E env "PATH=$PATH" ./setup.sh
         cd ..
 
     - name: Configure MinIO Client
@@ -216,7 +218,7 @@ jobs:
         sudo mkdir -p /var/lib/marmot/volumes
         sudo chown ubuntu:ubuntu /var/lib/marmot/volumes
         sudo chmod 755 /var/lib/marmot/volumes
-        mc cp myminio/os-image/jammy-server-cloudimg-amd64.img /var/lib/marmot/volumes/ubuntu22.04.qcow2
+        mc cp myminio/os-image/ubuntu-22.04-server-cloudimg-amd64.img /var/lib/marmot/volumes/ubuntu22.04.qcow2
 
     - name: Test cmd/mactl
       run: | 
@@ -250,7 +252,7 @@ jobs:
         run: |
           pwd
           ls -al
-          sudo ./tools/cleanup.sh
+          sudo -E env "PATH=$PATH" ./tools/cleanup.sh
 
   cleanup-runner1:
     runs-on: [ self-hosted, runner1 ]
@@ -262,7 +264,7 @@ jobs:
         run: |
           pwd
           ls -al
-          sudo ./tools/cleanup.sh
+          sudo -E env "PATH=$PATH" ./tools/cleanup.sh
 
   cleanup-runner2:
     runs-on: [ self-hosted, runner2 ]
@@ -274,4 +276,4 @@ jobs:
         run: |
           pwd
           ls -al
-          sudo ./tools/cleanup.sh
+          sudo -E env "PATH=$PATH" ./tools/cleanup.sh
