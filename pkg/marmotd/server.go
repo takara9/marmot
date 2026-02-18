@@ -145,7 +145,7 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 	}
 
 	slog.Debug("ハイパーバイザーのリソース確保")
-	var virtSpec virt.VmSpec
+	var virtSpec virt.ServerSpec
 	virtSpec.UUID = *serverConfig.Metadata.Uuid
 	if serverConfig.Metadata != nil && serverConfig.Metadata.Name != nil {
 		virtSpec.Name = *serverConfig.Metadata.Name + "-" + serverConfig.Id // VMを一意に識別する

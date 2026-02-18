@@ -559,7 +559,7 @@ components:
         Metadata:
           $ref: "#/components/schemas/Metadata"
         Spec:
-          $ref: "#/components/schemas/VmSpec"
+          $ref: "#/components/schemas/ServerSpec"
         Status:
           $ref: "#/components/schemas/Status"
     Status:
@@ -594,7 +594,7 @@ components:
           type: string
         comment:
           type: string
-    VmSpec:
+    ServerSpec:
       type: object
       properties:
         cpu:
