@@ -69,10 +69,22 @@ type Route struct {
 
 // Server defines model for Server.
 type Server struct {
-	Metadata *Metadata `json:"Metadata,omitempty"`
-	Spec     *VmSpec   `json:"Spec,omitempty"`
-	Status   *Status   `json:"Status,omitempty"`
-	Id       string    `json:"id"`
+	Metadata *Metadata   `json:"Metadata,omitempty"`
+	Spec     *ServerSpec `json:"Spec,omitempty"`
+	Status   *Status     `json:"Status,omitempty"`
+	Id       string      `json:"id"`
+}
+
+// ServerSpec defines model for ServerSpec.
+type ServerSpec struct {
+	NetworkInterface *[]NetworkInterface `json:"NetworkInterface,omitempty"`
+	Storage          *[]Volume           `json:"Storage,omitempty"`
+	BootVolume       *Volume             `json:"bootVolume,omitempty"`
+	Cpu              *int                `json:"cpu,omitempty"`
+	Memory           *int                `json:"memory,omitempty"`
+	OsLv             *string             `json:"osLv,omitempty"`
+	OsVariant        *string             `json:"osVariant,omitempty"`
+	OsVg             *string             `json:"osVg,omitempty"`
 }
 
 // Servers defines model for Servers.
@@ -118,18 +130,6 @@ type VlanSpec struct {
 	Netmask          *string `json:"netmask,omitempty"`
 	Stp              *bool   `json:"stp,omitempty"`
 	VirshNetXml      *string `json:"virshNetXml,omitempty"`
-}
-
-// VmSpec defines model for VmSpec.
-type VmSpec struct {
-	NetworkInterface *[]NetworkInterface `json:"NetworkInterface,omitempty"`
-	Storage          *[]Volume           `json:"Storage,omitempty"`
-	BootVolume       *Volume             `json:"bootVolume,omitempty"`
-	Cpu              *int                `json:"cpu,omitempty"`
-	Memory           *int                `json:"memory,omitempty"`
-	OsLv             *string             `json:"osLv,omitempty"`
-	OsVariant        *string             `json:"osVariant,omitempty"`
-	OsVg             *string             `json:"osVg,omitempty"`
 }
 
 // VolSpec defines model for VolSpec.

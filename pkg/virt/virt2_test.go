@@ -20,7 +20,7 @@ var _ = Describe("仮想サーバー生成から終了までのライフサイ�
 	var err error
 
 	// 入力パラメータ
-	var vs virt.VmSpec
+	var vs virt.ServerSpec
 	var xml1 string
 	var xml2 string
 	var hostname1 string = "vm-test-1"

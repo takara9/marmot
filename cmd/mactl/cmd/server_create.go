@@ -34,7 +34,7 @@ var serverCreateCmd = &cobra.Command{
 		virtualServer.Metadata = &api.Metadata{
 			Name: util.StringPtr(conf.Name),
 		}
-		virtualServer.Spec = &api.VmSpec{}
+		virtualServer.Spec = &api.ServerSpec{}
 		virtualServer.Spec.BootVolume = &api.Volume{}
 		virtualServer.Spec.Storage = &[]api.Volume{}
 		virtualServer.Spec.BootVolume.Spec = &api.VolSpec{}
