@@ -135,6 +135,7 @@ jobs:
     - name: ボリュームのセットアップ
       run: |
         whoami
+        export CI_ENVIRONMENT=true
         cd tools
         ls -al
         sudo -E env "PATH=$PATH" ./setup.sh
@@ -200,6 +201,7 @@ jobs:
     - name: ボリュームのセットアップ
       run: |
         whoami
+        export CI_ENVIRONMENT=true
         cd tools
         ls -al
         sudo -E env "PATH=$PATH" ./setup.sh
