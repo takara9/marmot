@@ -38,7 +38,7 @@ jobs:
         export CI_ENVIRONMENT=true
         cd tools
         ls -al
-        sudo -E ./setup.sh
+        sudo -E env "PATH=$PATH" ./setup.sh
         cd ..
 
     - name: Configure MinIO Client
@@ -137,7 +137,7 @@ jobs:
         whoami
         cd tools
         ls -al
-        sudo ./setup.sh
+        sudo -E env "PATH=$PATH" ./setup.sh
         cd ..
 
     - name: Configure MinIO Client
@@ -202,7 +202,7 @@ jobs:
         whoami
         cd tools
         ls -al
-        sudo ./setup.sh
+        sudo -E env "PATH=$PATH" ./setup.sh
         cd ..
 
     - name: Configure MinIO Client
@@ -250,7 +250,7 @@ jobs:
         run: |
           pwd
           ls -al
-          sudo ./tools/cleanup.sh
+          sudo -E env "PATH=$PATH" ./tools/cleanup.sh
 
   cleanup-runner1:
     runs-on: [ self-hosted, runner1 ]
@@ -262,7 +262,7 @@ jobs:
         run: |
           pwd
           ls -al
-          sudo ./tools/cleanup.sh
+          sudo -E env "PATH=$PATH" ./tools/cleanup.sh
 
   cleanup-runner2:
     runs-on: [ self-hosted, runner2 ]
@@ -274,4 +274,4 @@ jobs:
         run: |
           pwd
           ls -al
-          sudo ./tools/cleanup.sh
+          sudo -E env "PATH=$PATH" ./tools/cleanup.sh
