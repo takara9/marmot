@@ -34,8 +34,8 @@ type Nameservers struct {
 	Search    *[]string `json:"search,omitempty"`
 }
 
-// Network defines model for Network.
-type Network struct {
+// NetworkInterface defines model for NetworkInterface.
+type NetworkInterface struct {
 	Address     *string      `json:"address,omitempty"`
 	Dhcp4       *bool        `json:"dhcp4,omitempty"`
 	Dhcp6       *bool        `json:"dhcp6,omitempty"`
@@ -109,21 +109,27 @@ type VirtualNetwork struct {
 
 // VlanSpec defines model for VlanSpec.
 type VlanSpec struct {
-	BridgeName   *Volume `json:"bridgeName,omitempty"`
-	VirshNetName *string `json:"virshNetName,omitempty"`
-	VirshNetXml  *string `json:"virshNetXml,omitempty"`
+	BridgeName       *string `json:"bridgeName,omitempty"`
+	DhcpEndAddress   *string `json:"dhcpEndAddress,omitempty"`
+	DhcpStartAddress *string `json:"dhcpStartAddress,omitempty"`
+	ForwardMode      *string `json:"forwardMode,omitempty"`
+	IpAddress        *string `json:"ipAddress,omitempty"`
+	MacAddress       *string `json:"macAddress,omitempty"`
+	Netmask          *string `json:"netmask,omitempty"`
+	Stp              *bool   `json:"stp,omitempty"`
+	VirshNetXml      *string `json:"virshNetXml,omitempty"`
 }
 
 // VmSpec defines model for VmSpec.
 type VmSpec struct {
-	Network    *[]Network `json:"Network,omitempty"`
-	Storage    *[]Volume  `json:"Storage,omitempty"`
-	BootVolume *Volume    `json:"bootVolume,omitempty"`
-	Cpu        *int       `json:"cpu,omitempty"`
-	Memory     *int       `json:"memory,omitempty"`
-	OsLv       *string    `json:"osLv,omitempty"`
-	OsVariant  *string    `json:"osVariant,omitempty"`
-	OsVg       *string    `json:"osVg,omitempty"`
+	NetworkInterface *[]NetworkInterface `json:"NetworkInterface,omitempty"`
+	Storage          *[]Volume           `json:"Storage,omitempty"`
+	BootVolume       *Volume             `json:"bootVolume,omitempty"`
+	Cpu              *int                `json:"cpu,omitempty"`
+	Memory           *int                `json:"memory,omitempty"`
+	OsLv             *string             `json:"osLv,omitempty"`
+	OsVariant        *string             `json:"osVariant,omitempty"`
+	OsVg             *string             `json:"osVg,omitempty"`
 }
 
 // VolSpec defines model for VolSpec.

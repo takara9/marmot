@@ -170,7 +170,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 						LogicalVolume: util.StringPtr("lvos_test2"),
 					},
 				},
-				Network: &[]api.Network{
+				NetworkInterface: &[]api.NetworkInterface{
 					{
 						Id: "default",
 					},
@@ -235,7 +235,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 						LogicalVolume: util.StringPtr("lvos_test2"),
 					},
 				},
-				Network: &[]api.Network{
+				NetworkInterface: &[]api.NetworkInterface{
 					{
 						Id: "default",
 					},

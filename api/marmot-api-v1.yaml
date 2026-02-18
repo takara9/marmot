@@ -485,7 +485,7 @@ components:
           type: string
         persistent:
           type: boolean
-    Network:
+    NetworkInterface:
       type: object
       required:
         - id
@@ -603,11 +603,11 @@ components:
         memory:
           type: integer
           format: int
-        Network:
+        NetworkInterface:
           type: array
           maxItems: 10
           items:
-            $ref: "#/components/schemas/Network"
+            $ref: "#/components/schemas/NetworkInterface"
         Storage:
           type: array
           maxItems: 10
@@ -637,11 +637,22 @@ components:
     VlanSpec:
       type: object
       properties:
-        virshNetName:
-          type: string
-        virshNetXml:
+        forwardMode:
           type: string
         bridgeName:
           type: string
+        macAddress:
+          type: string
+        stp:
+          type: boolean
+        ipAddress:
+          type: string
+        netmask:
+          type: string
+        dhcpStartAddress:
+          type: string
+        dhcpEndAddress:
+          type: string
+        virshNetXml:
+          type: string
 
-          $ref: "#/components/schemas/Volume"
