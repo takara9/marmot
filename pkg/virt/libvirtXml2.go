@@ -37,6 +37,7 @@ type NetSpec struct {
 	IsTrunk     bool
 	Bus         uint
 }
+
 type ChannelSpec struct {
 	Type  string
 	Path  string

@@ -18,6 +18,22 @@ type Error struct {
 	Message string `json:"message"`
 }
 
+// IPAddress defines model for IPAddress.
+type IPAddress struct {
+	HostId    *string `json:"HostId,omitempty"`
+	IPAddress *string `json:"IPAddress,omitempty"`
+	Netmask   *string `json:"Netmask,omitempty"`
+	NetworkId *string `json:"NetworkId,omitempty"`
+}
+
+// IPNetwork defines model for IPNetwork.
+type IPNetwork struct {
+	AddressMaskLen *string `json:"AddressMaskLen,omitempty"`
+	EndAddress     *string `json:"EndAddress,omitempty"`
+	Id             string  `json:"Id"`
+	StartAddress   *string `json:"StartAddress,omitempty"`
+}
+
 // Metadata defines model for Metadata.
 type Metadata struct {
 	Comment      *string `json:"comment,omitempty"`
@@ -113,23 +129,24 @@ type Version struct {
 
 // VirtualNetwork defines model for VirtualNetwork.
 type VirtualNetwork struct {
-	Metadata *Metadata `json:"Metadata,omitempty"`
-	Spec     *VlanSpec `json:"Spec,omitempty"`
-	Status   *Status   `json:"Status,omitempty"`
-	Id       string    `json:"id"`
+	Metadata *Metadata           `json:"Metadata,omitempty"`
+	Spec     *VirtualNetworkSpec `json:"Spec,omitempty"`
+	Status   *Status             `json:"Status,omitempty"`
+	Id       string              `json:"id"`
 }
 
-// VlanSpec defines model for VlanSpec.
-type VlanSpec struct {
+// VirtualNetworkSpec defines model for VirtualNetworkSpec.
+type VirtualNetworkSpec struct {
 	BridgeName       *string `json:"bridgeName,omitempty"`
+	Dhcp             *bool   `json:"dhcp,omitempty"`
 	DhcpEndAddress   *string `json:"dhcpEndAddress,omitempty"`
 	DhcpStartAddress *string `json:"dhcpStartAddress,omitempty"`
 	ForwardMode      *string `json:"forwardMode,omitempty"`
 	IpAddress        *string `json:"ipAddress,omitempty"`
 	MacAddress       *string `json:"macAddress,omitempty"`
+	Nat              *bool   `json:"nat,omitempty"`
 	Netmask          *string `json:"netmask,omitempty"`
 	Stp              *bool   `json:"stp,omitempty"`
-	VirshNetXml      *string `json:"virshNetXml,omitempty"`
 }
 
 // VolSpec defines model for VolSpec.
