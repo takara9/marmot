@@ -1,102 +1,13 @@
 package client
 
 import (
-	"bytes"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
-	"log/slog"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/takara9/marmot/api"
 )
-
-type MarmotClient struct {
-	NodeName string
-}
-
-func NewMarmot(nodeName string, etcdUrl string) (*MarmotClient, error) {
-	var mc MarmotClient
-	mc.NodeName = nodeName
-	return &mc, nil
-}
-
-type MarmotEndpoint struct {
-	Scheme   string // Scheme for the endpoint, e.g., "http" or "https".
-	HostPort string
-	BasePath string       // Base path for the API, e.g., "/api/v1".
-	Client   *http.Client // Specialized client.
-}
-
-func NewMarmotdEp(schame string, address string, basePath string, timeout int) (*MarmotEndpoint, error) {
-	tr := http.DefaultTransport.(*http.Transport).Clone()
-	tr.DisableCompression = true
-	tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	return &MarmotEndpoint{
-		Scheme:   "http",
-		HostPort: address,
-		BasePath: basePath,
-		Client:   &http.Client{Transport: tr, Timeout: time.Duration(timeout) * time.Second},
-	}, nil
-}
-
-func (m *MarmotEndpoint) httpRequest(req *http.Request) (int, []byte, *url.URL, error) {
-	resp, err := m.Client.Do(req)
-	if err != nil {
-		return 0, nil, nil, err
-	}
-
-	byteJSON, err := io.ReadAll(resp.Body)
-	defer resp.Body.Close()
-	if err != nil {
-		return 0, nil, nil, err
-	}
-
-	jobURL, err := resp.Location()
-	if err != nil {
-		if err.Error() == "http: no Location header in response" {
-			return resp.StatusCode, byteJSON, nil, nil
-		} else {
-			return resp.StatusCode, byteJSON, nil, err
-		}
-	}
-	return resp.StatusCode, byteJSON, jobURL, nil
-}
-
-func (m *MarmotEndpoint) httpRequest2(req *http.Request) ([]byte, *url.URL, error) {
-	req.Header.Set("User-Agent", "MarmotdClient/1.0")
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := m.Client.Do(req)
-	if err != nil {
-		return nil, nil, err
-	} else if resp.StatusCode != http.StatusOK &&
-		resp.StatusCode != http.StatusCreated &&
-		resp.StatusCode != http.StatusAccepted &&
-		resp.StatusCode != http.StatusNoContent {
-		return nil, nil, fmt.Errorf("http status code = %d", resp.StatusCode)
-	}
-
-	byteJSON, err := io.ReadAll(resp.Body)
-	defer resp.Body.Close()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	jobURL, err := resp.Location()
-	if err != nil {
-		if err.Error() == "http: no Location header in response" {
-			return byteJSON, nil, nil
-		} else {
-			return byteJSON, nil, err
-		}
-	}
-
-	return byteJSON, jobURL, nil
-}
 
 func (m *MarmotEndpoint) Ping() (int, []byte, *url.URL, error) {
 	url, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/ping")
@@ -141,6 +52,7 @@ func (m *MarmotEndpoint) GetVersion() (*api.Version, error) {
 	return &ret, nil
 }
 
+/*
 // ボリュームの作成
 func (m *MarmotEndpoint) CreateVolume(spec api.Volume) ([]byte, *url.URL, error) {
 	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/volume")
@@ -320,3 +232,99 @@ func (m *MarmotEndpoint) GetServers() ([]byte, *url.URL, error) {
 	}
 	return m.httpRequest2(req)
 }
+
+// 仮想プライベートネットワークの作成
+func (m *MarmotEndpoint) CreateVirtualNetwork(spec api.VirtualNetwork) ([]byte, *url.URL, error) {
+	slog.Debug("===", "CreateVirtualNetwork is called", "===")
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/network")
+	if err != nil {
+		return nil, nil, err
+	}
+	slog.Debug("CreateVirtualNetwork", "reqURL", reqURL)
+
+	byteJSON, err := json.Marshal(spec)
+	if err != nil {
+		return nil, nil, err
+	}
+	slog.Debug("CreateVirtualNetwork", "body", string(byteJSON))
+
+	req, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
+	if err != nil {
+		return nil, nil, err
+	}
+	return m.httpRequest2(req)
+}
+
+// 仮想プライベートネットワークの削除
+func (m *MarmotEndpoint) DeleteVirtualNetworkById(id string) ([]byte, *url.URL, error) {
+	slog.Debug("===", "DeleteVirtualNetworkById is called", "===")
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/network/"+id)
+	if err != nil {
+		return nil, nil, err
+	}
+	slog.Debug("DeleteVirtualNetworkById", "reqURL", reqURL)
+
+	req, err := http.NewRequest("DELETE", reqURL, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	req.Header.Set("User-Agent", "MarmotdClient/1.0")
+	req.Header.Set("Content-Type", "application/json")
+	return m.httpRequest2(req)
+}
+
+// 仮想プライベートネットワークの詳細を取得
+func (m *MarmotEndpoint) GetVirtualNetworkById(id string) ([]byte, *url.URL, error) {
+	slog.Debug("===", "GetVirtualNetworkById is called", "===")
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/network/"+id)
+	if err != nil {
+		return nil, nil, err
+	}
+	slog.Debug("GetVirtualNetworkById", "reqURL", reqURL)
+
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	return m.httpRequest2(req)
+}
+
+// 仮想プライベートネットワークの更新
+func (m *MarmotEndpoint) UpdateVirtualNetworkById(id string, spec api.VirtualNetwork) ([]byte, *url.URL, error) {
+	slog.Debug("===", "UpdateVirtualNetworkById is called", "===")
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/network/"+id)
+	if err != nil {
+		return nil, nil, err
+	}
+	slog.Debug("UpdateVirtualNetworkById", "reqURL", reqURL)
+
+	byteJSON, err := json.Marshal(spec)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	slog.Debug("UpdateVirtualNetworkById", "body", string(byteJSON))
+
+	req, err := http.NewRequest("PUT", reqURL, bytes.NewBuffer(byteJSON))
+	if err != nil {
+		return nil, nil, err
+	}
+	return m.httpRequest2(req)
+}
+
+// 仮想プライベートネットワークの一覧を取得、フィルターは、パラメータで指定するようにする
+func (m *MarmotEndpoint) GetVirtualNetworks() ([]byte, *url.URL, error) {
+	slog.Debug("===", "GetVirtualNetworks is called", "===")
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/network")
+	if err != nil {
+		return nil, nil, err
+	}
+	slog.Debug("GetVirtualNetworks", "reqURL", reqURL)
+
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	return m.httpRequest2(req)
+}
+*/
