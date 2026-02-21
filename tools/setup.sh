@@ -15,10 +15,15 @@ fi
 echo "Ubuntu 22.04 (jammy) のcloud imageをダウンロードしてカスタマイズする"
 
 cd /var/lib/marmot/volumes
-if [ ${CI_ENVIRONMENT} = "true" ]; then
-  curl -OL http://10.1.0.12/${IMAGE}
-else
+
+echo "cloud imageをダウンロードする" 
+echo "環境変数 CI_ENVIRONMENT の値: ${CI_ENVIRONMENT}"
+if [ -z "${CI_ENVIRONMENT}" ]; then
+  echo "環境変数 CI_ENVIRONMENT は定義されていません。インターネットからcloud imageをダウンロードします。"
   curl -OL https://cloud-images.ubuntu.com/jammy/20251216/${IMAGE}
+else
+  echo "環境変数 CI_ENVIRONMENT は定義されています。社内サーバーからcloud imageをダウンロードします。"
+  curl -OL http://10.1.0.12/${IMAGE}
 fi
 
 echo "cloud imageのカスタマイズを行う"

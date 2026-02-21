@@ -19,7 +19,6 @@ const (
 	SERVER_STOPPED      = 3 // 停止中
 	SERVER_ERROR        = 4 // エラー状態
 	SERVER_DELETING     = 5 // 削除中
-	//SERVER_DELETED      = 6 // 削除済み
 )
 
 var ServerStatus = map[int]string{
@@ -29,7 +28,6 @@ var ServerStatus = map[int]string{
 	3: "STOPPED",
 	4: "ERROR",
 	5: "DELETING",
-	//6: "DELETED",
 }
 
 // サーバーを登録、サーバーを一意に識別するIDを自動生成
