@@ -631,10 +631,10 @@ components:
         Metadata:
           $ref: "#/components/schemas/Metadata"
         Spec:
-          $ref: "#/components/schemas/VlanSpec"
+          $ref: "#/components/schemas/VirtualNetworkSpec"
         Status:
           $ref: "#/components/schemas/Status"
-    VlanSpec:
+    VirtualNetworkSpec:
       type: object
       properties:
         forwardMode:
@@ -649,10 +649,37 @@ components:
           type: string
         netmask:
           type: string
+        dhcp:
+          type: boolean
         dhcpStartAddress:
           type: string
         dhcpEndAddress:
           type: string
-        virshNetXml:
+        nat:
+          type: boolean
+    IPNetwork:
+      type: object
+      required:
+        - Id
+      properties:
+        Id:
           type: string
-
+        AddressMaskLen:
+          type: string
+        StartAddress:
+          type: string
+        EndAddress:
+          type: string
+    IPAddress:
+      type: object
+      required:
+        - Address
+      properties:
+        NetworkId:
+          type: string
+        IPAddress:
+          type: string
+        Netmask:
+          type: string
+        HostId:
+          type: string

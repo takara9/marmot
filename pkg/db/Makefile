@@ -11,3 +11,7 @@ test-server:
 .PHONY: test-network
 test-network:
 	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus="Networks" -coverprofile cover.out
+
+.PHONY: test-ipam
+test-ipam:
+	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus="IPAM" -coverprofile cover.out

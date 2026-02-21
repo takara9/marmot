@@ -61,7 +61,7 @@ var _ = Describe("Networks", Ordered, func() {
 					Metadata: &api.Metadata{
 						Name: util.StringPtr("net01"),
 					},
-					Spec: &api.VlanSpec{
+					Spec: &api.VirtualNetworkSpec{
 						BridgeName:       util.StringPtr("br01"),
 						DhcpEndAddress:   util.StringPtr("192.168.122.0"),
 						DhcpStartAddress: util.StringPtr("192.168.122.254"),
@@ -107,7 +107,7 @@ var _ = Describe("Networks", Ordered, func() {
 					Metadata: &api.Metadata{
 						Name: util.StringPtr("net02"),
 					},
-					Spec: &api.VlanSpec{
+					Spec: &api.VirtualNetworkSpec{
 						BridgeName:       util.StringPtr("br01"),
 						DhcpEndAddress:   util.StringPtr("192.168.122.0"),
 						DhcpStartAddress: util.StringPtr("192.168.122.254"),
@@ -125,7 +125,7 @@ var _ = Describe("Networks", Ordered, func() {
 					Metadata: &api.Metadata{
 						Name: util.StringPtr("net03"),
 					},
-					Spec: &api.VlanSpec{
+					Spec: &api.VirtualNetworkSpec{
 						BridgeName:       util.StringPtr("br01"),
 						DhcpEndAddress:   util.StringPtr("192.168.122.0"),
 						DhcpStartAddress: util.StringPtr("192.168.122.254"),
