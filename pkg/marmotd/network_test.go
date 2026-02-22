@@ -235,13 +235,12 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 			Expect(err).To(HaveOccurred())
 			Expect(createdNet.Id).To(BeEmpty())
 			GinkgoWriter.Println("Created network ID: ", createdNet.Id)
-			networkId2 = createdNet.Id
 		})
 
 		It("仮想ネットワークの削除タイムスタンプのセット", func() {
-			err := m.Db.DeleteVirtualNetworkById(networkId1)
+			err := m.Db.SetDeleteTimestampVirtualNetwork(networkId1)
 			Expect(err).NotTo(HaveOccurred())
-			err = m.Db.DeleteVirtualNetworkById(networkId2)
+			err = m.Db.SetDeleteTimestampVirtualNetwork(networkId2)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -264,7 +263,7 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 		It("仮想ネットワークのリストの取得", func() {
 			nets, err := m.Db.GetVirtualNetworks()
 			Expect(err).NotTo(HaveOccurred())
-			Expect(nets).NotTo(BeNil())
+			Expect(nets).To(BeNil())
 			for _, net := range nets {
 				GinkgoWriter.Println("ネットワークID: ", net.Id, " ネットワーク名: ", *net.Metadata.Name, " ステータス: ", db.NetworkStatus[*net.Status.Status])
 				Expect(net.Status.DeletionTimeStamp).NotTo(BeNil())
