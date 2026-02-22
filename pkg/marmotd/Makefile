@@ -42,3 +42,8 @@ set-version:
 .PHONY:	download-image
 download-image:
 	mc cp myminio/os-image/ubuntu22.04.img testdata/ubuntu22.04.qcow2
+
+
+.PHONY: test-network
+test-network:
+	$(GO) test -ginkgo.focus="VirtualPrivateNetworks" -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
