@@ -2,6 +2,7 @@ package marmotd_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/config"
+	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
 	"github.com/takara9/marmot/pkg/util"
 )
@@ -126,8 +128,9 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 
 	// 最初はコントローラーなしでテストなので、
 	// etcdに反映されることを確認するまでとする。
-	Context("仮想ネットワークの生成から削除   作成中", func() {
+	Context("仮想ネットワークの生成から削除", func() {
 		var m *marmotd.Marmot
+		var networkId1, networkId2 string
 		//var err error
 
 		It("Marmotインスタンスの生成", func() {
@@ -149,6 +152,126 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 			Expect(createdNet.Id).NotTo(BeEmpty())
 			Expect(createdNet.Metadata.Uuid).NotTo(BeNil())
 			Expect(createdNet.Spec.IpAddress).To(Equal(util.StringPtr("192.168.200.0/24")))
+			GinkgoWriter.Println("Created network ID: ", createdNet.Id)
+			networkId1 = createdNet.Id
+		})
+
+		It("仮想ネットワークの情報取得", func() {
+			net, err := m.Db.GetVirtualNetworkById(networkId1)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(net).NotTo(BeNil())
+			jsonByte, err := json.MarshalIndent(net, "", "  ")
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(jsonByte))
+		})
+
+		It("同一サブネットの仮想ネットワークの生成", func() {
+			var net api.VirtualNetwork
+			var meta api.Metadata
+			var spec api.VirtualNetworkSpec
+			net.Metadata = &meta
+			net.Spec = &spec
+			net.Metadata.Name = util.StringPtr("test-network2")
+			net.Spec.IpAddress = util.StringPtr("192.168.200.0/24")
+			createdNet, err := m.Db.CreateVirtualNetwork(net)
+			Expect(err).ToNot(HaveOccurred())
+			GinkgoWriter.Println("Created network ID: ", createdNet.Id)
+			networkId2 = createdNet.Id
+		})
+
+		It("仮想ネットワークのステータス更新", func() {
+			m.Db.UpdateVirtualNetworkStatus(networkId1, db.NETWORK_ACTIVE)
+		})
+
+		It("仮想ネットワークの情報取得", func() {
+			net, err := m.Db.GetVirtualNetworkById(networkId1)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(net).NotTo(BeNil())
+			jsonByte, err := json.MarshalIndent(net, "", "  ")
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(jsonByte))
+		})
+
+		It("仮想ネットワークのステータス更新", func() {
+			m.Db.UpdateVirtualNetworkStatus(networkId2, db.NETWORK_INACTIVE)
+		})
+
+		It("稼働ネットワークの情報更新", func() {
+			var net api.VirtualNetwork
+			var spec api.VirtualNetworkSpec
+			net.Spec = &spec
+			net.Spec.Dhcp = util.BoolPtr(true)
+			err := m.Db.UpdateVirtualNetworkById(networkId1, net)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("仮想ネットワークの情報取得", func() {
+			net, err := m.Db.GetVirtualNetworkById(networkId1)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(net).NotTo(BeNil())
+			jsonByte, err := json.MarshalIndent(net, "", "  ")
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(jsonByte))
+		})
+
+		It("仮想ネットワークの情報取得", func() {
+			net, err := m.Db.GetVirtualNetworkById(networkId2)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(net).NotTo(BeNil())
+			jsonByte, err := json.MarshalIndent(net, "", "  ")
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(jsonByte))
+		})
+
+		It("同一ネットワーク名の仮想ネットワークの生成", func() {
+			var net api.VirtualNetwork
+			var meta api.Metadata
+			var spec api.VirtualNetworkSpec
+			net.Metadata = &meta
+			net.Spec = &spec
+			net.Metadata.Name = util.StringPtr("test-network2")
+			net.Spec.IpAddress = util.StringPtr("192.168.201.0/24")
+			createdNet, err := m.Db.CreateVirtualNetwork(net)
+			Expect(err).To(HaveOccurred())
+			Expect(createdNet.Id).To(BeEmpty())
+			GinkgoWriter.Println("Created network ID: ", createdNet.Id)
+			networkId2 = createdNet.Id
+		})
+
+		It("仮想ネットワークの削除タイムスタンプのセット", func() {
+			err := m.Db.DeleteVirtualNetworkById(networkId1)
+			Expect(err).NotTo(HaveOccurred())
+			err = m.Db.DeleteVirtualNetworkById(networkId2)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("仮想ネットワークのリストの取得 削除中", func() {
+			nets, err := m.Db.GetVirtualNetworks()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(nets).NotTo(BeNil())
+			jsonByte, err := json.MarshalIndent(nets, "", "  ")
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(jsonByte))
+		})
+
+		It("仮想ネットワークの削除", func() {
+			err := m.Db.DeleteVirtualNetworkById(networkId1)
+			Expect(err).NotTo(HaveOccurred())
+			err = m.Db.DeleteVirtualNetworkById(networkId2)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("仮想ネットワークのリストの取得", func() {
+			nets, err := m.Db.GetVirtualNetworks()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(nets).NotTo(BeNil())
+			for _, net := range nets {
+				GinkgoWriter.Println("ネットワークID: ", net.Id, " ネットワーク名: ", *net.Metadata.Name, " ステータス: ", db.NetworkStatus[*net.Status.Status])
+				Expect(net.Status.DeletionTimeStamp).NotTo(BeNil())
+			}
+			jsonByte, err := json.MarshalIndent(nets, "", "  ")
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(jsonByte))
 		})
 
 	})

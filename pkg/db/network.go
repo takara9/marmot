@@ -35,6 +35,20 @@ func (d *Database) CreateVirtualNetwork(spec api.VirtualNetwork) (api.VirtualNet
 	d.LockKey("/lock/virtualnetwork/create")
 	defer d.UnlockKey(d.Mutex)
 
+	// 同一ネットワーク名のネットワークが存在しないか確認
+	networks, err := d.GetVirtualNetworks()
+	if err != nil {
+		slog.Error("CreateVirtualNetwork() GetVirtualNetworks() failed", "err", err)
+		return api.VirtualNetwork{}, err
+	}
+	for _, n := range networks {
+		if n.Metadata.Name != nil && spec.Metadata.Name != nil && *n.Metadata.Name == *spec.Metadata.Name {
+			err := fmt.Errorf("network with the same name already exists: %s", *spec.Metadata.Name)
+			slog.Error("CreateVirtualNetwork()", "err", err)
+			return api.VirtualNetwork{}, err
+		}
+	}
+
 	// DeepCopyでspecの内容をコピー
 	network, err := util.DeepCopy(spec)
 	if err != nil {
@@ -198,14 +212,14 @@ func (d *Database) UpdateVirtualNetworkStatus(id string, status int) {
 }
 
 func (d *Database) SetDeleteTimestampVirtualNetwork(id string) error {
-	server, err := d.GetServerById(id)
+	network, err := d.GetVirtualNetworkById(id)
 	if err != nil {
-		slog.Error("SetDeleteTimestamp() GetServerById() failed", "err", err, "serverId", id)
+		slog.Error("SetDeleteTimestamp() GetVirtualNetworkById() failed", "err", err, "networkId", id)
 		return err
 	}
-	server.Status.DeletionTimeStamp = util.TimePtr(time.Now())
-	if err := d.UpdateServer(id, server); err != nil {
-		slog.Error("SetDeleteTimestamp() UpdateServer() failed", "err", err, "serverId", id)
+	network.Status.DeletionTimeStamp = util.TimePtr(time.Now())
+	if err := d.UpdateVirtualNetworkById(id, network); err != nil {
+		slog.Error("SetDeleteTimestamp() UpdateVirtualNetworkById() failed", "err", err, "networkId", id)
 		return err
 	}
 	return nil
