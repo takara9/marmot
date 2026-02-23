@@ -3,6 +3,7 @@ package virt
 import (
 	"encoding/xml"
 	"fmt"
+	"log/slog"
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/util"
@@ -10,49 +11,37 @@ import (
 	"libvirt.org/go/libvirtxml"
 )
 
-func CreateVirtualNetworkXML(net api.VirtualNetwork) error {
+func CreateVirtualNetworkXML(net api.VirtualNetwork) (*libvirtxml.Network, error) {
 	// 入力チェック
 	if net.Metadata == nil {
-		return fmt.Errorf("Metadata is required")
+		return nil, fmt.Errorf("Metadata is required")
 	}
 	if net.Metadata.Name == nil {
-		return fmt.Errorf("Metadata.Name is required")
+		return nil, fmt.Errorf("Metadata.Name is required")
 	}
 	if net.Metadata.Uuid == nil {
-		return fmt.Errorf("Metadata.Uuid is required")
+		return nil, fmt.Errorf("Metadata.Uuid is required")
 	}
 	if net.Spec.BridgeName == nil {
-		return fmt.Errorf("BridgeName is required")
-	}
-	if net.Spec.IpAddress == nil {
-		return fmt.Errorf("IpAddress is required")
-	}
-	if net.Spec.Netmask == nil {
-		return fmt.Errorf("Netmask is required")
+		return nil, fmt.Errorf("BridgeName is required")
 	}
 
 	// デフォルト値の設定
-
 	// フォワードモードのデフォルトはブリッジ
 	if net.Spec.ForwardMode == nil {
 		net.Spec.ForwardMode = util.StringPtr("bridge")
 	}
 
-	// フォワードモードがNATの場合、DHCPの開始・終了アドレスのデフォルトを設定
-	//if *net.Spec.ForwardMode == "nat" {
-	//	if net.Spec.DhcpStartAddress == nil {
-	//		net.Spec.DhcpStartAddress = util.StringPtr("192.168.122.2")
-	//	}
-	//	if net.Spec.DhcpEndAddress == nil {
-	//		net.Spec.DhcpEndAddress = util.StringPtr("192.168.122.254")
-	//	}
-	//}
+	// NATを有効にする場合、フォワードモードのデフォルトはNAT
+	if net.Spec.Nat != nil && *net.Spec.Nat == true {
+		net.Spec.ForwardMode = util.StringPtr("nat")
+	}
 
 	// MACアドレスのデフォルトはランダム生成
 	if net.Spec.MacAddress == nil {
 		mac, err := util.GenerateRandomMAC()
 		if err != nil {
-			return fmt.Errorf("Failed to generate random MAC address: %v", err)
+			return nil, fmt.Errorf("Failed to generate random MAC address: %v", err)
 		}
 		net.Spec.MacAddress = util.StringPtr(mac.String())
 	}
@@ -62,21 +51,25 @@ func CreateVirtualNetworkXML(net api.VirtualNetwork) error {
 			Space: "",
 			Local: *net.Metadata.Name,
 		},
+		Name: *net.Metadata.Name,
 		UUID: *net.Metadata.Uuid,
 		MAC: &libvirtxml.NetworkMAC{
 			Address: *net.Spec.MacAddress,
-		},
-		IPs: []libvirtxml.NetworkIP{
-			{
-				Address: *net.Spec.IpAddress,
-				Netmask: *net.Spec.Netmask,
-			},
 		},
 		Bridge: &libvirtxml.NetworkBridge{
 			Name:  *net.Spec.BridgeName,
 			STP:   "on",
 			Delay: "0",
 		},
+	}
+
+	if net.Spec.IpAddress != nil && net.Spec.Netmask != nil {
+		netxml.IPs = []libvirtxml.NetworkIP{
+			{
+				Address: *net.Spec.IpAddress,
+				Netmask: *net.Spec.Netmask,
+			},
+		}
 	}
 
 	if net.Spec.Nat != nil && *net.Spec.Nat == true {
@@ -110,13 +103,13 @@ func CreateVirtualNetworkXML(net api.VirtualNetwork) error {
 		}
 	}
 
-	xml, err := netxml.Marshal()
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Generated XML:\n%s\n", xml)
+	//xml, err := netxml.Marshal()
+	//if err != nil {
+	//	return nil, err
+	//}
+	//fmt.Printf("Generated XML:\n%s\n", xml)
 
-	return nil
+	return netxml, nil
 }
 
 func (l *LibVirtEp) ActivateVirtualNetworks(name string) error {
@@ -141,6 +134,69 @@ func (l *LibVirtEp) GetVirtualNetworkByName(name string) (*libvirt.Network, erro
 }
 
 func (l *LibVirtEp) DeleteVirtualNetwork(name string) error {
+	net, err := l.Com.LookupNetworkByName(name)
+	if err != nil {
+		slog.Error("Error looking up network", "err", err)
+		return err
+	}
+	if err = net.Destroy(); err != nil {
+		slog.Error("Error destroying network", "err", err)
+		return err
+	}
+	if err := net.Undefine(); err != nil {
+		slog.Error("Error undefining network", "err", err)
+	}
 
 	return nil
+}
+
+// 仮想ネットワークの定義と開始
+func (l *LibVirtEp) DefineAndStartVirtualNetwork(network libvirtxml.Network) error {
+	slog.Debug("DefineAndStartVirtualNetwork called", "network", network.Name)
+
+	xmlString, err := network.Marshal()
+	if err != nil {
+		slog.Error("Error marshaling network XML", "err", err)
+		return err
+	}
+
+	fmt.Println("Generated Network XML:", string(xmlString))
+
+	// Create Network
+	net, err := l.Com.NetworkDefineXML(xmlString)
+	if err != nil {
+		slog.Error("Error defining network", "err", err)
+		return err
+	}
+
+	// Start Network
+	err = net.Create()
+	if err != nil {
+		slog.Error("Error starting network", "err", err)
+		return err
+	}
+
+	//オートスタートを設定しないと、HVの再起動からの復帰時、停止している。
+	err = net.SetAutostart(true)
+	if err != nil {
+		slog.Error("Error setting network autostart", "err", err)
+		return err
+	}
+	defer net.Free()
+
+	return nil
+}
+
+func (l *LibVirtEp) ListNetworks() ([]string, error) {
+	var nameList []string
+
+	networks, err := l.Com.ListNetworks()
+	if err != nil {
+		return nameList, err
+	}
+
+	for _, net := range networks {
+		nameList = append(nameList, net)
+	}
+	return nameList, nil
 }
