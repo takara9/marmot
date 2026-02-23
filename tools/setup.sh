@@ -23,6 +23,7 @@ if [ -z "${CI_ENVIRONMENT}" ]; then
   echo "環境変数 CI_ENVIRONMENT は定義されていません。インターネットからcloud imageをダウンロードします。"
   curl -OL https://cloud-images.ubuntu.com/releases/jammy/release-20260218/${IMAGE}
 else
+  IMAGE="jammy-server-cloudimg-amd64.img"
   echo "環境変数 CI_ENVIRONMENT は定義されています。社内サーバーからcloud imageをダウンロードします。"
   curl -OL http://10.1.0.12/${IMAGE}
 fi
