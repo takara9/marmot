@@ -433,12 +433,18 @@ var _ = Describe("IPAM", Ordered, func() {
 			It("ネットワークの削除", func() {
 				err = v.DeleteIpNetworkById(idIpv4_1)
 				Expect(err).NotTo(HaveOccurred())
+				_, err = v.GetIpNetworkById(idIpv4_1)
+				Expect(err).To(HaveOccurred()) // 削除されたネットワークは取得できないことを期待
 
 				err = v.DeleteIpNetworkById(idIpv4_2)
 				Expect(err).NotTo(HaveOccurred())
+				_, err = v.GetIpNetworkById(idIpv4_2)
+				Expect(err).To(HaveOccurred()) // 削除されたネットワークは取得できないことを期待
 
 				err = v.DeleteIpNetworkById(idIpv6_1)
 				Expect(err).NotTo(HaveOccurred())
+				_, err = v.GetIpNetworkById(idIpv6_1)
+				Expect(err).To(HaveOccurred()) // 削除されたネットワークは取得できないことを期待
 			})
 
 			It("データベース接続のクローズ", func() {

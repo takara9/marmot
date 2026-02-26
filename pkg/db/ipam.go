@@ -122,7 +122,21 @@ func (d *Database) CreateIpNetwork(spec *api.IPNetwork) (string, error) {
 // IPネットワークアドレスを無指定で、自動生成して永続化する
 // 戻り値は、ネットワークIDなどの識別子
 func (d *Database) CreateAnyIpNetwork() (string, error) {
-	return "", nil
+	slog.Debug("CreateAnyIpNetwork()", "spec", "")
+	for i := 100; i < 200; i++ {
+		netadd := fmt.Sprintf("172.16.%d.0/24", i)
+		ipNetSpec := &api.IPNetwork{
+			AddressMaskLen: util.StringPtr(netadd),
+		}
+		id, err := d.CreateIpNetwork(ipNetSpec)
+		if err != nil {
+			continue
+		} else {
+			return id, nil
+		}
+	}
+	slog.Error("CreateAnyIpNetwork()", "err", "Failed to create any IP network after 100 attempts")
+	return "", fmt.Errorf("failed to create any IP network after 100 attempts")
 }
 
 func (d *Database) GetIpNetworks() ([]api.IPNetwork, error) {
@@ -176,7 +190,7 @@ func (d *Database) DeleteIpNetworkById(id string) error {
 	if len(ips) > 0 {
 		slog.Error("DeleteIpNetworkById() failed", "err", fmt.Errorf("cannot delete network with allocated IPs"), "netId", id, "allocatedIPsCount", len(ips))
 		return fmt.Errorf("cannot delete network with allocated IPs")
-	}	
+	}
 
 	key := IPNetworkPrefix + "/" + id
 	return d.DeleteJSON(key)

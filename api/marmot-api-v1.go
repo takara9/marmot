@@ -28,10 +28,11 @@ type IPAddress struct {
 
 // IPNetwork defines model for IPNetwork.
 type IPNetwork struct {
-	AddressMaskLen *string `json:"AddressMaskLen,omitempty"`
-	EndAddress     *string `json:"EndAddress,omitempty"`
-	Id             string  `json:"Id"`
-	StartAddress   *string `json:"StartAddress,omitempty"`
+	AddressMaskLen   *string `json:"AddressMaskLen,omitempty"`
+	EndAddress       *string `json:"EndAddress,omitempty"`
+	Id               string  `json:"Id"`
+	StartAddress     *string `json:"StartAddress,omitempty"`
+	VirtualNetworkId *string `json:"virtualNetworkId,omitempty"`
 }
 
 // Metadata defines model for Metadata.
@@ -143,6 +144,7 @@ type VirtualNetworkSpec struct {
 	DhcpStartAddress *string `json:"dhcpStartAddress,omitempty"`
 	ForwardMode      *string `json:"forwardMode,omitempty"`
 	IpAddress        *string `json:"ipAddress,omitempty"`
+	IpNetworkId      *string `json:"ipNetworkId,omitempty"`
 	MacAddress       *string `json:"macAddress,omitempty"`
 	Nat              *bool   `json:"nat,omitempty"`
 	Netmask          *string `json:"netmask,omitempty"`

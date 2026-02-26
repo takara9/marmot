@@ -100,23 +100,6 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 			}).Should(Succeed())
 		})
 
-		/*
-			It("動作確認 CheckHypervisors()", func() {
-				GinkgoWriter.Println(nodeName)
-				hv, err := marmotServer.Ma.Db.CheckHypervisors(etcdUrl, nodeName)
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("xxxxxx array size == ", len(hv))
-				for i, v := range hv {
-					GinkgoWriter.Println("xxxxxx hv index    == ", i)
-					GinkgoWriter.Println("xxxxxx hv nodename == ", v.NodeName)
-					GinkgoWriter.Println("xxxxxx hv port     == ", *v.Port)
-					GinkgoWriter.Println("xxxxxx hv CPU      == ", v.Cpu)
-					GinkgoWriter.Println("xxxxxx hv Mem      == ", *v.Memory)
-					GinkgoWriter.Println("xxxxxx hv IP addr  == ", *v.IpAddr)
-				}
-			})
-		*/
-
 		It("Check the config file to directly etcd", func() {
 			cmd := exec.Command(etcdctlExe, "--endpoints=localhost:9379", "get", "hvc")
 			cmd.Env = append(os.Environ(), "ETCDCTL_API=3")

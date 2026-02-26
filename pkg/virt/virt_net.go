@@ -123,7 +123,22 @@ func (l *LibVirtEp) InactivateVirtualNetworks(name string) error {
 }
 
 func (l *LibVirtEp) GetVirtualNetworks() (*[]libvirt.Network, error) {
+	slog.Debug("Libvirt GetVirtualNetworks called")
+
 	var networks []libvirt.Network
+	nameList, err := l.ListNetworks()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, name := range nameList {
+		net, err := l.Com.LookupNetworkByName(name)
+		if err != nil {
+			slog.Error("Error getting network by name", "err", err)
+			continue
+		}
+		networks = append(networks, *net)
+	}
 
 	return &networks, nil
 }

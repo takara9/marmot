@@ -47,3 +47,7 @@ download-image:
 .PHONY: test-network
 test-network:
 	$(GO) test -ginkgo.focus="VirtualPrivateNetworks" -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+
+.PHONY: test-network2
+test-network2:
+	$(GO) test -ginkgo.focus="VirtualPrivateNetworksUpperlayer" -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events

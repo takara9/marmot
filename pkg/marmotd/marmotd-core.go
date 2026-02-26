@@ -10,6 +10,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/virt"
 )
 
 //go:embed version.txt
@@ -22,6 +23,7 @@ type Marmot struct {
 	NodeName string
 	EtcdUrl  string
 	Db       *db.Database
+	Virt     *virt.LibVirtEp
 }
 
 type Server struct {
@@ -37,16 +39,31 @@ func NewMarmot(nodeName string, etcdUrl string) (*Marmot, error) {
 	var err error
 	m.Db, err = db.NewDatabase(etcdUrl)
 	if err != nil {
+		slog.Error("Failed to initialize database", "err", err)
 		return nil, err
 	}
 	m.NodeName = nodeName
 	m.EtcdUrl = etcdUrl
+	m.Virt, err = virt.NewLibVirtEp("qemu:///system")
+	if err != nil {
+		slog.Error("Failed to initialize libvirt endpoint", "err", err)
+		return nil, err
+	}
 	return &m, nil
 }
 
 // Marmot インスタンスの終了
 func (m *Marmot) Close() error {
-	return m.Db.Close()
+	if m.Virt != nil {
+		m.Virt.Close()
+	}
+	if m.Db != nil {
+		if err := m.Db.Close(); err != nil {
+			slog.Error("Failed to close database", "err", err)
+			return err
+		}
+	}
+	return nil
 }
 
 // marmotd サーバーの生成、REST API サーバーを起動する
@@ -85,4 +102,3 @@ func (s *Server) GetVersion(ctx echo.Context) error {
 	v.ServerVersion = &Version
 	return ctx.JSON(http.StatusOK, v)
 }
-

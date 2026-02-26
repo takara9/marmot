@@ -211,6 +211,7 @@ func (d *Database) UpdateVirtualNetworkStatus(id string, status int) {
 	}
 }
 
+// 仮想ネットワークオブジェクトの削除タイムスタンプをセット
 func (d *Database) SetDeleteTimestampVirtualNetwork(id string) error {
 	network, err := d.GetVirtualNetworkById(id)
 	if err != nil {
@@ -222,5 +223,37 @@ func (d *Database) SetDeleteTimestampVirtualNetwork(id string) error {
 		slog.Error("SetDeleteTimestamp() UpdateVirtualNetworkById() failed", "err", err, "networkId", id)
 		return err
 	}
+	return nil
+}
+
+// 既存ネットワークの取得とデータベースへの登録
+func (d *Database) PutVirtualNetworksETCD(vnet api.VirtualNetwork) error {
+	slog.Debug("PutVirtualNetworksETCD called")
+
+	// 作成したオブジェクトをデータベースに保存
+	d.LockKey("/lock/virtualnetwork/create")
+	defer d.UnlockKey(d.Mutex)
+
+	// DeepCopyでvnetの内容をコピー
+	network, err := util.DeepCopy(vnet)
+	if err != nil {
+		slog.Error("CreateVirtualNetwork()", "err", err)
+		return err
+	}
+
+	// IDは一意であると信じて処理
+	key := NetworkPrefix + "/" + vnet.Id
+
+	// ステータスセット、タイムスタンプセット
+	var s api.Status
+	s.Status = util.IntPtrInt(NETWORK_PENDING)
+	s.CreationTimeStamp = util.TimePtr(time.Now())
+	s.LastUpdateTimeStamp = util.TimePtr(time.Now())
+	network.Status = &s
+	if err := d.PutJSON(key, network); err != nil {
+		slog.Error("failed to write database data", "err", err, "key", key)
+		return err
+	}
+
 	return nil
 }

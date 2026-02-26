@@ -657,6 +657,8 @@ components:
           type: string
         nat:
           type: boolean
+        ipNetworkId:
+          type: string
     IPNetwork:
       type: object
       required:
@@ -669,6 +671,8 @@ components:
         StartAddress:
           type: string
         EndAddress:
+          type: string
+        virtualNetworkId:
           type: string
     IPAddress:
       type: object
