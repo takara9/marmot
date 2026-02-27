@@ -67,8 +67,10 @@ func (m *Marmot) GetVirtualNetworksAndPutDB() ([]api.VirtualNetwork, error) {
 			return nil, err
 		}
 
-		net.Spec.ForwardMode = util.StringPtr(libnet.Forward.Mode)
-		net.Spec.Nat = util.BoolPtr(libnet.Forward.NAT != nil)
+		if libnet.Forward != nil {
+			net.Spec.ForwardMode = util.StringPtr(libnet.Forward.Mode)
+			net.Spec.Nat = util.BoolPtr(libnet.Forward.NAT != nil)
+		}
 		if libnet.MAC != nil {
 			net.Spec.MacAddress = util.StringPtr(libnet.MAC.Address)
 		}
@@ -84,11 +86,6 @@ func (m *Marmot) GetVirtualNetworksAndPutDB() ([]api.VirtualNetwork, error) {
 
 		// TODO: VLAN Trunk を追加
 
-		// 仮想ネットワークの状態をACTIVEに更新
-		net.Status = &api.Status{
-			Status: util.IntPtrInt(db.NETWORK_ACTIVE),
-		}
-
 		// 既にETCDに登録されているか確認
 		_, err = m.Db.GetVirtualNetworkById(net.Id)
 		if err == nil {
@@ -100,6 +97,13 @@ func (m *Marmot) GetVirtualNetworksAndPutDB() ([]api.VirtualNetwork, error) {
 				slog.Error("Failed to put virtual network to ETCD", "err", err)
 			}
 		}
+
+		// 仮想ネットワークの状態をACTIVEに更新
+		//net.Status = &api.Status{
+		//	Status: util.IntPtrInt(db.NETWORK_ACTIVE),
+		//}
+		m.Db.UpdateVirtualNetworkStatus(net.Id, db.NETWORK_ACTIVE)
+
 		// 戻り値に追加
 		apiNetworks = append(apiNetworks, net)
 	}
@@ -189,4 +193,15 @@ func (m *Marmot) DeleteVirtualNetwork(networkId string) error {
 	}
 
 	return nil
+}
+
+// 仮想ネットワークの参照
+func (m *Marmot) GetVirtualNetwork() ([]api.VirtualNetwork, error) {
+	slog.Debug("GetVirtualNetwork called")
+	networks, err := m.Db.GetVirtualNetworks()
+	if err != nil {
+		slog.Error("Failed to get virtual networks", "err", err)
+		return nil, err
+	}
+	return networks, nil
 }
