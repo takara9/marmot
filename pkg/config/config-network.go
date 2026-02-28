@@ -46,10 +46,10 @@ type Status struct {
 
 // VirtualNetwork defines model for VirtualNetwork.
 type VirtualNetwork struct {
+	Id       string              `yaml:"id"`
 	Metadata *Metadata           `yaml:"Metadata,omitempty"`
 	Spec     *VirtualNetworkSpec `yaml:"Spec,omitempty"`
 	Status   *Status             `yaml:"Status,omitempty"`
-	Id       string              `yaml:"id"`
 }
 
 // VirtualNetworkSpec defines model for VirtualNetworkSpec.
