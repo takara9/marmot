@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/config"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -14,22 +15,24 @@ var networkListCmd = &cobra.Command{
 	Short: "List all networks",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var err error
-
 		byteBody, _, err := m.GetVirtualNetworks()
 		if err != nil {
 			println("エラー応答が返されました。", "err", err)
 			return nil
 		}
 
-		//var data interface{}
 		var data []api.VirtualNetwork
+		if err := json.Unmarshal(byteBody, &data); err != nil {
+			println("Failed to Unmarshal", err)
+			return err
+		}
+		if len(data) == 0 {
+			fmt.Println("No networks found.")
+			return nil
+		}
+
 		switch outputStyle {
 		case "text":
-			if string(byteBody) == "null\n" {
-				fmt.Println("仮想ネットワークが見つかりません。")
-				return nil
-			}
-
 			for i, network := range data {
 				fmt.Printf("  %2d", i+1)
 				fmt.Printf("  %-10v", network.Id)
@@ -40,10 +43,6 @@ var networkListCmd = &cobra.Command{
 			return nil
 
 		case "json":
-			if err := json.Unmarshal(byteBody, &data); err != nil {
-				println("Failed to Unmarshal", err)
-				return err
-			}
 			byteBody, err := json.MarshalIndent(data, "", "  ")
 			if err != nil {
 				fmt.Println("Failed to Marshal", err)
@@ -52,14 +51,14 @@ var networkListCmd = &cobra.Command{
 			return nil
 
 		case "yaml":
-			var data interface{}
-			if err := json.Unmarshal(byteBody, &data); err != nil {
-				fmt.Println("Failed to Unmarshal", err)
+			var data []config.VirtualNetwork
+			if err := yaml.Unmarshal(byteBody, &data); err != nil {
+				println("Failed to Unmarshal", err)
 				return err
 			}
 			yamlBytes, err := yaml.Marshal(data)
 			if err != nil {
-				fmt.Println("Failed to Marshal", err)
+				fmt.Println("Error:", err)
 				return err
 			}
 			fmt.Println(string(yamlBytes))

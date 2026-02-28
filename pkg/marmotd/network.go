@@ -86,6 +86,18 @@ func (m *Marmot) GetVirtualNetworksAndPutDB() ([]api.VirtualNetwork, error) {
 
 		// TODO: VLAN Trunk を追加
 
+		// 同じ名前のネットワークが既にETCDに登録されているか確認
+		existingNet, err := m.Db.GetVirtualNetworkByName(name)
+		if err == nil {
+			if existingNet.Metadata.Uuid != net.Metadata.Uuid {
+				err := m.Db.DeleteVirtualNetworkById(existingNet.Id)
+				if err != nil {
+					slog.Error("Failed to delete existing virtual network in ETCD", "err", err, "networkId", existingNet.Id)
+					continue
+				}
+			}
+		}
+
 		// 既にETCDに登録されているか確認
 		_, err = m.Db.GetVirtualNetworkById(net.Id)
 		if err == nil {

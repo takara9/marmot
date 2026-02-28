@@ -39,7 +39,6 @@ func (s *Server) DeleteNetworkById(ctx echo.Context, id string) error {
 	return ctx.NoContent(204)
 }
 
-
 // クライアントから仮想ネットワークの情報を受け取って、仮想ネットワークをIDで更新する
 // ここでは、etcdに書き込むだけで、実際に仮想ネットワークを更新するのはコントローラー側で行う
 func (s *Server) UpdateNetworkById(ctx echo.Context, id string) error {
@@ -57,10 +56,10 @@ func (s *Server) UpdateNetworkById(ctx echo.Context, id string) error {
 	return ctx.NoContent(204)
 }
 
-
 // 参照のみ
 // 仮想ネットワークのリストを取得して返す
 func (s *Server) GetNetworks(ctx echo.Context) error {
+	slog.Debug("===", "GetNetworks is called", "===")
 	networks, err := s.Ma.Db.GetVirtualNetworks()
 	if err != nil {
 		slog.Error("failed to get virtual networks", "err", err)
@@ -79,4 +78,3 @@ func (s *Server) GetNetworkById(ctx echo.Context, id string) error {
 	}
 	return ctx.JSON(200, network)
 }
-

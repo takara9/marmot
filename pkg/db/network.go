@@ -127,6 +127,36 @@ func (d *Database) GetVirtualNetworkById(id string) (api.VirtualNetwork, error) 
 	return network, nil
 }
 
+// 仮想ネットワークのリストを取得
+func (d *Database) GetVirtualNetworkByName(name string) (api.VirtualNetwork, error) {
+	var err error
+	var resp *etcd.GetResponse
+
+	slog.Debug("GetVirtualNetworkByName()", "key-prefix", NetworkPrefix)
+	resp, err = d.GetByPrefix(NetworkPrefix)
+	if err == ErrNotFound {
+		slog.Debug("no networks found", "key-prefix", NetworkPrefix)
+		return api.VirtualNetwork{}, ErrNotFound
+	} else if err != nil {
+		slog.Error("GetByPrefix() failed", "err", err, "key-prefix", NetworkPrefix)
+		return api.VirtualNetwork{}, err
+	}
+
+	for _, kv := range resp.Kvs {
+		var network api.VirtualNetwork
+		err := json.Unmarshal([]byte(kv.Value), &network)
+		if err != nil {
+			slog.Error("Unmarshal() failed", "err", err, "key", string(kv.Key))
+			continue
+		}
+		if network.Metadata.Name != nil && *network.Metadata.Name == name {
+			return network, nil
+		}
+	}
+
+	return api.VirtualNetwork{}, ErrNotFound
+}
+
 // 仮想ネットワークをIDで削除
 func (d *Database) DeleteVirtualNetworkById(id string) error {
 	lockKey := "/lock/virtualnetwork/" + id
