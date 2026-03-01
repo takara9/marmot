@@ -8,6 +8,7 @@ import (
 
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
+	"github.com/takara9/marmot/pkg/util"
 )
 
 const (
@@ -76,9 +77,10 @@ func (c *controller) controllerLoop() {
 		// 削除タイムスタンプが設定されて一定時間経過した仮想ネットワークのステータスをDELETINGに更新する
 		if vnet.Status != nil && vnet.Status.DeletionTimeStamp != nil {
 			deletionTime := *vnet.Status.DeletionTimeStamp
-			if time.Since(deletionTime) > 10*time.Second {
+			if time.Since(deletionTime) > 30*time.Second {
 				slog.Debug("削除のタイムスタンプが一定時間以上経過している仮想ネットワーク検出", "networkId", vnet.Id)
 				c.marmot.Db.UpdateVirtualNetworkStatus(vnet.Id, db.NETWORK_DELETING)
+				vnet.Status.Status = util.IntPtrInt(db.NETWORK_DELETING)
 			}
 		}
 

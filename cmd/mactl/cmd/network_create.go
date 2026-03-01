@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/config"
+	"github.com/takara9/marmot/pkg/util"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -16,7 +17,7 @@ var networkCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new network",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var conf config.Network
+		var conf config.VirtualNetwork
 		err := config.ReadYamlConfig(configFilename, &conf)
 		if err != nil {
 			println("ReadYamlConfig", "err", err)
@@ -24,14 +25,19 @@ var networkCreateCmd = &cobra.Command{
 		}
 
 		// 名前は必須項目
-		if len(conf.Name) == 0 {
+		if len(*conf.Metadata.Name) == 0 {
 			fmt.Println("Name is required in the configuration")
 			return fmt.Errorf("name is required in the configuration")
 		}
 
-		var virtualNetwork api.VirtualNetwork
+		var virtualNetwork *api.VirtualNetwork
+		virtualNetwork, err = util.ConvertToJSON(&conf)
+		if err != nil {
+			fmt.Println("ConvertToJSON", "err", err)
+			return err
+		}
 
-		byteBody, _, err := m.CreateVirtualNetwork(virtualNetwork)
+		byteBody, _, err := m.CreateVirtualNetwork(*virtualNetwork)
 		if err != nil {
 			fmt.Println("CreateVirtualNetwork", "err", err)
 			return err

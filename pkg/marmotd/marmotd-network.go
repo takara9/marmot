@@ -2,10 +2,14 @@ package marmotd
 
 import (
 	_ "embed"
+	"encoding/json"
+	"fmt"
 	"log/slog"
+	"net/http"
 
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/util"
 )
 
 // クライアントから仮想ネットワークの情報を受け取って、仮想ネットワークを作成する
@@ -18,6 +22,14 @@ func (s *Server) CreateNetwork(ctx echo.Context) error {
 		slog.Error("failed to bind request body", "err", err)
 		return echo.NewHTTPError(400, "invalid request body")
 	}
+
+	// デバッグ
+	jsonbytes, err := json.MarshalIndent(spec, "", "    ")
+	if err != nil {
+		slog.Error("failed to marshal request body", "err", err)
+		return echo.NewHTTPError(500, "failed to marshal request body")
+	}
+	fmt.Println("request body", "body", string(jsonbytes))
 
 	// 仮想ネットワークを作成する
 	network, err := s.Ma.Db.CreateVirtualNetwork(spec)
@@ -32,11 +44,17 @@ func (s *Server) CreateNetwork(ctx echo.Context) error {
 // 仮想ネットワークをIDで削除する
 // 実際に削除するのはコントローラー側で、ここではDBに削除タイムスタンプを設定するだけ
 func (s *Server) DeleteNetworkById(ctx echo.Context, id string) error {
-	if err := s.Ma.Db.DeleteVirtualNetworkById(id); err != nil {
-		slog.Error("failed to delete virtual network", "err", err, "networkId", id)
-		return echo.NewHTTPError(500, "failed to delete virtual network")
+	slog.Debug("===", "DeleteNetworkById is called", "===")
+
+	if err := s.Ma.Db.SetDeleteTimestampVirtualNetwork(id); err != nil {
+		slog.Error("SetDeleteTimestampVirtualNetwork()", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-	return ctx.NoContent(204)
+
+	var resp api.Success
+	resp.Id = id
+	resp.Message = util.StringPtr("Accepted the request to delete the network")
+	return ctx.JSON(http.StatusOK, resp)
 }
 
 // クライアントから仮想ネットワークの情報を受け取って、仮想ネットワークをIDで更新する
@@ -53,7 +71,10 @@ func (s *Server) UpdateNetworkById(ctx echo.Context, id string) error {
 		return echo.NewHTTPError(500, "failed to update virtual network")
 	}
 
-	return ctx.NoContent(204)
+	var resp api.Success
+	resp.Id = id
+	resp.Message = util.StringPtr("Accepted the request to update the network")
+	return ctx.JSON(http.StatusOK, resp)
 }
 
 // 参照のみ

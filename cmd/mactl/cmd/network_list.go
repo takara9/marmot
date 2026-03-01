@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/config"
+	"github.com/takara9/marmot/pkg/db"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -38,6 +39,7 @@ var networkListCmd = &cobra.Command{
 				fmt.Printf("  %-10v", network.Id)
 				fmt.Printf("  %-20v", *network.Metadata.Name)
 				fmt.Printf("  %-20v", *network.Spec.BridgeName)
+				fmt.Printf("  %-20v", db.NetworkStatus[*network.Status.Status])
 				fmt.Println()
 			}
 			return nil

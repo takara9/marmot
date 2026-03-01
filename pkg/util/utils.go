@@ -7,6 +7,10 @@ import (
 	"os"
 	"reflect"
 	"time"
+
+	"github.com/jinzhu/copier"
+	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/config"
 )
 
 // ポインタ生成ユーティリティ関数群
@@ -43,6 +47,16 @@ func DeepCopy[T any](src T) (T, error) {
 	var dst T
 	err = json.Unmarshal(b, &dst)
 	return dst, err
+}
+
+func ConvertToJSON(src *config.VirtualNetwork) (*api.VirtualNetwork, error) {
+	dst := &api.VirtualNetwork{}
+	if err := copier.CopyWithOption(dst, src, copier.Option{
+		DeepCopy: true,
+	}); err != nil {
+		return nil, err
+	}
+	return dst, nil
 }
 
 // src の非ゼロ値フィールドだけを dst にコピーする
