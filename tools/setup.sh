@@ -2,7 +2,8 @@
 
 #QCOW2POOL="/var/lib/libvirt/images"
 QCOW2POOL="/var/lib/marmot/volumes"
-IMAGE="jammy-server-cloudimg-amd64.img"
+#IMAGE="jammy-server-cloudimg-amd64.img"
+IMAGE="ubuntu-22.04-server-cloudimg-amd64.img"
 IMAGE_TEMPLATE="ubuntu-22.04-template.qcow2"
 
 if [ -d "${QCOW2POOL}" ]; then
@@ -15,10 +16,16 @@ fi
 echo "Ubuntu 22.04 (jammy) のcloud imageをダウンロードしてカスタマイズする"
 
 cd /var/lib/marmot/volumes
-if [ ${CI_ENVIRONMENT} = "true" ]; then
-  curl -OL http://10.1.0.12/${IMAGE}
+
+echo "cloud imageをダウンロードする" 
+echo "環境変数 CI_ENVIRONMENT の値: ${CI_ENVIRONMENT}"
+if [ -z "${CI_ENVIRONMENT}" ]; then
+  echo "環境変数 CI_ENVIRONMENT は定義されていません。インターネットからcloud imageをダウンロードします。"
+  curl -OL https://cloud-images.ubuntu.com/releases/jammy/release-20260218/${IMAGE}
 else
-  curl -OL https://cloud-images.ubuntu.com/jammy/20251216/${IMAGE}
+  IMAGE="jammy-server-cloudimg-amd64.img"
+  echo "環境変数 CI_ENVIRONMENT は定義されています。社内サーバーからcloud imageをダウンロードします。"
+  curl -OL http://10.1.0.12/${IMAGE}
 fi
 
 echo "cloud imageのカスタマイズを行う"

@@ -36,7 +36,7 @@ var serverListCmd = &cobra.Command{
 				return err
 			}
 
-			fmt.Printf("  %2s  %-10s  %-20s  %-12s  %-3s  %-8s  %-15s\n", "No", "Server-ID", "Server-Name", "Status", "CPU", "RAM(MB)", "IP-Address")
+			fmt.Printf("  %2s  %-10s  %-20s  %-12s  %-3s  %-8s  %-15s  %-15s\n", "No", "Server-ID", "Server-Name", "Status", "CPU", "RAM(MB)", "IP-Address", "Network")
 			for i, server := range data {
 				fmt.Printf("  %2d", i+1)
 				fmt.Printf("  %-10v", server.Id)
@@ -44,13 +44,15 @@ var serverListCmd = &cobra.Command{
 				fmt.Printf("  %-12v", db.ServerStatus[*server.Status.Status])
 				fmt.Printf("  %-3v", *server.Spec.Cpu)
 				fmt.Printf("  %-8v", *server.Spec.Memory)
-				if server.Spec.Network != nil {
-					for j, nic := range *server.Spec.Network {
+				if server.Spec.NetworkInterface != nil {
+					for j, nic := range *server.Spec.NetworkInterface {
 						if j == 0 {
 							if nic.Address != nil {
 								fmt.Printf("  %-15v", *nic.Address)
+								fmt.Printf("  %-15v", nic.Id)
 							} else {
-								fmt.Printf("  %-15s", "N/A")
+								fmt.Printf("  %-15v", "N/A")
+								fmt.Printf("  %-15v", "N/A")
 							}
 						}
 					}

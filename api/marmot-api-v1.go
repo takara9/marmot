@@ -18,6 +18,23 @@ type Error struct {
 	Message string `json:"message"`
 }
 
+// IPAddress defines model for IPAddress.
+type IPAddress struct {
+	HostId    *string `json:"HostId,omitempty"`
+	IPAddress *string `json:"IPAddress,omitempty"`
+	Netmask   *string `json:"Netmask,omitempty"`
+	NetworkId *string `json:"NetworkId,omitempty"`
+}
+
+// IPNetwork defines model for IPNetwork.
+type IPNetwork struct {
+	AddressMaskLen   *string `json:"AddressMaskLen,omitempty"`
+	EndAddress       *string `json:"EndAddress,omitempty"`
+	Id               string  `json:"Id"`
+	StartAddress     *string `json:"StartAddress,omitempty"`
+	VirtualNetworkId *string `json:"virtualNetworkId,omitempty"`
+}
+
 // Metadata defines model for Metadata.
 type Metadata struct {
 	Comment      *string `json:"comment,omitempty"`
@@ -34,8 +51,8 @@ type Nameservers struct {
 	Search    *[]string `json:"search,omitempty"`
 }
 
-// Network defines model for Network.
-type Network struct {
+// NetworkInterface defines model for NetworkInterface.
+type NetworkInterface struct {
 	Address     *string      `json:"address,omitempty"`
 	Dhcp4       *bool        `json:"dhcp4,omitempty"`
 	Dhcp6       *bool        `json:"dhcp6,omitempty"`
@@ -69,10 +86,22 @@ type Route struct {
 
 // Server defines model for Server.
 type Server struct {
-	Metadata *Metadata `json:"Metadata,omitempty"`
-	Spec     *VmSpec   `json:"Spec,omitempty"`
-	Status   *Status   `json:"Status,omitempty"`
-	Id       string    `json:"id"`
+	Metadata *Metadata   `json:"Metadata,omitempty"`
+	Spec     *ServerSpec `json:"Spec,omitempty"`
+	Status   *Status     `json:"Status,omitempty"`
+	Id       string      `json:"id"`
+}
+
+// ServerSpec defines model for ServerSpec.
+type ServerSpec struct {
+	NetworkInterface *[]NetworkInterface `json:"NetworkInterface,omitempty"`
+	Storage          *[]Volume           `json:"Storage,omitempty"`
+	BootVolume       *Volume             `json:"bootVolume,omitempty"`
+	Cpu              *int                `json:"cpu,omitempty"`
+	Memory           *int                `json:"memory,omitempty"`
+	OsLv             *string             `json:"osLv,omitempty"`
+	OsVariant        *string             `json:"osVariant,omitempty"`
+	OsVg             *string             `json:"osVg,omitempty"`
 }
 
 // Servers defines model for Servers.
@@ -99,16 +128,27 @@ type Version struct {
 	ServerVersion *string `json:"serverVersion,omitempty"`
 }
 
-// VmSpec defines model for VmSpec.
-type VmSpec struct {
-	Network    *[]Network `json:"Network,omitempty"`
-	Storage    *[]Volume  `json:"Storage,omitempty"`
-	BootVolume *Volume    `json:"bootVolume,omitempty"`
-	Cpu        *int       `json:"cpu,omitempty"`
-	Memory     *int       `json:"memory,omitempty"`
-	OsLv       *string    `json:"osLv,omitempty"`
-	OsVariant  *string    `json:"osVariant,omitempty"`
-	OsVg       *string    `json:"osVg,omitempty"`
+// VirtualNetwork defines model for VirtualNetwork.
+type VirtualNetwork struct {
+	Metadata *Metadata           `json:"Metadata,omitempty"`
+	Spec     *VirtualNetworkSpec `json:"Spec,omitempty"`
+	Status   *Status             `json:"Status,omitempty"`
+	Id       string              `json:"id"`
+}
+
+// VirtualNetworkSpec defines model for VirtualNetworkSpec.
+type VirtualNetworkSpec struct {
+	BridgeName       *string `json:"bridgeName,omitempty"`
+	Dhcp             *bool   `json:"dhcp,omitempty"`
+	DhcpEndAddress   *string `json:"dhcpEndAddress,omitempty"`
+	DhcpStartAddress *string `json:"dhcpStartAddress,omitempty"`
+	ForwardMode      *string `json:"forwardMode,omitempty"`
+	IpAddress        *string `json:"ipAddress,omitempty"`
+	IpNetworkId      *string `json:"ipNetworkId,omitempty"`
+	MacAddress       *string `json:"macAddress,omitempty"`
+	Nat              *bool   `json:"nat,omitempty"`
+	Netmask          *string `json:"netmask,omitempty"`
+	Stp              *bool   `json:"stp,omitempty"`
 }
 
 // VolSpec defines model for VolSpec.
@@ -131,6 +171,12 @@ type Volume struct {
 	Id       string    `json:"id"`
 }
 
+// CreateNetworkJSONRequestBody defines body for CreateNetwork for application/json ContentType.
+type CreateNetworkJSONRequestBody = VirtualNetwork
+
+// UpdateNetworkByIdJSONRequestBody defines body for UpdateNetworkById for application/json ContentType.
+type UpdateNetworkByIdJSONRequestBody = VirtualNetwork
+
 // CreateServerJSONRequestBody defines body for CreateServer for application/json ContentType.
 type CreateServerJSONRequestBody = Server
 
@@ -145,6 +191,21 @@ type UpdateVolumeByIdJSONRequestBody = Volume
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Get Network Information
+	// (GET /network)
+	GetNetworks(ctx echo.Context) error
+	// Create Virtual Network
+	// (POST /network)
+	CreateNetwork(ctx echo.Context) error
+	// Delete Virtual Network
+	// (DELETE /network/{id})
+	DeleteNetworkById(ctx echo.Context, id string) error
+	// Get particular virtual network Information
+	// (GET /network/{id})
+	GetNetworkById(ctx echo.Context, id string) error
+	// Update Virtual Network Information by Id
+	// (PUT /network/{id})
+	UpdateNetworkById(ctx echo.Context, id string) error
 	// Alive
 	// (GET /ping)
 	ReplyPing(ctx echo.Context) error
@@ -186,6 +247,72 @@ type ServerInterface interface {
 // ServerInterfaceWrapper converts echo contexts to parameters.
 type ServerInterfaceWrapper struct {
 	Handler ServerInterface
+}
+
+// GetNetworks converts echo context to params.
+func (w *ServerInterfaceWrapper) GetNetworks(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetNetworks(ctx)
+	return err
+}
+
+// CreateNetwork converts echo context to params.
+func (w *ServerInterfaceWrapper) CreateNetwork(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.CreateNetwork(ctx)
+	return err
+}
+
+// DeleteNetworkById converts echo context to params.
+func (w *ServerInterfaceWrapper) DeleteNetworkById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.DeleteNetworkById(ctx, id)
+	return err
+}
+
+// GetNetworkById converts echo context to params.
+func (w *ServerInterfaceWrapper) GetNetworkById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetNetworkById(ctx, id)
+	return err
+}
+
+// UpdateNetworkById converts echo context to params.
+func (w *ServerInterfaceWrapper) UpdateNetworkById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.UpdateNetworkById(ctx, id)
+	return err
 }
 
 // ReplyPing converts echo context to params.
@@ -366,6 +493,11 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 		Handler: si,
 	}
 
+	router.GET(baseURL+"/network", wrapper.GetNetworks)
+	router.POST(baseURL+"/network", wrapper.CreateNetwork)
+	router.DELETE(baseURL+"/network/:id", wrapper.DeleteNetworkById)
+	router.GET(baseURL+"/network/:id", wrapper.GetNetworkById)
+	router.PUT(baseURL+"/network/:id", wrapper.UpdateNetworkById)
 	router.GET(baseURL+"/ping", wrapper.ReplyPing)
 	router.GET(baseURL+"/server", wrapper.GetServers)
 	router.POST(baseURL+"/server", wrapper.CreateServer)

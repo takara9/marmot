@@ -34,12 +34,12 @@ var serverCreateCmd = &cobra.Command{
 		virtualServer.Metadata = &api.Metadata{
 			Name: util.StringPtr(conf.Name),
 		}
-		virtualServer.Spec = &api.VmSpec{}
+		virtualServer.Spec = &api.ServerSpec{}
 		virtualServer.Spec.BootVolume = &api.Volume{}
 		virtualServer.Spec.Storage = &[]api.Volume{}
 		virtualServer.Spec.BootVolume.Spec = &api.VolSpec{}
 		virtualServer.Spec.BootVolume.Metadata = &api.Metadata{}
-		virtualServer.Spec.Network = &[]api.Network{}
+		virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{}
 
 		if conf.Comment != nil {
 			virtualServer.Metadata.Comment = util.StringPtr(*conf.Comment)
@@ -68,7 +68,7 @@ var serverCreateCmd = &cobra.Command{
 		if conf.Network != nil {
 			for _, nic := range *conf.Network {
 				// ネットワークの設定があるときの追加設定
-				var n api.Network
+				var n api.NetworkInterface
 				n.Id = nic.Name // NameをIDとして使用
 				// 設定があれば固定IP設定
 				if nic.Address != nil {
@@ -119,7 +119,7 @@ var serverCreateCmd = &cobra.Command{
 					}
 				}
 				// インターフェースの設定追加
-				*virtualServer.Spec.Network = append(*virtualServer.Spec.Network, n)
+				*virtualServer.Spec.NetworkInterface = append(*virtualServer.Spec.NetworkInterface, n)
 			}
 		}
 

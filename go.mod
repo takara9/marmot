@@ -17,6 +17,7 @@ require (
 require github.com/mattn/go-isatty v0.0.20 // indirect
 
 require (
+	github.com/jinzhu/copier v0.4.0
 	github.com/spf13/cobra v1.10.1
 	go.yaml.in/yaml/v3 v3.0.4
 	libvirt.org/go/libvirtxml v1.11010.0

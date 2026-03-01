@@ -49,17 +49,17 @@ func SetupLinux(spec api.Server) error {
 	}
 
 	// ネットワーク設定
-	if spec.Spec.Network == nil {
+	if spec.Spec.NetworkInterface == nil {
 		// ネットワーク設定がない場合は、デフォルトネットワークにつないで、 DHCPでIPアドレスを取得する設定にする
-		defaultNic := api.Network{
+		defaultNic := api.NetworkInterface{
 			Networkname: StringPtr("default"),
 			Dhcp4:       BoolPtr(true),
 			Dhcp6:       BoolPtr(false),
 		}
-		spec.Spec.Network = &[]api.Network{defaultNic}
+		spec.Spec.NetworkInterface = &[]api.NetworkInterface{defaultNic}
 	}
 
-	if err := CreateNetplanInterfaces(*spec.Spec.Network, mountPoint); err != nil {
+	if err := CreateNetplanInterfaces(*spec.Spec.NetworkInterface, mountPoint); err != nil {
 		slog.Error("CreateNetplanInterfaces failed", "error", err)
 		return err
 	}
@@ -254,7 +254,7 @@ type Nameserver struct {
 }
 
 // NICの設定
-func CreateNetplanInterfaces(requestConfig []api.Network, mountPoint string) error {
+func CreateNetplanInterfaces(requestConfig []api.NetworkInterface, mountPoint string) error {
 
 	nicName := []string{"enp1s0", "enp2s0", "enp7s0", "enp8s0", "enp9s0", "enp10s0"}
 

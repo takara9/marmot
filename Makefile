@@ -32,7 +32,6 @@ package: clean all setup
 	cp TAG cmd/maadm/cmd/version.txt
 	cp cmd/install.sh $(BINDIR)/install.sh
 	cp cmd/mactl/config_marmot $(BINDIR)/config_marmot
-	cp cmd/marmotd/temp.xml $(BINDIR)/temp.xml
 	cp cmd/marmotd/marmot.service $(BINDIR)/marmot.service
 	tar czvf marmot-v$(TAG).tgz marmot-v$(TAG)
 
@@ -51,7 +50,6 @@ install:
 	rm -fr $(DISTDIR)
 	mkdir $(DISTDIR)
 	install -m 0755 $(BINDIR)/$(SERVER_EXE) $(DISTDIR)
-	install -m 0644 $(BINDIR)/temp.xml $(DISTDIR)
 	rm -f /etc/systemd/system/marmot.service
 	install -m 0644 $(BINDIR)/marmot.service /lib/systemd/system
 	rm -f /usr/local/bin/$(CLIENT_CMD)

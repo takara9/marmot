@@ -48,7 +48,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 			Metadata: &api.Metadata{
 				Name: util.StringPtr("test-linux"),
 			},
-			Spec: &api.VmSpec{
+			Spec: &api.ServerSpec{
 				BootVolume: &api.Volume{
 					Id: "test-linux-boot",
 					Spec: &api.VolSpec{
@@ -103,9 +103,9 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 			Metadata: &api.Metadata{
 				Name: util.StringPtr("test-linux-lvm"),
 			},
-			Spec: &api.VmSpec{
+			Spec: &api.ServerSpec{
 				BootVolume: &api.Volume{
-					Id:            "test-linux-boot2",
+					Id: "test-linux-boot2",
 					Spec: &api.VolSpec{
 						Type:          util.StringPtr("lvm"),
 						Path:          util.StringPtr("/dev/mapper/vg1-lvos_test1"),
@@ -160,9 +160,9 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 			Metadata: &api.Metadata{
 				Name: util.StringPtr("test-linux-mh"),
 			},
-			Spec: &api.VmSpec{
+			Spec: &api.ServerSpec{
 				BootVolume: &api.Volume{
-					Id:            "test-linux-boot3",
+					Id: "test-linux-boot3",
 					Spec: &api.VolSpec{
 						Type:          util.StringPtr("lvm"),
 						Path:          util.StringPtr("/dev/mapper/vg1-lvos_test2"),
@@ -170,7 +170,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 						LogicalVolume: util.StringPtr("lvos_test2"),
 					},
 				},
-				Network: &[]api.Network{
+				NetworkInterface: &[]api.NetworkInterface{
 					{
 						Id: "default",
 					},
@@ -225,9 +225,9 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 			Metadata: &api.Metadata{
 				Name: util.StringPtr("test-linux-mh"),
 			},
-			Spec: &api.VmSpec{
+			Spec: &api.ServerSpec{
 				BootVolume: &api.Volume{
-					Id:            "test-linux-boot4",
+					Id: "test-linux-boot4",
 					Spec: &api.VolSpec{
 						Type:          util.StringPtr("lvm"),
 						Path:          util.StringPtr("/dev/mapper/vg1-lvos_test2"),
@@ -235,7 +235,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 						LogicalVolume: util.StringPtr("lvos_test2"),
 					},
 				},
-				Network: &[]api.Network{
+				NetworkInterface: &[]api.NetworkInterface{
 					{
 						Id: "default",
 					},

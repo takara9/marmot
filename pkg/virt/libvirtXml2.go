@@ -37,6 +37,7 @@ type NetSpec struct {
 	IsTrunk     bool
 	Bus         uint
 }
+
 type ChannelSpec struct {
 	Type  string
 	Path  string
@@ -51,7 +52,7 @@ type ClockSpec struct {
 	Present    string
 }
 
-type VmSpec struct {
+type ServerSpec struct {
 	UUID         string
 	Name         string
 	RAM          uint
@@ -85,7 +86,7 @@ func (lve *LibVirtEp) Close() {
 }
 
 // libvirt XMLを生成する関数
-func CreateDomainXML(vs VmSpec) *libvirtxml.Domain {
+func CreateDomainXML(vs ServerSpec) *libvirtxml.Domain {
 	// This function is intentionally left blank.
 	dom := &libvirtxml.Domain{
 		Type: "kvm", ID: intPtr(1), Name: vs.Name, UUID: vs.UUID,
