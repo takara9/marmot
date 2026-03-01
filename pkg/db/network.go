@@ -71,6 +71,12 @@ func (d *Database) CreateVirtualNetwork(spec api.VirtualNetwork) (api.VirtualNet
 		}
 	}
 
+	// ブリッジ名の自動生成
+	if network.Spec.BridgeName == nil {
+		bridgeName := "br-" + network.Id
+		network.Spec.BridgeName = util.StringPtr(bridgeName)
+	}
+
 	// ステータスセット、タイムスタンプセット
 	var s api.Status
 	s.Status = util.IntPtrInt(NETWORK_PENDING)
@@ -166,6 +172,23 @@ func (d *Database) DeleteVirtualNetworkById(id string) error {
 		return err
 	}
 	defer d.UnlockKey(mutex)
+
+	// IPネットワークの削除
+	network, err := d.GetVirtualNetworkById(id)
+	if err != nil {
+		slog.Error("DeleteVirtualNetworkById() GetVirtualNetworkById() failed", "err", err, "networkId", id)
+		return err
+	}
+	if network.Spec.IpNetworkId != nil {
+		err := d.DeleteIpNetworkById(*network.Spec.IpNetworkId)
+		if err == ErrNotFound {
+			slog.Error("Not Found ", "err", err, "ipNetworkId", *network.Spec.IpNetworkId)
+		} else if err != nil {
+			slog.Error("DeleteVirtualNetworkById() DeleteIpNetworkById() failed", "err", err, "ipNetworkId", *network.Spec.IpNetworkId)
+			return err
+		}
+	}
+
 	key := NetworkPrefix + "/" + id
 	return d.DeleteJSON(key)
 }

@@ -3,6 +3,7 @@ package controller_net
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -103,6 +104,9 @@ func (c *controller) controllerLoop() {
 		case db.NETWORK_DELETING:
 			slog.Debug("削除中の仮想ネットワークを処理", "networkId", vnet.Id)
 			if err := c.marmot.DeleteVirtualNetwork(vnet.Id); err != nil {
+				if strings.HasPrefix(err.Error(), "Network not found") {
+					continue
+				}
 				slog.Error("DeleteVirtualNetwork()", "err", err)
 				c.db.UpdateVirtualNetworkStatus(vnet.Id, db.NETWORK_ERROR)
 				continue
