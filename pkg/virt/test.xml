@@ -1,8 +1,0 @@
-<network>
-  <name>test-net-0</name>
-  <uuid>73278d7c-4acd-4122-987c-3f1cf48aad95</uuid>
-  <bridge name="virbr-test0" stp="on" delay="0"></bridge>
-  <mac address="3a:22:fd:85:6e:c0"></mac>
-  <ip address="192.168.200.1" netmask="255.255.255.0"></ip>
-</network>
-
