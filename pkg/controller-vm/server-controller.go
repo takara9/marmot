@@ -102,7 +102,6 @@ func (c *controller) controllerLoop() {
 		case db.SERVER_ERROR:
 			slog.Debug("エラー状態のサーバー検出", "SERVER", spec.Id)
 		case db.SERVER_DELETING:
-			// 削除のタイムスタンプが一定時間以上経過しているかをチェックして、削除処理を実行するとするのが良さそう
 			slog.Debug("削除中のサーバー検出", "SERVER", spec.Id)
 
 			// 削除処理の実行
@@ -120,7 +119,4 @@ func (c *controller) controllerLoop() {
 			slog.Warn("不明な状態のサーバー検出", "SERVER", spec.Id, "STATUS", *spec.Status.Status)
 		}
 	}
-
-	// ワークキューから処理を取り出して、処理を実行する
-
 }
