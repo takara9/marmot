@@ -113,7 +113,7 @@ func (c *controller) controllerLoop() {
 			// IPアドレス開放処理の実行
 			if spec.Spec.NetworkInterface != nil {
 				for _, nic := range *spec.Spec.NetworkInterface {
-					if nic.Address != nil {
+					if nic.Address != nil && nic.IpNetworkId != nil && nic.Networkid != "" {
 						if err := c.marmot.Db.ReleaseIP(nic.Networkid, *nic.IpNetworkId, *nic.Address); err != nil {
 							slog.Error("ReleaseIP()", "err", err)
 							continue

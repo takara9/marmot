@@ -277,35 +277,29 @@ func CreateNetplanInterfaces(requestConfig []api.NetworkInterface, mountPoint st
 		for idx, nic := range requestConfig {
 			ethCfg := Ethernet{}
 			ifaceName := nicName[idx]
-			slog.Debug("Configuring interface", "ifaceName", ifaceName, "nic", nic)
+			slog.Debug("Configuring interface", "index", idx, "ifaceName", ifaceName, "nic", nic)
 
-			// DHCP設定
-			if nic.Dhcp4 != nil {
-				ethCfg.DHCP4 = *nic.Dhcp4
+			// IPアドレスの設定が無ければ、DHCPでIPアドレスを取得する設定にする
+			fmt.Println("DEBUG ===============================================================")
+			json, err := json.MarshalIndent(nic, "", "  ")
+			if err != nil {
+				slog.Error("json.MarshalIndent()", "err", err)
 			} else {
-				ethCfg.DHCP4 = true
+				fmt.Println("NIC情報(nic): ", string(json))
 			}
-			if nic.Dhcp6 != nil {
-				ethCfg.DHCP6 = *nic.Dhcp6
-			} else {
-				ethCfg.DHCP6 = true
-			}
+			fmt.Println("=====================================================================")
 
-			// IPアドレス設定 これでは複数のIPを持てない。（それでも良いのか？）
-			if nic.Address != nil && nic.Netmask != nil {
+			// IPアドレスとネットマスク長があれば、DHCPは無効にする
+			if nic.Address != nil && nic.Netmasklen != nil {
+				slog.Debug("IP address is specified in the request, skipping DHCP configuration", "ip address", *nic.Address, "netmask length", *nic.Netmasklen)
 				ethCfg.DHCP4 = false
 				ethCfg.DHCP6 = false
-
-				fmt.Println("===============================================================")
-				json, err := json.MarshalIndent(nic, "", "  ")
-				if err != nil {
-					slog.Error("json.MarshalIndent()", "err", err)
-				} else {
-					fmt.Println("NIC情報(nic): ", string(json))
-				}
-				fmt.Println("===============================================================")
 				addr := fmt.Sprintf("%s/%d", *nic.Address, *nic.Netmasklen)
 				ethCfg.Addresses = append(ethCfg.Addresses, addr)
+			} else {
+				slog.Debug("IP address is not specified in the request, enabling DHCP", "ip address", nic.Address, "netmask length", nic.Netmasklen)
+				ethCfg.DHCP4 = true
+				ethCfg.DHCP6 = true
 			}
 
 			// ルート設定 (IPv4/IPv6共通)
