@@ -66,12 +66,12 @@ func (c *controller) controllerLoop() {
 
 	for _, spec := range serverSpec {
 		// 取得したサーバースペック情報の表示とプロビジョニング中サーバーの検出
-		json, err := json.MarshalIndent(spec, "", "  ")
+		jsonByte, err := json.MarshalIndent(spec, "", "  ")
 		if err != nil {
 			slog.Error("json.MarshalIndent()", "err", err)
 			continue
 		}
-		fmt.Println(string(json))
+		fmt.Println(string(jsonByte))
 
 		// 削除のタイムスタンプが一定時間以上経過しているかをチェックして、削除処理を実行する
 		if spec.Status != nil && spec.Status.DeletionTimeStamp != nil {
@@ -88,8 +88,7 @@ func (c *controller) controllerLoop() {
 		case db.SERVER_PENDING:
 			slog.Debug("生成待ち状態のサーバー検出", "SERVER", spec.Id)
 			c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_PROVISIONING)
-			_, err := c.marmot.CreateServer2(spec.Id)
-			if err != nil {
+			if _, err := c.marmot.CreateServer2(spec.Id); err != nil {
 				slog.Error("CreateServer2()", "err", err)
 				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR)
 				continue
@@ -113,12 +112,23 @@ func (c *controller) controllerLoop() {
 			// IPアドレス開放処理の実行
 			if spec.Spec.NetworkInterface != nil {
 				for _, nic := range *spec.Spec.NetworkInterface {
-					if nic.Address != nil && nic.IpNetworkId != nil && nic.Networkid != "" {
-						if err := c.marmot.Db.ReleaseIP(nic.Networkid, *nic.IpNetworkId, *nic.Address); err != nil {
-							slog.Error("ReleaseIP()", "err", err)
-							continue
-						}
+					fmt.Println("NIC=========================================")
+					jsonbyte, err := json.MarshalIndent(nic, "", "  ")
+					if err != nil {
+						slog.Error("json.MarshalIndent()", "err", err)
+						continue
 					}
+					fmt.Println(string(jsonbyte))
+					fmt.Println("============================================")
+					fmt.Println("address:", *nic.Address)
+					fmt.Println("ipNetworkId:", *nic.IpNetworkId)
+					fmt.Println("networkId:", nic.Networkid)
+					//if nic.Address != nil && nic.IpNetworkId != nil && nic.Networkid != "" {
+					if err := c.marmot.Db.ReleaseIP(nic.Networkid, *nic.IpNetworkId, *nic.Address); err != nil {
+						slog.Error("ReleaseIP()", "err", err)
+						continue
+					}
+					//}
 				}
 			}
 

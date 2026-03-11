@@ -62,12 +62,11 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 		bootVol.Spec.OsVariant = serverConfig.Spec.OsVariant
 	}
 
-	// この前の段階で、IPアドレスをサーバーのネットワークインターフェースに割り当てる必要がある、
-	// そうしないと、ブート後にネットワークが設定されない
-
 	slog.Debug("サーバーのネットワークインターフェースの設定")
+
 	// ネットワークの設定
 	if serverConfig.Spec.NetworkInterface == nil {
+		// ネットワーク指定なし、デフォルトネットワークを使用
 		slog.Debug("ネットワーク指定なし、デフォルトネットワークを使用")
 		mac, err := util.GenerateRandomMAC()
 		if err != nil {
@@ -111,24 +110,14 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 				return "", err
 			}
 
-			// IPアドレスが設定されていない場合は、IPアドレスを割り当てる
-			// IPアドレスの割り当ては、ネットワークごとに管理されているIPアドレスプールから行う
-			// IPアドレスが設定されている場合は、IPアドレスの割り当ては行わない（将来的には、IPアドレスの重複チェックを行うべき）
 			var ipaddr string
 			var bitmask int
 			var net *api.IPNetwork
 
-			jsonData, err := json.MarshalIndent(reqNic, "", "  ")
-			if err != nil {
-				slog.Error("json.MarshalIndent()", "err", err)
-			} else {
-				fmt.Println("リクエストされたネットワークインターフェース(reqNic): ", string(jsonData))
-			}
+			reqNic.Networkid = vnet.Id // ネットワークIDをセット
 
 			if reqNic.Address != nil {
-				fmt.Println()
-				fmt.Println("=== IP address is specified in the request, skipping IP allocation", "ip address", *reqNic.Address)
-				fmt.Println()
+				// リクエストにIPアドレスが指定されている場合は、そのIPアドレスを使用する
 				ipaddr = *reqNic.Address
 				if reqNic.Netmasklen != nil {
 					bitmask = *reqNic.Netmasklen
@@ -137,10 +126,42 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 					bitmask = 24 // デフォルトのビットマスク長
 				}
 				slog.Debug("IP address is specified in the request, skipping IP allocation", "ip address", ipaddr, "netmask length", bitmask)
+
+				// IPネットワークが存在していれば、IPネットワークを作成する必要はない。
+				// IPネットワークと IPアドレスを設定
+				ipnet := &api.IPNetwork{
+					AddressMaskLen: util.StringPtr(fmt.Sprintf("%s/%d", ipaddr, bitmask)),
+				}
+				ipNetId, err := m.Db.CreateIpNetwork(vnet.Id, ipnet)
+				if err != nil {
+					if err.Error() == db.ErrAlreadyExists || err.Error() == db.ErrOverlapsExistingNetwork {
+						//NOP
+					} else {
+						slog.Error("CreateIpNetwork()", "err", err)
+						return "", err
+					}
+				}
+
+				slog.Debug("IPネットワークの作成成功", "network id", vnet.Id, "ip network id", ipNetId, "ip address with mask", ipaddr)
+				// ネットワークインターフェースのIPネットワークIDを設定
+				reqNic.IpNetworkId = util.StringPtr(ipNetId)
+				slog.Debug("ネットワークインターフェースのIPネットワークIDを設定成功", "network id", vnet.Id, "ip network id", ipNetId)
+				// IPアドレスの使用済設定
+
+				// 一致するものが無かったら、そのIPアドレスを割り当てる
+				found, err := m.Db.CheckIPaddrInUse(vnet.Id, ipNetId, ipaddr)
+				if err != nil {
+					slog.Error("AllocateIP()", "err", err, "vnetId", vnet.Id, "ipnetId", ipNetId, "candidateIP", ipaddr)
+					return "", err
+				}
+				if !found {
+					slog.Debug("セットさられたIPアドレス", "IP	", ipaddr)
+					m.Db.SetIPaddrInUse(vnet.Id, ipNetId, ipaddr, *serverConfig.Metadata.Name)
+					//return ipaddr, nil
+				}
 			} else {
+				// IPアドレスの指定が無いので、IPアドレスを割り当て
 				slog.Debug("IPアドレスの割り当て", "network id", vnet.Id, "network name", vnet.Metadata.Name)
-				slog.Debug("IP address is not specified in the request, allocating IP address from the pool")
-				//var net *api.IPNetwork
 				if vnet.Spec.IpNetworkId != nil {
 					ipaddr, bitmask, err = m.Db.AllocateIP(vnet.Id, *vnet.Spec.IpNetworkId, *serverConfig.Metadata.Name)
 					if err != nil {
@@ -153,14 +174,6 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 						slog.Error("GetIpNetworkById()", "err", err)
 						return "", err
 					}
-					fmt.Println("~~~~~~~~~~~~~~~~~ ネットワーク情報の確認 ~~~~~~~~~~~~~~~~~~")
-					josonData, err := json.MarshalIndent(net, "", "  ")
-					if err != nil {
-						slog.Error("json.MarshalIndent()", "err", err)
-					} else {
-						fmt.Println("ネットワーク情報(net): ", string(josonData))
-					}
-					fmt.Println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 				}
 			}
 
@@ -191,6 +204,12 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 			var ni api.NetworkInterface
 			ni.Networkname = ns.Network
 			ni.Networkid = vnet.Id
+
+			// ここでIP Network Idがセットされた場合、データベースにも保存する必要がある
+			if reqNic.IpNetworkId != nil {
+				ni.IpNetworkId = reqNic.IpNetworkId
+			}
+
 			ni.Mac = &ns.MAC
 			ni.Address = util.StringPtr(ipaddr)
 			ni.Netmasklen = util.IntPtrInt(bitmask)
@@ -211,6 +230,8 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 				}
 				if vnet.Spec.IpNetworkId != nil {
 					ni.IpNetworkId = util.StringPtr(*vnet.Spec.IpNetworkId)
+				} else {
+					ni.IpNetworkId = util.StringPtr(ni.Networkid)
 				}
 			}
 			(*serverConfig.Spec.NetworkInterface)[i] = ni

@@ -69,7 +69,7 @@ var _ = Describe("IPAM", Ordered, func() {
 
 			It("IPv4ネットワークアドレスの作成 #1", func() {
 				net := &api.IPNetwork{
-					AddressMaskLen: util.StringPtr("192.168.200.0/24"),
+					AddressMaskLen: util.StringPtr("192.168.200.5/24"),
 				}
 				id, err = v.CreateIpNetwork(vnetId, net)
 				Expect(err).NotTo(HaveOccurred())

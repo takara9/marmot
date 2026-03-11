@@ -15,15 +15,15 @@ import (
 )
 
 const (
-	OsTemplateImagePrefix = "/marmot/osTemplateImage"
-	VolumePrefix          = "/marmot/volume"
-	ServerPrefix          = "/marmot/server"
-	NetworkPrefix         = "/marmot/network"
-	SeqPrefix             = "/marmot/sequence"
-	VersionKey            = "/marmot/version"
-	JobPrefix             = "/marmot/job"
-	//IPNetworkPrefix       = "/marmot/ip_network"
-	//IPAddressPrefix       = "/marmot/ip_address"
+	OsTemplateImagePrefix      = "/marmot/osTemplateImage"
+	VolumePrefix               = "/marmot/volume"
+	ServerPrefix               = "/marmot/server"
+	NetworkPrefix              = "/marmot/network"
+	SeqPrefix                  = "/marmot/sequence"
+	VersionKey                 = "/marmot/version"
+	JobPrefix                  = "/marmot/job"
+	ErrAlreadyExists           = "Network with the same AddressMaskLen already exists"
+	ErrOverlapsExistingNetwork = "overlaps with an existing network"
 )
 
 var (
