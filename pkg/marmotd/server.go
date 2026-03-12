@@ -158,6 +158,12 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 					slog.Debug("セットさられたIPアドレス", "IP	", ipaddr)
 					m.Db.SetIPaddrInUse(vnet.Id, ipNetId, ipaddr, *serverConfig.Metadata.Name)
 					//return ipaddr, nil
+				}	
+				// 内部DNSへ登録
+				slog.Debug("内部DNSへ登録", "hostname", *serverConfig.Metadata.Name, "subdomain", reqNic.Networkname, "ip address", ipaddr)
+				if err := m.Db.PutDnsEntry(*serverConfig.Metadata.Name, reqNic.Networkname, ipaddr); err != nil {
+					slog.Error("PutDnsEntry()", "err", err)
+					return "", err
 				}
 			} else {
 				// IPアドレスの指定が無いので、IPアドレスを割り当て
@@ -172,6 +178,12 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 					net, err = m.Db.GetIpNetworkById(vnet.Id, *vnet.Spec.IpNetworkId)
 					if err != nil {
 						slog.Error("GetIpNetworkById()", "err", err)
+						return "", err
+					}
+					// 内部DNSへ登録
+					slog.Debug("内部DNSへ登録", "hostname", *serverConfig.Metadata.Name, "subdomain", reqNic.Networkname, "ip address", ipaddr)
+					if err := m.Db.PutDnsEntry(*serverConfig.Metadata.Name, reqNic.Networkname, ipaddr); err != nil {
+						slog.Error("PutDnsEntry()", "err", err)
 						return "", err
 					}
 				}

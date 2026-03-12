@@ -15,3 +15,7 @@ test-network:
 .PHONY: test-ipam
 test-ipam:
 	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus="IPAM" -coverprofile cover.out
+
+.PHONY: test-dns
+test-dns:
+	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus="InternalDNS" -coverprofile cover.out

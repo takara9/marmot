@@ -128,6 +128,12 @@ func (c *controller) controllerLoop() {
 						slog.Error("ReleaseIP()", "err", err)
 						continue
 					}
+
+					// 内部DNSからエントリーを削除する
+					if err := c.marmot.Db.DeleteDnsEntryByName(*spec.Metadata.Name, nic.Networkname); err != nil {
+						slog.Error("DeleteDnsEntryByName()", "err", err)
+						continue
+					}
 					//}
 				}
 			}
