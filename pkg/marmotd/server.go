@@ -158,7 +158,7 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 					slog.Debug("セットさられたIPアドレス", "IP	", ipaddr)
 					m.Db.SetIPaddrInUse(vnet.Id, ipNetId, ipaddr, *serverConfig.Metadata.Name)
 					//return ipaddr, nil
-				}	
+				}
 				// 内部DNSへ登録
 				slog.Debug("内部DNSへ登録", "hostname", *serverConfig.Metadata.Name, "subdomain", reqNic.Networkname, "ip address", ipaddr)
 				if err := m.Db.PutDnsEntry(*serverConfig.Metadata.Name, reqNic.Networkname, ipaddr); err != nil {
@@ -420,11 +420,11 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 		}
 	}
 
-	channelFile := "org.qemu.guest_agent.0"
-	channelPath, err := util.CreateChannelDir(virtSpec.UUID)
+	//channelFile := "org.qemu.guest_agent.0"
+	//channelPath, err := util.CreateChannelDir(virtSpec.UUID)
 
 	virtSpec.ChannelSpecs = []virt.ChannelSpec{
-		{"unix", channelPath + "/" + channelFile, channelFile, "channel0", 1},
+		//{"unix", channelPath + "/" + channelFile, channelFile, "channel0", 1},
 		{"spicevmc", "", "com.redhat.spice.0", "channel1", 2},
 	}
 	virtSpec.Clocks = []virt.ClockSpec{
