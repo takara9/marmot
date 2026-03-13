@@ -179,23 +179,3 @@ func (d *Database) DeleteJSON(key string) error {
 	return nil
 }
 
-// 削除対象
-/*
-func (d *Database) GetDnsByKey00(path string) (types.DNSEntry, error) {
-	var entry types.DNSEntry
-	resp, err := d.Cli.Get(d.Ctx, path)
-	if err != nil {
-		return entry, err
-	}
-
-	if resp.Count == 0 {
-		return entry, errors.New("not found")
-	}
-
-	err = json.Unmarshal([]byte(resp.Kvs[0].Value), &entry)
-	if err != nil {
-		return entry, err
-	}
-	return entry, nil
-}
-*/
