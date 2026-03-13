@@ -16,7 +16,7 @@ image_template:
   - name: "ubuntu22.04"
     volumegroup: "vg1"
     logicalvolume: "lvos_temp"
-    qcow2_path: "/var/lib/marmot/volumes/jammy-server-cloudimg-amd64.img"
+    qcow2_path: "/var/lib/marmot/volumes/ubuntu-22.04-server-cloudimg-amd64.img"
 #
 # シリアル番号管理
 #

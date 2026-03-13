@@ -10,7 +10,7 @@ https://askubuntu.com/questions/451673/default-username-password-for-ubuntu-clou
 ## ダウンロード
 
 ```
-wget https://cloud-images.ubuntu.com/daily/server/jammy/current/jammy-server-cloudimg-amd64.img
+wget https://cloud-images.ubuntu.com/daily/server/jammy/current/ubuntu-22.04-server-cloudimg-amd64.img
 ```
 
 ## コマンドのインストール
@@ -23,13 +23,13 @@ sudo apt install libguestfs-tools
 ## パスワードの設定
 
 ```
-$ sudo virt-customize -a jammy-server-cloudimg-amd64.img --root-password password:ubuntu
+$ sudo virt-customize -a ubuntu-22.04-server-cloudimg-amd64.img --root-password password:ubuntu
 ```
 
 ## qcow2形式に変換し、ディスクサイズを20GBに拡張する
 
 ```
-# mv jammy-server-cloudimg-amd64.img jammy-server-cloudimg-amd64.qcow2.original
+# mv ubuntu-22.04-server-cloudimg-amd64.img jammy-server-cloudimg-amd64.qcow2.original
 # qemu-img convert -f qcow2 -O qcow2 jammy-server-cloudimg-amd64.qcow2.original jammy-bootable.qcow2
 # qemu-img resize jammy-bootable.qcow2 +18G
 ```

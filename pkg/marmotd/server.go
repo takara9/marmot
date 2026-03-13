@@ -22,6 +22,7 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 	var bootVolMeta api.Metadata
 	bootVol.Spec = &bootVolSpec
 	bootVol.Metadata = &bootVolMeta
+	var virtSpec virt.ServerSpec
 
 	serverConfig, err := m.Db.GetServerById(id)
 	if err != nil {
@@ -59,6 +60,201 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 		bootVol.Spec.OsVariant = util.StringPtr("ubuntu22.04") // デフォルトをコンフィグに持たせるべき？
 	} else {
 		bootVol.Spec.OsVariant = serverConfig.Spec.OsVariant
+	}
+
+	slog.Debug("サーバーのネットワークインターフェースの設定")
+
+	// ネットワークの設定
+	if serverConfig.Spec.NetworkInterface == nil {
+		// ネットワーク指定なし、デフォルトネットワークを使用
+		slog.Debug("ネットワーク指定なし、デフォルトネットワークを使用")
+		mac, err := util.GenerateRandomMAC()
+		if err != nil {
+			slog.Error("GenerateRandomMAC()", "err", err)
+			return "", err
+		}
+		virtSpec.NetSpecs = []virt.NetSpec{
+			{
+				MAC:     mac.String(),
+				Network: "default",
+				PortID:  uuid.New().String(),
+				Bridge:  "virbr0",
+				Bus:     1,
+			},
+		}
+		// サーバーのネットワーク情報を更新
+		var net api.NetworkInterface
+
+		// ネットワーク名から、ネットワークのIDを取得して、net.Networkidにセットする必要がある
+		xnet, err := m.Db.GetVirtualNetworkByName("default")
+		if err != nil {
+			slog.Error("GetNetworkIdByName()", "err", err)
+			return "", err
+		}
+		net.Networkid = xnet.Id
+		net.Networkname = virtSpec.NetSpecs[0].Network
+		net.Mac = &virtSpec.NetSpecs[0].MAC
+		serverConfig.Spec.NetworkInterface = &[]api.NetworkInterface{net}
+	} else {
+		slog.Debug("ネットワーク指定あり、指定されたネットワークを使用")
+		for i, reqNic := range *serverConfig.Spec.NetworkInterface {
+			slog.Debug("ネットワーク", "index", i, "network id", reqNic.Networkname)
+			mac, err := util.GenerateRandomMAC()
+			if err != nil {
+				slog.Error("GenerateRandomMAC()", "err", err)
+				return "", err
+			}
+			vnet, err := m.Db.GetVirtualNetworkByName(reqNic.Networkname)
+			if err != nil {
+				slog.Error("GetVirtualNetworkByName()", "err", err)
+				return "", err
+			}
+
+			var ipaddr string
+			var bitmask int
+			var net *api.IPNetwork
+
+			reqNic.Networkid = vnet.Id // ネットワークIDをセット
+
+			if reqNic.Address != nil {
+				// リクエストにIPアドレスが指定されている場合は、そのIPアドレスを使用する
+				ipaddr = *reqNic.Address
+				if reqNic.Netmasklen != nil {
+					bitmask = *reqNic.Netmasklen
+				} else {
+					slog.Debug("Netmask length is not specified, using default 24")
+					bitmask = 24 // デフォルトのビットマスク長
+				}
+				slog.Debug("IP address is specified in the request, skipping IP allocation", "ip address", ipaddr, "netmask length", bitmask)
+
+				// IPネットワークが存在していれば、IPネットワークを作成する必要はない。
+				// IPネットワークと IPアドレスを設定
+				ipnet := &api.IPNetwork{
+					AddressMaskLen: util.StringPtr(fmt.Sprintf("%s/%d", ipaddr, bitmask)),
+				}
+				ipNetId, err := m.Db.CreateIpNetwork(vnet.Id, ipnet)
+				if err != nil {
+					if err.Error() == db.ErrAlreadyExists || err.Error() == db.ErrOverlapsExistingNetwork {
+						//NOP
+					} else {
+						slog.Error("CreateIpNetwork()", "err", err)
+						return "", err
+					}
+				}
+
+				slog.Debug("IPネットワークの作成成功", "network id", vnet.Id, "ip network id", ipNetId, "ip address with mask", ipaddr)
+				// ネットワークインターフェースのIPネットワークIDを設定
+				reqNic.IpNetworkId = util.StringPtr(ipNetId)
+				slog.Debug("ネットワークインターフェースのIPネットワークIDを設定成功", "network id", vnet.Id, "ip network id", ipNetId)
+				// IPアドレスの使用済設定
+
+				// 一致するものが無かったら、そのIPアドレスを割り当てる
+				found, err := m.Db.CheckIPaddrInUse(vnet.Id, ipNetId, ipaddr)
+				if err != nil {
+					slog.Error("AllocateIP()", "err", err, "vnetId", vnet.Id, "ipnetId", ipNetId, "candidateIP", ipaddr)
+					return "", err
+				}
+				if !found {
+					slog.Debug("セットさられたIPアドレス", "IP	", ipaddr)
+					m.Db.SetIPaddrInUse(vnet.Id, ipNetId, ipaddr, *serverConfig.Metadata.Name)
+					//return ipaddr, nil
+				}	
+				// 内部DNSへ登録
+				slog.Debug("内部DNSへ登録", "hostname", *serverConfig.Metadata.Name, "subdomain", reqNic.Networkname, "ip address", ipaddr)
+				if err := m.Db.PutDnsEntry(*serverConfig.Metadata.Name, reqNic.Networkname, ipaddr); err != nil {
+					slog.Error("PutDnsEntry()", "err", err)
+					return "", err
+				}
+			} else {
+				// IPアドレスの指定が無いので、IPアドレスを割り当て
+				slog.Debug("IPアドレスの割り当て", "network id", vnet.Id, "network name", vnet.Metadata.Name)
+				if vnet.Spec.IpNetworkId != nil {
+					ipaddr, bitmask, err = m.Db.AllocateIP(vnet.Id, *vnet.Spec.IpNetworkId, *serverConfig.Metadata.Name)
+					if err != nil {
+						slog.Error("AllocateIP()", "err", err)
+						return "", err
+					}
+
+					net, err = m.Db.GetIpNetworkById(vnet.Id, *vnet.Spec.IpNetworkId)
+					if err != nil {
+						slog.Error("GetIpNetworkById()", "err", err)
+						return "", err
+					}
+					// 内部DNSへ登録
+					slog.Debug("内部DNSへ登録", "hostname", *serverConfig.Metadata.Name, "subdomain", reqNic.Networkname, "ip address", ipaddr)
+					if err := m.Db.PutDnsEntry(*serverConfig.Metadata.Name, reqNic.Networkname, ipaddr); err != nil {
+						slog.Error("PutDnsEntry()", "err", err)
+						return "", err
+					}
+				}
+			}
+
+			// ネットワークのバス番号は、ディスクのバス番号と被らないように、ディスクの数に応じて調整する
+			busno := uint(i + 1)
+			if busno >= 3 {
+				busno += 4 // diskとバス番号が被らないようにする
+			}
+			ns := virt.NetSpec{
+				MAC:     mac.String(),
+				Network: reqNic.Networkname, // virsh のネットワーク名をセットする
+				PortID:  uuid.New().String(),
+				Bridge:  "virbr0",
+				Bus:     busno,
+			}
+
+			// VLAN対応
+			if reqNic.Portgroup != nil {
+				ns.PortGroup = *reqNic.Portgroup
+			}
+			if reqNic.Vlans != nil && len(*reqNic.Vlans) > 0 {
+				for _, v := range *reqNic.Vlans {
+					ns.Vlans = append(ns.Vlans, v)
+				}
+			}
+			virtSpec.NetSpecs = append(virtSpec.NetSpecs, ns)
+
+			var ni api.NetworkInterface
+			ni.Networkname = ns.Network
+			ni.Networkid = vnet.Id
+
+			// ここでIP Network Idがセットされた場合、データベースにも保存する必要がある
+			if reqNic.IpNetworkId != nil {
+				ni.IpNetworkId = reqNic.IpNetworkId
+			}
+
+			ni.Mac = &ns.MAC
+			ni.Address = util.StringPtr(ipaddr)
+			ni.Netmasklen = util.IntPtrInt(bitmask)
+			ni.Routes = reqNic.Routes
+			ni.Nameservers = reqNic.Nameservers
+
+			// netplanで静的IPアドレスを設定する場合のために、IPアドレス情報もサーバーに保存しておく
+			if vnet.Spec.IpNetworkId != nil {
+				if net.Netmasklen != nil {
+					ni.Netmasklen = util.IntPtrInt(*net.Netmasklen)
+				}
+				if net.Netmask != nil {
+					ni.Netmask = util.StringPtr(*net.Netmask)
+				}
+				// ルートとネームサーバーの情報も保存しておく
+				if net.Gateway != nil {
+					ni.IpGateway = util.StringPtr(*net.Gateway)
+				}
+				if vnet.Spec.IpNetworkId != nil {
+					ni.IpNetworkId = util.StringPtr(*vnet.Spec.IpNetworkId)
+				} else {
+					ni.IpNetworkId = util.StringPtr(ni.Networkid)
+				}
+			}
+			(*serverConfig.Spec.NetworkInterface)[i] = ni
+		}
+		// ループの終わり
+	}
+	// サーバーのネットワーク情報を更新
+	err = m.Db.UpdateServer(serverConfig.Id, serverConfig)
+	if err != nil {
+		slog.Error("UpdateServer()", "err", err)
+		return "", err
 	}
 
 	slog.Debug("ブートディスクの作成")
@@ -145,7 +341,7 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 	}
 
 	slog.Debug("ハイパーバイザーのリソース確保")
-	var virtSpec virt.VmSpec
+	//var virtSpec virt.ServerSpec
 	virtSpec.UUID = *serverConfig.Metadata.Uuid
 	if serverConfig.Metadata != nil && serverConfig.Metadata.Name != nil {
 		virtSpec.Name = *serverConfig.Metadata.Name + "-" + serverConfig.Id // VMを一意に識別する
@@ -226,78 +422,6 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 
 	channelFile := "org.qemu.guest_agent.0"
 	channelPath, err := util.CreateChannelDir(virtSpec.UUID)
-
-	// ネットワークの設定
-	if serverConfig.Spec.Network == nil {
-		slog.Debug("ネットワーク指定なし、デフォルトネットワークを使用")
-		mac, err := util.GenerateRandomMAC()
-		if err != nil {
-			slog.Error("GenerateRandomMAC()", "err", err)
-			return "", err
-		}
-		virtSpec.NetSpecs = []virt.NetSpec{
-			{
-				MAC:     mac.String(),
-				Network: "default",
-				PortID:  uuid.New().String(),
-				Bridge:  "virbr0",
-				Bus:     1,
-			},
-		}
-		// サーバーのネットワーク情報を更新
-		var net api.Network
-		net.Id = virtSpec.NetSpecs[0].Network
-		net.Mac = &virtSpec.NetSpecs[0].MAC
-		serverConfig.Spec.Network = &[]api.Network{net}
-	} else {
-		slog.Debug("ネットワーク指定あり、指定されたネットワークを使用")
-		for i, reqNic := range *serverConfig.Spec.Network {
-			slog.Debug("ネットワーク", "index", i, "network id", reqNic.Id)
-			mac, err := util.GenerateRandomMAC()
-			if err != nil {
-				slog.Error("GenerateRandomMAC()", "err", err)
-				return "", err
-			}
-			busno := uint(i + 1)
-			if busno >= 3 {
-				busno += 4 // diskとバス番号が被らないようにする
-			}
-			ns := virt.NetSpec{
-				MAC:     mac.String(),
-				Network: reqNic.Id,
-				PortID:  uuid.New().String(),
-				Bridge:  "virbr0",
-				Bus:     busno,
-			}
-
-			// VLAN対応
-			if reqNic.Portgroup != nil {
-				ns.PortGroup = *reqNic.Portgroup
-			}
-			if reqNic.Vlans != nil && len(*reqNic.Vlans) > 0 {
-				for _, v := range *reqNic.Vlans {
-					ns.Vlans = append(ns.Vlans, v)
-				}
-			}
-			virtSpec.NetSpecs = append(virtSpec.NetSpecs, ns)
-
-			var ni api.Network
-			ni.Id = ns.Network
-			ni.Mac = &ns.MAC
-			// netplanで静的IPアドレスを設定する場合のために、IPアドレス情報もサーバーに保存しておく
-			ni.Address = reqNic.Address
-			ni.Netmask = reqNic.Netmask
-			ni.Routes = reqNic.Routes
-			ni.Nameservers = reqNic.Nameservers
-			(*serverConfig.Spec.Network)[i] = ni
-		}
-	}
-	// サーバーのネットワーク情報を更新
-	err = m.Db.UpdateServer(serverConfig.Id, serverConfig)
-	if err != nil {
-		slog.Error("UpdateServer()", "err", err)
-		return "", err
-	}
 
 	virtSpec.ChannelSpecs = []virt.ChannelSpec{
 		{"unix", channelPath + "/" + channelFile, channelFile, "channel0", 1},

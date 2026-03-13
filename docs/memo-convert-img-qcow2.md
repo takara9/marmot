@@ -3,13 +3,13 @@
 ルートファイルシステムを拡大
 
 ```
-$ curl -OL https://cloud-images.ubuntu.com/jammy/20251216/jammy-server-cloudimg-amd64.img
+$ curl -OL https://cloud-images.ubuntu.com/jammy/20251216/ubuntu-22.04-server-cloudimg-amd64.img
 ```
 
 
 
 ```
-$ sudo qemu-img convert -f qcow2 -O qcow2 jammy-server-cloudimg-amd64.img jammy-server-cloudimg-amd64.qcow2
+$ sudo qemu-img convert -f qcow2 -O qcow2 ubuntu-22.04-server-cloudimg-amd64.img jammy-server-cloudimg-amd64.qcow2
 $ sudo virt-customize -a jammy-server-cloudimg-amd64.qcow2 \
   --root-password password:ubuntu \
   --edit '/etc/ssh/sshd_config: s/^#?PermitRootLogin.*/PermitRootLogin yes/' \

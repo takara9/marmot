@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -8,8 +9,10 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
+	controller_net "github.com/takara9/marmot/pkg/contorller-net"
 	controller_vm "github.com/takara9/marmot/pkg/controller-vm"
 	controller_vol "github.com/takara9/marmot/pkg/controller-vol"
+	internaldns "github.com/takara9/marmot/pkg/internal-dns"
 	"github.com/takara9/marmot/pkg/marmotd"
 )
 
@@ -63,6 +66,20 @@ func main() {
 	_, err = controller_vol.StartVolController(*node, *etcd) // ボリュームコントローラーの開始
 	if err != nil {
 		slog.Error("Failed to start controller", "err", err)
+		return
+	}
+
+	// ネットワークコントローラー
+	_, err = controller_net.StartNetController(*node, *etcd) // ネットワークコントローラーの開始
+	if err != nil {
+		slog.Error("Failed to start controller", "err", err)
+		return
+	}
+
+	// DNSサーバーコントローラー
+	_, err = internaldns.StartInternalDNSServer(context.Background(), *node, *etcd) // DNSサーバーコントローラーの開始
+	if err != nil {
+		slog.Error("Failed to start DNS server", "err", err)
 		return
 	}
 

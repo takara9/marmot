@@ -10,19 +10,21 @@ import (
 
 	etcd "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/concurrency"
-
-	"github.com/takara9/marmot/pkg/types"
 )
 
 const (
-	HvPrefix              = "/marmot/hypervisor"
-	VmPrefix              = "/marmot/virtualmachine"
+	// ETCD Keyのプレフィックス
 	OsTemplateImagePrefix = "/marmot/osTemplateImage"
 	VolumePrefix          = "/marmot/volume"
 	ServerPrefix          = "/marmot/server"
+	NetworkPrefix         = "/marmot/network"
 	SeqPrefix             = "/marmot/sequence"
 	VersionKey            = "/marmot/version"
 	JobPrefix             = "/marmot/job"
+	InternalDNSPrefix     = "/marmot/dns"
+	// エラーメッセージ
+	ErrAlreadyExists           = "Network with the same AddressMaskLen already exists"
+	ErrOverlapsExistingNetwork = "overlaps with an existing network"
 )
 
 var (
@@ -177,87 +179,3 @@ func (d *Database) DeleteJSON(key string) error {
 	return nil
 }
 
-// 削除対象
-func (d *Database) GetDnsByKey(path string) (types.DNSEntry, error) {
-	var entry types.DNSEntry
-	resp, err := d.Cli.Get(d.Ctx, path)
-	if err != nil {
-		return entry, err
-	}
-
-	if resp.Count == 0 {
-		return entry, errors.New("not found")
-	}
-
-	err = json.Unmarshal([]byte(resp.Kvs[0].Value), &entry)
-	if err != nil {
-		return entry, err
-	}
-	return entry, nil
-}
-
-/*
-// パブリックIPアドレスが一致するインスタンスを探す
-func (d *Database) FindByPublicIPaddress(ipAddress string) error {
-	resp, err := d.GetByPrefix(VmPrefix)
-	if err != nil {
-		return err
-	}
-
-	for _, ev := range resp.Kvs {
-		var vm api.VirtualMachine
-		if err := json.Unmarshal([]byte(ev.Value), &vm); err != nil {
-			slog.Error("failed unmarshal", "err", err, "ipAddress", ipAddress)
-			return err
-		}
-		if ipAddress == *vm.PublicIp {
-			return ErrFound
-		}
-	}
-	return ErrNotFound
-}
-*/
-/*
-// プライベートIPアドレスが一致するインスンスを探す
-func (d *Database) FindByPrivateIPaddress(ipAddress string) error {
-	resp, err := d.GetByPrefix(VmPrefix)
-	if err != nil {
-		return err
-	}
-
-	for _, ev := range resp.Kvs {
-		var vm api.VirtualMachine
-		err = json.Unmarshal([]byte(ev.Value), &vm)
-		if err != nil {
-			slog.Error("failed unmarshal", "err", err, "ipAddress", ipAddress)
-			return err
-		}
-		if ipAddress == *vm.PrivateIp {
-			return ErrFound
-		}
-	}
-	return ErrNotFound
-}
-*/
-
-/*
-// ホスト名とクラスタ名でVMキーを取得する
-func (d *Database) FindByHostAndClusteName(hostname string, clustername string) (string, error) {
-	resp, err := d.GetByPrefix(VmPrefix)
-	if err != nil {
-		return "", err
-	}
-	for _, ev := range resp.Kvs {
-		var vm api.VirtualMachine
-		if err := json.Unmarshal([]byte(ev.Value), &vm); err != nil {
-			slog.Error("FindByHostAndClusteName()", "err", err, "hostname", hostname, "clustername", clustername)
-			return "", err
-		}
-
-		if hostname == vm.Name && clustername == *vm.ClusterName {
-			return *vm.Key, ErrFound
-		}
-	}
-	return "", ErrNotFound
-}
-*/

@@ -5,7 +5,7 @@ go 1.25.3
 require (
 	github.com/google/uuid v1.6.0
 	github.com/labstack/echo/v4 v4.12.0
-	github.com/oapi-codegen/runtime v1.1.2
+	github.com/oapi-codegen/runtime v1.2.0
 	github.com/onsi/ginkgo/v2 v2.25.3
 	github.com/onsi/gomega v1.39.0
 	github.com/takara9/lvm v0.0.0-20251025114351-558f443e87d2
@@ -17,6 +17,8 @@ require (
 require github.com/mattn/go-isatty v0.0.20 // indirect
 
 require (
+	github.com/jinzhu/copier v0.4.0
+	github.com/miekg/dns v1.1.72
 	github.com/spf13/cobra v1.10.1
 	go.yaml.in/yaml/v3 v3.0.4
 	libvirt.org/go/libvirtxml v1.11010.0
@@ -45,15 +47,17 @@ require (
 	go.etcd.io/etcd/client/pkg/v3 v3.6.1 // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.27.0 // indirect
-	golang.org/x/crypto v0.41.0 // indirect
-	golang.org/x/net v0.43.0 // indirect
-	golang.org/x/sys v0.35.0 // indirect
-	golang.org/x/text v0.28.0 // indirect
-	golang.org/x/tools v0.36.0 // indirect
+	go.uber.org/zap v1.27.1 // indirect
+	golang.org/x/crypto v0.48.0 // indirect
+	golang.org/x/mod v0.33.0 // indirect
+	golang.org/x/net v0.51.0 // indirect
+	golang.org/x/sync v0.19.0 // indirect
+	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/text v0.34.0 // indirect
+	golang.org/x/tools v0.42.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250303144028-a0af3efb3deb // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250303144028-a0af3efb3deb // indirect
 	google.golang.org/grpc v1.71.1 // indirect
-	google.golang.org/protobuf v1.36.7 // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/freddierice/go-losetup.v1 v1.0.0-20170407175016-fc9adea44124 // indirect
 )
