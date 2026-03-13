@@ -1,4 +1,4 @@
-package controller_vm
+package controller
 
 import (
 	"encoding/json"
@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	CONTROLLER_INTERVAL = 5 * time.Second
+	SERVER_CONTROLLER_INTERVAL = 5 * time.Second
 )
 
 var controllerCounter uint64 = 0
@@ -39,12 +39,12 @@ func StartVmController(node string, etcdUrl string) (*controller, error) {
 	c.db = c.marmot.Db // 正しくないけど
 
 	// 定期実行の開始
-	ticker := time.NewTicker(CONTROLLER_INTERVAL)
+	ticker := time.NewTicker(SERVER_CONTROLLER_INTERVAL)
 	go func() {
 		for {
 			select {
 			case <-ticker.C:
-				c.controllerLoop()
+				c.serverControllerLoop()
 			}
 		}
 	}()
@@ -52,9 +52,8 @@ func StartVmController(node string, etcdUrl string) (*controller, error) {
 }
 
 // コントローラーの制御ループ
-func (c *controller) controllerLoop() {
-	slog.Info("コントローラーの制御ループ実行", "CONTROLLER", controllerCounter)
-	controllerCounter++
+func (c *controller) serverControllerLoop() {
+	slog.Info("サーバーコントローラーの制御ループ実行", "CONTROLLER", time.Now().Format("2006-01-02 15:04:05"))
 
 	// サーバースペック情報の取得
 	slog.Debug("サーバースペック情報取得", "", "")

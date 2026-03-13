@@ -1,11 +1,10 @@
-package controller_net
+package controller
 
 import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/takara9/marmot/pkg/db"
@@ -14,9 +13,10 @@ import (
 )
 
 const (
-	CONTROLLER_INTERVAL = 5 * time.Second
+	NETWORK_CONTROLLER_INTERVAL = 5 * time.Second
 )
 
+/*
 var controllerCounter uint64 = 0
 
 type controller struct {
@@ -24,6 +24,7 @@ type controller struct {
 	Lock   sync.Mutex
 	marmot *marmotd.Marmot
 }
+*/
 
 // ネットワークコントローラーの開始
 func StartNetController(node string, etcdUrl string) (*controller, error) {
@@ -46,12 +47,12 @@ func StartNetController(node string, etcdUrl string) (*controller, error) {
 	}
 
 	// 定期実行の開始
-	ticker := time.NewTicker(CONTROLLER_INTERVAL)
+	ticker := time.NewTicker(NETWORK_CONTROLLER_INTERVAL)
 	go func() {
 		for {
 			select {
 			case <-ticker.C:
-				c.controllerLoop()
+				c.networkControllerLoop()
 			}
 		}
 	}()
@@ -59,9 +60,9 @@ func StartNetController(node string, etcdUrl string) (*controller, error) {
 }
 
 // コントローラーの制御ループ
-func (c *controller) controllerLoop() {
-	slog.Info("ネットワークコントローラーの制御ループ実行", "CONTROLLER", controllerCounter)
-	controllerCounter++
+func (c *controller) networkControllerLoop() {
+	slog.Info("ネットワークコントローラーの制御ループ実行", "CONTROLLER", time.Now().Format("2006-01-02 15:04:05"))
+
 	vnets, err := c.marmot.GetVirtualNetwork()
 	if err != nil {
 		slog.Error("failed to get virtual networks", "err", err)
@@ -135,7 +136,7 @@ func (c *controller) controllerLoop() {
 							slog.Error("Failed to delete virtual network from DB", "err", err, "networkId", vnet.Id)
 							continue
 						}
-					}else {
+					} else {
 						c.db.UpdateVirtualNetworkStatus(vnet.Id, db.NETWORK_ACTIVE)
 						slog.Debug("仮想ネットワークの実態が存在するため、DBのステータスをACTIVEに更新", "networkId", vnet.Id)
 						continue

@@ -9,9 +9,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
-	controller_net "github.com/takara9/marmot/pkg/contorller-net"
-	controller_vm "github.com/takara9/marmot/pkg/controller-vm"
-	controller_vol "github.com/takara9/marmot/pkg/controller-vol"
+	"github.com/takara9/marmot/pkg/controller"
 	internaldns "github.com/takara9/marmot/pkg/internal-dns"
 	"github.com/takara9/marmot/pkg/marmotd"
 )
@@ -57,20 +55,20 @@ func main() {
 	// コントローラーの開始
 
 	// 仮想マシンコントローラー
-	_, err := controller_vm.StartVmController(*node, *etcd) // VMコントローラーの開始
+	_, err := controller.StartVmController(*node, *etcd) // VMコントローラーの開始
 	if err != nil {
 		slog.Error("Failed to start controller", "err", err)
 		return
 	}
 	// ボリュームコントローラー
-	_, err = controller_vol.StartVolController(*node, *etcd) // ボリュームコントローラーの開始
+	_, err = controller.StartVolController(*node, *etcd) // ボリュームコントローラーの開始
 	if err != nil {
 		slog.Error("Failed to start controller", "err", err)
 		return
 	}
 
 	// ネットワークコントローラー
-	_, err = controller_net.StartNetController(*node, *etcd) // ネットワークコントローラーの開始
+	_, err = controller.StartNetController(*node, *etcd) // ネットワークコントローラーの開始
 	if err != nil {
 		slog.Error("Failed to start controller", "err", err)
 		return
@@ -82,6 +80,7 @@ func main() {
 		slog.Error("Failed to start DNS server", "err", err)
 		return
 	}
+
 
 	//startDispatcher()
 	// And we serve HTTP until the world ends.
