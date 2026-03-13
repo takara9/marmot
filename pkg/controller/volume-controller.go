@@ -1,10 +1,9 @@
-package controller_vol
+package controller
 
 import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"sync"
 	"time"
 
 	"github.com/takara9/marmot/pkg/db"
@@ -12,9 +11,10 @@ import (
 )
 
 const (
-	CONTROLLER_INTERVAL = 5 * time.Second
+	VOLUME_CONTROLLER_INTERVAL = 5 * time.Second
 )
 
+/*
 var controllerCounter uint64 = 0
 
 type controller struct {
@@ -22,6 +22,7 @@ type controller struct {
 	Lock   sync.Mutex
 	marmot *marmotd.Marmot
 }
+*/
 
 // VMコントローラーの開始
 func StartVolController(node string, etcdUrl string) (*controller, error) {
@@ -38,12 +39,12 @@ func StartVolController(node string, etcdUrl string) (*controller, error) {
 	c.db = c.marmot.Db // 正しくないけど
 
 	// 定期実行の開始
-	ticker := time.NewTicker(CONTROLLER_INTERVAL)
+	ticker := time.NewTicker(VOLUME_CONTROLLER_INTERVAL)
 	go func() {
 		for {
 			select {
 			case <-ticker.C:
-				c.controllerLoop()
+				c.volumeControllerLoop()
 			}
 		}
 	}()
@@ -51,9 +52,9 @@ func StartVolController(node string, etcdUrl string) (*controller, error) {
 }
 
 // コントローラーの制御ループ
-func (c *controller) controllerLoop() {
-	slog.Info("ボリュームコントローラーの制御ループ実行", "CONTROLLER", controllerCounter)
-	controllerCounter++
+func (c *controller) volumeControllerLoop() {
+	slog.Info("ボリュームコントローラーの制御ループ実行", "CONTROLLER", time.Now().Format("2006-01-02 15:04:05"))
+
 	vols, err := c.marmot.GetVolumes()
 	if err != nil {
 		slog.Error("failed to get volumes", "err", err)
