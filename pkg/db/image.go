@@ -136,3 +136,29 @@ func (d *Database) SetImageStatus(id string, status int) {
 		return
 	}
 }
+
+func (d *Database) UpdateImage(id string, imageSpec api.Image) error {
+	slog.Debug("UpdateImageById() called", "id", id)
+	key := ImagePrefix + "/" + id
+	var img api.Image
+	_, err := d.GetJSON(key, &img)
+	if err != nil {
+		slog.Error("UpdateImageById() failed to get image", "err", err)
+		return err
+	}
+
+	// 変更可能なフィールドを更新する
+	if imageSpec.Metadata != nil && imageSpec.Metadata.Name != nil {
+		img.Metadata.Name = imageSpec.Metadata.Name
+	}
+	if imageSpec.Spec != nil && imageSpec.Spec.SourceUrl != nil {
+		img.Spec.SourceUrl = imageSpec.Spec.SourceUrl
+	}
+
+	err = d.PutJSON(key, img)
+	if err != nil {
+		slog.Error("UpdateImageById() failed to update image", "err", err)
+		return err
+	}
+	return nil
+}

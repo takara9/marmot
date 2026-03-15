@@ -216,6 +216,12 @@ type Volume struct {
 	Id       string    `json:"id"`
 }
 
+// CreateImageJSONRequestBody defines body for CreateImage for application/json ContentType.
+type CreateImageJSONRequestBody = Image
+
+// UpdateImageByIdJSONRequestBody defines body for UpdateImageById for application/json ContentType.
+type UpdateImageByIdJSONRequestBody = Image
+
 // CreateNetworkJSONRequestBody defines body for CreateNetwork for application/json ContentType.
 type CreateNetworkJSONRequestBody = VirtualNetwork
 
@@ -236,6 +242,21 @@ type UpdateVolumeByIdJSONRequestBody = Volume
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// List Images
+	// (GET /image)
+	GetImages(ctx echo.Context) error
+	// Create Image
+	// (POST /image)
+	CreateImage(ctx echo.Context) error
+	// Delete Image
+	// (DELETE /image/{id})
+	DeleteImageById(ctx echo.Context, id string) error
+	// Info for a specific image
+	// (GET /image/{id})
+	GetImageById(ctx echo.Context, id string) error
+	// Update Image
+	// (PUT /image/{id})
+	UpdateImageById(ctx echo.Context, id string) error
 	// Get Network Information
 	// (GET /network)
 	GetNetworks(ctx echo.Context) error
@@ -292,6 +313,72 @@ type ServerInterface interface {
 // ServerInterfaceWrapper converts echo contexts to parameters.
 type ServerInterfaceWrapper struct {
 	Handler ServerInterface
+}
+
+// GetImages converts echo context to params.
+func (w *ServerInterfaceWrapper) GetImages(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetImages(ctx)
+	return err
+}
+
+// CreateImage converts echo context to params.
+func (w *ServerInterfaceWrapper) CreateImage(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.CreateImage(ctx)
+	return err
+}
+
+// DeleteImageById converts echo context to params.
+func (w *ServerInterfaceWrapper) DeleteImageById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.DeleteImageById(ctx, id)
+	return err
+}
+
+// GetImageById converts echo context to params.
+func (w *ServerInterfaceWrapper) GetImageById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetImageById(ctx, id)
+	return err
+}
+
+// UpdateImageById converts echo context to params.
+func (w *ServerInterfaceWrapper) UpdateImageById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.UpdateImageById(ctx, id)
+	return err
 }
 
 // GetNetworks converts echo context to params.
@@ -538,6 +625,11 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 		Handler: si,
 	}
 
+	router.GET(baseURL+"/image", wrapper.GetImages)
+	router.POST(baseURL+"/image", wrapper.CreateImage)
+	router.DELETE(baseURL+"/image/:id", wrapper.DeleteImageById)
+	router.GET(baseURL+"/image/:id", wrapper.GetImageById)
+	router.PUT(baseURL+"/image/:id", wrapper.UpdateImageById)
 	router.GET(baseURL+"/network", wrapper.GetNetworks)
 	router.POST(baseURL+"/network", wrapper.CreateNetwork)
 	router.DELETE(baseURL+"/network/:id", wrapper.DeleteNetworkById)

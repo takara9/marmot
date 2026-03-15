@@ -404,6 +404,98 @@ paths:
               application/json:
                 schema:
                   $ref: "#/components/schemas/Error"
+  /image:
+    post:
+      summary: "Create Image"
+      operationId: createImage
+      tags:
+        - storage
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Image"
+      responses:
+        "200":
+          description: Created the Image
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      summary: "List Images"
+      operationId: getImages
+      tags:
+        - storage
+      responses:
+        "200":
+          description: List of Images
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Image"
+  /image/{id}:
+      get:
+        summary: "Info for a specific image"
+        operationId: getImageById
+        tags:
+          - image
+        parameters:
+          - name: id
+            in: path
+            required: true
+            description: The id of the image to retrieve
+            schema:
+              type: string
+      put:
+        summary: "Update Image"
+        operationId: updateImageById
+        tags:
+          - image
+        parameters:
+          - name: id
+            in: path
+            required: true
+            description: The id of the image to update
+            schema:
+              type: string
+        requestBody:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Image"
+        responses:
+          "200":
+            description: Updated the Image
+          default:
+            description: unexpected error
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Error"
+      delete:
+        summary: "Delete Image"
+        operationId: deleteImageById
+        tags:
+          - image
+        parameters:
+          - name: id
+            in: path
+            required: true
+            description: The id of the image to delete
+            schema:
+              type: string
+        responses:
+          "200":
+            description: Deleted the Volume
+          default:
+            description: unexpected error
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Error"
 
 components:
   schemas:
