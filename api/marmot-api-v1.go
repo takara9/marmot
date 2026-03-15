@@ -39,6 +39,24 @@ type IPNetwork struct {
 	VirtualNetworkId *string `json:"virtualNetworkId,omitempty"`
 }
 
+// Job defines model for Job.
+type Job struct {
+	Metadata *Metadata `json:"Metadata,omitempty"`
+	Spec     *JobSpec  `json:"Spec,omitempty"`
+	Status   *Status   `json:"Status,omitempty"`
+	Id       string    `json:"id"`
+}
+
+// JobSpec defines model for JobSpec.
+type JobSpec struct {
+	Command     *[]string  `json:"Command,omitempty"`
+	ExitCode    *int       `json:"ExitCode,omitempty"`
+	FinishTime  *time.Time `json:"FinishTime,omitempty"`
+	MaxTime     *time.Time `json:"MaxTime,omitempty"`
+	RequestTime *time.Time `json:"RequestTime,omitempty"`
+	StartTime   *time.Time `json:"StartTime,omitempty"`
+}
+
 // Metadata defines model for Metadata.
 type Metadata struct {
 	Comment      *string `json:"comment,omitempty"`

@@ -19,3 +19,7 @@ test-ipam:
 .PHONY: test-dns
 test-dns:
 	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus="InternalDNS" -coverprofile cover.out
+
+.PHONY: test-job
+test-job:
+	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus="Jobs" -coverprofile cover.out
