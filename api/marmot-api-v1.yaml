@@ -706,3 +706,39 @@ components:
           type: string
         HostId:
           type: string
+    Job:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        Metadata:
+          $ref: "#/components/schemas/Metadata"
+        Spec:
+          $ref: "#/components/schemas/JobSpec"
+        Status:
+          $ref: "#/components/schemas/Status"
+    JobSpec:
+      type: object
+      properties:
+        RequestTime:
+          type: string
+          format: date-time
+        StartTime:
+          type: string
+          format: date-time
+        FinishTime:
+          type: string
+          format: date-time
+        MaxTime:
+          type: string
+          format: date-time
+        Command:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+        ExitCode:
+          type: integer
+          format: int
