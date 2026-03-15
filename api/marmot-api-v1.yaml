@@ -742,3 +742,34 @@ components:
         ExitCode:
           type: integer
           format: int
+    Image:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        Metadata:
+          $ref: "#/components/schemas/Metadata"
+        Spec:
+          $ref: "#/components/schemas/ImageSpec"
+        Status:
+          $ref: "#/components/schemas/Status"
+    ImageSpec:
+      type: object
+      properties:
+        type:
+          type: string
+        kind:
+          type: string
+        volumeGroup:
+          type: string
+        logicalVolume:
+          type: string
+        size:
+          type: integer
+          format: int
+        path:
+          type: string
+        source_url:
+          type: string

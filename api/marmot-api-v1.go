@@ -39,6 +39,25 @@ type IPNetwork struct {
 	VirtualNetworkId *string `json:"virtualNetworkId,omitempty"`
 }
 
+// Image defines model for Image.
+type Image struct {
+	Metadata *Metadata  `json:"Metadata,omitempty"`
+	Spec     *ImageSpec `json:"Spec,omitempty"`
+	Status   *Status    `json:"Status,omitempty"`
+	Id       string     `json:"id"`
+}
+
+// ImageSpec defines model for ImageSpec.
+type ImageSpec struct {
+	Kind          *string `json:"kind,omitempty"`
+	LogicalVolume *string `json:"logicalVolume,omitempty"`
+	Path          *string `json:"path,omitempty"`
+	Size          *int    `json:"size,omitempty"`
+	SourceUrl     *string `json:"source_url,omitempty"`
+	Type          *string `json:"type,omitempty"`
+	VolumeGroup   *string `json:"volumeGroup,omitempty"`
+}
+
 // Job defines model for Job.
 type Job struct {
 	Metadata *Metadata `json:"Metadata,omitempty"`

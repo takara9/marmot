@@ -17,6 +17,7 @@ const (
 	OsTemplateImagePrefix = "/marmot/osTemplateImage"
 	VolumePrefix          = "/marmot/volume"
 	ServerPrefix          = "/marmot/server"
+	ImagePrefix           = "/marmot/image"
 	NetworkPrefix         = "/marmot/network"
 	SeqPrefix             = "/marmot/sequence"
 	VersionKey            = "/marmot/version"
