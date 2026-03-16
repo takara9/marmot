@@ -6,15 +6,29 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/util"
 	"go.yaml.in/yaml/v3"
 )
 
 var imageCreateCmd = &cobra.Command{
-	Use:   "create",
-	Short: "Create a new image",
+	Use:   "create [Image Name] [QCOW2 Image URL]",
+	Short: "Create a new OS template image",
+	Args:  cobra.MinimumNArgs(2), // 引数が1つ必要
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var err error
+
+		if len(args) != 2 {
+			fmt.Fprintln(cmd.ErrOrStderr(), "Usage: mactl image create [Image Name] [QCOW2 Image URL]")
+			return fmt.Errorf("invalid number of arguments")
+		}
+
 		var image api.Image
+		var spec api.ImageSpec
+		var meta api.Metadata
+		image.Spec = &spec
+		image.Metadata = &meta
+		image.Metadata.Name = util.StringPtr(args[0])
+		image.Spec.SourceUrl = util.StringPtr(args[1])
 
 		byteBody, _, err := m.CreateImage(image)
 		if err != nil {

@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"encoding/json"
-	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -82,18 +80,18 @@ func (c *controller) networkControllerLoop() {
 				}
 			}
 		}
-		fmt.Println("======================================================")
-		fmt.Println("仮想ネットワーク: ", "ID=", vnet.Id)
-		if vnet.Metadata != nil && vnet.Metadata.Name != nil {
-			fmt.Println("ネットワーク 名前=", *vnet.Metadata.Name)
-		}
-		byte, err := json.MarshalIndent(vnet, "", "  ")
-		if err != nil {
-			slog.Error("failed to marshal virtual network", "err", err)
-		} else {
-			fmt.Println("仮想ネットワークのJSON情報", "json", string(byte))
-		}
-		fmt.Println("======================================================")
+		//fmt.Println("======================================================")
+		//fmt.Println("仮想ネットワーク: ", "ID=", vnet.Id)
+		//if vnet.Metadata != nil && vnet.Metadata.Name != nil {
+		//	fmt.Println("ネットワーク 名前=", *vnet.Metadata.Name)
+		//}
+		//byte, err := json.MarshalIndent(vnet, "", "  ")
+		//if err != nil {
+		//	slog.Error("failed to marshal virtual network", "err", err)
+		//} else {
+		//	fmt.Println("仮想ネットワークのJSON情報", "json", string(byte))
+		//}
+		//fmt.Println("======================================================")
 
 		if vnet.Status != nil && vnet.Status.Status != nil {
 			switch *vnet.Status.Status {

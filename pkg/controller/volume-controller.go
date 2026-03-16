@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"encoding/json"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -62,12 +60,12 @@ func (c *controller) volumeControllerLoop() {
 	}
 	slog.Debug("取得したボリュームの数", "numVolumes", len(vols))
 	for _, vol := range vols {
-		byte, err := json.MarshalIndent(vol, "", "  ")
-		if err != nil {
-			slog.Error("failed to marshal volume", "err", err)
-		} else {
-			fmt.Println("ボリュームのJSON情報", "json", string(byte))
-		}
+		//byte, err := json.MarshalIndent(vol, "", "  ")
+		//if err != nil {
+		//	slog.Error("failed to marshal volume", "err", err)
+		//} else {
+		//	fmt.Println("ボリュームのJSON情報", "json", string(byte))
+		//}
 		// 削除タイムスタンプが設定されて一定時間経過したボリュームのステータスをDELETINGに更新する
 		if vol.Status != nil && vol.Status.DeletionTimeStamp != nil {
 			deletionTime := *vol.Status.DeletionTimeStamp

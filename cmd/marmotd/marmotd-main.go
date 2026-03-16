@@ -81,6 +81,12 @@ func main() {
 		return
 	}
 
+	// イメージコントローラーの開始
+	_, err = controller.StartImageController(*node, *etcd)
+	if err != nil {
+		slog.Error("Failed to start image controller", "err", err)
+		return
+	}
 
 	//startDispatcher()
 	// And we serve HTTP until the world ends.

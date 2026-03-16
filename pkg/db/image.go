@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/takara9/marmot/api"
@@ -189,6 +190,20 @@ func (d *Database) updateImage(id string, spec api.Image) error {
 	err = d.PutJSONCAS(key, expected, &rec)
 	if err != nil {
 		slog.Error("PutJSONCAS() failed", "err", err, "key", key, "expected", expected)
+		return err
+	}
+	return nil
+}
+
+func (d *Database) SetDeleteTimestampImage(id string) error {
+	image, err := d.GetImage(id)
+	if err != nil {
+		slog.Error("SetDeleteTimestamp() GetImage() failed", "err", err, "imageId", id)
+		return err
+	}
+	image.Status.DeletionTimeStamp = util.TimePtr(time.Now())
+	if err := d.UpdateImage(id, image); err != nil {
+		slog.Error("SetDeleteTimestamp() UpdateImage() failed", "err", err, "imageId", id)
 		return err
 	}
 	return nil

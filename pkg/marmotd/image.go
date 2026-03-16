@@ -109,14 +109,28 @@ func (m *Marmot) CreateNewImage(id string) (*api.Image, error) {
 	image.Spec.Size = util.IntPtrInt(bootVolumeSizeGB)
 	image.Status.Status = util.IntPtrInt(db.IMAGE_AVAILABLE)
 
-
-	// ここで保存されていない！　
+	// ここで保存されていない！
 	if err := m.Db.UpdateImage(id, image); err != nil {
 		slog.Error("Failed to update image data in DB", "imgId", id, "err", err)
 		return nil, err
 	}
 
 	return &image, nil
+}
+
+func (m *Marmot) UpdateImageStatus(id string, status int) error {
+	slog.Debug("Updating image status", "imgId", id, "status", status)
+	image, err := m.Db.GetImage(id)
+	if err != nil {
+		slog.Error("Failed to get image data from DB", "imgId", id, "err", err)
+		return err
+	}
+	image.Status.Status = util.IntPtrInt(status)
+	if err := m.Db.UpdateImage(id, image); err != nil {
+		slog.Error("Failed to update image status in DB", "imgId", id, "err", err)
+		return err
+	}
+	return nil
 }
 
 func (m *Marmot) GetImages() ([]api.Image, error) {
