@@ -2,6 +2,7 @@ package db
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 
 	"github.com/google/uuid"
@@ -137,27 +138,57 @@ func (d *Database) SetImageStatus(id string, status int) {
 	}
 }
 
-func (d *Database) UpdateImage(id string, imageSpec api.Image) error {
-	slog.Debug("UpdateImageById() called", "id", id)
-	key := ImagePrefix + "/" + id
-	var img api.Image
-	_, err := d.GetJSON(key, &img)
+// サーバーを更新
+func (d *Database) UpdateImage(id string, spec api.Image) error {
+	for {
+		err := d.updateImage(id, spec)
+		if err == ErrUpdateConflict {
+			slog.Warn("UpdateImage() retrying due to update conflict", "imageId", id)
+			continue
+		} else if err != nil {
+			slog.Error("UpdateImage()", "err", err)
+			return err
+		}
+		break
+	}
+
+	fmt.Println("=== 書き込みデータの情報確認 ===", "image Id", id)
+	data3, err := json.MarshalIndent(spec, "", "  ")
 	if err != nil {
-		slog.Error("UpdateImageById() failed to get image", "err", err)
+		slog.Error("json.MarshalIndent()", "err", err)
+	} else {
+		fmt.Println("イメージ情報(image): ", string(data3))
+	}
+
+	return nil
+}
+
+// イメージを更新
+func (d *Database) updateImage(id string, spec api.Image) error {
+	lockKey := "/lock/image/" + id
+	mutex, err := d.LockKey(lockKey)
+	if err != nil {
+		slog.Error("failed to lock", "err", err, "lockKey", lockKey)
 		return err
 	}
+	defer d.UnlockKey(mutex)
 
-	// 変更可能なフィールドを更新する
-	if imageSpec.Metadata != nil && imageSpec.Metadata.Name != nil {
-		img.Metadata.Name = imageSpec.Metadata.Name
-	}
-	if imageSpec.Spec != nil && imageSpec.Spec.SourceUrl != nil {
-		img.Spec.SourceUrl = imageSpec.Spec.SourceUrl
-	}
-
-	err = d.PutJSON(key, img)
+	var rec api.Image
+	key := ImagePrefix + "/" + id
+	resp, err := d.GetJSON(key, &rec)
 	if err != nil {
-		slog.Error("UpdateImageById() failed to update image", "err", err)
+		slog.Error("GetJSON() failed", "err", err, "key", key)
+		return err
+	}
+	expected := resp.Kvs[0].ModRevision
+
+	rec.Id = id
+	// パッチ適用
+	util.PatchStruct(&rec, spec)
+
+	err = d.PutJSONCAS(key, expected, &rec)
+	if err != nil {
+		slog.Error("PutJSONCAS() failed", "err", err, "key", key, "expected", expected)
 		return err
 	}
 	return nil

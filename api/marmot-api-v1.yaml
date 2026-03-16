@@ -858,10 +858,12 @@ components:
           type: string
         logicalVolume:
           type: string
+        lvPath:
+          type: string
         size:
           type: integer
           format: int
-        path:
+        qcow2Path:
           type: string
         source_url:
           type: string

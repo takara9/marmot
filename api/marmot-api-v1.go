@@ -51,7 +51,8 @@ type Image struct {
 type ImageSpec struct {
 	Kind          *string `json:"kind,omitempty"`
 	LogicalVolume *string `json:"logicalVolume,omitempty"`
-	Path          *string `json:"path,omitempty"`
+	LvPath        *string `json:"lvPath,omitempty"`
+	Qcow2Path     *string `json:"qcow2Path,omitempty"`
 	Size          *int    `json:"size,omitempty"`
 	SourceUrl     *string `json:"source_url,omitempty"`
 	Type          *string `json:"type,omitempty"`

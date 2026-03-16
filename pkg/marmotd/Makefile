@@ -51,3 +51,7 @@ test-network:
 .PHONY: test-network2
 test-network2:
 	$(GO) test -ginkgo.focus="VirtualPrivateNetworksUpperlayer" -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+
+.PHONY: test-image
+test-image:
+	$(GO) test -ginkgo.focus="ImageManagmentTest" -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events

@@ -95,7 +95,7 @@ func (s *Server) UpdateImageById(ctx echo.Context, id string) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	err := s.Ma.UpdateImage(id, &imageSpec)
+	err := s.Ma.UpdateImage(id, imageSpec)
 	if err != nil {
 		slog.Error("UpdateImageById()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
