@@ -108,16 +108,17 @@ $ mactl image delete [id]
 
 ## 作成するコマンドの再整理
 
-- mactl image list
-- mactl image detail [id]
-- mactl image createtemp --name [image name] URL
-- mactl image delete [id]
-- mactl server makeimage [server id] [image name]
+- mactl image list                                 イメージをリストする
+- mactl image detail [id]                          イメージの詳細を表示する
+- mactl image createtemp --name [image name] URL   URLからイメージを作成する
+- mactl image delete [id]                          イメージを削除する
+- mactl server makeimage [server id] [image name]  実行中仮想マシンからイメージを作成する
 
 ## データベースの追加
 
 イメージを管理するための構造体を追加する
 
+```
 type Image struct {
 	Id       string      `json:"id"`
 	Metadata *Metadata   `json:"Metadata,omitempty"`
@@ -127,16 +128,16 @@ type Image struct {
 
 Specは、VolSpecと共用するか、それとも ImageSpecを新たに作るか？検討が必要
 
-type VolSpec struct {
+type ImageSpec struct {
 	Kind          *string `json:"kind,omitempty"`             // OS or DATAの区別
 	Type          *string `json:"type,omitempty"`             // LV or QCOW2の区別
 	VolumeGroup   *string `json:"volumeGroup,omitempty"`      // 必要
 	LogicalVolume *string `json:"logicalVolume,omitempty"`    // 必要
-    OsVariant     *string `json:"osVariant,omitempty"`        // 未使用
+	SourceURL     *string `json:"sourceUrl,omitempty"`        // ダウンロード元のURL 
 	Path          *string `json:"path,omitempty"`             // QCOW2の時のパス
 	Size          *int    `json:"size,omitempty"`             // イメージのサイズ
-	Persistent    *bool   `json:"persistent,omitempty"`       // 未使用
 }
+```
 
 libvirt XML形式のデータは、どこに保持するか？ /var/lib/marmot/image/ID の下に固定ファイル名で保持
 イメージのディレクトリは、どこに保持するか？ /var/lib/marmot/image/XXXに固定ファイル名で保持

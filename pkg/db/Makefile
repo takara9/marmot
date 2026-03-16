@@ -23,3 +23,7 @@ test-dns:
 .PHONY: test-job
 test-job:
 	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus="Jobs" -coverprofile cover.out
+
+.PHONY: test-image
+test-image:
+	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus="Image" -coverprofile cover.out
