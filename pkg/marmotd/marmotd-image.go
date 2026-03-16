@@ -23,6 +23,17 @@ func (s *Server) CreateImage(ctx echo.Context) error {
 
 	// リクエストをetcdに登録し、正常応答を返す
 	slog.Debug("イメージの使用を付与してDBへ登録、一意のIDを取得")
+	// URLの設定チェック
+	if imageSpec.Spec == nil || imageSpec.Spec.SourceUrl == nil {
+		slog.Error("CreateImage()", "err", "SourceUrl is required")
+		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: "SourceUrl is required"})
+	}
+	// 名前の設定チェック
+	if imageSpec.Metadata == nil || imageSpec.Metadata.Name == nil {
+		slog.Error("CreateImage()", "err", "Name is required")
+		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: "Name is required"})
+	}
+
 	id, err := s.Ma.Db.CreateImageFromURL(*imageSpec.Metadata.Name, *imageSpec.Spec.SourceUrl)
 	if err != nil {
 		slog.Error("CreateImage()", "err", err)
@@ -75,7 +86,12 @@ func (s *Server) DeleteImageById(ctx echo.Context, id string) error {
 	// そうすることで、マネージャーの関数もテストできるようになる
 	// DelitionTimeをセットするだけで、DBからは削除しないようにする
 
-	err := s.Ma.DeleteImage(id)
+	//err := s.Ma.DeleteImage(id)
+	//if err != nil {
+	//	slog.Error("DeleteImageById()", "err", err)
+	//	return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	//}
+	err := s.Ma.Db.SetDeleteTimestampImage(id)
 	if err != nil {
 		slog.Error("DeleteImageById()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})

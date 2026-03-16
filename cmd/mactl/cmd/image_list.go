@@ -36,12 +36,14 @@ var imageListCmd = &cobra.Command{
 				return err
 			}
 
-			fmt.Printf("  %2s  %-10s  %-20s  %-12s  %-3s  %-8s  %-15s  %-15s\n", "No", "Image-ID", "Image-Name", "Status", "CPU", "RAM(MB)", "IP-Address", "Network")
+			fmt.Printf("  %2s  %-8s  %-16s  %-12s  %-20s  %-40s\n", "No", "IMAGE-ID", "IMAGE-NAME", "STATUS", "LV-PATH", "QCOW2-PATH")
 			for i, image := range data {
 				fmt.Printf("  %2d", i+1)
-				fmt.Printf("  %-10v", image.Id)
-				fmt.Printf("  %-20v", *image.Metadata.Name)
+				fmt.Printf("  %-8v", image.Id)
+				fmt.Printf("  %-16v", *image.Metadata.Name)
 				fmt.Printf("  %-12v", db.ImageStatus[*image.Status.Status])
+				fmt.Printf("  %-20v", *image.Spec.LvPath)
+				fmt.Printf("  %-40v", *image.Spec.Qcow2Path)
 				fmt.Println()
 			}
 			return nil

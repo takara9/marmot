@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
 )
 
@@ -42,4 +43,49 @@ func StartImageController(node string, etcdUrl string) (*controller, error) {
 func (c *controller) imageControllerLoop() {
 	slog.Info("イメージコントローラーの制御ループ実行", "CONTROLLER", time.Now().Format(time.DateTime))
 
+	imgaes, err := c.marmot.GetImages()
+	if err != nil {
+		slog.Error("failed to get images", "err", err)
+		return
+	}
+
+	for _, image := range imgaes {
+
+		// 削除タイムスタンプの処理
+		// 削除のタイムスタンプが一定時間以上経過しているかをチェックして、削除処理を実行する
+		if image.Status != nil && image.Status.DeletionTimeStamp != nil {
+			deletionTime := *image.Status.DeletionTimeStamp
+			if time.Since(deletionTime) > 10*time.Second {
+				slog.Debug("削除のタイムスタンプが一定時間以上経過しているイメージ検出", "IMAGE", *image.Metadata.Name)
+				c.marmot.Db.SetImageStatus(image.Id, db.IMAGE_DELETING)
+			}
+		}
+
+		slog.Info("イメージの状態を確認", "image", *image.Metadata.Name, "state", *image.Status.Status)
+		// イメージの状態に応じた処理
+		switch *image.Status.Status {
+		case db.IMAGE_PENDING:
+			slog.Info("イメージの作成処理を実行", "image", *image.Metadata.Name)
+			// イメージの作成を開始し、状態を IMAGE_CREATING に更新
+			c.marmot.UpdateImageStatus(image.Id, db.IMAGE_CREATING)
+			go c.marmot.CreateNewImage(image.Id)
+		case db.IMAGE_CREATING:
+			slog.Info("イメージの作成処理を継続", "image", *image.Metadata.Name)
+			// ここにイメージの作成処理の継続を実装
+		case db.IMAGE_CREATION_FAILED:
+			slog.Info("イメージの作成に失敗", "image", *image.Metadata.Name)
+			// ここにイメージの作成失敗時の処理を実装
+		case db.IMAGE_AVAILABLE:
+			slog.Info("イメージは利用可能", "image", *image.Metadata.Name)
+			// ここにイメージが利用可能な状態での処理を実装
+		case db.IMAGE_DELETING:
+			slog.Info("イメージの削除処理を実行", "image", *image.Metadata.Name)
+			err := c.marmot.DeleteImage(image.Id)
+			if err != nil {
+				slog.Error("DeleteImageById()", "err", err)
+			}
+		default:
+			slog.Info("イメージは安定状態", "image", *image.Metadata.Name, "state", *image.Status.Status)
+		}
+	}
 }

@@ -65,12 +65,12 @@ func (c *controller) serverControllerLoop() {
 
 	for _, spec := range serverSpec {
 		// 取得したサーバースペック情報の表示とプロビジョニング中サーバーの検出
-		jsonByte, err := json.MarshalIndent(spec, "", "  ")
-		if err != nil {
-			slog.Error("json.MarshalIndent()", "err", err)
-			continue
-		}
-		fmt.Println(string(jsonByte))
+		//jsonByte, err := json.MarshalIndent(spec, "", "  ")
+		//if err != nil {
+		//	slog.Error("json.MarshalIndent()", "err", err)
+		//	continue
+		//}
+		//fmt.Println(string(jsonByte))
 
 		// 削除のタイムスタンプが一定時間以上経過しているかをチェックして、削除処理を実行する
 		if spec.Status != nil && spec.Status.DeletionTimeStamp != nil {
