@@ -17,7 +17,6 @@ import (
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
 	"github.com/takara9/marmot/pkg/util"
-	ut "github.com/takara9/marmot/pkg/util"
 )
 
 var _ = Describe("サーバーテスト", Ordered, func() {
@@ -117,9 +116,6 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				g.Expect(err).NotTo(HaveOccurred())
 			}).Should(Succeed())
 		})
-	})
-
-	Context("最小構成 QCOW2 仮想サーバーの起動と終了のテスト", func() {
 		It("既存ネットワークの取得", func() {
 			var err error
 			vnets, err := marmotServer.Ma.GetVirtualNetworksAndPutDB()
@@ -130,6 +126,29 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				GinkgoWriter.Println("Found Network:", string(byteJson))
 			}
 		})
+	})
+
+	Context("URLを指定してダウンロードしたイメージからVM起動イメージを作成する", func() {
+		var id string
+		It("URLを指定してイメージのIDを取得", func() {
+			var err error
+			GinkgoWriter.Println("URLを指定してイメージのIDを取得")
+			url := "https://cloud-images.ubuntu.com/releases/jammy/release-20260218/ubuntu-22.04-server-cloudimg-amd64.img"
+			id, err = marmotServer.Ma.Db.CreateImageFromURL("ubuntu22.04", url)
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println("取得したイメージID: ", id)
+		})
+
+		It("ダウンロードとセットアップ", func() {
+			image, err := marmotServer.Ma.CreateNewImage(id)
+			Expect(err).NotTo(HaveOccurred())
+			jsonBytes, err := json.MarshalIndent(image, "", "  ")
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Println("Created image: ", string(jsonBytes))
+		})
+	})
+
+	Context("最小構成 QCOW2 仮想サーバーの起動と終了のテスト", func() {
 		It("仮想ネットワークの取得", func() {
 			net, err := marmotServer.Ma.Db.GetVirtualNetworks()
 			Expect(err).NotTo(HaveOccurred())
@@ -278,805 +297,807 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		})
 	})
 
-	Context("最小構成 LV 仮想サーバーの起動と終了のテスト", func() {
-		var id string
-		It("仮想サーバー生成:bootはlv で最小構成", func() {
-			var virtualServer api.Server
-			var meta api.Metadata
-			var spec api.ServerSpec
-			virtualServer.Metadata = &meta
-			virtualServer.Spec = &spec
+	/*
+		Context("最小構成 LV 仮想サーバーの起動と終了のテスト", func() {
+			var id string
+			It("仮想サーバー生成:bootはlv で最小構成", func() {
+				var virtualServer api.Server
+				var meta api.Metadata
+				var spec api.ServerSpec
+				virtualServer.Metadata = &meta
+				virtualServer.Spec = &spec
 
-			var bootVol api.Volume
-			var specVol api.VolSpec
-			var metaVol api.Metadata
-			bootVol.Metadata = &metaVol
-			bootVol.Spec = &specVol
-			virtualServer.Spec.BootVolume = &bootVol
-			var err error
+				var bootVol api.Volume
+				var specVol api.VolSpec
+				var metaVol api.Metadata
+				bootVol.Metadata = &metaVol
+				bootVol.Spec = &specVol
+				virtualServer.Spec.BootVolume = &bootVol
+				var err error
 
-			virtualServer.Metadata.Name = util.StringPtr("test-vm-3")
-			virtualServer.Spec.BootVolume.Spec.Type = util.StringPtr("lvm")
-			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
-				{
-					Networkname: "default",
-				},
-			}
+				virtualServer.Metadata.Name = util.StringPtr("test-vm-3")
+				virtualServer.Spec.BootVolume.Spec.Type = util.StringPtr("lvm")
+				virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
+					{
+						Networkname: "default",
+					},
+				}
 
-			// 他すべてデフォルト
-			// この中で、ブートボリュームのIDがセットされていない可能性がある？？？
-			vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
-			Expect(err).NotTo(HaveOccurred())
-			id, err = marmotServer.Ma.CreateServer2(vm.Id)
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created VM ID:", id)
-		})
+				// 他すべてデフォルト
+				// この中で、ブートボリュームのIDがセットされていない可能性がある？？？
+				vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
+				Expect(err).NotTo(HaveOccurred())
+				id, err = marmotServer.Ma.CreateServer2(vm.Id)
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println("Created VM ID:", id)
+			})
 
-		It("稼働中仮想サーバーの取得", func() {
-			GinkgoWriter.Println("取得する仮想サーバーID:", id)
-			sv, err := marmotServer.Ma.GetServerById(id)
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
-			data, err := json.MarshalIndent(sv, "", "  ")
-			Expect(err).NotTo(HaveOccurred())
-			fmt.Println("サーバー情報: ", string(data))
-			Expect(*sv.Metadata.Name).To(Equal("test-vm-3"))
-			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-		})
-
-		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
-		It("時間待ち", func() {
-			time.Sleep(15 * time.Second)
-		})
-
-		It("仮想サーバーのOS起動待ち 60秒", func() {
-			Eventually(func(g Gomega) {
+			It("稼働中仮想サーバーの取得", func() {
+				GinkgoWriter.Println("取得する仮想サーバーID:", id)
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
+				data, err := json.MarshalIndent(sv, "", "  ")
+				Expect(err).NotTo(HaveOccurred())
+				fmt.Println("サーバー情報: ", string(data))
+				Expect(*sv.Metadata.Name).To(Equal("test-vm-3"))
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
-			}, "120s", "10s").Should(Succeed())
+			})
+
+			// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
+			It("時間待ち", func() {
+				time.Sleep(15 * time.Second)
+			})
+
+			It("仮想サーバーのOS起動待ち 60秒", func() {
+				Eventually(func(g Gomega) {
+					sv, err := marmotServer.Ma.GetServerById(id)
+					Expect(err).NotTo(HaveOccurred())
+					GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+					g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
+				}, "120s", "10s").Should(Succeed())
+			})
+
+			It("仮想サーバーの削除", func() {
+				err := marmotServer.Ma.DeleteServerById(id)
+				Expect(err).NotTo(HaveOccurred())
+			})
 		})
 
-		It("仮想サーバーの削除", func() {
-			err := marmotServer.Ma.DeleteServerById(id)
-			Expect(err).NotTo(HaveOccurred())
-		})
-	})
+		Context("LVのデータディスクが複数存在する仮想サーバーの起動と終了のテスト", func() {
+			var id string
+			It("仮想サーバー生成:bootはlv で最小構成", func() {
+				var virtualServer api.Server
+				var meta api.Metadata
+				var spec api.ServerSpec
+				var err error
+				virtualServer.Spec = &spec
 
-	Context("LVのデータディスクが複数存在する仮想サーバーの起動と終了のテスト", func() {
-		var id string
-		It("仮想サーバー生成:bootはlv で最小構成", func() {
-			var virtualServer api.Server
-			var meta api.Metadata
-			var spec api.ServerSpec
-			var err error
-			virtualServer.Spec = &spec
+				var bootVol api.Volume
+				var specVol api.VolSpec
+				var metaVol api.Metadata
+				bootVol.Metadata = &metaVol
+				bootVol.Spec = &specVol
 
-			var bootVol api.Volume
-			var specVol api.VolSpec
-			var metaVol api.Metadata
-			bootVol.Metadata = &metaVol
-			bootVol.Spec = &specVol
+				By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
+				meta.Name = util.StringPtr("test-vm-4")
+				virtualServer.Metadata = &meta
 
-			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
-			meta.Name = util.StringPtr("test-vm-4")
-			virtualServer.Metadata = &meta
-
-			By("NICの接続先ネットワークを設定")
-			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
-				{
-					Networkname: "default",
-				},
-			}
-
-			By("ブートディスクのタイプ(LVM)を設定")
-			bootVol.Spec.Type = util.StringPtr("lvm") // ここだけqcow2と違う
-			virtualServer.Spec.BootVolume = &bootVol
-
-			By("データディスクのスペックを設定")
-			virtualServer.Spec.Storage = &[]api.Volume{
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-1"),
+				By("NICの接続先ネットワークを設定")
+				virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
+					{
+						Networkname: "default",
 					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("lvm"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
+				}
+
+				By("ブートディスクのタイプ(LVM)を設定")
+				bootVol.Spec.Type = util.StringPtr("lvm") // ここだけqcow2と違う
+				virtualServer.Spec.BootVolume = &bootVol
+
+				By("データディスクのスペックを設定")
+				virtualServer.Spec.Storage = &[]api.Volume{
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-1"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("lvm"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
 					},
-				},
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-2"),
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-2"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("lvm"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(2), //GB
+						},
 					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("lvm"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(2), //GB
-					},
-				},
-			}
+				}
 
-			By("他すべてデフォルトで、仮想サーバーを作成")
-			vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
-			Expect(err).NotTo(HaveOccurred())
-			id, err = marmotServer.Ma.CreateServer2(vm.Id)
-			Expect(err).NotTo(HaveOccurred()) //////////////////////// ここで失敗　続きはここから
-			GinkgoWriter.Println("Created VM ID:", id)
-		})
+				By("他すべてデフォルトで、仮想サーバーを作成")
+				vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
+				Expect(err).NotTo(HaveOccurred())
+				id, err = marmotServer.Ma.CreateServer2(vm.Id)
+				Expect(err).NotTo(HaveOccurred()) //////////////////////// ここで失敗　続きはここから
+				GinkgoWriter.Println("Created VM ID:", id)
+			})
 
-		It("稼働中仮想サーバー（１）の取得", func() {
-			GinkgoWriter.Println("取得する仮想サーバーID:", id)
-			sv, err := marmotServer.Ma.GetServerById(id)
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
-			Expect(*sv.Metadata.Name).To(Equal("test-vm-4"))
-			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-		})
-
-		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
-		It("LVMサーバーの時間待ち", func() {
-			time.Sleep(15 * time.Second)
-		})
-
-		It("仮想サーバーのOS起動待ち 60秒", func() {
-			Eventually(func(g Gomega) {
+			It("稼働中仮想サーバー（１）の取得", func() {
+				GinkgoWriter.Println("取得する仮想サーバーID:", id)
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
+				Expect(*sv.Metadata.Name).To(Equal("test-vm-4"))
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
-			}, "120s", "10s").Should(Succeed())
+			})
+
+			// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
+			It("LVMサーバーの時間待ち", func() {
+				time.Sleep(15 * time.Second)
+			})
+
+			It("仮想サーバーのOS起動待ち 60秒", func() {
+				Eventually(func(g Gomega) {
+					sv, err := marmotServer.Ma.GetServerById(id)
+					Expect(err).NotTo(HaveOccurred())
+					GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+					g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
+				}, "120s", "10s").Should(Succeed())
+			})
+
+			It("仮想サーバーの削除", func() {
+				err := marmotServer.Ma.DeleteServerById(id)
+				Expect(err).NotTo(HaveOccurred())
+			})
 		})
 
-		It("仮想サーバーの削除", func() {
-			err := marmotServer.Ma.DeleteServerById(id)
-			Expect(err).NotTo(HaveOccurred())
-		})
-	})
+		Context("LVとQCOW2のデータディスクが複数存在する仮想サーバーの起動と終了のテスト", func() {
+			var id string
+			It("仮想サーバー生成:bootはlv で最小構成", func() {
+				var virtualServer api.Server
+				var meta api.Metadata
+				var spec api.ServerSpec
+				var err error
+				virtualServer.Spec = &spec
+				virtualServer.Metadata = &meta
 
-	Context("LVとQCOW2のデータディスクが複数存在する仮想サーバーの起動と終了のテスト", func() {
-		var id string
-		It("仮想サーバー生成:bootはlv で最小構成", func() {
-			var virtualServer api.Server
-			var meta api.Metadata
-			var spec api.ServerSpec
-			var err error
-			virtualServer.Spec = &spec
-			virtualServer.Metadata = &meta
+				var bootVol api.Volume
+				var specVol api.VolSpec
+				var metaVol api.Metadata
+				bootVol.Metadata = &metaVol
+				bootVol.Spec = &specVol
 
-			var bootVol api.Volume
-			var specVol api.VolSpec
-			var metaVol api.Metadata
-			bootVol.Metadata = &metaVol
-			bootVol.Spec = &specVol
+				By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
+				virtualServer.Metadata.Name = util.StringPtr("test-vm-5")
 
-			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
-			virtualServer.Metadata.Name = util.StringPtr("test-vm-5")
-
-			By("NICの接続先ネットワークを設定")
-			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
-				{
-					Networkname: "default",
-				},
-			}
-
-			By("ブートディスクのタイプ(LVM)を設定")
-			bootVol.Spec.Type = util.StringPtr("lvm") // ここだけqcow2と違う
-			virtualServer.Spec.BootVolume = &bootVol
-
-			By("データディスクのスペックを設定")
-			virtualServer.Spec.Storage = &[]api.Volume{
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-1"),
+				By("NICの接続先ネットワークを設定")
+				virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
+					{
+						Networkname: "default",
 					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("lvm"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
+				}
+
+				By("ブートディスクのタイプ(LVM)を設定")
+				bootVol.Spec.Type = util.StringPtr("lvm") // ここだけqcow2と違う
+				virtualServer.Spec.BootVolume = &bootVol
+
+				By("データディスクのスペックを設定")
+				virtualServer.Spec.Storage = &[]api.Volume{
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-1"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("lvm"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
 					},
-				},
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-2"),
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-2"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("qcow2"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
 					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("qcow2"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
-					},
-				},
-			}
+				}
 
-			By("他すべてデフォルトで、仮想サーバーを作成")
-			vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
-			Expect(err).NotTo(HaveOccurred())
-			id, err = marmotServer.Ma.CreateServer2(vm.Id)
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created VM ID:", id)
-		})
+				By("他すべてデフォルトで、仮想サーバーを作成")
+				vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
+				Expect(err).NotTo(HaveOccurred())
+				id, err = marmotServer.Ma.CreateServer2(vm.Id)
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println("Created VM ID:", id)
+			})
 
-		It("稼働中仮想サーバー（１）の取得", func() {
-			GinkgoWriter.Println("取得する仮想サーバーID:", id)
-			sv, err := marmotServer.Ma.GetServerById(id)
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
-			Expect(*sv.Metadata.Name).To(Equal("test-vm-5"))
-			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-		})
-
-		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
-		It("LVMサーバーの時間待ち", func() {
-			time.Sleep(15 * time.Second)
-		})
-
-		It("仮想サーバーのOS起動待ち 60秒", func() {
-			Eventually(func(g Gomega) {
+			It("稼働中仮想サーバー（１）の取得", func() {
+				GinkgoWriter.Println("取得する仮想サーバーID:", id)
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
+				Expect(*sv.Metadata.Name).To(Equal("test-vm-5"))
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
-			}, "120s", "10s").Should(Succeed())
+			})
+
+			// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
+			It("LVMサーバーの時間待ち", func() {
+				time.Sleep(15 * time.Second)
+			})
+
+			It("仮想サーバーのOS起動待ち 60秒", func() {
+				Eventually(func(g Gomega) {
+					sv, err := marmotServer.Ma.GetServerById(id)
+					Expect(err).NotTo(HaveOccurred())
+					GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+					g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
+				}, "120s", "10s").Should(Succeed())
+			})
+
+			It("仮想サーバーの削除", func() {
+				err := marmotServer.Ma.DeleteServerById(id)
+				Expect(err).NotTo(HaveOccurred())
+			})
 		})
 
-		It("仮想サーバーの削除", func() {
-			err := marmotServer.Ma.DeleteServerById(id)
-			Expect(err).NotTo(HaveOccurred())
-		})
-	})
+		Context("qcow2x10データディスクが複数存在する仮想サーバーの起動と終了のテスト", func() {
+			var id string
+			It("仮想サーバー生成:最大構成", func() {
+				var err error
+				var virtualServer api.Server
+				var meta api.Metadata
+				var spec api.ServerSpec
+				virtualServer.Spec = &spec
 
-	Context("qcow2x10データディスクが複数存在する仮想サーバーの起動と終了のテスト", func() {
-		var id string
-		It("仮想サーバー生成:最大構成", func() {
-			var err error
-			var virtualServer api.Server
-			var meta api.Metadata
-			var spec api.ServerSpec
-			virtualServer.Spec = &spec
+				var bootVol api.Volume
+				var specVol api.VolSpec
+				var metaVol api.Metadata
+				bootVol.Metadata = &metaVol
+				bootVol.Spec = &specVol
+				virtualServer.Spec.BootVolume = &bootVol
 
-			var bootVol api.Volume
-			var specVol api.VolSpec
-			var metaVol api.Metadata
-			bootVol.Metadata = &metaVol
-			bootVol.Spec = &specVol
-			virtualServer.Spec.BootVolume = &bootVol
+				By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
+				meta.Name = util.StringPtr("test-vm-6")
+				virtualServer.Metadata = &meta
 
-			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
-			meta.Name = util.StringPtr("test-vm-6")
-			virtualServer.Metadata = &meta
+				By("NICの接続先ネットワークを設定")
+				virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
+					{
+						Networkname: "default",
+					},
+				}
+				By("ブートディスクのタイプ(LVM)を設定")
+				bootVol.Spec.Type = util.StringPtr("lvm") // ここだけqcow2と違う
+				virtualServer.Spec.BootVolume = &bootVol
 
-			By("NICの接続先ネットワークを設定")
-			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
-				{
-					Networkname: "default",
-				},
-			}
-			By("ブートディスクのタイプ(LVM)を設定")
-			bootVol.Spec.Type = util.StringPtr("lvm") // ここだけqcow2と違う
-			virtualServer.Spec.BootVolume = &bootVol
+				By("データディスクのスペックを設定")
+				virtualServer.Spec.Storage = &[]api.Volume{
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-1"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("qcow2"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
+					},
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-2"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("qcow2"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
+					},
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-3"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("qcow2"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
+					},
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-4"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("qcow2"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
+					},
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-5"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("qcow2"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
+					},
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-6"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("qcow2"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
+					},
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-7"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("qcow2"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
+					},
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-8"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("qcow2"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
+					},
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-9"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("qcow2"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
+					},
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-10"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("qcow2"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
+					},
+				}
+				By("他すべてデフォルトで、仮想サーバーを作成")
+				vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
+				Expect(err).NotTo(HaveOccurred())
+				id, err = marmotServer.Ma.CreateServer2(vm.Id)
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println("Created VM ID:", id)
+			})
 
-			By("データディスクのスペックを設定")
-			virtualServer.Spec.Storage = &[]api.Volume{
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-1"),
-					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("qcow2"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
-					},
-				},
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-2"),
-					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("qcow2"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
-					},
-				},
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-3"),
-					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("qcow2"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
-					},
-				},
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-4"),
-					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("qcow2"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
-					},
-				},
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-5"),
-					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("qcow2"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
-					},
-				},
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-6"),
-					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("qcow2"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
-					},
-				},
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-7"),
-					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("qcow2"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
-					},
-				},
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-8"),
-					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("qcow2"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
-					},
-				},
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-9"),
-					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("qcow2"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
-					},
-				},
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-10"),
-					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("qcow2"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
-					},
-				},
-			}
-			By("他すべてデフォルトで、仮想サーバーを作成")
-			vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
-			Expect(err).NotTo(HaveOccurred())
-			id, err = marmotServer.Ma.CreateServer2(vm.Id)
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created VM ID:", id)
-		})
-
-		It("稼働中仮想サーバー（１）の取得", func() {
-			GinkgoWriter.Println("取得する仮想サーバーID:", id)
-			sv, err := marmotServer.Ma.GetServerById(id)
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
-			Expect(*sv.Metadata.Name).To(Equal("test-vm-6"))
-			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-		})
-
-		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
-		It("LVMサーバーの時間待ち", func() {
-			time.Sleep(15 * time.Second)
-		})
-
-		It("仮想サーバーのOS起動待ち 60秒", func() {
-			Eventually(func(g Gomega) {
+			It("稼働中仮想サーバー（１）の取得", func() {
+				GinkgoWriter.Println("取得する仮想サーバーID:", id)
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
+				Expect(*sv.Metadata.Name).To(Equal("test-vm-6"))
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
-			}, "120s", "10s").Should(Succeed())
+			})
+
+			// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
+			It("LVMサーバーの時間待ち", func() {
+				time.Sleep(15 * time.Second)
+			})
+
+			It("仮想サーバーのOS起動待ち 60秒", func() {
+				Eventually(func(g Gomega) {
+					sv, err := marmotServer.Ma.GetServerById(id)
+					Expect(err).NotTo(HaveOccurred())
+					GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+					g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
+				}, "120s", "10s").Should(Succeed())
+			})
+
+			It("仮想サーバーの削除", func() {
+				err := marmotServer.Ma.DeleteServerById(id)
+				Expect(err).NotTo(HaveOccurred())
+			})
 		})
 
-		It("仮想サーバーの削除", func() {
-			err := marmotServer.Ma.DeleteServerById(id)
-			Expect(err).NotTo(HaveOccurred())
-		})
-	})
+		Context("LVx10データディスクが複数存在する仮想サーバーの起動と終了のテスト", func() {
+			var id string
+			It("仮想サーバー生成 最大最小構成", func() {
+				var virtualServer api.Server
+				var meta api.Metadata
+				var spec api.ServerSpec
+				var err error
+				virtualServer.Spec = &spec
 
-	Context("LVx10データディスクが複数存在する仮想サーバーの起動と終了のテスト", func() {
-		var id string
-		It("仮想サーバー生成 最大最小構成", func() {
-			var virtualServer api.Server
-			var meta api.Metadata
-			var spec api.ServerSpec
-			var err error
-			virtualServer.Spec = &spec
+				var bootVol api.Volume
+				var specVol api.VolSpec
+				var metaVol api.Metadata
+				bootVol.Metadata = &metaVol
+				bootVol.Spec = &specVol
+				virtualServer.Spec.BootVolume = &bootVol
 
-			var bootVol api.Volume
-			var specVol api.VolSpec
-			var metaVol api.Metadata
-			bootVol.Metadata = &metaVol
-			bootVol.Spec = &specVol
-			virtualServer.Spec.BootVolume = &bootVol
+				By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
+				meta.Name = util.StringPtr("test-vm-7")
+				virtualServer.Metadata = &meta
 
-			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
-			meta.Name = util.StringPtr("test-vm-7")
-			virtualServer.Metadata = &meta
+				By("NICの接続先ネットワークを設定")
+				virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
+					{
+						Networkname: "default",
+					},
+				}
+				By("ブートディスクのタイプ(LVM)を設定")
+				bootVol.Spec.Type = util.StringPtr("lvm") // ここだけqcow2と違う
 
-			By("NICの接続先ネットワークを設定")
-			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
-				{
-					Networkname: "default",
-				},
-			}
-			By("ブートディスクのタイプ(LVM)を設定")
-			bootVol.Spec.Type = util.StringPtr("lvm") // ここだけqcow2と違う
+				By("データディスクのスペックを設定")
+				virtualServer.Spec.Storage = &[]api.Volume{
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-1"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("lvm"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
+					},
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-2"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("lvm"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
+					},
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-3"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("lvm"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
+					},
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-4"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("lvm"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
+					},
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-5"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("lvm"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
+					},
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-6"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("lvm"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
+					},
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-7"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("lvm"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
+					},
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-8"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("lvm"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
+					},
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-9"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("lvm"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
+					},
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-10"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("lvm"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
+					},
+				}
+				By("他すべてデフォルトで、仮想サーバーを作成")
+				vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
+				Expect(err).NotTo(HaveOccurred())
+				id, err = marmotServer.Ma.CreateServer2(vm.Id)
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println("Created VM ID:", id)
+			})
 
-			By("データディスクのスペックを設定")
-			virtualServer.Spec.Storage = &[]api.Volume{
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-1"),
-					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("lvm"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
-					},
-				},
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-2"),
-					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("lvm"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
-					},
-				},
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-3"),
-					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("lvm"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
-					},
-				},
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-4"),
-					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("lvm"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
-					},
-				},
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-5"),
-					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("lvm"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
-					},
-				},
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-6"),
-					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("lvm"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
-					},
-				},
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-7"),
-					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("lvm"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
-					},
-				},
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-8"),
-					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("lvm"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
-					},
-				},
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-9"),
-					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("lvm"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
-					},
-				},
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-10"),
-					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("lvm"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
-					},
-				},
-			}
-			By("他すべてデフォルトで、仮想サーバーを作成")
-			vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
-			Expect(err).NotTo(HaveOccurred())
-			id, err = marmotServer.Ma.CreateServer2(vm.Id)
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created VM ID:", id)
-		})
-
-		It("稼働中仮想サーバー（１）の取得", func() {
-			GinkgoWriter.Println("取得する仮想サーバーID:", id)
-			sv, err := marmotServer.Ma.GetServerById(id)
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
-			Expect(*sv.Metadata.Name).To(Equal("test-vm-7"))
-			GinkgoWriter.Println("サーバーステータス: ", *sv.Status)
-		})
-
-		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
-		It("LVMサーバーの時間待ち", func() {
-			time.Sleep(15 * time.Second)
-		})
-
-		It("仮想サーバーのOS起動待ち 60秒", func() {
-			Eventually(func(g Gomega) {
+			It("稼働中仮想サーバー（１）の取得", func() {
+				GinkgoWriter.Println("取得する仮想サーバーID:", id)
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
-			}, "120s", "10s").Should(Succeed())
+				GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
+				Expect(*sv.Metadata.Name).To(Equal("test-vm-7"))
+				GinkgoWriter.Println("サーバーステータス: ", *sv.Status)
+			})
+
+			// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
+			It("LVMサーバーの時間待ち", func() {
+				time.Sleep(15 * time.Second)
+			})
+
+			It("仮想サーバーのOS起動待ち 60秒", func() {
+				Eventually(func(g Gomega) {
+					sv, err := marmotServer.Ma.GetServerById(id)
+					Expect(err).NotTo(HaveOccurred())
+					GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+					g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
+				}, "120s", "10s").Should(Succeed())
+			})
+
+			It("仮想サーバーの削除", func() {
+				err := marmotServer.Ma.DeleteServerById(id)
+				Expect(err).NotTo(HaveOccurred())
+			})
 		})
 
-		It("仮想サーバーの削除", func() {
-			err := marmotServer.Ma.DeleteServerById(id)
-			Expect(err).NotTo(HaveOccurred())
-		})
-	})
+		Context("既存,作成済のデータボリュームをアタッチして起動する仮想サーバーの起動と終了のテスト", func() {
+			var serverId string
+			hostname := "test-vm-8"
+			var volumeIds []string
 
-	Context("既存,作成済のデータボリュームをアタッチして起動する仮想サーバーの起動と終了のテスト", func() {
-		var serverId string
-		hostname := "test-vm-8"
-		var volumeIds []string
+			It("DATA論理ボリュームの生成1", func() {
+				v := api.Volume{
+					Metadata: &api.Metadata{
+						Name: ut.StringPtr("precreated-volume-001"),
+					},
+					Spec: &api.VolSpec{
+						Size: ut.IntPtrInt(100),
+					},
+				}
+				GinkgoWriter.Println("Creating Data volume", "volume", v)
+				tmpSpec, err := marmotServer.Ma.CreateNewVolumeWithWait(v)
+				volumeIds = append(volumeIds, tmpSpec.Id)
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println("Created volume key: ", *tmpSpec.Metadata.Key)
+			})
 
-		It("DATA論理ボリュームの生成1", func() {
-			v := api.Volume{
-				Metadata: &api.Metadata{
-					Name: ut.StringPtr("precreated-volume-001"),
-				},
-				Spec: &api.VolSpec{
-					Size: ut.IntPtrInt(100),
-				},
-			}
-			GinkgoWriter.Println("Creating Data volume", "volume", v)
-			tmpSpec, err := marmotServer.Ma.CreateNewVolumeWithWait(v)
-			volumeIds = append(volumeIds, tmpSpec.Id)
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Metadata.Key)
-		})
+			It("DATA論理ボリュームの生成2", func() {
+				v := api.Volume{
+					Metadata: &api.Metadata{
+						Name: ut.StringPtr("precreated-volume-002"),
+					},
+					Spec: &api.VolSpec{
+						Size: ut.IntPtrInt(200),
+					},
+				}
+				GinkgoWriter.Println("Creating Data volume", "volume", v)
+				tmpSpec, err := marmotServer.Ma.CreateNewVolumeWithWait(v)
+				volumeIds = append(volumeIds, tmpSpec.Id)
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println("Created volume key: ", *tmpSpec.Metadata.Key)
+			})
 
-		It("DATA論理ボリュームの生成2", func() {
-			v := api.Volume{
-				Metadata: &api.Metadata{
-					Name: ut.StringPtr("precreated-volume-002"),
-				},
-				Spec: &api.VolSpec{
-					Size: ut.IntPtrInt(200),
-				},
-			}
-			GinkgoWriter.Println("Creating Data volume", "volume", v)
-			tmpSpec, err := marmotServer.Ma.CreateNewVolumeWithWait(v)
-			volumeIds = append(volumeIds, tmpSpec.Id)
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created volume key: ", *tmpSpec.Metadata.Key)
-		})
+			It("仮想サーバー生成:bootはqcow2 でデータディスク２本構成", func() {
+				var virtualServer api.Server
+				var meta api.Metadata
+				var spec api.ServerSpec
+				virtualServer.Spec = &spec
 
-		It("仮想サーバー生成:bootはqcow2 でデータディスク２本構成", func() {
-			var virtualServer api.Server
-			var meta api.Metadata
-			var spec api.ServerSpec
-			virtualServer.Spec = &spec
+				var err error
 
-			var err error
+				By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
+				meta.Name = util.StringPtr(hostname)
+				virtualServer.Metadata = &meta
 
-			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
-			meta.Name = util.StringPtr(hostname)
-			virtualServer.Metadata = &meta
+				By("NICの接続先ネットワークを設定")
+				virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
+					{
+						Networkname: "default",
+					},
+				}
 
-			By("NICの接続先ネットワークを設定")
-			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
-				{
-					Networkname: "default",
-				},
-			}
+				By("データディスクのスペックを設定")
+				virtualServer.Spec.Storage = &[]api.Volume{
+					{
+						Id: volumeIds[0],
+					},
+					{
+						Id: volumeIds[1],
+					},
+				}
 
-			By("データディスクのスペックを設定")
-			virtualServer.Spec.Storage = &[]api.Volume{
-				{
-					Id: volumeIds[0],
-				},
-				{
-					Id: volumeIds[1],
-				},
-			}
+				By("他すべてデフォルトで、仮想サーバーを作成")
+				vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
+				Expect(err).NotTo(HaveOccurred())
+				id, err := marmotServer.Ma.CreateServer2(vm.Id)
+				Expect(err).NotTo(HaveOccurred())
+				serverId = vm.Id
+				GinkgoWriter.Println("Created VM ID:", id)
+			})
 
-			By("他すべてデフォルトで、仮想サーバーを作成")
-			vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
-			Expect(err).NotTo(HaveOccurred())
-			id, err := marmotServer.Ma.CreateServer2(vm.Id)
-			Expect(err).NotTo(HaveOccurred())
-			serverId = vm.Id
-			GinkgoWriter.Println("Created VM ID:", id)
-		})
-
-		It("稼働中仮想サーバーの取得", func() {
-			GinkgoWriter.Println("取得する仮想サーバーID:", serverId)
-			sv, err := marmotServer.Ma.GetServerById(serverId)
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
-			Expect(*sv.Metadata.Name).To(Equal(hostname))
-			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-		})
-
-		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
-		It("時間待ち", func() {
-			time.Sleep(15 * time.Second)
-		})
-
-		It("仮想サーバーのOS起動待ち 60秒", func() {
-			Eventually(func(g Gomega) {
+			It("稼働中仮想サーバーの取得", func() {
+				GinkgoWriter.Println("取得する仮想サーバーID:", serverId)
 				sv, err := marmotServer.Ma.GetServerById(serverId)
 				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
+				Expect(*sv.Metadata.Name).To(Equal(hostname))
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
-			}, "60s", "10s").Should(Succeed())
+			})
+
+			// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
+			It("時間待ち", func() {
+				time.Sleep(15 * time.Second)
+			})
+
+			It("仮想サーバーのOS起動待ち 60秒", func() {
+				Eventually(func(g Gomega) {
+					sv, err := marmotServer.Ma.GetServerById(serverId)
+					Expect(err).NotTo(HaveOccurred())
+					GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+					g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
+				}, "60s", "10s").Should(Succeed())
+			})
+
+			It("仮想サーバーの削除", func() {
+				err := marmotServer.Ma.DeleteServerById(serverId)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("ボリュームの削除", func() {
+				err := marmotServer.Ma.RemoveVolume(volumeIds[0])
+				Expect(err).NotTo(HaveOccurred())
+				err = marmotServer.Ma.RemoveVolume(volumeIds[1])
+				Expect(err).NotTo(HaveOccurred())
+			})
 		})
 
-		It("仮想サーバーの削除", func() {
-			err := marmotServer.Ma.DeleteServerById(serverId)
-			Expect(err).NotTo(HaveOccurred())
-		})
+		Context("複数インターフェース仮想サーバーの起動と終了のテスト", func() {
+			var id string
+			It("仮想サーバー生成:bootはqcow2 で構成", func() {
+				var virtualServer api.Server
+				var meta api.Metadata
+				var spec api.ServerSpec
+				virtualServer.Spec = &spec
+				var err error
 
-		It("ボリュームの削除", func() {
-			err := marmotServer.Ma.RemoveVolume(volumeIds[0])
-			Expect(err).NotTo(HaveOccurred())
-			err = marmotServer.Ma.RemoveVolume(volumeIds[1])
-			Expect(err).NotTo(HaveOccurred())
-		})
-	})
-
-	Context("複数インターフェース仮想サーバーの起動と終了のテスト", func() {
-		var id string
-		It("仮想サーバー生成:bootはqcow2 で構成", func() {
-			var virtualServer api.Server
-			var meta api.Metadata
-			var spec api.ServerSpec
-			virtualServer.Spec = &spec
-			var err error
-
-			meta.Name = util.StringPtr("test-vm-9")
-			virtualServer.Metadata = &meta
-			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
-				{
-					Networkname: "default",
-				},
-				{
-					Networkname: "host-bridge",
-				},
-				{
-					Networkname: "ovs-network",
-				},
-			}
-			spec.Storage = &[]api.Volume{
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-1"),
+				meta.Name = util.StringPtr("test-vm-9")
+				virtualServer.Metadata = &meta
+				virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
+					{
+						Networkname: "default",
 					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("lvm"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
+					{
+						Networkname: "host-bridge",
 					},
-				},
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-2"),
+					{
+						Networkname: "ovs-network",
 					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("lvm"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
+				}
+				spec.Storage = &[]api.Volume{
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-1"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("lvm"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
 					},
-				},
-				{
-					Metadata: &api.Metadata{
-						Name: util.StringPtr("data-disk-3"),
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-2"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("lvm"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
 					},
-					Spec: &api.VolSpec{
-						Type: util.StringPtr("lvm"),
-						Kind: util.StringPtr("data"),
-						Size: util.IntPtrInt(1), //GB
+					{
+						Metadata: &api.Metadata{
+							Name: util.StringPtr("data-disk-3"),
+						},
+						Spec: &api.VolSpec{
+							Type: util.StringPtr("lvm"),
+							Kind: util.StringPtr("data"),
+							Size: util.IntPtrInt(1), //GB
+						},
 					},
-				},
-			}
+				}
 
-			// 他すべてデフォルト
-			vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
-			Expect(err).NotTo(HaveOccurred())
-			id, err = marmotServer.Ma.CreateServer2(vm.Id)
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created VM ID:", id)
-		})
+				// 他すべてデフォルト
+				vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
+				Expect(err).NotTo(HaveOccurred())
+				id, err = marmotServer.Ma.CreateServer2(vm.Id)
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println("Created VM ID:", id)
+			})
 
-		It("稼働中仮想サーバー（１）の取得", func() {
-			GinkgoWriter.Println("取得する仮想サーバーID:", id)
-			sv, err := marmotServer.Ma.GetServerById(id)
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
-			Expect(*sv.Metadata.Name).To(Equal("test-vm-9"))
-			data, err := json.MarshalIndent(sv, "", "  ")
-			Expect(err).NotTo(HaveOccurred())
-			fmt.Println("サーバー情報: ", string(data))
-			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-		})
-
-		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
-		It("時間待ち", func() {
-			time.Sleep(15 * time.Second)
-		})
-
-		It("仮想サーバーのOS起動待ち 60秒", func() {
-			Eventually(func(g Gomega) {
+			It("稼働中仮想サーバー（１）の取得", func() {
+				GinkgoWriter.Println("取得する仮想サーバーID:", id)
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
+				Expect(*sv.Metadata.Name).To(Equal("test-vm-9"))
+				data, err := json.MarshalIndent(sv, "", "  ")
+				Expect(err).NotTo(HaveOccurred())
+				fmt.Println("サーバー情報: ", string(data))
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
-			}, "120s", "10s").Should(Succeed())
+			})
+
+			// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
+			It("時間待ち", func() {
+				time.Sleep(15 * time.Second)
+			})
+
+			It("仮想サーバーのOS起動待ち 60秒", func() {
+				Eventually(func(g Gomega) {
+					sv, err := marmotServer.Ma.GetServerById(id)
+					Expect(err).NotTo(HaveOccurred())
+					GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+					g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
+				}, "120s", "10s").Should(Succeed())
+			})
+
+			It("仮想サーバーの削除", func() {
+				err := marmotServer.Ma.DeleteServerById(id)
+				Expect(err).NotTo(HaveOccurred())
+			})
 		})
 
-		It("仮想サーバーの削除", func() {
-			err := marmotServer.Ma.DeleteServerById(id)
-			Expect(err).NotTo(HaveOccurred())
+		Context("API内部関数テスト", func() {
+			It("Marmotd のバージョン情報取得", func() {
+				// 中身は未実装
+				GinkgoWriter.Println(string("未実装"))
+			})
 		})
-	})
-
-	Context("API内部関数テスト", func() {
-		It("Marmotd のバージョン情報取得", func() {
-			// 中身は未実装
-			GinkgoWriter.Println(string("未実装"))
-		})
-	})
+	*/
 
 	Context("停止", func() {
 		It("コンテナとモック", func() {

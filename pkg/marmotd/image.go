@@ -98,8 +98,8 @@ func (m *Marmot) CreateNewImage(id string) (*api.Image, error) {
 		return nil, err
 	}
 
-	image.Spec.Kind = util.StringPtr("OS")
-	image.Spec.Type = util.StringPtr("both")
+	image.Spec.Kind = util.StringPtr("os")
+	image.Spec.Type = util.StringPtr("qcow2")
 
 	image.Spec.VolumeGroup = util.StringPtr("vg1")
 	image.Spec.LogicalVolume = util.StringPtr(lvName)

@@ -28,22 +28,28 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 		switch *volSpec.Spec.Kind {
 		case "os":
 			slog.Debug("qcow2 OSボリュームの生成", "volKind", *volSpec.Spec.Kind, "volId", volSpec.Id, "osVariant", volSpec.Spec.OsVariant)
-			img, err := m.Db.GetOsImgTempByOsVariant(*volSpec.Spec.OsVariant)
+			if volSpec.Spec.OsVariant == nil {
+				slog.Error("osVariant is nil in volume spec", "volId", volSpec.Id)
+				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
+				return nil, errors.New("osVariant is required for os volume")
+			}
+			img, err := m.Db.FindImageByName(*volSpec.Spec.OsVariant)
 			if err != nil {
 				slog.Error("failed to get os image template", "err", err)
 				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
 				return nil, err
 			}
-			if len(img.Qcow2Path) == 0 {
-				slog.Error("os image template has no qcow2 path", "len(img.Qcow2Path)", len(img.Qcow2Path))
+
+			if img.Spec.Qcow2Path == nil || len(*img.Spec.Qcow2Path) == 0 {
+				slog.Error("os image template has no qcow2 path", "", 0)
 				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
 				return nil, errors.New("os image template has no qcow2 path")
 			}
 
-			slog.Debug("qcow2 OSボリュームをテンプレートから生成", "テンプレートパス", img.Qcow2Path)
-			err = qcow.CopyQcow(img.Qcow2Path, *volSpec.Spec.Path)
+			slog.Debug("qcow2 OSボリュームをテンプレートから生成", "テンプレートパス", *img.Spec.Qcow2Path)
+			err = qcow.CopyQcow(*img.Spec.Qcow2Path, *volSpec.Spec.Path)
 			if err != nil {
-				slog.Error("failed to copy qcow2 image template", "err", err, "src", img.Qcow2Path, "dst", *volSpec.Spec.Path)
+				slog.Error("failed to copy qcow2 image template", "err", err, "src", *img.Spec.Qcow2Path, "dst", *volSpec.Spec.Path)
 				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
 				return nil, err
 			}
@@ -74,18 +80,25 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 		switch *volSpec.Spec.Kind {
 		case "os":
 			slog.Debug("LV OSボリュームの生成", "volKind", *volSpec.Spec.Kind, "volId", volSpec.Id)
-			img, err := m.Db.GetOsImgTempByOsVariant(*volSpec.Spec.OsVariant)
+
+			slog.Debug("qcow2 OSボリュームの生成", "volKind", *volSpec.Spec.Kind, "volId", volSpec.Id, "osVariant", volSpec.Spec.OsVariant)
+			if volSpec.Spec.OsVariant == nil {
+				slog.Error("osVariant is nil in volume spec", "volId", volSpec.Id)
+				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
+				return nil, errors.New("osVariant is required for os volume")
+			}
+			img, err := m.Db.FindImageByName(*volSpec.Spec.OsVariant)
 			if err != nil {
-				slog.Error("failed to get os image template", "err", err, "os_variant", *volSpec.Spec.OsVariant)
+				slog.Error("failed to get os image template", "err", err)
 				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
 				return nil, err
 			}
 
 			slog.Debug("OSボリュームをスナップショットで生成", "volKind", *volSpec.Spec.Kind)
 			size := uint64(4 * 1024 * 1024 * 1024) // スナップショットサイズは4GB固定
-			err = lvm.CreateSnapshot(img.VolumeGroup, img.LogicalVolume, *volSpec.Spec.LogicalVolume, size)
+			err = lvm.CreateSnapshot(*img.Spec.VolumeGroup, *img.Spec.LogicalVolume, *volSpec.Spec.LogicalVolume, size)
 			if err != nil {
-				slog.Error("failed to create OS logical volume", "err", err, "vg", img.VolumeGroup, "lv", img.LogicalVolume)
+				slog.Error("failed to create OS logical volume", "err", err, "vg", *img.Spec.VolumeGroup, "lv", *img.Spec.LogicalVolume)
 				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
 				return nil, err
 			}
