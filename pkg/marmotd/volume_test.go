@@ -2,6 +2,7 @@ package marmotd_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -121,6 +122,26 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			out, err := cmd.CombinedOutput()
 			GinkgoWriter.Println(out)
 			Expect(err).To(Succeed()) // 成功
+		})
+	})
+
+	Context("URLを指定してダウンロードしたイメージからVM起動イメージを作成する", func() {
+		var id string
+		It("URLを指定してイメージのIDを取得", func() {
+			var err error
+			GinkgoWriter.Println("URLを指定してイメージのIDを取得")
+			url := "https://cloud-images.ubuntu.com/releases/jammy/release-20260218/ubuntu-22.04-server-cloudimg-amd64.img"
+			id, err = marmotServer.Ma.Db.CreateImageFromURL("ubuntu22.04", url)
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println("取得したイメージID: ", id)
+		})
+
+		It("ダウンロードとセットアップ", func() {
+			image, err := marmotServer.Ma.CreateNewImage(id)
+			Expect(err).NotTo(HaveOccurred())
+			jsonBytes, err := json.MarshalIndent(image, "", "  ")
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Println("Created image: ", string(jsonBytes))
 		})
 	})
 
