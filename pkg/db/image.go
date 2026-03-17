@@ -195,6 +195,7 @@ func (d *Database) updateImage(id string, spec api.Image) error {
 	return nil
 }
 
+// イメージの削除予定日時をセットする
 func (d *Database) SetDeleteTimestampImage(id string) error {
 	image, err := d.GetImage(id)
 	if err != nil {
@@ -208,3 +209,34 @@ func (d *Database) SetDeleteTimestampImage(id string) error {
 	}
 	return nil
 }
+
+// イメージの全リストを返す
+func (d *Database) FindImageByName(name string) (api.Image, error) {
+	slog.Debug("FindImageByName() called", "name", name)
+	var err error
+	var resp *etcd.GetResponse
+
+	resp, err = d.GetByPrefix(ImagePrefix)
+	if err == ErrNotFound {
+		slog.Debug("no images found", "key-prefix", ImagePrefix)
+		return api.Image{}, nil
+	} else if err != nil {
+		slog.Error("GetByPrefix() failed", "err", err, "key-prefix", ImagePrefix)
+		return api.Image{}, err
+	}
+
+	for _, kv := range resp.Kvs {
+		var img api.Image
+		err := json.Unmarshal(kv.Value, &img)
+		if err != nil {
+			slog.Error("FindImageByName() failed to unmarshal image", "err", err)
+			continue
+		}
+		if img.Metadata != nil && img.Metadata.Name != nil && *img.Metadata.Name == name {
+			return img, nil
+		}
+	}
+
+	return api.Image{}, fmt.Errorf("image not found with name: %v", name)
+}
+

@@ -119,6 +119,26 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		})
 	})
 
+	Context("URLを指定してダウンロードしたイメージからVM起動イメージを作成する", func() {
+		var id string
+		It("URLを指定してイメージのIDを取得", func() {
+			var err error
+			GinkgoWriter.Println("URLを指定してイメージのIDを取得")
+			url := "https://cloud-images.ubuntu.com/releases/jammy/release-20260218/ubuntu-22.04-server-cloudimg-amd64.img"
+			id, err = marmotServer.Ma.Db.CreateImageFromURL("ubuntu22.04", url)
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println("取得したイメージID: ", id)
+		})
+
+		It("ダウンロードとセットアップ", func() {
+			image, err := marmotServer.Ma.CreateNewImage(id)
+			Expect(err).NotTo(HaveOccurred())
+			jsonBytes, err := json.MarshalIndent(image, "", "  ")
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Println("Created image: ", string(jsonBytes))
+		})
+	})
+
 	Context("最小構成 QCOW2 仮想サーバーの起動と終了のテスト", func() {
 		It("既存ネットワークの取得", func() {
 			var err error
