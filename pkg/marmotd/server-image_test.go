@@ -222,7 +222,7 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 		})
 	})
 
-	Context("QCOW2のデータディスクが複数存在する仮想サーバーの起動と終了のテスト", func() {
+	Context("取得したイメージから仮想サーバーを起動するテスト", func() {
 		var id string
 		It("仮想サーバー生成:bootはqcow2 でデータディスク２本構成", func() {
 			var virtualServer api.Server
@@ -301,7 +301,7 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 		})
 
 		It("稼働中の仮想サーバーからイメージの作成", func() {
-			imageId, err := marmotServer.Ma.CreateImageFromServer(id, "test-image-from-server")
+			imageId, err := marmotServer.Ma.CreateImageFromServer(id, "test-image-from-server-1")
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created image ID: ", imageId)
 			image, err := marmotServer.Ma.Db.GetImage(imageId)
@@ -319,73 +319,149 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 
 	})
 
-	/*
-		Context("最小構成 LV 仮想サーバーの起動と終了のテスト", func() {
-			var id string
-			It("仮想サーバー生成:bootはlv で最小構成", func() {
-				var virtualServer api.Server
-				var meta api.Metadata
-				var spec api.ServerSpec
-				virtualServer.Metadata = &meta
-				virtualServer.Spec = &spec
-
-				var bootVol api.Volume
-				var specVol api.VolSpec
-				var metaVol api.Metadata
-				bootVol.Metadata = &metaVol
-				bootVol.Spec = &specVol
-				virtualServer.Spec.BootVolume = &bootVol
-				var err error
-
-				virtualServer.Metadata.Name = util.StringPtr("test-vm-3")
-				virtualServer.Spec.BootVolume.Spec.Type = util.StringPtr("lvm")
-				virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
-					{
-						Networkname: "default",
-					},
-				}
-
-				// 他すべてデフォルト
-				// この中で、ブートボリュームのIDがセットされていない可能性がある？？？
-				vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
-				Expect(err).NotTo(HaveOccurred())
-				id, err = marmotServer.Ma.CreateServer2(vm.Id)
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("Created VM ID:", id)
-			})
-
-			It("稼働中仮想サーバーの取得", func() {
-				GinkgoWriter.Println("取得する仮想サーバーID:", id)
-				sv, err := marmotServer.Ma.GetServerById(id)
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
-				data, err := json.MarshalIndent(sv, "", "  ")
-				Expect(err).NotTo(HaveOccurred())
-				fmt.Println("サーバー情報: ", string(data))
-				Expect(*sv.Metadata.Name).To(Equal("test-vm-3"))
-				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-			})
-
-			// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
-			It("時間待ち", func() {
-				time.Sleep(15 * time.Second)
-			})
-
-			It("仮想サーバーのOS起動待ち 60秒", func() {
-				Eventually(func(g Gomega) {
-					sv, err := marmotServer.Ma.GetServerById(id)
-					Expect(err).NotTo(HaveOccurred())
-					GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-					g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
-				}, "120s", "10s").Should(Succeed())
-			})
-
-			It("仮想サーバーの削除", func() {
-				err := marmotServer.Ma.DeleteServerById(id)
-				Expect(err).NotTo(HaveOccurred())
-			})
+	Context("取得したイメージからの仮想サーバーの起動テスト", func() {
+		It("仮想ネットワークの取得", func() {
+			net, err := marmotServer.Ma.Db.GetVirtualNetworks()
+			Expect(err).NotTo(HaveOccurred())
+			data, err := json.MarshalIndent(net, "", "  ")
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Println("ネットワーク情報: ", string(data))
 		})
 
+		var id string
+		It("仮想サーバー生成:bootはqcow2 で最小構成", func() {
+			var virtualServer api.Server
+			var meta api.Metadata
+			var spec api.ServerSpec
+			var err error
+			meta.Name = util.StringPtr("test-vm-2")
+			virtualServer.Metadata = &meta
+			virtualServer.Spec = &spec
+			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
+				{
+					Networkname: "default",
+				},
+			}
+			virtualServer.Spec.OsVariant = util.StringPtr("test-image-from-server-1")
+			// 他すべてデフォルト
+			vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
+			Expect(err).NotTo(HaveOccurred())
+			id, err = marmotServer.Ma.CreateServer2(vm.Id)
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println("Created VM ID:", id)
+		})
+
+		It("稼働中仮想サーバー（１）の取得", func() {
+			GinkgoWriter.Println("取得する仮想サーバーID:", id)
+			sv, err := marmotServer.Ma.GetServerById(id)
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
+			Expect(*sv.Metadata.Name).To(Equal("test-vm-2"))
+			data, err := json.MarshalIndent(sv, "", "  ")
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Println("サーバー情報: ", string(data))
+			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+		})
+
+		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
+		It("時間待ち", func() {
+			time.Sleep(15 * time.Second)
+		})
+
+		It("仮想サーバーのOS起動待ち 60秒", func() {
+			Eventually(func(g Gomega) {
+				sv, err := marmotServer.Ma.GetServerById(id)
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
+			}, "120s", "10s").Should(Succeed())
+		})
+
+		It("仮想サーバーの削除", func() {
+			err := marmotServer.Ma.DeleteServerById(id)
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
+	Context("最小構成 LV 仮想サーバーの起動と終了のテスト", func() {
+		var id string
+		It("仮想サーバー生成:bootはlv で最小構成", func() {
+			var virtualServer api.Server
+			var meta api.Metadata
+			var spec api.ServerSpec
+			virtualServer.Metadata = &meta
+			virtualServer.Spec = &spec
+
+			var bootVol api.Volume
+			var specVol api.VolSpec
+			var metaVol api.Metadata
+			bootVol.Metadata = &metaVol
+			bootVol.Spec = &specVol
+			virtualServer.Spec.BootVolume = &bootVol
+			var err error
+
+			virtualServer.Metadata.Name = util.StringPtr("test-vm-3")
+			virtualServer.Spec.BootVolume.Spec.Type = util.StringPtr("lvm")
+			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
+				{
+					Networkname: "default",
+				},
+			}
+
+			// 他すべてデフォルト
+			// この中で、ブートボリュームのIDがセットされていない可能性がある？？？
+			vm, err := marmotServer.Ma.Db.CreateServer(virtualServer)
+			Expect(err).NotTo(HaveOccurred())
+			id, err = marmotServer.Ma.CreateServer2(vm.Id)
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println("Created VM ID:", id)
+		})
+
+		It("稼働中仮想サーバーの取得", func() {
+			GinkgoWriter.Println("取得する仮想サーバーID:", id)
+			sv, err := marmotServer.Ma.GetServerById(id)
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
+			data, err := json.MarshalIndent(sv, "", "  ")
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Println("サーバー情報: ", string(data))
+			Expect(*sv.Metadata.Name).To(Equal("test-vm-3"))
+			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+		})
+
+		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
+		It("時間待ち", func() {
+			time.Sleep(15 * time.Second)
+		})
+
+		It("仮想サーバーのOS起動待ち 60秒", func() {
+			Eventually(func(g Gomega) {
+				sv, err := marmotServer.Ma.GetServerById(id)
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
+			}, "120s", "10s").Should(Succeed())
+		})
+
+		It("稼働中の仮想サーバーからイメージの作成", func() {
+			imageId, err := marmotServer.Ma.CreateImageFromServer(id, "test-image-from-server-2")
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println("Created image ID: ", imageId)
+			image, err := marmotServer.Ma.Db.GetImage(imageId)
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println("Created image: ", *image.Metadata.Name)
+			data, err := json.MarshalIndent(image, "", "  ")
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Println("Created image details: ", string(data))
+		})
+
+		//It("仮想サーバーの削除", func() {
+		//	err := marmotServer.Ma.DeleteServerById(id)
+		//	Expect(err).NotTo(HaveOccurred())
+		//})
+	})
+
+	/*
 		Context("LVのデータディスクが複数存在する仮想サーバーの起動と終了のテスト", func() {
 			var id string
 			It("仮想サーバー生成:bootはlv で最小構成", func() {

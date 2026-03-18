@@ -114,15 +114,15 @@ func (d *Database) CreateImageFromVolume(name string, volumeId string) (api.Imag
 			slog.Error("CreateImageFromVolume() failed to create image directory", "err", err, "imageDir", imageDir)
 			return api.Image{}, err
 		}
+		// イメージのqcow2ボリューム名を設定
 		imagePath := fmt.Sprintf("%s/osimage-%s.qcow2", imageDir, id)
-
 		img = api.Image{
 			Id: id,
 			Metadata: &api.Metadata{
 				Name: &name,
 			},
 			Spec: &api.ImageSpec{
-				Kind:          vol.Spec.Kind,
+				Kind:          vol.Spec.Kind, // ポインタの値を直接使用
 				Type:          vol.Spec.Type,
 				VolumeGroup:   nil,
 				LogicalVolume: nil,
@@ -136,17 +136,20 @@ func (d *Database) CreateImageFromVolume(name string, volumeId string) (api.Imag
 			},
 		}
 	} else if vol.Spec.Type != nil && *vol.Spec.Type == "lvm" {
+		// イメージの論理ボリューム名を設定
+		logicalVolumePath := fmt.Sprintf("/dev/%s/osimage-%s", *vol.Spec.VolumeGroup, id)
+		logicalVolumeName := fmt.Sprintf("osimage-%s", id)
 		img = api.Image{
 			Id: id,
 			Metadata: &api.Metadata{
 				Name: &name,
 			},
 			Spec: &api.ImageSpec{
-				Kind:          vol.Spec.Kind,
+				Kind:          vol.Spec.Kind, // ポインタの値を直接使用
 				Type:          vol.Spec.Type,
 				VolumeGroup:   vol.Spec.VolumeGroup,
-				LogicalVolume: vol.Spec.LogicalVolume,
-				LvPath:        util.StringPtr(fmt.Sprintf("/dev/%s/%s", *vol.Spec.VolumeGroup, *vol.Spec.LogicalVolume)),
+				LogicalVolume: util.StringPtr(logicalVolumeName),
+				LvPath:        util.StringPtr(logicalVolumePath),
 				Qcow2Path:     nil,
 				Size:          vol.Spec.Size,
 				SourceUrl:     nil,
@@ -192,10 +195,10 @@ func (d *Database) GetImages() ([]api.Image, error) {
 
 	resp, err = d.GetByPrefix(ImagePrefix)
 	if err == ErrNotFound {
-		slog.Debug("no volumes found", "key-prefix", VolumePrefix)
+		slog.Debug("no images found", "key-prefix", ImagePrefix)
 		return images, nil
 	} else if err != nil {
-		slog.Error("GetByPrefix() failed", "err", err, "key-prefix", VolumePrefix)
+		slog.Error("GetByPrefix() failed", "err", err, "key-prefix", ImagePrefix)
 		return images, err
 	}
 

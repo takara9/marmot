@@ -628,6 +628,7 @@ func (m *Marmot) CreateImageFromServer(id, name string) (string, error) {
 
 	if bootVol.Spec.Type != nil && *bootVol.Spec.Type == "qcow2" {
 		// qcow2ファイルのコピー
+		slog.Debug("qcow2ファイルのコピー", "source path", *bootVol.Spec.Path, "destination path", *image.Spec.Qcow2Path)
 		if bootVol.Spec.Path != nil {
 			// 物理的なボリュームのコピー
 			if err := qcow.CopyQcow(*bootVol.Spec.Path, *image.Spec.Qcow2Path); err != nil {
@@ -636,13 +637,18 @@ func (m *Marmot) CreateImageFromServer(id, name string) (string, error) {
 		}
 	} else if bootVol.Spec.Type != nil && *bootVol.Spec.Type == "lvm" {
 		// LVMのスナップショット作成とコピー
+		slog.Debug("LVMのスナップショット作成とコピー", "volume group", *bootVol.Spec.VolumeGroup, "logical volume", *bootVol.Spec.LogicalVolume, "destination logical volume", *image.Spec.LogicalVolume)
 		if bootVol.Spec.VolumeGroup != nil && bootVol.Spec.LogicalVolume != nil {
-			//lvPath := fmt.Sprintf("/dev/%s/%s", *bootVol.Spec.VolumeGroup, *bootVol.Spec.LogicalVolume)
-			size := uint64(4 * 1024 * 1024 * 1024) // スナップショットサイズは4GB固定
-			if err := lvm.CreateSnapshot(*bootVol.Spec.VolumeGroup, *bootVol.Spec.LogicalVolume, *image.Spec.LogicalVolume, size); err != nil {
-				slog.Error("lvm.CreateSnapshot()", "err", err)
+			// スナップショットを取って、コピーする方向に変更が必要。しかし、実装は後にする
+			// 同じサイズのボリュームを作成して、dd でコピーを作成する。
+			size := uint64(*image.Spec.Size * 1024 * 1024 * 1024) // スナップショットサイズは16GB固定
+			//if err := lvm.CreateSnapshot(*bootVol.Spec.VolumeGroup, *bootVol.Spec.LogicalVolume, *image.Spec.LogicalVolume, size); err != nil {
+			//	slog.Error("lvm.CreateSnapshot()", "err", err)
+			//}
+
+			if err := lvm.CopyLogicalVoulume(*bootVol.Spec.VolumeGroup, *bootVol.Spec.LogicalVolume, "vg1", *image.Spec.LogicalVolume, size); err != nil {
+				slog.Error("lvm.CopyLogicalVoulume()", "err", err)
 			}
-			// スナップショットをイメージストレージにコピーの処理は、時間が必要なので、ジョブに投げる
 		}
 	}
 
