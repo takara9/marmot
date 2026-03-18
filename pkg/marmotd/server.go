@@ -9,6 +9,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/lvm"
+	"github.com/takara9/marmot/pkg/qcow"
 	"github.com/takara9/marmot/pkg/util"
 	"github.com/takara9/marmot/pkg/virt"
 )
@@ -587,4 +589,71 @@ func (m *Marmot) CreateNewVolumeWithWait(volReq api.Volume) (api.Volume, error) 
 	}
 
 	return *volDefined, nil
+}
+
+// サーバーから起動イメージの作成
+func (m *Marmot) CreateImageFromServer(id, name string) (string, error) {
+	slog.Debug("===CreateImageFromServer is called===", "server id", id)
+	// サーバーの情報を取得
+	serverSpec, err := m.Db.GetServerById(id)
+	if err != nil {
+		slog.Error("GetServerById()", "err", err)
+		return "", err
+	}
+
+	// ブートボリュームのIDを取得
+	slog.Debug("CreateImageFromServer()", "boot volume id", serverSpec.Spec.BootVolume.Id)
+
+	// ブートボリュームの情報を取得
+	bootVol, err := m.GetVolumeById(serverSpec.Spec.BootVolume.Id)
+	if err != nil {
+		slog.Error("GetVolumeById()", "err", err)
+		return "", err
+	}
+
+	slog.Debug("CreateImageFromServer()", "boot volume", bootVol.Spec.Path)
+
+	// イメージIDの取得、名前チェック
+	image, err := m.Db.CreateImageFromVolume(name, bootVol.Id)
+	if err != nil {
+		slog.Error("CreateImageFromVolume()", "err", err)
+		return "", err
+	}
+
+	// 仮想マシンの一時停止
+	if err := m.Virt.SuspendDomain(*serverSpec.Metadata.InstanceName); err != nil {
+		slog.Error("SuspendDomain()", "err", err)
+		//return "", err
+	}
+
+	if bootVol.Spec.Type != nil && *bootVol.Spec.Type == "qcow2" {
+		// qcow2ファイルのコピー
+		if bootVol.Spec.Path != nil {
+			// 物理的なボリュームのコピー
+			if err := qcow.CopyQcow(*bootVol.Spec.Path, *image.Spec.Qcow2Path); err != nil {
+				slog.Error("qcow.CopyQcow()", "err", err)
+			}
+		}
+	} else if bootVol.Spec.Type != nil && *bootVol.Spec.Type == "lvm" {
+		// LVMのスナップショット作成とコピー
+		if bootVol.Spec.VolumeGroup != nil && bootVol.Spec.LogicalVolume != nil {
+			//lvPath := fmt.Sprintf("/dev/%s/%s", *bootVol.Spec.VolumeGroup, *bootVol.Spec.LogicalVolume)
+			size := uint64(4 * 1024 * 1024 * 1024) // スナップショットサイズは4GB固定
+			if err := lvm.CreateSnapshot(*bootVol.Spec.VolumeGroup, *bootVol.Spec.LogicalVolume, *image.Spec.LogicalVolume, size); err != nil {
+				slog.Error("lvm.CreateSnapshot()", "err", err)
+			}
+			// スナップショットをイメージストレージにコピーの処理は、時間が必要なので、ジョブに投げる
+		}
+	}
+
+	// 仮想マシンの再開
+	if err := m.Virt.ResumeDomain(*serverSpec.Metadata.InstanceName); err != nil {
+		slog.Error("ResumeDomain()", "err", err)
+		//return "", err
+	}
+
+	// イメージ情報の登録
+	m.Db.SetImageStatus(image.Id, db.IMAGE_CREATING)
+
+	return image.Id, nil
 }

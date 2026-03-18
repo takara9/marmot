@@ -399,3 +399,35 @@ func (l *LibVirtEp) DeleteDomain(vmname string) error {
 
 	return nil
 }
+
+// 仮想マシンの一時停止
+func (l *LibVirtEp) SuspendDomain(vmname string) error {
+	domain, err := l.Com.LookupDomainByName(vmname)
+	if err != nil {
+		return err
+	}
+
+	// ドメインの一時停止
+	err = domain.Suspend()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// 仮想マシンの再開
+func (l *LibVirtEp) ResumeDomain(vmname string) error {
+	domain, err := l.Com.LookupDomainByName(vmname)
+	if err != nil {
+		return err
+	}
+
+	// ドメインの再開
+	err = domain.Resume()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
