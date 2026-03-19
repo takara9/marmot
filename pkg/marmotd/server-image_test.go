@@ -49,6 +49,14 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 	})
 
 	AfterAll(func(ctx0 SpecContext) {
+		//OSイメージを削除
+		if osImageid != "" {
+			osimage, err := marmotServer.Ma.Db.GetImage(osImageid)
+			Expect(err).NotTo(HaveOccurred())
+			err = lvm.RemoveLV(*osimage.Spec.VolumeGroup, *osimage.Spec.LogicalVolume)
+			Expect(err).NotTo(HaveOccurred())
+		}
+
 		cmd := exec.Command("docker", "kill", containerID)
 		_, err := cmd.CombinedOutput()
 		if err != nil {
@@ -58,14 +66,6 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 		_, err = cmd.CombinedOutput()
 		if err != nil {
 			fmt.Printf("Failed to remove container: %v\n", err)
-		}
-
-		//OSイメージを削除
-		if osImageid != "" {
-			osimage, err := marmotServer.Ma.Db.GetImage(osImageid)
-			Expect(err).NotTo(HaveOccurred())
-			err = lvm.RemoveLV(*osimage.Spec.VolumeGroup, *osimage.Spec.LogicalVolume)
-			Expect(err).NotTo(HaveOccurred())
 		}
 
 		cancel() // モックサーバー停止
