@@ -53,6 +53,11 @@ rm -f lxc_domain_list.txt
 rm -f lv_list.json
 rm -f lv_to_remove.txt
 
+cd /var/lib/marmot/volumes
+rm -f *.qcow2
+cd /var/lib/marmot/images
+rm -fr *
+
 echo "Cleanup completed."
 pwd
 sudo rm -fr 

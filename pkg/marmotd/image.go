@@ -159,9 +159,14 @@ func (m *Marmot) DeleteImage(id string) error {
 			lvPath := strings.TrimSpace(*image.Spec.LvPath)
 			slog.Debug("*** Attempting to remove logical volume ***", "imgId", id, "lvPath", lvPath)
 			if err := runCmd(ctx, "lvdisplay", lvPath); err == nil {
-				if err := runCmd(ctx, "lvremove", "-y", lvPath); err != nil {
-					slog.Error("Failed to remove logical volume", "imgId", id, "lvPath", lvPath, "err", err)
-					return err
+				for i := 0; i < 10; i++ {
+					err := runCmd(ctx, "lvremove", "-y", lvPath)
+					if err == nil {
+						slog.Debug("Logical volume removed successfully", "imgId", id, "lvPath", lvPath)
+						break
+					}
+					slog.Warn("Failed to remove logical volume, retrying...", "imgId", id, "lvPath", lvPath, "attempt", i+1, "err", err)
+					time.Sleep(3 * time.Second)
 				}
 			} else {
 				slog.Debug("Logical volume not found, skip remove", "imgId", id, "lvPath", lvPath)

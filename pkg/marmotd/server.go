@@ -484,7 +484,9 @@ func (m *Marmot) DeleteServerById(id string) error {
 		}
 		defer l.Close()
 
+		// この下で異常動作が起きている
 		slog.Debug("DeleteServerById()", "deleting domain", *sv.Metadata.InstanceName)
+
 		if err = l.DeleteDomain(*sv.Metadata.InstanceName); err != nil {
 			// ドメインが存在しない場合はスキップしたいが、区別が難しいので意図的にスキップする
 			//if *sv.Status != db.SERVER_PROVISIONING {

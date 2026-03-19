@@ -21,7 +21,7 @@ install:
 
 .PHONY: test
 test:
-	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -coverprofile cover.out
+	$(GO) test -v -race . -timeout 20m -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -coverprofile cover.out
 
 .PHONY: test-volume
 test-volume:

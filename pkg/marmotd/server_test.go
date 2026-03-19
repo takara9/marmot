@@ -290,7 +290,13 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 
 		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
 		It("時間待ち", func() {
-			time.Sleep(15 * time.Second)
+			Eventually(func(g Gomega) {
+				sv, err := marmotServer.Ma.GetServerById(id)
+				Expect(err).NotTo(HaveOccurred())
+				g.Expect(sv.Status).NotTo(BeNil())
+				g.Expect(sv.Status.Status).NotTo(BeNil())
+				g.Expect(*sv.Status.Status).NotTo(Equal(db.SERVER_ERROR))
+			}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).Should(Succeed())
 		})
 
 		It("仮想サーバーのOS起動待ち 60秒", func() {
@@ -312,6 +318,28 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("サーバー情報: ", string(data))
 			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+		})
+
+		It("LVMの状態確認", func() {
+			out, err := exec.Command("lvs", "vg1").Output()
+			fmt.Println("lvs output:\n", string(out))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("VGの状態確認", func() {
+			out, err := exec.Command("vgs").Output()
+			fmt.Println("vgs output:\n", string(out))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("時間待ち PD", func() {
+			Consistently(func(g Gomega) {
+				sv, err := marmotServer.Ma.GetServerById(id)
+				Expect(err).NotTo(HaveOccurred())
+				g.Expect(sv.Status).NotTo(BeNil())
+				g.Expect(sv.Status.Status).NotTo(BeNil())
+				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
+			}).WithTimeout(20 * time.Second).WithPolling(5 * time.Second).Should(Succeed())
 		})
 
 		It("仮想サーバーの削除", func() {
