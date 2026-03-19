@@ -117,6 +117,12 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 				g.Expect(err).NotTo(HaveOccurred())
 			}).Should(Succeed())
 		})
+
+		It("LVMの状態確認", func() {
+			out, err := exec.Command("lvs", "vg1").Output()
+			fmt.Println("lvs output:\n", string(out))
+			Expect(err).NotTo(HaveOccurred())
+		})
 	})
 
 	Context("URLを指定してダウンロードしたイメージからVM起動イメージを作成する", func() {
@@ -174,7 +180,7 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 		It("イメージの詳細情報取得 -1", func() {
 			image, err := marmotServer.Ma.GetImage((images)[0].Id)
 			Expect(err).NotTo(HaveOccurred())
-			jsonBytes,err := json.MarshalIndent(image, "", "    ")
+			jsonBytes, err := json.MarshalIndent(image, "", "    ")
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println(string(jsonBytes))
 		})
@@ -182,7 +188,7 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 		It("イメージの詳細情報取得 -2", func() {
 			image, err := marmotServer.Ma.GetImage((images)[1].Id)
 			Expect(err).NotTo(HaveOccurred())
-			jsonBytes,err := json.MarshalIndent(image, "", "    ")
+			jsonBytes, err := json.MarshalIndent(image, "", "    ")
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println(string(jsonBytes))
 		})
@@ -192,7 +198,7 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			_, err = marmotServer.Ma.GetImage((images)[0].Id)
 			Expect(err).To(HaveOccurred())
-			fmt.Println("Deleted image ID: ", (images)[0].Id)			
+			fmt.Println("Deleted image ID: ", (images)[0].Id)
 		})
 
 		It("イメージの削除 -2", func() {
@@ -200,7 +206,7 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			_, err = marmotServer.Ma.GetImage((images)[1].Id)
 			Expect(err).To(HaveOccurred())
-			fmt.Println("Deleted image ID: ", (images)[1].Id)			
+			fmt.Println("Deleted image ID: ", (images)[1].Id)
 		})
 	})
 

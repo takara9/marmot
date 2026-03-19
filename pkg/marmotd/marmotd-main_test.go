@@ -31,7 +31,6 @@ var _ = Describe("関数テスト", Ordered, func() {
 		cancel       context.CancelFunc
 		marmotServer *marmotd.Server
 	)
-	//etcdUrl := "http://127.0.0.1:" + fmt.Sprintf("%d", etcdPort)
 	marmotEp := "localhost:" + fmt.Sprintf("%d", marmotPort)
 
 	BeforeAll(func(ctx0 SpecContext) {

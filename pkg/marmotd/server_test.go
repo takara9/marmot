@@ -265,18 +265,6 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			GinkgoWriter.Println("Created VM ID:", id)
 		})
 
-		It("稼働中仮想サーバーの取得", func() {
-			GinkgoWriter.Println("取得する仮想サーバーID:", id)
-			sv, err := marmotServer.Ma.GetServerById(id)
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
-			Expect(*sv.Metadata.Name).To(Equal("test-vm-2"))
-			data, err := json.MarshalIndent(sv, "", "  ")
-			Expect(err).NotTo(HaveOccurred())
-			fmt.Println("サーバー情報: ", string(data))
-			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-		})
-
 		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
 		It("時間待ち", func() {
 			time.Sleep(15 * time.Second)
@@ -289,6 +277,18 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
 			}, "60s", "10s").Should(Succeed())
+		})
+
+		It("稼働中仮想サーバーの取得", func() {
+			GinkgoWriter.Println("取得する仮想サーバーID:", id)
+			sv, err := marmotServer.Ma.GetServerById(id)
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
+			Expect(*sv.Metadata.Name).To(Equal("test-vm-2"))
+			data, err := json.MarshalIndent(sv, "", "  ")
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Println("サーバー情報: ", string(data))
+			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 		})
 
 		It("仮想サーバーの削除", func() {
