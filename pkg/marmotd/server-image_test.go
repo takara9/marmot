@@ -21,8 +21,8 @@ import (
 
 var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 	const (
-		marmotPort        = 8100
-		etcdPort          = 4379
+		marmotPort        = 8102
+		etcdPort          = 14379
 		etcdctlExe        = "/usr/bin/etcdctl"
 		nodeName          = "hvc"
 		etcdImage         = "ghcr.io/takara9/etcd:3.6.5"
@@ -455,10 +455,10 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			fmt.Println("Created image details: ", string(data))
 		})
 
-		//It("仮想サーバーの削除", func() {
-		//	err := marmotServer.Ma.DeleteServerById(id)
-		//	Expect(err).NotTo(HaveOccurred())
-		//})
+		It("仮想サーバーの削除", func() {
+			err := marmotServer.Ma.DeleteServerById(id)
+			Expect(err).NotTo(HaveOccurred())
+		})
 	})
 
 	/*
