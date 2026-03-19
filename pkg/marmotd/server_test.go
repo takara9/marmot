@@ -15,6 +15,7 @@ import (
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/lvm"
 	"github.com/takara9/marmot/pkg/marmotd"
 	"github.com/takara9/marmot/pkg/util"
 )
@@ -33,6 +34,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		ctx          context.Context
 		cancel       context.CancelFunc
 		marmotServer *marmotd.Server
+		osImageid    string
 	)
 	etcdUrl := "http://127.0.0.1:" + fmt.Sprintf("%d", etcdPort)
 	marmotEp := "localhost:" + fmt.Sprintf("%d", marmotPort)
@@ -47,6 +49,27 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 	})
 
 	AfterAll(func(ctx0 SpecContext) {
+
+		//OSイメージを削除
+		if osImageid != "" {
+			osimage, err := marmotServer.Ma.Db.GetImage(osImageid)
+			Expect(err).NotTo(HaveOccurred())
+			err = lvm.RemoveLV(*osimage.Spec.VolumeGroup, *osimage.Spec.LogicalVolume)
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		cmd := exec.Command("docker", "kill", containerID)
+		_, err := cmd.CombinedOutput()
+		if err != nil {
+			fmt.Printf("Failed to stop container: %v\n", err)
+		}
+		cmd = exec.Command("docker", "rm", containerID)
+		_, err = cmd.CombinedOutput()
+		if err != nil {
+			fmt.Printf("Failed to remove container: %v\n", err)
+		}
+		cancel() // モックサーバー停止
+
 		marmotd.CleanupTestEnvironment()
 	})
 
@@ -129,18 +152,18 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 	})
 
 	Context("URLを指定してダウンロードしたイメージからVM起動イメージを作成する", func() {
-		var id string
+		//var id string
 		It("URLを指定してイメージのIDを取得", func() {
 			var err error
 			GinkgoWriter.Println("URLを指定してイメージのIDを取得")
 			url := "https://cloud-images.ubuntu.com/releases/jammy/release-20260218/ubuntu-22.04-server-cloudimg-amd64.img"
-			id, err = marmotServer.Ma.Db.CreateImageFromURL("ubuntu22.04", url)
+			osImageid, err = marmotServer.Ma.Db.CreateImageFromURL("ubuntu22.04", url)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("取得したイメージID: ", id)
+			GinkgoWriter.Println("取得したイメージID: ", osImageid)
 		})
 
 		It("ダウンロードとセットアップ", func() {
-			image, err := marmotServer.Ma.CreateNewImage(id)
+			image, err := marmotServer.Ma.CreateNewImage(osImageid)
 			Expect(err).NotTo(HaveOccurred())
 			jsonBytes, err := json.MarshalIndent(image, "", "  ")
 			Expect(err).NotTo(HaveOccurred())
@@ -1099,19 +1122,21 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		})
 	*/
 
-	Context("停止", func() {
-		It("コンテナとモック", func() {
-			cmd := exec.Command("docker", "kill", containerID)
-			_, err := cmd.CombinedOutput()
-			if err != nil {
-				fmt.Printf("Failed to stop container: %v\n", err)
-			}
-			cmd = exec.Command("docker", "rm", containerID)
-			_, err = cmd.CombinedOutput()
-			if err != nil {
-				fmt.Printf("Failed to remove container: %v\n", err)
-			}
-			cancel() // モックサーバー停止
+	/*
+		Context("停止", func() {
+			It("コンテナとモック", func() {
+				cmd := exec.Command("docker", "kill", containerID)
+				_, err := cmd.CombinedOutput()
+				if err != nil {
+					fmt.Printf("Failed to stop container: %v\n", err)
+				}
+				cmd = exec.Command("docker", "rm", containerID)
+				_, err = cmd.CombinedOutput()
+				if err != nil {
+					fmt.Printf("Failed to remove container: %v\n", err)
+				}
+				cancel() // モックサーバー停止
+			})
 		})
-	})
+	*/
 })
