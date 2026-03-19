@@ -210,10 +210,4 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 		})
 	})
 
-	Context("稼働中の仮想マシンから、VM起動イメージを作成する", func() {
-		It("仮想マシンの起動", func() {
-			GinkgoWriter.Println("仮想マシンの起動")
-		})
-	})
-
 })

@@ -25,7 +25,7 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 		etcdctlExe        = "/usr/bin/etcdctl"
 		nodeName          = "hvc"
 		etcdImage         = "ghcr.io/takara9/etcd:3.6.5"
-		etcdContainerName = "etcd-server"
+		etcdContainerName = "etcd-server-14379"
 	)
 	var (
 		containerID  string
