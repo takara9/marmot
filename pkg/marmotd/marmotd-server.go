@@ -97,3 +97,10 @@ func (s *Server) UpdateServerById(ctx echo.Context, id string) error {
 	resp.Message = util.StringPtr("Server updated successfully")
 	return ctx.JSON(http.StatusOK, resp)
 }
+
+// サーバーからイメージを作成
+func (s *Server) CreateImageFromServerById(ctx echo.Context, id string) error {
+	slog.Debug("=== CreateImageFromServerById() is called ===", "id", id)
+	// Implement the logic to create an image from the server by ID
+	return ctx.JSON(http.StatusOK, api.Success{Id: id, Message: util.StringPtr("Image created successfully from server")})
+}
