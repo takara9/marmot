@@ -43,6 +43,11 @@ while read lv; do
     lvremove -y /dev/$lv
 done < lv_to_remove.txt
 
+lvs --reportformat json |/usr/bin/jq -r '.report[].lv[] | .vg_name + "/" + .lv_name' | sed 's/vg1\/lv01//g' | sed '/^$/d' > lv_to_remove2.txt
+while read lv; do
+    lvremove -y /dev/$lv
+done < lv_to_remove2.txt
+
 lvremove -y /dev/vg1/lvos_temp
 
 ids=$(docker ps -q); [ -n "$ids" ] && docker kill $ids
