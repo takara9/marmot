@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,11 +31,7 @@ var ImageStatus = map[int]string{
 	5: "DELETED",
 }
 
-// URLのイメージをダウンロードして、それからイメージを作成する
-func (d *Database) CreateImageFromURL(name, url string) (string, error) {
-	slog.Debug("CreateImageFromURL() called", "name", name, "url", url)
-
-	//一意なIDを発行
+func (d *Database) getUniqueImageID() (string, error) {
 	var id string
 	var key string
 	for {
@@ -45,10 +42,24 @@ func (d *Database) CreateImageFromURL(name, url string) (string, error) {
 		if err == ErrNotFound {
 			break
 		} else if err != nil {
-			slog.Error("CreateImageFromURL()", "err", err)
+			slog.Error("getUniqueImageID()", "err", err)
 			return "", err
 		}
 	}
+	return id, nil
+}
+
+// URLのイメージをダウンロードして、それからイメージを作成する
+func (d *Database) CreateImageFromURL(name, url string) (string, error) {
+	slog.Debug("CreateImageFromURL() called", "name", name, "url", url)
+
+	//一意なIDを発行
+	id, err := d.getUniqueImageID()
+	if err != nil {
+		slog.Error("CreateImageFromURL()", "err", err)
+		return "", err
+	}
+
 	//イメージの基本情報を保存
 	img := api.Image{
 		Id: id,
@@ -62,13 +73,103 @@ func (d *Database) CreateImageFromURL(name, url string) (string, error) {
 			Status: util.IntPtrInt(IMAGE_PENDING),
 		},
 	}
-	err := d.PutJSON(key, img)
-	if err != nil {
+	key := ImagePrefix + "/" + id
+	if err := d.PutJSON(key, img); err != nil {
 		slog.Error("CreateImageFromURL()", "err", err)
 		return "", err
 	}
 
 	return id, nil
+}
+
+// ブートボリュームからイメージを作成する
+func (d *Database) CreateImageFromVolume(name string, volumeId string) (api.Image, error) {
+	slog.Debug("CreateImageFromVolume() called", "name", name, "volumeId", volumeId)
+
+	//一意なIDを発行
+	id, err := d.getUniqueImageID()
+	if err != nil {
+		slog.Error("CreateImageFromVolume()", "err", err)
+		return api.Image{}, err
+	}
+
+	vol, err := d.GetVolumeById(volumeId)
+	if err != nil {
+		slog.Error("CreateImageFromVolume() failed to get volume by id", "err", err, "volumeId", volumeId)
+		return api.Image{}, err
+	}
+
+	// ボリュームがOSボリュームであることを確認
+	if *vol.Spec.Kind != "os" {
+		slog.Error("CreateImageFromVolume() volume is not an OS volume", "volumeId", volumeId)
+		return api.Image{}, fmt.Errorf("volume with id %v is not an OS volume", volumeId)
+	}
+
+	//イメージの基本情報を保存
+	var img api.Image
+	if vol.Spec.Type != nil && *vol.Spec.Type == "qcow2" {
+		// イメージを書き込むディレクトリの作成
+		imageDir := fmt.Sprintf("/var/lib/marmot/images/%s", id)
+		if err := os.MkdirAll(imageDir, 0755); err != nil {
+			slog.Error("CreateImageFromVolume() failed to create image directory", "err", err, "imageDir", imageDir)
+			return api.Image{}, err
+		}
+		// イメージのqcow2ボリューム名を設定
+		imagePath := fmt.Sprintf("%s/osimage-%s.qcow2", imageDir, id)
+		img = api.Image{
+			Id: id,
+			Metadata: &api.Metadata{
+				Name: &name,
+			},
+			Spec: &api.ImageSpec{
+				Kind:          vol.Spec.Kind, // ポインタの値を直接使用
+				Type:          vol.Spec.Type,
+				VolumeGroup:   nil,
+				LogicalVolume: nil,
+				LvPath:        nil,
+				Qcow2Path:     util.StringPtr(imagePath),
+				Size:          vol.Spec.Size,
+				SourceUrl:     nil,
+			},
+			Status: &api.Status{
+				Status: util.IntPtrInt(IMAGE_PENDING),
+			},
+		}
+	} else if vol.Spec.Type != nil && *vol.Spec.Type == "lvm" {
+		// イメージの論理ボリューム名を設定
+		logicalVolumePath := fmt.Sprintf("/dev/%s/osimage-%s", *vol.Spec.VolumeGroup, id)
+		logicalVolumeName := fmt.Sprintf("osimage-%s", id)
+		img = api.Image{
+			Id: id,
+			Metadata: &api.Metadata{
+				Name: &name,
+			},
+			Spec: &api.ImageSpec{
+				Kind:          vol.Spec.Kind, // ポインタの値を直接使用
+				Type:          vol.Spec.Type,
+				VolumeGroup:   vol.Spec.VolumeGroup,
+				LogicalVolume: util.StringPtr(logicalVolumeName),
+				LvPath:        util.StringPtr(logicalVolumePath),
+				Qcow2Path:     nil,
+				Size:          vol.Spec.Size,
+				SourceUrl:     nil,
+			},
+			Status: &api.Status{
+				Status: util.IntPtrInt(IMAGE_PENDING),
+			},
+		}
+	} else {
+		slog.Error("CreateImageFromVolume() unsupported volume type", "volumeId", volumeId, "type", vol.Spec.Type)
+		return api.Image{}, fmt.Errorf("unsupported volume type for volume with id %v: %v", volumeId, vol.Spec.Type)
+	}
+
+	key := ImagePrefix + "/" + id
+	if err := d.PutJSON(key, img); err != nil {
+		slog.Error("CreateImageFromVolume()", "err", err)
+		return api.Image{}, err
+	}
+
+	return img, nil
 }
 
 // IDを指定してイメージの情報を取得する
@@ -94,10 +195,10 @@ func (d *Database) GetImages() ([]api.Image, error) {
 
 	resp, err = d.GetByPrefix(ImagePrefix)
 	if err == ErrNotFound {
-		slog.Debug("no volumes found", "key-prefix", VolumePrefix)
+		slog.Debug("no images found", "key-prefix", ImagePrefix)
 		return images, nil
 	} else if err != nil {
-		slog.Error("GetByPrefix() failed", "err", err, "key-prefix", VolumePrefix)
+		slog.Error("GetByPrefix() failed", "err", err, "key-prefix", ImagePrefix)
 		return images, err
 	}
 
@@ -239,4 +340,3 @@ func (d *Database) FindImageByName(name string) (api.Image, error) {
 
 	return api.Image{}, fmt.Errorf("image not found with name: %v", name)
 }
-

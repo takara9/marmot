@@ -9,6 +9,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/lvm"
+	"github.com/takara9/marmot/pkg/qcow"
 	"github.com/takara9/marmot/pkg/util"
 	"github.com/takara9/marmot/pkg/virt"
 )
@@ -482,7 +484,9 @@ func (m *Marmot) DeleteServerById(id string) error {
 		}
 		defer l.Close()
 
+		// この下で異常動作が起きている
 		slog.Debug("DeleteServerById()", "deleting domain", *sv.Metadata.InstanceName)
+
 		if err = l.DeleteDomain(*sv.Metadata.InstanceName); err != nil {
 			// ドメインが存在しない場合はスキップしたいが、区別が難しいので意図的にスキップする
 			//if *sv.Status != db.SERVER_PROVISIONING {
@@ -587,4 +591,77 @@ func (m *Marmot) CreateNewVolumeWithWait(volReq api.Volume) (api.Volume, error) 
 	}
 
 	return *volDefined, nil
+}
+
+// サーバーから起動イメージの作成
+func (m *Marmot) CreateImageFromServer(id, name string) (string, error) {
+	slog.Debug("===CreateImageFromServer is called===", "server id", id)
+	// サーバーの情報を取得
+	serverSpec, err := m.Db.GetServerById(id)
+	if err != nil {
+		slog.Error("GetServerById()", "err", err)
+		return "", err
+	}
+
+	// ブートボリュームのIDを取得
+	slog.Debug("CreateImageFromServer()", "boot volume id", serverSpec.Spec.BootVolume.Id)
+
+	// ブートボリュームの情報を取得
+	bootVol, err := m.GetVolumeById(serverSpec.Spec.BootVolume.Id)
+	if err != nil {
+		slog.Error("GetVolumeById()", "err", err)
+		return "", err
+	}
+
+	slog.Debug("CreateImageFromServer()", "boot volume", bootVol.Spec.Path)
+
+	// イメージIDの取得、名前チェック
+	image, err := m.Db.CreateImageFromVolume(name, bootVol.Id)
+	if err != nil {
+		slog.Error("CreateImageFromVolume()", "err", err)
+		return "", err
+	}
+
+	// 仮想マシンの一時停止
+	if err := m.Virt.SuspendDomain(*serverSpec.Metadata.InstanceName); err != nil {
+		slog.Error("SuspendDomain()", "err", err)
+		//return "", err
+	}
+
+	if bootVol.Spec.Type != nil && *bootVol.Spec.Type == "qcow2" {
+		// qcow2ファイルのコピー
+		slog.Debug("qcow2ファイルのコピー", "source path", *bootVol.Spec.Path, "destination path", *image.Spec.Qcow2Path)
+		if bootVol.Spec.Path != nil {
+			// 物理的なボリュームのコピー
+			if err := qcow.CopyQcow(*bootVol.Spec.Path, *image.Spec.Qcow2Path); err != nil {
+				slog.Error("qcow.CopyQcow()", "err", err)
+			}
+		}
+	} else if bootVol.Spec.Type != nil && *bootVol.Spec.Type == "lvm" {
+		// LVMのスナップショット作成とコピー
+		slog.Debug("LVMのスナップショット作成とコピー", "volume group", *bootVol.Spec.VolumeGroup, "logical volume", *bootVol.Spec.LogicalVolume, "destination logical volume", *image.Spec.LogicalVolume)
+		if bootVol.Spec.VolumeGroup != nil && bootVol.Spec.LogicalVolume != nil {
+			// スナップショットを取って、コピーする方向に変更が必要。しかし、実装は後にする
+			// 同じサイズのボリュームを作成して、dd でコピーを作成する。
+			size := uint64(*image.Spec.Size * 1024 * 1024 * 1024) // スナップショットサイズは16GB固定
+			//if err := lvm.CreateSnapshot(*bootVol.Spec.VolumeGroup, *bootVol.Spec.LogicalVolume, *image.Spec.LogicalVolume, size); err != nil {
+			//	slog.Error("lvm.CreateSnapshot()", "err", err)
+			//}
+
+			if err := lvm.CopyLogicalVoulume(*bootVol.Spec.VolumeGroup, *bootVol.Spec.LogicalVolume, "vg1", *image.Spec.LogicalVolume, size); err != nil {
+				slog.Error("lvm.CopyLogicalVoulume()", "err", err)
+			}
+		}
+	}
+
+	// 仮想マシンの再開
+	if err := m.Virt.ResumeDomain(*serverSpec.Metadata.InstanceName); err != nil {
+		slog.Error("ResumeDomain()", "err", err)
+		//return "", err
+	}
+
+	// イメージ情報の登録
+	m.Db.SetImageStatus(image.Id, db.IMAGE_CREATING)
+
+	return image.Id, nil
 }

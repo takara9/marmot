@@ -21,7 +21,7 @@ install:
 
 .PHONY: test
 test:
-	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -coverprofile cover.out
+	$(GO) test -v -race . -timeout 20m -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -coverprofile cover.out
 
 .PHONY: test-volume
 test-volume:
@@ -43,7 +43,6 @@ set-version:
 download-image:
 	mc cp myminio/os-image/ubuntu22.04.img testdata/ubuntu22.04.qcow2
 
-
 .PHONY: test-network
 test-network:
 	$(GO) test -ginkgo.focus="VirtualPrivateNetworks" -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
@@ -55,3 +54,7 @@ test-network2:
 .PHONY: test-image
 test-image:
 	$(GO) test -ginkgo.focus="ImageManagmentTest" -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+
+.PHONY: test-image2
+test-image2:
+	$(GO) test -ginkgo.focus="ServerImageCopyingTest" -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events

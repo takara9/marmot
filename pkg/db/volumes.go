@@ -108,8 +108,14 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 	if volume.Spec.Type == nil {
 		volume.Spec.Type = util.StringPtr("qcow2")
 	}
+
+	// QCOW2ボリュームの場合、パスを決定する。OSとDATAでパスを分ける。OSはboot-<id>.qcow2、DATAはdata-<id>.qcow2
 	if *volume.Spec.Type == "qcow2" {
-		volume.Spec.Path = util.StringPtr(fmt.Sprintf("/var/lib/marmot/volumes/%s.qcow2", volume.Id))
+		if *volume.Spec.Kind == "os" {
+			volume.Spec.Path = util.StringPtr(fmt.Sprintf("/var/lib/marmot/volumes/boot-%s.qcow2", volume.Id))
+		} else {
+			volume.Spec.Path = util.StringPtr(fmt.Sprintf("/var/lib/marmot/volumes/data-%s.qcow2", volume.Id))
+		}
 	}
 
 	// LVMボリュームの場合、パスを決定する
@@ -125,7 +131,7 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 		}
 	}
 
-	// OSボリュームの場合、OsVariantのデフォルト値を設定する
+	// OSボリュームの場合、OsVariantのデフォルト値を設定する  必要か？
 	if *volume.Spec.Kind == "os" {
 		if volume.Spec.OsVariant == nil {
 			volume.Spec.OsVariant = util.StringPtr("ubuntu22.04")
