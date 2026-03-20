@@ -79,12 +79,13 @@ type JobSpec struct {
 
 // Metadata defines model for Metadata.
 type Metadata struct {
-	Comment      *string `json:"comment,omitempty"`
-	Id           *string `json:"id,omitempty"`
-	InstanceName *string `json:"instanceName,omitempty"`
-	Key          *string `json:"key,omitempty"`
-	Name         *string `json:"name,omitempty"`
-	Uuid         *string `json:"uuid,omitempty"`
+	Comment      *string                 `json:"comment,omitempty"`
+	Id           *string                 `json:"id,omitempty"`
+	InstanceName *string                 `json:"instanceName,omitempty"`
+	Key          *string                 `json:"key,omitempty"`
+	Labels       *map[string]interface{} `json:"labels,omitempty"`
+	Name         *string                 `json:"name,omitempty"`
+	Uuid         *string                 `json:"uuid,omitempty"`
 }
 
 // Nameservers defines model for Nameservers.
@@ -232,6 +233,9 @@ type UpdateNetworkByIdJSONRequestBody = VirtualNetwork
 // CreateServerJSONRequestBody defines body for CreateServer for application/json ContentType.
 type CreateServerJSONRequestBody = Server
 
+// CreateImageFromServerByIdJSONRequestBody defines body for CreateImageFromServerById for application/json ContentType.
+type CreateImageFromServerByIdJSONRequestBody = Image
+
 // UpdateServerByIdJSONRequestBody defines body for UpdateServerById for application/json ContentType.
 type UpdateServerByIdJSONRequestBody = Server
 
@@ -288,6 +292,9 @@ type ServerInterface interface {
 	// Get particular server Information
 	// (GET /server/{id})
 	GetServerById(ctx echo.Context, id string) error
+	// Create image from Server Object by Id
+	// (POST /server/{id})
+	CreateImageFromServerById(ctx echo.Context, id string) error
 	// Update Server Information by Id
 	// (PUT /server/{id})
 	UpdateServerById(ctx echo.Context, id string) error
@@ -507,6 +514,22 @@ func (w *ServerInterfaceWrapper) GetServerById(ctx echo.Context) error {
 	return err
 }
 
+// CreateImageFromServerById converts echo context to params.
+func (w *ServerInterfaceWrapper) CreateImageFromServerById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.CreateImageFromServerById(ctx, id)
+	return err
+}
+
 // UpdateServerById converts echo context to params.
 func (w *ServerInterfaceWrapper) UpdateServerById(ctx echo.Context) error {
 	var err error
@@ -641,6 +664,7 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.POST(baseURL+"/server", wrapper.CreateServer)
 	router.DELETE(baseURL+"/server/:id", wrapper.DeleteServerById)
 	router.GET(baseURL+"/server/:id", wrapper.GetServerById)
+	router.POST(baseURL+"/server/:id", wrapper.CreateImageFromServerById)
 	router.PUT(baseURL+"/server/:id", wrapper.UpdateServerById)
 	router.GET(baseURL+"/version", wrapper.GetVersion)
 	router.GET(baseURL+"/volume", wrapper.ListVolumes)

@@ -268,6 +268,36 @@ paths:
               application/json:
                 schema:
                   $ref: "#/components/schemas/Error"
+      post:
+        summary: "Create image from Server Object by Id"
+        operationId: createImageFromServerById
+        tags:
+          - server
+        parameters:
+          - name: id
+            in: path
+            required: true
+            description: The id of the server to create an image from running server
+            schema:
+              type: string
+        requestBody:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Image"
+        responses:
+          "200":
+            description: Successfully created an image from the server
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Success"
+          default:
+            description: unexpected error
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Error"
   /network:
     post:
       summary: "Create Virtual Network"
@@ -694,6 +724,13 @@ components:
           type: string
         comment:
           type: string
+        labels:
+          type: object
+          additonalProperties:
+            type: string
+          example:
+            key1: "value1"
+            key2: "value2"
     ServerSpec:
       type: object
       properties:

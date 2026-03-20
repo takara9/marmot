@@ -83,31 +83,36 @@ func (d *Database) CreateImageFromURL(name, url string) (string, error) {
 }
 
 // ブートボリュームからイメージを作成する
-func (d *Database) CreateImageFromVolume(name string, volumeId string) (api.Image, error) {
-	slog.Debug("CreateImageFromVolume() called", "name", name, "volumeId", volumeId)
+func (d *Database) CreateImageFromServer(serverId, name string) (api.Image, error) {
+	slog.Debug("CreateImageFromServer() called", "name", name, "serverId", serverId)
 
 	//一意なIDを発行
 	id, err := d.getUniqueImageID()
 	if err != nil {
-		slog.Error("CreateImageFromVolume()", "err", err)
+		slog.Error("CreateImageFromServer()", "err", err)
 		return api.Image{}, err
 	}
 
-	vol, err := d.GetVolumeById(volumeId)
+	server, err := d.GetServerById(serverId)
 	if err != nil {
-		slog.Error("CreateImageFromVolume() failed to get volume by id", "err", err, "volumeId", volumeId)
+		slog.Error("CreateImageFromServer() failed to get server by id", "err", err, "serverId", serverId)
 		return api.Image{}, err
 	}
+	bootVol := server.Spec.BootVolume
 
 	// ボリュームがOSボリュームであることを確認
-	if *vol.Spec.Kind != "os" {
-		slog.Error("CreateImageFromVolume() volume is not an OS volume", "volumeId", volumeId)
-		return api.Image{}, fmt.Errorf("volume with id %v is not an OS volume", volumeId)
+	if *bootVol.Spec.Kind != "os" {
+		slog.Error("CreateImageFromVolume() volume is not an OS volume", "volumeId", bootVol.Id)
+		return api.Image{}, fmt.Errorf("volume with id %v is not an OS volume", bootVol.Id)
 	}
 
 	//イメージの基本情報を保存
+	labels := map[string]interface{}{
+		"source":   "bootVolume",
+		"serverId": serverId,
+	}
 	var img api.Image
-	if vol.Spec.Type != nil && *vol.Spec.Type == "qcow2" {
+	if bootVol.Spec.Type != nil && *bootVol.Spec.Type == "qcow2" {
 		// イメージを書き込むディレクトリの作成
 		imageDir := fmt.Sprintf("/var/lib/marmot/images/%s", id)
 		if err := os.MkdirAll(imageDir, 0755); err != nil {
@@ -119,39 +124,41 @@ func (d *Database) CreateImageFromVolume(name string, volumeId string) (api.Imag
 		img = api.Image{
 			Id: id,
 			Metadata: &api.Metadata{
-				Name: &name,
+				Name:   &name,
+				Labels: &labels,
 			},
 			Spec: &api.ImageSpec{
-				Kind:          vol.Spec.Kind, // ポインタの値を直接使用
-				Type:          vol.Spec.Type,
+				Kind:          bootVol.Spec.Kind, // ポインタの値を直接使用
+				Type:          bootVol.Spec.Type,
 				VolumeGroup:   nil,
 				LogicalVolume: nil,
 				LvPath:        nil,
 				Qcow2Path:     util.StringPtr(imagePath),
-				Size:          vol.Spec.Size,
+				Size:          bootVol.Spec.Size,
 				SourceUrl:     nil,
 			},
 			Status: &api.Status{
 				Status: util.IntPtrInt(IMAGE_PENDING),
 			},
 		}
-	} else if vol.Spec.Type != nil && *vol.Spec.Type == "lvm" {
+	} else if bootVol.Spec.Type != nil && *bootVol.Spec.Type == "lvm" {
 		// イメージの論理ボリューム名を設定
-		logicalVolumePath := fmt.Sprintf("/dev/%s/osimage-%s", *vol.Spec.VolumeGroup, id)
+		logicalVolumePath := fmt.Sprintf("/dev/%s/osimage-%s", *bootVol.Spec.VolumeGroup, id)
 		logicalVolumeName := fmt.Sprintf("osimage-%s", id)
 		img = api.Image{
 			Id: id,
 			Metadata: &api.Metadata{
-				Name: &name,
+				Name:   &name,
+				Labels: &labels,
 			},
 			Spec: &api.ImageSpec{
-				Kind:          vol.Spec.Kind, // ポインタの値を直接使用
-				Type:          vol.Spec.Type,
-				VolumeGroup:   vol.Spec.VolumeGroup,
+				Kind:          bootVol.Spec.Kind, // ポインタの値を直接使用
+				Type:          bootVol.Spec.Type,
+				VolumeGroup:   bootVol.Spec.VolumeGroup,
 				LogicalVolume: util.StringPtr(logicalVolumeName),
 				LvPath:        util.StringPtr(logicalVolumePath),
 				Qcow2Path:     nil,
-				Size:          vol.Spec.Size,
+				Size:          bootVol.Spec.Size,
 				SourceUrl:     nil,
 			},
 			Status: &api.Status{
@@ -159,8 +166,8 @@ func (d *Database) CreateImageFromVolume(name string, volumeId string) (api.Imag
 			},
 		}
 	} else {
-		slog.Error("CreateImageFromVolume() unsupported volume type", "volumeId", volumeId, "type", vol.Spec.Type)
-		return api.Image{}, fmt.Errorf("unsupported volume type for volume with id %v: %v", volumeId, vol.Spec.Type)
+		slog.Error("CreateImageFromVolume() unsupported volume type", "volumeId", bootVol.Id, "type", bootVol.Spec.Type)
+		return api.Image{}, fmt.Errorf("unsupported volume type for volume with id %v: %v", bootVol.Id, bootVol.Spec.Type)
 	}
 
 	key := ImagePrefix + "/" + id

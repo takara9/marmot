@@ -537,9 +537,6 @@ func (m *Marmot) GetServerById(id string) (api.Server, error) {
 		slog.Error("GetServerById()", "err", err)
 		return api.Server{}, err
 	}
-	// ここで BootVolumeのIDがセットできていない理由を調べる!
-	slog.Debug("GetServerById()", "server boot volume id", serverSpec.Spec.BootVolume.Id)
-	slog.Debug("GetServerById()", "server", serverSpec)
 
 	return serverSpec, nil
 }
@@ -594,33 +591,32 @@ func (m *Marmot) CreateNewVolumeWithWait(volReq api.Volume) (api.Volume, error) 
 }
 
 // サーバーから起動イメージの作成
-func (m *Marmot) CreateImageFromServer(id, name string) (string, error) {
-	slog.Debug("===CreateImageFromServer is called===", "server id", id)
+func (m *Marmot) CreateImageFromServer(serverId, name string, image api.Image) (string, error) {
+	slog.Debug("===CreateImageFromServer is called===", "server id", serverId)
 	// サーバーの情報を取得
-	serverSpec, err := m.Db.GetServerById(id)
+	serverSpec, err := m.Db.GetServerById(serverId)
 	if err != nil {
-		slog.Error("GetServerById()", "err", err)
+		slog.Error("GetServerById()", "err", err, "server id", serverId)
 		return "", err
 	}
 
 	// ブートボリュームのIDを取得
-	slog.Debug("CreateImageFromServer()", "boot volume id", serverSpec.Spec.BootVolume.Id)
+	//slog.Debug("CreateImageFromServer()", "boot volume id", serverSpec.Spec.BootVolume.Id)
 
 	// ブートボリュームの情報を取得
 	bootVol, err := m.GetVolumeById(serverSpec.Spec.BootVolume.Id)
 	if err != nil {
-		slog.Error("GetVolumeById()", "err", err)
+		slog.Error("GetVolumeById()", "err", err, "volume id", serverSpec.Spec.BootVolume.Id)
 		return "", err
 	}
-
-	slog.Debug("CreateImageFromServer()", "boot volume", bootVol.Spec.Path)
+	//slog.Debug("CreateImageFromServer()", "boot volume", bootVol.Spec.Path)
 
 	// イメージIDの取得、名前チェック
-	image, err := m.Db.CreateImageFromVolume(name, bootVol.Id)
-	if err != nil {
-		slog.Error("CreateImageFromVolume()", "err", err)
-		return "", err
-	}
+	//image, err := m.Db.CreateImageFromServer(serverId, name)
+	//if err != nil {
+	//	slog.Error("CreateImageFromServer()", "err", err, "server id", serverId)
+	//	return "", err
+	//}
 
 	// 仮想マシンの一時停止
 	if err := m.Virt.SuspendDomain(*serverSpec.Metadata.InstanceName); err != nil {
@@ -661,7 +657,7 @@ func (m *Marmot) CreateImageFromServer(id, name string) (string, error) {
 	}
 
 	// イメージ情報の登録
-	m.Db.SetImageStatus(image.Id, db.IMAGE_CREATING)
+	m.Db.SetImageStatus(image.Id, db.IMAGE_AVAILABLE)
 
 	return image.Id, nil
 }
