@@ -79,12 +79,13 @@ type JobSpec struct {
 
 // Metadata defines model for Metadata.
 type Metadata struct {
-	Comment      *string `json:"comment,omitempty"`
-	Id           *string `json:"id,omitempty"`
-	InstanceName *string `json:"instanceName,omitempty"`
-	Key          *string `json:"key,omitempty"`
-	Name         *string `json:"name,omitempty"`
-	Uuid         *string `json:"uuid,omitempty"`
+	Comment      *string                 `json:"comment,omitempty"`
+	Id           *string                 `json:"id,omitempty"`
+	InstanceName *string                 `json:"instanceName,omitempty"`
+	Key          *string                 `json:"key,omitempty"`
+	Labels       *map[string]interface{} `json:"labels,omitempty"`
+	Name         *string                 `json:"name,omitempty"`
+	Uuid         *string                 `json:"uuid,omitempty"`
 }
 
 // Nameservers defines model for Nameservers.
@@ -233,7 +234,7 @@ type UpdateNetworkByIdJSONRequestBody = VirtualNetwork
 type CreateServerJSONRequestBody = Server
 
 // CreateImageFromServerByIdJSONRequestBody defines body for CreateImageFromServerById for application/json ContentType.
-type CreateImageFromServerByIdJSONRequestBody = Server
+type CreateImageFromServerByIdJSONRequestBody = Image
 
 // UpdateServerByIdJSONRequestBody defines body for UpdateServerById for application/json ContentType.
 type UpdateServerByIdJSONRequestBody = Server

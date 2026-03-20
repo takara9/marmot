@@ -2,6 +2,7 @@ package marmotd
 
 import (
 	_ "embed"
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -99,8 +100,35 @@ func (s *Server) UpdateServerById(ctx echo.Context, id string) error {
 }
 
 // サーバーからイメージを作成
-func (s *Server) CreateImageFromServerById(ctx echo.Context, id string) error {
-	slog.Debug("=== CreateImageFromServerById() is called ===", "id", id)
-	// Implement the logic to create an image from the server by ID
-	return ctx.JSON(http.StatusOK, api.Success{Id: id, Message: util.StringPtr("Image created successfully from server")})
+func (s *Server) CreateImageFromServerById(ctx echo.Context, serverId string) error {
+	slog.Debug("=== CreateImageFromServerById() is called ===", "id", serverId)
+
+	// イメージのリクエストをDBへ登録、実際の処理はコントローラーに委ねる
+	var image api.Image
+	if err := ctx.Bind(&image); err != nil {
+		slog.Error("DeleteServerById()", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	// serverIdから、ブートボリュームIDを取得
+	server, err := s.Ma.GetServerById(serverId)
+	if err != nil {
+		slog.Error("GetServerById()", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	// 新しいイメージ名の有無チェック
+	if image.Metadata.Name == nil && len(*image.Metadata.Name) > 0 {
+		slog.Error("Image name is not set, it must set for new image", "err", err)
+		err := fmt.Errorf("Must set image name")
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	// イメージ作成の登録
+	if _, err := s.Ma.Db.CreateImageFromServer(server.Id, *image.Metadata.Name); err != nil {
+		slog.Error("Image name is not set, it must set for new image", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	return ctx.JSON(http.StatusOK, api.Success{Id: serverId, Message: util.StringPtr("Image created successfully from server")})
 }

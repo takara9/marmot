@@ -91,7 +91,7 @@ func (d *Database) GetServerById(id string) (api.Server, error) {
 	var server api.Server
 	_, err := d.GetJSON(key, &server)
 	if err != nil {
-		slog.Error("GetServerById()", "err", err)
+		slog.Error("GetServerById()", "err", err, "key", key)
 		return api.Server{}, err
 	}
 	return server, nil

@@ -105,7 +105,7 @@ func (m *MarmotEndpoint) GetServers() ([]byte, *url.URL, error) {
 	return m.httpRequest2(req)
 }
 
-func (m *MarmotEndpoint) CreateImageFromServerById(id string) ([]byte, *url.URL, error) {
+func (m *MarmotEndpoint) CreateImageFromServerById(id, name string) ([]byte, *url.URL, error) {
 	slog.Debug("===", "CreateImageFromServerById is called", "===")
 	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/server/"+id)
 	if err != nil {
@@ -113,10 +113,20 @@ func (m *MarmotEndpoint) CreateImageFromServerById(id string) ([]byte, *url.URL,
 	}
 	slog.Debug("CreateImageFromServerById", "reqURL", reqURL)
 
-	req, err := http.NewRequest("POST", reqURL, nil)
+	var image api.Image
+	var meta api.Metadata
+	image.Metadata = &meta
+	image.Metadata.Name = &name
+
+	byteJSON, err := json.Marshal(image)
 	if err != nil {
 		return nil, nil, err
 	}
+
+	req, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
+	if err != nil {
+		return nil, nil, err
+	}
+
 	return m.httpRequest2(req)
 }
-

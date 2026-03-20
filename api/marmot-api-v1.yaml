@@ -284,7 +284,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Server"
+                $ref: "#/components/schemas/Image"
         responses:
           "200":
             description: Successfully created an image from the server
@@ -724,6 +724,13 @@ components:
           type: string
         comment:
           type: string
+        labels:
+          type: object
+          additonalProperties:
+            type: string
+          example:
+            key1: "value1"
+            key2: "value2"
     ServerSpec:
       type: object
       properties:

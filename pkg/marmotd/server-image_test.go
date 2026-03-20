@@ -309,7 +309,9 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 		})
 
 		It("イメージの作成", func() {
-			imageId, err := marmotServer.Ma.CreateImageFromServer(id, "image-1")
+			img, err := marmotServer.Ma.Db.CreateImageFromServer(id, "image-1")
+			Expect(err).NotTo(HaveOccurred())
+			imageId, err := marmotServer.Ma.CreateImageFromServer(id, "image-1", img)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created image ID: ", imageId)
 			image, err := marmotServer.Ma.Db.GetImage(imageId)
@@ -451,7 +453,9 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 		})
 
 		It("LVイメージ取得", func() {
-			imageId, err := marmotServer.Ma.CreateImageFromServer(id, "image-2")
+			img, err := marmotServer.Ma.Db.CreateImageFromServer(id, "image-2")
+			Expect(err).NotTo(HaveOccurred())
+			imageId, err := marmotServer.Ma.CreateImageFromServer(id, "image-2", img)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created image ID: ", imageId)
 			image, err := marmotServer.Ma.Db.GetImage(imageId)

@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"encoding/json"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -50,7 +52,6 @@ func (c *controller) imageControllerLoop() {
 	}
 
 	for _, image := range imgaes {
-
 		// 削除タイムスタンプの処理
 		// 削除のタイムスタンプが一定時間以上経過しているかをチェックして、削除処理を実行する
 		if image.Status != nil && image.Status.DeletionTimeStamp != nil {
@@ -61,14 +62,28 @@ func (c *controller) imageControllerLoop() {
 			}
 		}
 
-		slog.Info("イメージの状態を確認", "image", *image.Metadata.Name, "state", *image.Status.Status)
+		jsonBytes, err := json.MarshalIndent(image, "", "    ")
+		if err != nil {
+			slog.Error("failed to marshal image", "err", err)
+			continue
+		}
+		slog.Debug("イメージの状態を確認", "image", *image.Metadata.Name, "state", db.ImageStatus[*image.Status.Status])
+		fmt.Println("details", string(jsonBytes))
+
 		// イメージの状態に応じた処理
 		switch *image.Status.Status {
 		case db.IMAGE_PENDING:
 			slog.Info("イメージの作成処理を実行", "image", *image.Metadata.Name)
-			// イメージの作成を開始し、状態を IMAGE_CREATING に更新
 			c.marmot.UpdateImageStatus(image.Id, db.IMAGE_CREATING)
-			go c.marmot.CreateNewImage(image.Id)
+			// ラベルの存在をチェック,
+			if image.Metadata.Labels == nil || (*image.Metadata.Labels)["source"] == "bootVolume" {
+				slog.Info("イメージの作成処理を実行", "image", *image.Metadata.Name, "source", "bootVolume")
+				serverId := (*image.Metadata.Labels)["serverId"].(string)
+				go c.marmot.CreateImageFromServer(serverId, *image.Metadata.Name, image)
+			} else {
+				slog.Info("イメージの作成処理を実行", "image", *image.Metadata.Name, "source", "url")
+				go c.marmot.CreateNewImage(image.Id)
+			}
 		case db.IMAGE_CREATING:
 			slog.Info("イメージの作成処理を継続", "image", *image.Metadata.Name)
 			// ここにイメージの作成処理の継続を実装

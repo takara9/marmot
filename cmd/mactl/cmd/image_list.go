@@ -40,10 +40,27 @@ var imageListCmd = &cobra.Command{
 			for i, image := range data {
 				fmt.Printf("  %2d", i+1)
 				fmt.Printf("  %-8v", image.Id)
-				fmt.Printf("  %-16v", *image.Metadata.Name)
-				fmt.Printf("  %-12v", db.ImageStatus[*image.Status.Status])
-				fmt.Printf("  %-20v", *image.Spec.LvPath)
-				fmt.Printf("  %-40v", *image.Spec.Qcow2Path)
+				if image.Metadata.Name != nil {
+					fmt.Printf("  %-16v", *image.Metadata.Name)
+				} else {
+					fmt.Printf("  %-16v", "N/A")
+				}
+				if image.Status.Status != nil {
+					fmt.Printf("  %-12v", db.ImageStatus[*image.Status.Status])
+				} else {
+					fmt.Printf("  %-12v", "N/A")
+				}
+				if image.Spec.LvPath != nil {
+					fmt.Printf("  %-20v", *image.Spec.LvPath)
+				} else {
+					fmt.Printf("  %-20v", "N/A")
+				}
+				if image.Spec.Qcow2Path != nil {
+					fmt.Printf("  %-40v", *image.Spec.Qcow2Path)
+				} else {
+					fmt.Printf("  %-40v", "N/A")
+				}
+
 				fmt.Println()
 			}
 			return nil
