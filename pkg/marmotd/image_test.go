@@ -131,13 +131,13 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 			var err error
 			GinkgoWriter.Println("URLを指定してイメージのIDを取得")
 			url := "https://cloud-images.ubuntu.com/releases/jammy/release-20260218/ubuntu-22.04-server-cloudimg-amd64.img"
-			id, err = marmotServer.Ma.Db.CreateImageFromURL("ubuntu-22.04", url)
+			id, err = marmotServer.Ma.Db.MakeImageEntryFromURL("ubuntu-22.04", url)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("取得したイメージID: ", id)
 		})
 
 		It("ダウンロードとセットアップ", func() {
-			image, err := marmotServer.Ma.CreateNewImage(id)
+			image, err := marmotServer.Ma.CreateNewImageManage(id)
 			Expect(err).NotTo(HaveOccurred())
 			jsonBytes, err := json.MarshalIndent(image, "", "  ")
 			Expect(err).NotTo(HaveOccurred())
@@ -151,13 +151,13 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 			var err error
 			GinkgoWriter.Println("URLを指定してイメージのIDを取得")
 			url := "https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img"
-			id, err = marmotServer.Ma.Db.CreateImageFromURL("ubuntu-24.04", url)
+			id, err = marmotServer.Ma.Db.MakeImageEntryFromURL("ubuntu-24.04", url)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("取得したイメージID: ", id)
 		})
 
 		It("ダウンロードとセットアップ", func() {
-			image, err := marmotServer.Ma.CreateNewImage(id)
+			image, err := marmotServer.Ma.CreateNewImageManage(id)
 			Expect(err).NotTo(HaveOccurred())
 			jsonBytes, err := json.MarshalIndent(image, "", "  ")
 			Expect(err).NotTo(HaveOccurred())
@@ -170,7 +170,7 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 
 		It("イメージのリスト取得", func() {
 			var err error
-			images, err = marmotServer.Ma.GetImages()
+			images, err = marmotServer.Ma.GetImagesManage()
 			Expect(err).NotTo(HaveOccurred())
 			for _, image := range images {
 				fmt.Println("ID", image.Id, "Name", *image.Metadata.Name)
@@ -178,7 +178,7 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 		})
 
 		It("イメージの詳細情報取得 -1", func() {
-			image, err := marmotServer.Ma.GetImage((images)[0].Id)
+			image, err := marmotServer.Ma.GetImageManage((images)[0].Id)
 			Expect(err).NotTo(HaveOccurred())
 			jsonBytes, err := json.MarshalIndent(image, "", "    ")
 			Expect(err).NotTo(HaveOccurred())
@@ -186,7 +186,7 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 		})
 
 		It("イメージの詳細情報取得 -2", func() {
-			image, err := marmotServer.Ma.GetImage((images)[1].Id)
+			image, err := marmotServer.Ma.GetImageManage((images)[1].Id)
 			Expect(err).NotTo(HaveOccurred())
 			jsonBytes, err := json.MarshalIndent(image, "", "    ")
 			Expect(err).NotTo(HaveOccurred())
@@ -194,17 +194,17 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 		})
 
 		It("イメージの削除 -1", func() {
-			err := marmotServer.Ma.DeleteImage((images)[0].Id)
+			err := marmotServer.Ma.DeleteImageManage((images)[0].Id)
 			Expect(err).NotTo(HaveOccurred())
-			_, err = marmotServer.Ma.GetImage((images)[0].Id)
+			_, err = marmotServer.Ma.GetImageManage((images)[0].Id)
 			Expect(err).To(HaveOccurred())
 			fmt.Println("Deleted image ID: ", (images)[0].Id)
 		})
 
 		It("イメージの削除 -2", func() {
-			err := marmotServer.Ma.DeleteImage((images)[1].Id)
+			err := marmotServer.Ma.DeleteImageManage((images)[1].Id)
 			Expect(err).NotTo(HaveOccurred())
-			_, err = marmotServer.Ma.GetImage((images)[1].Id)
+			_, err = marmotServer.Ma.GetImageManage((images)[1].Id)
 			Expect(err).To(HaveOccurred())
 			fmt.Println("Deleted image ID: ", (images)[1].Id)
 		})

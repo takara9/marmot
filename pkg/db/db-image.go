@@ -50,13 +50,13 @@ func (d *Database) getUniqueImageID() (string, error) {
 }
 
 // URLのイメージをダウンロードして、それからイメージを作成する
-func (d *Database) CreateImageFromURL(name, url string) (string, error) {
-	slog.Debug("CreateImageFromURL() called", "name", name, "url", url)
+func (d *Database) MakeImageEntryFromURL(name, url string) (string, error) {
+	slog.Debug("MakeImageEntryFromURL() called", "name", name, "url", url)
 
 	//一意なIDを発行
 	id, err := d.getUniqueImageID()
 	if err != nil {
-		slog.Error("CreateImageFromURL()", "err", err)
+		slog.Error("MakeImageEntryFromURL()", "err", err)
 		return "", err
 	}
 
@@ -75,7 +75,7 @@ func (d *Database) CreateImageFromURL(name, url string) (string, error) {
 	}
 	key := ImagePrefix + "/" + id
 	if err := d.PutJSON(key, img); err != nil {
-		slog.Error("CreateImageFromURL()", "err", err)
+		slog.Error("MakeImageEntryFromURL()", "err", err)
 		return "", err
 	}
 
@@ -83,26 +83,26 @@ func (d *Database) CreateImageFromURL(name, url string) (string, error) {
 }
 
 // ブートボリュームからイメージを作成する
-func (d *Database) CreateImageFromServer(serverId, name string) (api.Image, error) {
-	slog.Debug("CreateImageFromServer() called", "name", name, "serverId", serverId)
+func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image, error) {
+	slog.Debug("MakeImageEntryFromRunningVM() called", "name", name, "serverId", serverId)
 
 	//一意なIDを発行
 	id, err := d.getUniqueImageID()
 	if err != nil {
-		slog.Error("CreateImageFromServer()", "err", err)
+		slog.Error("MakeImageEntryFromRunningVM()", "err", err)
 		return api.Image{}, err
 	}
 
 	server, err := d.GetServerById(serverId)
 	if err != nil {
-		slog.Error("CreateImageFromServer() failed to get server by id", "err", err, "serverId", serverId)
+		slog.Error("MakeImageEntryFromRunningVM() failed to get server by id", "err", err, "serverId", serverId)
 		return api.Image{}, err
 	}
 	bootVol := server.Spec.BootVolume
 
 	// ボリュームがOSボリュームであることを確認
 	if *bootVol.Spec.Kind != "os" {
-		slog.Error("CreateImageFromVolume() volume is not an OS volume", "volumeId", bootVol.Id)
+		slog.Error("MakeImageEntryFromRunningVM() volume is not an OS volume", "volumeId", bootVol.Id)
 		return api.Image{}, fmt.Errorf("volume with id %v is not an OS volume", bootVol.Id)
 	}
 
@@ -166,13 +166,13 @@ func (d *Database) CreateImageFromServer(serverId, name string) (api.Image, erro
 			},
 		}
 	} else {
-		slog.Error("CreateImageFromVolume() unsupported volume type", "volumeId", bootVol.Id, "type", bootVol.Spec.Type)
+		slog.Error("MakeImageEntryFromRunningVM() unsupported volume type", "volumeId", bootVol.Id, "type", bootVol.Spec.Type)
 		return api.Image{}, fmt.Errorf("unsupported volume type for volume with id %v: %v", bootVol.Id, bootVol.Spec.Type)
 	}
 
 	key := ImagePrefix + "/" + id
 	if err := d.PutJSON(key, img); err != nil {
-		slog.Error("CreateImageFromVolume()", "err", err)
+		slog.Error("MakeImageEntryFromRunningVM()", "err", err)
 		return api.Image{}, err
 	}
 

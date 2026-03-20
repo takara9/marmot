@@ -67,7 +67,7 @@ var _ = Describe("Servers", Ordered, func() {
 						Memory: util.IntPtrInt(4096),
 					},
 				}
-				serverSpec, err = v.CreateServer(*server)
+				serverSpec, err = v.MakeServerEntry(*server)
 				Expect(err).NotTo(HaveOccurred())
 				fmt.Println("Created server with ID:", serverSpec.Id)
 			})
@@ -108,7 +108,7 @@ var _ = Describe("Servers", Ordered, func() {
 						Memory: util.IntPtrInt(4096),
 					},
 				}
-				serverSpec, err = v.CreateServer(*server)
+				serverSpec, err = v.MakeServerEntry(*server)
 				Expect(err).NotTo(HaveOccurred())
 				fmt.Println("Created server with ID:", serverSpec.Id)
 			})
@@ -123,7 +123,7 @@ var _ = Describe("Servers", Ordered, func() {
 						Memory: util.IntPtrInt(4096),
 					},
 				}
-				serverSpec, err = v.CreateServer(*server)
+				serverSpec, err = v.MakeServerEntry(*server)
 				Expect(err).NotTo(HaveOccurred())
 				fmt.Println("Created server with ID:", serverSpec.Id)
 			})

@@ -20,7 +20,7 @@ paths:
   /version:
     get:
       summary: "Get Version"
-      operationId: getVersion
+      operationId: apiGetVersion
       tags:
         - version
       responses:
@@ -33,7 +33,7 @@ paths:
   /ping:
     get:
       summary: "Alive"
-      operationId: replyPing
+      operationId: apiReplyPing
       tags:
         - alive
       responses:
@@ -46,7 +46,7 @@ paths:
   /volume:
     post:
       summary: "Create Volume"
-      operationId: createVolume
+      operationId: apiCreateVolume
       tags:
         - storage
       requestBody:
@@ -65,7 +65,7 @@ paths:
                 $ref: "#/components/schemas/Error"
     get:
       summary: "List Volumes"
-      operationId: listVolumes
+      operationId: apiListVolumes
       tags:
         - storage
       responses:
@@ -78,7 +78,7 @@ paths:
   /volume/{volumeId}:
     get:
       summary: "Info for a specific volume"
-      operationId: showVolumeById
+      operationId: apiShowVolumeById
       tags:
         - storage
       parameters:
@@ -90,7 +90,7 @@ paths:
             type: string
     put:
       summary: "Update Volume"
-      operationId: updateVolumeById
+      operationId: apiUpdateVolumeById
       tags:
         - storage
       parameters:
@@ -116,7 +116,7 @@ paths:
                 $ref: "#/components/schemas/Error"
     delete:
       summary: "Delete Volume"
-      operationId: deleteVolumeById
+      operationId: apiDeleteVolumeById
       tags:
         - storage
       parameters:
@@ -144,7 +144,7 @@ paths:
         The virtual server is then automatically started.
         The virtual server specifications include CPU, memory, storage, network settings, and more.
         If an error occurs during virtual server creation, an appropriate error message is returned.
-      operationId: createServer
+      operationId: apiCreateServer
       tags:
         - server
       requestBody:
@@ -171,7 +171,7 @@ paths:
         Retrieve information about existing virtual servers. A list of virtual servers is returned in the response.
         Each virtual server's information includes server ID, status, resource usage, and more.
         If no virtual servers exist or an error occurs while retrieving information, an appropriate error message is returned.
-      operationId: getServers
+      operationId: apiGetServers
       tags:
         - server
       responses:
@@ -190,7 +190,7 @@ paths:
   /server/{id}:
       get:
         summary: "Get particular server Information"
-        operationId: getServerById
+        operationId: apiGetServerById
         tags:
           - server
         parameters:
@@ -215,7 +215,7 @@ paths:
                   $ref: "#/components/schemas/Error"
       put:
         summary: "Update Server Information by Id"
-        operationId: updateServerById
+        operationId: apiUpdateServerById
         tags:
           - server
         parameters:
@@ -245,7 +245,7 @@ paths:
                   $ref: "#/components/schemas/Error"
       delete:
         summary: "Delete Server"
-        operationId: deleteServerById
+        operationId: apiDeleteServerById
         tags:
           - server
         parameters:
@@ -270,7 +270,7 @@ paths:
                   $ref: "#/components/schemas/Error"
       post:
         summary: "Create image from Server Object by Id"
-        operationId: createImageFromServerById
+        operationId: apiMakeImageEntryFromRunningVMById
         tags:
           - server
         parameters:
@@ -306,7 +306,7 @@ paths:
         If the virtual network is successfully created, the information of the created virtual network is returned in the response.
         The virtual network specifications include network name, IP address range, DHCP settings, and more.
         If an error occurs during virtual network creation, an appropriate error message is returned.
-      operationId: createNetwork
+      operationId: apiCreateNetwork
       tags:
         - network
         - virtual-network
@@ -334,7 +334,7 @@ paths:
         Retrieve information about existing virtual networks. A list of virtual networks is returned in the response.
         Each virtual network's information includes network ID, status, IP address range, DHCP settings, and more.
         If no virtual networks exist or an error occurs while retrieving information, an appropriate error message is returned.
-      operationId: getNetworks
+      operationId: apiGetNetworks
       tags:
         - network
       responses:
@@ -353,7 +353,7 @@ paths:
   /network/{id}:
       get:
         summary: "Get particular virtual network Information"
-        operationId: getNetworkById
+        operationId: apiGetNetworkById
         tags:
           - network
           - virtual-network
@@ -379,7 +379,7 @@ paths:
                   $ref: "#/components/schemas/Error"
       put:
         summary: "Update Virtual Network Information by Id"
-        operationId: updateNetworkById
+        operationId: apiUpdateNetworkById
         tags:
           - network
           - virtual-network
@@ -410,7 +410,7 @@ paths:
                   $ref: "#/components/schemas/Error"
       delete:
         summary: "Delete Virtual Network"
-        operationId: deleteNetworkById
+        operationId: apiDeleteNetworkById
         tags:
           - network
           - virtual-network
@@ -437,7 +437,7 @@ paths:
   /image:
     post:
       summary: "Create Image"
-      operationId: createImage
+      operationId: apiCreateImage
       tags:
         - storage
       requestBody:
@@ -456,7 +456,7 @@ paths:
                 $ref: "#/components/schemas/Error"
     get:
       summary: "List Images"
-      operationId: getImages
+      operationId: apiGetImages
       tags:
         - storage
       responses:
@@ -469,7 +469,7 @@ paths:
   /image/{id}:
       get:
         summary: "Info for a specific image"
-        operationId: getImageById
+        operationId: apiGetImageById
         tags:
           - image
         parameters:
@@ -481,7 +481,7 @@ paths:
               type: string
       put:
         summary: "Update Image"
-        operationId: updateImageById
+        operationId: apiUpdateImageById
         tags:
           - image
         parameters:
@@ -507,7 +507,7 @@ paths:
                   $ref: "#/components/schemas/Error"
       delete:
         summary: "Delete Image"
-        operationId: deleteImageById
+        operationId: apiDeleteImageById
         tags:
           - image
         parameters:
@@ -519,7 +519,7 @@ paths:
               type: string
         responses:
           "200":
-            description: Deleted the Volume
+            description: Deleted the Image
           default:
             description: unexpected error
             content:

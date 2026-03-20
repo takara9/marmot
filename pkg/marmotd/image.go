@@ -26,9 +26,8 @@ const (
 	IMAGE_POOL = "/var/lib/marmot/images"
 )
 
-// CreateNewImage は、指定されたIDのイメージを新規作成する関数
-// コントローラーから呼び出されることを想定している
-func (m *Marmot) CreateNewImage(id string) (*api.Image, error) {
+// CreateNewImage は、指定されたIDのイメージを新規作成する関数 	コントローラーで使用
+func (m *Marmot) CreateNewImageManage(id string) (*api.Image, error) {
 	slog.Debug("Creating image", "imgId", id)
 
 	// /var/lib/marmot/imagesの存在をチェックして、無ければ作成する
@@ -133,17 +132,20 @@ func (m *Marmot) UpdateImageStatus(id string, status int) error {
 	return nil
 }
 
-func (m *Marmot) GetImages() ([]api.Image, error) {
+// イメージ群を取得する関数 （ラップ関数）
+func (m *Marmot) GetImagesManage() ([]api.Image, error) {
 	slog.Debug("Getting images")
 	return m.Db.GetImages()
 }
 
-func (m *Marmot) GetImage(id string) (api.Image, error) {
+// 指定したIDのイメージを取得する関数 （ラップ関数）
+func (m *Marmot) GetImageManage(id string) (api.Image, error) {
 	slog.Debug("Getting image", "imgId", id)
 	return m.Db.GetImage(id)
 }
 
-func (m *Marmot) DeleteImage(id string) error {
+// 指定したIDのイメージを削除する関数 （ラップ関数） コントローラーで使用
+func (m *Marmot) DeleteImageManage(id string) error {
 	slog.Debug("Deleting image", "imgId", id)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
@@ -191,7 +193,8 @@ func (m *Marmot) DeleteImage(id string) error {
 	return m.Db.DeleteImage(id)
 }
 
-func (m *Marmot) UpdateImage(id string, image api.Image) error {
+// イメージの情報を更新する関数 （ラップ関数） コントローラーで使用
+func (m *Marmot) UpdateImageManage(id string, image api.Image) error {
 	slog.Debug("Updating image", "imgId", id)
 	return m.Db.UpdateImage(id, image)
 }

@@ -15,8 +15,8 @@ import (
 	"github.com/takara9/marmot/pkg/virt"
 )
 
-// サーバーの生成
-func (m *Marmot) CreateServer2(id string) (string, error) {
+// サーバーの生成 コントローラーから呼び出される
+func (m *Marmot) CreateServerManage(id string) (string, error) {
 	slog.Debug("=====CreateServer2()=====", "", "")
 
 	var bootVol api.Volume
@@ -466,10 +466,10 @@ func (m *Marmot) CreateServer2(id string) (string, error) {
 	return id, nil
 }
 
-// サーバーの削除
-func (m *Marmot) DeleteServerById(id string) error {
+// サーバーの削除 コントローラーから呼び出される
+func (m *Marmot) DeleteServerByIdManage(id string) error {
 	slog.Debug("===DeleteServerById is called===", "id", id)
-	sv, err := m.GetServerById(id)
+	sv, err := m.Db.GetServerById(id)
 	if err != nil {
 		slog.Error("GetServerById()", "err", err)
 		return err
@@ -517,20 +517,19 @@ func (m *Marmot) DeleteServerById(id string) error {
 	return nil
 }
 
-// サーバーのリストを取得、フィルターは、パラメータで指定するようにする
-func (m *Marmot) GetServers() (api.Servers, error) {
-	slog.Debug("===GetServers is called===", "none", "none")
+// サーバーのリストを取得 ラップ関数  コントローラーから呼び出される
+func (m *Marmot) GetServersManage() (api.Servers, error) {
+	slog.Debug("GetServersManage is called===", "", "")
 	serverSpec, err := m.Db.GetServers()
 	if err != nil {
-		slog.Error("GetServers()", "err", err)
+		slog.Error("GetServersManage()", "err", err)
 		return nil, err
 	}
-	slog.Debug("GetServers()", "Number of servers", len(serverSpec))
 	return serverSpec, nil
 }
 
 // サーバーの詳細を取得
-func (m *Marmot) GetServerById(id string) (api.Server, error) {
+func (m *Marmot) GetServerManage(id string) (api.Server, error) {
 	slog.Debug("===GetServerById is called===", "id", id)
 	serverSpec, err := m.Db.GetServerById(id)
 	if err != nil {
@@ -591,8 +590,8 @@ func (m *Marmot) CreateNewVolumeWithWait(volReq api.Volume) (api.Volume, error) 
 }
 
 // サーバーから起動イメージの作成
-func (m *Marmot) CreateImageFromServer(serverId, name string, image api.Image) (string, error) {
-	slog.Debug("===CreateImageFromServer is called===", "server id", serverId)
+func (m *Marmot) MakeImageEntryFromRunningVM(serverId, name string, image api.Image) (string, error) {
+	slog.Debug("===MakeImageEntryFromRunningVM is called===", "server id", serverId)
 	// サーバーの情報を取得
 	serverSpec, err := m.Db.GetServerById(serverId)
 	if err != nil {
@@ -601,7 +600,7 @@ func (m *Marmot) CreateImageFromServer(serverId, name string, image api.Image) (
 	}
 
 	// ブートボリュームのIDを取得
-	//slog.Debug("CreateImageFromServer()", "boot volume id", serverSpec.Spec.BootVolume.Id)
+	//slog.Debug("MakeImageEntryFromRunningVM()", "boot volume id", serverSpec.Spec.BootVolume.Id)
 
 	// ブートボリュームの情報を取得
 	bootVol, err := m.GetVolumeById(serverSpec.Spec.BootVolume.Id)
@@ -609,12 +608,12 @@ func (m *Marmot) CreateImageFromServer(serverId, name string, image api.Image) (
 		slog.Error("GetVolumeById()", "err", err, "volume id", serverSpec.Spec.BootVolume.Id)
 		return "", err
 	}
-	//slog.Debug("CreateImageFromServer()", "boot volume", bootVol.Spec.Path)
+	//slog.Debug("MakeImageEntryFromRunningVM()", "boot volume", bootVol.Spec.Path)
 
 	// イメージIDの取得、名前チェック
-	//image, err := m.Db.CreateImageFromServer(serverId, name)
+	//image, err := m.Db.MakeImageEntryFromRunningVM(serverId, name)
 	//if err != nil {
-	//	slog.Error("CreateImageFromServer()", "err", err, "server id", serverId)
+	//	slog.Error("MakeImageEntryFromRunningVM()", "err", err, "server id", serverId)
 	//	return "", err
 	//}
 

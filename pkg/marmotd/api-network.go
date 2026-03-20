@@ -14,7 +14,7 @@ import (
 
 // クライアントから仮想ネットワークの情報を受け取って、仮想ネットワークを作成する
 // ここでは、etcdに書き込むだけで、実際に仮想ネットワークを作成するのはコントローラー側で行う
-func (s *Server) CreateNetwork(ctx echo.Context) error {
+func (s *Server) ApiCreateNetwork(ctx echo.Context) error {
 	// クライアントから仮想ネットワークの情報を受け取る
 	var spec api.VirtualNetwork
 
@@ -43,8 +43,8 @@ func (s *Server) CreateNetwork(ctx echo.Context) error {
 
 // 仮想ネットワークをIDで削除する
 // 実際に削除するのはコントローラー側で、ここではDBに削除タイムスタンプを設定するだけ
-func (s *Server) DeleteNetworkById(ctx echo.Context, id string) error {
-	slog.Debug("===", "DeleteNetworkById is called", "===")
+func (s *Server) ApiDeleteNetworkById(ctx echo.Context, id string) error {
+	slog.Debug("===", "ApiDeleteNetworkById is called", "===")
 
 	if err := s.Ma.Db.SetDeleteTimestampVirtualNetwork(id); err != nil {
 		slog.Error("SetDeleteTimestampVirtualNetwork()", "err", err)
@@ -59,7 +59,7 @@ func (s *Server) DeleteNetworkById(ctx echo.Context, id string) error {
 
 // クライアントから仮想ネットワークの情報を受け取って、仮想ネットワークをIDで更新する
 // ここでは、etcdに書き込むだけで、実際に仮想ネットワークを更新するのはコントローラー側で行う
-func (s *Server) UpdateNetworkById(ctx echo.Context, id string) error {
+func (s *Server) ApiUpdateNetworkById(ctx echo.Context, id string) error {
 	var spec api.VirtualNetwork
 	if err := ctx.Bind(&spec); err != nil {
 		slog.Error("failed to bind request body", "err", err)
@@ -79,8 +79,8 @@ func (s *Server) UpdateNetworkById(ctx echo.Context, id string) error {
 
 // 参照のみ
 // 仮想ネットワークのリストを取得して返す
-func (s *Server) GetNetworks(ctx echo.Context) error {
-	slog.Debug("===", "GetNetworks is called", "===")
+func (s *Server) ApiGetNetworks(ctx echo.Context) error {
+	slog.Debug("===", "ApiGetNetworks is called", "===")
 	networks, err := s.Ma.Db.GetVirtualNetworks()
 	if err != nil {
 		slog.Error("failed to get virtual networks", "err", err)
@@ -91,7 +91,7 @@ func (s *Server) GetNetworks(ctx echo.Context) error {
 
 // 参照のみ
 // 仮想ネットワークをIDで取得する
-func (s *Server) GetNetworkById(ctx echo.Context, id string) error {
+func (s *Server) ApiGetNetworkById(ctx echo.Context, id string) error {
 	network, err := s.Ma.Db.GetVirtualNetworkById(id)
 	if err != nil {
 		slog.Error("failed to get virtual network", "err", err, "networkId", id)
