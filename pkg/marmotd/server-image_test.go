@@ -12,7 +12,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
 	"github.com/takara9/marmot/pkg/util"
@@ -47,16 +46,6 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 	})
 
 	AfterAll(func(ctx0 SpecContext) {
-		//OSイメージを削除
-
-		// 暫定的な処置として、OSイメージの削除は行わない。イメージの削除機能が実装されたら、以下のコードを有効にする。
-		//if osImageid != "" {
-		//	osimage, err := marmotServer.Ma.Db.GetImage(osImageid)
-		//	Expect(err).NotTo(HaveOccurred())
-		//	err = lvm.RemoveLV(*osimage.Spec.VolumeGroup, *osimage.Spec.LogicalVolume)
-		//	Expect(err).NotTo(HaveOccurred())
-		//}
-
 		err := marmotServer.Ma.DeleteImageManage(osImageid)
 		Expect(err).NotTo(HaveOccurred())
 		_, err = marmotServer.Ma.GetImageManage(osImageid)
@@ -79,8 +68,6 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 	})
 
 	Context("テスト環境初期化", func() {
-		var hvs config.Hypervisors_yaml
-
 		It("モックサーバー用etcdの起動", func() {
 			cmd := exec.Command("docker", "run", "-d", "--name", etcdContainerName, "-p", fmt.Sprintf("%d", etcdPort)+":2379", "-p", fmt.Sprintf("%d", etcdPort+1)+":2380", "--rm", etcdImage)
 			output, err := cmd.CombinedOutput()
@@ -105,34 +92,6 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 				GinkgoWriter.Println(cmd, "err= ", err)
 				g.Expect(err).NotTo(HaveOccurred())
 			}).Should(Succeed())
-		})
-
-		It("ハイパーバイザーのコンフィグファイルの読み取り", func() {
-			err := config.ReadYAML("testdata/hypervisor-config-server.yaml", &hvs)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		/*
-			It("ハイパーバイザーの情報セット", func() {
-				for _, hv := range hvs.Hvs {
-					fmt.Println(hv)
-					err := marmotServer.Ma.Db.SetHypervisors(hv)
-					Expect(err).NotTo(HaveOccurred())
-				}
-			})
-		*/
-		It("OSイメージテンプレート", func() {
-			for _, hd := range hvs.Imgs {
-				err := marmotServer.Ma.Db.SetImageTemplate(hd)
-				Expect(err).NotTo(HaveOccurred())
-			}
-		})
-
-		It("シーケンス番号のリセット", func() {
-			for _, sq := range hvs.Seq {
-				err := marmotServer.Ma.Db.CreateSeq(sq.Key, sq.Start, sq.Step)
-				Expect(err).NotTo(HaveOccurred())
-			}
 		})
 
 		It("モックサーバー起動の確認", func() {
@@ -294,11 +253,6 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			fmt.Println("オブジェクト情報: ", string(data))
 		})
 
-		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
-		//It("時間待ち", func() {
-		//	time.Sleep(15 * time.Second)
-		//})
-
 		It("OS起動待ち", func() {
 			Eventually(func(g Gomega) {
 				sv, err := marmotServer.Ma.GetServerManage(id)
@@ -373,11 +327,6 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 		})
 
-		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
-		//It("時間待ち", func() {
-		//	time.Sleep(15 * time.Second)
-		//})
-
 		It("OS起動待ち", func() {
 			Eventually(func(g Gomega) {
 				sv, err := marmotServer.Ma.GetServerManage(id)
@@ -437,11 +386,6 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			Expect(*sv.Metadata.Name).To(Equal("test-vm-3"))
 			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 		})
-
-		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
-		//It("時間待ち", func() {
-		//	time.Sleep(15 * time.Second)
-		//})
 
 		It("OS起動待ち", func() {
 			Eventually(func(g Gomega) {
@@ -525,11 +469,6 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			fmt.Println("サーバー情報: ", string(data))
 			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 		})
-
-		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
-		//It("時間待ち", func() {
-		//	time.Sleep(15 * time.Second)
-		//})
 
 		It("OS起動待ち", func() {
 			Eventually(func(g Gomega) {

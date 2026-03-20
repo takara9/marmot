@@ -12,7 +12,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/marmotd"
 	ut "github.com/takara9/marmot/pkg/util"
 )
@@ -59,36 +58,6 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			marmotServer = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
 		})
 
-		var hvs config.Hypervisors_yaml
-		It("ハイパーバイザーのコンフィグファイルの読み取り", func() {
-			err := config.ReadYAML("testdata/hypervisor-config-hvc-func.yaml", &hvs)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		/*
-			It("ハイパーバイザーの情報セット", func() {
-				for _, hv := range hvs.Hvs {
-					fmt.Println(hv)
-					err := marmotServer.Ma.Db.SetHypervisors(hv)
-					Expect(err).NotTo(HaveOccurred())
-				}
-			})
-		*/
-
-		It("OSイメージテンプレート", func() {
-			for _, hd := range hvs.Imgs {
-				err := marmotServer.Ma.Db.SetImageTemplate(hd)
-				Expect(err).NotTo(HaveOccurred())
-			}
-		})
-
-		It("シーケンス番号のセット", func() {
-			for _, sq := range hvs.Seq {
-				err := marmotServer.Ma.Db.CreateSeq(sq.Key, sq.Start, sq.Step)
-				Expect(err).NotTo(HaveOccurred())
-			}
-		})
-
 		It("起動完了待ちチェック", func() {
 			By("Trying to connect to marmot")
 			Eventually(func(g Gomega) {
@@ -98,23 +67,6 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 				g.Expect(err).NotTo(HaveOccurred())
 			}).Should(Succeed())
 		})
-
-		/*
-			It("動作確認 CheckHypervisors()", func() {
-				GinkgoWriter.Println(nodeName)
-				hv, err := marmotServer.Ma.Db.CheckHypervisors(etcdUrl, nodeName)
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("xxxxxx array size == ", len(hv))
-				for i, v := range hv {
-					GinkgoWriter.Println("xxxxxx hv index    == ", i)
-					GinkgoWriter.Println("xxxxxx hv nodename == ", v.NodeName)
-					GinkgoWriter.Println("xxxxxx hv port     == ", *v.Port)
-					GinkgoWriter.Println("xxxxxx hv CPU      == ", v.Cpu)
-					GinkgoWriter.Println("xxxxxx hv Mem      == ", *v.Memory)
-					GinkgoWriter.Println("xxxxxx hv IP addr  == ", *v.IpAddr)
-				}
-			})
-		*/
 
 		It("Check the config file to directly etcd", func() {
 			cmd := exec.Command(etcdctlExe, "--endpoints=localhost:7379", "get", "hvc")
@@ -361,7 +313,6 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 				},
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
-			//tmpSpec, err := m.CreateNewVolume(v)
 
 			volSpec, err := m.Db.CreateVolumeOnDB2(v)
 			Expect(err).NotTo(HaveOccurred())
@@ -405,7 +356,6 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 				},
 			}
 			GinkgoWriter.Println("Creating Data volume", "volume", v)
-			//tmpSpec, err := m.CreateNewVolume(v)
 			volSpec, err := m.Db.CreateVolumeOnDB2(v)
 			Expect(err).NotTo(HaveOccurred())
 			tmpSpec, err := m.CreateNewVolume(volSpec.Id)
@@ -428,7 +378,6 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 				},
 			}
 			GinkgoWriter.Println("Creating Data volume", "volume", v)
-			//tmpSpec, err := m.CreateNewVolume(v)
 
 			volSpec, err := m.Db.CreateVolumeOnDB2(v)
 			Expect(err).NotTo(HaveOccurred())
@@ -556,7 +505,6 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 				},
 			}
 			GinkgoWriter.Println("Creating qcow2 volume", "volume", v)
-			//tmpSSpec, err := m.CreateNewVolume(v)
 			volSpec, err := m.Db.CreateVolumeOnDB2(v)
 			Expect(err).NotTo(HaveOccurred())
 			tmpSSpec, err := m.CreateNewVolume(volSpec.Id)
@@ -632,7 +580,6 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 					Size: ut.IntPtrInt(1),
 				},
 			}
-			//tmpSpec, err := m.CreateNewVolume(v)
 			volSpec, err := m.Db.CreateVolumeOnDB2(v)
 			Expect(err).NotTo(HaveOccurred())
 			tmpSpec, err := m.CreateNewVolume(volSpec.Id)

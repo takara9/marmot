@@ -34,7 +34,6 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 		// テスト用のLVMボリュームをスナップショットで準備
 		err = exec.Command("lvcreate", "-L", "1G", "-s", "-n", "lvos_test2", "/dev/vg1/lvos_temp").Run()
 		Expect(err).To(BeNil())
-
 	})
 
 	AfterAll(func(ctx0 SpecContext) {

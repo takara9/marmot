@@ -12,7 +12,6 @@ import (
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/client"
-	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/marmotd"
 	"github.com/takara9/marmot/pkg/util"
 )
@@ -26,10 +25,10 @@ var _ = Describe("関数テスト", Ordered, func() {
 		etcdImage  = "ghcr.io/takara9/etcd:3.6.5"
 	)
 	var (
-		containerID  string
-		ctx          context.Context
-		cancel       context.CancelFunc
-		marmotServer *marmotd.Server
+		containerID string
+		ctx         context.Context
+		cancel      context.CancelFunc
+		//marmotServer *marmotd.Server
 	)
 	marmotEp := "localhost:" + fmt.Sprintf("%d", marmotPort)
 
@@ -40,7 +39,7 @@ var _ = Describe("関数テスト", Ordered, func() {
 	})
 
 	Context("テスト環境初期化", func() {
-		var hvs config.Hypervisors_yaml
+		//var hvs config.Hypervisors_yaml
 		var marmotClient *client.MarmotEndpoint
 
 		It("モックサーバー用etcdの起動", func() {
@@ -56,13 +55,14 @@ var _ = Describe("関数テスト", Ordered, func() {
 
 		It("モックサーバーの起動", func() {
 			ctx, cancel = context.WithCancel(context.Background())
-			marmotServer = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
+			//marmotServer = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
+			marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
 		})
 
-		It("ハイパーバイザーのコンフィグファイルの読み取り", func() {
-			err := config.ReadYAML("testdata/hypervisor-config-hvc-main.yaml", &hvs)
-			Expect(err).NotTo(HaveOccurred())
-		})
+		//It("ハイパーバイザーのコンフィグファイルの読み取り", func() {
+		//	err := config.ReadYAML("testdata/hypervisor-config-hvc-main.yaml", &hvs)
+		//	Expect(err).NotTo(HaveOccurred())
+		//})
 
 		It("Marmotエンドポイントの生成", func() {
 			var err error
@@ -85,18 +85,18 @@ var _ = Describe("関数テスト", Ordered, func() {
 			})
 		*/
 
-		It("OSイメージテンプレート", func() {
-			for _, hd := range hvs.Imgs {
-				err := marmotServer.Ma.Db.SetImageTemplate(hd)
-				Expect(err).NotTo(HaveOccurred())
-			}
-		})
-		It("シーケンス番号のリセット", func() {
-			for _, sq := range hvs.Seq {
-				err := marmotServer.Ma.Db.CreateSeq(sq.Key, sq.Start, sq.Step)
-				Expect(err).NotTo(HaveOccurred())
-			}
-		})
+		//It("OSイメージテンプレート", func() {
+		//	for _, hd := range hvs.Imgs {
+		//		err := marmotServer.Ma.Db.SetImageTemplate(hd)
+		//		Expect(err).NotTo(HaveOccurred())
+		//	}
+		//})
+		//It("シーケンス番号のリセット", func() {
+		//	for _, sq := range hvs.Seq {
+		//		err := marmotServer.Ma.Db.CreateSeq(sq.Key, sq.Start, sq.Step)
+		//		Expect(err).NotTo(HaveOccurred())
+		//	}
+		//})
 
 		It("Marmotd の生存確認", func() {
 			httpStatus, body, url, err := marmotClient.Ping()
