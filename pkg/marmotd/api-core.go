@@ -86,7 +86,7 @@ func (s *Server) Close() error {
 
 // ＝＝＝＝＝＝＝＝＝＝＝＝＝＝　API 関数群  ＝＝＝＝＝＝＝＝＝＝＝＝＝＝
 // 生存確認
-func (s *Server) ReplyPing(ctx echo.Context) error {
+func (s *Server) ApiReplyPing(ctx echo.Context) error {
 	slog.Debug("===", "ReplyPing() is called", "===")
 	s.Lock.Lock()
 	defer s.Lock.Unlock()
@@ -94,7 +94,7 @@ func (s *Server) ReplyPing(ctx echo.Context) error {
 }
 
 // バージョン取得
-func (s *Server) GetVersion(ctx echo.Context) error {
+func (s *Server) ApiGetVersion(ctx echo.Context) error {
 	slog.Debug("===", "GetVersion() is called", "===")
 	s.Lock.Lock()
 	defer s.Lock.Unlock()

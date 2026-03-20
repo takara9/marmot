@@ -16,9 +16,9 @@ var serverCreateImageCmd = &cobra.Command{
 
 		serverId := args[0]
 		imageName := args[1]
-		byteBody, _, err := m.CreateImageFromServerById(serverId, imageName)
+		byteBody, _, err := m.MakeImageEntryFromRunningVMById(serverId, imageName)
 		if err != nil {
-			println("CreateImageFromServerById", "err", err)
+			println("MakeImageEntryFromRunningVMById", "err", err)
 			return err
 		}
 

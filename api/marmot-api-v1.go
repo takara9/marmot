@@ -218,104 +218,104 @@ type Volume struct {
 	Id       string    `json:"id"`
 }
 
-// CreateImageJSONRequestBody defines body for CreateImage for application/json ContentType.
-type CreateImageJSONRequestBody = Image
+// ApiCreateImageJSONRequestBody defines body for ApiCreateImage for application/json ContentType.
+type ApiCreateImageJSONRequestBody = Image
 
-// UpdateImageByIdJSONRequestBody defines body for UpdateImageById for application/json ContentType.
-type UpdateImageByIdJSONRequestBody = Image
+// ApiUpdateImageByIdJSONRequestBody defines body for ApiUpdateImageById for application/json ContentType.
+type ApiUpdateImageByIdJSONRequestBody = Image
 
-// CreateNetworkJSONRequestBody defines body for CreateNetwork for application/json ContentType.
-type CreateNetworkJSONRequestBody = VirtualNetwork
+// ApiCreateNetworkJSONRequestBody defines body for ApiCreateNetwork for application/json ContentType.
+type ApiCreateNetworkJSONRequestBody = VirtualNetwork
 
-// UpdateNetworkByIdJSONRequestBody defines body for UpdateNetworkById for application/json ContentType.
-type UpdateNetworkByIdJSONRequestBody = VirtualNetwork
+// ApiUpdateNetworkByIdJSONRequestBody defines body for ApiUpdateNetworkById for application/json ContentType.
+type ApiUpdateNetworkByIdJSONRequestBody = VirtualNetwork
 
-// CreateServerJSONRequestBody defines body for CreateServer for application/json ContentType.
-type CreateServerJSONRequestBody = Server
+// ApiCreateServerJSONRequestBody defines body for ApiCreateServer for application/json ContentType.
+type ApiCreateServerJSONRequestBody = Server
 
-// CreateImageFromServerByIdJSONRequestBody defines body for CreateImageFromServerById for application/json ContentType.
-type CreateImageFromServerByIdJSONRequestBody = Image
+// ApiMakeImageEntryFromRunningVMByIdJSONRequestBody defines body for ApiMakeImageEntryFromRunningVMById for application/json ContentType.
+type ApiMakeImageEntryFromRunningVMByIdJSONRequestBody = Image
 
-// UpdateServerByIdJSONRequestBody defines body for UpdateServerById for application/json ContentType.
-type UpdateServerByIdJSONRequestBody = Server
+// ApiUpdateServerByIdJSONRequestBody defines body for ApiUpdateServerById for application/json ContentType.
+type ApiUpdateServerByIdJSONRequestBody = Server
 
-// CreateVolumeJSONRequestBody defines body for CreateVolume for application/json ContentType.
-type CreateVolumeJSONRequestBody = Volume
+// ApiCreateVolumeJSONRequestBody defines body for ApiCreateVolume for application/json ContentType.
+type ApiCreateVolumeJSONRequestBody = Volume
 
-// UpdateVolumeByIdJSONRequestBody defines body for UpdateVolumeById for application/json ContentType.
-type UpdateVolumeByIdJSONRequestBody = Volume
+// ApiUpdateVolumeByIdJSONRequestBody defines body for ApiUpdateVolumeById for application/json ContentType.
+type ApiUpdateVolumeByIdJSONRequestBody = Volume
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// List Images
 	// (GET /image)
-	GetImages(ctx echo.Context) error
+	ApiGetImages(ctx echo.Context) error
 	// Create Image
 	// (POST /image)
-	CreateImage(ctx echo.Context) error
+	ApiCreateImage(ctx echo.Context) error
 	// Delete Image
 	// (DELETE /image/{id})
-	DeleteImageById(ctx echo.Context, id string) error
+	ApiDeleteImageById(ctx echo.Context, id string) error
 	// Info for a specific image
 	// (GET /image/{id})
-	GetImageById(ctx echo.Context, id string) error
+	ApiGetImageById(ctx echo.Context, id string) error
 	// Update Image
 	// (PUT /image/{id})
-	UpdateImageById(ctx echo.Context, id string) error
+	ApiUpdateImageById(ctx echo.Context, id string) error
 	// Get Network Information
 	// (GET /network)
-	GetNetworks(ctx echo.Context) error
+	ApiGetNetworks(ctx echo.Context) error
 	// Create Virtual Network
 	// (POST /network)
-	CreateNetwork(ctx echo.Context) error
+	ApiCreateNetwork(ctx echo.Context) error
 	// Delete Virtual Network
 	// (DELETE /network/{id})
-	DeleteNetworkById(ctx echo.Context, id string) error
+	ApiDeleteNetworkById(ctx echo.Context, id string) error
 	// Get particular virtual network Information
 	// (GET /network/{id})
-	GetNetworkById(ctx echo.Context, id string) error
+	ApiGetNetworkById(ctx echo.Context, id string) error
 	// Update Virtual Network Information by Id
 	// (PUT /network/{id})
-	UpdateNetworkById(ctx echo.Context, id string) error
+	ApiUpdateNetworkById(ctx echo.Context, id string) error
 	// Alive
 	// (GET /ping)
-	ReplyPing(ctx echo.Context) error
+	ApiReplyPing(ctx echo.Context) error
 	// Get Server Information
 	// (GET /server)
-	GetServers(ctx echo.Context) error
+	ApiGetServers(ctx echo.Context) error
 	// Create Virtual Server
 	// (POST /server)
-	CreateServer(ctx echo.Context) error
+	ApiCreateServer(ctx echo.Context) error
 	// Delete Server
 	// (DELETE /server/{id})
-	DeleteServerById(ctx echo.Context, id string) error
+	ApiDeleteServerById(ctx echo.Context, id string) error
 	// Get particular server Information
 	// (GET /server/{id})
-	GetServerById(ctx echo.Context, id string) error
+	ApiGetServerById(ctx echo.Context, id string) error
 	// Create image from Server Object by Id
 	// (POST /server/{id})
-	CreateImageFromServerById(ctx echo.Context, id string) error
+	ApiMakeImageEntryFromRunningVMById(ctx echo.Context, id string) error
 	// Update Server Information by Id
 	// (PUT /server/{id})
-	UpdateServerById(ctx echo.Context, id string) error
+	ApiUpdateServerById(ctx echo.Context, id string) error
 	// Get Version
 	// (GET /version)
-	GetVersion(ctx echo.Context) error
+	ApiGetVersion(ctx echo.Context) error
 	// List Volumes
 	// (GET /volume)
-	ListVolumes(ctx echo.Context) error
+	ApiListVolumes(ctx echo.Context) error
 	// Create Volume
 	// (POST /volume)
-	CreateVolume(ctx echo.Context) error
+	ApiCreateVolume(ctx echo.Context) error
 	// Delete Volume
 	// (DELETE /volume/{volumeId})
-	DeleteVolumeById(ctx echo.Context, volumeId string) error
+	ApiDeleteVolumeById(ctx echo.Context, volumeId string) error
 	// Info for a specific volume
 	// (GET /volume/{volumeId})
-	ShowVolumeById(ctx echo.Context, volumeId string) error
+	ApiShowVolumeById(ctx echo.Context, volumeId string) error
 	// Update Volume
 	// (PUT /volume/{volumeId})
-	UpdateVolumeById(ctx echo.Context, volumeId string) error
+	ApiUpdateVolumeById(ctx echo.Context, volumeId string) error
 }
 
 // ServerInterfaceWrapper converts echo contexts to parameters.
@@ -323,42 +323,26 @@ type ServerInterfaceWrapper struct {
 	Handler ServerInterface
 }
 
-// GetImages converts echo context to params.
-func (w *ServerInterfaceWrapper) GetImages(ctx echo.Context) error {
+// ApiGetImages converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiGetImages(ctx echo.Context) error {
 	var err error
 
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.GetImages(ctx)
+	err = w.Handler.ApiGetImages(ctx)
 	return err
 }
 
-// CreateImage converts echo context to params.
-func (w *ServerInterfaceWrapper) CreateImage(ctx echo.Context) error {
+// ApiCreateImage converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiCreateImage(ctx echo.Context) error {
 	var err error
 
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.CreateImage(ctx)
+	err = w.Handler.ApiCreateImage(ctx)
 	return err
 }
 
-// DeleteImageById converts echo context to params.
-func (w *ServerInterfaceWrapper) DeleteImageById(ctx echo.Context) error {
-	var err error
-	// ------------- Path parameter "id" -------------
-	var id string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
-	}
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.DeleteImageById(ctx, id)
-	return err
-}
-
-// GetImageById converts echo context to params.
-func (w *ServerInterfaceWrapper) GetImageById(ctx echo.Context) error {
+// ApiDeleteImageById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiDeleteImageById(ctx echo.Context) error {
 	var err error
 	// ------------- Path parameter "id" -------------
 	var id string
@@ -369,12 +353,12 @@ func (w *ServerInterfaceWrapper) GetImageById(ctx echo.Context) error {
 	}
 
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.GetImageById(ctx, id)
+	err = w.Handler.ApiDeleteImageById(ctx, id)
 	return err
 }
 
-// UpdateImageById converts echo context to params.
-func (w *ServerInterfaceWrapper) UpdateImageById(ctx echo.Context) error {
+// ApiGetImageById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiGetImageById(ctx echo.Context) error {
 	var err error
 	// ------------- Path parameter "id" -------------
 	var id string
@@ -385,30 +369,12 @@ func (w *ServerInterfaceWrapper) UpdateImageById(ctx echo.Context) error {
 	}
 
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.UpdateImageById(ctx, id)
+	err = w.Handler.ApiGetImageById(ctx, id)
 	return err
 }
 
-// GetNetworks converts echo context to params.
-func (w *ServerInterfaceWrapper) GetNetworks(ctx echo.Context) error {
-	var err error
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.GetNetworks(ctx)
-	return err
-}
-
-// CreateNetwork converts echo context to params.
-func (w *ServerInterfaceWrapper) CreateNetwork(ctx echo.Context) error {
-	var err error
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.CreateNetwork(ctx)
-	return err
-}
-
-// DeleteNetworkById converts echo context to params.
-func (w *ServerInterfaceWrapper) DeleteNetworkById(ctx echo.Context) error {
+// ApiUpdateImageById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiUpdateImageById(ctx echo.Context) error {
 	var err error
 	// ------------- Path parameter "id" -------------
 	var id string
@@ -419,12 +385,30 @@ func (w *ServerInterfaceWrapper) DeleteNetworkById(ctx echo.Context) error {
 	}
 
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.DeleteNetworkById(ctx, id)
+	err = w.Handler.ApiUpdateImageById(ctx, id)
 	return err
 }
 
-// GetNetworkById converts echo context to params.
-func (w *ServerInterfaceWrapper) GetNetworkById(ctx echo.Context) error {
+// ApiGetNetworks converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiGetNetworks(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiGetNetworks(ctx)
+	return err
+}
+
+// ApiCreateNetwork converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiCreateNetwork(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiCreateNetwork(ctx)
+	return err
+}
+
+// ApiDeleteNetworkById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiDeleteNetworkById(ctx echo.Context) error {
 	var err error
 	// ------------- Path parameter "id" -------------
 	var id string
@@ -435,12 +419,12 @@ func (w *ServerInterfaceWrapper) GetNetworkById(ctx echo.Context) error {
 	}
 
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.GetNetworkById(ctx, id)
+	err = w.Handler.ApiDeleteNetworkById(ctx, id)
 	return err
 }
 
-// UpdateNetworkById converts echo context to params.
-func (w *ServerInterfaceWrapper) UpdateNetworkById(ctx echo.Context) error {
+// ApiGetNetworkById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiGetNetworkById(ctx echo.Context) error {
 	var err error
 	// ------------- Path parameter "id" -------------
 	var id string
@@ -451,39 +435,12 @@ func (w *ServerInterfaceWrapper) UpdateNetworkById(ctx echo.Context) error {
 	}
 
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.UpdateNetworkById(ctx, id)
+	err = w.Handler.ApiGetNetworkById(ctx, id)
 	return err
 }
 
-// ReplyPing converts echo context to params.
-func (w *ServerInterfaceWrapper) ReplyPing(ctx echo.Context) error {
-	var err error
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.ReplyPing(ctx)
-	return err
-}
-
-// GetServers converts echo context to params.
-func (w *ServerInterfaceWrapper) GetServers(ctx echo.Context) error {
-	var err error
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.GetServers(ctx)
-	return err
-}
-
-// CreateServer converts echo context to params.
-func (w *ServerInterfaceWrapper) CreateServer(ctx echo.Context) error {
-	var err error
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.CreateServer(ctx)
-	return err
-}
-
-// DeleteServerById converts echo context to params.
-func (w *ServerInterfaceWrapper) DeleteServerById(ctx echo.Context) error {
+// ApiUpdateNetworkById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiUpdateNetworkById(ctx echo.Context) error {
 	var err error
 	// ------------- Path parameter "id" -------------
 	var id string
@@ -494,12 +451,39 @@ func (w *ServerInterfaceWrapper) DeleteServerById(ctx echo.Context) error {
 	}
 
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.DeleteServerById(ctx, id)
+	err = w.Handler.ApiUpdateNetworkById(ctx, id)
 	return err
 }
 
-// GetServerById converts echo context to params.
-func (w *ServerInterfaceWrapper) GetServerById(ctx echo.Context) error {
+// ApiReplyPing converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiReplyPing(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiReplyPing(ctx)
+	return err
+}
+
+// ApiGetServers converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiGetServers(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiGetServers(ctx)
+	return err
+}
+
+// ApiCreateServer converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiCreateServer(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiCreateServer(ctx)
+	return err
+}
+
+// ApiDeleteServerById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiDeleteServerById(ctx echo.Context) error {
 	var err error
 	// ------------- Path parameter "id" -------------
 	var id string
@@ -510,12 +494,12 @@ func (w *ServerInterfaceWrapper) GetServerById(ctx echo.Context) error {
 	}
 
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.GetServerById(ctx, id)
+	err = w.Handler.ApiDeleteServerById(ctx, id)
 	return err
 }
 
-// CreateImageFromServerById converts echo context to params.
-func (w *ServerInterfaceWrapper) CreateImageFromServerById(ctx echo.Context) error {
+// ApiGetServerById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiGetServerById(ctx echo.Context) error {
 	var err error
 	// ------------- Path parameter "id" -------------
 	var id string
@@ -526,12 +510,12 @@ func (w *ServerInterfaceWrapper) CreateImageFromServerById(ctx echo.Context) err
 	}
 
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.CreateImageFromServerById(ctx, id)
+	err = w.Handler.ApiGetServerById(ctx, id)
 	return err
 }
 
-// UpdateServerById converts echo context to params.
-func (w *ServerInterfaceWrapper) UpdateServerById(ctx echo.Context) error {
+// ApiMakeImageEntryFromRunningVMById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiMakeImageEntryFromRunningVMById(ctx echo.Context) error {
 	var err error
 	// ------------- Path parameter "id" -------------
 	var id string
@@ -542,39 +526,55 @@ func (w *ServerInterfaceWrapper) UpdateServerById(ctx echo.Context) error {
 	}
 
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.UpdateServerById(ctx, id)
+	err = w.Handler.ApiMakeImageEntryFromRunningVMById(ctx, id)
 	return err
 }
 
-// GetVersion converts echo context to params.
-func (w *ServerInterfaceWrapper) GetVersion(ctx echo.Context) error {
+// ApiUpdateServerById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiUpdateServerById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiUpdateServerById(ctx, id)
+	return err
+}
+
+// ApiGetVersion converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiGetVersion(ctx echo.Context) error {
 	var err error
 
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.GetVersion(ctx)
+	err = w.Handler.ApiGetVersion(ctx)
 	return err
 }
 
-// ListVolumes converts echo context to params.
-func (w *ServerInterfaceWrapper) ListVolumes(ctx echo.Context) error {
+// ApiListVolumes converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiListVolumes(ctx echo.Context) error {
 	var err error
 
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.ListVolumes(ctx)
+	err = w.Handler.ApiListVolumes(ctx)
 	return err
 }
 
-// CreateVolume converts echo context to params.
-func (w *ServerInterfaceWrapper) CreateVolume(ctx echo.Context) error {
+// ApiCreateVolume converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiCreateVolume(ctx echo.Context) error {
 	var err error
 
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.CreateVolume(ctx)
+	err = w.Handler.ApiCreateVolume(ctx)
 	return err
 }
 
-// DeleteVolumeById converts echo context to params.
-func (w *ServerInterfaceWrapper) DeleteVolumeById(ctx echo.Context) error {
+// ApiDeleteVolumeById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiDeleteVolumeById(ctx echo.Context) error {
 	var err error
 	// ------------- Path parameter "volumeId" -------------
 	var volumeId string
@@ -585,12 +585,12 @@ func (w *ServerInterfaceWrapper) DeleteVolumeById(ctx echo.Context) error {
 	}
 
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.DeleteVolumeById(ctx, volumeId)
+	err = w.Handler.ApiDeleteVolumeById(ctx, volumeId)
 	return err
 }
 
-// ShowVolumeById converts echo context to params.
-func (w *ServerInterfaceWrapper) ShowVolumeById(ctx echo.Context) error {
+// ApiShowVolumeById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiShowVolumeById(ctx echo.Context) error {
 	var err error
 	// ------------- Path parameter "volumeId" -------------
 	var volumeId string
@@ -601,12 +601,12 @@ func (w *ServerInterfaceWrapper) ShowVolumeById(ctx echo.Context) error {
 	}
 
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.ShowVolumeById(ctx, volumeId)
+	err = w.Handler.ApiShowVolumeById(ctx, volumeId)
 	return err
 }
 
-// UpdateVolumeById converts echo context to params.
-func (w *ServerInterfaceWrapper) UpdateVolumeById(ctx echo.Context) error {
+// ApiUpdateVolumeById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiUpdateVolumeById(ctx echo.Context) error {
 	var err error
 	// ------------- Path parameter "volumeId" -------------
 	var volumeId string
@@ -617,7 +617,7 @@ func (w *ServerInterfaceWrapper) UpdateVolumeById(ctx echo.Context) error {
 	}
 
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.UpdateVolumeById(ctx, volumeId)
+	err = w.Handler.ApiUpdateVolumeById(ctx, volumeId)
 	return err
 }
 
@@ -649,28 +649,28 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 		Handler: si,
 	}
 
-	router.GET(baseURL+"/image", wrapper.GetImages)
-	router.POST(baseURL+"/image", wrapper.CreateImage)
-	router.DELETE(baseURL+"/image/:id", wrapper.DeleteImageById)
-	router.GET(baseURL+"/image/:id", wrapper.GetImageById)
-	router.PUT(baseURL+"/image/:id", wrapper.UpdateImageById)
-	router.GET(baseURL+"/network", wrapper.GetNetworks)
-	router.POST(baseURL+"/network", wrapper.CreateNetwork)
-	router.DELETE(baseURL+"/network/:id", wrapper.DeleteNetworkById)
-	router.GET(baseURL+"/network/:id", wrapper.GetNetworkById)
-	router.PUT(baseURL+"/network/:id", wrapper.UpdateNetworkById)
-	router.GET(baseURL+"/ping", wrapper.ReplyPing)
-	router.GET(baseURL+"/server", wrapper.GetServers)
-	router.POST(baseURL+"/server", wrapper.CreateServer)
-	router.DELETE(baseURL+"/server/:id", wrapper.DeleteServerById)
-	router.GET(baseURL+"/server/:id", wrapper.GetServerById)
-	router.POST(baseURL+"/server/:id", wrapper.CreateImageFromServerById)
-	router.PUT(baseURL+"/server/:id", wrapper.UpdateServerById)
-	router.GET(baseURL+"/version", wrapper.GetVersion)
-	router.GET(baseURL+"/volume", wrapper.ListVolumes)
-	router.POST(baseURL+"/volume", wrapper.CreateVolume)
-	router.DELETE(baseURL+"/volume/:volumeId", wrapper.DeleteVolumeById)
-	router.GET(baseURL+"/volume/:volumeId", wrapper.ShowVolumeById)
-	router.PUT(baseURL+"/volume/:volumeId", wrapper.UpdateVolumeById)
+	router.GET(baseURL+"/image", wrapper.ApiGetImages)
+	router.POST(baseURL+"/image", wrapper.ApiCreateImage)
+	router.DELETE(baseURL+"/image/:id", wrapper.ApiDeleteImageById)
+	router.GET(baseURL+"/image/:id", wrapper.ApiGetImageById)
+	router.PUT(baseURL+"/image/:id", wrapper.ApiUpdateImageById)
+	router.GET(baseURL+"/network", wrapper.ApiGetNetworks)
+	router.POST(baseURL+"/network", wrapper.ApiCreateNetwork)
+	router.DELETE(baseURL+"/network/:id", wrapper.ApiDeleteNetworkById)
+	router.GET(baseURL+"/network/:id", wrapper.ApiGetNetworkById)
+	router.PUT(baseURL+"/network/:id", wrapper.ApiUpdateNetworkById)
+	router.GET(baseURL+"/ping", wrapper.ApiReplyPing)
+	router.GET(baseURL+"/server", wrapper.ApiGetServers)
+	router.POST(baseURL+"/server", wrapper.ApiCreateServer)
+	router.DELETE(baseURL+"/server/:id", wrapper.ApiDeleteServerById)
+	router.GET(baseURL+"/server/:id", wrapper.ApiGetServerById)
+	router.POST(baseURL+"/server/:id", wrapper.ApiMakeImageEntryFromRunningVMById)
+	router.PUT(baseURL+"/server/:id", wrapper.ApiUpdateServerById)
+	router.GET(baseURL+"/version", wrapper.ApiGetVersion)
+	router.GET(baseURL+"/volume", wrapper.ApiListVolumes)
+	router.POST(baseURL+"/volume", wrapper.ApiCreateVolume)
+	router.DELETE(baseURL+"/volume/:volumeId", wrapper.ApiDeleteVolumeById)
+	router.GET(baseURL+"/volume/:volumeId", wrapper.ApiShowVolumeById)
+	router.PUT(baseURL+"/volume/:volumeId", wrapper.ApiUpdateVolumeById)
 
 }

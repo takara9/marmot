@@ -105,13 +105,13 @@ func (m *MarmotEndpoint) GetServers() ([]byte, *url.URL, error) {
 	return m.httpRequest2(req)
 }
 
-func (m *MarmotEndpoint) CreateImageFromServerById(id, name string) ([]byte, *url.URL, error) {
-	slog.Debug("===", "CreateImageFromServerById is called", "===")
+func (m *MarmotEndpoint) MakeImageEntryFromRunningVMById(id, name string) ([]byte, *url.URL, error) {
+	slog.Debug("===", "MakeImageEntryFromRunningVMById is called", "===")
 	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/server/"+id)
 	if err != nil {
 		return nil, nil, err
 	}
-	slog.Debug("CreateImageFromServerById", "reqURL", reqURL)
+	slog.Debug("MakeImageEntryFromRunningVMById", "reqURL", reqURL)
 
 	var image api.Image
 	var meta api.Metadata

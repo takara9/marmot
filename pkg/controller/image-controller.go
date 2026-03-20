@@ -45,7 +45,7 @@ func StartImageController(node string, etcdUrl string) (*controller, error) {
 func (c *controller) imageControllerLoop() {
 	slog.Info("イメージコントローラーの制御ループ実行", "CONTROLLER", time.Now().Format(time.DateTime))
 
-	imgaes, err := c.marmot.GetImages()
+	imgaes, err := c.marmot.GetImagesManage()
 	if err != nil {
 		slog.Error("failed to get images", "err", err)
 		return
@@ -79,10 +79,10 @@ func (c *controller) imageControllerLoop() {
 			if image.Metadata.Labels == nil || (*image.Metadata.Labels)["source"] == "bootVolume" {
 				slog.Info("イメージの作成処理を実行", "image", *image.Metadata.Name, "source", "bootVolume")
 				serverId := (*image.Metadata.Labels)["serverId"].(string)
-				go c.marmot.CreateImageFromServer(serverId, *image.Metadata.Name, image)
+				go c.marmot.MakeImageEntryFromRunningVM(serverId, *image.Metadata.Name, image)
 			} else {
 				slog.Info("イメージの作成処理を実行", "image", *image.Metadata.Name, "source", "url")
-				go c.marmot.CreateNewImage(image.Id)
+				go c.marmot.CreateNewImageManage(image.Id)
 			}
 		case db.IMAGE_CREATING:
 			slog.Info("イメージの作成処理を継続", "image", *image.Metadata.Name)
@@ -95,7 +95,7 @@ func (c *controller) imageControllerLoop() {
 			// ここにイメージが利用可能な状態での処理を実装
 		case db.IMAGE_DELETING:
 			slog.Info("イメージの削除処理を実行", "image", *image.Metadata.Name)
-			err := c.marmot.DeleteImage(image.Id)
+			err := c.marmot.DeleteImageManage(image.Id)
 			if err != nil {
 				slog.Error("DeleteImageById()", "err", err)
 			}

@@ -30,8 +30,8 @@ var ServerStatus = map[int]string{
 	5: "DELETING",
 }
 
-// サーバーを登録、サーバーを一意に識別するIDを自動生成
-func (d *Database) CreateServer(spec api.Server) (api.Server, error) {
+// サーバーを登録、サーバーを一意に識別するIDを自動生成、サーバーのステータスは、PENDINGで開始
+func (d *Database) MakeServerEntry(spec api.Server) (api.Server, error) {
 	d.LockKey("/lock/server/create")
 	defer d.UnlockKey(d.Mutex)
 

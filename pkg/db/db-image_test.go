@@ -56,7 +56,7 @@ var _ = Describe("Image", Ordered, func() {
 
 			It("イメージの作成 #1", func() {
 				url := "https://cloud-images.ubuntu.com/releases/jammy/release-20260218/ubuntu-22.04-server-cloudimg-amd64.img"
-				id, err = v.CreateImageFromURL("test-image-1", url)
+				id, err = v.MakeImageEntryFromURL("test-image-1", url)
 				Expect(err).NotTo(HaveOccurred())
 				fmt.Println("Created image with ID:", id)
 			})
@@ -71,7 +71,7 @@ var _ = Describe("Image", Ordered, func() {
 
 			It("イメージの作成 #2", func() {
 				url := "https://download.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud.latest.x86_64.qcow2"
-				id, err = v.CreateImageFromURL("test-image-2", url)
+				id, err = v.MakeImageEntryFromURL("test-image-2", url)
 				Expect(err).NotTo(HaveOccurred())
 				fmt.Println("Created image with ID:", id)
 			})

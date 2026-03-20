@@ -57,9 +57,9 @@ func (c *controller) serverControllerLoop() {
 
 	// サーバースペック情報の取得
 	slog.Debug("サーバースペック情報取得", "", "")
-	serverSpec, err := c.db.GetServers()
+	serverSpec, err := c.marmot.GetServersManage()
 	if err != nil {
-		slog.Error("GetServers()", "err", err)
+		slog.Error("GetServersManage()", "err", err)
 		return
 	}
 
@@ -87,8 +87,8 @@ func (c *controller) serverControllerLoop() {
 		case db.SERVER_PENDING:
 			slog.Debug("生成待ち状態のサーバー検出", "SERVER", spec.Id)
 			c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_PROVISIONING)
-			if _, err := c.marmot.CreateServer2(spec.Id); err != nil {
-				slog.Error("CreateServer2()", "err", err)
+			if _, err := c.marmot.CreateServerManage(spec.Id); err != nil {
+				slog.Error("CreateServerManage()", "err", err)
 				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR)
 				continue
 			}
@@ -103,7 +103,7 @@ func (c *controller) serverControllerLoop() {
 			slog.Debug("削除中のサーバー検出", "SERVER", spec.Id)
 
 			// 仮想マシンの削除処理の実行
-			if err := c.marmot.DeleteServerById(spec.Id); err != nil {
+			if err := c.marmot.DeleteServerByIdManage(spec.Id); err != nil {
 				slog.Error("DeleteServerById()", "err", err)
 				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR)
 			}
