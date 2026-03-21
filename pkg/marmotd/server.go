@@ -656,7 +656,7 @@ func (m *Marmot) MakeImageEntryFromRunningVM(serverId, name string, image api.Im
 	}
 
 	// イメージ情報の登録
-	m.Db.SetImageStatus(image.Id, db.IMAGE_AVAILABLE)
+	m.Db.UpdateImageStatus(image.Id, db.IMAGE_AVAILABLE)
 
 	return image.Id, nil
 }

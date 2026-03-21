@@ -231,7 +231,7 @@ func (d *Database) UpdateVirtualNetworkById(vnetId string, spec api.VirtualNetwo
 	return nil
 }
 
-// 仮想ネットワークを更新
+// 内部関数 仮想ネットワークを更新
 func (d *Database) updateVirtualNetwork(id string, spec api.VirtualNetwork) error {
 	lockKey := "/lock/virtualnetwork/" + id
 	mutex, err := d.LockKey(lockKey)

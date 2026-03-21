@@ -58,7 +58,7 @@ func (c *controller) imageControllerLoop() {
 			deletionTime := *image.Status.DeletionTimeStamp
 			if time.Since(deletionTime) > 10*time.Second {
 				slog.Debug("削除のタイムスタンプが一定時間以上経過しているイメージ検出", "IMAGE", *image.Metadata.Name)
-				c.marmot.Db.SetImageStatus(image.Id, db.IMAGE_DELETING)
+				c.marmot.Db.UpdateImageStatus(image.Id, db.IMAGE_DELETING)
 			}
 		}
 
@@ -74,7 +74,7 @@ func (c *controller) imageControllerLoop() {
 		switch *image.Status.Status {
 		case db.IMAGE_PENDING:
 			slog.Info("イメージの作成処理を実行", "image", *image.Metadata.Name)
-			c.marmot.UpdateImageStatus(image.Id, db.IMAGE_CREATING)
+			c.marmot.Db.UpdateImageStatus(image.Id, db.IMAGE_CREATING)
 			// ラベルの存在をチェック,
 			if image.Metadata.Labels == nil || (*image.Metadata.Labels)["source"] == "bootVolume" {
 				slog.Info("イメージの作成処理を実行", "image", *image.Metadata.Name, "source", "bootVolume")

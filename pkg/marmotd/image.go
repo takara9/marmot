@@ -117,21 +117,6 @@ func (m *Marmot) CreateNewImageManage(id string) (*api.Image, error) {
 	return &image, nil
 }
 
-func (m *Marmot) UpdateImageStatus(id string, status int) error {
-	slog.Debug("Updating image status", "imgId", id, "status", status)
-	image, err := m.Db.GetImage(id)
-	if err != nil {
-		slog.Error("Failed to get image data from DB", "imgId", id, "err", err)
-		return err
-	}
-	image.Status.Status = util.IntPtrInt(status)
-	if err := m.Db.UpdateImage(id, image); err != nil {
-		slog.Error("Failed to update image status in DB", "imgId", id, "err", err)
-		return err
-	}
-	return nil
-}
-
 // イメージ群を取得する関数 （ラップ関数）
 func (m *Marmot) GetImagesManage() ([]api.Image, error) {
 	slog.Debug("Getting images")

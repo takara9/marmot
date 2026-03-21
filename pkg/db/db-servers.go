@@ -141,11 +141,11 @@ func (d *Database) UpdateServer(id string, spec api.Server) error {
 	}
 
 	fmt.Println("=== 書き込みデータの情報確認 ===", "server Id", id)
-	data3, err := json.MarshalIndent(spec, "", "  ")
+	data, err := json.MarshalIndent(spec, "", "  ")
 	if err != nil {
 		slog.Error("json.MarshalIndent()", "err", err)
 	} else {
-		fmt.Println("サーバー情報(server): ", string(data3))
+		fmt.Println("サーバー情報(server): ", string(data))
 	}
 
 	return nil
@@ -197,6 +197,7 @@ func (d *Database) UpdateServerStatus(id string, status int) {
 	}
 }
 
+// サーバーオブジェクトの削除日時をセット
 func (d *Database) SetDeleteTimestamp(id string) error {
 	server, err := d.GetServerById(id)
 	if err != nil {
