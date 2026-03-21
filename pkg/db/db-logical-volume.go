@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"log/slog"
 
-	cf "github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/types"
 )
 
+/*
 // イメージテンプレート
 func (d *Database) SetImageTemplate(v cf.Image_yaml) error {
 	lockKey := "/lock/image/" + v.Name
@@ -31,6 +31,7 @@ func (d *Database) SetImageTemplate(v cf.Image_yaml) error {
 	}
 	return nil
 }
+*/
 
 func (d *Database) GetOsImgTempByKey(key string) (types.OsImageTemplate, error) {
 	var osit types.OsImageTemplate

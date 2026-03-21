@@ -12,8 +12,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/marmotd"
 )
 
 var _ = Describe("Marmotd Test", Ordered, func() {
@@ -34,11 +32,9 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 	})
 
 	Context("基本的なクライアントからのアクセステスト", func() {
-		var hvs config.Hypervisors_yaml
 		var ctx context.Context
 		var cancel context.CancelFunc
 		var containerID string
-		var marmotServer *marmotd.Server
 
 		It("モックサーバー用etcdの起動", func() {
 			cmd := exec.Command("docker", "run", "-d", "--name", "etcd0", "-p", "3379:2379", "-p", "3380:2380", "ghcr.io/takara9/etcd:3.6.5")
@@ -48,13 +44,11 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			}
 			containerID = string(output[:12]) // 最初の12文字をIDとして取得
 			fmt.Printf("Container started with ID: %s\n", containerID)
-			//time.Sleep(5 * time.Second) // コンテナが起動するまで待機
 		})
 
 		It("モックサーバーの起動", func() {
 			ctx, cancel = context.WithCancel(context.Background())
-			marmotServer = startMockServer(ctx)
-			//time.Sleep(5 * time.Second) // Marmotインスタンスの生成待ち
+			startMockServer(ctx)
 		})
 
 		It("モックサーバー起動の確認", func() {
@@ -65,25 +59,6 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 				GinkgoWriter.Println(cmd, "err= ", err)
 				g.Expect(err).NotTo(HaveOccurred())
 			}).Should(Succeed())
-		})
-
-		It("ハイパーバイザーのコンフィグファイルの読み取り", func() {
-			err := config.ReadYAML("testdata/hypervisor-config-hvc.yaml", &hvs)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("OSイメージテンプレート", func() {
-			for _, hd := range hvs.Imgs {
-				err := marmotServer.Ma.Db.SetImageTemplate(hd)
-				Expect(err).NotTo(HaveOccurred())
-			}
-		})
-
-		It("シーケンス番号のリセット", func() {
-			for _, sq := range hvs.Seq {
-				err := marmotServer.Ma.Db.CreateSeq(sq.Key, sq.Start, sq.Step)
-				Expect(err).NotTo(HaveOccurred())
-			}
 		})
 
 		It("Marmotd のバージョン情報取得", func() {
@@ -239,11 +214,9 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 	})
 
 	Context("基本的なCLIからのアクセステスト サーバー編", func() {
-		var hvs config.Hypervisors_yaml
 		var ctx context.Context
 		var cancel context.CancelFunc
 		var containerID string
-		var marmotServer *marmotd.Server
 
 		It("モックサーバー用etcdの起動", func() {
 			cmd := exec.Command("docker", "run", "-d", "--name", "etcd0", "-p", "3379:2379", "-p", "3380:2380", "ghcr.io/takara9/etcd:3.6.5")
@@ -257,7 +230,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 		It("モックサーバーの起動", func() {
 			ctx, cancel = context.WithCancel(context.Background())
-			marmotServer = startMockServer(ctx)
+			startMockServer(ctx)
 		})
 
 		It("モックサーバー起動の確認", func() {
@@ -268,25 +241,6 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 				GinkgoWriter.Println(cmd, "err= ", err)
 				g.Expect(err).NotTo(HaveOccurred())
 			}).Should(Succeed())
-		})
-
-		It("ハイパーバイザーのコンフィグファイルの読み取り", func() {
-			err := config.ReadYAML("testdata/hypervisor-config-hvc.yaml", &hvs)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("OSイメージテンプレート", func() {
-			for _, hd := range hvs.Imgs {
-				err := marmotServer.Ma.Db.SetImageTemplate(hd)
-				Expect(err).NotTo(HaveOccurred())
-			}
-		})
-
-		It("シーケンス番号のリセット", func() {
-			for _, sq := range hvs.Seq {
-				err := marmotServer.Ma.Db.CreateSeq(sq.Key, sq.Start, sq.Step)
-				Expect(err).NotTo(HaveOccurred())
-			}
 		})
 
 		var id1 string

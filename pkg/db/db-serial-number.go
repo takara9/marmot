@@ -11,7 +11,7 @@ import (
 )
 
 // シリアル番号
-func (d *Database) CreateSeq(key string, start uint64, step uint64) error {
+func (d *Database) CreateSeq0(key string, start uint64, step uint64) error {
 	var seq VmSerial
 	seq.Serial = start
 	seq.Start = start

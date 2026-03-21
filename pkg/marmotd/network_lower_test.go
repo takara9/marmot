@@ -12,7 +12,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
 	"github.com/takara9/marmot/pkg/util"
@@ -28,10 +27,10 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 		etcdContainerName = "etcd-net"
 	)
 	var (
-		containerID  string
-		ctx          context.Context
-		cancel       context.CancelFunc
-		marmotServer *marmotd.Server
+		containerID string
+		ctx         context.Context
+		cancel      context.CancelFunc
+		//marmotServer *marmotd.Server
 	)
 	etcdUrl := "http://127.0.0.1:" + fmt.Sprintf("%d", etcdPort)
 
@@ -57,37 +56,7 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 		It("モックサーバーの起動", func() {
 			GinkgoWriter.Println("Start marmot server mock")
 			ctx, cancel = context.WithCancel(context.Background())
-			marmotServer = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
-		})
-
-		var hvs config.Hypervisors_yaml
-		It("ハイパーバイザーのコンフィグファイルの読み取り", func() {
-			err := config.ReadYAML("testdata/hypervisor-config-hvc-func.yaml", &hvs)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		/*
-			It("ハイパーバイザーの情報セット", func() {
-				for _, hv := range hvs.Hvs {
-					fmt.Println(hv)
-					err := marmotServer.Ma.Db.SetHypervisors(hv)
-					Expect(err).NotTo(HaveOccurred())
-				}
-			})
-		*/
-
-		It("OSイメージテンプレート", func() {
-			for _, hd := range hvs.Imgs {
-				err := marmotServer.Ma.Db.SetImageTemplate(hd)
-				Expect(err).NotTo(HaveOccurred())
-			}
-		})
-
-		It("シーケンス番号のセット", func() {
-			for _, sq := range hvs.Seq {
-				err := marmotServer.Ma.Db.CreateSeq(sq.Key, sq.Start, sq.Step)
-				Expect(err).NotTo(HaveOccurred())
-			}
+			marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
 		})
 
 		It("起動完了待ちチェック", func() {
@@ -114,7 +83,6 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 	Context("仮想ネットワークの生成から削除", func() {
 		var m *marmotd.Marmot
 		var networkId1, networkId2 string
-		//var err error
 
 		It("Marmotインスタンスの生成", func() {
 			var err error

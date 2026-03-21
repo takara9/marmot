@@ -94,64 +94,66 @@ var _ = Describe("Etcd", Ordered, func() {
 			})
 		})
 
-		Context("Test Sequence number", func() {
-			var IDX = "TST"
+		/*
+			Context("Test Sequence number", func() {
+				var IDX = "TST"
 
-			It("Delete seqno key", func() {
-				err := d.DeleteJSON(IDX)
-				Expect(err).NotTo(HaveOccurred())
+				It("Delete seqno key", func() {
+					err := d.DeleteJSON(IDX)
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				It("Create seqno key", func() {
+					err := d.CreateSeq(IDX, 1, 1)
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				tests := []struct {
+					name string
+					want uint64
+				}{
+					{name: "Get Seq No inital", want: 1},
+					{name: "Get Seq No 2nd", want: 2},
+					{name: "Get Seq No 3rd", want: 3},
+					{name: "Get Seq No 4th", want: 4},
+				}
+
+				It(tests[0].name, func() {
+					seqno, err := d.GetSeqByKind(IDX)
+					GinkgoWriter.Println("seqno ", seqno)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(seqno).To(Equal(uint64(tests[0].want)))
+				})
+
+				It(tests[1].name, func() {
+					seqno, err := d.GetSeqByKind(IDX)
+					GinkgoWriter.Println("seqno ", seqno)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(seqno).To(Equal(uint64(tests[1].want)))
+				})
+
+				It(tests[2].name, func() {
+					seqno, err := d.GetSeqByKind(IDX)
+					GinkgoWriter.Println("seqno ", seqno)
+
+					Expect(err).NotTo(HaveOccurred())
+					Expect(seqno).To(Equal(uint64(tests[2].want)))
+				})
+
+				It(tests[3].name, func() {
+					seqno, err := d.GetSeqByKind(IDX)
+					GinkgoWriter.Println("seqno ", seqno)
+
+					Expect(err).NotTo(HaveOccurred())
+					Expect(seqno).To(Equal(uint64(tests[3].want)))
+				})
+
+				It("Delete seqno key", func() {
+					err := d.DeleteJSON(IDX)
+					Expect(err).NotTo(HaveOccurred())
+				})
 			})
-
-			It("Create seqno key", func() {
-				err := d.CreateSeq(IDX, 1, 1)
-				Expect(err).NotTo(HaveOccurred())
-			})
-
-			tests := []struct {
-				name string
-				want uint64
-			}{
-				{name: "Get Seq No inital", want: 1},
-				{name: "Get Seq No 2nd", want: 2},
-				{name: "Get Seq No 3rd", want: 3},
-				{name: "Get Seq No 4th", want: 4},
-			}
-
-			It(tests[0].name, func() {
-				seqno, err := d.GetSeqByKind(IDX)
-				GinkgoWriter.Println("seqno ", seqno)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(seqno).To(Equal(uint64(tests[0].want)))
-			})
-
-			It(tests[1].name, func() {
-				seqno, err := d.GetSeqByKind(IDX)
-				GinkgoWriter.Println("seqno ", seqno)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(seqno).To(Equal(uint64(tests[1].want)))
-			})
-
-			It(tests[2].name, func() {
-				seqno, err := d.GetSeqByKind(IDX)
-				GinkgoWriter.Println("seqno ", seqno)
-
-				Expect(err).NotTo(HaveOccurred())
-				Expect(seqno).To(Equal(uint64(tests[2].want)))
-			})
-
-			It(tests[3].name, func() {
-				seqno, err := d.GetSeqByKind(IDX)
-				GinkgoWriter.Println("seqno ", seqno)
-
-				Expect(err).NotTo(HaveOccurred())
-				Expect(seqno).To(Equal(uint64(tests[3].want)))
-			})
-
-			It("Delete seqno key", func() {
-				err := d.DeleteJSON(IDX)
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
+		*/
 
 	})
 
@@ -179,17 +181,17 @@ var _ = Describe("Etcd", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			It("PUT Hypervisor node data #2", func() {
-				// OSイメージテンプレート
-				for _, hd := range cnf.Imgs {
-					d.SetImageTemplate(hd)
-				}
-
-				// シーケンス番号のリセット
-				for _, sq := range cnf.Seq {
-					d.CreateSeq(sq.Key, sq.Start, sq.Step)
-				}
-			})
+			//It("PUT Hypervisor node data #2", func() {
+			//	// OSイメージテンプレート
+			//	for _, hd := range cnf.Imgs {
+			//		d.SetImageTemplate(hd)
+			//	}
+			//
+			//				// シーケンス番号のリセット
+			//				for _, sq := range cnf.Seq {
+			//					d.CreateSeq(sq.Key, sq.Start, sq.Step)
+			//				}
+			//})
 		})
 	})
 })

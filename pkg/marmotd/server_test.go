@@ -13,7 +13,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/lvm"
 	"github.com/takara9/marmot/pkg/marmotd"
@@ -74,7 +73,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 	})
 
 	Context("テスト環境初期化", func() {
-		var hvs config.Hypervisors_yaml
+		//var hvs config.Hypervisors_yaml
 
 		It("モックサーバー用etcdの起動", func() {
 			cmd := exec.Command("docker", "run", "-d", "--name", etcdContainerName, "-p", fmt.Sprintf("%d", etcdPort)+":2379", "-p", fmt.Sprintf("%d", etcdPort+1)+":2380", "--rm", etcdImage)
@@ -102,34 +101,6 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			}).Should(Succeed())
 		})
 
-		It("ハイパーバイザーのコンフィグファイルの読み取り", func() {
-			err := config.ReadYAML("testdata/hypervisor-config-server.yaml", &hvs)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		/*
-			It("ハイパーバイザーの情報セット", func() {
-				for _, hv := range hvs.Hvs {
-					fmt.Println(hv)
-					err := marmotServer.Ma.Db.SetHypervisors(hv)
-					Expect(err).NotTo(HaveOccurred())
-				}
-			})
-		*/
-		It("OSイメージテンプレート", func() {
-			for _, hd := range hvs.Imgs {
-				err := marmotServer.Ma.Db.SetImageTemplate(hd)
-				Expect(err).NotTo(HaveOccurred())
-			}
-		})
-
-		It("シーケンス番号のリセット", func() {
-			for _, sq := range hvs.Seq {
-				err := marmotServer.Ma.Db.CreateSeq(sq.Key, sq.Start, sq.Step)
-				Expect(err).NotTo(HaveOccurred())
-			}
-		})
-
 		It("モックサーバー起動の確認", func() {
 			By("Trying to connect to marmot")
 			Eventually(func(g Gomega) {
@@ -152,7 +123,6 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 	})
 
 	Context("URLを指定してダウンロードしたイメージからVM起動イメージを作成する", func() {
-		//var id string
 		It("URLを指定してイメージのIDを取得", func() {
 			var err error
 			GinkgoWriter.Println("URLを指定してイメージのIDを取得")
@@ -240,10 +210,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			var virtualServer api.Server
 			var meta api.Metadata
 			var spec api.ServerSpec
-			//var net []api.Network
 			var err error
 			virtualServer.Spec = &spec
-			//virtualServer.Spec.Network = &net
 
 			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
 			meta.Name = util.StringPtr("test-vm-2")
@@ -310,7 +278,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 
 		It("稼働中仮想サーバーの取得", func() {
 			GinkgoWriter.Println("取得する仮想サーバーID:", id)
-			sv, err := marmotServer.Ma.GetServerManage(id)	
+			sv, err := marmotServer.Ma.GetServerManage(id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
 			Expect(*sv.Metadata.Name).To(Equal("test-vm-2"))

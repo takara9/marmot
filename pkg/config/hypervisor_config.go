@@ -1,13 +1,6 @@
 package config
 
-import (
-	"flag"
-	"os"
-	"path/filepath"
-
-	"gopkg.in/yaml.v3"
-)
-
+/*
 func ReadYAML(fn string, yf interface{}) error {
 	file, err := os.Open(fn)
 	if err != nil {
@@ -51,3 +44,4 @@ func ReadHypervisorConfig(yamlFileName string) (*Hypervisors_yaml, error) {
 	}
 	return &hvs, nil
 }
+*/

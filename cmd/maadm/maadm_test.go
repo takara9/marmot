@@ -11,14 +11,12 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
 )
 
 var _ = Describe("Marmotd Test", Ordered, func() {
 	var containerID1 string
 	var containerName1 string
-
 	var containerID2 string
 	var containerName2 string
 
@@ -84,81 +82,6 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 	}, NodeTimeout(20*time.Second))
 
-	Context("maadm setup の動作テスト", func() {
-		var d1 *db.Database
-		//var h api.Hypervisor
-		It("Marmotd の初期データを、etcdに直接セット", func() {
-			cmd := exec.Command("./bin/maadm-test", "setup", "--hvconfig", "testdata/hypervisor-config-hvc.yaml", "--etcdurl", "http://localhost:3379")
-			stdoutStderr, err := cmd.CombinedOutput()
-			GinkgoWriter.Println("err: ", err)
-			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("command messeag: ", string(stdoutStderr))
-		})
-
-		// marmotd を介さずに、DB操作で内容をチェックする
-		/*
-			It("キーでハイパーバイザーのセットした情報を取得", func() {
-				var err error
-				d1, err = db.NewDatabase("http://localhost:3379")
-				Expect(err).NotTo(HaveOccurred())
-				h, err = d1.GetHypervisorByName("hvc")
-				Expect(err).NotTo(HaveOccurred())
-				Expect(h.NodeName).To(Equal("hvc"))
-				Expect(*h.IpAddr).To(Equal("127.0.0.1"))
-				Expect(h.Cpu).To(Equal(int32(4)))
-				Expect(*h.Memory).To(Equal(int64(16384)))
-				Expect(*(*h.StgPool)[0].VolGroup).To(Equal("vg1"))
-				Expect(*(*h.StgPool)[1].VolGroup).To(Equal("vg2"))
-			})
-		*/
-		It("データベースに接続", func() {
-			var err error
-			d1, err = db.NewDatabase("http://localhost:3379")
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("OSイメージ、LVOS、LVDATA、VMのシーケンス番号をチェック", func() {
-			// OSイメージのシーケンス番号をチェック
-			seq, err := d1.GetSeqByKind("LVOS")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(seq).To(Equal(uint64(900)))
-			seq, err = d1.GetSeqByKind("LVOS")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(seq).To(Equal(uint64(901)))
-			// DATAボリュームのシーケンス番号をチェック
-			seq, err = d1.GetSeqByKind("LVDATA")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(seq).To(Equal(uint64(900)))
-			seq, err = d1.GetSeqByKind("LVDATA")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(seq).To(Equal(uint64(901)))
-			// VM番号のシーケンス番号をチェック
-			seq, err = d1.GetSeqByKind("VM")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(seq).To(Equal(uint64(900)))
-			seq, err = d1.GetSeqByKind("VM")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(seq).To(Equal(uint64(901)))
-		})
-
-		It("OSイメージのデータ取得チェック", func() {
-			v, err := d1.GetOsImgTempByOsVariant("ubuntu22.04")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(v.VolumeGroup).To(Equal("vg1"))
-			Expect(v.LogicalVolume).To(Equal("lv02"))
-		})
-
-		It("OSイメージのKey経由でのデータ取得チェック", func() {
-			key := db.OsTemplateImagePrefix + "/" + "ubuntu22.04"
-			osit, err := d1.GetOsImgTempByKey(key)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(osit.Key).To(Equal(key))
-			Expect(osit.VolumeGroup).To(Equal("vg1"))
-			Expect(osit.LogicalVolume).To(Equal("lv02"))
-		})
-
-	})
-
 	Context("maadm version の動作テスト", func() {
 		It("maadm version でバージョンを取得", func() {
 			cmd := exec.Command("./bin/maadm-test", "version", "--api", "testdata/config_marmot.conf")
@@ -190,75 +113,6 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			GinkgoWriter.Println("err: ", err)
 			GinkgoWriter.Println(string(stdoutStderr))
 			Expect(err).NotTo(HaveOccurred())
-		})
-
-	})
-
-	Context("maadm export/import の動作テスト", func() {
-		It("maadm export 取得", func() {
-			cmd := exec.Command("./bin/maadm-test", "export", "--etcdurl", "http://localhost:3379", "--filename", "/tmp/marmot-backup.zip")
-			stdout, err := cmd.CombinedOutput()
-			GinkgoWriter.Println("err: ", err)
-			GinkgoWriter.Println("stdout: ", string(stdout))
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("maadm import インポート", func() {
-			cmd := exec.Command("./bin/maadm-test", "import", "--etcdurl", "http://localhost:4379", "--filename", "/tmp/marmot-backup.zip")
-			stdout, err := cmd.CombinedOutput()
-			GinkgoWriter.Println("err: ", err)
-			GinkgoWriter.Println("stdout: ", string(stdout))
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		var d2 *db.Database
-		//var h api.Hypervisor
-
-		// marmotd を介さずに、DB操作で内容をチェックする
-		It("キーでハイパーバイザーのセットした情報を取得", func() {
-			var err error
-			d2, err = db.NewDatabase("http://localhost:4379")
-			Expect(err).NotTo(HaveOccurred())
-			//h, err = d2.GetHypervisorByName("hvc")
-			//Expect(err).NotTo(HaveOccurred())
-			//Expect(h.NodeName).To(Equal("hvc"))
-			//Expect(*h.IpAddr).To(Equal("127.0.0.1"))
-			//Expect(h.Cpu).To(Equal(int32(4)))
-			//GinkgoWriter.Println("Memory:", *h.Memory)
-			//Expect(*h.Memory).To(Equal(int64(16384)))
-			//Expect(*(*h.StgPool)[0].VolGroup).To(Equal("vg1"))
-			//Expect(*(*h.StgPool)[1].VolGroup).To(Equal("vg2"))
-		})
-
-		It("OSイメージ、LVOS、LVDATA、VMのシーケンス番号をチェック", func() {
-			By("OSイメージのシーケンス番号をチェック")
-			seq, err := d2.GetSeqByKind("LVOS")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(seq).To(Equal(uint64(902)))
-			By("DATAボリュームのシーケンス番号をチェック")
-			seq, err = d2.GetSeqByKind("LVDATA")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(seq).To(Equal(uint64(902)))
-			By("VM番号のシーケンス番号をチェック")
-			seq, err = d2.GetSeqByKind("VM")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(seq).To(Equal(uint64(902)))
-		})
-
-		It("OSイメージのデータ取得チェック", func() {
-			v, err := d2.GetOsImgTempByOsVariant("ubuntu22.04")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(v.VolumeGroup).To(Equal("vg1"))
-			Expect(v.LogicalVolume).To(Equal("lv02"))
-		})
-
-		It("OSイメージのKey経由でのデータ取得チェック", func() {
-			key := db.OsTemplateImagePrefix + "/" + "ubuntu22.04"
-			osit, err := d2.GetOsImgTempByKey(key)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(osit.Key).To(Equal(key))
-			Expect(osit.VolumeGroup).To(Equal("vg1"))
-			Expect(osit.LogicalVolume).To(Equal("lv02"))
 		})
 
 	})

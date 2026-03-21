@@ -13,7 +13,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
 	"github.com/takara9/marmot/pkg/util"
@@ -68,23 +67,6 @@ var _ = Describe("VirtualPrivateNetworksUpperlayer", Ordered, func() {
 		ctx, cancel = context.WithCancel(context.Background())
 		marmotServer = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
 
-		By("ハイパーバイザーのコンフィグファイルの読み取り")
-		var hvs config.Hypervisors_yaml
-		err = config.ReadYAML("testdata/hypervisor-config-hvc-func.yaml", &hvs)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("OSイメージテンプレート")
-		for _, hd := range hvs.Imgs {
-			err := marmotServer.Ma.Db.SetImageTemplate(hd)
-			Expect(err).NotTo(HaveOccurred())
-		}
-
-		By("シーケンス番号のセット")
-		for _, sq := range hvs.Seq {
-			err := marmotServer.Ma.Db.CreateSeq(sq.Key, sq.Start, sq.Step)
-			Expect(err).NotTo(HaveOccurred())
-		}
-
 		By("Marmotの起動待ちチェック")
 		Eventually(func(g Gomega) {
 			cmd := exec.Command("curl", etcdUrl+"/ping")
@@ -95,7 +77,6 @@ var _ = Describe("VirtualPrivateNetworksUpperlayer", Ordered, func() {
 
 	})
 	AfterAll(func(ctx0 SpecContext) {
-		//marmotd.CleanupTestEnvironment()
 		cmd := exec.Command("docker", "kill", containerID)
 		_, err := cmd.CombinedOutput()
 		if err != nil {
