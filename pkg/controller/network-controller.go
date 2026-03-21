@@ -7,7 +7,6 @@ import (
 
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
-	"github.com/takara9/marmot/pkg/util"
 )
 
 const (
@@ -70,13 +69,13 @@ func (c *controller) networkControllerLoop() {
 	for _, vnet := range vnets {
 		// 削除タイムスタンプが設定されて一定時間経過した仮想ネットワークのステータスをDELETINGに更新する
 		// エラー中の仮想ネットワークは、対象にしない。
-		if vnet.Status.Status != nil && *vnet.Status.Status != db.NETWORK_ERROR {
+		if vnet.Status != nil && vnet.Status.StatusCode != db.NETWORK_ERROR {
 			if vnet.Status != nil && vnet.Status.DeletionTimeStamp != nil {
 				deletionTime := *vnet.Status.DeletionTimeStamp
 				if time.Since(deletionTime) > 10*time.Second {
 					slog.Debug("削除のタイムスタンプが一定時間以上経過している仮想ネットワーク検出", "networkId", vnet.Id)
 					c.marmot.Db.UpdateVirtualNetworkStatus(vnet.Id, db.NETWORK_DELETING)
-					vnet.Status.Status = util.IntPtrInt(db.NETWORK_DELETING)
+					vnet.Status.StatusCode = db.NETWORK_DELETING
 				}
 			}
 		}
@@ -94,7 +93,7 @@ func (c *controller) networkControllerLoop() {
 		//fmt.Println("======================================================")
 
 		if vnet.Status != nil && vnet.Status.Status != nil {
-			switch *vnet.Status.Status {
+			switch vnet.Status.StatusCode {
 			case db.NETWORK_PENDING:
 				slog.Debug("待ち状態の仮想ネットワークを処理", "networkId", vnet.Id)
 				c.db.UpdateVirtualNetworkStatus(vnet.Id, db.NETWORK_PROVISIONING)

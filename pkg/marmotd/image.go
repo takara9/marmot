@@ -106,7 +106,8 @@ func (m *Marmot) CreateNewImageManage(id string) (*api.Image, error) {
 
 	image.Spec.Qcow2Path = util.StringPtr(downloadPath)
 	image.Spec.Size = util.IntPtrInt(bootVolumeSizeGB)
-	image.Status.Status = util.IntPtrInt(db.IMAGE_AVAILABLE)
+	image.Status.StatusCode = db.IMAGE_AVAILABLE
+	image.Status.Status = util.StringPtr(db.ImageStatus[db.IMAGE_AVAILABLE])
 
 	// ここで保存されていない！
 	if err := m.Db.UpdateImage(id, image); err != nil {

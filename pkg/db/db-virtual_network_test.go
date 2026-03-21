@@ -86,7 +86,8 @@ var _ = Describe("Networks", Ordered, func() {
 			It("ネットワークの状態更新 #1", func() {
 				net := api.VirtualNetwork{
 					Status: &api.Status{
-						Status: util.IntPtrInt(db.NETWORK_ACTIVE),
+						StatusCode: db.NETWORK_ACTIVE,
+						Status:     util.StringPtr(db.NetworkStatus[db.NETWORK_ACTIVE]),
 					},
 				}
 				err = v.UpdateVirtualNetworkById(netSpec.Id, net)

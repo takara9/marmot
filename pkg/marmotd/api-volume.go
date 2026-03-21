@@ -44,7 +44,8 @@ func (s *Server) ApiDeleteVolumeById(ctx echo.Context, id string) error {
 	// レコードは状態だけを変更して、実際の削除はコントローラーが実施する
 	v := api.Volume{
 		Status: &api.Status{
-			Status:              util.IntPtrInt(db.VOLUME_DELETING),
+			StatusCode:          db.VOLUME_DELETING,
+			Status:              util.StringPtr(db.VolStatus[db.VOLUME_DELETING]),
 			DeletionTimeStamp:   util.TimePtr(time.Now()),
 			LastUpdateTimeStamp: util.TimePtr(time.Now()),
 		},

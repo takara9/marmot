@@ -159,7 +159,8 @@ type Status struct {
 	DeletionTimeStamp   *time.Time `json:"deletionTimeStamp,omitempty"`
 	LastUpdateTimeStamp *time.Time `json:"lastUpdateTimeStamp,omitempty"`
 	Message             *string    `json:"message,omitempty"`
-	Status              *int       `json:"status,omitempty"`
+	Status              *string    `json:"status,omitempty"`
+	StatusCode          int        `json:"statusCode"`
 }
 
 // Success defines model for Success.

@@ -70,10 +70,10 @@ var _ = Describe("Jobs", Ordered, func() {
 				Expect(len(jobs)).To(BeNumerically(">", 0))
 				fmt.Printf("%-5s  %-12s  %-10s  %-20s  %-s\n", "ID", "JOB-NAME", "STATUS", "REQUESTED-TIME", "COMMAND")
 				for _, job := range jobs {
-					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 					if job.Id == entryJobId {
 						Expect(*job.Metadata.Name).To(Equal("test-job1"))
-						Expect(db.JobStatus[*job.Status.Status]).To(Equal("PENDING"))
+						Expect(db.JobStatus[job.Status.StatusCode]).To(Equal("PENDING"))
 						Expect(*job.Spec.Command).To(Equal([]string{"sleep", "2"}))
 					}
 				}
@@ -82,7 +82,7 @@ var _ = Describe("Jobs", Ordered, func() {
 			It("ジョブ1の取り出しと実行-1", func() {
 				job, err := j.FetchJob()
 				Expect(err).NotTo(HaveOccurred())
-				fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+				fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 				err = j.RunJob(job)
 				Expect(err).NotTo(HaveOccurred())
 				fmt.Printf("終了 Job ID: %5s\n", job.Id)
@@ -94,10 +94,10 @@ var _ = Describe("Jobs", Ordered, func() {
 				Expect(len(jobs)).To(BeNumerically(">", 0))
 				fmt.Printf("%-5s  %-12s  %-10s  %-20s  %-s\n", "ID", "JOB-NAME", "STATUS", "REQUESTED-TIME", "COMMAND")
 				for _, job := range jobs {
-					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 					if job.Id == entryJobId {
 						Expect(*job.Metadata.Name).To(Equal("test-job1"))
-						Expect(db.JobStatus[*job.Status.Status]).To(Equal("SUCCEEDED"))
+						Expect(db.JobStatus[job.Status.StatusCode]).To(Equal("SUCCEEDED"))
 						Expect(*job.Spec.Command).To(Equal([]string{"sleep", "2"}))
 					}
 				}
@@ -117,10 +117,10 @@ var _ = Describe("Jobs", Ordered, func() {
 				Expect(len(jobs)).To(BeNumerically(">", 0))
 				fmt.Printf("%-5s  %-12s  %-10s  %-20s  %-s\n", "ID", "JOB-NAME", "STATUS", "REQUESTED-TIME", "COMMAND")
 				for _, job := range jobs {
-					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 					if job.Id == entryJobId {
 						Expect(*job.Metadata.Name).To(Equal("test-job2"))
-						Expect(db.JobStatus[*job.Status.Status]).To(Equal("PENDING"))
+						Expect(db.JobStatus[job.Status.StatusCode]).To(Equal("PENDING"))
 						Expect(*job.Spec.Command).To(Equal([]string{"false"}))
 					}
 				}
@@ -129,7 +129,7 @@ var _ = Describe("Jobs", Ordered, func() {
 			It("ジョブ2の取り出しと実行", func() {
 				job, err := j.FetchJob()
 				Expect(err).NotTo(HaveOccurred())
-				fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+				fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 				err = j.RunJob(job)
 				// ジョブが開始されれば、ジョブが失敗してもエラーにはならない
 				Expect(err).NotTo(HaveOccurred())
@@ -142,10 +142,10 @@ var _ = Describe("Jobs", Ordered, func() {
 				Expect(len(jobs)).To(BeNumerically(">", 0))
 				fmt.Printf("%-5s  %-12s  %-10s  %-20s  %-s\n", "ID", "JOB-NAME", "STATUS", "REQUESTED-TIME", "COMMAND")
 				for _, job := range jobs {
-					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 					if job.Id == entryJobId {
 						Expect(*job.Metadata.Name).To(Equal("test-job2"))
-						Expect(db.JobStatus[*job.Status.Status]).To(Equal("FAILED"))
+						Expect(db.JobStatus[job.Status.StatusCode]).To(Equal("FAILED"))
 						Expect(*job.Spec.Command).To(Equal([]string{"false"}))
 					}
 				}
@@ -172,14 +172,14 @@ var _ = Describe("Jobs", Ordered, func() {
 				Expect(len(jobs)).To(BeNumerically(">", 0))
 				fmt.Printf("%-5s  %-12s  %-10s  %-20s  %-s\n", "ID", "JOB-NAME", "STATUS", "REQUESTED-TIME", "COMMAND")
 				for _, job := range jobs {
-					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 				}
 			})
 
 			It("ジョブ3の取り出しと実行", func() {
 				job, err := j.FetchJob()
 				Expect(err).NotTo(HaveOccurred())
-				fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+				fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 				Expect(job.Id).To(Equal(entryJobId))
 				err = j.RunJob(job)
 				Expect(err).NotTo(HaveOccurred())
@@ -189,7 +189,7 @@ var _ = Describe("Jobs", Ordered, func() {
 			It("ジョブ4の取り出しと実行", func() {
 				job, err := j.FetchJob()
 				Expect(err).NotTo(HaveOccurred())
-				fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+				fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 				err = j.RunJob(job)
 				// ジョブが開始されれば、ジョブが失敗してもエラーにはならない
 				Expect(err).NotTo(HaveOccurred())
@@ -202,7 +202,7 @@ var _ = Describe("Jobs", Ordered, func() {
 				Expect(len(jobs)).To(BeNumerically(">", 0))
 				fmt.Printf("%-5s  %-12s  %-10s  %-20s  %-s\n", "ID", "JOB-NAME", "STATUS", "REQUESTED-TIME", "COMMAND")
 				for _, job := range jobs {
-					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 				}
 			})
 
@@ -220,7 +220,7 @@ var _ = Describe("Jobs", Ordered, func() {
 				Expect(len(jobs)).To(BeNumerically(">", 0))
 				fmt.Printf("%-5s  %-12s  %-10s  %-20s  %-s\n", "ID", "JOB-NAME", "STATUS", "REQUESTED-TIME", "COMMAND")
 				for _, job := range jobs {
-					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 				}
 			})
 
@@ -239,7 +239,7 @@ var _ = Describe("Jobs", Ordered, func() {
 				Expect(len(jobs)).To(BeNumerically(">", 0))
 				fmt.Printf("%-5s  %-12s  %-10s  %-20s  %-s\n", "ID", "JOB-NAME", "STATUS", "REQUESTED-TIME", "COMMAND")
 				for _, job := range jobs {
-					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 				}
 			})
 
@@ -249,7 +249,7 @@ var _ = Describe("Jobs", Ordered, func() {
 				Expect(len(jobs)).To(Equal(0))
 				fmt.Printf("%-5s  %-12s  %-10s  %-20s  %-s\n", "ID", "JOB-NAME", "STATUS", "REQUESTED-TIME", "COMMAND")
 				for _, job := range jobs {
-					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 				}
 			})
 
@@ -261,7 +261,7 @@ var _ = Describe("Jobs", Ordered, func() {
 				Expect(len(jobs)).To(BeNumerically(">", 0))
 				fmt.Printf("%-5s  %-12s  %-10s  %-20s  %-s\n", "ID", "JOB-NAME", "STATUS", "REQUESTED-TIME", "COMMAND")
 				for _, job := range jobs {
-					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 				}
 			})
 
@@ -278,7 +278,7 @@ var _ = Describe("Jobs", Ordered, func() {
 				Expect(len(jobs)).To(BeNumerically(">", 0))
 				fmt.Printf("%-5s  %-12s  %-10s  %-20s  %-s\n", "ID", "JOB-NAME", "STATUS", "REQUESTED-TIME", "COMMAND")
 				for _, job := range jobs {
-					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 				}
 			})
 
@@ -288,14 +288,14 @@ var _ = Describe("Jobs", Ordered, func() {
 				Expect(len(jobs)).To(BeNumerically(">", 0))
 				fmt.Printf("%-5s  %-12s  %-10s  %-20s  %-s\n", "ID", "JOB-NAME", "STATUS", "REQUESTED-TIME", "COMMAND")
 				for _, job := range jobs {
-					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 				}
 			})
 
 			It("未実行のジョブ６の実行開始", func() {
 				job, err := j.FetchJob()
 				Expect(err).NotTo(HaveOccurred())
-				fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+				fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 
 				go func() {
 					err = j.RunJob(job)
@@ -310,9 +310,9 @@ var _ = Describe("Jobs", Ordered, func() {
 				fmt.Printf("%-5s  %-12s  %-10s  %-20s  %-s\n", "ID", "JOB-NAME", "STATUS", "DURATION-TIME", "COMMAND")
 				for _, job := range jobs {
 					if job.Spec.StartTime != nil {
-						fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], (time.Since(*job.Spec.StartTime) * time.Second), *job.Spec.Command)
+						fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], (time.Since(*job.Spec.StartTime) * time.Second), *job.Spec.Command)
 					} else {
-						fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], 0 * time.Second, *job.Spec.Command)
+						fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], 0 * time.Second, *job.Spec.Command)
 					}
 				}
 			})
@@ -326,7 +326,7 @@ var _ = Describe("Jobs", Ordered, func() {
 						break
 					}
 					for _, job := range jobs {
-						fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+						fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 					}
 					time.Sleep(5 * time.Second)
 				}
@@ -337,7 +337,7 @@ var _ = Describe("Jobs", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 				fmt.Printf("%-5s  %-12s  %-10s  %-20s  %-s\n", "ID", "JOB-NAME", "STATUS", "REQUESTED-TIME", "COMMAND")
 				for _, job := range jobs {
-					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 				}
 			})
 
@@ -354,7 +354,7 @@ var _ = Describe("Jobs", Ordered, func() {
 				Expect(len(jobs)).To(BeNumerically(">", 0))
 				fmt.Printf("%-5s  %-12s  %-10s  %-20s  %-s\n", "ID", "JOB-NAME", "STATUS", "REQUESTED-TIME", "COMMAND")
 				for _, job := range jobs {
-					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 				}
 			})
 
@@ -362,7 +362,7 @@ var _ = Describe("Jobs", Ordered, func() {
 				job, err := j.FetchJob()
 				Expect(err).NotTo(HaveOccurred())
 				//fmt.Printf("Job ID: %5s, Task: %10s, Args: %v, ReqTime: %20s\n", job.Id, *job.Metadata.Name, *job.Spec.Command, job.Spec.RequestTime.String())
-				fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+				fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 				go func() {
 					err = j.RunJob(job)
 					Expect(err).NotTo(HaveOccurred())
@@ -377,7 +377,7 @@ var _ = Describe("Jobs", Ordered, func() {
 				Expect(len(jobs)).To(BeNumerically(">", 0))
 				fmt.Printf("%-5s  %-12s  %-10s  %-20s  %-s\n", "ID", "JOB-NAME", "STATUS", "REQUESTED-TIME", "COMMAND")
 				for _, job := range jobs {
-					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 				}
 			})
 
@@ -391,7 +391,7 @@ var _ = Describe("Jobs", Ordered, func() {
 						break
 					}
 					for _, job := range jobs {
-						fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+						fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 					}
 					time.Sleep(5 * time.Second)
 				}
@@ -403,7 +403,7 @@ var _ = Describe("Jobs", Ordered, func() {
 				Expect(len(jobs)).To(BeNumerically(">", 0))
 				fmt.Printf("%-5s  %-12s  %-10s  %-20s  %-s\n", "ID", "JOB-NAME", "STATUS", "REQUESTED-TIME", "COMMAND")
 				for _, job := range jobs {
-					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 				}
 			})
 
@@ -415,7 +415,7 @@ var _ = Describe("Jobs", Ordered, func() {
 				Expect(len(jobs)).To(BeNumerically(">", 0))
 				fmt.Printf("%-5s  %-12s  %-10s  %-20s  %-s\n", "ID", "JOB-NAME", "STATUS", "REQUESTED-TIME", "COMMAND")
 				for _, job := range jobs {
-					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[*job.Status.Status], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
+					fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], job.Spec.RequestTime.Format(time.DateTime), *job.Spec.Command)
 				}
 			})
 

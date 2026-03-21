@@ -77,22 +77,23 @@ func (c *controller) serverControllerLoop() {
 			deletionTime := *spec.Status.DeletionTimeStamp
 			if time.Since(deletionTime) > 10*time.Second {
 				slog.Debug("削除のタイムスタンプが一定時間以上経過しているサーバー検出", "SERVER", spec.Id)
-				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_DELETING)
+				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_DELETING, "")
 			}
 		}
 
 		// サーバーの状態チェックと処理
 		// ここでワークキューに積むなどの処理を行う
-		switch *spec.Status.Status {
+		switch spec.Status.StatusCode {
 		case db.SERVER_PENDING:
 			slog.Debug("生成待ち状態のサーバー検出", "SERVER", spec.Id)
-			c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_PROVISIONING)
+			c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_PROVISIONING, "")
 			if _, err := c.marmot.CreateServerManage(spec.Id); err != nil {
 				slog.Error("CreateServerManage()", "err", err)
-				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR)
+				msg := fmt.Sprintf("サーバーのプロビジョニングに失敗: %v", err)
+				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR, msg)
 				continue
 			}
-			c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_RUNNING)
+			c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_RUNNING, "")
 		case db.SERVER_RUNNING:
 			slog.Debug("稼働中のサーバー検出", "SERVER", spec.Id)
 		case db.SERVER_STOPPED:
@@ -105,7 +106,8 @@ func (c *controller) serverControllerLoop() {
 			// 仮想マシンの削除処理の実行
 			if err := c.marmot.DeleteServerByIdManage(spec.Id); err != nil {
 				slog.Error("DeleteServerById()", "err", err)
-				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR)
+				msg := fmt.Sprintf("サーバーの削除に失敗: %v", err)
+				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR, msg)
 			}
 
 			// IPアドレス開放処理の実行
@@ -140,8 +142,8 @@ func (c *controller) serverControllerLoop() {
 			// データベースから削除する
 			if err := c.marmot.Db.DeleteServerById(spec.Id); err != nil {
 				slog.Error("DeleteServerById()", "err", err)
-				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR)
-				// 削除処理が失敗した場合は、データベースにエラーの内容を記録できると良いな。
+				msg := fmt.Sprintf("サーバーのデータベースからの削除に失敗: %v", err)
+				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR, msg)
 			}
 
 		case db.SERVER_PROVISIONING:

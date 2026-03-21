@@ -86,7 +86,8 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 	volume.Metadata.Key = util.StringPtr(key)
 	volume.Status.CreationTimeStamp = util.TimePtr(time.Now())
 	volume.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
-	volume.Status.Status = util.IntPtrInt(VOLUME_PROVISIONING)
+	volume.Status.StatusCode = VOLUME_PROVISIONING
+	volume.Status.Status = util.StringPtr(VolStatus[volume.Status.StatusCode])
 
 	// 指定が無い項目についてデフォルト値を設定する
 	if volume.Metadata.Name == nil {
@@ -358,7 +359,9 @@ func (d *Database) UpdateVolumeStatus(id string, status int) {
 		//panic(fmt.Sprintf("failed to get volume by id: %s", id))
 	}
 	vol.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
-	vol.Status.Status = util.IntPtrInt(status)
+	vol.Status.StatusCode = status
+	vol.Status.Status = util.StringPtr(VolStatus[vol.Status.StatusCode])
+
 	if err = d.UpdateVolume(id, vol); err != nil {
 		slog.Error("panic! failed to update volume", "err", err, "volId", id)
 		//panic(fmt.Sprintf("failed to update volume: %s", id))

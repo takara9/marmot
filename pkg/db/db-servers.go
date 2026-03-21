@@ -59,7 +59,8 @@ func (d *Database) MakeServerEntry(spec api.Server) (api.Server, error) {
 
 	// ステータスセット、タイムスタンプセット
 	var s api.Status
-	s.Status = util.IntPtrInt(SERVER_PENDING)
+	s.StatusCode = SERVER_PENDING
+	s.Status = util.StringPtr(ServerStatus[s.StatusCode])
 	s.CreationTimeStamp = util.TimePtr(time.Now())
 	s.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	server.Status = &s
@@ -183,13 +184,15 @@ func (d *Database) updateServer(id string, spec api.Server) error {
 }
 
 // サーバーオブジェクトのステータスを更新
-func (d *Database) UpdateServerStatus(id string, status int) {
+func (d *Database) UpdateServerStatus(id string, status int, message string) {
 	server, err := d.GetServerById(id)
 	if err != nil {
 		slog.Error("UpdateServerStatus() GetServerById() failed", "err", err, "serverId", id)
 		panic(err)
 	}
-	server.Status.Status = util.IntPtrInt(status)
+	server.Status.StatusCode = status
+	server.Status.Status = util.StringPtr(ServerStatus[status])
+	server.Status.Message = util.StringPtr(message)
 	server.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	if err := d.UpdateServer(id, server); err != nil {
 		slog.Error("UpdateServerStatus() UpdateServer() failed", "err", err, "serverId", id)

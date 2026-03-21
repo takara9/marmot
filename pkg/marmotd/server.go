@@ -455,7 +455,8 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	}
 
 	// ステータスを利用可能に更新、更新日時もセット
-	serverConfig.Status.Status = util.IntPtrInt(db.SERVER_RUNNING)
+	serverConfig.Status.StatusCode = db.SERVER_RUNNING
+	serverConfig.Status.Status = util.StringPtr(db.ServerStatus[serverConfig.Status.StatusCode])
 	serverConfig.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	err = m.Db.UpdateServer(serverConfig.Id, serverConfig)
 	if err != nil {
@@ -579,7 +580,7 @@ func (m *Marmot) CreateNewVolumeWithWait(volReq api.Volume) (api.Volume, error) 
 			return api.Volume{}, err
 		}
 		slog.Debug("ブートボリュームのステータス確認ループ", "volume id", vol.Id, "status", vol.Status.Status)
-		if *vol.Status.Status == db.VOLUME_AVAILABLE {
+		if vol.Status.StatusCode == db.VOLUME_AVAILABLE {
 			slog.Debug("ブートボリュームのステータスがAVAILABLEになった", "volume id", vol.Id)
 			break
 		}

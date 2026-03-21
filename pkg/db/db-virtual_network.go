@@ -80,7 +80,8 @@ func (d *Database) CreateVirtualNetwork(spec api.VirtualNetwork) (api.VirtualNet
 
 	// ステータスセット、タイムスタンプセット
 	var s api.Status
-	s.Status = util.IntPtrInt(NETWORK_PENDING)
+	s.StatusCode = NETWORK_PENDING
+	s.Status = util.StringPtr(NetworkStatus[s.StatusCode])
 	s.CreationTimeStamp = util.TimePtr(time.Now())
 	s.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	network.Status = &s
@@ -269,7 +270,8 @@ func (d *Database) UpdateVirtualNetworkStatus(id string, status int) {
 		slog.Error("UpdateVirtualNetworkStatus() GetVirtualNetworkById() failed", "err", err, "networkId", id)
 		panic(err)
 	}
-	network.Status.Status = util.IntPtrInt(status)
+	network.Status.StatusCode = status
+	network.Status.Status = util.StringPtr(NetworkStatus[network.Status.StatusCode])
 	network.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	if err := d.UpdateVirtualNetworkById(id, network); err != nil {
 		slog.Error("UpdateVirtualNetworkStatus() UpdateVirtualNetwork() failed", "err", err, "networkId", id)
@@ -312,7 +314,8 @@ func (d *Database) PutVirtualNetworksETCD(vnet api.VirtualNetwork) error {
 
 	// ステータスセット、タイムスタンプセット
 	var s api.Status
-	s.Status = util.IntPtrInt(NETWORK_PENDING)
+	s.StatusCode = NETWORK_PENDING
+	s.Status = util.StringPtr(NetworkStatus[s.StatusCode])
 	s.CreationTimeStamp = util.TimePtr(time.Now())
 	s.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	network.Status = &s

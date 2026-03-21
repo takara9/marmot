@@ -67,11 +67,11 @@ func (c *controller) imageControllerLoop() {
 			slog.Error("failed to marshal image", "err", err)
 			continue
 		}
-		slog.Debug("イメージの状態を確認", "image", *image.Metadata.Name, "state", db.ImageStatus[*image.Status.Status])
+		slog.Debug("イメージの状態を確認", "image", *image.Metadata.Name, "state", db.ImageStatus[image.Status.StatusCode])
 		fmt.Println("details", string(jsonBytes))
 
 		// イメージの状態に応じた処理
-		switch *image.Status.Status {
+		switch image.Status.StatusCode {
 		case db.IMAGE_PENDING:
 			slog.Info("イメージの作成処理を実行", "image", *image.Metadata.Name)
 			c.marmot.Db.UpdateImageStatus(image.Id, db.IMAGE_CREATING)
