@@ -180,7 +180,7 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 				sv, err := marmotServer.Ma.GetServerManage(id)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
+				g.Expect(sv.Status.StatusCode).To(Equal(db.SERVER_RUNNING))
 			}, "300s", "10s").Should(Succeed())
 		})
 
@@ -258,7 +258,7 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 				sv, err := marmotServer.Ma.GetServerManage(id)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
+				g.Expect(sv.Status.StatusCode).To(Equal(db.SERVER_RUNNING))
 			}, "600s", "10s").Should(Succeed())
 		})
 
@@ -332,7 +332,7 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 				sv, err := marmotServer.Ma.GetServerManage(id)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
+				g.Expect(sv.Status.StatusCode).To(Equal(db.SERVER_RUNNING))
 			}, "180s", "10s").Should(Succeed())
 		})
 
@@ -392,7 +392,7 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 				sv, err := marmotServer.Ma.GetServerManage(id)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
+				g.Expect(sv.Status.StatusCode).To(Equal(db.SERVER_RUNNING))
 			}, "180s", "10s").Should(Succeed())
 		})
 
@@ -475,7 +475,7 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 				sv, err := marmotServer.Ma.GetServerManage(id)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
+				g.Expect(sv.Status.StatusCode).To(Equal(db.SERVER_RUNNING))
 			}, "180s", "10s").Should(Succeed())
 		})
 
