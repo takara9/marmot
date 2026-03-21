@@ -100,7 +100,7 @@ var _ = Describe("Networks", Ordered, func() {
 				jsonData, err := json.MarshalIndent(net, "", "  ")
 				Expect(err).NotTo(HaveOccurred())
 				fmt.Println(string(jsonData))
-				Expect(*net.Status.Status).To(Equal(db.NETWORK_ACTIVE))
+				Expect(net.Status.StatusCode).To(Equal(db.NETWORK_ACTIVE))
 			})
 
 			It("ネットワークの作成 #2", func() {
