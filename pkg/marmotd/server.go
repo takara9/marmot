@@ -109,6 +109,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			vnet, err := m.Db.GetVirtualNetworkByName(reqNic.Networkname)
 			if err != nil {
 				slog.Error("GetVirtualNetworkByName()", "err", err, "network name", reqNic.Networkname)
+				if err.Error() == "not found" {
+					err = fmt.Errorf("network '%s' is not found", reqNic.Networkname)
+				}
 				return "", err
 			}
 

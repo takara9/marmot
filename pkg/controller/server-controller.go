@@ -88,7 +88,7 @@ func (c *controller) serverControllerLoop() {
 			c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_PROVISIONING, "")
 			if _, err := c.marmot.CreateServerManage(spec.Id); err != nil {
 				slog.Error("CreateServerManage()", "err", err)
-				msg := fmt.Sprintf("サーバーのプロビジョニングに失敗: %v", err)
+				msg := fmt.Sprintf("サーバーのプロビジョニングに失敗した。原因エラー: %v", err)
 				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR, msg)
 				continue
 			}
