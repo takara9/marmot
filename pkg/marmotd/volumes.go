@@ -5,6 +5,7 @@ package marmotd
 import (
 	"errors"
 	"log/slog"
+	"time"
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
@@ -56,7 +57,11 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 
 			// 取得したLV名とサイズで、データベースを更新
 			slog.Debug("qcow2ボリュームの状態変更", "volId", volSpec.Id)
-			m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_AVAILABLE)
+			volSpec.Status.Message = nil
+			volSpec.Status.StatusCode = db.VOLUME_AVAILABLE
+			volSpec.Status.Status = util.StringPtr(db.VolStatus[db.VOLUME_AVAILABLE])
+			volSpec.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+			m.Db.UpdateVolumeStatus(volSpec.Id, volSpec.Status.StatusCode)
 			slog.Debug("qcow2ボリュームの更新完了", "volId", volSpec.Id)
 
 			return &volSpec, nil
@@ -104,7 +109,11 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 			}
 
 			slog.Debug("OSボリュームののVGとLVでDBを更新", "Vol Id", volSpec.Id) // 取得したLV名をデータベースの登録
-			m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_AVAILABLE)
+			volSpec.Status.Message = nil
+			volSpec.Status.StatusCode = db.VOLUME_AVAILABLE
+			volSpec.Status.Status = util.StringPtr(db.VolStatus[db.VOLUME_AVAILABLE])
+			volSpec.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+			m.Db.UpdateVolumeStatus(volSpec.Id, volSpec.Status.StatusCode)
 			slog.Debug("OSボリュームの情報更新 成功", "volId", volSpec.Id)
 			return &volSpec, nil
 

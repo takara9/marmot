@@ -192,7 +192,11 @@ func (d *Database) UpdateServerStatus(id string, status int, message string) {
 	}
 	server.Status.StatusCode = status
 	server.Status.Status = util.StringPtr(ServerStatus[status])
-	server.Status.Message = util.StringPtr(message)
+	if len(message) > 0 {
+		server.Status.Message = util.StringPtr(message)
+	} else {
+		server.Status.Message = nil
+	}
 	server.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	if err := d.UpdateServer(id, server); err != nil {
 		slog.Error("UpdateServerStatus() UpdateServer() failed", "err", err, "serverId", id)

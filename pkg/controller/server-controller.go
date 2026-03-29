@@ -81,8 +81,7 @@ func (c *controller) serverControllerLoop() {
 			}
 		}
 
-		// サーバーの状態チェックと処理
-		// ここでワークキューに積むなどの処理を行う
+		// サーバーの状態に応じた処理を実行する
 		switch spec.Status.StatusCode {
 		case db.SERVER_PENDING:
 			slog.Debug("生成待ち状態のサーバー検出", "SERVER", spec.Id)
@@ -120,22 +119,22 @@ func (c *controller) serverControllerLoop() {
 						continue
 					}
 					fmt.Println(string(jsonbyte))
-					fmt.Println("============================================")
-					fmt.Println("address:", *nic.Address)
-					fmt.Println("ipNetworkId:", *nic.IpNetworkId)
-					fmt.Println("networkId:", nic.Networkid)
-					//if nic.Address != nil && nic.IpNetworkId != nil && nic.Networkid != "" {
-					if err := c.marmot.Db.ReleaseIP(nic.Networkid, *nic.IpNetworkId, *nic.Address); err != nil {
-						slog.Error("ReleaseIP()", "err", err)
-						continue
+					fmt.Println("=========================================")
+
+					if nic.IpNetworkId != nil && nic.Address != nil {
+						if err := c.marmot.Db.ReleaseIP(nic.Networkid, *nic.IpNetworkId, *nic.Address); err != nil {
+							slog.Error("ReleaseIP()", "err", err)
+							continue
+						}
 					}
 
 					// 内部DNSからエントリーを削除する
-					if err := c.marmot.Db.DeleteDnsEntryByName(*spec.Metadata.Name, nic.Networkname); err != nil {
-						slog.Error("DeleteDnsEntryByName()", "err", err)
-						continue
+					if spec.Metadata != nil && spec.Metadata.Name != nil {
+						if err := c.marmot.Db.DeleteDnsEntryByName(*spec.Metadata.Name, nic.Networkname); err != nil {
+							slog.Error("DeleteDnsEntryByName()", "err", err)
+							continue
+						}
 					}
-					//}
 				}
 			}
 

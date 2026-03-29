@@ -188,6 +188,8 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 						slog.Error("PutDnsEntry()", "err", err)
 						return "", err
 					}
+				} else {
+					slog.Debug("IPネットワークIDが指定されていないため、IPアドレスの割り当てができない", "network id", vnet.Id, "network name", vnet.Metadata.Name)
 				}
 			}
 
@@ -225,8 +227,14 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			}
 
 			ni.Mac = &ns.MAC
-			ni.Address = util.StringPtr(ipaddr)
-			ni.Netmasklen = util.IntPtrInt(bitmask)
+			// IPアドレスとネットマスク長があれば、ネットワークインターフェースの情報にセットする
+			if len(ipaddr) > 0 {
+				ni.Address = util.StringPtr(ipaddr)
+			}
+			if bitmask > 0 {
+				ni.Netmasklen = util.IntPtrInt(bitmask)
+			}
+
 			ni.Routes = reqNic.Routes
 			ni.Nameservers = reqNic.Nameservers
 
