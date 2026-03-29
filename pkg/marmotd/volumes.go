@@ -74,7 +74,11 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 				return nil, err
 			}
 			slog.Debug("Dataボリュームの情報更新 成功", "volId", volSpec.Id)
-			m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_AVAILABLE)
+			volSpec.Status.Message = nil
+			volSpec.Status.StatusCode = db.VOLUME_AVAILABLE
+			volSpec.Status.Status = util.StringPtr(db.VolStatus[db.VOLUME_AVAILABLE])
+			volSpec.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+			m.Db.UpdateVolumeStatus(volSpec.Id, volSpec.Status.StatusCode)
 			return &volSpec, nil
 		default:
 			err := errors.New("unsupported unknown volume kind and type")
@@ -126,7 +130,11 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 			}
 
 			slog.Debug("Dataボリュームの生成 成功", "LV Name", *volSpec.Spec.LogicalVolume, "VG Name", *volSpec.Spec.VolumeGroup, "Size", *volSpec.Spec.Size, "volId", volSpec.Id)
-			m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_AVAILABLE)
+			volSpec.Status.Message = nil
+			volSpec.Status.StatusCode = db.VOLUME_AVAILABLE
+			volSpec.Status.Status = util.StringPtr(db.VolStatus[db.VOLUME_AVAILABLE])
+			volSpec.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+			m.Db.UpdateVolumeStatus(volSpec.Id, volSpec.Status.StatusCode)
 			slog.Debug("Dataボリュームの情報更新 成功", "volId", volSpec.Id)
 			return &volSpec, nil
 		default:
