@@ -512,7 +512,7 @@ func (m *Marmot) DeleteServerByIdManage(id string) error {
 
 	// データボリュームの削除タイムスタンプのセット
 	if sv.Spec.Storage != nil {
-		slog.Debug("アタッチされているボリュームの削除", "ボリューム数", len(*sv.Spec.Storage))
+		slog.Debug("アタッチされているボリューム削除のため Deletion Timestamp をセット", "ボリューム数", len(*sv.Spec.Storage))
 		for i, vol := range *sv.Spec.Storage {
 			slog.Debug("DeleteServerById()", "index", i, "deleting volume id", vol.Id)
 			if vol.Spec.Persistent != nil && *vol.Spec.Persistent {

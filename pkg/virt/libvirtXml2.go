@@ -2,6 +2,8 @@ package virt
 
 import (
 	"fmt"
+	"log/slog"
+	"time"
 
 	"libvirt.org/go/libvirt"
 	"libvirt.org/go/libvirtxml"
@@ -382,18 +384,30 @@ func (l *LibVirtEp) ListDomains() ([]string, error) {
 func (l *LibVirtEp) DeleteDomain(vmname string) error {
 	domain, err := l.Com.LookupDomainByName(vmname)
 	if err != nil {
+		slog.Error("LookupDomainByName()", "err", err)
 		return err
 	}
 
 	// ドメインの停止
 	err = domain.Destroy()
 	if err != nil {
+		slog.Error("Destroy()", "err", err)
 		return err
+	}
+
+	for i := 0; i < 5; i++ {
+		_, err := l.Com.LookupDomainByName(vmname)
+		if err != nil {
+			slog.Error("LookupDomainByName()", "err", err)
+			break
+		}
+		time.Sleep(1 * time.Second)
 	}
 
 	// ドメインの削除
 	err = domain.Undefine()
 	if err != nil {
+		slog.Error("Undefine()", "err", err)
 		return err
 	}
 

@@ -186,6 +186,7 @@ func UnMountVolume(v api.Volume, mountPoint string, nbdDevice string) error {
 		slog.Error("umount command failed", "error", err, "mountPoint", mountPoint)
 		return err
 	}
+	slog.Debug("Unmounted volume", "type", *v.Spec.Type, "mountPoint", mountPoint)
 
 	switch *v.Spec.Type {
 	case "qcow2":
@@ -206,10 +207,15 @@ func UnMountVolume(v api.Volume, mountPoint string, nbdDevice string) error {
 		}
 
 	case "lvm":
-		lvPath := fmt.Sprintf("/dev/mapper/%s-%s", *v.Spec.VolumeGroup, *v.Spec.LogicalVolume)
-		if _, err := exec.Command("kpartx", "-d", lvPath).CombinedOutput(); err != nil {
-			slog.Error("kpartx -d command failed", "error", err)
-			return err
+		for i := 0; i < 3; i++ {
+			// *v.Spec.LogicalVolumeの名前の - を -- に変換して、kpartx -d コマンドでデバイスマップを削除する
+			lvName := strings.Replace(*v.Spec.LogicalVolume, "-", "--", -1)
+			lvPath := fmt.Sprintf("/dev/mapper/%s-%s", *v.Spec.VolumeGroup, lvName)
+			if _, err := exec.Command("kpartx", "-d", lvPath).CombinedOutput(); err != nil {
+				slog.Error("kpartx -d command failed", "error", err, "lvPath", lvPath)
+				//return err
+			}
+			time.Sleep(5 * time.Second) // 少し待つ
 		}
 
 	default:
