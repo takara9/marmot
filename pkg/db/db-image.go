@@ -70,8 +70,11 @@ func (d *Database) MakeImageEntryFromURL(name, url string) (string, error) {
 			SourceUrl: &url,
 		},
 		Status: &api.Status{
-			StatusCode: IMAGE_PENDING,
-			Status: util.StringPtr(ImageStatus[IMAGE_PENDING]),
+			StatusCode:          IMAGE_PENDING,
+			Status:              util.StringPtr(ImageStatus[IMAGE_PENDING]),
+			CreationTimeStamp:   util.TimePtr(time.Now()),
+			LastUpdateTimeStamp: util.TimePtr(time.Now()),
+			Message:             util.StringPtr("イメージの作成処理の開始待ち"),
 		},
 	}
 	key := ImagePrefix + "/" + id
@@ -139,9 +142,10 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 				SourceUrl:     nil,
 			},
 			Status: &api.Status{
-				StatusCode: IMAGE_PENDING,
-				Status: util.StringPtr(ImageStatus[IMAGE_PENDING]),
-
+				StatusCode:          IMAGE_PENDING,
+				Status:              util.StringPtr(ImageStatus[IMAGE_PENDING]),
+				CreationTimeStamp:   util.TimePtr(time.Now()),
+				LastUpdateTimeStamp: util.TimePtr(time.Now()),
 			},
 		}
 	} else if bootVol.Spec.Type != nil && *bootVol.Spec.Type == "lvm" {
@@ -166,7 +170,7 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 			},
 			Status: &api.Status{
 				StatusCode: IMAGE_PENDING,
-				Status: util.StringPtr(ImageStatus[IMAGE_PENDING]),
+				Status:     util.StringPtr(ImageStatus[IMAGE_PENDING]),
 			},
 		}
 	} else {
@@ -243,7 +247,7 @@ func (d *Database) UpdateImageStatus(id string, status int) {
 	}
 	image.Status.StatusCode = status
 	image.Status.Status = util.StringPtr(ImageStatus[status])
-	image.Status.DeletionTimeStamp = util.TimePtr(time.Now())
+	image.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	if err := d.UpdateImage(id, image); err != nil {
 		slog.Error("SetDeleteTimestamp() UpdateImage() failed", "err", err, "imageId", id)
 		panic(err)

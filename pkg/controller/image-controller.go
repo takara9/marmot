@@ -76,12 +76,12 @@ func (c *controller) imageControllerLoop() {
 			slog.Info("イメージの作成処理を実行", "image", *image.Metadata.Name)
 			c.marmot.Db.UpdateImageStatus(image.Id, db.IMAGE_CREATING)
 			// ラベルの存在をチェック,
-			if image.Metadata.Labels == nil || (*image.Metadata.Labels)["source"] == "bootVolume" {
-				slog.Info("イメージの作成処理を実行", "image", *image.Metadata.Name, "source", "bootVolume")
+			if image.Metadata.Labels != nil && (*image.Metadata.Labels)["source"] == "bootVolume" {
+				slog.Info("実行中VMからイメージの作成", "image", *image.Metadata.Name, "source", "bootVolume")
 				serverId := (*image.Metadata.Labels)["serverId"].(string)
 				go c.marmot.MakeImageEntryFromRunningVM(serverId, *image.Metadata.Name, image)
 			} else {
-				slog.Info("イメージの作成処理を実行", "image", *image.Metadata.Name, "source", "url")
+				slog.Info("ダウンロードしてイメージの作成", "image", *image.Metadata.Name, "source", "url")
 				go c.marmot.CreateNewImageManage(image.Id)
 			}
 		case db.IMAGE_CREATING:

@@ -51,11 +51,23 @@ func (m *Marmot) CreateNewImageManage(id string) (*api.Image, error) {
 		return nil, err
 	}
 
+	image.Status.Message = util.StringPtr("イメージの作成処理を開始")
+	if err := m.Db.UpdateImage(id, image); err != nil {
+		slog.Error("Failed to update image status in DB", "imgId", id, "err", err)
+		return nil, err
+	}
+
 	if image.Spec == nil || image.Spec.SourceUrl == nil || *image.Spec.SourceUrl == "" {
 		slog.Error("sourceUrl is empty", "imgId", id)
 		return nil, fmt.Errorf("sourceUrl is empty: id=%s", id)
 	}
 	src := *image.Spec.SourceUrl
+
+	image.Status.Message = util.StringPtr("ダウンロード進行中")
+	if err := m.Db.UpdateImage(id, image); err != nil {
+		slog.Error("Failed to update image status in DB", "imgId", id, "err", err)
+		return nil, err
+	}
 
 	downloadPath, err := resolveImagePath(imageDir, src)
 	if err != nil {
@@ -66,6 +78,12 @@ func (m *Marmot) CreateNewImageManage(id string) (*api.Image, error) {
 	// イメージをダウンロードする
 	if err := downloadImage(src, downloadPath); err != nil {
 		slog.Error("Failed to download image", "imgId", id, "url", src, "err", err)
+		return nil, err
+	}
+
+	image.Status.Message = util.StringPtr("OSイメージを設定中")
+	if err := m.Db.UpdateImage(id, image); err != nil {
+		slog.Error("Failed to update image status in DB", "imgId", id, "err", err)
 		return nil, err
 	}
 
@@ -90,6 +108,12 @@ func (m *Marmot) CreateNewImageManage(id string) (*api.Image, error) {
 		return nil, err
 	}
 
+	image.Status.Message = util.StringPtr("OSイメージをロジカルボリュームに転送中")
+	if err := m.Db.UpdateImage(id, image); err != nil {
+		slog.Error("Failed to update image status in DB", "imgId", id, "err", err)
+		return nil, err
+	}
+
 	// イメージをLVにコピーする
 	lvPath, lvName, err := createBootableLVFromQCOW2(ctx, id, downloadPath)
 	if err != nil {
@@ -108,8 +132,9 @@ func (m *Marmot) CreateNewImageManage(id string) (*api.Image, error) {
 	image.Spec.Size = util.IntPtrInt(bootVolumeSizeGB)
 	image.Status.StatusCode = db.IMAGE_AVAILABLE
 	image.Status.Status = util.StringPtr(db.ImageStatus[db.IMAGE_AVAILABLE])
+	image.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+	image.Status.Message = nil
 
-	// ここで保存されていない！
 	if err := m.Db.UpdateImage(id, image); err != nil {
 		slog.Error("Failed to update image data in DB", "imgId", id, "err", err)
 		return nil, err
