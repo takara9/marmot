@@ -103,7 +103,10 @@ func (d *Job) EntryJob(name string, cmd ...string) (string, error) {
 	for _, c := range cmd {
 		*job.Spec.Command = append(*job.Spec.Command, c)
 	}
-	job.Status.Status = util.IntPtrInt(JOB_PENDING)
+	job.Status.StatusCode = JOB_PENDING
+	job.Status.Status = util.StringPtr(JobStatus[job.Status.StatusCode])
+	job.Status.CreationTimeStamp = util.TimePtr(time.Now())
+	job.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
 
 	// ジョブのIDの重複は発生しないので、排他制御しない
 	Key := JobPrefix + "/" + job.Id
@@ -143,7 +146,9 @@ func (d *Job) CancelJob(id string) error {
 	}
 
 	// 状態をキャンセルにして
-	job.Status.Status = util.IntPtrInt(JOB_CANCELED)
+	job.Status.StatusCode = JOB_CANCELED
+	job.Status.Status = util.StringPtr(JobStatus[job.Status.StatusCode])
+	job.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
 
 	// データを保存する
 	key := JobPrefix + "/" + id
@@ -172,7 +177,7 @@ func (d *Job) GetJobs(jobStatus int) ([]api.Job, error) {
 			return nil, err
 		}
 		// 未処理ジョブのみ抽出
-		if *job.Status.Status == jobStatus {
+		if job.Status.StatusCode == jobStatus {
 			jobs = append(jobs, job)
 		}
 	}
@@ -240,7 +245,8 @@ func (d *Job) RunJob(job api.Job) error {
 
 	// ジョブ状態の更新 （ここだけ別関数にして排他制御を入れるのが良いかも）
 	key := JobPrefix + "/" + job.Id
-	job.Status.Status = util.IntPtrInt(JOB_RUNNING)
+	job.Status.StatusCode = JOB_RUNNING
+	job.Status.Status = util.StringPtr(JobStatus[job.Status.StatusCode])
 	job.Spec.StartTime = util.TimePtr(time.Now())
 	if err := d.Database.PutJSON(key, job); err != nil {
 		slog.Error("failed to put job entry", "err", err, "key", key)
@@ -309,12 +315,14 @@ func (d *Job) RunJob(job api.Job) error {
 	job.Spec.FinishTime = util.TimePtr(time.Now())
 	job.Spec.ExitCode = util.IntPtrInt(cmd.ProcessState.ExitCode())
 	if *job.Spec.ExitCode == 0 {
-		job.Status.Status = util.IntPtrInt(JOB_SUCCEEDED)
+		job.Status.StatusCode = JOB_SUCCEEDED
+		job.Status.Status = util.StringPtr(JobStatus[job.Status.StatusCode])
 	} else {
-		job.Status.Status = util.IntPtrInt(JOB_FAILED)
+		job.Status.StatusCode = JOB_FAILED
+		job.Status.Status = util.StringPtr(JobStatus[job.Status.StatusCode])
 	}
 
-	slog.Info("***PUT ETCD", "key", key, "job-id", job.Id, "status", JobStatus[*job.Status.Status], "exit-code", *job.Spec.ExitCode)
+	slog.Info("***PUT ETCD", "key", key, "job-id", job.Id, "status", JobStatus[job.Status.StatusCode], "exit-code", *job.Spec.ExitCode)
 
 	if err := d.Database.PutJSON(key, job); err != nil {
 		slog.Error("failed to write Job data", "err", err, "key", key)

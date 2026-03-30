@@ -5,6 +5,7 @@ package marmotd
 import (
 	"errors"
 	"log/slog"
+	"time"
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
@@ -56,7 +57,11 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 
 			// 取得したLV名とサイズで、データベースを更新
 			slog.Debug("qcow2ボリュームの状態変更", "volId", volSpec.Id)
-			m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_AVAILABLE)
+			volSpec.Status.Message = nil
+			volSpec.Status.StatusCode = db.VOLUME_AVAILABLE
+			volSpec.Status.Status = util.StringPtr(db.VolStatus[db.VOLUME_AVAILABLE])
+			volSpec.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+			m.Db.UpdateVolumeStatus(volSpec.Id, volSpec.Status.StatusCode)
 			slog.Debug("qcow2ボリュームの更新完了", "volId", volSpec.Id)
 
 			return &volSpec, nil
@@ -69,7 +74,11 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 				return nil, err
 			}
 			slog.Debug("Dataボリュームの情報更新 成功", "volId", volSpec.Id)
-			m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_AVAILABLE)
+			volSpec.Status.Message = nil
+			volSpec.Status.StatusCode = db.VOLUME_AVAILABLE
+			volSpec.Status.Status = util.StringPtr(db.VolStatus[db.VOLUME_AVAILABLE])
+			volSpec.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+			m.Db.UpdateVolumeStatus(volSpec.Id, volSpec.Status.StatusCode)
 			return &volSpec, nil
 		default:
 			err := errors.New("unsupported unknown volume kind and type")
@@ -104,7 +113,11 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 			}
 
 			slog.Debug("OSボリュームののVGとLVでDBを更新", "Vol Id", volSpec.Id) // 取得したLV名をデータベースの登録
-			m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_AVAILABLE)
+			volSpec.Status.Message = nil
+			volSpec.Status.StatusCode = db.VOLUME_AVAILABLE
+			volSpec.Status.Status = util.StringPtr(db.VolStatus[db.VOLUME_AVAILABLE])
+			volSpec.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+			m.Db.UpdateVolumeStatus(volSpec.Id, volSpec.Status.StatusCode)
 			slog.Debug("OSボリュームの情報更新 成功", "volId", volSpec.Id)
 			return &volSpec, nil
 
@@ -117,7 +130,11 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 			}
 
 			slog.Debug("Dataボリュームの生成 成功", "LV Name", *volSpec.Spec.LogicalVolume, "VG Name", *volSpec.Spec.VolumeGroup, "Size", *volSpec.Spec.Size, "volId", volSpec.Id)
-			m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_AVAILABLE)
+			volSpec.Status.Message = nil
+			volSpec.Status.StatusCode = db.VOLUME_AVAILABLE
+			volSpec.Status.Status = util.StringPtr(db.VolStatus[db.VOLUME_AVAILABLE])
+			volSpec.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+			m.Db.UpdateVolumeStatus(volSpec.Id, volSpec.Status.StatusCode)
 			slog.Debug("Dataボリュームの情報更新 成功", "volId", volSpec.Id)
 			return &volSpec, nil
 		default:
@@ -150,6 +167,9 @@ func (m *Marmot) RemoveVolume(id string) error {
 		if vol.Spec.VolumeGroup != nil && vol.Spec.LogicalVolume != nil {
 			if err := lvm.RemoveLV(*vol.Spec.VolumeGroup, *vol.Spec.LogicalVolume); err != nil {
 				slog.Error("lvm.RemoveLV()", "err", err)
+                // ここでエラーが発生して、err = "Logical volume vg1/oslv-76c5f is used by another device."　の場合
+				// これは、論理ボリュームがまだ仮想マシンにアタッチされたままになっていることが原因で発生するエラーです。
+				// そのため、論理ボリュームを削除する前に、仮想マシンからデタッチする必要があります。
 			}
 		}
 	} else if *vol.Spec.Type == "qcow2" {

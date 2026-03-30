@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"encoding/json"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -58,30 +56,30 @@ func (c *controller) imageControllerLoop() {
 			deletionTime := *image.Status.DeletionTimeStamp
 			if time.Since(deletionTime) > 10*time.Second {
 				slog.Debug("削除のタイムスタンプが一定時間以上経過しているイメージ検出", "IMAGE", *image.Metadata.Name)
-				c.marmot.Db.SetImageStatus(image.Id, db.IMAGE_DELETING)
+				c.marmot.Db.UpdateImageStatus(image.Id, db.IMAGE_DELETING)
 			}
 		}
 
-		jsonBytes, err := json.MarshalIndent(image, "", "    ")
-		if err != nil {
-			slog.Error("failed to marshal image", "err", err)
-			continue
-		}
-		slog.Debug("イメージの状態を確認", "image", *image.Metadata.Name, "state", db.ImageStatus[*image.Status.Status])
-		fmt.Println("details", string(jsonBytes))
+		//jsonBytes, err := json.MarshalIndent(image, "", "    ")
+		//if err != nil {
+		//	slog.Error("failed to marshal image", "err", err)
+		//	continue
+		//}
+		//fmt.Println("details", string(jsonBytes))
+		slog.Debug("イメージの状態を確認", "image", *image.Metadata.Name, "state", db.ImageStatus[image.Status.StatusCode])
 
 		// イメージの状態に応じた処理
-		switch *image.Status.Status {
+		switch image.Status.StatusCode {
 		case db.IMAGE_PENDING:
 			slog.Info("イメージの作成処理を実行", "image", *image.Metadata.Name)
-			c.marmot.UpdateImageStatus(image.Id, db.IMAGE_CREATING)
+			c.marmot.Db.UpdateImageStatus(image.Id, db.IMAGE_CREATING)
 			// ラベルの存在をチェック,
-			if image.Metadata.Labels == nil || (*image.Metadata.Labels)["source"] == "bootVolume" {
-				slog.Info("イメージの作成処理を実行", "image", *image.Metadata.Name, "source", "bootVolume")
+			if image.Metadata.Labels != nil && (*image.Metadata.Labels)["source"] == "bootVolume" {
+				slog.Info("実行中VMからイメージの作成", "image", *image.Metadata.Name, "source", "bootVolume")
 				serverId := (*image.Metadata.Labels)["serverId"].(string)
 				go c.marmot.MakeImageEntryFromRunningVM(serverId, *image.Metadata.Name, image)
 			} else {
-				slog.Info("イメージの作成処理を実行", "image", *image.Metadata.Name, "source", "url")
+				slog.Info("ダウンロードしてイメージの作成", "image", *image.Metadata.Name, "source", "url")
 				go c.marmot.CreateNewImageManage(image.Id)
 			}
 		case db.IMAGE_CREATING:

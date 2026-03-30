@@ -59,7 +59,8 @@ func (d *Database) MakeServerEntry(spec api.Server) (api.Server, error) {
 
 	// ステータスセット、タイムスタンプセット
 	var s api.Status
-	s.Status = util.IntPtrInt(SERVER_PENDING)
+	s.StatusCode = SERVER_PENDING
+	s.Status = util.StringPtr(ServerStatus[s.StatusCode])
 	s.CreationTimeStamp = util.TimePtr(time.Now())
 	s.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	server.Status = &s
@@ -141,11 +142,11 @@ func (d *Database) UpdateServer(id string, spec api.Server) error {
 	}
 
 	fmt.Println("=== 書き込みデータの情報確認 ===", "server Id", id)
-	data3, err := json.MarshalIndent(spec, "", "  ")
+	data, err := json.MarshalIndent(spec, "", "  ")
 	if err != nil {
 		slog.Error("json.MarshalIndent()", "err", err)
 	} else {
-		fmt.Println("サーバー情報(server): ", string(data3))
+		fmt.Println("サーバー情報(server): ", string(data))
 	}
 
 	return nil
@@ -183,13 +184,19 @@ func (d *Database) updateServer(id string, spec api.Server) error {
 }
 
 // サーバーオブジェクトのステータスを更新
-func (d *Database) UpdateServerStatus(id string, status int) {
+func (d *Database) UpdateServerStatus(id string, status int, message string) {
 	server, err := d.GetServerById(id)
 	if err != nil {
 		slog.Error("UpdateServerStatus() GetServerById() failed", "err", err, "serverId", id)
 		panic(err)
 	}
-	server.Status.Status = util.IntPtrInt(status)
+	server.Status.StatusCode = status
+	server.Status.Status = util.StringPtr(ServerStatus[status])
+	if len(message) > 0 {
+		server.Status.Message = util.StringPtr(message)
+	} else {
+		server.Status.Message = nil
+	}
 	server.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	if err := d.UpdateServer(id, server); err != nil {
 		slog.Error("UpdateServerStatus() UpdateServer() failed", "err", err, "serverId", id)
@@ -197,6 +204,7 @@ func (d *Database) UpdateServerStatus(id string, status int) {
 	}
 }
 
+// サーバーオブジェクトの削除日時をセット
 func (d *Database) SetDeleteTimestamp(id string) error {
 	server, err := d.GetServerById(id)
 	if err != nil {

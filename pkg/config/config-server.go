@@ -37,6 +37,7 @@ type Network struct {
 	Name        string       `yaml:"name"`
 	Address     *string      `yaml:"address,omitempty"`
 	Netmask     *string      `yaml:"netmask,omitempty"`
+	Netmasklen  *int         `yaml:"netmasklen,omitempty"`
 	Portgroup   *string      `yaml:"portgroup,omitempty"`
 	Routes      *[]Route     `yaml:"routes,omitempty"`
 	Nameservers *Nameservers `yaml:"nameservers,omitempty"`

@@ -142,7 +142,8 @@ var _ = Describe("VirtualPrivateNetworksUpperlayer", Ordered, func() {
 					BridgeName: util.StringPtr("testbridge"),
 				},
 				Status: &api.Status{
-					Status: util.IntPtrInt(db.NETWORK_PENDING),
+					StatusCode: db.NETWORK_PENDING,
+					Status: util.StringPtr(db.NetworkStatus[db.NETWORK_PENDING]),
 				},
 			}
 			createdNet, err = marmotServer.Ma.Db.CreateVirtualNetwork(createdNet)

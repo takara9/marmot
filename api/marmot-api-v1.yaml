@@ -694,10 +694,14 @@ components:
           $ref: "#/components/schemas/Status"
     Status:
       type: object
+      required:
+        - statusCode
       properties:
-        status:
+        statusCode:
           type: integer
           format: int
+        status:
+          type: string
         creationTimeStamp:
           type: string
           format: date-time

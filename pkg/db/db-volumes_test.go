@@ -75,13 +75,14 @@ var _ = Describe("Volumes", Ordered, func() {
 			It("Keyからボリューム情報を取得", func() {
 				vol, err := v.GetVolumeById(volSpec.Id)
 				Expect(err).NotTo(HaveOccurred())
-				fmt.Printf("Retrieved volume: Id=%s Key=%s Name=%s Path=%s Size=%d Status=%v\n", vol.Id, *vol.Metadata.Key, *vol.Metadata.Name, *vol.Spec.Path, *vol.Spec.Size, db.VolStatus[*vol.Status.Status])
+				fmt.Printf("Retrieved volume: Id=%s Key=%s Name=%s Path=%s Size=%d Status=%v\n", vol.Id, *vol.Metadata.Key, *vol.Metadata.Name, *vol.Spec.Path, *vol.Spec.Size, db.VolStatus[vol.Status.StatusCode])
 			})
 
 			It("ボリュームの状態更新 #1", func() {
 				vol := api.Volume{
 					Status: &api.Status{
-						Status: util.IntPtrInt(db.VOLUME_AVAILABLE),
+						StatusCode: db.VOLUME_AVAILABLE,
+						Status:     util.StringPtr(db.VolStatus[db.VOLUME_AVAILABLE]),
 					},
 				}
 				err = v.UpdateVolume(volSpec.Id, vol)

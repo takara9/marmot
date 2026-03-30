@@ -70,7 +70,11 @@ func (d *Database) MakeImageEntryFromURL(name, url string) (string, error) {
 			SourceUrl: &url,
 		},
 		Status: &api.Status{
-			Status: util.IntPtrInt(IMAGE_PENDING),
+			StatusCode:          IMAGE_PENDING,
+			Status:              util.StringPtr(ImageStatus[IMAGE_PENDING]),
+			CreationTimeStamp:   util.TimePtr(time.Now()),
+			LastUpdateTimeStamp: util.TimePtr(time.Now()),
+			Message:             util.StringPtr("イメージの作成処理の開始待ち"),
 		},
 	}
 	key := ImagePrefix + "/" + id
@@ -138,7 +142,10 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 				SourceUrl:     nil,
 			},
 			Status: &api.Status{
-				Status: util.IntPtrInt(IMAGE_PENDING),
+				StatusCode:          IMAGE_PENDING,
+				Status:              util.StringPtr(ImageStatus[IMAGE_PENDING]),
+				CreationTimeStamp:   util.TimePtr(time.Now()),
+				LastUpdateTimeStamp: util.TimePtr(time.Now()),
 			},
 		}
 	} else if bootVol.Spec.Type != nil && *bootVol.Spec.Type == "lvm" {
@@ -162,7 +169,8 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 				SourceUrl:     nil,
 			},
 			Status: &api.Status{
-				Status: util.IntPtrInt(IMAGE_PENDING),
+				StatusCode: IMAGE_PENDING,
+				Status:     util.StringPtr(ImageStatus[IMAGE_PENDING]),
 			},
 		}
 	} else {
@@ -230,24 +238,23 @@ func (d *Database) DeleteImage(id string) error {
 }
 
 // ステータスの変更
-func (d *Database) SetImageStatus(id string, status int) {
+func (d *Database) UpdateImageStatus(id string, status int) {
 	slog.Debug("SetImageStatus() called", "id", id, "status", status)
-	key := ImagePrefix + "/" + id
-	var img api.Image
-	_, err := d.GetJSON(key, &img)
+	image, err := d.GetImage(id)
 	if err != nil {
-		slog.Error("SetImageStatus() failed to get image", "err", err)
-		return
+		slog.Error("SetDeleteTimestamp() GetImage() failed", "err", err, "imageId", id)
+		panic(err)
 	}
-	img.Status.Status = util.IntPtrInt(status)
-	err = d.PutJSON(key, img)
-	if err != nil {
-		slog.Error("SetImageStatus() failed to update image status", "err", err)
-		return
+	image.Status.StatusCode = status
+	image.Status.Status = util.StringPtr(ImageStatus[status])
+	image.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+	if err := d.UpdateImage(id, image); err != nil {
+		slog.Error("SetDeleteTimestamp() UpdateImage() failed", "err", err, "imageId", id)
+		panic(err)
 	}
 }
 
-// サーバーを更新
+// イメージのオブジェクトを部分更新
 func (d *Database) UpdateImage(id string, spec api.Image) error {
 	for {
 		err := d.updateImage(id, spec)
@@ -272,7 +279,7 @@ func (d *Database) UpdateImage(id string, spec api.Image) error {
 	return nil
 }
 
-// イメージを更新
+// 内部イメージを更新
 func (d *Database) updateImage(id string, spec api.Image) error {
 	lockKey := "/lock/image/" + id
 	mutex, err := d.LockKey(lockKey)

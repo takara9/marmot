@@ -48,7 +48,7 @@ var networkListCmd = &cobra.Command{
 					fmt.Printf("  %-20v", "")
 				}
 				if network.Status != nil && network.Status.Status != nil {
-					fmt.Printf("  %-20v", db.NetworkStatus[*network.Status.Status])
+					fmt.Printf("  %-20v", db.NetworkStatus[network.Status.StatusCode])
 				} else {
 					fmt.Printf("  %-20v", "")
 				}

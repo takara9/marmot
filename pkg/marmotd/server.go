@@ -109,32 +109,44 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			vnet, err := m.Db.GetVirtualNetworkByName(reqNic.Networkname)
 			if err != nil {
 				slog.Error("GetVirtualNetworkByName()", "err", err, "network name", reqNic.Networkname)
+				if err.Error() == "not found" {
+					err = fmt.Errorf("network '%s' is not found", reqNic.Networkname)
+				}
 				return "", err
 			}
 
 			var ipaddr string
 			var bitmask int
-			var net *api.IPNetwork
+			var ipnet *api.IPNetwork
+
+			// DEBUG
+			jsonBytes0, err := json.MarshalIndent(reqNic, "", "  ")
+			if err != nil {
+				slog.Error("failed to marshal network interface", "err", err)
+			} else {
+				fmt.Println("=== ネットワークインターフェースの情報 ===", "ni", string(jsonBytes0))
+			}
 
 			reqNic.Networkid = vnet.Id // ネットワークIDをセット
-
 			if reqNic.Address != nil {
 				// リクエストにIPアドレスが指定されている場合は、そのIPアドレスを使用する
 				ipaddr = *reqNic.Address
+				// netmask に　ビット長が入っているため、以下がバグになる。
+
 				if reqNic.Netmasklen != nil {
 					bitmask = *reqNic.Netmasklen
 				} else {
 					slog.Debug("Netmask length is not specified, using default 24")
 					bitmask = 24 // デフォルトのビットマスク長
 				}
-				slog.Debug("IP address is specified in the request, skipping IP allocation", "ip address", ipaddr, "netmask length", bitmask)
+				//slog.Debug("IP address is specified in the request, skipping IP allocation", "ip address", ipaddr, "netmask length", *reqNic.Netmasklen)
 
 				// IPネットワークが存在していれば、IPネットワークを作成する必要はない。
 				// IPネットワークと IPアドレスを設定
-				ipnet := &api.IPNetwork{
+				ipNetAddr := &api.IPNetwork{
 					AddressMaskLen: util.StringPtr(fmt.Sprintf("%s/%d", ipaddr, bitmask)),
 				}
-				ipNetId, err := m.Db.CreateIpNetwork(vnet.Id, ipnet)
+				ipNetId, err := m.Db.CreateIpNetwork(vnet.Id, ipNetAddr)
 				if err != nil {
 					if err.Error() == db.ErrAlreadyExists || err.Error() == db.ErrOverlapsExistingNetwork {
 						//NOP
@@ -177,7 +189,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 						return "", err
 					}
 
-					net, err = m.Db.GetIpNetworkById(vnet.Id, *vnet.Spec.IpNetworkId)
+					ipnet, err = m.Db.GetIpNetworkById(vnet.Id, *vnet.Spec.IpNetworkId)
 					if err != nil {
 						slog.Error("GetIpNetworkById()", "err", err)
 						return "", err
@@ -188,6 +200,8 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 						slog.Error("PutDnsEntry()", "err", err)
 						return "", err
 					}
+				} else {
+					slog.Debug("IPネットワークIDが指定されていないため、IPアドレスの割り当てができない", "network id", vnet.Id, "network name", vnet.Metadata.Name)
 				}
 			}
 
@@ -225,22 +239,54 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			}
 
 			ni.Mac = &ns.MAC
-			ni.Address = util.StringPtr(ipaddr)
-			ni.Netmasklen = util.IntPtrInt(bitmask)
+			// IPアドレスとネットマスク長があれば、ネットワークインターフェースの情報にセットする
+			if len(ipaddr) > 0 {
+				ni.Address = util.StringPtr(ipaddr)
+			}
+			if bitmask > 0 {
+				ni.Netmasklen = util.IntPtrInt(bitmask)
+			}
+
 			ni.Routes = reqNic.Routes
 			ni.Nameservers = reqNic.Nameservers
 
+			fmt.Println("=== ネットワークインターフェースの情報確認 ===", "network interface", "ipaddr", ipaddr, "bitmask", bitmask)
+
+			// DEBUG
+			jsonBytes, err := json.MarshalIndent(ni, "", "  ")
+			if err != nil {
+				slog.Error("failed to marshal network interface", "err", err)
+			} else {
+				fmt.Println("ネットワークインターフェースの情報", "ni", string(jsonBytes))
+			}
+
+			// DEBUG
+			jsonBytes2, err := json.MarshalIndent(reqNic, "", "  ")
+			if err != nil {
+				slog.Error("failed to marshal requested network interface", "err", err)
+			} else {
+				fmt.Println("要求されたネットワークインターフェースの情報", "reqNic", string(jsonBytes2))
+			}
+
 			// netplanで静的IPアドレスを設定する場合のために、IPアドレス情報もサーバーに保存しておく
-			if vnet.Spec.IpNetworkId != nil {
-				if net.Netmasklen != nil {
-					ni.Netmasklen = util.IntPtrInt(*net.Netmasklen)
+			if ipnet != nil && vnet.Spec.IpNetworkId != nil {
+				// DEBUG
+				jsonBytes3, err := json.MarshalIndent(*ipnet, "", "  ")
+				if err != nil {
+					slog.Error("failed to marshal IP network", "err", err)
+				} else {
+					fmt.Println("IPネットワークの情報", "ipnet", string(jsonBytes3))
 				}
-				if net.Netmask != nil {
-					ni.Netmask = util.StringPtr(*net.Netmask)
+
+				if ipnet.Netmasklen != nil {
+					ni.Netmasklen = util.IntPtrInt(*ipnet.Netmasklen)
+				}
+				if ipnet.Netmask != nil {
+					ni.Netmask = util.StringPtr(*ipnet.Netmask)
 				}
 				// ルートとネームサーバーの情報も保存しておく
-				if net.Gateway != nil {
-					ni.IpGateway = util.StringPtr(*net.Gateway)
+				if ipnet.Gateway != nil {
+					ni.IpGateway = util.StringPtr(*ipnet.Gateway)
 				}
 				if vnet.Spec.IpNetworkId != nil {
 					ni.IpNetworkId = util.StringPtr(*vnet.Spec.IpNetworkId)
@@ -455,7 +501,8 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	}
 
 	// ステータスを利用可能に更新、更新日時もセット
-	serverConfig.Status.Status = util.IntPtrInt(db.SERVER_RUNNING)
+	serverConfig.Status.StatusCode = db.SERVER_RUNNING
+	serverConfig.Status.Status = util.StringPtr(db.ServerStatus[serverConfig.Status.StatusCode])
 	serverConfig.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	err = m.Db.UpdateServer(serverConfig.Id, serverConfig)
 	if err != nil {
@@ -503,7 +550,7 @@ func (m *Marmot) DeleteServerByIdManage(id string) error {
 
 	// データボリュームの削除タイムスタンプのセット
 	if sv.Spec.Storage != nil {
-		slog.Debug("アタッチされているボリュームの削除", "ボリューム数", len(*sv.Spec.Storage))
+		slog.Debug("アタッチされているボリューム削除のため Deletion Timestamp をセット", "ボリューム数", len(*sv.Spec.Storage))
 		for i, vol := range *sv.Spec.Storage {
 			slog.Debug("DeleteServerById()", "index", i, "deleting volume id", vol.Id)
 			if vol.Spec.Persistent != nil && *vol.Spec.Persistent {
@@ -579,7 +626,7 @@ func (m *Marmot) CreateNewVolumeWithWait(volReq api.Volume) (api.Volume, error) 
 			return api.Volume{}, err
 		}
 		slog.Debug("ブートボリュームのステータス確認ループ", "volume id", vol.Id, "status", vol.Status.Status)
-		if *vol.Status.Status == db.VOLUME_AVAILABLE {
+		if vol.Status.StatusCode == db.VOLUME_AVAILABLE {
 			slog.Debug("ブートボリュームのステータスがAVAILABLEになった", "volume id", vol.Id)
 			break
 		}
@@ -656,7 +703,7 @@ func (m *Marmot) MakeImageEntryFromRunningVM(serverId, name string, image api.Im
 	}
 
 	// イメージ情報の登録
-	m.Db.SetImageStatus(image.Id, db.IMAGE_AVAILABLE)
+	m.Db.UpdateImageStatus(image.Id, db.IMAGE_AVAILABLE)
 
 	return image.Id, nil
 }

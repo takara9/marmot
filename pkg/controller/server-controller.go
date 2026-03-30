@@ -77,22 +77,22 @@ func (c *controller) serverControllerLoop() {
 			deletionTime := *spec.Status.DeletionTimeStamp
 			if time.Since(deletionTime) > 10*time.Second {
 				slog.Debug("削除のタイムスタンプが一定時間以上経過しているサーバー検出", "SERVER", spec.Id)
-				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_DELETING)
+				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_DELETING, "")
 			}
 		}
 
-		// サーバーの状態チェックと処理
-		// ここでワークキューに積むなどの処理を行う
-		switch *spec.Status.Status {
+		// サーバーの状態に応じた処理を実行する
+		switch spec.Status.StatusCode {
 		case db.SERVER_PENDING:
 			slog.Debug("生成待ち状態のサーバー検出", "SERVER", spec.Id)
-			c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_PROVISIONING)
+			c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_PROVISIONING, "")
 			if _, err := c.marmot.CreateServerManage(spec.Id); err != nil {
 				slog.Error("CreateServerManage()", "err", err)
-				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR)
+				msg := fmt.Sprintf("サーバーのプロビジョニングに失敗した。原因エラー: %v", err)
+				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR, msg)
 				continue
 			}
-			c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_RUNNING)
+			c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_RUNNING, "")
 		case db.SERVER_RUNNING:
 			slog.Debug("稼働中のサーバー検出", "SERVER", spec.Id)
 		case db.SERVER_STOPPED:
@@ -105,7 +105,8 @@ func (c *controller) serverControllerLoop() {
 			// 仮想マシンの削除処理の実行
 			if err := c.marmot.DeleteServerByIdManage(spec.Id); err != nil {
 				slog.Error("DeleteServerById()", "err", err)
-				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR)
+				msg := fmt.Sprintf("サーバーの削除に失敗: %v", err)
+				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR, msg)
 			}
 
 			// IPアドレス開放処理の実行
@@ -118,30 +119,30 @@ func (c *controller) serverControllerLoop() {
 						continue
 					}
 					fmt.Println(string(jsonbyte))
-					fmt.Println("============================================")
-					fmt.Println("address:", *nic.Address)
-					fmt.Println("ipNetworkId:", *nic.IpNetworkId)
-					fmt.Println("networkId:", nic.Networkid)
-					//if nic.Address != nil && nic.IpNetworkId != nil && nic.Networkid != "" {
-					if err := c.marmot.Db.ReleaseIP(nic.Networkid, *nic.IpNetworkId, *nic.Address); err != nil {
-						slog.Error("ReleaseIP()", "err", err)
-						continue
+					fmt.Println("=========================================")
+
+					if nic.IpNetworkId != nil && nic.Address != nil {
+						if err := c.marmot.Db.ReleaseIP(nic.Networkid, *nic.IpNetworkId, *nic.Address); err != nil {
+							slog.Error("ReleaseIP()", "err", err)
+							continue
+						}
 					}
 
 					// 内部DNSからエントリーを削除する
-					if err := c.marmot.Db.DeleteDnsEntryByName(*spec.Metadata.Name, nic.Networkname); err != nil {
-						slog.Error("DeleteDnsEntryByName()", "err", err)
-						continue
+					if spec.Metadata != nil && spec.Metadata.Name != nil {
+						if err := c.marmot.Db.DeleteDnsEntryByName(*spec.Metadata.Name, nic.Networkname); err != nil {
+							slog.Error("DeleteDnsEntryByName()", "err", err)
+							continue
+						}
 					}
-					//}
 				}
 			}
 
 			// データベースから削除する
 			if err := c.marmot.Db.DeleteServerById(spec.Id); err != nil {
 				slog.Error("DeleteServerById()", "err", err)
-				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR)
-				// 削除処理が失敗した場合は、データベースにエラーの内容を記録できると良いな。
+				msg := fmt.Sprintf("サーバーのデータベースからの削除に失敗: %v", err)
+				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR, msg)
 			}
 
 		case db.SERVER_PROVISIONING:

@@ -83,7 +83,8 @@ var _ = Describe("Servers", Ordered, func() {
 			It("サーバーの状態更新 #1", func() {
 				srv := api.Server{
 					Status: &api.Status{
-						Status: util.IntPtrInt(db.VOLUME_AVAILABLE),
+						StatusCode: db.SERVER_RUNNING,
+						Status:     util.StringPtr(db.ServerStatus[db.SERVER_RUNNING]),
 					},
 				}
 				err = v.UpdateServer(serverSpec.Id, srv)

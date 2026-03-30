@@ -89,7 +89,7 @@ var _ = Describe("Image", Ordered, func() {
 				imgs, err := v.GetImages()
 				Expect(err).NotTo(HaveOccurred())
 				for i, img := range imgs {
-					fmt.Println("Id", img.Id, "Name", *img.Metadata.Name, "Status", db.ImageStatus[*img.Status.Status])
+					fmt.Println("Id", img.Id, "Name", *img.Metadata.Name, "Status", db.ImageStatus[img.Status.StatusCode])
 					ids[i] = img.Id
 				}
 			})
@@ -103,7 +103,7 @@ var _ = Describe("Image", Ordered, func() {
 				imgs, err := v.GetImages()
 				Expect(err).NotTo(HaveOccurred())
 				for i, img := range imgs {
-					fmt.Println("Id", img.Id, "Name", *img.Metadata.Name, "Status", db.ImageStatus[*img.Status.Status])
+					fmt.Println("Id", img.Id, "Name", *img.Metadata.Name, "Status", db.ImageStatus[img.Status.StatusCode])
 					ids[i] = img.Id
 				}
 			})

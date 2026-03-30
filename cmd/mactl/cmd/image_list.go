@@ -46,7 +46,7 @@ var imageListCmd = &cobra.Command{
 					fmt.Printf("  %-16v", "N/A")
 				}
 				if image.Status.Status != nil {
-					fmt.Printf("  %-12v", db.ImageStatus[*image.Status.Status])
+					fmt.Printf("  %-12v", db.ImageStatus[image.Status.StatusCode])
 				} else {
 					fmt.Printf("  %-12v", "N/A")
 				}

@@ -86,7 +86,8 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 	volume.Metadata.Key = util.StringPtr(key)
 	volume.Status.CreationTimeStamp = util.TimePtr(time.Now())
 	volume.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
-	volume.Status.Status = util.IntPtrInt(VOLUME_PROVISIONING)
+	volume.Status.StatusCode = VOLUME_PROVISIONING
+	volume.Status.Status = util.StringPtr(VolStatus[volume.Status.StatusCode])
 
 	// 指定が無い項目についてデフォルト値を設定する
 	if volume.Metadata.Name == nil {
@@ -167,37 +168,60 @@ func (d *Database) RollbackVolumeCreation(id string) {
 	}
 }
 
-// ボリュームの情報更新 CASを持ちるべき？
+/// ボリュームを更新
 func (d *Database) UpdateVolume(id string, updateData api.Volume) error {
+	for {
+		err := d.updateVolume(id, updateData)
+		if err == ErrUpdateConflict {
+			slog.Warn("UpdateVolume() retrying due to update conflict", "volumeId", id)
+			continue
+		} else if err != nil {
+			slog.Error("UpdateVolume()", "err", err)
+			return err
+		}
+		break
+	}
+
+	fmt.Println("=== 書き込みデータの情報確認 ===", "volume Id", id)
+	data, err := json.MarshalIndent(updateData, "", "  ")
+	if err != nil {
+		slog.Error("json.MarshalIndent()", "err", err)
+	} else {
+		fmt.Println("ボリューム情報(volume): ", string(data))
+	}
+
+	return nil
+}
+
+// 内部関数 ボリュームを更新
+func (d *Database) updateVolume(id string, updateData api.Volume) error {
 	lockKey := "/lock/volume/" + id
 	mutex, err := d.LockKey(lockKey)
 	if err != nil {
-		slog.Error("failed to lock", "err", err, "lockkey", lockKey)
+		slog.Error("failed to lock", "err", err, "lockKey", lockKey)
 		return err
 	}
 	defer d.UnlockKey(mutex)
 
 	var rec api.Volume
 	key := VolumePrefix + "/" + id
-	if _, err := d.GetJSON(key, &rec); err != nil {
+	resp, err := d.GetJSON(key, &rec)
+	if err != nil {
 		slog.Error("GetJSON() failed", "err", err, "key", key)
 		return err
 	}
+	expected := resp.Kvs[0].ModRevision
 
-	// デバッグ用ログ出力
-	debugData1, _ := json.MarshalIndent(updateData, "", "    ")
-	fmt.Println("Updating data\n", string(debugData1))
+	rec.Id = id
+	// パッチ適用
+	util.PatchStruct(&rec, updateData)
 
-	// 更新フィールドの反映  rec <- updateData
-	util.PatchStruct(&rec, &updateData)
-
-	// デバッグ用ログ出力
-	debugData2, _ := json.MarshalIndent(rec, "", "    ")
-	fmt.Println("Updated volume data\n", string(debugData2))
-
-	// データベースに更新
-	return d.PutJSON(key, rec)
-
+	err = d.PutJSONCAS(key, expected, &rec)
+	if err != nil {
+		slog.Error("PutJSONCAS() failed", "err", err, "key", key, "expected", expected)
+		return err
+	}
+	return nil
 }
 
 // データボリュームの削除
@@ -335,7 +359,9 @@ func (d *Database) UpdateVolumeStatus(id string, status int) {
 		//panic(fmt.Sprintf("failed to get volume by id: %s", id))
 	}
 	vol.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
-	vol.Status.Status = util.IntPtrInt(status)
+	vol.Status.StatusCode = status
+	vol.Status.Status = util.StringPtr(VolStatus[vol.Status.StatusCode])
+
 	if err = d.UpdateVolume(id, vol); err != nil {
 		slog.Error("panic! failed to update volume", "err", err, "volId", id)
 		//panic(fmt.Sprintf("failed to update volume: %s", id))
@@ -361,27 +387,6 @@ func (d *Database) SetVolumeDeletionTimestamp(id string) {
 }
 
 // 以下は未実装
-
-// イメージテンプレートの登録
-func registerImageTemplate() {
-
-}
-
-// イメージテンプレートの削除
-func deleteImageTemplate() {
-
-}
-
-// イメージテンプレートの一覧取得
-func listImageTemplates() {
-
-}
-
-// イメージテンプレートの情報取得
-func createImageTemplatefromVm() {
-
-}
-
 // 仮想マシンからデータボリュームを作成
 func createDataVolumefromVm() {
 

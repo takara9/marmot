@@ -194,7 +194,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				sv, err := marmotServer.Ma.GetServerManage(id)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
+				g.Expect(sv.Status.StatusCode).To(Equal(db.SERVER_RUNNING))
 			}, "120s", "10s").Should(Succeed())
 		})
 
@@ -262,8 +262,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				sv, err := marmotServer.Ma.GetServerManage(id)
 				Expect(err).NotTo(HaveOccurred())
 				g.Expect(sv.Status).NotTo(BeNil())
-				g.Expect(sv.Status.Status).NotTo(BeNil())
-				g.Expect(*sv.Status.Status).NotTo(Equal(db.SERVER_ERROR))
+				g.Expect(sv.Status.StatusCode).NotTo(Equal(db.SERVER_ERROR))
 			}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).Should(Succeed())
 		})
 
@@ -272,7 +271,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				sv, err := marmotServer.Ma.GetServerManage(id)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
+				g.Expect(sv.Status.StatusCode).To(Equal(db.SERVER_RUNNING))
 			}, "60s", "10s").Should(Succeed())
 		})
 
@@ -305,8 +304,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				sv, err := marmotServer.Ma.GetServerManage(id)
 				Expect(err).NotTo(HaveOccurred())
 				g.Expect(sv.Status).NotTo(BeNil())
-				g.Expect(sv.Status.Status).NotTo(BeNil())
-				g.Expect(*sv.Status.Status).To(Equal(db.SERVER_RUNNING))
+				g.Expect(sv.Status.StatusCode).To(Equal(db.SERVER_RUNNING))
 			}).WithTimeout(20 * time.Second).WithPolling(5 * time.Second).Should(Succeed())
 		})
 

@@ -76,7 +76,7 @@ func (c *controller) volumeControllerLoop() {
 		}
 
 		slog.Debug("ボリュームの情報", "volId", vol.Id, "volName", *vol.Metadata.Name, "volStatus", *vol.Status.Status)
-		switch *vol.Status.Status {
+		switch vol.Status.StatusCode {
 		case db.VOLUME_PENDING:
 			slog.Debug("待ち状態のボリュームを処理", "volId", vol.Id)
 			// 待ち状態のボリュームを処理するコードをここに追加

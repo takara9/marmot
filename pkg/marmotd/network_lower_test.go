@@ -216,7 +216,7 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(nets).To(BeNil())
 			for _, net := range nets {
-				GinkgoWriter.Println("ネットワークID: ", net.Id, " ネットワーク名: ", *net.Metadata.Name, " ステータス: ", db.NetworkStatus[*net.Status.Status])
+				GinkgoWriter.Println("ネットワークID: ", net.Id, " ネットワーク名: ", *net.Metadata.Name, " ステータス: ", db.NetworkStatus[net.Status.StatusCode])
 				Expect(net.Status.DeletionTimeStamp).NotTo(BeNil())
 			}
 			jsonByte, err := json.MarshalIndent(nets, "", "  ")
