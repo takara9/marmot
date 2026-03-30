@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"encoding/json"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -62,13 +60,13 @@ func (c *controller) imageControllerLoop() {
 			}
 		}
 
-		jsonBytes, err := json.MarshalIndent(image, "", "    ")
-		if err != nil {
-			slog.Error("failed to marshal image", "err", err)
-			continue
-		}
+		//jsonBytes, err := json.MarshalIndent(image, "", "    ")
+		//if err != nil {
+		//	slog.Error("failed to marshal image", "err", err)
+		//	continue
+		//}
+		//fmt.Println("details", string(jsonBytes))
 		slog.Debug("イメージの状態を確認", "image", *image.Metadata.Name, "state", db.ImageStatus[image.Status.StatusCode])
-		fmt.Println("details", string(jsonBytes))
 
 		// イメージの状態に応じた処理
 		switch image.Status.StatusCode {

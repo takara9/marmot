@@ -80,6 +80,10 @@ var serverCreateCmd = &cobra.Command{
 				if nic.Netmask != nil {
 					n.Netmask = util.StringPtr(*nic.Netmask)
 				}
+				if nic.Netmasklen != nil {
+					n.Netmasklen = util.IntPtrInt(*nic.Netmasklen)
+				}
+
 				// 設定があればルート設定
 				if nic.Routes != nil {
 					routes := make([]api.Route, len(*nic.Routes))
