@@ -31,9 +31,12 @@ install:
 
 .PHONY: test
 test: mactl-test
-	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -coverprofile cover.out
-	#$(GINKGO) -v --race --focus-file mactl_test.go
+	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus-file mactl_test.go -coverprofile cover.out
 
 .PHONY: test2
 test2: mactl-test
 	$(GINKGO) -v --focus-file mactl-new_test.go
+
+.PHONY:test-net 
+test-net: mactl-test
+	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus-file mactl-network_test.go -timeout=20m -coverprofile cover.out

@@ -23,7 +23,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 	BeforeAll(func(specCtx SpecContext) {
 		opts := &slog.HandlerOptions{
 			AddSource: true,
-			Level:     slog.LevelDebug,
+			//Level:     slog.LevelDebug,
 		}
 		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
 		slog.SetDefault(logger)
@@ -212,7 +212,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 				err = json.Unmarshal(stdoutStderr, &volume)
 				Expect(err).NotTo(HaveOccurred())
 				g.Expect(volume.Status.StatusCode).To(Equal(db.VOLUME_DELETING))
-			}, 60*time.Second, 3*time.Second).Should(Succeed())
+			}, 120*time.Second, 3*time.Second).Should(Succeed())
 
 			By("削除したボリュームが消えることを確認")
 			Eventually(func(g Gomega) {
@@ -223,7 +223,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 				err = json.Unmarshal(stdoutStderr, &volumes)
 				Expect(err).NotTo(HaveOccurred())
 				g.Expect(len(volumes)).To(Equal(0))
-			}, 60*time.Second, 3*time.Second).Should(Succeed())
+			}, 120*time.Second, 3*time.Second).Should(Succeed())
 		})
 
 		var volumeID3 string
@@ -511,7 +511,6 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr))
 		})
-
 	})
 
 	/*

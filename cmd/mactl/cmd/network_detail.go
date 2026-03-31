@@ -10,9 +10,9 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-var volumeDetailCmd = &cobra.Command{
-	Use:   "detail [volume id]",
-	Short: "show volume details",
+var networkDetailCmd = &cobra.Command{
+	Use:   "detail [network id]",
+	Short: "show network details",
 	Args:  cobra.MinimumNArgs(1), // 引数が1つ必要
 	RunE: func(cmd *cobra.Command, args []string) error {
 		m, err := getClientConfig()
@@ -20,41 +20,36 @@ var volumeDetailCmd = &cobra.Command{
 			fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
 			os.Exit(1)
 		}
-		for _, volumeId := range args {
-			byteBody, _, err := m.ShowVolumeById(volumeId)
+		for _, networkId := range args {
+			byteBody, _, err := m.GetVirtualNetworkById(networkId)
 			if err != nil {
-				fmt.Fprintln(cmd.ErrOrStderr(), "ShowVolumeById", "Id", volumeId, "err", err)
+				fmt.Fprintln(cmd.ErrOrStderr(), "GetVirtualNetworkById", "Id", networkId, "err", err)
 				continue
 			}
 
-			var data api.Volume
+			var data api.VirtualNetwork
 			if err := json.Unmarshal(byteBody, &data); err != nil {
-				fmt.Println("Failed to Unmarshal", "Id", volumeId, "err", err)
+				println("Failed to Unmarshal", "Id", networkId, "err", err)
 				continue
 			}
 
 			switch outputStyle {
 			case "text":
-				fmt.Println("ボリュームの詳細情報。Id", volumeId)
+				fmt.Println("ネットワークが表示されました。Id", networkId)
 				continue
 
 			case "json":
-				byteJson, err := json.Marshal(data)
-				if err != nil {
-					fmt.Println("Failed to Marshal", err)
-					return nil
-				}
-				fmt.Println(string(byteJson))
+				fmt.Println(string(byteBody))
 				continue
 
 			case "yaml":
 				yamlBytes, err := yaml.Marshal(data)
 				if err != nil {
-					fmt.Fprintln(cmd.ErrOrStderr(), "Failed to Marshal", "Id", volumeId, "err", err)
+					fmt.Fprintln(cmd.ErrOrStderr(), "Failed to Marshal", "Id", networkId, "err", err)
 					continue
 
 				}
-				cmd.Print(string(yamlBytes))
+				fmt.Println(string(yamlBytes))
 				continue
 
 			default:
@@ -68,5 +63,5 @@ var volumeDetailCmd = &cobra.Command{
 }
 
 func init() {
-	volumeCmd.AddCommand(volumeDetailCmd)
+	networkCmd.AddCommand(networkDetailCmd)
 }

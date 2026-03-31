@@ -1,0 +1,6 @@
+Metadata:
+  name: test-net-2
+Spec:
+  forwardMode: bridge
+  IPNetworkAddress: "192.168.100.0/25"
+

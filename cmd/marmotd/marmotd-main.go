@@ -18,7 +18,7 @@ var controllerCounter uint64 = 0
 
 // 定期的に実行したい関数
 //func dispatchJobTask() {
-//	slog.Info("ジョブの要求チェックと実行", "JOB", 0)
+//	slog.Debug("ジョブの要求チェックと実行", "JOB", 0)
 //}
 
 //func startDispatcher() {
@@ -38,7 +38,7 @@ func main() {
 	// Setup slog
 	opts := &slog.HandlerOptions{
 		AddSource: true,
-		Level:     slog.LevelDebug,
+		//Level:     slog.LevelDebug,
 	}
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
 	slog.SetDefault(logger)

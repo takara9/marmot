@@ -50,7 +50,7 @@ func StartVolController(node string, etcdUrl string) (*controller, error) {
 
 // コントローラーの制御ループ
 func (c *controller) volumeControllerLoop() {
-	slog.Info("ボリュームコントローラーの制御ループ実行", "CONTROLLER", time.Now().Format("2006-01-02 15:04:05"))
+	slog.Debug("ボリュームコントローラーの制御ループ実行", "CONTROLLER", time.Now().Format("2006-01-02 15:04:05"))
 
 	vols, err := c.marmot.GetVolumes()
 	if err != nil {

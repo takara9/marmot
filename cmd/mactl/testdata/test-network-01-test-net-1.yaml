@@ -1,0 +1,6 @@
+Metadata:
+  name: test-net-1
+Spec:
+  forwardMode: bridge
+
+

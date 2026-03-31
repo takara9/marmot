@@ -1,0 +1,22 @@
+name: test-server-08
+cpu: 1 
+memory: 1024
+comment: "This is a minimum configuration"
+network:
+  - name: "ovs-network"
+    portgroup: "vlan-1002"
+    vlans:
+    - 1002 
+    address: "192.168.1.37"
+    netmask: "24"
+    routes:
+    - destination: "default"
+      gateway: "192.168.1.1"
+    nameservers:
+      addresses:
+      - 192.168.1.9
+      - 8.8.8.8
+      - 8.8.4.4
+      search:
+      - labo.local
+      - lab.local

@@ -1,0 +1,10 @@
+name: test-server-30
+cpu: 1 
+memory: 1024
+os_variant: ubuntu22.04
+comment: "This is a minimum configuration"
+network:
+  - name: "test-net-2"
+  - name: "test-net-1"
+  - name: "default"
+

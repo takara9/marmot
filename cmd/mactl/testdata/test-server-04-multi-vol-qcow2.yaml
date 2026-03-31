@@ -1,0 +1,17 @@
+name: test-server-04
+cpu: 2
+memory: 2048
+volume_type: qcow2
+os_variant: ubuntu22.04
+boot_volume:
+  type: qcow2
+storage:
+  - name: "data-disk-1"
+    size: 100
+    comment: "data volume"
+  - name: "data-disk-2"
+    size: 100
+    comment: "backup volume"
+network:
+  - name: "host-bridge"
+comment: "This is a test server configuration"

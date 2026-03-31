@@ -41,7 +41,7 @@ func StartImageController(node string, etcdUrl string) (*controller, error) {
 
 // コントローラーの制御ループ
 func (c *controller) imageControllerLoop() {
-	slog.Info("イメージコントローラーの制御ループ実行", "CONTROLLER", time.Now().Format(time.DateTime))
+	slog.Debug("イメージコントローラーの制御ループ実行", "CONTROLLER", time.Now().Format(time.DateTime))
 
 	imgaes, err := c.marmot.GetImagesManage()
 	if err != nil {
@@ -71,34 +71,34 @@ func (c *controller) imageControllerLoop() {
 		// イメージの状態に応じた処理
 		switch image.Status.StatusCode {
 		case db.IMAGE_PENDING:
-			slog.Info("イメージの作成処理を実行", "image", *image.Metadata.Name)
+			slog.Debug("イメージの作成処理を実行", "image", *image.Metadata.Name)
 			c.marmot.Db.UpdateImageStatus(image.Id, db.IMAGE_CREATING)
 			// ラベルの存在をチェック,
 			if image.Metadata.Labels != nil && (*image.Metadata.Labels)["source"] == "bootVolume" {
-				slog.Info("実行中VMからイメージの作成", "image", *image.Metadata.Name, "source", "bootVolume")
+				slog.Debug("実行中VMからイメージの作成", "image", *image.Metadata.Name, "source", "bootVolume")
 				serverId := (*image.Metadata.Labels)["serverId"].(string)
 				go c.marmot.MakeImageEntryFromRunningVM(serverId, *image.Metadata.Name, image)
 			} else {
-				slog.Info("ダウンロードしてイメージの作成", "image", *image.Metadata.Name, "source", "url")
+				slog.Debug("ダウンロードしてイメージの作成", "image", *image.Metadata.Name, "source", "url")
 				go c.marmot.CreateNewImageManage(image.Id)
 			}
 		case db.IMAGE_CREATING:
-			slog.Info("イメージの作成処理を継続", "image", *image.Metadata.Name)
+			slog.Debug("イメージの作成処理を継続", "image", *image.Metadata.Name)
 			// ここにイメージの作成処理の継続を実装
 		case db.IMAGE_CREATION_FAILED:
-			slog.Info("イメージの作成に失敗", "image", *image.Metadata.Name)
+			slog.Debug("イメージの作成に失敗", "image", *image.Metadata.Name)
 			// ここにイメージの作成失敗時の処理を実装
 		case db.IMAGE_AVAILABLE:
-			slog.Info("イメージは利用可能", "image", *image.Metadata.Name)
+			slog.Debug("イメージは利用可能", "image", *image.Metadata.Name)
 			// ここにイメージが利用可能な状態での処理を実装
 		case db.IMAGE_DELETING:
-			slog.Info("イメージの削除処理を実行", "image", *image.Metadata.Name)
+			slog.Debug("イメージの削除処理を実行", "image", *image.Metadata.Name)
 			err := c.marmot.DeleteImageManage(image.Id)
 			if err != nil {
 				slog.Error("DeleteImageById()", "err", err)
 			}
 		default:
-			slog.Info("イメージは安定状態", "image", *image.Metadata.Name, "state", *image.Status.Status)
+			slog.Debug("イメージは安定状態", "image", *image.Metadata.Name, "state", *image.Status.Status)
 		}
 	}
 }

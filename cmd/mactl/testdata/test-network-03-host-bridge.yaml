@@ -1,0 +1,6 @@
+Metadata:
+  name: test-net-3
+Spec:
+  #bridgeName: br3
+  forwardMode: bridge
+

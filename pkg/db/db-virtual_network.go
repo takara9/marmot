@@ -155,7 +155,7 @@ func (d *Database) GetVirtualNetworkByName(name string) (api.VirtualNetwork, err
 	}
 
 	for _, kv := range resp.Kvs {
-		fmt.Println("仮想ネットワークの検索結果", "key", string(kv.Key), "value", string(kv.Value))
+		//fmt.Println("仮想ネットワークの検索結果", "key", string(kv.Key), "value", string(kv.Value))
 		if strings.Contains(string(kv.Key), "/ip_network/") {
 			continue
 		}
