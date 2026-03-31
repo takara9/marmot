@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -14,7 +15,11 @@ var imageListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all images",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var err error
+		m, err := getClientConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
+			os.Exit(1)
+		}
 
 		byteBody, _, err := m.GetImages()
 		if err != nil {

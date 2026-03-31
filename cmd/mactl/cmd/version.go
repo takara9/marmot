@@ -20,7 +20,17 @@ var versionCmd = &cobra.Command{
 	Short: "バージョンの表示",
 	Long:  `marmot クライアントのバージョンを表示します。`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		slog.Debug("===", "versionCmd is called", "===")
+		m, err := getClientConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
+			os.Exit(1)
+		}
+
+		fmt.Println("Getting server Information...")
+		fmt.Println("Host and Port:", m.HostPort)
+		fmt.Println("API Path:", m.BasePath)
+		fmt.Println("Scheme:", m.Scheme)
+
 		JsonVersion, err := m.GetVersion()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to get server version: %v\n", err)

@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -13,13 +14,18 @@ var serverUpdateCmd = &cobra.Command{
 	Use:   "update [server-id]",
 	Short: "Update a server",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var err error
 		var spec api.Server
 		var meta api.Metadata
-        serverId := args[0]
+		serverId := args[0]
 		spec.Id = serverId
 		meta.Name = &serverName
 		spec.Metadata = &meta
+
+		m, err := getClientConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
+			os.Exit(1)
+		}
 
 		byteBody, _, err := m.UpdateServerById(serverId, spec)
 		if err != nil {
@@ -62,10 +68,4 @@ var serverUpdateCmd = &cobra.Command{
 func init() {
 	serverCmd.AddCommand(serverUpdateCmd)
 	serverUpdateCmd.Flags().StringVarP(&serverName, "name", "n", "", "New name of the server")
-	//serverCreateCmd.Flags().StringVarP(&serverType, "type", "t", "qcow2", "Type of the server (lvm, qcow2)")
-	//serverCreateCmd.Flags().StringVarP(&serverKind, "kind", "k", "data", "Kind of the server (os, data)")
-	//serverCreateCmd.Flags().IntVarP(&serverSize, "size", "s", 0, "Size of the server in GB")
-	//serverCreateCmd.MarkFlagRequired("name")
-	//serverCreateCmd.MarkFlagRequired("type")
-	//serverCreateCmd.MarkFlagRequired("kind")
 }

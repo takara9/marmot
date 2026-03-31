@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -14,6 +15,12 @@ var volumeListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all volumes",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		m, err := getClientConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
+			os.Exit(1)
+		}
+
 		byteBody, _, err := m.ListVolumes()
 		if err != nil {
 			println("ListVolumes", "err", err)

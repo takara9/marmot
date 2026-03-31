@@ -18,7 +18,7 @@ const (
 	VOLUME_ERROR        = 2 // 問題発生
 	VOLUME_AVAILABLE    = 3 // 利用可能
 	VOLUME_DELETING     = 4 // 削除中
-	VOLUME_DELETED      = 5 // 削除済み
+	//VOLUME_DELETED      = 5 // 削除済み
 )
 
 var VolStatus = map[int]string{
@@ -27,7 +27,7 @@ var VolStatus = map[int]string{
 	2: "ERROR",
 	3: "AVAILABLE",
 	4: "DELETING",
-	5: "DELETED",
+	//5: "DELETED",
 }
 
 // 仮想マシンを生成する時にボリュームを生成して、アタッチする
@@ -86,7 +86,7 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 	volume.Metadata.Key = util.StringPtr(key)
 	volume.Status.CreationTimeStamp = util.TimePtr(time.Now())
 	volume.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
-	volume.Status.StatusCode = VOLUME_PROVISIONING
+	volume.Status.StatusCode = VOLUME_PENDING
 	volume.Status.Status = util.StringPtr(VolStatus[volume.Status.StatusCode])
 
 	// 指定が無い項目についてデフォルト値を設定する
@@ -168,7 +168,7 @@ func (d *Database) RollbackVolumeCreation(id string) {
 	}
 }
 
-/// ボリュームを更新
+// / ボリュームを更新
 func (d *Database) UpdateVolume(id string, updateData api.Volume) error {
 	for {
 		err := d.updateVolume(id, updateData)

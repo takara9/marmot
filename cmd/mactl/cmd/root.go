@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/takara9/marmot/pkg/client"
 	"github.com/takara9/marmot/pkg/config"
 )
 
@@ -13,7 +12,8 @@ var apiConfigFilename string
 var mactlConfig config.ClientConfig
 var clusterConfigFilename string
 var outputStyle string
-var m *client.MarmotEndpoint
+
+//var m *client.MarmotEndpoint
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -23,13 +23,13 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute() {
-	var err error
-	m, err = getClientConfig()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
-		os.Exit(1)
-	}
-	err = rootCmd.Execute()
+	//var err error
+	//m, err = getClientConfig()
+	//if err != nil {
+	//	fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
+	//	os.Exit(1)
+	//}
+	err := rootCmd.Execute()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Failed error:", err)
 		os.Exit(1)

@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -14,6 +15,11 @@ var volumeDetailCmd = &cobra.Command{
 	Short: "show volume details",
 	Args:  cobra.MinimumNArgs(1), // 引数が1つ必要
 	RunE: func(cmd *cobra.Command, args []string) error {
+		m, err := getClientConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
+			os.Exit(1)
+		}
 		for _, volumeId := range args {
 			byteBody, _, err := m.ShowVolumeById(volumeId)
 			if err != nil {

@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v3"
@@ -13,6 +14,11 @@ var serverCreateImageCmd = &cobra.Command{
 	Short: "create image from running server",
 	Args:  cobra.MinimumNArgs(2), // Idの列挙を許容
 	RunE: func(cmd *cobra.Command, args []string) error {
+		m, err := getClientConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
+			os.Exit(1)
+		}
 
 		serverId := args[0]
 		imageName := args[1]

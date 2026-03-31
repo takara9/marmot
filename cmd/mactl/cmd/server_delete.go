@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v3"
@@ -13,6 +14,12 @@ var serverDeleteCmd = &cobra.Command{
 	Short: "Delete one or more servers",
 	Args:  cobra.MinimumNArgs(1), // Idの列挙を許容
 	RunE: func(cmd *cobra.Command, args []string) error {
+		m, err := getClientConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
+			os.Exit(1)
+		}
+
 		for _, serverId := range args {
 			byteBody, _, err := m.DeleteServerById(serverId)
 			if err != nil {

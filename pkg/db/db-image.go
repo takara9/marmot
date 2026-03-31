@@ -334,7 +334,7 @@ func (d *Database) FindImageByName(name string) (api.Image, error) {
 	resp, err = d.GetByPrefix(ImagePrefix)
 	if err == ErrNotFound {
 		slog.Debug("no images found", "key-prefix", ImagePrefix)
-		return api.Image{}, nil
+		return api.Image{}, err
 	} else if err != nil {
 		slog.Error("GetByPrefix() failed", "err", err, "key-prefix", ImagePrefix)
 		return api.Image{}, err

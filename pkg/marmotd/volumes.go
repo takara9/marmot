@@ -41,7 +41,8 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 				return nil, err
 			}
 
-			if img.Spec.Qcow2Path == nil || len(*img.Spec.Qcow2Path) == 0 {
+			//if img.Spec.Qcow2Path == nil || len(*img.Spec.Qcow2Path) == 0 {
+			if img.Spec.Qcow2Path == nil {
 				slog.Error("os image template has no qcow2 path", "", 0)
 				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
 				return nil, errors.New("os image template has no qcow2 path")
@@ -167,7 +168,7 @@ func (m *Marmot) RemoveVolume(id string) error {
 		if vol.Spec.VolumeGroup != nil && vol.Spec.LogicalVolume != nil {
 			if err := lvm.RemoveLV(*vol.Spec.VolumeGroup, *vol.Spec.LogicalVolume); err != nil {
 				slog.Error("lvm.RemoveLV()", "err", err)
-                // ここでエラーが発生して、err = "Logical volume vg1/oslv-76c5f is used by another device."　の場合
+				// ここでエラーが発生して、err = "Logical volume vg1/oslv-76c5f is used by another device."　の場合
 				// これは、論理ボリュームがまだ仮想マシンにアタッチされたままになっていることが原因で発生するエラーです。
 				// そのため、論理ボリュームを削除する前に、仮想マシンからデタッチする必要があります。
 			}

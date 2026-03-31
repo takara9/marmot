@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -15,13 +16,16 @@ var imageCreateCmd = &cobra.Command{
 	Short: "Create a new OS template image",
 	Args:  cobra.MinimumNArgs(2), // 引数が1つ必要
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var err error
+		m, err := getClientConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
+			os.Exit(1)
+		}
 
 		if len(args) != 2 {
 			fmt.Fprintln(cmd.ErrOrStderr(), "Usage: mactl image create [Image Name] [QCOW2 Image URL]")
 			return fmt.Errorf("invalid number of arguments")
 		}
-
 		var image api.Image
 		var spec api.ImageSpec
 		var meta api.Metadata
@@ -74,12 +78,4 @@ var imageCreateCmd = &cobra.Command{
 
 func init() {
 	imageCmd.AddCommand(imageCreateCmd)
-	//imageCreateCmd.Flags().StringVarP(&imageName, "name", "n", "", "Name of the image")
-	//imageCreateCmd.Flags().StringVarP(&imageType, "type", "t", "qcow2", "Type of the image (lvm, qcow2)")
-	//imageCreateCmd.Flags().StringVarP(&imageKind, "kind", "k", "data", "Kind of the image (os, data)")
-	//imageCreateCmd.Flags().StringVarP(&osName, "osname", "l", "", "Name of the OS (required for os kind)")
-	//imageCreateCmd.Flags().IntVarP(&imageSize, "size", "s", 0, "Size of the image in GB")
-	//imageCreateCmd.MarkFlagRequired("name")
-	//imageCreateCmd.MarkFlagRequired("type")
-	//volumeCreateCmd.MarkFlagRequired("kind")
 }
