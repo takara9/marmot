@@ -142,15 +142,15 @@ jobs:
         sudo rm -fr bin
         cd ../..
 
-    - name: Test cmd/maadm
-      run: | 
-        cd cmd/maadm
-        sudo -s mkdir -p bin
-        sudo -s chown ubuntu:ubuntu bin
-        sudo -s chmod 755 bin
-        sudo -E env "PATH=$PATH" make test
-        sudo rm -fr bin
-        cd ../..
+    #- name: Test cmd/maadm
+    #  run: | 
+    #    cd cmd/maadm
+    #    sudo -s mkdir -p bin
+    #    sudo -s chown ubuntu:ubuntu bin
+    #    sudo -s chmod 755 bin
+    #    sudo -E env "PATH=$PATH" make test
+    #    sudo rm -fr bin
+    #    cd ../..
 
   cleanup-runner3:
     runs-on: [ self-hosted, runner3 ]

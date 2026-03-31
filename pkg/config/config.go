@@ -7,6 +7,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type mactlClientConfig struct {
+	ApiServerUrl string `yaml:"api_server"`
+}
+
 // YAML形式のコンフィグファイルを構造体に読み込む
 func ReadYamlConfig(fn string, yamlConfig interface{}) error {
 	file, err := os.Open(fn)

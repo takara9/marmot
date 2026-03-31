@@ -3,12 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os/exec"
 	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/controller"
+	internaldns "github.com/takara9/marmot/pkg/internal-dns"
 	"github.com/takara9/marmot/pkg/marmotd"
 )
 
@@ -22,14 +25,54 @@ func startMockServer(ctx context.Context) *marmotd.Server {
 		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
 		slog.SetDefault(logger)
 	*/
+	nodeName := "hvc"
+	etcdEp := "http://127.0.0.1:3379"
+
 	e := echo.New()
-	server := marmotd.NewServer("hvc", "http://127.0.0.1:3379")
+	server := marmotd.NewServer(nodeName, etcdEp)
 
 	go func() {
 		api.RegisterHandlersWithBaseURL(e, server, "/api/v1")
 
 		// サーバー起動
 		go func() {
+			// コントローラーの開始
+
+			// 仮想マシンコントローラー
+			_, err := controller.StartVmController(nodeName, etcdEp) // VMコントローラーの開始
+			if err != nil {
+				slog.Error("Failed to start controller", "err", err)
+				return
+			}
+
+			// ボリュームコントローラー
+			_, err = controller.StartVolController(nodeName, etcdEp) // ボリュームコントローラーの開始
+			if err != nil {
+				slog.Error("Failed to start controller", "err", err)
+				return
+			}
+
+			// ネットワークコントローラー
+			_, err = controller.StartNetController(nodeName, etcdEp) // ネットワークコントローラーの開始
+			if err != nil {
+				slog.Error("Failed to start controller", "err", err)
+				return
+			}
+
+			// DNSサーバーコントローラー
+			_, err = internaldns.StartInternalDNSServer(context.Background(), nodeName, etcdEp) // DNSサーバーコントローラーの開始
+			if err != nil {
+				slog.Error("Failed to start DNS server", "err", err)
+				return
+			}
+
+			// イメージコントローラーの開始
+			_, err = controller.StartImageController(nodeName, etcdEp)
+			if err != nil {
+				slog.Error("Failed to start image controller", "err", err)
+				return
+			}
+
 			if err := e.Start("0.0.0.0:8080"); err != nil && err != http.ErrServerClosed {
 				fmt.Println("server error:", err)
 			}

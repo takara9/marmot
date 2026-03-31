@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -14,7 +15,12 @@ var imageDetailCmd = &cobra.Command{
 	Short: "Show image details",
 	Args:  cobra.ExactArgs(1), // 引数が1つ必要
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var err error
+		m, err := getClientConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
+			os.Exit(1)
+		}
+
 		imageId := args[0]
 		byteBody, _, err := m.ShowImageById(imageId)
 		if err != nil {

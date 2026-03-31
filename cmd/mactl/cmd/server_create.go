@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -17,8 +18,14 @@ var serverCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new server",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		m, err := getClientConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
+			os.Exit(1)
+		}
+
 		var conf config.Server
-		err := config.ReadYamlConfig(configFilename, &conf)
+		err = config.ReadYamlConfig(configFilename, &conf)
 		if err != nil {
 			println("ReadYamlConfig", "err", err)
 			return err

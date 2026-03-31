@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -16,7 +17,11 @@ var serverDetailCmd = &cobra.Command{
 	Short: "Show server details",
 	Args:  cobra.ExactArgs(1), // 引数が1つ必要
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var err error
+		m, err := getClientConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
+			os.Exit(1)
+		}
 		serverId := args[0]
 		byteBody, _, err := m.GetServerById(serverId)
 		if err != nil {
@@ -94,11 +99,4 @@ var serverDetailCmd = &cobra.Command{
 
 func init() {
 	serverCmd.AddCommand(serverDetailCmd)
-	//serverCreateCmd.Flags().StringVarP(&serverName, "name", "n", "", "Name of the server")
-	//serverCreateCmd.Flags().StringVarP(&serverType, "type", "t", "qcow2", "Type of the server (lvm, qcow2)")
-	//serverCreateCmd.Flags().StringVarP(&serverKind, "kind", "k", "data", "Kind of the server (os, data)")
-	//serverCreateCmd.Flags().IntVarP(&serverSize, "size", "s", 0, "Size of the server in GB")
-	//serverCreateCmd.MarkFlagRequired("name")
-	//serverCreateCmd.MarkFlagRequired("type")
-	//serverCreateCmd.MarkFlagRequired("kind")
 }

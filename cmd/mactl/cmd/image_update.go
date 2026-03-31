@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -13,13 +14,18 @@ var imageUpdateCmd = &cobra.Command{
 	Use:   "update [image-id]",
 	Short: "Update an image",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var err error
 		var spec api.Image
 		var meta api.Metadata
 		imageId := args[0]
 		spec.Id = imageId
 		meta.Name = &imageName
 		spec.Metadata = &meta
+
+		m, err := getClientConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
+			os.Exit(1)
+		}
 
 		byteBody, _, err := m.UpdateImageById(imageId, spec)
 		if err != nil {

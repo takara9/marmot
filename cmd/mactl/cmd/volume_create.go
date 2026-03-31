@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -14,7 +15,12 @@ var volumeCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new volume",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var err error
+		m, err := getClientConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
+			os.Exit(1)
+		}
+
 		var volume api.Volume = api.Volume{
 			Metadata: &api.Metadata{
 				Name: util.StringPtr(volumeName),

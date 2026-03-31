@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -15,7 +16,12 @@ var networkListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all networks",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var err error
+		m, err := getClientConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
+			os.Exit(1)
+		}
+
 		byteBody, _, err := m.GetVirtualNetworks()
 		if err != nil {
 			println("エラー応答が返されました。", "err", err)

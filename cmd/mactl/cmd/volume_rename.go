@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -15,6 +16,12 @@ var volumeRenameCmd = &cobra.Command{
 	Short: "Rename a volume",
 	Args:  cobra.ExactArgs(2), // 引数が2つ必要
 	RunE: func(cmd *cobra.Command, args []string) error {
+		m, err := getClientConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
+			os.Exit(1)
+		}
+
 		volumeId := args[0]
 		newName := args[1]
 		var volume api.Volume

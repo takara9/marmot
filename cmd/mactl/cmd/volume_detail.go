@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v3"
@@ -13,6 +14,11 @@ var volumeDeleteCmd = &cobra.Command{
 	Short: "delete a volume",
 	Args:  cobra.MinimumNArgs(1), // 引数が1つ必要
 	RunE: func(cmd *cobra.Command, args []string) error {
+		m, err := getClientConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
+			os.Exit(1)
+		}
 		for _, volumeId := range args {
 			byteBody, _, err := m.DeleteVolumeById(volumeId)
 			if err != nil {
