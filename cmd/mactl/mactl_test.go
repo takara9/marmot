@@ -420,11 +420,98 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 	Context("OSイメージの準備", func() {
 		It("OSイメージのリスト取得", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "image", "list")
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "image", "list", "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+			var images []api.Image
+			err = json.Unmarshal(stdoutStderr, &images)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(images)).To(Equal(0))
+		})
+
+		var imageID string
+		It("OSイメージの登録", func() {
+			url := "https://cloud-images.ubuntu.com/releases/jammy/release-20260218/ubuntu-22.04-server-cloudimg-amd64.img"
+			imageName := "ubuntu22.04"
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "image", "create", imageName, url, "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Println(string(stdoutStderr))
+			var image api.Success
+			err = json.Unmarshal(stdoutStderr, &image)
+			Expect(err).NotTo(HaveOccurred())
+			imageID = image.Id
+		})
+
+		It("OSイメージの個別詳細取得", func() {
+			Eventually(func(g Gomega) {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "image", "detail", imageID, "--output", "json")
+				stdoutStderr, err := cmd.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println(string(stdoutStderr))
+				var image api.Image
+				err = json.Unmarshal(stdoutStderr, &image)
+				Expect(err).NotTo(HaveOccurred())
+				g.Expect(image.Status.StatusCode).To(Equal(db.IMAGE_AVAILABLE))
+			}, 10*60*time.Second, 3*time.Second).Should(Succeed())
+		})
+
+		It("OSイメージのリスト取得", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "image", "list", "--output", "text")
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr))
 		})
+
+		var volumeID3 string
+		It("ボリュームの作成  os qcow2 成功ケース", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "create", "-n", "boot-volume1", "-t", "qcow2", "-k", "os", "-l", "ubuntu22.04", "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+
+			var volume api.Volume
+			err = json.Unmarshal(stdoutStderr, &volume)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(*volume.Metadata.Name).To(Equal("boot-volume1"))
+			Expect(*volume.Spec.Size).To(Equal(int(16)))
+			volumeID3 = volume.Id
+			fmt.Println("Volume ID:", volumeID3)
+		})
+
+		var volumeID4 string
+		It("ボリュームの作成  os lvm 成功ケース", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "create", "-n", "test-volume2", "-t", "lvm", "-k", "os", "-l", "ubuntu22.04", "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+
+			var volume api.Volume
+			err = json.Unmarshal(stdoutStderr, &volume)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(*volume.Metadata.Name).To(Equal("test-volume2"))
+			Expect(*volume.Spec.Size).To(Equal(int(16)))
+			volumeID4 = volume.Id
+			fmt.Println("Volume ID:", volumeID4)
+		})
+
+		It("OSイメージのリスト取得", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "image", "list", "--output", "text")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+		})
+
+		It("ボリュームリスト取得", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "list", "--output", "text")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+		})
+
 	})
 
 	/*
