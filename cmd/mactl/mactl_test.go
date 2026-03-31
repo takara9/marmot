@@ -213,6 +213,17 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 				g.Expect(volume.Status.StatusCode).To(Equal(db.VOLUME_DELETING))
 			}, 60*time.Second, 3*time.Second).Should(Succeed())
+
+			By("削除したボリュームが消えることを確認")
+			Eventually(func(g Gomega) {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "list", "--output", "json")
+				stdoutStderr, err := cmd.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+				var volumes []api.Volume
+				err = json.Unmarshal(stdoutStderr, &volumes)
+				Expect(err).NotTo(HaveOccurred())
+				g.Expect(len(volumes)).To(Equal(0))
+			}, 60*time.Second, 3*time.Second).Should(Succeed())
 		})
 
 		var volumeID3 string
@@ -405,35 +416,15 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr))
 		})
+	})
 
-		/*
-
-
-			It("ボリュームのJSONリスト取得 & 削除 26", func() {
-				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "list", "--output", "json")
-				stdoutStderr, err := cmd.CombinedOutput()
-				Expect(err).NotTo(HaveOccurred())
-				jsonStr := string(stdoutStderr)
-				GinkgoWriter.Print("stdout:", jsonStr)
-
-				var volumes []api.Volume
-				if err := json.Unmarshal([]byte(jsonStr), &volumes); err != nil {
-					Expect(err).NotTo(HaveOccurred())
-				}
-				for _, v := range volumes {
-					cmdDel := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "destroy", v.Id, "--output", "json")
-					stdoutStderr, err := cmdDel.CombinedOutput()
-					Expect(err).NotTo(HaveOccurred())
-					GinkgoWriter.Print(string(stdoutStderr))
-				}
-			})
-		*/
-		/*
-			It("モックの停止", func() {
-
-				cancel() // モックサーバー停止
-			})
-		*/
+	Context("OSイメージの準備", func() {
+		It("OSイメージのリスト取得", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "image", "list")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+		})
 	})
 
 	/*
