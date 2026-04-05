@@ -762,6 +762,8 @@ components:
           type: string
         bootVolume:
           $ref: "#/components/schemas/Volume"
+        auth:
+          $ref: "#/components/schemas/Auth"
     VirtualNetwork:
       type: object
       required:
@@ -908,3 +910,13 @@ components:
           type: string
         source_url:
           type: string
+    Auth:
+      type: object
+      properties:
+        url:
+          type: string
+        publicKey:
+          type: string
+        user:
+          type: string
+
