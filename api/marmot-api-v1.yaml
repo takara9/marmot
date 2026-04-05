@@ -919,4 +919,6 @@ components:
           type: string
         user:
           type: string
+        rootPassword:
+          type: string
 

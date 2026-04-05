@@ -1651,5 +1651,74 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 				g.Expect(len(servers)).To(Equal(0))
 			}, 120*time.Second, 5*time.Second).Should(Succeed())
 		})
+
+		It("SSH-KEYを設定したサーバー作成 test-34", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "create", "--configfile", "testdata/test-server-34-sshkey.yaml", "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Println(string(stdoutStderr))
+
+			var server api.Server
+			err = json.Unmarshal(stdoutStderr, &server)
+			Expect(err).NotTo(HaveOccurred())
+			//Expect(*server.Metadata.Name).To(Equal("test-server-00"))
+			serverId_1 = server.Id
+		})
+
+		It("外部接続の仮想サーバーの状態確認 test-34", func() {
+			Eventually(func(g Gomega) {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "detail", serverId_1, "--output", "json")
+				stdoutStderr, err := cmd.CombinedOutput()
+				g.Expect(err).NotTo(HaveOccurred())
+				fmt.Println(string(stdoutStderr))
+
+				var server api.Server
+				err = json.Unmarshal(stdoutStderr, &server)
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Printf("  - %s (%s)\n", *server.Metadata.Name, server.Id)
+				g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_RUNNING)))
+			}, 120*time.Second, 5*time.Second).Should(Succeed())
+		})
+
+		It("外部接続の仮想サーバーの削除 test-34", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "delete", serverId_1, "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Println(string(stdoutStderr))
+		})
+
+		It("外部接続の仮想サーバーの削除状態確認 test-34", func() {
+			Eventually(func(g Gomega) {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "detail", serverId_1, "--output", "json")
+				stdoutStderr, err := cmd.CombinedOutput()
+				g.Expect(err).NotTo(HaveOccurred())
+				fmt.Println(string(stdoutStderr))
+
+				var server api.Server
+				err = json.Unmarshal(stdoutStderr, &server)
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Printf("  - %s (%s)\n", *server.Metadata.Name, server.Id)
+				g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_DELETING)))
+			}, 120*time.Second, 5*time.Second).Should(Succeed())
+		})
+
+		It("外部接続の仮想サーバーで削除を確認 test-34", func() {
+			By("仮想サーバーのリスト")
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "list", "--output", "text")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Println(string(stdoutStderr))
+
+			By("仮想サーバーのリスト JSON形式")
+			Eventually(func(g Gomega) {
+				cmd = exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "list", "--output", "json")
+				stdoutStderr, err = cmd.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+				var servers []api.Server
+				err = json.Unmarshal(stdoutStderr, &servers)
+				Expect(err).NotTo(HaveOccurred())
+				g.Expect(len(servers)).To(Equal(0))
+			}, 120*time.Second, 5*time.Second).Should(Succeed())
+		})
 	})
 })

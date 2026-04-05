@@ -47,6 +47,19 @@ var serverCreateCmd = &cobra.Command{
 		virtualServer.Spec.BootVolume.Spec = &api.VolSpec{}
 		virtualServer.Spec.BootVolume.Metadata = &api.Metadata{}
 		virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{}
+		virtualServer.Spec.Auth = &api.Auth{}
+
+		if conf.Auth != nil {
+			if conf.Auth.PublicKey != nil {
+				virtualServer.Spec.Auth.PublicKey = util.StringPtr(*conf.Auth.PublicKey)
+			}
+			if conf.Auth.Url != nil {
+				virtualServer.Spec.Auth.Url = util.StringPtr(*conf.Auth.Url)
+			}
+			if conf.Auth.User != nil {
+				virtualServer.Spec.Auth.User = util.StringPtr(*conf.Auth.User)
+			}
+		}
 
 		if conf.Comment != nil {
 			virtualServer.Metadata.Comment = util.StringPtr(*conf.Comment)
