@@ -139,6 +139,7 @@ jobs:
         sudo -E env "PATH=$PATH" make mactl-test
         ls -la bin
         sudo -E env "PATH=$PATH" make test
+        sudo -E env "PATH=$PATH" make test-net
         sudo rm -fr bin
         cd ../..
 

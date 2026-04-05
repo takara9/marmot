@@ -429,8 +429,8 @@ func findTargertPartition(lvPath string) (string, error) {
 	// kpartx でマップ作成
 	out, err := exec.Command("kpartx", "-av", lvPath).CombinedOutput()
 	if err != nil {
-		slog.Error("kpartx -av command failed", "error", err)
-		return "", err
+		slog.Error("kpartx -av command failed", "error", err, "lvPath", lvPath, "output", string(out))
+		return "", fmt.Errorf("kpartx -av command failed: %v, lvpath: %s, output: %s", err, lvPath, string(out))
 	}
 
 	slog.Debug("kpartx output", "output", string(out))

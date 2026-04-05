@@ -339,7 +339,7 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 		}
 	}()
 
-	slog.Info("Resizing image and extending partition", "image", imageTemplatePath)
+	slog.Debug("Resizing image and extending partition", "image", imageTemplatePath)
 
 	if err := runCmd(ctx, "modprobe", "nbd", "max_part=8"); err != nil {
 		return err

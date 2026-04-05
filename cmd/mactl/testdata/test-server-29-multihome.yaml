@@ -1,0 +1,10 @@
+name: test-server-29
+cpu: 1 
+memory: 1024
+os_variant: ubuntu22.04
+comment: "N/A image"
+network:
+  - name: "test-net-2"
+  - name: "test-net-1"
+  - name: "default"
+

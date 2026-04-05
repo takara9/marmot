@@ -1,0 +1,4 @@
+name: test-server-00
+cpu: 1 
+memory: 1024
+comment: "This is a minimum configuration"

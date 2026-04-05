@@ -57,7 +57,7 @@ func StartInternalDNSServer(ctx context.Context, node string, etcdUrl string) (*
 	// Graceful Shutdown 用の監視ゴルーチン
 	go func() {
 		<-ctx.Done() // 外部（main等）からの終了通知を待機
-		slog.Info("DNSサーバーのシャットダウンを開始します...")
+		slog.Debug("DNSサーバーのシャットダウンを開始します...")
 
 		// シャットダウンに猶予（タイムアウト）を持たせる
 		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -66,14 +66,14 @@ func StartInternalDNSServer(ctx context.Context, node string, etcdUrl string) (*
 		if err := c.server.ShutdownContext(shutCtx); err != nil {
 			slog.Error("DNSサーバーの強制終了", "err", err)
 		}
-		slog.Info("DNSサーバーが正常に停止しました")
+		slog.Debug("DNSサーバーが正常に停止しました")
 	}()
 
 	return c, nil
 }
 
 func (c *controller) dnsServer() {
-	slog.Info("DNSサーバーのリスナーを開始します", "addr", c.server.Addr)
+	slog.Debug("DNSサーバーのリスナーを開始します", "addr", c.server.Addr)
 
 	// ListenAndServe は終了するまでここでブロックされる
 	if err := c.server.ListenAndServe(); err != nil {

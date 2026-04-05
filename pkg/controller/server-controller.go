@@ -53,7 +53,7 @@ func StartVmController(node string, etcdUrl string) (*controller, error) {
 
 // コントローラーの制御ループ
 func (c *controller) serverControllerLoop() {
-	slog.Info("サーバーコントローラーの制御ループ実行", "CONTROLLER", time.Now().Format("2006-01-02 15:04:05"))
+	slog.Debug("サーバーコントローラーの制御ループ実行", "CONTROLLER", time.Now().Format("2006-01-02 15:04:05"))
 
 	// サーバースペック情報の取得
 	slog.Debug("サーバースペック情報取得", "", "")

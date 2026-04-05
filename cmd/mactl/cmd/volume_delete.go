@@ -10,9 +10,9 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-var volumeDetailCmd = &cobra.Command{
-	Use:   "detail [volume id]",
-	Short: "show volume details",
+var volumeDeleteCmd = &cobra.Command{
+	Use:   "delete [volume id]",
+	Short: "delete a volume",
 	Args:  cobra.MinimumNArgs(1), // 引数が1つ必要
 	RunE: func(cmd *cobra.Command, args []string) error {
 		m, err := getClientConfig()
@@ -21,42 +21,27 @@ var volumeDetailCmd = &cobra.Command{
 			os.Exit(1)
 		}
 		for _, volumeId := range args {
-			byteBody, _, err := m.ShowVolumeById(volumeId)
+			byteBody, _, err := m.DeleteVolumeById(volumeId)
 			if err != nil {
-				fmt.Fprintln(cmd.ErrOrStderr(), "ShowVolumeById", "Id", volumeId, "err", err)
+				fmt.Fprintln(cmd.ErrOrStderr(), "DeleteVolumeById", "Id", volumeId, "err", err)
+				continue
+			}
+			var data api.Volume
+			if err := json.Unmarshal(byteBody, &data); err != nil {
+				fmt.Println("Failed to Unmarshal", "Id", volumeId, "err", err)
 				continue
 			}
 
 			switch outputStyle {
 			case "text":
-				var data interface{}
-				if err := json.Unmarshal(byteBody, &data); err != nil {
-					println("Failed to Unmarshal", "Id", volumeId, "err", err)
-					continue
-				}
-				fmt.Println("ボリュームの詳細情報。Id", volumeId)
+				fmt.Println("ボリュームが削除されました。Id", volumeId)
 				continue
 
 			case "json":
-				var data api.Volume
-				if err := json.Unmarshal(byteBody, &data); err != nil {
-					println("Failed to Unmarshal", "Id", volumeId, "err", err)
-					continue
-				}
-				byteJson, err := json.MarshalIndent(data, "", "  ")
-				if err != nil {
-					println("Failed to Marshal", err)
-					return nil
-				}
-				println(string(byteJson))
+				cmd.Print(string(byteBody))
 				continue
 
 			case "yaml":
-				var data interface{}
-				if err := json.Unmarshal(byteBody, &data); err != nil {
-					fmt.Fprintln(cmd.ErrOrStderr(), "Failed to Unmarshal", "Id", volumeId, "err", err)
-					continue
-				}
 				yamlBytes, err := yaml.Marshal(data)
 				if err != nil {
 					fmt.Fprintln(cmd.ErrOrStderr(), "Failed to Marshal", "Id", volumeId, "err", err)
@@ -77,5 +62,5 @@ var volumeDetailCmd = &cobra.Command{
 }
 
 func init() {
-	volumeCmd.AddCommand(volumeDetailCmd)
+	volumeCmd.AddCommand(volumeDeleteCmd)
 }

@@ -96,7 +96,7 @@ func (d *Job) EntryJob(name string, cmd ...string) (string, error) {
 		}
 	}
 
-	slog.Info("EntryJob()", "jobId", job.Id, "name", name, "cmd", cmd)
+	slog.Debug("EntryJob()", "jobId", job.Id, "name", name, "cmd", cmd)
 	x := time.Now()
 	job.Spec.RequestTime = util.TimePtr(x)
 	job.Metadata.Name = util.StringPtr(name)
@@ -322,7 +322,7 @@ func (d *Job) RunJob(job api.Job) error {
 		job.Status.Status = util.StringPtr(JobStatus[job.Status.StatusCode])
 	}
 
-	slog.Info("***PUT ETCD", "key", key, "job-id", job.Id, "status", JobStatus[job.Status.StatusCode], "exit-code", *job.Spec.ExitCode)
+	slog.Debug("***PUT ETCD", "key", key, "job-id", job.Id, "status", JobStatus[job.Status.StatusCode], "exit-code", *job.Spec.ExitCode)
 
 	if err := d.Database.PutJSON(key, job); err != nil {
 		slog.Error("failed to write Job data", "err", err, "key", key)
@@ -353,7 +353,7 @@ func (d *Job) CleanupJob(t int) error {
 				slog.Error("failed to delete job log file", "err", err, "file", jobLogFile)
 				return err
 			}
-			slog.Info("Cleaned up job and log file", "jobId", job.Id, "logFile", jobLogFile)
+			slog.Debug("Cleaned up job and log file", "jobId", job.Id, "logFile", jobLogFile)
 		}
 	}
 	return nil

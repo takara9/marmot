@@ -1,4 +1,4 @@
-# GitHub Runnner の仮想サーバーのセットアップ方法
+# GitHub Runnner の仮想サーバーの marmot セットアップ方法
 
 
 ## ホスト名

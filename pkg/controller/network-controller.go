@@ -35,7 +35,7 @@ func StartNetController(node string, etcdUrl string) (*controller, error) {
 		slog.Error("Failed to create marmot instance", "err", err)
 		return nil, err
 	}
-	c.db = c.marmot.Db // 正しくないけど
+	c.db = c.marmot.Db
 
 	// 起動時に既存の仮想ネットワークを取得して、データベースに登録する
 	if _, err := c.marmot.GetVirtualNetworksAndPutDB(); err != nil {
@@ -58,7 +58,13 @@ func StartNetController(node string, etcdUrl string) (*controller, error) {
 
 // コントローラーの制御ループ
 func (c *controller) networkControllerLoop() {
-	slog.Info("ネットワークコントローラーの制御ループ実行", "CONTROLLER", time.Now().Format("2006-01-02 15:04:05"))
+	slog.Debug("ネットワークコントローラーの制御ループ実行", "CONTROLLER", time.Now().Format("2006-01-02 15:04:05"))
+
+	// 既存の仮想ネットワークを取得して、データベースに登録する
+	if err := c.marmot.CheckVirtualNetworks(); err != nil {
+		slog.Error("Failed to get virtual networks and put DB", "err", err)
+		return
+	}
 
 	vnets, err := c.marmot.GetVirtualNetwork()
 	if err != nil {

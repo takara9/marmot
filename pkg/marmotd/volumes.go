@@ -21,7 +21,7 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 		return nil, err
 	}
 
-	slog.Info("Creating volume", "volId", volSpec.Id, "volType", *volSpec.Spec.Type, "volKind", *volSpec.Spec.Kind)
+	slog.Debug("Creating volume", "volId", volSpec.Id, "volType", *volSpec.Spec.Type, "volKind", *volSpec.Spec.Kind)
 
 	// ボリュームの実体を作成
 	switch *volSpec.Spec.Type {

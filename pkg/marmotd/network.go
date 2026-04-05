@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/util"
 	"github.com/takara9/marmot/pkg/virt"
+	"libvirt.org/go/libvirt"
 	"libvirt.org/go/libvirtxml"
 )
 
@@ -17,12 +19,14 @@ func (m *Marmot) GetVirtualNetworksAndPutDB() ([]api.VirtualNetwork, error) {
 	slog.Debug("GetVirtualNetworks called")
 	var apiNetworks []api.VirtualNetwork
 
+	// 実態ネットワークを取得
 	networks, err := m.Virt.GetVirtualNetworks()
 	if err != nil {
 		slog.Error("Failed to get virtual networks from libvirt", "err", err)
 		return nil, err
 	}
 
+	// 取得した実態ネットワークをETCDに登録
 	for _, n := range *networks {
 		var net api.VirtualNetwork
 		var meta api.Metadata
@@ -62,6 +66,7 @@ func (m *Marmot) GetVirtualNetworksAndPutDB() ([]api.VirtualNetwork, error) {
 		}
 		fmt.Println(string(xml))
 
+		// libvirt XMLをパースして、APIのVirtualNetworkに変換る
 		var libnet libvirtxml.Network
 		err = libnet.Unmarshal(xml)
 		if err != nil {
@@ -102,7 +107,7 @@ func (m *Marmot) GetVirtualNetworksAndPutDB() ([]api.VirtualNetwork, error) {
 		// 既にETCDに登録されているか確認
 		_, err = m.Db.GetVirtualNetworkById(net.Id)
 		if err == nil {
-			slog.Info("Virtual network already exists in ETCD, skipping", "id", net.Id)
+			slog.Debug("Virtual network already exists in ETCD, skipping", "id", net.Id)
 			continue
 		} else if err == db.ErrNotFound {
 			// データベースに登録
@@ -251,4 +256,147 @@ func (m *Marmot) GetVirtualNetwork() ([]api.VirtualNetwork, error) {
 		return nil, err
 	}
 	return networks, nil
+}
+
+// ETCDに登録されたオブジェクトと実態ネットワークを比較して、ETCDの状態を更新する
+func (m *Marmot) CheckVirtualNetworks() error {
+	slog.Debug("CheckVirtualNetworks called")
+
+	// ETCDに登録されたオブジェクトと実態を比較して、ETCDの状態を更新する
+	vNetworks, err := m.Db.GetVirtualNetworks()
+	if err != nil {
+		slog.Error("Failed to get virtual networks", "err", err)
+		return err
+	}
+	for _, vnet := range vNetworks {
+		_, found, err := m.Virt.GetVirtualNetworkByName(*vnet.Metadata.Name)
+		if err != nil {
+			slog.Error("Error checking virtual network existence", "err", err, "networkId", vnet.Id)
+			if !found {
+				// Createから１０分経過しても実態が存在しない場合は、エラーにする
+				if vnet.Status != nil && vnet.Status.CreationTimeStamp != nil {
+					creationTime := *vnet.Status.CreationTimeStamp
+					if time.Since(creationTime) > 10*time.Minute {
+						slog.Debug("仮想ネットワークの実態が存在しないため、エラーにする", "networkId", vnet.Id)
+						m.Db.UpdateVirtualNetworkStatus(vnet.Id, db.NETWORK_ERROR)
+						continue
+					}
+				} else {
+					slog.Debug("CreationTimeStamp is nil, skipping error update for now", "networkId", vnet.Id)
+				}
+			} else {
+				// 削除予定が無いことを確認して、ACTIVEに更新する
+				if vnet.Status != nil && vnet.Status.DeletionTimeStamp == nil {
+					slog.Debug("仮想ネットワークの実態が存在、削除予定が無いためACTIVEに更新", "networkId", vnet.Id)
+					m.Db.UpdateVirtualNetworkStatus(vnet.Id, db.NETWORK_ACTIVE)
+					continue
+				}
+			}
+		}
+	}
+
+	// 実態ネットワークを取得して、ETCDに登録されたオブジェクトと比較して、ETCDに登録されていない実態があれば、ETCDに登録する
+	networks, err := m.Virt.GetVirtualNetworks()
+	if err != nil {
+		slog.Error("Failed to get virtual networks from libvirt", "err", err)
+		return err
+	}
+	for _, n := range *networks {
+		vnet, err := convertLibvirtNetworkToAPINetwork(n)
+		if err != nil {
+			slog.Error("Failed to convert libvirt network to API network", "err", err)
+			continue
+		}
+
+		// 同じ名前のネットワークが既にETCDに登録されている場合は、何もしない。
+		_, err = m.Db.GetVirtualNetworkByName(*vnet.Metadata.Name)
+		if err != nil {
+			if err != db.ErrNotFound {
+				slog.Error("Failed to check existing virtual network in ETCD", "err", err, "networkName", *vnet.Metadata.Name)
+				continue
+			}
+		}
+
+		// 既にETCDに登録されているか確認
+		_, err = m.Db.GetVirtualNetworkById(vnet.Id)
+		if err == nil {
+			slog.Debug("Virtual network already exists in ETCD, skipping", "id", vnet.Id)
+			continue
+		} else if err == db.ErrNotFound {
+			// データベースに登録
+			if err := m.Db.PutVirtualNetworksETCD(*vnet); err != nil {
+				slog.Error("Failed to put virtual network to ETCD", "err", err)
+			}
+		}
+		m.Db.UpdateVirtualNetworkStatus(vnet.Id, db.NETWORK_ACTIVE)
+	}
+
+	return nil
+}
+
+// virtual.Networkをapi.VirtualNetworkに変換する関数
+func convertLibvirtNetworkToAPINetwork(libnet libvirt.Network) (*api.VirtualNetwork, error) {
+	var net api.VirtualNetwork
+	var meta api.Metadata
+	var spec api.VirtualNetworkSpec
+	net.Metadata = &meta
+	net.Spec = &spec
+
+	// name
+	name, err := libnet.GetName()
+	if err != nil {
+		slog.Error("Failed to get virtual network name", "err", err)
+		return nil, err
+	}
+	net.Metadata.Name = util.StringPtr(name)
+
+	// uuid
+	uuid, err := libnet.GetUUIDString()
+	if err != nil {
+		slog.Error("Failed to get virtual network UUID", "err", err)
+		return nil, err
+	}
+	net.Metadata.Uuid = util.StringPtr(uuid)
+	net.Id = uuid[:5] // IDはUUIDの先頭8文字を使用
+
+	// Bridge
+	bridge, err := libnet.GetBridgeName()
+	if err != nil {
+		slog.Error("Failed to get virtual network bridge name", "err", err)
+		return nil, err
+	}
+	net.Spec.BridgeName = util.StringPtr(bridge)
+
+	xml, err := libnet.GetXMLDesc(0)
+	if err != nil {
+		slog.Error("Failed to get virtual network XML description", "err", err)
+		return nil, err
+	}
+
+	// libvirt XMLをパースして、APIのVirtualNetworkに変換る
+	var libvirtxmlNet libvirtxml.Network
+	err = libvirtxmlNet.Unmarshal(xml)
+	if err != nil {
+		return nil, err
+	}
+
+	if libvirtxmlNet.Forward != nil {
+		net.Spec.ForwardMode = util.StringPtr(libvirtxmlNet.Forward.Mode)
+		net.Spec.Nat = util.BoolPtr(libvirtxmlNet.Forward.NAT != nil)
+	}
+	if libvirtxmlNet.MAC != nil {
+		net.Spec.MacAddress = util.StringPtr(libvirtxmlNet.MAC.Address)
+	}
+	if len(libvirtxmlNet.IPs) > 0 {
+		net.Spec.IpAddress = util.StringPtr(libvirtxmlNet.IPs[0].Address)
+		net.Spec.Netmask = util.StringPtr(libvirtxmlNet.IPs[0].Netmask)
+		if libvirtxmlNet.IPs[0].DHCP != nil && len(libvirtxmlNet.IPs[0].DHCP.Ranges) > 0 {
+			net.Spec.Dhcp = util.BoolPtr(true)
+			net.Spec.DhcpStartAddress = util.StringPtr(libvirtxmlNet.IPs[0].DHCP.Ranges[0].Start)
+			net.Spec.DhcpEndAddress = util.StringPtr(libvirtxmlNet.IPs[0].DHCP.Ranges[0].End)
+		}
+	}
+
+	return &net, nil
+
 }
