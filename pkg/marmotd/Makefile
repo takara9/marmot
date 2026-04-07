@@ -58,3 +58,7 @@ test-image:
 .PHONY: test-image2
 test-image2:
 	$(GO) test -ginkgo.focus="ServerImageCopyingTest" -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+
+.PHONY: test-iso
+test-iso:
+	$(GO) test -ginkgo.focus="Cloud-InitISO作成テスト" -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
