@@ -85,14 +85,14 @@ install -m 0644 ${BINDIR}/marmot.service /lib/systemd/system
 ```
 
 
-
+```
 # vi config_marmot 
 # cp config_marmot /home/ubuntu/.config_marmot
 # cp config_marmot /root/.config_marmot
 # mactl global-status
+```
 
-
-
-hv-admin  -config hypervisor-config-hv1.yaml 
-
+```
+# hv-admin  -config hypervisor-config-hv1.yaml 
+```
 
