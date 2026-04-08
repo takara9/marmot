@@ -12,6 +12,14 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Auth defines model for Auth.
+type Auth struct {
+	PublicKey    *string `json:"publicKey,omitempty"`
+	RootPassword *string `json:"rootPassword,omitempty"`
+	Url          *string `json:"url,omitempty"`
+	User         *string `json:"user,omitempty"`
+}
+
 // Error defines model for Error.
 type Error struct {
 	Code    int32  `json:"code"`
@@ -142,6 +150,7 @@ type Server struct {
 type ServerSpec struct {
 	NetworkInterface *[]NetworkInterface `json:"NetworkInterface,omitempty"`
 	Storage          *[]Volume           `json:"Storage,omitempty"`
+	Auth             *Auth               `json:"auth,omitempty"`
 	BootVolume       *Volume             `json:"bootVolume,omitempty"`
 	Cpu              *int                `json:"cpu,omitempty"`
 	Memory           *int                `json:"memory,omitempty"`

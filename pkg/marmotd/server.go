@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -422,16 +423,65 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	}
 	slog.Debug("ボリュームの設定が無いときはqcow2をデフォルトとする2", "boot volume ptr", bootVolDefined)
 
+	path := "/var/lib/marmot/isos/" + serverConfig.Id
+
+	var password string
+	var sshKey string
+	var username string
+
+	if serverConfig.Spec.Auth != nil {
+		if serverConfig.Spec.Auth.RootPassword != nil {
+			password = *serverConfig.Spec.Auth.RootPassword
+		}
+		if serverConfig.Spec.Auth.User != nil {
+			username = *serverConfig.Spec.Auth.User
+		}
+		if serverConfig.Spec.Auth.Url != nil {
+			keys, err := FetchPublicKeys(*serverConfig.Spec.Auth.Url)
+			if err != nil {
+				slog.Error("公開鍵の取得に失敗", "url", *serverConfig.Spec.Auth.Url, "err", err)
+				return "", err
+			}
+			sshKey = strings.Join(keys, "\n")
+		} else if serverConfig.Spec.Auth.PublicKey != nil {
+			sshKey = *serverConfig.Spec.Auth.PublicKey
+		}
+	}
+
+	isoPath, err := GenerateCloudInitISO(path, password, sshKey, username)
+
 	switch {
 	case *bootVolDefined.Spec.Type == "qcow2":
 		virtSpec.DiskSpecs = []virt.DiskSpec{
-			{"vda", *bootVolDefined.Spec.Path, 3, *bootVolDefined.Spec.Type},
+			{
+				Dev:  "vda",
+				Src:  *bootVolDefined.Spec.Path,
+				Bus:  3,
+				Type: *bootVolDefined.Spec.Type,
+			},
+			{
+				Dev:  "sr0",   // CDドライブ
+				Src:  isoPath, // ISO ファイルパス
+				Bus:  5,       // PCI バス 5
+				Type: "iso",   // タイプは iso
+			},
 		}
 	case *bootVolDefined.Spec.Type == "lvm":
 		// ＊＊＊　パスは createNewVolume で設定されるべき　＊＊＊
 		lvPath := fmt.Sprintf("/dev/%s/%s", *bootVolDefined.Spec.VolumeGroup, *bootVolDefined.Spec.LogicalVolume)
 		virtSpec.DiskSpecs = []virt.DiskSpec{
-			{"vda", lvPath, 3, "raw"},
+			{
+				Dev:  "vda",
+				Src:  lvPath,
+				Bus:  3,
+				Type: "raw",
+			},
+			{
+				Dev:  "sr0",   // CDドライブ
+				Src:  isoPath, // ISO ファイルパス
+				Bus:  5,       // PCI バス 5
+				Type: "iso",   // タイプは iso
+			},
 		}
 	default:
 		slog.Error("CreateServer()", "unsupported volume type", *bootVolDefined.Spec.Type)

@@ -141,19 +141,37 @@ func CreateDomainXML(vs ServerSpec) *libvirtxml.Domain {
 			Address: pciAddr(d.Bus, 0, 0),
 		}
 
+		cdrom := libvirtxml.DomainDisk{
+			Device: "cdrom",
+			Driver: &libvirtxml.DomainDiskDriver{
+				Name: "qemu", Type: "raw", Cache: "none", IO: "native",
+			},
+			Target:  &libvirtxml.DomainDiskTarget{Dev: "sda", Bus: "sata"},
+			Alias:   &libvirtxml.DomainAlias{Name: "sata0-0-0"},
+			Address: &libvirtxml.DomainAddress{Drive: &libvirtxml.DomainAddressDrive{Controller: uintPtr(0), Bus: uintPtr(0), Target: uintPtr(0), Unit: uintPtr(0)}},
+		}
+
 		// ソースの割り当て（Typeに応じて切り替え）
 		switch d.Type {
 		case "raw":
 			disk.Source = &libvirtxml.DomainDiskSource{
 				Block: &libvirtxml.DomainDiskSourceBlock{Dev: d.Src},
 			}
+			dom.Devices.Disks = append(dom.Devices.Disks, disk)
+
 		case "qcow2":
 			disk.Source = &libvirtxml.DomainDiskSource{
 				File: &libvirtxml.DomainDiskSourceFile{File: d.Src},
 			}
-		}
+			dom.Devices.Disks = append(dom.Devices.Disks, disk)
 
-		dom.Devices.Disks = append(dom.Devices.Disks, disk)
+		case "iso":
+			cdrom.Source = &libvirtxml.DomainDiskSource{
+				File: &libvirtxml.DomainDiskSourceFile{File: d.Src},
+			}
+			dom.Devices.Disks = append(dom.Devices.Disks, cdrom)
+
+		}
 	}
 
 	// PCIコントローラーの生成

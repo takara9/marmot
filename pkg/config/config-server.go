@@ -1,5 +1,12 @@
 package config
 
+// Auth defines model for Auth.
+type Auth struct {
+	PublicKey *string `yaml:"publicKey,omitempty"`
+	Url       *string `yaml:"url,omitempty"`
+	User      *string `yaml:json:"user,omitempty"`
+}
+
 // Server defines model for Server.
 type Server struct {
 	Name       string     `yaml:"name"`
@@ -10,6 +17,7 @@ type Server struct {
 	Playbook   *string    `yaml:"playbook,omitempty"`
 	Network    *[]Network `yaml:"network,omitempty"`
 	Storage    *[]Volume  `yaml:"storage,omitempty"`
+	Auth       *Auth      `yaml:"auth,omitempty"`
 	Comment    *string    `yaml:"comment,omitempty"`
 }
 

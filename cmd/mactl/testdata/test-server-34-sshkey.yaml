@@ -1,0 +1,23 @@
+name: test-server-34
+cpu: 1
+memory: 1024
+os_variant: ubuntu22.04
+auth:
+  url: https://github.com/takara9.keys
+comment: "This is a minimum configuration"
+network:
+  - name: "host-bridge"
+    address: "192.168.1.198"
+    netmask: "24"
+    routes:
+    - destination: "default"
+      gateway: "192.168.1.1"
+    nameservers:
+      addresses:
+      - 192.168.1.9
+      - 8.8.8.8
+      - 8.8.4.4
+      search:
+      - labo.local
+      - lab.local
+  - name: "test-net-1"
