@@ -182,13 +182,13 @@ func (d *Database) UpdateVolume(id string, updateData api.Volume) error {
 		break
 	}
 
-	fmt.Println("=== 書き込みデータの情報確認 ===", "volume Id", id)
-	data, err := json.MarshalIndent(updateData, "", "  ")
-	if err != nil {
-		slog.Error("json.MarshalIndent()", "err", err)
-	} else {
-		fmt.Println("ボリューム情報(volume): ", string(data))
-	}
+	//fmt.Println("=== 書き込みデータの情報確認 ===", "volume Id", id)
+	//data, err := json.MarshalIndent(updateData, "", "  ")
+	//if err != nil {
+	//	slog.Error("json.MarshalIndent()", "err", err)
+	//} else {
+	//	fmt.Println("ボリューム情報(volume): ", string(data))
+	//}
 
 	return nil
 }
