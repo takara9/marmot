@@ -62,6 +62,9 @@ cd /var/lib/marmot/volumes
 rm -f *.qcow2
 cd /var/lib/marmot/images
 rm -fr *
+cd /var/lib/marmot/isos
+rm -fr *
+
 
 echo "Cleanup completed."
 pwd
