@@ -33,10 +33,6 @@ chpasswd:
   list:
     - %s:%s
   expire: False
-write_files:
-  - path: /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
-    content: "network: {config: disabled}\n"
-    permissions: '0644'
 `, username, formatSSHKeys(sshKey, "      "), username, password)
 	} else {
 		userData = fmt.Sprintf(`#cloud-config
@@ -44,10 +40,6 @@ password: %s
 chpasswd: { expire: False }
 ssh_authorized_keys:
 %s
-write_files:
-  - path: /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
-    content: "network: {config: disabled}\n"
-    permissions: '0644'
 `, password, formatSSHKeys(sshKey, "  "))
 	}
 
@@ -64,6 +56,15 @@ write_files:
 	if err := os.WriteFile(metaDataPath, []byte(metaData), 0644); err != nil {
 		err := fmt.Errorf("failed to write meta-data: %v", err)
 		slog.Error("Cloud-initの作成中に、メタデータの書き込みに失敗", "error", err)
+		return "", err
+	}
+
+	// Generate network-config: cloud-initのネットワーク設定を無効化（50-cloud-init.yamlを生成させない）
+	networkConfig := "network:\n  config: disabled\n"
+	networkConfigPath := filepath.Join(tempDir, "network-config")
+	if err := os.WriteFile(networkConfigPath, []byte(networkConfig), 0644); err != nil {
+		err := fmt.Errorf("failed to write network-config: %v", err)
+		slog.Error("Cloud-initの作成中に、ネットワーク設定の書き込みに失敗", "error", err)
 		return "", err
 	}
 
