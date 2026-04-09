@@ -4,6 +4,7 @@ package marmotd
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -168,6 +169,7 @@ func (m *Marmot) RemoveVolume(id string) error {
 		if vol.Spec.VolumeGroup != nil && vol.Spec.LogicalVolume != nil {
 			if err := lvm.RemoveLV(*vol.Spec.VolumeGroup, *vol.Spec.LogicalVolume); err != nil {
 				slog.Error("lvm.RemoveLV()", "err", err)
+				vol.Status.Message = util.StringPtr(fmt.Sprintf("failed to remove logical volume: %v", err))
 				// ここでエラーが発生して、err = "Logical volume vg1/oslv-76c5f is used by another device."　の場合
 				// これは、論理ボリュームがまだ仮想マシンにアタッチされたままになっていることが原因で発生するエラーです。
 				// そのため、論理ボリュームを削除する前に、仮想マシンからデタッチする必要があります。

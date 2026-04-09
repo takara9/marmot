@@ -59,6 +59,15 @@ ssh_authorized_keys:
 		return "", err
 	}
 
+	// Generate network-config: cloud-initのネットワーク設定を無効化（50-cloud-init.yamlを生成させない）
+	networkConfig := "network:\n  config: disabled\n"
+	networkConfigPath := filepath.Join(tempDir, "network-config")
+	if err := os.WriteFile(networkConfigPath, []byte(networkConfig), 0644); err != nil {
+		err := fmt.Errorf("failed to write network-config: %v", err)
+		slog.Error("Cloud-initの作成中に、ネットワーク設定の書き込みに失敗", "error", err)
+		return "", err
+	}
+
 	// Generate ISO using genisoimage (assuming it's installed)
 	if err := os.MkdirAll(path, 0755); err != nil {
 		err := fmt.Errorf("failed to create directory: %v", err)
