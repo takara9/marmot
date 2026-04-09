@@ -33,6 +33,10 @@ chpasswd:
   list:
     - %s:%s
   expire: False
+write_files:
+  - path: /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+    content: "network: {config: disabled}\n"
+    permissions: '0644'
 `, username, formatSSHKeys(sshKey, "      "), username, password)
 	} else {
 		userData = fmt.Sprintf(`#cloud-config
@@ -40,6 +44,10 @@ password: %s
 chpasswd: { expire: False }
 ssh_authorized_keys:
 %s
+write_files:
+  - path: /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+    content: "network: {config: disabled}\n"
+    permissions: '0644'
 `, password, formatSSHKeys(sshKey, "  "))
 	}
 
