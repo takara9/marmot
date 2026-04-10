@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -34,6 +35,9 @@ var volumeListCmd = &cobra.Command{
 				println("Failed to Unmarshal", err)
 				return err
 			}
+			sort.Slice(data, func(i, j int) bool {
+				return creationTime(data[i].Status).Before(creationTime(data[j].Status))
+			})
 
 			fmt.Printf("%-2v  %-6v  %-16v  %-4v  %-5v  %-8v  %-12v  %-20v\n", "No", "Id", "Name", "Kind", "Type", "Size(GB)", "Status", "Path")
 			for i, v := range data {
@@ -54,6 +58,9 @@ var volumeListCmd = &cobra.Command{
 				println("Failed to Unmarshal", err)
 				return err
 			}
+			sort.Slice(data, func(i, j int) bool {
+				return creationTime(data[i].Status).Before(creationTime(data[j].Status))
+			})
 			jsonBytes, err := json.MarshalIndent(data, "", "  ")
 			if err != nil {
 				println("Failed to Marshal", err)
@@ -68,6 +75,9 @@ var volumeListCmd = &cobra.Command{
 				println("Failed to Unmarshal", err)
 				return err
 			}
+			sort.Slice(data, func(i, j int) bool {
+				return creationTime(data[i].Status).Before(creationTime(data[j].Status))
+			})
 			yamlBytes, err := yaml.Marshal(data)
 			if err != nil {
 				println("Failed to Marshal", err)
