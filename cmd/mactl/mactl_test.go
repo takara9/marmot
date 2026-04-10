@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -647,4 +648,212 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			})
 		})
 	*/
+
+	Context("ep コマンドのテスト（エンドポイント管理）", func() {
+		var tmpHome string
+
+		// 各テストごとに独立した一時 HOME ディレクトリを用意する
+		BeforeEach(func() {
+			var err error
+			tmpHome, err = os.MkdirTemp("", "mactl-ep-test-*")
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			os.RemoveAll(tmpHome)
+		})
+
+		// HOME を上書きした環境変数リストを返すヘルパー
+		epEnv := func() []string {
+			env := make([]string, 0, len(os.Environ()))
+			for _, e := range os.Environ() {
+				if !strings.HasPrefix(e, "HOME=") {
+					env = append(env, e)
+				}
+			}
+			return append(env, "HOME="+tmpHome)
+		}
+
+		It("エンドポイント未登録のとき ep list はメッセージを表示して正常終了する", func() {
+			cmd := exec.Command("./bin/mactl-test", "ep", "list")
+			cmd.Env = epEnv()
+			output, err := cmd.CombinedOutput()
+			GinkgoWriter.Println(string(output))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(output)).To(ContainSubstring("登録されていません"))
+		})
+
+		It("ep add でエンドポイントを追加できる", func() {
+			cmd := exec.Command("./bin/mactl-test", "ep", "add", "http://localhost:8750")
+			cmd.Env = epEnv()
+			output, err := cmd.CombinedOutput()
+			GinkgoWriter.Println(string(output))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(output)).To(ContainSubstring("http://localhost:8750"))
+		})
+
+		It("ep add で複数エンドポイントを追加すると ep list に全件表示される", func() {
+			for _, u := range []string{
+				"http://localhost:8750",
+				"http://hv1:8750",
+				"http://hv2:8750",
+			} {
+				cmd := exec.Command("./bin/mactl-test", "ep", "add", u)
+				cmd.Env = epEnv()
+				_, err := cmd.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			cmd := exec.Command("./bin/mactl-test", "ep", "list")
+			cmd.Env = epEnv()
+			output, err := cmd.CombinedOutput()
+			GinkgoWriter.Println(string(output))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(output)).To(ContainSubstring("http://localhost:8750"))
+			Expect(string(output)).To(ContainSubstring("http://hv1:8750"))
+			Expect(string(output)).To(ContainSubstring("http://hv2:8750"))
+			// 最初に追加したエンドポイントがアクティブ
+			Expect(string(output)).To(MatchRegexp(`\* active\s+http://localhost:8750`))
+		})
+
+		It("ep add で同一 URL を重複登録するとエラーになる", func() {
+			cmd := exec.Command("./bin/mactl-test", "ep", "add", "http://localhost:8750")
+			cmd.Env = epEnv()
+			_, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+
+			cmd = exec.Command("./bin/mactl-test", "ep", "add", "http://localhost:8750")
+			cmd.Env = epEnv()
+			output, err := cmd.CombinedOutput()
+			GinkgoWriter.Println(string(output))
+			Expect(err).To(HaveOccurred())
+			Expect(string(output)).To(ContainSubstring("既に登録済み"))
+		})
+
+		It("ep add で不正な URL はエラーになる", func() {
+			cmd := exec.Command("./bin/mactl-test", "ep", "add", "not-a-valid-url")
+			cmd.Env = epEnv()
+			output, err := cmd.CombinedOutput()
+			GinkgoWriter.Println(string(output))
+			Expect(err).To(HaveOccurred())
+			Expect(string(output)).To(ContainSubstring("無効なURL"))
+		})
+
+		It("ep set でアクティブなエンドポイントを切り替えられる", func() {
+			for _, u := range []string{
+				"http://localhost:8750",
+				"http://hv1:8750",
+			} {
+				cmd := exec.Command("./bin/mactl-test", "ep", "add", u)
+				cmd.Env = epEnv()
+				_, err := cmd.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			// 2番に切り替え
+			cmd := exec.Command("./bin/mactl-test", "ep", "set", "2")
+			cmd.Env = epEnv()
+			output, err := cmd.CombinedOutput()
+			GinkgoWriter.Println(string(output))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(output)).To(ContainSubstring("http://hv1:8750"))
+
+			// リストで hv1 が active になっていることを確認
+			cmd = exec.Command("./bin/mactl-test", "ep", "list")
+			cmd.Env = epEnv()
+			output, err = cmd.CombinedOutput()
+			GinkgoWriter.Println(string(output))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(output)).To(MatchRegexp(`\* active\s+http://hv1:8750`))
+		})
+
+		It("ep set で範囲外の番号はエラーになる", func() {
+			cmd := exec.Command("./bin/mactl-test", "ep", "add", "http://localhost:8750")
+			cmd.Env = epEnv()
+			_, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+
+			cmd = exec.Command("./bin/mactl-test", "ep", "set", "99")
+			cmd.Env = epEnv()
+			output, err := cmd.CombinedOutput()
+			GinkgoWriter.Println(string(output))
+			Expect(err).To(HaveOccurred())
+			Expect(string(output)).To(ContainSubstring("範囲外"))
+		})
+
+		It("ep set で数値以外の引数はエラーになる", func() {
+			cmd := exec.Command("./bin/mactl-test", "ep", "add", "http://localhost:8750")
+			cmd.Env = epEnv()
+			_, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+
+			cmd = exec.Command("./bin/mactl-test", "ep", "set", "abc")
+			cmd.Env = epEnv()
+			output, err := cmd.CombinedOutput()
+			GinkgoWriter.Println(string(output))
+			Expect(err).To(HaveOccurred())
+			Expect(string(output)).To(ContainSubstring("不正"))
+		})
+
+		It("ep delete でエンドポイントを削除できる", func() {
+			for _, u := range []string{
+				"http://localhost:8750",
+				"http://hv1:8750",
+				"http://hv2:8750",
+			} {
+				cmd := exec.Command("./bin/mactl-test", "ep", "add", u)
+				cmd.Env = epEnv()
+				_, err := cmd.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			// 2番 (hv1:8750) を削除
+			cmd := exec.Command("./bin/mactl-test", "ep", "delete", "2")
+			cmd.Env = epEnv()
+			output, err := cmd.CombinedOutput()
+			GinkgoWriter.Println(string(output))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(output)).To(ContainSubstring("http://hv1:8750"))
+
+			// リストに hv1 が含まれていないことを確認
+			cmd = exec.Command("./bin/mactl-test", "ep", "list")
+			cmd.Env = epEnv()
+			output, err = cmd.CombinedOutput()
+			GinkgoWriter.Println(string(output))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(output)).NotTo(ContainSubstring("http://hv1:8750"))
+			Expect(string(output)).To(ContainSubstring("http://localhost:8750"))
+			Expect(string(output)).To(ContainSubstring("http://hv2:8750"))
+		})
+
+		It(".marmot のアクティブエンドポイントを使ってサーバーに接続できる", func() {
+			// モックサーバー (http://localhost:8080) をエンドポイントとして登録してアクティブにする
+			cmd := exec.Command("./bin/mactl-test", "ep", "add", "http://localhost:8080")
+			cmd.Env = epEnv()
+			_, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+
+			// --api フラグなしで version コマンドを実行 → .marmot のアクティブ EP が使われる
+			cmd = exec.Command("./bin/mactl-test", "version")
+			cmd.Env = epEnv()
+			output, err := cmd.CombinedOutput()
+			GinkgoWriter.Println(string(output))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("--api フラグは .marmot より優先される", func() {
+			// .marmot に到達不能なエンドポイントを登録しておく
+			cmd := exec.Command("./bin/mactl-test", "ep", "add", "http://unreachable-host:9999")
+			cmd.Env = epEnv()
+			_, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+
+			// --api でモックサーバーを明示指定すれば成功する
+			cmd = exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "version")
+			cmd.Env = epEnv()
+			output, err := cmd.CombinedOutput()
+			GinkgoWriter.Println(string(output))
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
 })
