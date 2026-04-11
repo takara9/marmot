@@ -1,6 +1,6 @@
 {
   "node_name": "hv1",
-  "etcd_url": "http://127.0.0.1:3379",
+  "etcd_url": "http://127.0.0.1:2379",
   "api_listen_addr": "0.0.0.0:8750",
   "dns_listen_addr": "127.0.0.1:53",
   "dns_upstream": "8.8.8.8:53",

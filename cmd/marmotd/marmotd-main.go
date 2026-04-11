@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log/slog"
 	"os"
 
@@ -61,11 +60,15 @@ func main() {
 		"deletion_delay_seconds", cfg.DeletionDelaySeconds)
 
 	// REST-APIサーバーの処理
+	slog.Info("Starting api server", "nodeName", cfg.NodeName, "etcdURL", cfg.EtcdURL, "apiListenAddr", cfg.APIListenAddr)
+
 	e := echo.New()
+	slog.Debug("Starting api server #2", "nodeName", cfg.NodeName, "etcdURL", cfg.EtcdURL, "apiListenAddr", cfg.APIListenAddr)
 	Server := marmotd.NewServer(cfg.NodeName, cfg.EtcdURL)
 	api.RegisterHandlersWithBaseURL(e, Server, "/api/v1")
 
 	// コントローラーの開始
+	slog.Info("Starting controllers", "nodeName", cfg.NodeName, "etcdURL", cfg.EtcdURL, "deletionDelaySeconds", cfg.DeletionDelaySeconds)
 
 	// 仮想マシンコントローラー
 	_, err = controller.StartVmController(cfg.NodeName, cfg.EtcdURL, cfg.DeletionDelaySeconds) // VMコントローラーの開始
@@ -103,5 +106,10 @@ func main() {
 
 	//startDispatcher()
 	// And we serve HTTP until the world ends.
-	fmt.Println(e.Start(cfg.APIListenAddr))
+	slog.Info("Starting API server", "addr", cfg.APIListenAddr)
+
+	if err := e.Start(cfg.APIListenAddr); err != nil {
+		slog.Error("API server stopped", "err", err)
+		os.Exit(1)
+	}
 }

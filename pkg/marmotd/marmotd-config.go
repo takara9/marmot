@@ -14,7 +14,7 @@ type MarmotdConfig struct {
 	NodeName string `json:"node_name"`
 
 	// etcd のエンドポイント URL
-	// 例: "http://127.0.0.1:3379"
+	// 例: "http://127.0.0.1:2379"
 	EtcdURL string `json:"etcd_url"`
 
 	// marmot-API サーバーのバインドアドレスとポート番号
@@ -39,7 +39,7 @@ type MarmotdConfig struct {
 func defaultConfig() *MarmotdConfig {
 	return &MarmotdConfig{
 		NodeName:             "hv1",
-		EtcdURL:              "http://127.0.0.1:3379",
+		EtcdURL:              "http://127.0.0.1:2379",
 		APIListenAddr:        "0.0.0.0:8750",
 		DNSListenAddr:        "127.0.0.1:53",
 		DNSUpstream:          "8.8.8.8:53",

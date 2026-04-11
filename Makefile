@@ -1,4 +1,5 @@
-PROGRAMS = mactl marmotd maadm
+PROGRAMS = mactl marmotd
+.PHONY: all $(PROGRAMS)
 all:	$(PROGRAMS)
 
 MAKE = /usr/bin/make
