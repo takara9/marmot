@@ -16,80 +16,82 @@ var volumeListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all volumes",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		m, err := getClientConfig()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
-			os.Exit(1)
-		}
-
-		byteBody, _, err := m.ListVolumes()
-		if err != nil {
-			println("ListVolumes", "err", err)
-			return err
-		}
-
-		switch outputStyle {
-		case "text":
-			var data []api.Volume
-			if err := json.Unmarshal(byteBody, &data); err != nil {
-				println("Failed to Unmarshal", err)
-				return err
-			}
-			sort.Slice(data, func(i, j int) bool {
-				return creationTime(data[i].Status).Before(creationTime(data[j].Status))
-			})
-
-			fmt.Printf("%-2v  %-6v  %-16v  %-4v  %-5v  %-8v  %-12v  %-20v\n", "No", "Id", "Name", "Kind", "Type", "Size(GB)", "Status", "Path")
-			for i, v := range data {
-				fmt.Printf("%2d", i+1)
-				fmt.Printf("  %-6v", v.Id)
-				fmt.Printf("  %-16v", *v.Metadata.Name)
-				fmt.Printf("  %-4v", *v.Spec.Kind)
-				fmt.Printf("  %-5v", *v.Spec.Type)
-				fmt.Printf("  %-8v", *v.Spec.Size)
-				fmt.Printf("  %-12v", db.VolStatus[v.Status.StatusCode])
-				fmt.Printf("  %-20v", *v.Spec.Path)
-				fmt.Println()
-			}
-			return nil
-		case "json":
-			var data []api.Volume
-			if err := json.Unmarshal(byteBody, &data); err != nil {
-				println("Failed to Unmarshal", err)
-				return err
-			}
-			sort.Slice(data, func(i, j int) bool {
-				return creationTime(data[i].Status).Before(creationTime(data[j].Status))
-			})
-			jsonBytes, err := json.MarshalIndent(data, "", "  ")
+		return runList(func() error {
+			m, err := getClientConfig()
 			if err != nil {
-				println("Failed to Marshal", err)
-				return err
+				fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
+				os.Exit(1)
 			}
-			fmt.Println(string(jsonBytes))
-			return nil
 
-		case "yaml":
-			var data []api.Volume
-			if err := json.Unmarshal(byteBody, &data); err != nil {
-				println("Failed to Unmarshal", err)
-				return err
-			}
-			sort.Slice(data, func(i, j int) bool {
-				return creationTime(data[i].Status).Before(creationTime(data[j].Status))
-			})
-			yamlBytes, err := yaml.Marshal(data)
+			byteBody, _, err := m.ListVolumes()
 			if err != nil {
-				println("Failed to Marshal", err)
+				println("ListVolumes", "err", err)
 				return err
 			}
-			fmt.Println(string(yamlBytes))
-			return nil
 
-		default:
-			fmt.Println("output style must set text/json/yaml")
-			return fmt.Errorf("output style must set text/json/yaml")
-		}
+			switch outputStyle {
+			case "text":
+				var data []api.Volume
+				if err := json.Unmarshal(byteBody, &data); err != nil {
+					println("Failed to Unmarshal", err)
+					return err
+				}
+				sort.Slice(data, func(i, j int) bool {
+					return creationTime(data[i].Status).Before(creationTime(data[j].Status))
+				})
+
+				fmt.Printf("%-2v  %-6v  %-16v  %-4v  %-5v  %-8v  %-12v  %-20v\n", "No", "Id", "Name", "Kind", "Type", "Size(GB)", "Status", "Path")
+				for i, v := range data {
+					fmt.Printf("%2d", i+1)
+					fmt.Printf("  %-6v", v.Id)
+					fmt.Printf("  %-16v", *v.Metadata.Name)
+					fmt.Printf("  %-4v", *v.Spec.Kind)
+					fmt.Printf("  %-5v", *v.Spec.Type)
+					fmt.Printf("  %-8v", *v.Spec.Size)
+					fmt.Printf("  %-12v", db.VolStatus[v.Status.StatusCode])
+					fmt.Printf("  %-20v", *v.Spec.Path)
+					fmt.Println()
+				}
+				return nil
+			case "json":
+				var data []api.Volume
+				if err := json.Unmarshal(byteBody, &data); err != nil {
+					println("Failed to Unmarshal", err)
+					return err
+				}
+				sort.Slice(data, func(i, j int) bool {
+					return creationTime(data[i].Status).Before(creationTime(data[j].Status))
+				})
+				jsonBytes, err := json.MarshalIndent(data, "", "  ")
+				if err != nil {
+					println("Failed to Marshal", err)
+					return err
+				}
+				fmt.Println(string(jsonBytes))
+				return nil
+
+			case "yaml":
+				var data []api.Volume
+				if err := json.Unmarshal(byteBody, &data); err != nil {
+					println("Failed to Unmarshal", err)
+					return err
+				}
+				sort.Slice(data, func(i, j int) bool {
+					return creationTime(data[i].Status).Before(creationTime(data[j].Status))
+				})
+				yamlBytes, err := yaml.Marshal(data)
+				if err != nil {
+					println("Failed to Marshal", err)
+					return err
+				}
+				fmt.Println(string(yamlBytes))
+				return nil
+
+			default:
+				fmt.Println("output style must set text/json/yaml")
+				return fmt.Errorf("output style must set text/json/yaml")
+			}
+		})
 	},
 }
 
