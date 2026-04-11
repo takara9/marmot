@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -40,6 +41,9 @@ var serverListCmd = &cobra.Command{
 				println("Failed to Unmarshal", err)
 				return err
 			}
+			sort.Slice(data, func(i, j int) bool {
+				return creationTime(data[i].Status).Before(creationTime(data[j].Status))
+			})
 
 			fmt.Printf("  %2s  %-10s  %-20s  %-12s  %-3s  %-8s  %-15s  %-15s\n", "No", "Server-ID", "Server-Name", "Status", "CPU", "RAM(MB)", "IP-Address", "Network")
 			for i, server := range data {
@@ -73,6 +77,9 @@ var serverListCmd = &cobra.Command{
 				println("Failed to Unmarshal", err)
 				return err
 			}
+			sort.Slice(data, func(i, j int) bool {
+				return creationTime(data[i].Status).Before(creationTime(data[j].Status))
+			})
 			byteBody, err := json.MarshalIndent(data, "", "  ")
 			if err != nil {
 				fmt.Println("Failed to Marshal", err)

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -33,6 +34,9 @@ var networkListCmd = &cobra.Command{
 			println("Failed to Unmarshal", err)
 			return err
 		}
+		sort.Slice(data, func(i, j int) bool {
+			return creationTime(data[i].Status).Before(creationTime(data[j].Status))
+		})
 		if len(data) == 0 {
 			fmt.Println("No networks found.")
 			return nil

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -40,6 +41,9 @@ var imageListCmd = &cobra.Command{
 				println("Failed to Unmarshal", err)
 				return err
 			}
+			sort.Slice(data, func(i, j int) bool {
+				return creationTime(data[i].Status).Before(creationTime(data[j].Status))
+			})
 
 			fmt.Printf("  %2s  %-8s  %-16s  %-12s  %-20s  %-40s\n", "No", "IMAGE-ID", "IMAGE-NAME", "STATUS", "LV-PATH", "QCOW2-PATH")
 			for i, image := range data {
@@ -75,6 +79,9 @@ var imageListCmd = &cobra.Command{
 				println("Failed to Unmarshal", err)
 				return err
 			}
+			sort.Slice(data, func(i, j int) bool {
+				return creationTime(data[i].Status).Before(creationTime(data[j].Status))
+			})
 			byteBody, err := json.MarshalIndent(data, "", "  ")
 			if err != nil {
 				fmt.Println("Failed to Marshal", err)

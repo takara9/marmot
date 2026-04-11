@@ -60,8 +60,6 @@ var serverCreateImageCmd = &cobra.Command{
 			fmt.Println("output style must set text/json/yaml")
 			return fmt.Errorf("output style must set text/json/yaml")
 		}
-
-		return nil
 	},
 }
 
