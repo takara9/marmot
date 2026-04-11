@@ -43,8 +43,6 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
 	slog.SetDefault(logger)
 
-	node := flag.String("node", "hv1", "Hypervisor node name")
-	etcd := flag.String("etcd", "http://127.0.0.1:3379", "etcd url")
 	configPath := flag.String("config", marmotd.DefaultConfigPath, "Path to JSON config file")
 	flag.Parse()
 
@@ -54,47 +52,50 @@ func main() {
 		slog.Error("Failed to load config file", "path", *configPath, "err", err)
 		return
 	}
-	slog.Info("Config loaded", "api_listen_addr", cfg.APIListenAddr,
+	slog.Info("Config loaded",
+		"node_name", cfg.NodeName,
+		"etcd_url", cfg.EtcdURL,
+		"api_listen_addr", cfg.APIListenAddr,
 		"dns_listen_addr", cfg.DNSListenAddr,
 		"dns_upstream", cfg.DNSUpstream,
 		"deletion_delay_seconds", cfg.DeletionDelaySeconds)
 
 	// REST-APIサーバーの処理
 	e := echo.New()
-	Server := marmotd.NewServer(*node, *etcd)
+	Server := marmotd.NewServer(cfg.NodeName, cfg.EtcdURL)
 	api.RegisterHandlersWithBaseURL(e, Server, "/api/v1")
 
 	// コントローラーの開始
 
 	// 仮想マシンコントローラー
-	_, err = controller.StartVmController(*node, *etcd, cfg.DeletionDelaySeconds) // VMコントローラーの開始
+	_, err = controller.StartVmController(cfg.NodeName, cfg.EtcdURL, cfg.DeletionDelaySeconds) // VMコントローラーの開始
 	if err != nil {
 		slog.Error("Failed to start controller", "err", err)
 		return
 	}
 	// ボリュームコントローラー
-	_, err = controller.StartVolController(*node, *etcd, cfg.DeletionDelaySeconds) // ボリュームコントローラーの開始
+	_, err = controller.StartVolController(cfg.NodeName, cfg.EtcdURL, cfg.DeletionDelaySeconds) // ボリュームコントローラーの開始
 	if err != nil {
 		slog.Error("Failed to start controller", "err", err)
 		return
 	}
 
 	// ネットワークコントローラー
-	_, err = controller.StartNetController(*node, *etcd, cfg.DeletionDelaySeconds) // ネットワークコントローラーの開始
+	_, err = controller.StartNetController(cfg.NodeName, cfg.EtcdURL, cfg.DeletionDelaySeconds) // ネットワークコントローラーの開始
 	if err != nil {
 		slog.Error("Failed to start controller", "err", err)
 		return
 	}
 
 	// DNSサーバーコントローラー
-	_, err = internaldns.StartInternalDNSServer(context.Background(), *node, *etcd, cfg) // DNSサーバーコントローラーの開始
+	_, err = internaldns.StartInternalDNSServer(context.Background(), cfg.NodeName, cfg.EtcdURL, cfg) // DNSサーバーコントローラーの開始
 	if err != nil {
 		slog.Error("Failed to start DNS server", "err", err)
 		return
 	}
 
 	// イメージコントローラーの開始
-	_, err = controller.StartImageController(*node, *etcd, cfg.DeletionDelaySeconds)
+	_, err = controller.StartImageController(cfg.NodeName, cfg.EtcdURL, cfg.DeletionDelaySeconds)
 	if err != nil {
 		slog.Error("Failed to start image controller", "err", err)
 		return

@@ -9,6 +9,14 @@ const DefaultConfigPath = "/etc/marmot/marmotd.json"
 
 // MarmotdConfig は /etc/marmot/marmotd.json で設定可能なパラメータを保持します。
 type MarmotdConfig struct {
+	// ハイパーバイザーのノード名
+	// 例: "hv1"
+	NodeName string `json:"node_name"`
+
+	// etcd のエンドポイント URL
+	// 例: "http://127.0.0.1:3379"
+	EtcdURL string `json:"etcd_url"`
+
 	// marmot-API サーバーのバインドアドレスとポート番号
 	// 例: "0.0.0.0:8750"
 	APIListenAddr string `json:"api_listen_addr"`
@@ -30,6 +38,8 @@ type MarmotdConfig struct {
 // 指定されていない場合に使用されるデフォルト値を返します。
 func defaultConfig() *MarmotdConfig {
 	return &MarmotdConfig{
+		NodeName:             "hv1",
+		EtcdURL:              "http://127.0.0.1:3379",
 		APIListenAddr:        "0.0.0.0:8750",
 		DNSListenAddr:        "127.0.0.1:53",
 		DNSUpstream:          "8.8.8.8:53",
