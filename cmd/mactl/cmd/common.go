@@ -5,7 +5,9 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/takara9/marmot/api"
@@ -81,4 +83,33 @@ func getClientConfig() (*client.MarmotEndpoint, error) {
 		"/api/v1",
 		60,
 	)
+}
+
+// clearScreen はターミナル画面をクリアする。
+func clearScreen() {
+	fmt.Print("\033[H\033[2J")
+}
+
+// runList はリスト表示関数 fn を実行する。-w フラグが指定されている場合は
+// watchInterval 秒ごとに fn を繰り返し呼び出し、Ctrl+C で終了する。
+func runList(fn func() error) error {
+	if !watchMode {
+		return fn()
+	}
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sigCh)
+
+	for {
+		clearScreen()
+		if err := fn(); err != nil {
+			return err
+		}
+		select {
+		case <-sigCh:
+			return nil
+		case <-time.After(time.Duration(watchInterval) * time.Second):
+		}
+	}
 }
