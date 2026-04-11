@@ -6,10 +6,20 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"time"
 
+	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/client"
 	"github.com/takara9/marmot/pkg/config"
 )
+
+// creationTime は Status から作成日時を返す。nil の場合はゼロ時刻を返す。
+func creationTime(s *api.Status) time.Time {
+	if s != nil && s.CreationTimeStamp != nil {
+		return *s.CreationTimeStamp
+	}
+	return time.Time{}
+}
 
 // コンフィグからエンドポイントを取り出してセットする
 //
