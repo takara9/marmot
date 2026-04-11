@@ -39,6 +39,7 @@ package: clean all setup
 clean:
 	rm -fr $(BINDIR)
 	rm -f marmot-v$(TAG).tgz 
+	rm -fr dist
 
 DISTDIR = /usr/local/marmot
 SERVER_EXE = marmotd
