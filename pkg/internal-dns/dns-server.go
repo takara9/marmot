@@ -25,8 +25,17 @@ type controller struct {
 	Upstream string // 外部DNSサーバーのアドレス (例: "
 }
 
-// StartInternalDNSServer はサーバーを非同期で開始し、制御構造体を返します
-func StartInternalDNSServer(ctx context.Context, node string, etcdUrl string) (*controller, error) {
+// StartInternalDNSServer はサーバーを非同期で開始し、制御構造体を返します。
+// cfg に nil を渡した場合はデフォルト設定が使用されます。
+func StartInternalDNSServer(ctx context.Context, node string, etcdUrl string, cfg *marmotd.MarmotdConfig) (*controller, error) {
+	if cfg == nil {
+		var err error
+		cfg, err = marmotd.LoadConfig(marmotd.DefaultConfigPath)
+		if err != nil {
+			return nil, fmt.Errorf("load config: %w", err)
+		}
+	}
+
 	m, err := marmotd.NewMarmot(node, etcdUrl)
 	if err != nil {
 		slog.Error("Failed to create marmot instance", "err", err)
@@ -37,7 +46,7 @@ func StartInternalDNSServer(ctx context.Context, node string, etcdUrl string) (*
 		marmot:   m,
 		db:       m.Db,
 		etcdUrl:  etcdUrl,
-		Upstream: "8.8.8.8:53",
+		Upstream: cfg.DNSUpstream,
 		client:   &dns.Client{Timeout: 5 * time.Second},
 	}
 
@@ -45,9 +54,8 @@ func StartInternalDNSServer(ctx context.Context, node string, etcdUrl string) (*
 	mux := dns.NewServeMux()
 	mux.HandleFunc(".", c.handleRequest)
 	c.server = &dns.Server{
-		Addr: "127.0.0.1:53",
-		Net:  "udp",
-		// Handler を設定。必要に応じて c.handleDNS を実装
+		Addr:    cfg.DNSListenAddr,
+		Net:     "udp",
 		Handler: mux,
 	}
 

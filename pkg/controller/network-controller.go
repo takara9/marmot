@@ -24,9 +24,15 @@ type controller struct {
 */
 
 // ネットワークコントローラーの開始
-func StartNetController(node string, etcdUrl string) (*controller, error) {
+// deletionDelaySeconds に 0 を渡した場合はデフォルト値 (10秒) が使用されます。
+func StartNetController(node string, etcdUrl string, deletionDelaySeconds int) (*controller, error) {
 	var c controller
 	var err error
+
+	if deletionDelaySeconds <= 0 {
+		deletionDelaySeconds = 10
+	}
+	c.deletionDelay = time.Duration(deletionDelaySeconds) * time.Second
 
 	// 初期化
 	// marmotd との接続設定
@@ -78,7 +84,7 @@ func (c *controller) networkControllerLoop() {
 		if vnet.Status != nil && vnet.Status.StatusCode != db.NETWORK_ERROR {
 			if vnet.Status != nil && vnet.Status.DeletionTimeStamp != nil {
 				deletionTime := *vnet.Status.DeletionTimeStamp
-				if time.Since(deletionTime) > 10*time.Second {
+				if time.Since(deletionTime) > c.deletionDelay {
 					slog.Debug("削除のタイムスタンプが一定時間以上経過している仮想ネットワーク検出", "networkId", vnet.Id)
 					c.marmot.Db.UpdateVirtualNetworkStatus(vnet.Id, db.NETWORK_DELETING)
 					vnet.Status.StatusCode = db.NETWORK_DELETING

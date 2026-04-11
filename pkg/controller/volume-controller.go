@@ -22,10 +22,16 @@ type controller struct {
 }
 */
 
-// VMコントローラーの開始
-func StartVolController(node string, etcdUrl string) (*controller, error) {
+// ボリュームコントローラーの開始
+// deletionDelaySeconds に 0 を渡した場合はデフォルト値 (10秒) が使用されます。
+func StartVolController(node string, etcdUrl string, deletionDelaySeconds int) (*controller, error) {
 	var c controller
 	var err error
+
+	if deletionDelaySeconds <= 0 {
+		deletionDelaySeconds = 10
+	}
+	c.deletionDelay = time.Duration(deletionDelaySeconds) * time.Second
 
 	// marmotd との接続設定
 	c.marmot, err = marmotd.NewMarmot(node, etcdUrl)
@@ -71,7 +77,7 @@ func (c *controller) volumeControllerLoop() {
 		// 削除タイムスタンプが設定されて一定時間経過したボリュームのステータスをDELETINGに更新する
 		if vol.Status != nil && vol.Status.DeletionTimeStamp != nil {
 			deletionTime := *vol.Status.DeletionTimeStamp
-			if time.Since(deletionTime) > 10*time.Second {
+			if time.Since(deletionTime) > c.deletionDelay {
 				slog.Debug("削除のタイムスタンプが一定時間以上経過しているボリューム検出", "volId", vol.Id)
 				c.marmot.Db.UpdateVolumeStatus(vol.Id, db.VOLUME_DELETING)
 			}

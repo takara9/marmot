@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log/slog"
 	"os"
 
@@ -43,46 +42,63 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
 	slog.SetDefault(logger)
 
-	node := flag.String("node", "hv1", "Hypervisor node name")
-	etcd := flag.String("etcd", "http://127.0.0.1:3379", "etcd url")
+	configPath := flag.String("config", marmotd.DefaultConfigPath, "Path to JSON config file")
 	flag.Parse()
 
+	// コンフィグファイルの読み込み
+	cfg, err := marmotd.LoadConfig(*configPath)
+	if err != nil {
+		slog.Error("Failed to load config file", "path", *configPath, "err", err)
+		return
+	}
+	slog.Info("Config loaded",
+		"node_name", cfg.NodeName,
+		"etcd_url", cfg.EtcdURL,
+		"api_listen_addr", cfg.APIListenAddr,
+		"dns_listen_addr", cfg.DNSListenAddr,
+		"dns_upstream", cfg.DNSUpstream,
+		"deletion_delay_seconds", cfg.DeletionDelaySeconds)
+
 	// REST-APIサーバーの処理
+	slog.Info("Starting api server", "nodeName", cfg.NodeName, "etcdURL", cfg.EtcdURL, "apiListenAddr", cfg.APIListenAddr)
+
 	e := echo.New()
-	Server := marmotd.NewServer(*node, *etcd)
+	slog.Debug("Starting api server #2", "nodeName", cfg.NodeName, "etcdURL", cfg.EtcdURL, "apiListenAddr", cfg.APIListenAddr)
+	Server := marmotd.NewServer(cfg.NodeName, cfg.EtcdURL)
 	api.RegisterHandlersWithBaseURL(e, Server, "/api/v1")
 
 	// コントローラーの開始
+	slog.Info("Starting controllers", "nodeName", cfg.NodeName, "etcdURL", cfg.EtcdURL, "deletionDelaySeconds", cfg.DeletionDelaySeconds)
 
 	// 仮想マシンコントローラー
-	_, err := controller.StartVmController(*node, *etcd) // VMコントローラーの開始
+	_, err = controller.StartVmController(cfg.NodeName, cfg.EtcdURL, cfg.DeletionDelaySeconds) // VMコントローラーの開始
 	if err != nil {
 		slog.Error("Failed to start controller", "err", err)
 		return
 	}
 	// ボリュームコントローラー
-	_, err = controller.StartVolController(*node, *etcd) // ボリュームコントローラーの開始
+	_, err = controller.StartVolController(cfg.NodeName, cfg.EtcdURL, cfg.DeletionDelaySeconds) // ボリュームコントローラーの開始
 	if err != nil {
 		slog.Error("Failed to start controller", "err", err)
 		return
 	}
 
 	// ネットワークコントローラー
-	_, err = controller.StartNetController(*node, *etcd) // ネットワークコントローラーの開始
+	_, err = controller.StartNetController(cfg.NodeName, cfg.EtcdURL, cfg.DeletionDelaySeconds) // ネットワークコントローラーの開始
 	if err != nil {
 		slog.Error("Failed to start controller", "err", err)
 		return
 	}
 
 	// DNSサーバーコントローラー
-	_, err = internaldns.StartInternalDNSServer(context.Background(), *node, *etcd) // DNSサーバーコントローラーの開始
+	_, err = internaldns.StartInternalDNSServer(context.Background(), cfg.NodeName, cfg.EtcdURL, cfg) // DNSサーバーコントローラーの開始
 	if err != nil {
 		slog.Error("Failed to start DNS server", "err", err)
 		return
 	}
 
 	// イメージコントローラーの開始
-	_, err = controller.StartImageController(*node, *etcd)
+	_, err = controller.StartImageController(cfg.NodeName, cfg.EtcdURL, cfg.DeletionDelaySeconds)
 	if err != nil {
 		slog.Error("Failed to start image controller", "err", err)
 		return
@@ -90,5 +106,10 @@ func main() {
 
 	//startDispatcher()
 	// And we serve HTTP until the world ends.
-	fmt.Println(e.Start("0.0.0.0:8750"))
+	slog.Info("Starting API server", "addr", cfg.APIListenAddr)
+
+	if err := e.Start(cfg.APIListenAddr); err != nil {
+		slog.Error("API server stopped", "err", err)
+		os.Exit(1)
+	}
 }

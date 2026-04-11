@@ -12,10 +12,16 @@ const (
 	IMAGE_CONTROLLER_INTERVAL = 5 * time.Second
 )
 
-// VMコントローラーの開始
-func StartImageController(node string, etcdUrl string) (*controller, error) {
+// イメージコントローラーの開始
+// deletionDelaySeconds に 0 を渡した場合はデフォルト値 (10秒) が使用されます。
+func StartImageController(node string, etcdUrl string, deletionDelaySeconds int) (*controller, error) {
 	var c controller
 	var err error
+
+	if deletionDelaySeconds <= 0 {
+		deletionDelaySeconds = 10
+	}
+	c.deletionDelay = time.Duration(deletionDelaySeconds) * time.Second
 
 	// 初期化
 	// marmotd との接続設定
@@ -54,7 +60,7 @@ func (c *controller) imageControllerLoop() {
 		// 削除のタイムスタンプが一定時間以上経過しているかをチェックして、削除処理を実行する
 		if image.Status != nil && image.Status.DeletionTimeStamp != nil {
 			deletionTime := *image.Status.DeletionTimeStamp
-			if time.Since(deletionTime) > 10*time.Second {
+			if time.Since(deletionTime) > c.deletionDelay {
 				slog.Debug("削除のタイムスタンプが一定時間以上経過しているイメージ検出", "IMAGE", *image.Metadata.Name)
 				c.marmot.Db.UpdateImageStatus(image.Id, db.IMAGE_DELETING)
 			}

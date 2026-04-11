@@ -39,35 +39,35 @@ func startMockServer(ctx context.Context) *marmotd.Server {
 			// コントローラーの開始
 
 			// 仮想マシンコントローラー
-			_, err := controller.StartVmController(nodeName, etcdEp) // VMコントローラーの開始
+			_, err := controller.StartVmController(nodeName, etcdEp, 0) // VMコントローラーの開始
 			if err != nil {
 				slog.Error("Failed to start controller", "err", err)
 				return
 			}
 
 			// ボリュームコントローラー
-			_, err = controller.StartVolController(nodeName, etcdEp) // ボリュームコントローラーの開始
+			_, err = controller.StartVolController(nodeName, etcdEp, 0) // ボリュームコントローラーの開始
 			if err != nil {
 				slog.Error("Failed to start controller", "err", err)
 				return
 			}
 
 			// ネットワークコントローラー
-			_, err = controller.StartNetController(nodeName, etcdEp) // ネットワークコントローラーの開始
+			_, err = controller.StartNetController(nodeName, etcdEp, 0) // ネットワークコントローラーの開始
 			if err != nil {
 				slog.Error("Failed to start controller", "err", err)
 				return
 			}
 
 			// DNSサーバーコントローラー
-			_, err = internaldns.StartInternalDNSServer(context.Background(), nodeName, etcdEp) // DNSサーバーコントローラーの開始
+			_, err = internaldns.StartInternalDNSServer(context.Background(), nodeName, etcdEp, nil) // DNSサーバーコントローラーの開始
 			if err != nil {
 				slog.Error("Failed to start DNS server", "err", err)
 				return
 			}
 
 			// イメージコントローラーの開始
-			_, err = controller.StartImageController(nodeName, etcdEp)
+			_, err = controller.StartImageController(nodeName, etcdEp, 0)
 			if err != nil {
 				slog.Error("Failed to start image controller", "err", err)
 				return

@@ -18,15 +18,22 @@ const (
 var controllerCounter uint64 = 0
 
 type controller struct {
-	db     *db.Database
-	Lock   sync.Mutex
-	marmot *marmotd.Marmot
+	db            *db.Database
+	Lock          sync.Mutex
+	marmot        *marmotd.Marmot
+	deletionDelay time.Duration // DeletionTimestamp 検知から削除実行までの待機時間
 }
 
 // VMコントローラーの開始
-func StartVmController(node string, etcdUrl string) (*controller, error) {
+// deletionDelaySeconds に 0 を渡した場合はデフォルト値 (10秒) が使用されます。
+func StartVmController(node string, etcdUrl string, deletionDelaySeconds int) (*controller, error) {
 	var c controller
 	var err error
+
+	if deletionDelaySeconds <= 0 {
+		deletionDelaySeconds = 10
+	}
+	c.deletionDelay = time.Duration(deletionDelaySeconds) * time.Second
 
 	// 初期化
 	// marmotd との接続設定
@@ -75,7 +82,7 @@ func (c *controller) serverControllerLoop() {
 		// 削除のタイムスタンプが一定時間以上経過しているかをチェックして、削除処理を実行する
 		if spec.Status != nil && spec.Status.DeletionTimeStamp != nil {
 			deletionTime := *spec.Status.DeletionTimeStamp
-			if time.Since(deletionTime) > 10*time.Second {
+			if time.Since(deletionTime) > c.deletionDelay {
 				slog.Debug("削除のタイムスタンプが一定時間以上経過しているサーバー検出", "SERVER", spec.Id)
 				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_DELETING, "")
 			}
