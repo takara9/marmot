@@ -1,3 +1,0 @@
-#
-api_server:  http://localhost:8750
-etcd_server: http://localhost:2379

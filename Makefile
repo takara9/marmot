@@ -30,11 +30,12 @@ package: clean all setup
 	@echo $(TAG)
 	cp TAG pkg/marmotd/version.txt
 	cp TAG cmd/mactl/cmd/version.txt
-	cp TAG cmd/maadm/cmd/version.txt
 	cp cmd/install.sh $(BINDIR)/install.sh
-	cp cmd/mactl/config_marmot $(BINDIR)/config_marmot
+	cp cmd/mactl/.marmot.example $(BINDIR)/.marmot.example
 	cp cmd/marmotd/marmot.service $(BINDIR)/marmot.service
+	cp cmd/marmotd/marmotd.json $(BINDIR)/marmotd.json
 	tar czvf marmot-v$(TAG).tgz marmot-v$(TAG)
+	tools/build-deb.sh
 
 .PHONY:	clean
 clean:
