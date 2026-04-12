@@ -6,7 +6,7 @@
 #
 # 前提条件:
 #   - 以下のバイナリが marmot-v<VERSION>/ ディレクトリに存在すること
-#       marmotd, mactl, maadm
+#       marmotd, mactl
 #   - dpkg-deb コマンドが利用可能であること
 #
 # 使用方法:
@@ -36,13 +36,12 @@ echo "=== marmot v${TAG} dpkgパッケージビルド ==="
 echo ""
 
 # バイナリの存在確認
-for bin in marmotd mactl maadm; do
+for bin in marmotd mactl; do
     if [ ! -f "${BINDIR}/${bin}" ]; then
         echo "エラー: ${BINDIR}/${bin} が見つかりません。"
         echo "先に各コマンドをビルドしてください:"
         echo "  (cd cmd/marmotd && make)"
         echo "  (cd cmd/mactl   && make)"
-        echo "  (cd cmd/maadm   && make)"
         exit 1
     fi
 done
@@ -69,16 +68,18 @@ mkdir -p "${PKG_DIR}/var/lib/marmot/volumes"
 echo "バイナリをコピー中..."
 install -m 0755 "${BINDIR}/marmotd" "${PKG_DIR}/usr/local/marmot/marmotd"
 install -m 0755 "${BINDIR}/mactl"   "${PKG_DIR}/usr/local/bin/mactl"
-install -m 0755 "${BINDIR}/maadm"   "${PKG_DIR}/usr/local/bin/maadm"
 
 echo "systemd サービスファイルをコピー中..."
 # XXXHOSTXXXX はインストール後の postinst スクリプトで実際のホスト名に置換される
 install -m 0644 "${ROOT_DIR}/cmd/marmotd/marmot.service" \
     "${PKG_DIR}/lib/systemd/system/marmot.service"
 
+install -m 0644 "${ROOT_DIR}/cmd/marmotd/marmotd.json" \
+    "${PKG_DIR}/etc/marmot/marmotd.json"
+
 echo "設定ファイルのサンプルをコピー中..."
-install -m 0644 "${ROOT_DIR}/cmd/mactl/config_marmot" \
-    "${PKG_DIR}/etc/marmot/config_marmot.example"
+install -m 0644 "${ROOT_DIR}/cmd/mactl/.marmot.example" \
+    "${PKG_DIR}/etc/marmot/.marmot.example"
 
 # インストール済みサイズを計算 (KB単位)
 INSTALLED_SIZE=$(du -sk "${PKG_DIR}" | cut -f1)
@@ -105,27 +106,19 @@ Depends: libvirt-daemon-system,
  genisoimage,
  nfs-common,
  lvm2,
- etcd
+ etcd-server
 Section: admin
 Priority: optional
 Description: marmot - VM クラスター管理サービス
  marmot はVMクラスターを管理するサービスです。
  サーバーデーモン (marmotd)、クライアントCLI (mactl)、
- 管理者CLI (maadm) を含みます。
+ を含みます。
 EOF
 
 echo "DEBIAN/postinst を生成中..."
 cat > "${PKG_DIR}/DEBIAN/postinst" <<'POSTINST'
 #!/bin/bash
 set -e
-
-SERVICE_FILE="/lib/systemd/system/marmot.service"
-NODE_HOSTNAME="$(hostname)"
-
-# サービスファイル内のホスト名プレースホルダーを置換
-if grep -q "XXXHOSTXXXX" "${SERVICE_FILE}" 2>/dev/null; then
-    sed -i "s/XXXHOSTXXXX/${NODE_HOSTNAME}/g" "${SERVICE_FILE}"
-fi
 
 # LXC を有効化するために libvirtd を停止・無効化して lxcfs を起動する
 if systemctl is-active --quiet libvirtd.service 2>/dev/null; then
@@ -139,6 +132,7 @@ systemctl start lxcfs.service
 
 systemctl daemon-reload
 systemctl enable marmot.service
+systemctl start marmot.service
 
 echo ""
 echo "============================================================"
@@ -197,12 +191,8 @@ echo ""
 echo "【次のステップ3】marmot サービスの起動"
 echo ""
 echo "  クライアント設定を配置する (サンプルをコピーして編集):"
-echo "    cp /etc/marmot/config_marmot.example ~/.config_marmot"
-echo "    vi ~/.config_marmot"
-echo ""
-echo "  サービスを開始する:"
-echo "    systemctl start marmot"
-echo "    systemctl status marmot"
+echo "    cp /etc/marmot/.marmot.example ~/.marmot"
+echo "    vi ~/.marmot"
 echo ""
 echo "============================================================"
 
@@ -252,8 +242,8 @@ echo "=== ビルド完了 ==="
 echo "パッケージ: ${DEB_FILE}"
 echo ""
 echo "インストール:"
-echo "  sudo dpkg -i ${DEB_FILE}"
+echo "  sudo apt install ./${DEB_FILE}"
 echo ""
 echo "アンインストール:"
-echo "  sudo dpkg -r ${PACKAGE_NAME}"
+echo "  sudo apt remove ${PACKAGE_NAME}"
 echo ""
