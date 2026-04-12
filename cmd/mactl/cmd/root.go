@@ -40,7 +40,7 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&apiConfigFilename, "api", "", "API Endpoint URL (default is $HOME/.config_marmot)")
+	rootCmd.PersistentFlags().StringVar(&apiConfigFilename, "api", "", "API Endpoint URL (default is $HOME/.marmot)")
 	rootCmd.Flags().BoolP("toggle", "t", false, "ヘルプメッセージの表示を切り替えます")
 	rootCmd.PersistentFlags().StringVarP(&outputStyle, "output", "o", "text", "Text style output")
 	rootCmd.PersistentFlags().BoolVarP(&watchMode, "watch", "w", false, "変化があった時に表示を更新する")
