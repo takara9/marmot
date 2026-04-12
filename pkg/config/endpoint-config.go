@@ -2,11 +2,32 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
+
+const exampleConfigPath = "/etc/marmot/.marmot.example"
+
+// EnsureMarmotConfig は $HOME/.marmot が存在しない場合、
+// /etc/marmot/.marmot.example からコピーして自動作成する。
+func EnsureMarmotConfig() error {
+	dest := MarmotConfigPath()
+	if _, err := os.Stat(dest); err == nil {
+		return nil // すでに存在する
+	}
+	data, err := os.ReadFile(exampleConfigPath)
+	if err != nil {
+		return fmt.Errorf("サンプル設定ファイルが見つかりません (%s): %w", exampleConfigPath, err)
+	}
+	if err := os.WriteFile(dest, data, 0600); err != nil {
+		return fmt.Errorf("設定ファイルの作成に失敗しました (%s): %w", dest, err)
+	}
+	slog.Info("設定ファイルを作成しました", "path", dest, "from", exampleConfigPath)
+	return nil
+}
 
 // MarmotConfig は $HOME/.marmot に保存される複数エンドポイント設定
 type MarmotConfig struct {

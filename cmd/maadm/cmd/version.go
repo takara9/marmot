@@ -72,5 +72,5 @@ var versionCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(versionCmd)
-	versionCmd.PersistentFlags().StringVar(&apiConfigFilename, "api", "", "API Endpoint URL (default is $HOME/.config_marmot)")
+	versionCmd.PersistentFlags().StringVar(&apiConfigFilename, "api", "", "設定ファイルのパス (デフォルト: $HOME/.marmot)")
 }

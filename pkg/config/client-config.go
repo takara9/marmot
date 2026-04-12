@@ -3,33 +3,54 @@ package config
 import (
 	"log/slog"
 	"net/url"
-	"os"
-	"path/filepath"
 
 	"github.com/takara9/marmot/pkg/client"
 )
 
-// コンフィグからエンドポイントを取り出してセットする
+// GetClientConfig2 はコンフィグからエンドポイントを取り出して返す。
+// apiConfigFilename が指定された場合はそのファイルを $HOME/.marmot 形式として読み込む。
+// 省略時は EnsureMarmotConfig() で $HOME/.marmot を保証してから読み込む。
 func GetClientConfig2(apiConfigFilename string) (*client.MarmotEndpoint, error) {
-	var configFn string
-	if len(apiConfigFilename) == 0 {
-		configFn = filepath.Join(os.Getenv("HOME"), ".config_marmot")
+	var rawURL string
+
+	if len(apiConfigFilename) > 0 {
+		// ファイルパスとして .marmot フォーマットで読み込む
+		cfg, err := ReadMarmotConfig(apiConfigFilename)
+		if err != nil {
+			slog.Error("GetClientConfig2", "read error", err)
+			return nil, err
+		}
+		rawURL, err = cfg.ActiveEndpoint()
+		if err != nil {
+			slog.Error("GetClientConfig2", "active endpoint error", err)
+			return nil, err
+		}
 	} else {
-		configFn = apiConfigFilename
+		// $HOME/.marmot を保証し読み込む
+		if err := EnsureMarmotConfig(); err != nil {
+			slog.Error("GetClientConfig2", "ensure config error", err)
+			return nil, err
+		}
+		cfg, err := ReadMarmotConfig(MarmotConfigPath())
+		if err != nil {
+			slog.Error("GetClientConfig2", "read error", err)
+			return nil, err
+		}
+		var aErr error
+		rawURL, aErr = cfg.ActiveEndpoint()
+		if aErr != nil {
+			slog.Error("GetClientConfig2", "active endpoint error", aErr)
+			return nil, aErr
+		}
 	}
 
-	var mactlConfig mactlClientConfig
-	if err := ReadYamlConfig(configFn, &mactlConfig); err != nil {
-		slog.Error("mactlConfig", "read error", err)
-		return nil, err
-	}
-	if len(mactlConfig.ApiServerUrl) == 0 {
-		mactlConfig.ApiServerUrl = "http://localhost:8080"
+	if len(rawURL) == 0 {
+		rawURL = "http://localhost:8750"
 	}
 
-	u, err := url.Parse(mactlConfig.ApiServerUrl)
+	u, err := url.Parse(rawURL)
 	if err != nil {
-		slog.Error("mactlConfig", "read error", err)
+		slog.Error("GetClientConfig2", "parse error", err)
 		return nil, err
 	}
 

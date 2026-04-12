@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
@@ -28,7 +27,7 @@ func creationTime(s *api.Status) time.Time {
 // 優先順位:
 //  1. --api フラグで明示指定された URL
 //  2. $HOME/.marmot に登録されたアクティブエンドポイント
-//  3. フォールバック: $HOME/.config_marmot (後方互換)
+//     ($HOME/.marmot が無い場合は /etc/marmot/.marmot.example からコピーして自動作成)
 func getClientConfig() (*client.MarmotEndpoint, error) {
 	var rawURL string
 
@@ -47,24 +46,20 @@ func getClientConfig() (*client.MarmotEndpoint, error) {
 			rawURL = mactlConfig.ApiServerUrl
 		}
 	} else {
-		// $HOME/.marmot が存在すれば優先的に使用する
-		marmotCfgPath := config.MarmotConfigPath()
-		if marmotCfg, err := config.ReadMarmotConfig(marmotCfgPath); err == nil {
-			activeURL, err := marmotCfg.ActiveEndpoint()
-			if err != nil {
-				return nil, err
-			}
-			rawURL = activeURL
-		} else if !os.IsNotExist(err) {
-			return nil, fmt.Errorf("failed to read %s: %w", marmotCfgPath, err)
-		} else {
-			// フォールバック: 旧来の .config_marmot を読み込む
-			configFn := filepath.Join(os.Getenv("HOME"), ".config_marmot")
-			if err := config.ReadYamlConfig(configFn, &mactlConfig); err != nil {
-				return nil, fmt.Errorf("設定ファイルが見つかりません。'mactl ep add <URL>' または ~/.config_marmot を作成してください: %w", err)
-			}
-			rawURL = mactlConfig.ApiServerUrl
+		// $HOME/.marmot を保証し（なければサンプルからコピー）、読み込む
+		if err := config.EnsureMarmotConfig(); err != nil {
+			return nil, err
 		}
+		marmotCfgPath := config.MarmotConfigPath()
+		marmotCfg, err := config.ReadMarmotConfig(marmotCfgPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read %s: %w", marmotCfgPath, err)
+		}
+		activeURL, err := marmotCfg.ActiveEndpoint()
+		if err != nil {
+			return nil, err
+		}
+		rawURL = activeURL
 	}
 
 	if len(rawURL) == 0 {
