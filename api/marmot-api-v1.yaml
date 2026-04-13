@@ -526,6 +526,90 @@ paths:
               application/json:
                 schema:
                   $ref: "#/components/schemas/Error"
+  /ipnetwork:
+    get:
+      summary: "List all assigned IP Networks"
+      description: |
+        Retrieve all assigned IP networks across all virtual networks.
+      operationId: apiListIpNetworks
+      tags:
+        - ipnetwork
+      responses:
+        "200":
+          description: "Successfully retrieved the list of IP networks."
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IPNetwork"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /ipnetwork/{id}/addresses:
+    get:
+      summary: "Get assigned IP addresses for a specific IP network"
+      description: |
+        Retrieve the list of assigned IP addresses for a specific IP network.
+      operationId: apiGetIpAddressesByNetwork
+      tags:
+        - ipnetwork
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The ID of the IP network.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Successfully retrieved the list of IP addresses."
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IPAddress"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /network/{id}/ipnetworks:
+    get:
+      summary: "Get IP networks for a virtual network"
+      description: |
+        Retrieve the list of IP networks assigned to a specific virtual network.
+      operationId: apiGetNetworkIpNetworks
+      tags:
+        - ipnetwork
+        - virtual-network
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The ID of the virtual network.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Successfully retrieved the list of IP networks."
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IPNetwork"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
 components:
   schemas:

@@ -272,6 +272,12 @@ type ServerInterface interface {
 	// Update Image
 	// (PUT /image/{id})
 	ApiUpdateImageById(ctx echo.Context, id string) error
+	// List all assigned IP Networks
+	// (GET /ipnetwork)
+	ApiListIpNetworks(ctx echo.Context) error
+	// Get assigned IP addresses for a specific IP network
+	// (GET /ipnetwork/{id}/addresses)
+	ApiGetIpAddressesByNetwork(ctx echo.Context, id string) error
 	// Get Network Information
 	// (GET /network)
 	ApiGetNetworks(ctx echo.Context) error
@@ -287,6 +293,9 @@ type ServerInterface interface {
 	// Update Virtual Network Information by Id
 	// (PUT /network/{id})
 	ApiUpdateNetworkById(ctx echo.Context, id string) error
+	// Get IP networks for a virtual network
+	// (GET /network/{id}/ipnetworks)
+	ApiGetNetworkIpNetworks(ctx echo.Context, id string) error
 	// Alive
 	// (GET /ping)
 	ApiReplyPing(ctx echo.Context) error
@@ -399,6 +408,31 @@ func (w *ServerInterfaceWrapper) ApiUpdateImageById(ctx echo.Context) error {
 	return err
 }
 
+// ApiListIpNetworks converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiListIpNetworks(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiListIpNetworks(ctx)
+	return err
+}
+
+// ApiGetIpAddressesByNetwork converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiGetIpAddressesByNetwork(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiGetIpAddressesByNetwork(ctx, id)
+	return err
+}
+
 // ApiGetNetworks converts echo context to params.
 func (w *ServerInterfaceWrapper) ApiGetNetworks(ctx echo.Context) error {
 	var err error
@@ -462,6 +496,22 @@ func (w *ServerInterfaceWrapper) ApiUpdateNetworkById(ctx echo.Context) error {
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.ApiUpdateNetworkById(ctx, id)
+	return err
+}
+
+// ApiGetNetworkIpNetworks converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiGetNetworkIpNetworks(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiGetNetworkIpNetworks(ctx, id)
 	return err
 }
 
@@ -664,11 +714,14 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.DELETE(baseURL+"/image/:id", wrapper.ApiDeleteImageById)
 	router.GET(baseURL+"/image/:id", wrapper.ApiGetImageById)
 	router.PUT(baseURL+"/image/:id", wrapper.ApiUpdateImageById)
+	router.GET(baseURL+"/ipnetwork", wrapper.ApiListIpNetworks)
+	router.GET(baseURL+"/ipnetwork/:id/addresses", wrapper.ApiGetIpAddressesByNetwork)
 	router.GET(baseURL+"/network", wrapper.ApiGetNetworks)
 	router.POST(baseURL+"/network", wrapper.ApiCreateNetwork)
 	router.DELETE(baseURL+"/network/:id", wrapper.ApiDeleteNetworkById)
 	router.GET(baseURL+"/network/:id", wrapper.ApiGetNetworkById)
 	router.PUT(baseURL+"/network/:id", wrapper.ApiUpdateNetworkById)
+	router.GET(baseURL+"/network/:id/ipnetworks", wrapper.ApiGetNetworkIpNetworks)
 	router.GET(baseURL+"/ping", wrapper.ApiReplyPing)
 	router.GET(baseURL+"/server", wrapper.ApiGetServers)
 	router.POST(baseURL+"/server", wrapper.ApiCreateServer)
