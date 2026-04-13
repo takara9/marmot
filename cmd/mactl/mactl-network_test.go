@@ -313,6 +313,30 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println(string(stdoutStderr))
 		})
+
+		It("IPネットワークのリスト ipn", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "network", "ipn", "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Println(string(stdoutStderr))
+
+			var ipnets []api.IPNetwork
+			err = json.Unmarshal(stdoutStderr, &ipnets)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(ipnets)).To(BeNumerically(">", 0))
+		})
+
+		It("仮想ネットワーク配下のIPネットワークのリスト ipn-by-vn", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "network", "ipn-by-vn", netId1, "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Println(string(stdoutStderr))
+
+			var ipnets []api.IPNetwork
+			err = json.Unmarshal(stdoutStderr, &ipnets)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(ipnets)).To(BeNumerically(">", 0))
+		})
 	})
 
 	Context("OSイメージの準備", func() {
@@ -458,6 +482,47 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Printf("  - %s (%s)\n", *server.Metadata.Name, server.Id)
 				g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_RUNNING)))
+			}, 120*time.Second, 5*time.Second).Should(Succeed())
+		})
+
+		It("割り当て済みIPアドレスのリスト ips", func() {
+			Eventually(func(g Gomega) {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "network", "list", "--output", "json")
+				stdoutStderr, err := cmd.CombinedOutput()
+				g.Expect(err).NotTo(HaveOccurred())
+
+				var vnets []api.VirtualNetwork
+				err = json.Unmarshal(stdoutStderr, &vnets)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(len(vnets)).To(BeNumerically(">", 0))
+
+				var defaultVnetID string
+				for _, v := range vnets {
+					if v.Metadata != nil && v.Metadata.Name != nil && *v.Metadata.Name == "default" {
+						defaultVnetID = v.Id
+						break
+					}
+				}
+				g.Expect(defaultVnetID).NotTo(BeEmpty())
+
+				cmd = exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "network", "ipn-by-vn", defaultVnetID, "--output", "json")
+				stdoutStderr, err = cmd.CombinedOutput()
+				g.Expect(err).NotTo(HaveOccurred())
+
+				var ipnets []api.IPNetwork
+				err = json.Unmarshal(stdoutStderr, &ipnets)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(len(ipnets)).To(BeNumerically(">", 0))
+
+				cmd = exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "network", "ips", ipnets[0].Id, "--output", "json")
+				stdoutStderr, err = cmd.CombinedOutput()
+				g.Expect(err).NotTo(HaveOccurred())
+				fmt.Println(string(stdoutStderr))
+
+				var addrs []api.IPAddress
+				err = json.Unmarshal(stdoutStderr, &addrs)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(len(addrs)).To(BeNumerically(">", 0))
 			}, 120*time.Second, 5*time.Second).Should(Succeed())
 		})
 
