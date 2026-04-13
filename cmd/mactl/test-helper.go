@@ -109,3 +109,11 @@ func cleanupTestEnvironment() {
 	cmd = exec.Command("lvremove vg2/data0903 -y")
 	cmd.CombinedOutput()
 }
+
+func cleanupTestNetworks() {
+	networks := []string{"default", "host-bridge", "ovs-network", "test-net-1", "test-net-2", "test-net-3"}
+	for _, network := range networks {
+		exec.Command("virsh", "net-destroy", network).CombinedOutput()
+		exec.Command("virsh", "net-undefine", network).CombinedOutput()
+	}
+}

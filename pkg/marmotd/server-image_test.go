@@ -43,6 +43,7 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 		}
 		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
 		slog.SetDefault(logger)
+		Expect(marmotd.EnsureDefaultTestNetwork()).To(Succeed())
 	})
 
 	AfterAll(func(ctx0 SpecContext) {
@@ -64,6 +65,7 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 		}
 
 		cancel() // モックサーバー停止
+		marmotd.CleanupDefaultTestNetwork()
 		marmotd.CleanupTestEnvironment()
 	})
 

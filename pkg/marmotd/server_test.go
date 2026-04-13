@@ -45,6 +45,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		}
 		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
 		slog.SetDefault(logger)
+		Expect(marmotd.EnsureDefaultTestNetwork()).To(Succeed())
 	})
 
 	AfterAll(func(ctx0 SpecContext) {
@@ -69,6 +70,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		}
 		cancel() // モックサーバー停止
 
+		marmotd.CleanupDefaultTestNetwork()
 		marmotd.CleanupTestEnvironment()
 	})
 

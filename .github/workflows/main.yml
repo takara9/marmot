@@ -10,6 +10,11 @@ env:
   # Setting an environment variable with the value of a configuration variable
   env_var: ${{ vars.ENV_CONTEXT_VAR || 'MARMOT CI' }}
   DEBUG: true
+  GO_VERSION: '1.26.1'
+  GOPATH: ${{ github.workspace }}/.go
+  GOBIN: ${{ github.workspace }}/.go/bin
+  GOCACHE: ${{ github.workspace }}/.cache/go-build
+  GOMODCACHE: ${{ github.workspace }}/.cache/go/pkg/mod
 
 jobs:
   # Label of the job
@@ -17,6 +22,10 @@ jobs:
     runs-on: [ self-hosted ]
     steps:
     - uses: actions/checkout@v5
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
 
     - name: change permissions
       run: |
@@ -43,43 +52,43 @@ jobs:
     - name: Test pkg/config
       run: | 
         cd pkg/config
-        sudo -s make test
+        sudo -E env "PATH=$PATH" make test
         cd ../..
 
     - name: Test pkg/db
       run: | 
         cd pkg/db
-        sudo -s make test
+        sudo -E env "PATH=$PATH" make test
         cd ../..
 
     - name: Test pkg/lvm
       run: | 
         cd pkg/lvm
-        sudo -s make test
+        sudo -E env "PATH=$PATH" make test
         cd ../..
 
     - name: Test pkg/qcow2
       run: | 
         cd pkg/qcow
-        sudo -s make test
+        sudo -E env "PATH=$PATH" make test
         cd ../..
 
     - name: Test pkg/util
       run: | 
         cd pkg/util
-        sudo -s make test
+        sudo -E env "PATH=$PATH" make test
         cd ../..
 
     - name: Test pkg/virt
       run: | 
         cd pkg/virt
-        sudo -s make test
+        sudo -E env "PATH=$PATH" make test
         cd ../..
 
     - name: Test pkg/marmotd ボリューム機能テスト
       run: |
         cd pkg/marmotd
-        sudo -s make test-volume
+        sudo -E env "PATH=$PATH" make test-volume
         cd ../..
 
     - name: Cleanup runner workspace
@@ -93,6 +102,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v5
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
 
     - name: change permissions
       run: |
@@ -123,6 +136,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v5
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
 
     - name: change permissions
       run: |
@@ -153,6 +170,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v5
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
 
     - name: change permissions
       run: |
@@ -184,6 +205,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v5
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
 
     - name: change permissions
       run: |
@@ -215,6 +240,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v5
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
 
     - name: change permissions
       run: |
