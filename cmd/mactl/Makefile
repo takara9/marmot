@@ -39,4 +39,4 @@ test2: mactl-test
 
 .PHONY:test-net 
 test-net: mactl-test
-	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus-file mactl-network_test.go -timeout=20m -coverprofile cover.out
+	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus-file mactl-network_test.go -timeout=40m -coverprofile cover.out

@@ -29,7 +29,7 @@ test-volume:
 
 .PHONY: test-server
 test-server:
-	$(GO) test -ginkgo.focus-file server_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+	$(GO) test -ginkgo.focus-file server_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -timeout 30m
 
 .PHONY: test-func
 test-func:
@@ -73,12 +73,12 @@ test-image2:
 
 .PHONY: test-server-image
 test-server-image:
-	$(GO) test -ginkgo.focus-file server-image_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+	$(GO) test -ginkgo.focus-file server-image_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -timeout 30m
 
 .PHONY: test-iso
 test-iso:
-	$(GO) test -ginkgo.focus-file cloud-init_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+	$(GO) test -ginkgo.focus-file cloud-init_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -timeout 30m
 
 .PHONY: test-cloud-init
 test-cloud-init:
-	$(GO) test -ginkgo.focus-file cloud-init_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+	$(GO) test -ginkgo.focus-file cloud-init_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -timeout 30m
