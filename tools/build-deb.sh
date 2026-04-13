@@ -27,21 +27,22 @@ TAG=$(cat "${ROOT_DIR}/TAG")
 ARCH="amd64"
 PACKAGE_NAME="marmot"
 
-BINDIR="${ROOT_DIR}/marmot-v${TAG}"
+BINDIR="${ROOT_DIR}/dist/marmot-v${TAG}"
 DIST_DIR="${ROOT_DIR}/dist"
-PKG_DIR="${DIST_DIR}/${PACKAGE_NAME}_${TAG}_${ARCH}"
-DEB_FILE="${DIST_DIR}/${PACKAGE_NAME}_${TAG}_${ARCH}.deb"
+PKG_DIR="${DIST_DIR}/${PACKAGE_NAME}_v${TAG}_${ARCH}"
+DEB_FILE="${PACKAGE_NAME}_v${TAG}_${ARCH}.deb"
 
 echo "=== marmot v${TAG} dpkgパッケージビルド ==="
 echo ""
 
 # バイナリの存在確認
-for bin in marmotd mactl; do
+for bin in marmotd mactl maadm; do
     if [ ! -f "${BINDIR}/${bin}" ]; then
         echo "エラー: ${BINDIR}/${bin} が見つかりません。"
         echo "先に各コマンドをビルドしてください:"
         echo "  (cd cmd/marmotd && make)"
         echo "  (cd cmd/mactl   && make)"
+        echo "  (cd cmd/maadm   && make)"
         exit 1
     fi
 done
@@ -68,9 +69,9 @@ mkdir -p "${PKG_DIR}/var/lib/marmot/volumes"
 echo "バイナリをコピー中..."
 install -m 0755 "${BINDIR}/marmotd" "${PKG_DIR}/usr/local/marmot/marmotd"
 install -m 0755 "${BINDIR}/mactl"   "${PKG_DIR}/usr/local/bin/mactl"
+install -m 0755 "${BINDIR}/maadm"   "${PKG_DIR}/usr/local/bin/maadm"
 
 echo "systemd サービスファイルをコピー中..."
-# XXXHOSTXXXX はインストール後の postinst スクリプトで実際のホスト名に置換される
 install -m 0644 "${ROOT_DIR}/cmd/marmotd/marmot.service" \
     "${PKG_DIR}/lib/systemd/system/marmot.service"
 
@@ -235,7 +236,7 @@ POSTRM
 chmod 0755 "${PKG_DIR}/DEBIAN/postrm"
 
 echo "dpkgパッケージをビルド中..."
-dpkg-deb --build --root-owner-group "${PKG_DIR}" "${DEB_FILE}"
+dpkg-deb --build --root-owner-group "${PKG_DIR}" "${DIST_DIR}/${DEB_FILE}"
 
 echo ""
 echo "=== ビルド完了 ==="

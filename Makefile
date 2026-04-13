@@ -1,11 +1,11 @@
-PROGRAMS = mactl marmotd
+PROGRAMS = mactl marmotd maadm
 .PHONY: all $(PROGRAMS)
 all:	$(PROGRAMS)
 
 MAKE = /usr/bin/make
 CURDIR := $(shell pwd)
 TAG := $(shell cat TAG)
-BINDIR = $(CURDIR)/marmot-v$(TAG)
+BINDIR = dist/marmot-v$(TAG)
 
 $(PROGRAMS):
 	mkdir -p $(BINDIR)
@@ -28,19 +28,19 @@ test: setup
 .PHONY:	package
 package: clean all setup
 	@echo $(TAG)
+	mkdir -p $(BINDIR)
 	cp TAG pkg/marmotd/version.txt
 	cp TAG cmd/mactl/cmd/version.txt
+	cp TAG cmd/maadm/cmd/version.txt
 	cp cmd/install.sh $(BINDIR)/install.sh
 	cp cmd/mactl/.marmot.example $(BINDIR)/.marmot.example
 	cp cmd/marmotd/marmot.service $(BINDIR)/marmot.service
 	cp cmd/marmotd/marmotd.json $(BINDIR)/marmotd.json
-	tar czvf marmot-v$(TAG).tgz marmot-v$(TAG)
+	tar -C $(BINDIR) -czvf dist/marmot-v$(TAG).tgz .
 	tools/build-deb.sh
 
 .PHONY:	clean
 clean:
-	rm -fr $(BINDIR)
-	rm -f marmot-v$(TAG).tgz 
 	rm -fr dist
 
 DISTDIR = /usr/local/marmot

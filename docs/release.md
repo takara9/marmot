@@ -22,7 +22,7 @@ $ git push origin "v$VERSION"
 $ make package
 $ gh release list
 $ gh release create "v$VERSION"
-$ gh release upload "v$VERSION" --repo github.com/takara9/marmot marmot-v${VERSION}.tgz
+$ gh release upload "v$VERSION" --repo github.com/takara9/marmot dist/marmot-v${VERSION}.tgz
 $ gh release upload "v$VERSION" --repo github.com/takara9/marmot dist/marmot_v${VERSION}_amd64.deb
 $ make clean
 ```

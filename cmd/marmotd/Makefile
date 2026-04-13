@@ -3,7 +3,7 @@ PROGRAM	= marmotd
 all:	$(PROGRAM)
 
 TAG := $(shell cat ../../TAG)
-BINDIR = ../../marmot-v$(TAG)
+BINDIR = ../../dist/marmot-v$(TAG)
 
 $(PROGRAM): $(%.go)
 	echo $(BINDIR)
