@@ -33,7 +33,11 @@ test-server:
 
 .PHONY: test-func
 test-func:
-	$(GO) test -ginkgo.focus-file marmotd-funcs_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+	$(GO) test -ginkgo.focus-file api_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+
+.PHONY: test-api
+test-api:
+	$(GO) test -ginkgo.focus-file api_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
 .PHONY:	set-version
 set-version:
@@ -45,20 +49,36 @@ download-image:
 
 .PHONY: test-network
 test-network:
-	$(GO) test -ginkgo.focus="VirtualPrivateNetworks" -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+	$(GO) test -ginkgo.focus-file network_lower_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
 .PHONY: test-network2
 test-network2:
-	$(GO) test -ginkgo.focus="VirtualPrivateNetworksUpperlayer" -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+	$(GO) test -ginkgo.focus-file network_upperr_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+
+.PHONY: test-network-lower
+test-network-lower:
+	$(GO) test -ginkgo.focus-file network_lower_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+
+.PHONY: test-network-upper
+test-network-upper:
+	$(GO) test -ginkgo.focus-file network_upperr_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
 .PHONY: test-image
 test-image:
-	$(GO) test -ginkgo.focus="ImageManagmentTest" -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+	$(GO) test -ginkgo.focus-file image_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
 .PHONY: test-image2
 test-image2:
-	$(GO) test -ginkgo.focus="ServerImageCopyingTest" -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+	$(GO) test -ginkgo.focus-file server-image_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+
+.PHONY: test-server-image
+test-server-image:
+	$(GO) test -ginkgo.focus-file server-image_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
 .PHONY: test-iso
 test-iso:
-	$(GO) test -ginkgo.focus="Cloud-InitISO作成テスト" -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+	$(GO) test -ginkgo.focus-file cloud-init_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+
+.PHONY: test-cloud-init
+test-cloud-init:
+	$(GO) test -ginkgo.focus-file cloud-init_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events

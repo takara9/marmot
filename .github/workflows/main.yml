@@ -1,9 +1,10 @@
-name: marmot CI on self-hosted hv2
+name: marmot CI on self-hosted
 on: 
   push:
     paths-ignore:
       - 'docs/**'
       - 'README.md'
+  workflow_dispatch:
 
 env:
   # Setting an environment variable with the value of a configuration variable
@@ -13,7 +14,7 @@ env:
 jobs:
   # Label of the job
   marmot-package:
-    runs-on: [ self-hosted, runner3 ]
+    runs-on: [ self-hosted ]
     steps:
     - uses: actions/checkout@v5
 
@@ -81,9 +82,14 @@ jobs:
         sudo -s make test-volume
         cd ../..
 
+    - name: Cleanup runner workspace
+      if: always()
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+
   # Label of the job
-  marmot-daemon:
-    runs-on: [ self-hosted, runner1 ]
+  marmot-daemon-core:
+    runs-on: [ self-hosted ]
 
     steps:
     - uses: actions/checkout@v5
@@ -101,14 +107,141 @@ jobs:
       run: |
         make setup
  
-    - name: Test pkg/marmotd 全機能テスト
+    - name: Test pkg/marmotd サーバー機能テスト
       run: |
         cd pkg/marmotd
-        sudo -s make test
+        sudo -E env "PATH=$PATH" make test-server
         cd ../..
 
-  marmot-command:
-    runs-on: [ self-hosted, runner2 ]
+    - name: Cleanup runner workspace
+      if: always()
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+
+  marmot-daemon-api:
+    runs-on: [ self-hosted ]
+
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: change permissions
+      run: |
+        sudo -S chown -R $USER:$USER /var/actions-runner/_work/marmot
+
+    - name: Install ca-certificates
+      run: |
+        sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
+        sudo update-ca-certificates
+
+    - name: Setup for build
+      run: |
+        make setup
+
+    - name: Test pkg/marmotd API機能テスト
+      run: |
+        cd pkg/marmotd
+        sudo -E env "PATH=$PATH" make test-api
+        cd ../..
+
+    - name: Cleanup runner workspace
+      if: always()
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+
+  marmot-daemon-network:
+    runs-on: [ self-hosted ]
+
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: change permissions
+      run: |
+        sudo -S chown -R $USER:$USER /var/actions-runner/_work/marmot
+
+    - name: Install ca-certificates
+      run: |
+        sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
+        sudo update-ca-certificates
+
+    - name: Setup for build
+      run: |
+        make setup
+
+    - name: Test pkg/marmotd ネットワーク機能テスト
+      run: |
+        cd pkg/marmotd
+        sudo -E env "PATH=$PATH" make test-network-lower
+        sudo -E env "PATH=$PATH" make test-network-upper
+        cd ../..
+
+    - name: Cleanup runner workspace
+      if: always()
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+
+  marmot-daemon-image:
+    runs-on: [ self-hosted ]
+
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: change permissions
+      run: |
+        sudo -S chown -R $USER:$USER /var/actions-runner/_work/marmot
+
+    - name: Install ca-certificates
+      run: |
+        sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
+        sudo update-ca-certificates
+
+    - name: Setup for build
+      run: |
+        make setup
+
+    - name: Test pkg/marmotd イメージ機能テスト
+      run: |
+        cd pkg/marmotd
+        sudo -E env "PATH=$PATH" make test-image
+        sudo -E env "PATH=$PATH" make test-server-image
+        cd ../..
+
+    - name: Cleanup runner workspace
+      if: always()
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+
+  marmot-daemon-cloud-init:
+    runs-on: [ self-hosted ]
+
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: change permissions
+      run: |
+        sudo -S chown -R $USER:$USER /var/actions-runner/_work/marmot
+
+    - name: Install ca-certificates
+      run: |
+        sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
+        sudo update-ca-certificates
+
+    - name: Setup for build
+      run: |
+        make setup
+
+    - name: Test pkg/marmotd cloud-init 機能テスト
+      run: |
+        cd pkg/marmotd
+        sudo -E env "PATH=$PATH" make test-cloud-init
+        cd ../..
+
+    - name: Cleanup runner workspace
+      if: always()
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+
+  marmot-command-mactl:
+    runs-on: [ self-hosted ]
     strategy:
       matrix:
         go-version: [ '1.26.1' ]
@@ -139,52 +272,88 @@ jobs:
         sudo -E env "PATH=$PATH" make mactl-test
         ls -la bin
         sudo -E env "PATH=$PATH" make test
+        sudo rm -fr bin
+        cd ../..
+
+    - name: Cleanup runner workspace
+      if: always()
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+
+  marmot-command-network:
+    runs-on: [ self-hosted ]
+    strategy:
+      matrix:
+        go-version: [ '1.26.1' ]
+    steps:
+    - uses: actions/checkout@v5
+    - name: Setup Go ${{ matrix.go-version }}
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+    - name: Display Go version
+      run: go version
+
+    - name: change permissions
+      run: |
+        sudo -S chown -R $USER:$USER /var/actions-runner/_work/marmot
+
+    - name: Install ca-certificates
+      run: |
+        sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
+        sudo update-ca-certificates
+
+    - name: Test cmd/mactl-network
+      run: |
+        cd cmd/mactl
+        sudo -s mkdir -p bin
+        sudo -s chown ubuntu:ubuntu bin
+        sudo -s chmod 755 bin
+        sudo -E env "PATH=$PATH" make mactl-test
         sudo -E env "PATH=$PATH" make test-net
         sudo rm -fr bin
         cd ../..
 
-    #- name: Test cmd/maadm
-    #  run: | 
-    #    cd cmd/maadm
-    #    sudo -s mkdir -p bin
-    #    sudo -s chown ubuntu:ubuntu bin
-    #    sudo -s chmod 755 bin
-    #    sudo -E env "PATH=$PATH" make test
-    #    sudo rm -fr bin
-    #    cd ../..
+    - name: Cleanup runner workspace
+      if: always()
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/cleanup.sh
 
-  cleanup-runner3:
-    runs-on: [ self-hosted, runner3 ]
-    needs: 
-      - marmot-package
-    if: always() 
+  marmot-command-maadm:
+    runs-on: [ self-hosted ]
+    strategy:
+      matrix:
+        go-version: [ '1.26.1' ]
     steps:
-      - name: 各ランナーを掃除
-        run: |
-          pwd
-          ls -al
-          sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+    - uses: actions/checkout@v5
+    - name: Setup Go ${{ matrix.go-version }}
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+    - name: Display Go version
+      run: go version
 
-  cleanup-runner1:
-    runs-on: [ self-hosted, runner1 ]
-    needs: 
-      - marmot-daemon
-    if: always() 
-    steps:
-      - name: 各ランナーを掃除
-        run: |
-          pwd
-          ls -al
-          sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+    - name: change permissions
+      run: |
+        sudo -S chown -R $USER:$USER /var/actions-runner/_work/marmot
 
-  cleanup-runner2:
-    runs-on: [ self-hosted, runner2 ]
-    needs: 
-      - marmot-command
-    if: always() 
-    steps:
-      - name: 各ランナーを掃除
-        run: |
-          pwd
-          ls -al
-          sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+    - name: Install ca-certificates
+      run: |
+        sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
+        sudo update-ca-certificates
+
+    - name: Test cmd/maadm
+      run: |
+        cd cmd/maadm
+        sudo -s mkdir -p bin
+        sudo -s chown ubuntu:ubuntu bin
+        sudo -s chmod 755 bin
+        sudo -E env "PATH=$PATH" make test
+        sudo rm -fr bin
+        cd ../..
+
+    - name: Cleanup runner workspace
+      if: always()
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+
