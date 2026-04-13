@@ -104,3 +104,51 @@ func (m *MarmotEndpoint) GetVirtualNetworks() ([]byte, *url.URL, error) {
 	}
 	return m.httpRequest2(req)
 }
+
+// 全ての仮想ネットワークに割り当てられたIPネットワークの一覧を取得
+func (m *MarmotEndpoint) ListIpNetworks() ([]byte, *url.URL, error) {
+	slog.Debug("===", "ListIpNetworks is called", "===")
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/ipnetwork")
+	if err != nil {
+		return nil, nil, err
+	}
+	slog.Debug("ListIpNetworks", "reqURL", reqURL)
+
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	return m.httpRequest2(req)
+}
+
+// 指定したIPネットワークに割り当てられたIPアドレスの一覧を取得
+func (m *MarmotEndpoint) GetIpAddressesByNetworkId(id string) ([]byte, *url.URL, error) {
+	slog.Debug("===", "GetIpAddressesByNetworkId is called", "===")
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/ipnetwork/"+id+"/addresses")
+	if err != nil {
+		return nil, nil, err
+	}
+	slog.Debug("GetIpAddressesByNetworkId", "reqURL", reqURL)
+
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	return m.httpRequest2(req)
+}
+
+// 指定した仮想ネットワークに割り当てられたIPネットワークの一覧を取得
+func (m *MarmotEndpoint) GetIpNetworksByVirtualNetworkId(id string) ([]byte, *url.URL, error) {
+	slog.Debug("===", "GetIpNetworksByVirtualNetworkId is called", "===")
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/network/"+id+"/ipnetworks")
+	if err != nil {
+		return nil, nil, err
+	}
+	slog.Debug("GetIpNetworksByVirtualNetworkId", "reqURL", reqURL)
+
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	return m.httpRequest2(req)
+}
