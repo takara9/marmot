@@ -23,7 +23,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 		slog.SetDefault(logger)
 
 		// テスト用のqcow2ボリュームの準備
-		cmd := exec.Command("cp", "/var/lib/marmot/volumes/ubuntu-22.04-server-cloudimg-amd64.img", "/var/lib/marmot/volumes/test-linux-qcow2.img")
+		cmd := exec.Command("cp", "/var/lib/marmot/volumes/ubuntu-24.04-server-cloudimg-amd64.img", "/var/lib/marmot/volumes/test-linux-qcow2.img")
 		err := cmd.Run()
 		Expect(err).To(BeNil())
 
