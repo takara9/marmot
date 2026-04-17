@@ -239,6 +239,11 @@ func (d *Database) DeleteImage(id string) error {
 
 // ステータスの変更
 func (d *Database) UpdateImageStatus(id string, status int) {
+	d.UpdateImageStatusMessage(id, status, "")
+}
+
+// ステータスとメッセージの変更
+func (d *Database) UpdateImageStatusMessage(id string, status int, message string) {
 	slog.Debug("SetImageStatus() called", "id", id, "status", status)
 	image, err := d.GetImage(id)
 	if err != nil {
@@ -247,6 +252,11 @@ func (d *Database) UpdateImageStatus(id string, status int) {
 	}
 	image.Status.StatusCode = status
 	image.Status.Status = util.StringPtr(ImageStatus[status])
+	if len(message) > 0 {
+		image.Status.Message = util.StringPtr(message)
+	} else {
+		image.Status.Message = nil
+	}
 	image.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	if err := d.UpdateImage(id, image); err != nil {
 		slog.Error("SetDeleteTimestamp() UpdateImage() failed", "err", err, "imageId", id)

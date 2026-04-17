@@ -18,7 +18,8 @@ const (
 	VOLUME_ERROR        = 2 // 問題発生
 	VOLUME_AVAILABLE    = 3 // 利用可能
 	VOLUME_DELETING     = 4 // 削除中
-	//VOLUME_DELETED      = 5 // 削除済み
+	VOLUME_UNAVAILABLE  = 5 // 実体欠損
+	//VOLUME_DELETED      = 6 // 削除済み
 )
 
 var VolStatus = map[int]string{
@@ -27,7 +28,8 @@ var VolStatus = map[int]string{
 	2: "ERROR",
 	3: "AVAILABLE",
 	4: "DELETING",
-	//5: "DELETED",
+	5: "UNAVAILABLE",
+	//6: "DELETED",
 }
 
 // 仮想マシンを生成する時にボリュームを生成して、アタッチする
@@ -349,6 +351,10 @@ func (d *Database) FindVolumeByName(name, kind string) ([]api.Volume, error) {
 // OSボリュームの状態更新
 // エラーが出る場合、パニックして停止させるべき
 func (d *Database) UpdateVolumeStatus(id string, status int) {
+	d.UpdateVolumeStatusMessage(id, status, "")
+}
+
+func (d *Database) UpdateVolumeStatusMessage(id string, status int, message string) {
 	if len(id) == 0 {
 		slog.Error("invalid volume id", "id", id)
 		return
@@ -361,6 +367,11 @@ func (d *Database) UpdateVolumeStatus(id string, status int) {
 	vol.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	vol.Status.StatusCode = status
 	vol.Status.Status = util.StringPtr(VolStatus[vol.Status.StatusCode])
+	if len(message) > 0 {
+		vol.Status.Message = util.StringPtr(message)
+	} else {
+		vol.Status.Message = nil
+	}
 
 	if err = d.UpdateVolume(id, vol); err != nil {
 		slog.Error("panic! failed to update volume", "err", err, "volId", id)

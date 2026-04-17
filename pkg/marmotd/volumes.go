@@ -6,6 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/takara9/marmot/api"
@@ -254,6 +257,57 @@ func (m *Marmot) UpdateVolumeById(id string, volSpec api.Volume) (*api.Volume, e
 	}
 
 	return &vol, nil
+}
+
+func CheckVolumeBackingStore(volume api.Volume) error {
+	if volume.Spec == nil {
+		return nil
+	}
+
+	backingPath, backingType := getVolumeBackingStore(volume.Spec)
+	if backingPath == "" {
+		return nil
+	}
+
+	if _, err := os.Stat(backingPath); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("missing volume backing store: %s %s", backingType, backingPath)
+		}
+		return fmt.Errorf("failed to inspect %s %s: %w", backingType, backingPath, err)
+	}
+
+	return nil
+}
+
+func getVolumeBackingStore(spec *api.VolSpec) (string, string) {
+	if spec == nil {
+		return "", ""
+	}
+
+	volType := strings.TrimSpace(util.OrDefault(spec.Type, ""))
+	switch volType {
+	case "qcow2":
+		path := strings.TrimSpace(util.OrDefault(spec.Path, ""))
+		if path == "" {
+			return "", ""
+		}
+		return path, "qcow2 file"
+	case "lvm":
+		path := strings.TrimSpace(util.OrDefault(spec.Path, ""))
+		if path != "" {
+			return path, "logical volume"
+		}
+
+		volumeGroup := strings.TrimSpace(util.OrDefault(spec.VolumeGroup, ""))
+		logicalVolume := strings.TrimSpace(util.OrDefault(spec.LogicalVolume, ""))
+		if volumeGroup == "" || logicalVolume == "" {
+			return "", ""
+		}
+
+		return filepath.Join("/dev", volumeGroup, logicalVolume), "logical volume"
+	default:
+		return "", ""
+	}
 }
 
 // 以下は未実装
