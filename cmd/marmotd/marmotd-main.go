@@ -51,12 +51,15 @@ func main() {
 		slog.Error("Failed to load config file", "path", *configPath, "err", err)
 		return
 	}
+	marmotd.SetRuntimeConfig(cfg)
 	slog.Info("Config loaded",
 		"node_name", cfg.NodeName,
 		"etcd_url", cfg.EtcdURL,
 		"api_listen_addr", cfg.APIListenAddr,
 		"dns_listen_addr", cfg.DNSListenAddr,
 		"dns_upstream", cfg.DNSUpstream,
+		"os_volume_group", cfg.OSVolumeGroup,
+		"data_volume_group", cfg.DataVolumeGroup,
 		"deletion_delay_seconds", cfg.DeletionDelaySeconds)
 
 	// REST-APIサーバーの処理

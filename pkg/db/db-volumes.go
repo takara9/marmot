@@ -123,15 +123,7 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 
 	// LVMボリュームの場合、パスを決定する
 	if *volume.Spec.Type == "lvm" {
-		if *volume.Spec.Kind == "os" {
-			volume.Spec.Path = util.StringPtr(fmt.Sprintf("/dev/%s/oslv-%s", "vg1", volume.Id))
-			volume.Spec.LogicalVolume = util.StringPtr(fmt.Sprintf("oslv-%s", volume.Id))
-			volume.Spec.VolumeGroup = util.StringPtr("vg1")
-		} else {
-			volume.Spec.Path = util.StringPtr(fmt.Sprintf("/dev/%s/datalv-%s", "vg2", volume.Id))
-			volume.Spec.LogicalVolume = util.StringPtr(fmt.Sprintf("datalv-%s", volume.Id))
-			volume.Spec.VolumeGroup = util.StringPtr("vg2")
-		}
+		configureLVMVolumeSpec(volume.Spec, volume.Id)
 	}
 
 	// OSボリュームの場合、OsVariantのデフォルト値を設定する  必要か？
@@ -150,6 +142,25 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 		return nil, err
 	}
 	return &volume, nil
+}
+
+func configureLVMVolumeSpec(spec *api.VolSpec, volumeID string) {
+	if spec == nil {
+		return
+	}
+
+	if spec.Kind != nil && *spec.Kind == "os" {
+		volumeGroup := defaultOSVolumeGroup()
+		spec.Path = util.StringPtr(fmt.Sprintf("/dev/%s/oslv-%s", volumeGroup, volumeID))
+		spec.LogicalVolume = util.StringPtr(fmt.Sprintf("oslv-%s", volumeID))
+		spec.VolumeGroup = util.StringPtr(volumeGroup)
+		return
+	}
+
+	volumeGroup := defaultDataVolumeGroup()
+	spec.Path = util.StringPtr(fmt.Sprintf("/dev/%s/datalv-%s", volumeGroup, volumeID))
+	spec.LogicalVolume = util.StringPtr(fmt.Sprintf("datalv-%s", volumeID))
+	spec.VolumeGroup = util.StringPtr(volumeGroup)
 }
 
 // ボリューム作成のロールバック

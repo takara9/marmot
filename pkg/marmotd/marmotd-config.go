@@ -3,6 +3,10 @@ package marmotd
 import (
 	"encoding/json"
 	"os"
+	"strings"
+	"sync"
+
+	"github.com/takara9/marmot/pkg/db"
 )
 
 const DefaultConfigPath = "/etc/marmot/marmotd.json"
@@ -29,9 +33,24 @@ type MarmotdConfig struct {
 	// 例: "8.8.8.8:53"
 	DNSUpstream string `json:"dns_upstream"`
 
+	// OS ボリューム用の LVM Volume Group 名
+	// 例: "vg1"
+	OSVolumeGroup string `json:"os_volume_group"`
+
+	// DATA ボリューム用の LVM Volume Group 名
+	// 例: "vg2"
+	DataVolumeGroup string `json:"data_volume_group"`
+
 	// コントローラーが DeletionTimestamp を検知してから実際に削除処理を
 	// 開始するまでの待機秒数
 	DeletionDelaySeconds int `json:"deletion_delay_seconds"`
+}
+
+var runtimeConfigState = struct {
+	mu  sync.RWMutex
+	cfg *MarmotdConfig
+}{
+	cfg: defaultConfig(),
 }
 
 // defaultConfig はコンフィグファイルが存在しない場合や一部フィールドが
@@ -43,8 +62,66 @@ func defaultConfig() *MarmotdConfig {
 		APIListenAddr:        "0.0.0.0:8750",
 		DNSListenAddr:        "127.0.0.1:53",
 		DNSUpstream:          "8.8.8.8:53",
+		OSVolumeGroup:        db.DefaultOSVolumeGroup,
+		DataVolumeGroup:      db.DefaultDataVolumeGroup,
 		DeletionDelaySeconds: 10,
 	}
+}
+
+func init() {
+	SetRuntimeConfig(defaultConfig())
+}
+
+func normalizeConfig(cfg *MarmotdConfig) *MarmotdConfig {
+	normalized := defaultConfig()
+	if cfg == nil {
+		return normalized
+	}
+
+	*normalized = *cfg
+	defaults := defaultConfig()
+	if strings.TrimSpace(normalized.NodeName) == "" {
+		normalized.NodeName = defaults.NodeName
+	}
+	if strings.TrimSpace(normalized.EtcdURL) == "" {
+		normalized.EtcdURL = defaults.EtcdURL
+	}
+	if strings.TrimSpace(normalized.APIListenAddr) == "" {
+		normalized.APIListenAddr = defaults.APIListenAddr
+	}
+	if strings.TrimSpace(normalized.DNSListenAddr) == "" {
+		normalized.DNSListenAddr = defaults.DNSListenAddr
+	}
+	if strings.TrimSpace(normalized.DNSUpstream) == "" {
+		normalized.DNSUpstream = defaults.DNSUpstream
+	}
+	if strings.TrimSpace(normalized.OSVolumeGroup) == "" {
+		normalized.OSVolumeGroup = db.DefaultOSVolumeGroup
+	}
+	if strings.TrimSpace(normalized.DataVolumeGroup) == "" {
+		normalized.DataVolumeGroup = db.DefaultDataVolumeGroup
+	}
+	if normalized.DeletionDelaySeconds <= 0 {
+		normalized.DeletionDelaySeconds = defaults.DeletionDelaySeconds
+	}
+	return normalized
+}
+
+func SetRuntimeConfig(cfg *MarmotdConfig) {
+	normalized := normalizeConfig(cfg)
+
+	runtimeConfigState.mu.Lock()
+	runtimeConfigState.cfg = normalized
+	runtimeConfigState.mu.Unlock()
+
+	db.SetDefaultVolumeGroups(normalized.OSVolumeGroup, normalized.DataVolumeGroup)
+}
+
+func CurrentConfig() *MarmotdConfig {
+	runtimeConfigState.mu.RLock()
+	defer runtimeConfigState.mu.RUnlock()
+	copy := *runtimeConfigState.cfg
+	return &copy
 }
 
 // LoadConfig は path で指定された JSON ファイルを読み込み MarmotdConfig を返します。
@@ -70,5 +147,5 @@ func LoadConfig(path string) (*MarmotdConfig, error) {
 		return nil, err
 	}
 
-	return cfg, nil
+	return normalizeConfig(cfg), nil
 }
