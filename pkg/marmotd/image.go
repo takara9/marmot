@@ -210,6 +210,58 @@ func (m *Marmot) UpdateImageManage(id string, image api.Image) error {
 	return m.Db.UpdateImage(id, image)
 }
 
+func CheckImageBackingStore(image api.Image) error {
+	if image.Spec == nil {
+		return nil
+	}
+
+	missing := make([]string, 0, 2)
+
+	if qcow2Path := strings.TrimSpace(util.OrDefault(image.Spec.Qcow2Path, "")); qcow2Path != "" {
+		if _, err := os.Stat(qcow2Path); err != nil {
+			if os.IsNotExist(err) {
+				missing = append(missing, fmt.Sprintf("qcow2 file %s", qcow2Path))
+			} else {
+				return fmt.Errorf("failed to inspect qcow2 file %s: %w", qcow2Path, err)
+			}
+		}
+	}
+
+	if lvPath := getImageLogicalVolumePath(image.Spec); lvPath != "" {
+		if _, err := os.Stat(lvPath); err != nil {
+			if os.IsNotExist(err) {
+				missing = append(missing, fmt.Sprintf("logical volume %s", lvPath))
+			} else {
+				return fmt.Errorf("failed to inspect logical volume %s: %w", lvPath, err)
+			}
+		}
+	}
+
+	if len(missing) > 0 {
+		return fmt.Errorf("missing image backing store: %s", strings.Join(missing, ", "))
+	}
+
+	return nil
+}
+
+func getImageLogicalVolumePath(spec *api.ImageSpec) string {
+	if spec == nil {
+		return ""
+	}
+
+	if lvPath := strings.TrimSpace(util.OrDefault(spec.LvPath, "")); lvPath != "" {
+		return lvPath
+	}
+
+	volumeGroup := strings.TrimSpace(util.OrDefault(spec.VolumeGroup, ""))
+	logicalVolume := strings.TrimSpace(util.OrDefault(spec.LogicalVolume, ""))
+	if volumeGroup == "" || logicalVolume == "" {
+		return ""
+	}
+
+	return filepath.Join("/dev", volumeGroup, logicalVolume)
+}
+
 func resolveImagePath(imageDir, sourceURL string) (string, error) {
 	u, err := url.Parse(sourceURL)
 	if err != nil {

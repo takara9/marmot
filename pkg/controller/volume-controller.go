@@ -111,9 +111,14 @@ func (c *controller) volumeControllerLoop() {
 		case db.VOLUME_ERROR:
 			slog.Debug("エラー状態のボリュームを処理", "volId", vol.Id)
 			// エラー状態のボリュームを処理するコードをここに追加
+		case db.VOLUME_UNAVAILABLE:
+			slog.Debug("実体欠損状態のボリュームを処理", "volId", vol.Id)
 		case db.VOLUME_AVAILABLE:
 			slog.Debug("利用可能なボリュームを処理", "volId", vol.Id)
-			// 利用可能なボリュームを処理するコードをここに追加
+			if err := marmotd.CheckVolumeBackingStore(vol); err != nil {
+				slog.Warn("AVAILABLE ボリュームの実体が見つからないため UNAVAILABLE に更新", "volId", vol.Id, "err", err)
+				c.db.UpdateVolumeStatusMessage(vol.Id, db.VOLUME_UNAVAILABLE, err.Error())
+			}
 		default:
 			slog.Warn("不明なステータスのボリュームをスキップ", "volId", vol.Id, "status", *vol.Status.Status)
 		}

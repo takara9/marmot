@@ -96,7 +96,10 @@ func (c *controller) imageControllerLoop() {
 			// ここにイメージの作成失敗時の処理を実装
 		case db.IMAGE_AVAILABLE:
 			slog.Debug("イメージは利用可能", "image", *image.Metadata.Name)
-			// ここにイメージが利用可能な状態での処理を実装
+			if err := marmotd.CheckImageBackingStore(image); err != nil {
+				slog.Warn("AVAILABLE イメージの実体が見つからないため DELETED に更新", "imageId", image.Id, "err", err)
+				c.marmot.Db.UpdateImageStatusMessage(image.Id, db.IMAGE_DELETED, err.Error())
+			}
 		case db.IMAGE_DELETING:
 			slog.Debug("イメージの削除処理を実行", "image", *image.Metadata.Name)
 			err := c.marmot.DeleteImageManage(image.Id)
