@@ -740,7 +740,7 @@ func (m *Marmot) MakeImageEntryFromRunningVM(serverId, name string, image api.Im
 			//	slog.Error("lvm.CreateSnapshot()", "err", err)
 			//}
 
-			if err := lvm.CopyLogicalVoulume(*bootVol.Spec.VolumeGroup, *bootVol.Spec.LogicalVolume, "vg1", *image.Spec.LogicalVolume, size); err != nil {
+			if err := lvm.CopyLogicalVoulume(*bootVol.Spec.VolumeGroup, *bootVol.Spec.LogicalVolume, CurrentConfig().OSVolumeGroup, *image.Spec.LogicalVolume, size); err != nil {
 				slog.Error("lvm.CopyLogicalVoulume()", "err", err)
 			}
 		}

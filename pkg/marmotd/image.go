@@ -115,7 +115,7 @@ func (m *Marmot) CreateNewImageManage(id string) (*api.Image, error) {
 	}
 
 	// イメージをLVにコピーする
-	lvPath, lvName, err := createBootableLVFromQCOW2(ctx, id, downloadPath)
+	lvPath, lvName, err := createBootableLVFromQCOW2(ctx, id, downloadPath, CurrentConfig().OSVolumeGroup)
 	if err != nil {
 		slog.Error("Failed to create bootable LV from QCOW2", "imgId", id, "path", downloadPath, "err", err)
 		return nil, err
@@ -124,7 +124,7 @@ func (m *Marmot) CreateNewImageManage(id string) (*api.Image, error) {
 	image.Spec.Kind = util.StringPtr("os")
 	image.Spec.Type = util.StringPtr("qcow2")
 
-	image.Spec.VolumeGroup = util.StringPtr("vg1")
+	image.Spec.VolumeGroup = util.StringPtr(CurrentConfig().OSVolumeGroup)
 	image.Spec.LogicalVolume = util.StringPtr(lvName)
 	image.Spec.LvPath = util.StringPtr(lvPath)
 
@@ -446,10 +446,9 @@ func runCmd(ctx context.Context, name string, args ...string) error {
 	return nil
 }
 
-// CreateBootableLVFromQCOW2 creates /dev/vg1/<imageID> (16G) and writes qcow2 image into it.
-func createBootableLVFromQCOW2(ctx context.Context, imageID, qcow2Path string) (string, string, error) {
+// CreateBootableLVFromQCOW2 creates /dev/<volume-group>/<imageID> (16G) and writes qcow2 image into it.
+func createBootableLVFromQCOW2(ctx context.Context, imageID, qcow2Path, vgName string) (string, string, error) {
 	const (
-		vgName = "vg1"
 		lvSize = "16G"
 	)
 	bootVolName := "boot-" + imageID

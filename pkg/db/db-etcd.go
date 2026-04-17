@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
+	"sync"
 	"time"
 
 	etcd "go.etcd.io/etcd/client/v3"
@@ -33,6 +35,48 @@ var (
 	ErrUpdateConflict = errors.New("update conflict")
 	ErrFound          = errors.New("found")
 )
+
+const (
+	DefaultOSVolumeGroup   = "vg1"
+	DefaultDataVolumeGroup = "vg2"
+)
+
+var defaultVolumeGroups = struct {
+	mu   sync.RWMutex
+	os   string
+	data string
+}{
+	os:   DefaultOSVolumeGroup,
+	data: DefaultDataVolumeGroup,
+}
+
+func SetDefaultVolumeGroups(osVolumeGroup, dataVolumeGroup string) {
+	osVolumeGroup = strings.TrimSpace(osVolumeGroup)
+	dataVolumeGroup = strings.TrimSpace(dataVolumeGroup)
+	if osVolumeGroup == "" {
+		osVolumeGroup = DefaultOSVolumeGroup
+	}
+	if dataVolumeGroup == "" {
+		dataVolumeGroup = DefaultDataVolumeGroup
+	}
+
+	defaultVolumeGroups.mu.Lock()
+	defaultVolumeGroups.os = osVolumeGroup
+	defaultVolumeGroups.data = dataVolumeGroup
+	defaultVolumeGroups.mu.Unlock()
+}
+
+func defaultOSVolumeGroup() string {
+	defaultVolumeGroups.mu.RLock()
+	defer defaultVolumeGroups.mu.RUnlock()
+	return defaultVolumeGroups.os
+}
+
+func defaultDataVolumeGroup() string {
+	defaultVolumeGroups.mu.RLock()
+	defer defaultVolumeGroups.mu.RUnlock()
+	return defaultVolumeGroups.data
+}
 
 type Database struct {
 	Cli     *etcd.Client
@@ -179,4 +223,3 @@ func (d *Database) DeleteJSON(key string) error {
 	}
 	return nil
 }
-

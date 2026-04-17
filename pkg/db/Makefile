@@ -27,3 +27,7 @@ test-job:
 .PHONY: test-image
 test-image:
 	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus="Image" -coverprofile cover.out
+
+.PHONY: test-vol
+test-vol:
+	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus="VolumeGroupConfig" -coverprofile cover.out
