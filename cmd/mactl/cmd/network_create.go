@@ -89,5 +89,5 @@ var networkCreateCmd = &cobra.Command{
 
 func init() {
 	networkCmd.AddCommand(networkCreateCmd)
-	networkCreateCmd.Flags().StringVarP(&configFilename, "configfile", "f", "network.yaml", "Configuration file for the network")
+	networkCreateCmd.Flags().StringVarP(&configFilename, "configfile", "f", "network.yaml", "Configuration file or raw URL for the network")
 }

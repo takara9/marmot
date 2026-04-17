@@ -16,6 +16,8 @@ import (
 	"github.com/takara9/marmot/pkg/db"
 )
 
+const testServerConfigRawURL = "https://raw.githubusercontent.com/takara9/marmot/refs/heads/main/cmd/mactl/testdata/test-server-1.yaml"
+
 var _ = Describe("Marmotd Test", Ordered, func() {
 	var ctx context.Context
 	var cancel context.CancelFunc
@@ -546,10 +548,10 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			})
 
 			var id1 string
-			It("サーバー単体の作成", func() {
+			It("サーバー単体の作成 raw URL", func() {
 				// このコマンドで、marmotd側でエラーが発生する。
 				// エラーが発生する理由は、サーバー生成部分が未実装のため
-				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "create", "--output", "json", "--configfile", "testdata/test-server-1.yaml")
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "server", "create", "--output", "json", "--configfile", testServerConfigRawURL)
 				stdoutStderr, _ := cmd.CombinedOutput()
 				GinkgoWriter.Println(string(stdoutStderr))
 				var resp api.Success
