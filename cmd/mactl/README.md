@@ -11,3 +11,10 @@ Cobraフレームワークを使って開発するリメイク版
 - status: VMのリストを出力
 - version: バージョン表示
 
+設定 YAML はローカルファイルだけでなく raw URL も指定可能
+
+```sh
+mactl server create --configfile https://raw.githubusercontent.com/takara9/marmot/refs/heads/main/cmd/mactl/testdata/test-server-03-host-bridge-ip.yaml
+mactl network create -f https://raw.githubusercontent.com/takara9/marmot/refs/heads/main/cmd/mactl/testdata/test-network-02-test-net-2.yaml
+```
+

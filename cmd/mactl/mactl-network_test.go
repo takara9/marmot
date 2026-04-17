@@ -15,6 +15,8 @@ import (
 	"github.com/takara9/marmot/pkg/db"
 )
 
+const testNetworkConfigRawURL = "https://raw.githubusercontent.com/takara9/marmot/refs/heads/main/cmd/mactl/testdata/test-network-02-test-net-2.yaml"
+
 var _ = Describe("MarmotdTest", Ordered, func() {
 	var ctx context.Context
 	var cancel context.CancelFunc
@@ -266,8 +268,8 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 		})
 
 		var netId2 string
-		It("仮想ネットワークの作成 test-net-2", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "network", "create", "--configfile", "testdata/test-network-02-test-net-2.yaml", "--output", "json")
+		It("仮想ネットワークの作成 test-net-2 raw URL", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "network", "create", "--configfile", testNetworkConfigRawURL, "--output", "json")
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println(string(stdoutStderr))

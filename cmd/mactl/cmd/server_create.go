@@ -217,5 +217,5 @@ var serverCreateCmd = &cobra.Command{
 
 func init() {
 	serverCmd.AddCommand(serverCreateCmd)
-	serverCreateCmd.Flags().StringVarP(&configFilename, "configfile", "f", "vm-server.yaml", "Configuration file for the server")
+	serverCreateCmd.Flags().StringVarP(&configFilename, "configfile", "f", "vm-server.yaml", "Configuration file or raw URL for the server")
 }
