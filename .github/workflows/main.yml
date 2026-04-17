@@ -17,9 +17,11 @@ jobs:
     steps:
     - uses: actions/checkout@v5
 
-    - name: change permissions
-      run: |
-        sudo -S chown -R $USER:$USER /var/actions-runner/_work/marmot
+    #- name: change permissions
+    #  run: |
+    #    pwd
+    #    ls -al
+    #    sudo -S chown -R $USER:$USER _work/marmot
 
     - name: Install ca-certificates
       run: |
@@ -88,9 +90,9 @@ jobs:
     steps:
     - uses: actions/checkout@v5
 
-    - name: change permissions
-      run: |
-        sudo -S chown -R $USER:$USER /var/actions-runner/_work/marmot
+    #- name: change permissions
+    #  run: |
+    #    sudo -S chown -R $USER:$USER /var/actions-runner/_work/marmot
 
     - name: Install ca-certificates
       run: |
@@ -121,9 +123,9 @@ jobs:
     - name: Display Go version
       run: go version
 
-    - name: change permissions
-      run: |
-        sudo -S chown -R $USER:$USER /var/actions-runner/_work/marmot
+    #- name: change permissions
+    #  run: |
+    #    sudo -S chown -R $USER:$USER /var/actions-runner/_work/marmot
 
     - name: Install ca-certificates
       run: |

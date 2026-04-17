@@ -57,6 +57,7 @@ rm -f domain_list.txt
 rm -f lxc_domain_list.txt
 rm -f lv_list.json
 rm -f lv_to_remove.txt
+rm -f lv_to_remove2.txt
 
 cd /var/lib/marmot/volumes
 rm -f *.qcow2

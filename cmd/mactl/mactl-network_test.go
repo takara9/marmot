@@ -137,60 +137,78 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			By("定義設定 デファルト")
 			cmd := exec.Command("virsh", "net-define", "testdata/default-network.xml")
 			stdoutStderr, err := cmd.CombinedOutput()
+			if err != nil {
+				GinkgoWriter.Println(string(stdoutStderr))
+			}
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println(string(stdoutStderr))
 
 			By("開始 デファルト")
 			cmd = exec.Command("virsh", "net-start", "default")
 			stdoutStderr, err = cmd.CombinedOutput()
+			if err != nil {
+				GinkgoWriter.Println(string(stdoutStderr))
+			}
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println(string(stdoutStderr))
 
 			By("自動起動設定  デファルト")
 			cmd = exec.Command("virsh", "net-autostart", "default")
 			stdoutStderr, err = cmd.CombinedOutput()
+			if err != nil {
+				GinkgoWriter.Println(string(stdoutStderr))
+			}
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println(string(stdoutStderr))
 		})
 
 		It("定義 host-bridge", func() {
 			By("定義設定 ホストブリッジ")
 			cmd := exec.Command("virsh", "net-define", "testdata/host-bridge.xml")
 			stdoutStderr, err := cmd.CombinedOutput()
+			if err != nil {
+				GinkgoWriter.Println(string(stdoutStderr))
+			}
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println(string(stdoutStderr))
 
 			By("開始 ホストブリッジ")
 			cmd = exec.Command("virsh", "net-start", "host-bridge")
 			stdoutStderr, err = cmd.CombinedOutput()
+			if err != nil {
+				GinkgoWriter.Println(string(stdoutStderr))
+			}
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println(string(stdoutStderr))
 
 			By("自動起動設定  ホストブリッジ")
 			cmd = exec.Command("virsh", "net-autostart", "host-bridge")
 			stdoutStderr, err = cmd.CombinedOutput()
+			if err != nil {
+				GinkgoWriter.Println(string(stdoutStderr))
+			}
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println(string(stdoutStderr))
 		})
 
 		It("ネットワークの定義 ovs-network", func() {
 			By("定義設定Open-VSwitch")
 			cmd := exec.Command("virsh", "net-define", "testdata/ovs-network.xml")
 			stdoutStderr, err := cmd.CombinedOutput()
+			if err != nil {
+				GinkgoWriter.Println(string(stdoutStderr))
+			}
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println(string(stdoutStderr))
 
 			By("開始 Open-VSwitch")
 			cmd = exec.Command("virsh", "net-start", "ovs-network")
 			stdoutStderr, err = cmd.CombinedOutput()
+			if err != nil {
+				GinkgoWriter.Println(string(stdoutStderr))
+			}
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println(string(stdoutStderr))
 
 			By("自動起動設定  Open-VSwitch")
 			cmd = exec.Command("virsh", "net-autostart", "ovs-network")
 			stdoutStderr, err = cmd.CombinedOutput()
+			if err != nil {
+				GinkgoWriter.Println(string(stdoutStderr))
+			}
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println(string(stdoutStderr))
 		})
 
 		It("DB登録をチェック", func() {

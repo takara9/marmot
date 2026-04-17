@@ -80,7 +80,7 @@ var _ = Describe("VirtualServers", func() {
 			var xml2 string
 			var cpus uint = 2
 			var ramMB uint = 4096
-			var bootdiskpath string = "/var/lib/marmot/volumes/ubuntu-22.04-server-cloudimg-amd64.img"
+			var bootdiskpath string = "/var/lib/marmot/volumes/ubuntu-24.04-server-cloudimg-amd64.img"
 
 			vs2.UUID = uuid.New().String()
 			vs2.Name = hostname2

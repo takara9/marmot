@@ -3,7 +3,7 @@ PROGRAM	= maadm
 all:	$(PROGRAM)
 
 TAG := $(shell cat ../../TAG)
-BINDIR = ../../marmot-v$(TAG)
+BINDIR = ../../dist/marmot-v$(TAG)
 TESTBINDIR = bin
 
 $(PROGRAM): $(%.go)
