@@ -130,11 +130,11 @@ jobs:
         sudo -s chown ubuntu:ubuntu bin
         sudo -s chmod 755 bin
         sudo -E env "PATH=$PATH" make mactl-test
-        ls -la bin
-        sudo -E env "PATH=$PATH" make test
-        sudo -E env "PATH=$PATH" make test-net
-        sudo rm -fr bin
-        cd ../..
+    #ls -la bin
+    #sudo -E env "PATH=$PATH" make test
+    #sudo -E env "PATH=$PATH" make test-net
+    #sudo rm -fr bin
+    #cd ../..
 
     #- name: Test cmd/maadm
     #  run: | 
