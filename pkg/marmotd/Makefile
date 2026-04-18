@@ -21,7 +21,7 @@ install:
 
 .PHONY: test
 test:
-	$(GO) test -v -race . -timeout 20m -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -coverprofile cover.out
+	$(GO) test . -run TestMarmotd -v -race -count=1 -timeout 20m -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
 .PHONY: test-volume
 test-volume:
@@ -30,10 +30,6 @@ test-volume:
 .PHONY: test-server
 test-server:
 	$(GO) test -ginkgo.focus-file server_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
-
-.PHONY: test-func
-test-func:
-	$(GO) test -ginkgo.focus-file marmotd-funcs_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
 .PHONY:	set-version
 set-version:

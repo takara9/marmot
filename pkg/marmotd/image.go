@@ -19,12 +19,18 @@ import (
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/lvm"
 	"github.com/takara9/marmot/pkg/util"
 )
 
 const (
 	IMAGE_POOL = "/var/lib/marmot/images"
 )
+
+var checkImageVolumeGroup = func(vgName string) error {
+	_, _, err := lvm.CheckVG(vgName)
+	return err
+}
 
 // CreateNewImage は、指定されたIDのイメージを新規作成する関数 	コントローラーで使用
 func (m *Marmot) CreateNewImageManage(id string) (*api.Image, error) {
@@ -108,28 +114,32 @@ func (m *Marmot) CreateNewImageManage(id string) (*api.Image, error) {
 		return nil, err
 	}
 
-	image.Status.Message = util.StringPtr("OSイメージをロジカルボリュームに転送中")
-	if err := m.Db.UpdateImage(id, image); err != nil {
-		slog.Error("Failed to update image status in DB", "imgId", id, "err", err)
-		return nil, err
-	}
-
-	// イメージをLVにコピーする
-	lvPath, lvName, err := createBootableLVFromQCOW2(ctx, id, downloadPath, CurrentConfig().OSVolumeGroup)
-	if err != nil {
-		slog.Error("Failed to create bootable LV from QCOW2", "imgId", id, "path", downloadPath, "err", err)
-		return nil, err
-	}
-
 	image.Spec.Kind = util.StringPtr("os")
 	image.Spec.Type = util.StringPtr("qcow2")
-
-	image.Spec.VolumeGroup = util.StringPtr(CurrentConfig().OSVolumeGroup)
-	image.Spec.LogicalVolume = util.StringPtr(lvName)
-	image.Spec.LvPath = util.StringPtr(lvPath)
-
 	image.Spec.Qcow2Path = util.StringPtr(downloadPath)
 	image.Spec.Size = util.IntPtrInt(bootVolumeSizeGB)
+
+	volumeGroup := strings.TrimSpace(CurrentConfig().OSVolumeGroup)
+	if err := ensureImageVolumeGroupAvailable(volumeGroup); err != nil {
+		slog.Warn("OS volume group unavailable; keep qcow2 image only", "imgId", id, "volumeGroup", volumeGroup, "err", err)
+	} else {
+		image.Status.Message = util.StringPtr("OSイメージをロジカルボリュームに転送中")
+		if err := m.Db.UpdateImage(id, image); err != nil {
+			slog.Error("Failed to update image status in DB", "imgId", id, "err", err)
+			return nil, err
+		}
+
+		lvPath, lvName, err := createBootableLVFromQCOW2(ctx, id, downloadPath, volumeGroup)
+		if err != nil {
+			slog.Error("Failed to create bootable LV from QCOW2", "imgId", id, "path", downloadPath, "volumeGroup", volumeGroup, "err", err)
+			return nil, err
+		}
+
+		image.Spec.VolumeGroup = util.StringPtr(volumeGroup)
+		image.Spec.LogicalVolume = util.StringPtr(lvName)
+		image.Spec.LvPath = util.StringPtr(lvPath)
+	}
+
 	image.Status.StatusCode = db.IMAGE_AVAILABLE
 	image.Status.Status = util.StringPtr(db.ImageStatus[db.IMAGE_AVAILABLE])
 	image.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
@@ -260,6 +270,17 @@ func getImageLogicalVolumePath(spec *api.ImageSpec) string {
 	}
 
 	return filepath.Join("/dev", volumeGroup, logicalVolume)
+}
+
+func ensureImageVolumeGroupAvailable(vgName string) error {
+	vgName = strings.TrimSpace(vgName)
+	if vgName == "" {
+		return fmt.Errorf("volume group is empty")
+	}
+	if err := checkImageVolumeGroup(vgName); err != nil {
+		return fmt.Errorf("volume group %s is not available: %w", vgName, err)
+	}
+	return nil
 }
 
 func resolveImagePath(imageDir, sourceURL string) (string, error) {

@@ -82,7 +82,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 		It("URLを指定してイメージのIDを取得", func() {
 			var err error
 			GinkgoWriter.Println("URLを指定してイメージのIDを取得")
-			url := "https://cloud-images.ubuntu.com/releases/jammy/release-20260218/ubuntu-22.04-server-cloudimg-amd64.img"
+			url := "http://hmc/ubuntu-22.04-server-cloudimg-amd64.img"
 			id, err = marmotServer.Ma.Db.MakeImageEntryFromURL("ubuntu22.04", url)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("取得したイメージID: ", id)
