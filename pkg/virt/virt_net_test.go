@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"os/exec"
 	"time"
 
 	"github.com/google/uuid"
@@ -35,7 +34,6 @@ var _ = Describe("Networks", Ordered, func() {
 
 	AfterAll(func(ctx SpecContext) {
 		l.Close()
-
 		// クリーンアップ: 作成したネットワークを削除
 		nameList, err := l.ListNetworks()
 		Expect(err).NotTo(HaveOccurred())
@@ -51,7 +49,6 @@ var _ = Describe("Networks", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 			}
 		}
-
 
 	})
 

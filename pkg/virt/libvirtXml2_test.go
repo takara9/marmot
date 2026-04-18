@@ -36,8 +36,9 @@ var _ = Describe("VirtualServers", Ordered, func() {
 			err = os.Remove("/var/lib/marmot/volumes/test-linux-qcow2.img")
 			err = os.Remove("/var/lib/marmot/volumes/ubuntu-24.04-server-cloudimg-amd64.img")
 			// テスト用のLVMボリュームのクリーンアップ
-			err = exec.Command("lvremove", "-f", "/dev/vg1/lvos_temp").Run()
-			err = exec.Command("lvremove", "-f", "/dev/vg1/lvdata").Run()
+			err = exec.Command("lvremove", "-y", "vg1/lvos_temp").Run()
+			err = exec.Command("lvremove", "-y", "vg1/lvdata").Run()
+			err = exec.Command("lvremove", "-y", "vg1/oslv").Run()
 			// 仮想マシンのクリーンアップ
 			err = exec.Command("virsh", "destroy", hostname1).Run()
 			err = exec.Command("virsh", "undefine", hostname1).Run()
