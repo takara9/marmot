@@ -64,47 +64,26 @@ jobs:
         sudo -s make test
         cd ../..
 
-
-  marmot-package:
+  package-marmotd:
     runs-on: [ self-hosted, runner3 ]
     steps:
     - uses: actions/checkout@v5
-
-    #- name: change permissions
-    #  run: |
-    #    pwd
-    #    ls -al
-    #    sudo -S chown -R $USER:$USER _work/marmot
-
-    - name: Install ca-certificates
-      run: |
-        sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
-        sudo update-ca-certificates
-
-    - name: 環境セットアップ
-      run: |
-        whoami
-        export CI_ENVIRONMENT=true
-        cd tools
-        ls -al
-        sudo -E env "PATH=$PATH" ./setup.sh
-        cd ..
-
     - name: Setup for build
       run: |
         make setup
-
+    - name: 環境セットアップ
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/setup.sh
+        cd ..
     - name: Test pkg/marmotd ボリューム機能テスト
       run: |
         cd pkg/marmotd
         sudo -s make test-volume
         cd ../..
 
-
   # Label of the job
   marmot-daemon:
     runs-on: [ self-hosted, runner1 ]
-
     steps:
     - uses: actions/checkout@v5
 
