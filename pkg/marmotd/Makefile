@@ -21,7 +21,11 @@ install:
 
 .PHONY: test
 test:
-	$(GO) test -v -race . -timeout 20m -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -coverprofile cover.out
+	$(GO) test -run TestMarmotd -v -race . -timeout 20m -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -coverprofile cover.out
+
+.PHONY: test-internal
+test-internal:
+	$(GO) test -run TestMarmotdInternal -v -race . -ginkgo.focus="Image backing store" -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -coverprofile cover.out
 
 .PHONY: test-volume
 test-volume:
