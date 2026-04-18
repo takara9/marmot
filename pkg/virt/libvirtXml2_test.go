@@ -197,10 +197,3 @@ var _ = Describe("VirtualServers", Ordered, func() {
 	})
 })
 
-// 他テストスペック
-
-// LVM
-
-// インタフェース
-
-// データボリューム
