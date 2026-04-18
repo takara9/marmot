@@ -32,7 +32,6 @@ jobs:
         make test
         cd ../..
 
-
   packages-root:
     runs-on: [ self-hosted, any ]
     steps:
@@ -86,11 +85,6 @@ jobs:
     runs-on: [ self-hosted, runner1 ]
     steps:
     - uses: actions/checkout@v5
-
-    #- name: change permissions
-    #  run: |
-    #    sudo -S chown -R $USER:$USER /var/actions-runner/_work/marmot
-
     - name: Install ca-certificates
       run: |
         sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
