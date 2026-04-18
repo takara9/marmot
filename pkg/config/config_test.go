@@ -1,85 +1,68 @@
-package config
+package config_test
 
 import (
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/takara9/marmot/pkg/config"
 )
 
-func TestReadYamlConfigFromFile(t *testing.T) {
-	t.Parallel()
+var _ = Describe("ReadYamlConfig", func() {
+	It("reads a YAML config from a file", func() {
+		tmpDir := GinkgoT().TempDir()
+		configPath := filepath.Join(tmpDir, "server.yaml")
+		content := "name: file-server\ncpu: 2\n"
 
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "server.yaml")
-	content := "name: file-server\ncpu: 2\n"
-	if err := os.WriteFile(configPath, []byte(content), 0o600); err != nil {
-		t.Fatalf("failed to write config file: %v", err)
-	}
+		err := os.WriteFile(configPath, []byte(content), 0o600)
+		Expect(err).NotTo(HaveOccurred())
 
-	var conf Server
-	if err := ReadYamlConfig(configPath, &conf); err != nil {
-		t.Fatalf("ReadYamlConfig returned error: %v", err)
-	}
+		var conf config.Server
+		err = config.ReadYamlConfig(configPath, &conf)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(conf.Name).To(Equal("file-server"))
+		Expect(conf.Cpu).NotTo(BeNil())
+		Expect(*conf.Cpu).To(Equal(2))
+	})
 
-	if conf.Name != "file-server" {
-		t.Fatalf("unexpected server name: %q", conf.Name)
-	}
-	if conf.Cpu == nil || *conf.Cpu != 2 {
-		t.Fatalf("unexpected cpu value: %#v", conf.Cpu)
-	}
-}
+	It("reads a YAML config from a URL", func() {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/server.yaml" {
+				http.NotFound(w, r)
+				return
+			}
+			_, _ = w.Write([]byte("name: url-server\nmemory: 2048\n"))
+		}))
+		defer server.Close()
 
-func TestReadYamlConfigFromURL(t *testing.T) {
-	t.Parallel()
+		var conf config.Server
+		err := config.ReadYamlConfig(server.URL+"/server.yaml", &conf)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(conf.Name).To(Equal("url-server"))
+		Expect(conf.Memory).NotTo(BeNil())
+		Expect(*conf.Memory).To(Equal(2048))
+	})
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/server.yaml" {
-			http.NotFound(w, r)
-			return
-		}
-		_, _ = w.Write([]byte("name: url-server\nmemory: 2048\n"))
-	}))
-	defer server.Close()
+	It("returns an error when the URL responds with a non-200 status", func() {
+		server := httptest.NewServer(http.NotFoundHandler())
+		defer server.Close()
 
-	var conf Server
-	if err := ReadYamlConfig(server.URL+"/server.yaml", &conf); err != nil {
-		t.Fatalf("ReadYamlConfig returned error: %v", err)
-	}
+		var conf config.Server
+		err := config.ReadYamlConfig(server.URL+"/missing.yaml", &conf)
+		Expect(err).To(HaveOccurred())
+	})
 
-	if conf.Name != "url-server" {
-		t.Fatalf("unexpected server name: %q", conf.Name)
-	}
-	if conf.Memory == nil || *conf.Memory != 2048 {
-		t.Fatalf("unexpected memory value: %#v", conf.Memory)
-	}
-}
+	It("returns an error for invalid YAML from a URL", func() {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte("name: [unterminated\n"))
+		}))
+		defer server.Close()
 
-func TestReadYamlConfigFromURLStatusError(t *testing.T) {
-	t.Parallel()
-
-	server := httptest.NewServer(http.NotFoundHandler())
-	defer server.Close()
-
-	var conf Server
-	err := ReadYamlConfig(server.URL+"/missing.yaml", &conf)
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-}
-
-func TestReadYamlConfigFromURLInvalidYAML(t *testing.T) {
-	t.Parallel()
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("name: [unterminated\n"))
-	}))
-	defer server.Close()
-
-	var conf Server
-	err := ReadYamlConfig(server.URL, &conf)
-	if err == nil {
-		t.Fatal("expected yaml unmarshal error, got nil")
-	}
-}
+		var conf config.Server
+		err := config.ReadYamlConfig(server.URL, &conf)
+		Expect(err).To(HaveOccurred())
+	})
+})

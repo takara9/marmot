@@ -16,7 +16,9 @@ import (
 )
 
 var _ = Describe("IPAM", Ordered, func() {
-	var url string = "http://127.0.0.1:9379"
+	var port string = "13379"
+	var url string = fmt.Sprintf("http://127.0.0.1:%s", port)
+
 	var containerID string
 	var idIpv4_1, idIpv4_2, idIpv6_1 string
 
@@ -29,7 +31,7 @@ var _ = Describe("IPAM", Ordered, func() {
 		slog.SetDefault(logger)
 
 		// Dockerコンテナを起動
-		cmd := exec.Command("docker", "run", "-d", "--name", "jobEtcdDb", "-p", "9379:2379", "-p", "9380:2380", "ghcr.io/takara9/etcd:3.6.5")
+		cmd := exec.Command("docker", "run", "-d", "--rm", "-p", fmt.Sprintf("%s:2379", port), "ghcr.io/takara9/etcd:3.6.5")
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to start container: %s, %v", string(output), err))
@@ -47,11 +49,6 @@ var _ = Describe("IPAM", Ordered, func() {
 		_, err := cmd.CombinedOutput()
 		if err != nil {
 			fmt.Printf("Failed to stop container: %v\n", err)
-		}
-		cmd = exec.Command("docker", "rm", containerID)
-		_, err = cmd.CombinedOutput()
-		if err != nil {
-			fmt.Printf("Failed to remove container: %v\n", err)
 		}
 	}, NodeTimeout(20*time.Second))
 
@@ -269,7 +266,7 @@ var _ = Describe("IPAM", Ordered, func() {
 			It("IPアドレスの割り当て #2", func() {
 				_, err := v.GetIpNetworkById(vnetId, idIpv4_1)
 				Expect(err).NotTo(HaveOccurred())
-				ip,mask, err := v.AllocateIP(vnetId, idIpv4_1, "host2")
+				ip, mask, err := v.AllocateIP(vnetId, idIpv4_1, "host2")
 				Expect(err).NotTo(HaveOccurred())
 				fmt.Printf("Allocated IP: %s/%d\n", ip, mask)
 			})
@@ -277,7 +274,7 @@ var _ = Describe("IPAM", Ordered, func() {
 			It("IPアドレスの割り当て #3", func() {
 				_, err := v.GetIpNetworkById(vnetId, idIpv4_1)
 				Expect(err).NotTo(HaveOccurred())
-				ip,mask, err := v.AllocateIP(vnetId, idIpv4_1, "host3")
+				ip, mask, err := v.AllocateIP(vnetId, idIpv4_1, "host3")
 				Expect(err).NotTo(HaveOccurred())
 				fmt.Printf("Allocated IP: %s/%d\n", ip, mask)
 			})

@@ -12,6 +12,46 @@ env:
 
 jobs:
   # Label of the job
+  packages-non-root:
+    runs-on: [ self-hosted ]
+    steps:
+    - uses: actions/checkout@v5
+    - name: コンフィグパッケージ
+      run: | 
+        cd pkg/config
+        make test
+        cd ../..
+    - name: ETCDのデータアクセス パッケージ
+      run: | 
+        cd pkg/db
+        make test
+        cd ../..
+    - name: QCOW2操作パッケージのテスト
+      run: | 
+        cd pkg/qcow
+        make test
+        cd ../..
+
+
+  packages-root:
+    runs-on: [ self-hosted ]
+    steps:
+    - uses: actions/checkout@v5
+    - name: Test pkg/lvm
+      run: | 
+        cd pkg/lvm
+        sudo -s make test
+        cd ../..
+    - name: ランナーをセットアップ
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/setup.sh
+    - name: ユーティリティパッケージのテスト
+      run: | 
+        cd pkg/util
+        sudo -s make test
+        cd ../..
+
+
   marmot-package:
     runs-on: [ self-hosted, runner3 ]
     steps:
@@ -40,36 +80,6 @@ jobs:
     - name: Setup for build
       run: |
         make setup
-
-    - name: Test pkg/config
-      run: | 
-        cd pkg/config
-        sudo -s make test
-        cd ../..
-
-    - name: Test pkg/db
-      run: | 
-        cd pkg/db
-        sudo -s make test
-        cd ../..
-
-    - name: Test pkg/lvm
-      run: | 
-        cd pkg/lvm
-        sudo -s make test
-        cd ../..
-
-    - name: Test pkg/qcow2
-      run: | 
-        cd pkg/qcow
-        sudo -s make test
-        cd ../..
-
-    - name: Test pkg/util
-      run: | 
-        cd pkg/util
-        sudo -s make test
-        cd ../..
 
     - name: Test pkg/virt
       run: | 
