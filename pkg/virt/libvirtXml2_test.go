@@ -2,6 +2,8 @@
 package virt_test
 
 import (
+	"os"
+	"os/exec"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,7 +15,7 @@ import (
 	"github.com/takara9/marmot/pkg/virt"
 )
 
-var _ = Describe("VirtualServers", func() {
+var _ = Describe("VirtualServers", Ordered, func() {
 
 	Context("仮想サーバー生成から終了までのライフサイクル", func() {
 		var err error
@@ -24,6 +26,24 @@ var _ = Describe("VirtualServers", func() {
 		// 入力パラメータ
 		var hostname1 string = "vm-test-1"
 		var hostname2 string = "vm-test-2"
+
+		BeforeAll(func(ctx SpecContext) {
+
+		})
+
+		AfterAll(func(ctx SpecContext) {
+			// テスト用のqcow2ボリュームのクリーンアップ
+			err = os.Remove("/var/lib/marmot/volumes/test-linux-qcow2.img")
+			err = os.Remove("/var/lib/marmot/volumes/ubuntu-24.04-server-cloudimg-amd64.img")
+			// テスト用のLVMボリュームのクリーンアップ
+			err = exec.Command("lvremove", "-f", "/dev/vg1/lvos_temp").Run()
+			err = exec.Command("lvremove", "-f", "/dev/vg1/lvdata").Run()
+			// 仮想マシンのクリーンアップ
+			err = exec.Command("virsh", "destroy", hostname1).Run()
+			err = exec.Command("virsh", "undefine", hostname1).Run()
+			err = exec.Command("virsh", "destroy", hostname2).Run()
+			err = exec.Command("virsh", "undefine", hostname2).Run()
+		})
 
 		It("仮想マシンの定義作成 #1", func() {
 			var vs1 virt.ServerSpec

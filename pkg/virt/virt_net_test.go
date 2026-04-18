@@ -52,16 +52,7 @@ var _ = Describe("Networks", Ordered, func() {
 			}
 		}
 
-		// テスト用のqcow2ボリュームのクリーンアップ
-		err = os.Remove("/var/lib/marmot/volumes/test-linux-qcow2.img")
-		Expect(err).To(BeNil())
-		err = os.Remove("/var/lib/marmot/volumes/ubuntu-24.04-server-cloudimg-amd64.img")
-		Expect(err).To(BeNil())
-		// テスト用のLVMボリュームのクリーンアップ
-		err = exec.Command("lvremove", "-f", "/dev/vg1/lvos_temp").Run()
-		Expect(err).To(BeNil())
-		err = exec.Command("lvremove", "-f", "/dev/vg1/lvdata").Run()
-		Expect(err).To(BeNil())
+
 	})
 
 	Context("仮想ネットワークの作成", func() {
