@@ -155,7 +155,7 @@ jobs:
   cleanup-runner3:
     runs-on: [ self-hosted, runner3 ]
     needs: 
-      - marmot-package
+      - package-marmotd
     if: always() 
     steps:
       - name: 各ランナーを掃除
