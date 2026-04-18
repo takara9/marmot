@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os/exec"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -46,28 +45,4 @@ func StartMockServer(ctx context.Context, marmotPort int, etcdPort int) *Server 
 	}()
 
 	return server
-}
-
-func CleanupTestEnvironment() {
-	cmd := exec.Command("lvremove vg1/oslv0900 -y")
-	cmd.CombinedOutput()
-	cmd = exec.Command("lvremove vg1/oslv0901 -y")
-	cmd.CombinedOutput()
-	cmd = exec.Command("lvremove vg1/oslv0902 -y")
-	cmd.CombinedOutput()
-
-	cmd = exec.Command("lvremove vg2/data0900 -y")
-	cmd.CombinedOutput()
-	cmd = exec.Command("lvremove vg2/data0901 -y")
-	cmd.CombinedOutput()
-	cmd = exec.Command("lvremove vg2/data0902 -y")
-	cmd.CombinedOutput()
-	cmd = exec.Command("lvremove vg2/data0903 -y")
-	cmd.CombinedOutput()
-
-	cmd = exec.Command("docker kill $(docker ps |awk 'NR>1 {print $1}')")
-	cmd.CombinedOutput()
-
-	cmd = exec.Command("docker rm $(docker ps --all |awk 'NR>1 {print $1}')")
-	cmd.CombinedOutput()
 }

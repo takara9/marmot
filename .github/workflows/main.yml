@@ -12,138 +12,259 @@ env:
 
 jobs:
   # Label of the job
-  marmot-package:
-    runs-on: [ self-hosted, runner3 ]
+  start:
+    runs-on: [ self-hosted, any ]
     steps:
     - uses: actions/checkout@v5
 
-    #- name: change permissions
-    #  run: |
-    #    pwd
-    #    ls -al
-    #    sudo -S chown -R $USER:$USER _work/marmot
+  moodule-tests:
+    runs-on: [ self-hosted, any ]
+    needs: 
+      - start
+    if: always() 
+    steps:
+    - uses: actions/checkout@v5
+    - name: 時間調整
+      run: | 
+        sleep 10
 
-    - name: Install ca-certificates
-      run: |
-        sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
-        sudo update-ca-certificates
+  system-tests:
+    runs-on: [ self-hosted, any ]
+    needs: 
+      - start
+    if: always() 
+    steps:
+    - uses: actions/checkout@v5
 
-    - name: 環境セットアップ
-      run: |
-        whoami
-        export CI_ENVIRONMENT=true
-        cd tools
-        ls -al
-        sudo -E env "PATH=$PATH" ./setup.sh
-        cd ..
-
-    - name: Setup for build
-      run: |
-        make setup
-
-    - name: Test pkg/config
+  packages-run-as-nonroot:
+    runs-on: [ self-hosted, any ]
+    needs: 
+      - moodule-tests
+    if: always() 
+    steps:
+    - uses: actions/checkout@v5
+    - name: コンフィグパッケージ
       run: | 
         cd pkg/config
-        sudo -s make test
+        make test
         cd ../..
-
-    - name: Test pkg/db
+    - name: ETCDのデータアクセス パッケージ
       run: | 
         cd pkg/db
-        sudo -s make test
+        make test
+        cd ../..
+    - name: QCOW2操作 パッケージ
+      run: | 
+        cd pkg/qcow
+        make test
         cd ../..
 
-    - name: Test pkg/lvm
+  packages-run-as-root:
+    runs-on: [ self-hosted, any ]
+    needs: 
+      - moodule-tests
+    if: always() 
+    steps:
+    - uses: actions/checkout@v5
+    - name: ロジカルボリューム マネージャー 操作パッケージ
       run: | 
         cd pkg/lvm
         sudo -s make test
         cd ../..
-
-    - name: Test pkg/qcow2
-      run: | 
-        cd pkg/qcow
-        sudo -s make test
-        cd ../..
-
-    - name: Test pkg/util
+    - name: ランナーのセットアップ
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/setup.sh
+    - name: ユーティリティ パッケージ 
       run: | 
         cd pkg/util
         sudo -s make test
         cd ../..
 
-    - name: Test pkg/virt
+  package-virsh:
+    runs-on: [ self-hosted, any ]
+    needs: 
+      - moodule-tests
+    if: always() 
+    steps:
+    - uses: actions/checkout@v5
+    - name: ランナーのセットアップ
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/setup.sh
+    - name: 仮想ネットワーク作成
+      run: | 
+        sudo -E env "PATH=$PATH" ./tools/setup-libvirt-networks.sh
+    - name: 仮想化操作 パッケージ
       run: | 
         cd pkg/virt
         sudo -s make test
         cd ../..
 
+  package-marmotd-volume:
+    runs-on: [ self-hosted, any ]
+    needs: 
+      - moodule-tests
+    if: always()
+    steps:
+    - uses: actions/checkout@v5
     - name: Test pkg/marmotd ボリューム機能テスト
       run: |
         cd pkg/marmotd
         sudo -s make test-volume
         cd ../..
 
-  # Label of the job
-  marmot-daemon:
-    runs-on: [ self-hosted, runner1 ]
-
+  package-marmotd-server:
+    runs-on: [ self-hosted, any ]
+    needs: 
+      - moodule-tests
+    if: always()
     steps:
     - uses: actions/checkout@v5
-
-    #- name: change permissions
-    #  run: |
-    #    sudo -S chown -R $USER:$USER /var/actions-runner/_work/marmot
-
-    - name: Install ca-certificates
-      run: |
-        sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
-        sudo update-ca-certificates
-
-    - name: Setup for build
-      run: |
-        make setup
- 
-    - name: Test pkg/marmotd 全機能テスト
+    - name: Test pkg/marmotd サーバー機能テスト
       run: |
         cd pkg/marmotd
-        sudo -s make test
+        sudo -s make test-server
         cd ../..
 
-  marmot-command:
-    runs-on: [ self-hosted, runner2 ]
-    strategy:
-      matrix:
-        go-version: [ '1.26.1' ]
+  package-marmotd-etc:
+    runs-on: [ self-hosted, any ]
+    needs: 
+      - moodule-tests
+    if: always()
     steps:
     - uses: actions/checkout@v5
-    - name: Setup Go ${{ matrix.go-version }}
-      uses: actions/setup-go@v5
-      with:
-        go-version: ${{ matrix.go-version }}
-    - name: Display Go version
-      run: go version
-
-    #- name: change permissions
-    #  run: |
-    #    sudo -S chown -R $USER:$USER /var/actions-runner/_work/marmot
-
-    - name: Install ca-certificates
+    - name: Test pkg/marmotd ネットワーク機能テスト
       run: |
-        sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
-        sudo update-ca-certificates
+        cd pkg/marmotd
+        sudo -s make test-vnet
+        sudo -s make test-ipnet
+        sudo -s make test-cloud-init
+        sudo -s make test-timeout
+        sudo -s make test-backing-store
+        sudo -s make test-config
+        sudo -s make test-volume-backing-store 
+        cd ../..
 
-    - name: Test cmd/mactl
+  package-marmotd-images:
+    runs-on: [ self-hosted, any ]
+    needs: 
+      - moodule-tests
+    if: always()
+    steps:
+    - uses: actions/checkout@v5
+    - name: 仮想ネットワーク作成
+      run: | 
+        sudo -E env "PATH=$PATH" ./tools/setup-libvirt-networks.sh
+    - name: Test pkg/marmotd サーバーとイメージ機能テスト
+      run: |
+        cd pkg/marmotd
+        sudo -s make test-server-image
+        cd ../..
+ 
+  package-marmotd-osimage:
+    runs-on: [ self-hosted, any ]
+    needs: 
+      - moodule-tests
+    if: always()
+    steps:
+    - uses: actions/checkout@v5
+    - name: Test pkg/marmotd OSイメージ機能テスト
+      run: |
+        cd pkg/marmotd
+        sudo -s make test-osimage
+        cd ../..
+
+  # Label of the job
+  #marmot-daemon:
+  #  runs-on: [ self-hosted, runner1 ]
+  #  steps:
+  #  - uses: actions/checkout@v5
+  #  - name: Install ca-certificates
+  #    run: |
+  #      sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
+  #      sudo update-ca-certificates
+  #
+  #  - name: Setup for build
+  #   run: |
+  #      make setup
+  #
+  #  - name: Test pkg/marmotd 全機能テスト
+  #    run: |
+  #      cd pkg/marmotd
+  #      sudo -s make test
+  #       cd ../..
+
+  mactl-vm-deploy-basic:
+    runs-on: [ self-hosted, any ]
+    needs: 
+      - system-tests
+    if: always()
+    steps:
+    - uses: actions/checkout@v5
+    - name: 仮想ネットワーク作成
+      run: | 
+        sudo -E env "PATH=$PATH" ./tools/setup-libvirt-networks.sh
+    - name: mactlコマンドのテスト その１
       run: | 
         cd cmd/mactl
-        sudo -s mkdir -p bin
-        sudo -s chown ubuntu:ubuntu bin
-        sudo -s chmod 755 bin
-        sudo -E env "PATH=$PATH" make mactl-test
-        ls -la bin
-        sudo -E env "PATH=$PATH" make test
-        sudo -E env "PATH=$PATH" make test-net
-        sudo rm -fr bin
+        make mactl-test
+        sudo -E env "PATH=$PATH" make test0
         cd ../..
+        sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+
+  mactl-vm-deploy-1:
+    runs-on: [ self-hosted, any ]
+    needs: 
+      - system-tests
+    if: always()
+    steps:
+    - uses: actions/checkout@v5
+    - name: 仮想ネットワーク作成
+      run: | 
+        sudo -E env "PATH=$PATH" ./tools/setup-libvirt-networks.sh
+    - name: mactlコマンドのテスト その１
+      run: | 
+        cd cmd/mactl
+        make mactl-test
+        sudo -E env "PATH=$PATH" make test1
+        cd ../..
+        sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+
+  mactl-vm-deploy-2:
+    runs-on: [ self-hosted, any ]
+    needs: 
+      - system-tests
+    if: always()
+    steps:
+    - uses: actions/checkout@v5
+    - name: 仮想ネットワーク作成
+      run: | 
+        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
+    - name: mactlコマンドのテスト その２
+      run: | 
+        cd cmd/mactl
+        make mactl-test
+        sudo -E env "PATH=$PATH" make test2
+        cd ../..
+        sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+
+  mactl-vm-deploy-3:
+    runs-on: [ self-hosted, any ]
+    needs: 
+      - system-tests
+    if: always()
+    steps:
+    - uses: actions/checkout@v5
+    - name: 仮想ネットワーク作成
+      run: | 
+        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
+    - name: mactlコマンドのテスト その３
+      run: | 
+        cd cmd/mactl
+        make mactl-test
+        sudo -E env "PATH=$PATH" make test3
+        cd ../..
+        sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+
 
     #- name: Test cmd/maadm
     #  run: | 
@@ -155,38 +276,52 @@ jobs:
     #    sudo rm -fr bin
     #    cd ../..
 
-  cleanup-runner3:
-    runs-on: [ self-hosted, runner3 ]
-    needs: 
-      - marmot-package
-    if: always() 
-    steps:
-      - name: 各ランナーを掃除
-        run: |
-          pwd
-          ls -al
-          sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+  #cleanup-runner1:
+  #  runs-on: [ self-hosted, runner1 ]
+  #  needs: 
+  #    - marmot-daemon
+  #  if: always() 
+  #  steps:
+  #    - name: 各ランナーを掃除
+  #      run: |
+  #        pwd
+  #        ls -al
+  #         sudo -E env "PATH=$PATH" ./tools/cleanup.sh
 
-  cleanup-runner1:
-    runs-on: [ self-hosted, runner1 ]
+  moodule-tests-end:
+    runs-on: [ self-hosted, any ]
     needs: 
-      - marmot-daemon
+      - packages-run-as-nonroot
+      - packages-run-as-root
+      - package-virsh
+      - package-marmotd-volume
+      - package-marmotd-server
+      - package-marmotd-etc
+      - package-marmotd-images
+      - package-marmotd-osimage
     if: always() 
     steps:
-      - name: 各ランナーを掃除
-        run: |
-          pwd
-          ls -al
-          sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+    - uses: actions/checkout@v5
 
-  cleanup-runner2:
-    runs-on: [ self-hosted, runner2 ]
+  system-tests-end:
+    runs-on: [ self-hosted, any ]
     needs: 
-      - marmot-command
+      - mactl-vm-deploy-basic
+      - mactl-vm-deploy-1
+      - mactl-vm-deploy-2
+      - mactl-vm-deploy-3
     if: always() 
     steps:
-      - name: 各ランナーを掃除
-        run: |
-          pwd
-          ls -al
-          sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+    - uses: actions/checkout@v5
+
+  final-cleanup:
+    runs-on: [ self-hosted, any ]
+    needs: 
+      - moodule-tests-end
+      - system-tests-end
+    if: always() 
+    steps:
+    - uses: actions/checkout@v5
+    - name: 最終クリーンアップ
+      run: |
+        sleep 1

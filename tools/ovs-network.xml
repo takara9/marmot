@@ -1,0 +1,24 @@
+<network>
+  <name>ovs-network</name>
+  <forward mode='bridge'/>
+  <bridge name='ovsbr0'/>
+  <virtualport type='openvswitch'/>
+  <portgroup name='vlan-0001' default='yes'>
+  </portgroup>
+  <portgroup name='vlan-1001'>
+    <vlan>
+      <tag id='1001'/>
+    </vlan>
+  </portgroup>
+  <portgroup name='vlan-1002'>
+    <vlan>
+      <tag id='1002'/>
+    </vlan>
+  </portgroup>
+  <portgroup name='vlan-all'>
+    <vlan trunk='yes'>
+      <tag id='1001'/>
+      <tag id='1002'/>
+    </vlan>
+  </portgroup>
+</network>

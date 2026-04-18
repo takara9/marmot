@@ -29,14 +29,18 @@ install:
 	rm -f /usr/local/bin/$(PROGRAM)
 	install -m 0755 $(PROGRAM) /usr/local/bin
 
-.PHONY: test
-test: mactl-test
+.PHONY: test0
+test0: mactl-test
 	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus-file mactl_test.go -coverprofile cover.out
 
-.PHONY: test2
-test2: mactl-test
-	$(GINKGO) -v --focus-file mactl-new_test.go
+.PHONY:test1 
+test1:
+	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus-file mactl-vm-deploy-1_test.go -timeout=20m -coverprofile cover.out
 
-.PHONY:test-net 
-test-net: mactl-test
-	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus-file mactl-network_test.go -timeout=20m -coverprofile cover.out
+.PHONY:test2
+test2:
+	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus-file mactl-vm-deploy-2_test.go -timeout=20m -coverprofile cover.out
+
+.PHONY:test3
+test3:
+	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus-file mactl-vm-deploy-3_test.go -timeout=20m -coverprofile cover.out

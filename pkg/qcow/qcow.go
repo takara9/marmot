@@ -1,6 +1,7 @@
 package qcow
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -33,9 +34,14 @@ func CreateQcow(path string, size int) error {
 
 // QCOW2 ボリュームのコピー
 func CopyQcow(srcPath string, destPath string) error {
+	return CopyQcowWithContext(context.Background(), srcPath, destPath)
+}
+
+// QCOW2 ボリュームのコピー
+func CopyQcowWithContext(ctx context.Context, srcPath string, destPath string) error {
 	slog.Debug("Copying QCOW2 volume", "srcPath", srcPath, "destPath", destPath)
 	//cmd := exec.Command("qemu-img", "convert", "-f", "qcow2", "-O", "qcow2", srcPath, destPath)
-	cmd := exec.Command("cp", srcPath, destPath)
+	cmd := exec.CommandContext(ctx, "cp", srcPath, destPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		slog.Error("qemu-img copy failed", "output", string(output))
