@@ -29,15 +29,16 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 		osImageURL = "http://hmc/" + osImage
 	)
 	var (
-		containerID    string
-		ctx            context.Context
-		cancel         context.CancelFunc
-		marmotServer   *marmotd.Server
-		osImageid      string
-		vmId           [5]string
-		bootVolId      []string
-		dataVolId      []string
-		createdImageId string
+		containerID     string
+		ctx             context.Context
+		cancel          context.CancelFunc
+		marmotServer    *marmotd.Server
+		osImageid       string
+		vmId            [5]string
+		bootVolId       []string
+		dataVolId       []string
+		createdImageId1 string
+		createdImageId2 string
 	)
 	//etcdUrl := "http://127.0.0.1:" + fmt.Sprintf("%d", etcdPort)
 	marmotEp := "localhost:" + fmt.Sprintf("%d", marmotPort)
@@ -122,13 +123,22 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			os.RemoveAll(dataVolPath)
 		}
 
-		By("作成したイメージの削除")
-		fmt.Println("削除するイメージID: ", createdImageId)
-		fmt.Println("削除するイメージのLV名: ", "vg1/osimage-"+createdImageId)
-		fmt.Println("削除するイメージのパス: ", fmt.Sprintf("/var/lib/marmot/images/%s", createdImageId))
-		exec.Command("lvremove", "-y", "vg1/osimage-"+createdImageId).Run()
-		imageVolPath := fmt.Sprintf("/var/lib/marmot/images/%s", createdImageId)
+		By("作成したイメージの削除-1")
+		fmt.Println("削除するイメージID: ", createdImageId1)
+		fmt.Println("削除するイメージのLV名: ", "vg1/osimage-"+createdImageId1)
+		fmt.Println("削除するイメージのパス: ", fmt.Sprintf("/var/lib/marmot/images/%s", createdImageId1))
+		exec.Command("lvremove", "-y", "vg1/osimage-"+createdImageId1).Run()
+		imageVolPath := fmt.Sprintf("/var/lib/marmot/images/%s", createdImageId1)
 		os.RemoveAll(imageVolPath)
+
+		By("作成したイメージの削除-2")
+		fmt.Println("削除するイメージID: ", createdImageId2)
+		fmt.Println("削除するイメージのLV名: ", "vg1/osimage-"+createdImageId2)
+		fmt.Println("削除するイメージのパス: ", fmt.Sprintf("/var/lib/marmot/images/%s", createdImageId2))
+		exec.Command("lvremove", "-y", "vg1/osimage-"+createdImageId2).Run()
+		imageVolPath = fmt.Sprintf("/var/lib/marmot/images/%s", createdImageId2)
+		os.RemoveAll(imageVolPath)
+
 	})
 
 	Context("イメージ作成", func() {
@@ -283,10 +293,10 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			copyCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 			defer cancel()
-			imageId, err := marmotServer.Ma.MakeImageEntryFromRunningVMWithContext(copyCtx, vmId[1], "image-1", img)
+			createdImageId2, err = marmotServer.Ma.MakeImageEntryFromRunningVMWithContext(copyCtx, vmId[1], "image-1", img)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created image ID: ", imageId)
-			image, err := marmotServer.Ma.Db.GetImage(imageId)
+			GinkgoWriter.Println("Created image ID: ", createdImageId2)
+			image, err := marmotServer.Ma.Db.GetImage(createdImageId2)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created image: ", *image.Metadata.Name)
 			data, err := json.MarshalIndent(image, "", "  ")
@@ -422,7 +432,7 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			imageId, err := marmotServer.Ma.MakeImageEntryFromRunningVMWithContext(copyCtx, vmId[3], "image-2", img)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("作成されたイメージのID: ", imageId)
-			createdImageId = imageId
+			createdImageId1 = imageId
 			image, err := marmotServer.Ma.Db.GetImage(imageId)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("作成されたイメージの名前: ", *image.Metadata.Name)
