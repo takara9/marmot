@@ -45,7 +45,7 @@ var _ = Describe("VirtualPrivateNetworksUpperlayer", Ordered, func() {
 		slog.SetDefault(logger)
 
 		By("モックサーバー用etcdの起動")
-		cmd := exec.Command("docker", "run", "-d", "--name", etcdContainerName, "-p", fmt.Sprintf("%d", etcdPort)+":2379", "-p", fmt.Sprintf("%d", etcdPort+1)+":2380", "--rm", etcdImage)
+		cmd := exec.Command("docker", "run", "-d", "-p", fmt.Sprintf("%d", etcdPort)+":2379", "--rm", etcdImage)
 		output, err := cmd.CombinedOutput()
 		Expect(err).NotTo(HaveOccurred())
 		containerID = string(output[:12]) // 最初の12文字をIDとして取得
@@ -79,14 +79,7 @@ var _ = Describe("VirtualPrivateNetworksUpperlayer", Ordered, func() {
 	AfterAll(func(ctx0 SpecContext) {
 		cmd := exec.Command("docker", "kill", containerID)
 		_, err := cmd.CombinedOutput()
-		if err != nil {
-			fmt.Printf("Failed to stop container: %v\n", err)
-		}
-		cmd = exec.Command("docker", "rm", containerID)
-		_, err = cmd.CombinedOutput()
-		if err != nil {
-			fmt.Printf("Failed to remove container: %v\n", err)
-		}
+		Expect(err).NotTo(HaveOccurred())
 		cancel() // モックサーバー停止
 	})
 
@@ -143,7 +136,7 @@ var _ = Describe("VirtualPrivateNetworksUpperlayer", Ordered, func() {
 				},
 				Status: &api.Status{
 					StatusCode: db.NETWORK_PENDING,
-					Status: util.StringPtr(db.NetworkStatus[db.NETWORK_PENDING]),
+					Status:     util.StringPtr(db.NetworkStatus[db.NETWORK_PENDING]),
 				},
 			}
 			createdNet, err = marmotServer.Ma.Db.CreateVirtualNetwork(createdNet)

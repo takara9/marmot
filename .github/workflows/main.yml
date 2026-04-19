@@ -12,88 +12,130 @@ env:
 
 jobs:
   # Label of the job
-  marmot-package:
-    runs-on: [ self-hosted, runner3 ]
+  packages-non-root:
+    runs-on: [ self-hosted, any ]
     steps:
     - uses: actions/checkout@v5
-
-    #- name: change permissions
-    #  run: |
-    #    pwd
-    #    ls -al
-    #    sudo -S chown -R $USER:$USER _work/marmot
-
-    - name: Install ca-certificates
-      run: |
-        sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
-        sudo update-ca-certificates
-
-    - name: 環境セットアップ
-      run: |
-        whoami
-        export CI_ENVIRONMENT=true
-        cd tools
-        ls -al
-        sudo -E env "PATH=$PATH" ./setup.sh
-        cd ..
-
-    - name: Setup for build
-      run: |
-        make setup
-
-    - name: Test pkg/config
+    - name: コンフィグパッケージ
       run: | 
         cd pkg/config
-        sudo -s make test
+        make test
         cd ../..
-
-    - name: Test pkg/db
+    - name: ETCDのデータアクセス パッケージ
       run: | 
         cd pkg/db
-        sudo -s make test
+        make test
+        cd ../..
+    - name: QCOW2操作 パッケージ
+      run: | 
+        cd pkg/qcow
+        make test
         cd ../..
 
-    - name: Test pkg/lvm
+  packages-root:
+    runs-on: [ self-hosted, any ]
+    steps:
+    - uses: actions/checkout@v5
+    - name: ロジカルボリューム マネージャー 操作パッケージ
       run: | 
         cd pkg/lvm
         sudo -s make test
         cd ../..
-
-    - name: Test pkg/qcow2
-      run: | 
-        cd pkg/qcow
-        sudo -s make test
-        cd ../..
-
-    - name: Test pkg/util
+    - name: ランナーのセットアップ
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/setup.sh
+    - name: ユーティリティ パッケージ 
       run: | 
         cd pkg/util
         sudo -s make test
         cd ../..
 
-    - name: Test pkg/virt
+  packages-virsh:
+    runs-on: [ self-hosted, any ]
+    steps:
+    - uses: actions/checkout@v5
+    - name: ランナーのセットアップ
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/setup.sh
+    - name: 仮想化操作 パッケージ
       run: | 
         cd pkg/virt
         sudo -s make test
         cd ../..
 
+  package-marmotd-volume:
+    runs-on: [ self-hosted, any ]
+    steps:
+    - uses: actions/checkout@v5
     - name: Test pkg/marmotd ボリューム機能テスト
       run: |
         cd pkg/marmotd
         sudo -s make test-volume
         cd ../..
 
+  package-marmotd-server:
+    runs-on: [ self-hosted, any ]
+    steps:
+    - uses: actions/checkout@v5
+    - name: Test pkg/marmotd サーバー機能テスト
+      run: |
+        cd pkg/marmotd
+        sudo -s make test-server
+        cd ../..
+
+  package-marmotd-network:
+    runs-on: [ self-hosted, any ]
+    steps:
+    - uses: actions/checkout@v5
+    - name: Test pkg/marmotd ネットワーク機能テスト
+      run: |
+        cd pkg/marmotd
+        sudo -s make test-vnet
+        sudo -s make test-ipnet
+        cd ../..
+
+  package-marmotd-image:
+    runs-on: [ self-hosted, any ]
+    steps:
+    - uses: actions/checkout@v5
+    - name: Test pkg/marmotd サーバーとイメージ機能テスト
+      run: |
+        cd pkg/marmotd
+        sudo -s make test-server-image
+        cd ../..
+ 
+  package-marmotd-osimage:
+    runs-on: [ self-hosted, any ]
+    steps:
+    - uses: actions/checkout@v5
+    - name: Test pkg/marmotd OSイメージ機能テスト
+      run: |
+        cd pkg/marmotd
+        sudo -s make test-osimage
+        cd ../..
+
+ #package-marmotd:
+ #  runs-on: [ self-hosted, runner3 ]
+ #  steps:
+ #  - uses: actions/checkout@v5
+ #  - name: Setup for build
+ #    run: |
+ #      make setup
+ #  - name: 環境セットアップ
+ #    run: |
+ #      sudo -E env "PATH=$PATH" ./tools/setup.sh
+ #      cd ..
+ #  - name: Test pkg/marmotd ボリューム機能テスト
+ #    run: |
+ #      cd pkg/marmotd
+ #       sudo -s make test-volume
+ #       cd ../..
+
   # Label of the job
   marmot-daemon:
     runs-on: [ self-hosted, runner1 ]
-
     steps:
     - uses: actions/checkout@v5
-
-    #- name: change permissions
-    #  run: |
-    #    sudo -S chown -R $USER:$USER /var/actions-runner/_work/marmot
-
     - name: Install ca-certificates
       run: |
         sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
@@ -139,11 +181,11 @@ jobs:
         sudo -s chown ubuntu:ubuntu bin
         sudo -s chmod 755 bin
         sudo -E env "PATH=$PATH" make mactl-test
-        ls -la bin
-        sudo -E env "PATH=$PATH" make test
-        sudo -E env "PATH=$PATH" make test-net
-        sudo rm -fr bin
-        cd ../..
+    #ls -la bin
+    #sudo -E env "PATH=$PATH" make test
+    #sudo -E env "PATH=$PATH" make test-net
+    #sudo rm -fr bin
+    #cd ../..
 
     #- name: Test cmd/maadm
     #  run: | 
@@ -155,17 +197,17 @@ jobs:
     #    sudo rm -fr bin
     #    cd ../..
 
-  cleanup-runner3:
-    runs-on: [ self-hosted, runner3 ]
-    needs: 
-      - marmot-package
-    if: always() 
-    steps:
-      - name: 各ランナーを掃除
-        run: |
-          pwd
-          ls -al
-          sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+ # cleanup-runner3:
+ #   runs-on: [ self-hosted, runner3 ]
+ #   needs: 
+ #     - package-marmotd
+ #   if: always() 
+ #   steps:
+ #     - name: 各ランナーを掃除
+ #       run: |
+ #         pwd
+ #         ls -al
+ #         sudo -E env "PATH=$PATH" ./tools/cleanup.sh
 
   cleanup-runner1:
     runs-on: [ self-hosted, runner1 ]

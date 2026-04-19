@@ -1,6 +1,7 @@
 package marmotd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -688,12 +689,32 @@ func (m *Marmot) CreateNewVolumeWithWait(volReq api.Volume) (api.Volume, error) 
 
 // サーバーから起動イメージの作成
 func (m *Marmot) MakeImageEntryFromRunningVM(serverId, name string, image api.Image) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), CurrentConfig().ImageCreateFromVMTimeout())
+	defer cancel()
+	return m.MakeImageEntryFromRunningVMWithContext(ctx, serverId, name, image)
+}
+
+// サーバーから起動イメージの作成
+func (m *Marmot) MakeImageEntryFromRunningVMWithContext(ctx context.Context, serverId, name string, image api.Image) (string, error) {
 	slog.Debug("===MakeImageEntryFromRunningVM is called===", "server id", serverId)
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	operationTimeout := contextTimeoutHint(ctx)
+	markFailed := func(err error) error {
+		err = wrapDeadlineExceeded(err, "実行中 VM からのイメージ作成", operationTimeout)
+		return m.markImageCreationFailed(image, err)
+	}
+
+	if err := ctx.Err(); err != nil {
+		return "", markFailed(err)
+	}
+
 	// サーバーの情報を取得
 	serverSpec, err := m.Db.GetServerById(serverId)
 	if err != nil {
 		slog.Error("GetServerById()", "err", err, "server id", serverId)
-		return "", err
+		return "", markFailed(err)
 	}
 
 	// ブートボリュームのIDを取得
@@ -703,7 +724,7 @@ func (m *Marmot) MakeImageEntryFromRunningVM(serverId, name string, image api.Im
 	bootVol, err := m.GetVolumeById(serverSpec.Spec.BootVolume.Id)
 	if err != nil {
 		slog.Error("GetVolumeById()", "err", err, "volume id", serverSpec.Spec.BootVolume.Id)
-		return "", err
+		return "", markFailed(err)
 	}
 	//slog.Debug("MakeImageEntryFromRunningVM()", "boot volume", bootVol.Spec.Path)
 
@@ -715,8 +736,8 @@ func (m *Marmot) MakeImageEntryFromRunningVM(serverId, name string, image api.Im
 	//}
 
 	// 仮想マシンの一時停止
-	if err := m.Virt.SuspendDomain(*serverSpec.Metadata.InstanceName); err != nil {
-		slog.Error("SuspendDomain()", "err", err)
+	if err := m.Virt.StopDomain(*serverSpec.Metadata.InstanceName); err != nil {
+		slog.Error("StopDomain()", "err", err)
 		//return "", err
 	}
 
@@ -725,8 +746,9 @@ func (m *Marmot) MakeImageEntryFromRunningVM(serverId, name string, image api.Im
 		slog.Debug("qcow2ファイルのコピー", "source path", *bootVol.Spec.Path, "destination path", *image.Spec.Qcow2Path)
 		if bootVol.Spec.Path != nil {
 			// 物理的なボリュームのコピー
-			if err := qcow.CopyQcow(*bootVol.Spec.Path, *image.Spec.Qcow2Path); err != nil {
+			if err := qcow.CopyQcowWithContext(ctx, *bootVol.Spec.Path, *image.Spec.Qcow2Path); err != nil {
 				slog.Error("qcow.CopyQcow()", "err", err)
+				return "", markFailed(err)
 			}
 		}
 	} else if bootVol.Spec.Type != nil && *bootVol.Spec.Type == "lvm" {
@@ -740,16 +762,21 @@ func (m *Marmot) MakeImageEntryFromRunningVM(serverId, name string, image api.Im
 			//	slog.Error("lvm.CreateSnapshot()", "err", err)
 			//}
 
-			if err := lvm.CopyLogicalVoulume(*bootVol.Spec.VolumeGroup, *bootVol.Spec.LogicalVolume, CurrentConfig().OSVolumeGroup, *image.Spec.LogicalVolume, size); err != nil {
+			if err := lvm.CopyLogicalVoulumeWithContext(ctx, *bootVol.Spec.VolumeGroup, *bootVol.Spec.LogicalVolume, CurrentConfig().OSVolumeGroup, *image.Spec.LogicalVolume, size); err != nil {
 				slog.Error("lvm.CopyLogicalVoulume()", "err", err)
+				return "", markFailed(err)
 			}
 		}
+	} else {
+		err := fmt.Errorf("unsupported boot volume type for image creation")
+		slog.Error("MakeImageEntryFromRunningVM()", "err", err, "server id", serverId)
+		return "", markFailed(err)
 	}
 
 	// 仮想マシンの再開
-	if err := m.Virt.ResumeDomain(*serverSpec.Metadata.InstanceName); err != nil {
-		slog.Error("ResumeDomain()", "err", err)
-		//return "", err
+	if err := m.Virt.StartDomain(*serverSpec.Metadata.InstanceName); err != nil {
+		slog.Error("StartDomain()", "err", err)
+		return "", markFailed(err)
 	}
 
 	// イメージ情報の登録

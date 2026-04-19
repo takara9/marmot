@@ -11,15 +11,16 @@ import (
 )
 
 var _ = Describe("Jobs", Ordered, func() {
-	var url string
+	var port string = "14379"
+	var url string = fmt.Sprintf("http://127.0.0.1:%s", port)
 	var err error
 	var containerID string
 	var j *db.Job
 
 	BeforeAll(func(ctx SpecContext) {
 		// Dockerコンテナを起動
-		url = "http://127.0.0.1:5379"
-		cmd := exec.Command("docker", "run", "-d", "--name", "jobEtcdDb", "-p", "5379:2379", "-p", "5380:2380", "ghcr.io/takara9/etcd:3.6.5")
+		url = fmt.Sprintf("http://127.0.0.1:%s", port)
+		cmd := exec.Command("docker", "run", "-d", "--rm", "-p", fmt.Sprintf("%s:2379", port), "ghcr.io/takara9/etcd:3.6.5")
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to start container: %s, %v", string(output), err))
@@ -37,11 +38,6 @@ var _ = Describe("Jobs", Ordered, func() {
 		_, err := cmd.CombinedOutput()
 		if err != nil {
 			fmt.Printf("Failed to stop container: %v\n", err)
-		}
-		cmd = exec.Command("docker", "rm", containerID)
-		_, err = cmd.CombinedOutput()
-		if err != nil {
-			fmt.Printf("Failed to remove container: %v\n", err)
 		}
 	}, NodeTimeout(20*time.Second))
 
@@ -312,7 +308,7 @@ var _ = Describe("Jobs", Ordered, func() {
 					if job.Spec.StartTime != nil {
 						fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], (time.Since(*job.Spec.StartTime) * time.Second), *job.Spec.Command)
 					} else {
-						fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], 0 * time.Second, *job.Spec.Command)
+						fmt.Printf("%-5s  %-12s  %-10s  %-20s %-v\n", job.Id, *job.Metadata.Name, db.JobStatus[job.Status.StatusCode], 0*time.Second, *job.Spec.Command)
 					}
 				}
 			})

@@ -13,7 +13,7 @@ import (
 )
 
 var _ = Describe("InternalDNS", Ordered, func() {
-	var port string = "10379"
+	var port string = "12379"
 	var url string = fmt.Sprintf("http://127.0.0.1:%s", port)
 	var containerID string
 
@@ -26,7 +26,7 @@ var _ = Describe("InternalDNS", Ordered, func() {
 		slog.SetDefault(logger)
 
 		// Dockerコンテナを起動
-		cmd := exec.Command("docker", "run", "-d", "--name", "dnsEtcdDb", "-p", fmt.Sprintf("%s:2379", port), "ghcr.io/takara9/etcd:3.6.5")
+		cmd := exec.Command("docker", "run", "-d", "--rm", "-p", fmt.Sprintf("%s:2379", port), "ghcr.io/takara9/etcd:3.6.5")
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to start container: %s, %v", string(output), err))
@@ -44,11 +44,6 @@ var _ = Describe("InternalDNS", Ordered, func() {
 		_, err := cmd.CombinedOutput()
 		if err != nil {
 			fmt.Printf("Failed to stop container: %v\n", err)
-		}
-		cmd = exec.Command("docker", "rm", containerID)
-		_, err = cmd.CombinedOutput()
-		if err != nil {
-			fmt.Printf("Failed to remove container: %v\n", err)
 		}
 	}, NodeTimeout(20*time.Second))
 

@@ -60,7 +60,12 @@ func main() {
 		"dns_upstream", cfg.DNSUpstream,
 		"os_volume_group", cfg.OSVolumeGroup,
 		"data_volume_group", cfg.DataVolumeGroup,
-		"deletion_delay_seconds", cfg.DeletionDelaySeconds)
+		"deletion_delay_seconds", cfg.DeletionDelaySeconds,
+		"image_create_from_vm_timeout_seconds", cfg.ImageCreateFromVMTimeoutSeconds,
+		"image_create_from_url_timeout_seconds", cfg.ImageCreateFromURLTimeoutSeconds,
+		"image_download_timeout_seconds", cfg.ImageDownloadTimeoutSeconds,
+		"image_resize_timeout_seconds", cfg.ImageResizeTimeoutSeconds,
+		"image_delete_timeout_seconds", cfg.ImageDeleteTimeoutSeconds)
 
 	// REST-APIサーバーの処理
 	slog.Info("Starting api server", "nodeName", cfg.NodeName, "etcdURL", cfg.EtcdURL, "apiListenAddr", cfg.APIListenAddr)

@@ -35,7 +35,6 @@ var _ = Describe("関数テスト", Ordered, func() {
 	BeforeAll(func(ctx0 SpecContext) {
 	})
 	AfterAll(func(ctx0 SpecContext) {
-		marmotd.CleanupTestEnvironment()
 	})
 
 	Context("テスト環境初期化", func() {

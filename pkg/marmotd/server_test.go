@@ -14,7 +14,6 @@ import (
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/lvm"
 	"github.com/takara9/marmot/pkg/marmotd"
 	"github.com/takara9/marmot/pkg/util"
 )
@@ -26,19 +25,34 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		etcdctlExe        = "/usr/bin/etcdctl"
 		nodeName          = "hvc"
 		etcdImage         = "ghcr.io/takara9/etcd:3.6.5"
-		etcdContainerName = "etcd-server"
+		osImage           = "ubuntu-22.04-server-cloudimg-amd64.img"
+		osImageURL        = "http://hmc/" + osImage
 	)
 	var (
-		containerID  string
-		ctx          context.Context
-		cancel       context.CancelFunc
-		marmotServer *marmotd.Server
-		osImageid    string
+		containerID      string
+		ctx              context.Context
+		cancel           context.CancelFunc
+		marmotServer     *marmotd.Server
+		osImageid        string
+		vm1Id            string
+		vm1BootVolumeId  string
+		vm2Id            string
+		vm2BootVolumeId  string
+		vm2DataVolumeId1 string
+		vm2DataVolumeId2 string
 	)
 	etcdUrl := "http://127.0.0.1:" + fmt.Sprintf("%d", etcdPort)
 	marmotEp := "localhost:" + fmt.Sprintf("%d", marmotPort)
 
 	BeforeAll(func(ctx0 SpecContext) {
+		cmd := exec.Command("docker", "run", "-d", "--rm", "-p", fmt.Sprintf("%d", etcdPort)+":2379", "--rm", etcdImage)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			Fail(fmt.Sprintf("Failed to start container: %s, %v", string(output), err))
+		}
+		containerID = string(output[:12]) // 最初の12文字をIDとして取得
+		fmt.Printf("Container started with ID: %s\n", containerID)
+
 		opts := &slog.HandlerOptions{
 			AddSource: true,
 			Level:     slog.LevelDebug,
@@ -49,42 +63,63 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 
 	AfterAll(func(ctx0 SpecContext) {
 
-		//OSイメージを削除
-		if osImageid != "" {
-			osimage, err := marmotServer.Ma.Db.GetImage(osImageid)
-			Expect(err).NotTo(HaveOccurred())
-			err = lvm.RemoveLV(*osimage.Spec.VolumeGroup, *osimage.Spec.LogicalVolume)
-			Expect(err).NotTo(HaveOccurred())
-		}
-
+		By("Dockerコンテナの停止とモックサーバーのシャットダウン")
 		cmd := exec.Command("docker", "kill", containerID)
 		_, err := cmd.CombinedOutput()
 		if err != nil {
 			fmt.Printf("Failed to stop container: %v\n", err)
 		}
-		cmd = exec.Command("docker", "rm", containerID)
-		_, err = cmd.CombinedOutput()
-		if err != nil {
-			fmt.Printf("Failed to remove container: %v\n", err)
-		}
 		cancel() // モックサーバー停止
+		// /var/lib/marmot/images/9e24c/ubuntu-22.04-server-cloudimg-amd64.img のようなファイルを削除する
 
-		marmotd.CleanupTestEnvironment()
+		// 以下の後処理は、本来、それぞれの削除関数の中で実施するべきもの
+		// OS論理ボリューム vg1/boot-9e24c のようなものができるはずなので、削除する
+		By("後処理: 作成された論理ボリュームの削除")
+		cmd = exec.Command("lvremove", "-y", "vg1/boot-"+osImageid)
+		if err := cmd.Run(); err != nil {
+			fmt.Printf("Failed to remove logical volume: %v\n", err)
+		}
+
+		// "/var/lib/marmot/images/" + osImageid　のディレクトリを削除する
+		By("後処理: 作成されたイメージファイルの削除")
+		imagePath := "/var/lib/marmot/images/" + osImageid
+		if _, err := os.Stat(imagePath); err == nil {
+			if err := os.RemoveAll(imagePath); err != nil {
+				fmt.Printf("Failed to remove image directory: %v\n", err)
+			}
+		}
+
+		// /var/lib/marmot/isos/ の中にディレクトリができるはずなので、削除する
+		By("後処理: /var/lib/marmot/isos/ の中に作成されたディレクトリの削除")
+		cdimagePath := "/var/lib/marmot/isos/" + vm1Id
+		err = os.RemoveAll(cdimagePath)
+		Expect(err).NotTo(HaveOccurred())
+
+		cdimagePath = "/var/lib/marmot/isos/" + vm2Id
+		err = os.RemoveAll(cdimagePath)
+		Expect(err).NotTo(HaveOccurred())
+
+		// /var/lib/marmot/volumesの下に作成されたファイルを消す
+		By("後処理: /var/lib/marmot/volumesの下に作成されたファイルの削除 未実装")
+		pathVol := "/var/lib/marmot/volumes/" + fmt.Sprintf("boot-%s.qcow2", vm1BootVolumeId)
+		err = os.Remove(pathVol)
+		Expect(err).NotTo(HaveOccurred())
+
+		pathVol = "/var/lib/marmot/volumes/" + fmt.Sprintf("boot-%s.qcow2", vm2BootVolumeId)
+		err = os.Remove(pathVol)
+		Expect(err).NotTo(HaveOccurred())
+
+		pathVol = "/var/lib/marmot/volumes/" + fmt.Sprintf("data-%s.qcow2", vm2DataVolumeId1)
+		err = os.Remove(pathVol)
+		Expect(err).NotTo(HaveOccurred())
+
+		pathVol = "/var/lib/marmot/volumes/" + fmt.Sprintf("data-%s.qcow2", vm2DataVolumeId2)
+		err = os.Remove(pathVol)
+		Expect(err).NotTo(HaveOccurred())
+
 	})
 
 	Context("テスト環境初期化", func() {
-		//var hvs config.Hypervisors_yaml
-
-		It("モックサーバー用etcdの起動", func() {
-			cmd := exec.Command("docker", "run", "-d", "--name", etcdContainerName, "-p", fmt.Sprintf("%d", etcdPort)+":2379", "-p", fmt.Sprintf("%d", etcdPort+1)+":2380", "--rm", etcdImage)
-			output, err := cmd.CombinedOutput()
-			if err != nil {
-				Fail(fmt.Sprintf("Failed to start container: %s, %v", string(output), err))
-			}
-			containerID = string(output[:12]) // 最初の12文字をIDとして取得
-			fmt.Printf("Container started with ID: %s\n", containerID)
-		})
-
 		It("モックサーバーの起動", func() {
 			GinkgoWriter.Println("Start marmot server mock")
 			ctx, cancel = context.WithCancel(context.Background())
@@ -110,6 +145,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				g.Expect(err).NotTo(HaveOccurred())
 			}).Should(Succeed())
 		})
+
 		It("既存ネットワークの取得", func() {
 			var err error
 			vnets, err := marmotServer.Ma.GetVirtualNetworksAndPutDB()
@@ -126,8 +162,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		It("URLを指定してイメージのIDを取得", func() {
 			var err error
 			GinkgoWriter.Println("URLを指定してイメージのIDを取得")
-			url := "http://hmc/ubuntu-22.04-server-cloudimg-amd64.img"
-			osImageid, err = marmotServer.Ma.Db.MakeImageEntryFromURL("ubuntu22.04", url)
+			osImageid, err = marmotServer.Ma.Db.MakeImageEntryFromURL("ubuntu22.04", osImageURL)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("取得したイメージID: ", osImageid)
 		})
@@ -150,7 +185,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			fmt.Println("ネットワーク情報: ", string(data))
 		})
 
-		var id string
+		//var id string
 		It("仮想サーバー生成:bootはqcow2 で最小構成", func() {
 			var virtualServer api.Server
 			var meta api.Metadata
@@ -167,14 +202,14 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			// 他すべてデフォルト
 			vm, err := marmotServer.Ma.Db.MakeServerEntry(virtualServer)
 			Expect(err).NotTo(HaveOccurred())
-			id, err = marmotServer.Ma.CreateServerManage(vm.Id)
+			vm1Id, err = marmotServer.Ma.CreateServerManage(vm.Id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created VM ID:", id)
+			GinkgoWriter.Println("Created VM ID:", vm1Id)
 		})
 
 		It("稼働中仮想サーバー（１）の取得", func() {
-			GinkgoWriter.Println("取得する仮想サーバーID:", id)
-			sv, err := marmotServer.Ma.GetServerManage(id)
+			GinkgoWriter.Println("取得する仮想サーバーID:", vm1Id)
+			sv, err := marmotServer.Ma.GetServerManage(vm1Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
 			Expect(*sv.Metadata.Name).To(Equal("test-vm-1"))
@@ -191,21 +226,21 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 
 		It("仮想サーバーのOS起動待ち 60秒", func() {
 			Eventually(func(g Gomega) {
-				sv, err := marmotServer.Ma.GetServerManage(id)
+				sv, err := marmotServer.Ma.GetServerManage(vm1Id)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 				g.Expect(sv.Status.StatusCode).To(Equal(db.SERVER_RUNNING))
+				vm1BootVolumeId = sv.Spec.BootVolume.Id
 			}, "120s", "10s").Should(Succeed())
 		})
 
 		It("仮想サーバーの削除", func() {
-			err := marmotServer.Ma.DeleteServerByIdManage(id)
+			err := marmotServer.Ma.DeleteServerByIdManage(vm1Id)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 
 	Context("QCOW2のデータディスクが複数存在する仮想サーバーの起動と終了のテスト", func() {
-		var id string
 		It("仮想サーバー生成:bootはqcow2 でデータディスク２本構成", func() {
 			var virtualServer api.Server
 			var meta api.Metadata
@@ -251,15 +286,15 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			By("他すべてデフォルトで、仮想サーバーを作成")
 			vm, err := marmotServer.Ma.Db.MakeServerEntry(virtualServer)
 			Expect(err).NotTo(HaveOccurred())
-			id, err = marmotServer.Ma.CreateServerManage(vm.Id)
+			vm2Id, err = marmotServer.Ma.CreateServerManage(vm.Id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created VM ID:", id)
+			GinkgoWriter.Println("Created VM ID:", vm2Id)
 		})
 
 		// 本来ならばSSHログイン成功まで待ちたい、DHCPとDNSが必要
 		It("時間待ち", func() {
 			Eventually(func(g Gomega) {
-				sv, err := marmotServer.Ma.GetServerManage(id)
+				sv, err := marmotServer.Ma.GetServerManage(vm2Id)
 				Expect(err).NotTo(HaveOccurred())
 				g.Expect(sv.Status).NotTo(BeNil())
 				g.Expect(sv.Status.StatusCode).NotTo(Equal(db.SERVER_ERROR))
@@ -268,7 +303,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 
 		It("仮想サーバーのOS起動待ち 60秒", func() {
 			Eventually(func(g Gomega) {
-				sv, err := marmotServer.Ma.GetServerManage(id)
+				sv, err := marmotServer.Ma.GetServerManage(vm2Id)
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 				g.Expect(sv.Status.StatusCode).To(Equal(db.SERVER_RUNNING))
@@ -276,8 +311,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		})
 
 		It("稼働中仮想サーバーの取得", func() {
-			GinkgoWriter.Println("取得する仮想サーバーID:", id)
-			sv, err := marmotServer.Ma.GetServerManage(id)
+			GinkgoWriter.Println("取得する仮想サーバーID:", vm2Id)
+			sv, err := marmotServer.Ma.GetServerManage(vm2Id)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
 			Expect(*sv.Metadata.Name).To(Equal("test-vm-2"))
@@ -285,6 +320,9 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("サーバー情報: ", string(data))
 			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+			vm2BootVolumeId = sv.Spec.BootVolume.Id
+			vm2DataVolumeId1 = (*sv.Spec.Storage)[0].Id
+			vm2DataVolumeId2 = (*sv.Spec.Storage)[1].Id
 		})
 
 		It("LVMの状態確認", func() {
@@ -301,7 +339,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 
 		It("時間待ち PD", func() {
 			Consistently(func(g Gomega) {
-				sv, err := marmotServer.Ma.GetServerManage(id)
+				sv, err := marmotServer.Ma.GetServerManage(vm2Id)
 				Expect(err).NotTo(HaveOccurred())
 				g.Expect(sv.Status).NotTo(BeNil())
 				g.Expect(sv.Status.StatusCode).To(Equal(db.SERVER_RUNNING))
@@ -309,7 +347,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		})
 
 		It("仮想サーバーの削除", func() {
-			err := marmotServer.Ma.DeleteServerByIdManage(id)
+			err := marmotServer.Ma.DeleteServerByIdManage(vm2Id)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
