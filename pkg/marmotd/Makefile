@@ -47,16 +47,14 @@ test-vnet:
 test-ipnet:
 	$(GO) test -ginkgo.focus-file network_ipnet_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
-
 .PHONY: test-server-image
 test-server-image:
 	$(GO) test -ginkgo.focus-file server-image_test.go -timeout 60m -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
+.PHONY: test-osimage
+test-osimage:
+	$(GO) test -ginkgo.focus-file osimage_test.go -timeout 60m -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
-
-.PHONY: test-image
-test-image:
-	$(GO) test -ginkgo.focus-file image_test.go -timeout 20m -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
 
 .PHONY: test-iso

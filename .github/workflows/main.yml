@@ -83,7 +83,7 @@ jobs:
         sudo -s make test-server
         cd ../..
 
-  package-marmotd-network-image:
+  package-marmotd-network:
     runs-on: [ self-hosted, any ]
     steps:
     - uses: actions/checkout@v5
@@ -93,12 +93,27 @@ jobs:
         sudo -s make test-vnet
         sudo -s make test-ipnet
         cd ../..
+
+  package-marmotd-image:
+    runs-on: [ self-hosted, any ]
+    steps:
+    - uses: actions/checkout@v5
     - name: Test pkg/marmotd サーバーとイメージ機能テスト
       run: |
         cd pkg/marmotd
         sudo -s make test-server-image
         cd ../..
-  
+ 
+  package-marmotd-osimage:
+    runs-on: [ self-hosted, any ]
+    steps:
+    - uses: actions/checkout@v5
+    - name: Test pkg/marmotd OSイメージ機能テスト
+      run: |
+        cd pkg/marmotd
+        sudo -s make test-osimage
+        cd ../..
+
  #package-marmotd:
  #  runs-on: [ self-hosted, runner3 ]
  #  steps:
