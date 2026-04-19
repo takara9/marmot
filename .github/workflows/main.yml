@@ -93,7 +93,8 @@ jobs:
         sudo -s make test-vnet
         sudo -s make test-ipnet
         cd ../..
-    - run: |
+    - name: Test pkg/marmotd サーバーとイメージ機能テスト
+      run: |
         cd pkg/marmotd
         sudo -s make test-server-image
         cd ../..
