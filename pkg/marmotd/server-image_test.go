@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -19,21 +20,26 @@ import (
 
 var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 	const (
-		marmotPort        = 8102
-		etcdPort          = 14379
-		etcdctlExe        = "/usr/bin/etcdctl"
-		nodeName          = "hvc"
-		etcdImage         = "ghcr.io/takara9/etcd:3.6.5"
-		etcdContainerName = "etcd-server-14379"
+		marmotPort = 8102
+		etcdPort   = 14379
+		etcdctlExe = "/usr/bin/etcdctl"
+		nodeName   = "hvc"
+		etcdImage  = "ghcr.io/takara9/etcd:3.6.5"
+		osImage    = "ubuntu-22.04-server-cloudimg-amd64.img"
+		osImageURL = "http://hmc/" + osImage
 	)
 	var (
-		containerID  string
-		ctx          context.Context
-		cancel       context.CancelFunc
-		marmotServer *marmotd.Server
-		osImageid    string
+		containerID    string
+		ctx            context.Context
+		cancel         context.CancelFunc
+		marmotServer   *marmotd.Server
+		osImageid      string
+		vmId           [5]string
+		bootVolId      []string
+		dataVolId      []string
+		createdImageId string
 	)
-	etcdUrl := "http://127.0.0.1:" + fmt.Sprintf("%d", etcdPort)
+	//etcdUrl := "http://127.0.0.1:" + fmt.Sprintf("%d", etcdPort)
 	marmotEp := "localhost:" + fmt.Sprintf("%d", marmotPort)
 
 	BeforeAll(func(ctx0 SpecContext) {
@@ -43,84 +49,80 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 		}
 		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
 		slog.SetDefault(logger)
+
+		By("モックサーバー用etcdの起動")
+		cmd := exec.Command("docker", "run", "-d", "-p", fmt.Sprintf("%d", etcdPort)+":2379", "--rm", etcdImage)
+		output, err := cmd.CombinedOutput()
+		Expect(err).NotTo(HaveOccurred())
+		containerID = string(output[:12]) // 最初の12文字をIDとして取得
+		fmt.Printf("Container started with ID: %s\n", containerID)
+
+		By("モックサーバーの起動")
+		ctx, cancel = context.WithCancel(context.Background())
+		marmotServer = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
+
+		By("モックサーバー起動の確認")
+		Eventually(func(g Gomega) {
+			cmd := exec.Command("curl", "http://"+marmotEp+"/ping")
+			err := cmd.Run()
+			GinkgoWriter.Println(cmd, "err= ", err)
+			g.Expect(err).NotTo(HaveOccurred())
+		}).Should(Succeed())
+
+		By("既存ネットワークの取得")
+		vnets, err := marmotServer.Ma.GetVirtualNetworksAndPutDB()
+		Expect(err).NotTo(HaveOccurred())
+		for _, name := range vnets {
+			byteJson, err := json.MarshalIndent(name, "", "  ")
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println("Found Network:", string(byteJson))
+		}
 	})
 
 	AfterAll(func(ctx0 SpecContext) {
+		By("モックサーバー終了")
+		cancel() // モックサーバー停止
+
+		By("作成したイメージの削除")
 		err := marmotServer.Ma.DeleteImageManage(osImageid)
 		Expect(err).NotTo(HaveOccurred())
 		_, err = marmotServer.Ma.GetImageManage(osImageid)
 		Expect(err).To(HaveOccurred())
 		fmt.Println("Deleted image ID: ", osImageid)
 
+		By("etcdコンテナの停止")
 		cmd := exec.Command("docker", "kill", containerID)
 		_, err = cmd.CombinedOutput()
-		if err != nil {
-			fmt.Printf("Failed to stop container: %v\n", err)
-		}
-		cmd = exec.Command("docker", "rm", containerID)
-		_, err = cmd.CombinedOutput()
-		if err != nil {
-			fmt.Printf("Failed to remove container: %v\n", err)
-		}
+		Expect(err).NotTo(HaveOccurred())
 
-		cancel() // モックサーバー停止
-		marmotd.CleanupTestEnvironment()
-	})
-
-	Context("テスト環境初期化", func() {
-		It("モックサーバー用etcdの起動", func() {
-			cmd := exec.Command("docker", "run", "-d", "--name", etcdContainerName, "-p", fmt.Sprintf("%d", etcdPort)+":2379", "-p", fmt.Sprintf("%d", etcdPort+1)+":2380", "--rm", etcdImage)
-			output, err := cmd.CombinedOutput()
-			if err != nil {
-				Fail(fmt.Sprintf("Failed to start container: %s, %v", string(output), err))
-			}
-			containerID = string(output[:12]) // 最初の12文字をIDとして取得
-			fmt.Printf("Container started with ID: %s\n", containerID)
-		})
-
-		It("モックサーバーの起動", func() {
-			GinkgoWriter.Println("Start marmot server mock")
-			ctx, cancel = context.WithCancel(context.Background())
-			marmotServer = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
-		})
-
-		It("モックサーバー起動の確認", func() {
-			By("Trying to connect to marmot")
-			Eventually(func(g Gomega) {
-				cmd := exec.Command("curl", "http://"+marmotEp+"/ping")
-				err := cmd.Run()
-				GinkgoWriter.Println(cmd, "err= ", err)
-				g.Expect(err).NotTo(HaveOccurred())
-			}).Should(Succeed())
-		})
-
-		It("モックサーバー起動の確認", func() {
-			By("Trying to connect to marmot")
-			Eventually(func(g Gomega) {
-				cmd := exec.Command("curl", etcdUrl+"/ping")
-				err := cmd.Run()
-				GinkgoWriter.Println(cmd, "err= ", err)
-				g.Expect(err).NotTo(HaveOccurred())
-			}).Should(Succeed())
-		})
-		It("既存ネットワークの取得", func() {
-			var err error
-			vnets, err := marmotServer.Ma.GetVirtualNetworksAndPutDB()
+		By("/var/lib/marmotd/images/ 以下のファイルの削除")
+		for i := 0; i < len(vmId); i++ {
+			dirPath1 := fmt.Sprintf("/var/lib/marmot/images/%s", vmId[i])
+			err := os.RemoveAll(dirPath1)
 			Expect(err).NotTo(HaveOccurred())
-			for _, name := range vnets {
-				byteJson, err := json.MarshalIndent(name, "", "  ")
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("Found Network:", string(byteJson))
-			}
-		})
+			dirPath2 := fmt.Sprintf("/var/lib/marmot/isos/%s", vmId[i])
+			err = os.RemoveAll(dirPath2)
+			Expect(err).NotTo(HaveOccurred())
+		}
+		for i := 0; i < len(bootVolId); i++ {
+			bootVolPath := fmt.Sprintf("/var/lib/marmot/volumes/boot-%s.qcow2", bootVolId[i])
+			os.RemoveAll(bootVolPath)
+		}
+		for i := 0; i < len(dataVolId); i++ {
+			dataVolPath := fmt.Sprintf("/var/lib/marmot/volumes/data-%s.qcow2", dataVolId[i])
+			os.RemoveAll(dataVolPath)
+		}
+
+		By("作成したイメージの削除")
+		exec.Command("lvremove", "vg1/"+createdImageId).Run()
+		imageVolPath := fmt.Sprintf("/var/lib/marmot/image/%s", createdImageId)
+		os.RemoveAll(imageVolPath)
 	})
 
 	Context("イメージ作成", func() {
 		It("URLを指定してイメージのIDを取得 DB操作のみ", func() {
 			var err error
-			GinkgoWriter.Println("URLを指定してイメージのIDを取得")
-			url := "http://hmc/ubuntu-22.04-server-cloudimg-amd64.img"
-			osImageid, err = marmotServer.Ma.Db.MakeImageEntryFromURL("ubuntu22.04", url)
+			osImageid, err = marmotServer.Ma.Db.MakeImageEntryFromURL("ubuntu22.04", osImageURL)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("取得したイメージID: ", osImageid)
 		})
@@ -142,7 +144,6 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			fmt.Println("ネットワーク情報: ", string(data))
 		})
 
-		var id string
 		It("仮想サーバーqcow2 起動", func() {
 			var virtualServer api.Server
 			var meta api.Metadata
@@ -159,25 +160,26 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			// 他すべてデフォルト
 			vm, err := marmotServer.Ma.Db.MakeServerEntry(virtualServer)
 			Expect(err).NotTo(HaveOccurred())
-			id, err = marmotServer.Ma.CreateServerManage(vm.Id)
+			vmId[0], err = marmotServer.Ma.CreateServerManage(vm.Id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created VM ID:", id)
+			GinkgoWriter.Println("Created VM ID:", vmId[0])
 		})
 
 		It("起動チェック", func() {
-			GinkgoWriter.Println("仮想サーバーID:", id)
-			sv, err := marmotServer.Ma.GetServerManage(id)
+			GinkgoWriter.Println("仮想サーバーID:", vmId[0])
+			sv, err := marmotServer.Ma.GetServerManage(vmId[0])
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
 			Expect(*sv.Metadata.Name).To(Equal("test-vm-1"))
 			data, err := json.MarshalIndent(sv, "", "  ")
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("オブジェクト情報: ", string(data))
+			bootVolId = append(bootVolId, sv.Spec.BootVolume.Id)
 		})
 
 		It("OS起動待ち", func() {
 			Eventually(func(g Gomega) {
-				sv, err := marmotServer.Ma.GetServerManage(id)
+				sv, err := marmotServer.Ma.GetServerManage(vmId[0])
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 				g.Expect(sv.Status.StatusCode).To(Equal(db.SERVER_RUNNING))
@@ -185,13 +187,12 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 		})
 
 		It("削除", func() {
-			err := marmotServer.Ma.DeleteServerByIdManage(id)
+			err := marmotServer.Ma.DeleteServerByIdManage(vmId[0])
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 
 	Context("イメージ取得のテスト", func() {
-		var id string
 		It("仮想サーバー起動 boot + data x2 qcow2", func() {
 			var virtualServer api.Server
 			var meta api.Metadata
@@ -237,25 +238,28 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			By("他すべてデフォルトで、仮想サーバーを作成")
 			vm, err := marmotServer.Ma.Db.MakeServerEntry(virtualServer)
 			Expect(err).NotTo(HaveOccurred())
-			id, err = marmotServer.Ma.CreateServerManage(vm.Id)
+			vmId[1], err = marmotServer.Ma.CreateServerManage(vm.Id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created VM ID:", id)
+			GinkgoWriter.Println("Created VM ID:", vmId[1])
 		})
 
 		It("起動チェック", func() {
-			GinkgoWriter.Println("取得する仮想サーバーID:", id)
-			sv, err := marmotServer.Ma.GetServerManage(id)
+			GinkgoWriter.Println("取得する仮想サーバーID:", vmId[1])
+			sv, err := marmotServer.Ma.GetServerManage(vmId[1])
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
 			Expect(*sv.Metadata.Name).To(Equal("test-vm-image-1"))
 			data, err := json.MarshalIndent(sv, "", "  ")
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("オブジェクト情報: ", string(data))
+			bootVolId = append(bootVolId, sv.Spec.BootVolume.Id)
+			dataVolId = append(dataVolId, (*sv.Spec.Storage)[0].Id)
+			dataVolId = append(dataVolId, (*sv.Spec.Storage)[1].Id)
 		})
 
 		It("OS起動待ち", func() {
 			Eventually(func(g Gomega) {
-				sv, err := marmotServer.Ma.GetServerManage(id)
+				sv, err := marmotServer.Ma.GetServerManage(vmId[1])
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 				g.Expect(sv.Status.StatusCode).To(Equal(db.SERVER_RUNNING))
@@ -263,9 +267,11 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 		})
 
 		It("イメージの作成", func() {
-			img, err := marmotServer.Ma.Db.MakeImageEntryFromRunningVM(id, "image-1")
+			img, err := marmotServer.Ma.Db.MakeImageEntryFromRunningVM(vmId[1], "image-1")
 			Expect(err).NotTo(HaveOccurred())
-			imageId, err := marmotServer.Ma.MakeImageEntryFromRunningVM(id, "image-1", img)
+			copyCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			defer cancel()
+			imageId, err := marmotServer.Ma.MakeImageEntryFromRunningVMWithContext(copyCtx, vmId[1], "image-1", img)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created image ID: ", imageId)
 			image, err := marmotServer.Ma.Db.GetImage(imageId)
@@ -277,7 +283,7 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 		})
 
 		It("削除", func() {
-			err := marmotServer.Ma.DeleteServerByIdManage(id)
+			err := marmotServer.Ma.DeleteServerByIdManage(vmId[1])
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -292,7 +298,6 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			fmt.Println("ネットワーク情報: ", string(data))
 		})
 
-		var id string
 		It("qcow2イメージからの仮想サーバー起動", func() {
 			var virtualServer api.Server
 			var meta api.Metadata
@@ -310,14 +315,14 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			// 他すべてデフォルト
 			vm, err := marmotServer.Ma.Db.MakeServerEntry(virtualServer)
 			Expect(err).NotTo(HaveOccurred())
-			id, err = marmotServer.Ma.CreateServerManage(vm.Id)
+			vmId[2], err = marmotServer.Ma.CreateServerManage(vm.Id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created VM ID:", id)
+			GinkgoWriter.Println("Created VM ID:", vmId[2])
 		})
 
 		It("起動チェック", func() {
-			GinkgoWriter.Println("取得する仮想サーバーID:", id)
-			sv, err := marmotServer.Ma.GetServerManage(id)
+			GinkgoWriter.Println("取得する仮想サーバーID:", vmId[2])
+			sv, err := marmotServer.Ma.GetServerManage(vmId[2])
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
 			Expect(*sv.Metadata.Name).To(Equal("test-vm-2"))
@@ -325,11 +330,12 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("サーバー情報: ", string(data))
 			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+			bootVolId = append(bootVolId, sv.Spec.BootVolume.Id)
 		})
 
 		It("OS起動待ち", func() {
 			Eventually(func(g Gomega) {
-				sv, err := marmotServer.Ma.GetServerManage(id)
+				sv, err := marmotServer.Ma.GetServerManage(vmId[2])
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 				g.Expect(sv.Status.StatusCode).To(Equal(db.SERVER_RUNNING))
@@ -337,13 +343,12 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 		})
 
 		It("仮想サーバーの削除", func() {
-			err := marmotServer.Ma.DeleteServerByIdManage(id)
+			err := marmotServer.Ma.DeleteServerByIdManage(vmId[2])
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 
 	Context("LV仮想サーバー", func() {
-		var id string
 		It("起動", func() {
 			var virtualServer api.Server
 			var meta api.Metadata
@@ -370,14 +375,14 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			// 他すべてデフォルト
 			vm, err := marmotServer.Ma.Db.MakeServerEntry(virtualServer)
 			Expect(err).NotTo(HaveOccurred())
-			id, err = marmotServer.Ma.CreateServerManage(vm.Id)
+			vmId[3], err = marmotServer.Ma.CreateServerManage(vm.Id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created VM ID:", id)
+			GinkgoWriter.Println("Created VM ID:", vmId[3])
 		})
 
 		It("起動チェック", func() {
-			GinkgoWriter.Println("取得する仮想サーバーID:", id)
-			sv, err := marmotServer.Ma.GetServerManage(id)
+			GinkgoWriter.Println("取得する仮想サーバーID:", vmId[3])
+			sv, err := marmotServer.Ma.GetServerManage(vmId[3])
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
 			data, err := json.MarshalIndent(sv, "", "  ")
@@ -385,11 +390,12 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			fmt.Println("サーバー情報: ", string(data))
 			Expect(*sv.Metadata.Name).To(Equal("test-vm-3"))
 			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+			bootVolId = append(bootVolId, sv.Spec.BootVolume.Id)
 		})
 
 		It("OS起動待ち", func() {
 			Eventually(func(g Gomega) {
-				sv, err := marmotServer.Ma.GetServerManage(id)
+				sv, err := marmotServer.Ma.GetServerManage(vmId[3])
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 				g.Expect(sv.Status.StatusCode).To(Equal(db.SERVER_RUNNING))
@@ -397,21 +403,24 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 		})
 
 		It("LVイメージ取得", func() {
-			img, err := marmotServer.Ma.Db.MakeImageEntryFromRunningVM(id, "image-2")
+			img, err := marmotServer.Ma.Db.MakeImageEntryFromRunningVM(vmId[3], "image-2")
 			Expect(err).NotTo(HaveOccurred())
-			imageId, err := marmotServer.Ma.MakeImageEntryFromRunningVM(id, "image-2", img)
+			copyCtx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+			defer cancel()
+			imageId, err := marmotServer.Ma.MakeImageEntryFromRunningVMWithContext(copyCtx, vmId[3], "image-2", img)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created image ID: ", imageId)
+			GinkgoWriter.Println("作成されたイメージのID: ", imageId)
+			createdImageId = imageId
 			image, err := marmotServer.Ma.Db.GetImage(imageId)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created image: ", *image.Metadata.Name)
+			GinkgoWriter.Println("作成されたイメージの名前: ", *image.Metadata.Name)
 			data, err := json.MarshalIndent(image, "", "  ")
 			Expect(err).NotTo(HaveOccurred())
-			fmt.Println("Created image details: ", string(data))
+			fmt.Println("作成されたイメージの詳細: ", string(data))
 		})
 
 		It("仮想サーバーの削除", func() {
-			err := marmotServer.Ma.DeleteServerByIdManage(id)
+			err := marmotServer.Ma.DeleteServerByIdManage(vmId[3])
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
@@ -425,7 +434,6 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			fmt.Println("ネットワーク情報: ", string(data))
 		})
 
-		var id string
 		It("LV仮想サーバー起動", func() {
 			var err error
 			var virtualServer api.Server
@@ -453,14 +461,14 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 
 			vm, err := marmotServer.Ma.Db.MakeServerEntry(virtualServer)
 			Expect(err).NotTo(HaveOccurred())
-			id, err = marmotServer.Ma.CreateServerManage(vm.Id)
+			vmId[4], err = marmotServer.Ma.CreateServerManage(vm.Id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created VM ID:", id)
+			GinkgoWriter.Println("Created VM ID:", vmId[4])
 		})
 
 		It("起動チェック", func() {
-			GinkgoWriter.Println("取得する仮想サーバーID:", id)
-			sv, err := marmotServer.Ma.GetServerManage(id)
+			GinkgoWriter.Println("取得する仮想サーバーID:", vmId[4])
+			sv, err := marmotServer.Ma.GetServerManage(vmId[4])
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
 			Expect(*sv.Metadata.Name).To(Equal("test-vm-2"))
@@ -468,11 +476,12 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("サーバー情報: ", string(data))
 			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
+			bootVolId = append(bootVolId, sv.Spec.BootVolume.Id)
 		})
 
 		It("OS起動待ち", func() {
 			Eventually(func(g Gomega) {
-				sv, err := marmotServer.Ma.GetServerManage(id)
+				sv, err := marmotServer.Ma.GetServerManage(vmId[4])
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 				g.Expect(sv.Status.StatusCode).To(Equal(db.SERVER_RUNNING))
@@ -480,7 +489,7 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 		})
 
 		It("仮想サーバーの削除", func() {
-			marmotServer.Ma.DeleteServerByIdManage(id)
+			marmotServer.Ma.DeleteServerByIdManage(vmId[4])
 			//Expect(err).NotTo(HaveOccurred())
 		})
 	})

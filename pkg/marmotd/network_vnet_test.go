@@ -35,32 +35,31 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 	etcdUrl := "http://127.0.0.1:" + fmt.Sprintf("%d", etcdPort)
 
 	BeforeAll(func(ctx0 SpecContext) {
+		By("開始 etcd container")
+		cmd := exec.Command("docker", "run", "-d", "-p", fmt.Sprintf("%d", etcdPort)+":2379", "--rm", etcdImage)
+		output, err := cmd.CombinedOutput()
+		Expect(err).NotTo(HaveOccurred())
+		containerID = string(output[:12]) // 最初の12文字をIDとして取得
+		fmt.Printf("Container started with ID: %s\n", containerID)
+		time.Sleep(10 * time.Second) // コンテナが起動するまで待機
+
+		By("モックサーバー起動")
+		ctx, cancel = context.WithCancel(context.Background())
+		marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
 	})
 
 	AfterAll(func(ctx0 SpecContext) {
-		marmotd.CleanupTestEnvironment()
+		By("停止 etcd container")
+		cmd := exec.Command("docker", "kill", containerID)
+		_, err := cmd.CombinedOutput()
+		Expect(err).NotTo(HaveOccurred())
+
+		By("モックサーバー停止")
+		cancel() // モックサーバー停止
 	})
 
 	Context("テスト環境初期化", func() {
-		It("モックサーバー用etcdの起動", func() {
-			cmd := exec.Command("docker", "run", "-d", "--name", etcdContainerName, "-p", fmt.Sprintf("%d", etcdPort)+":2379", "-p", fmt.Sprintf("%d", etcdPort+1)+":2380", "--rm", etcdImage)
-			output, err := cmd.CombinedOutput()
-			if err != nil {
-				Fail(fmt.Sprintf("Failed to start container: %s, %v", string(output), err))
-			}
-			containerID = string(output[:12]) // 最初の12文字をIDとして取得
-			fmt.Printf("Container started with ID: %s\n", containerID)
-			time.Sleep(10 * time.Second) // コンテナが起動するまで待機
-		})
-
-		It("モックサーバーの起動", func() {
-			GinkgoWriter.Println("Start marmot server mock")
-			ctx, cancel = context.WithCancel(context.Background())
-			marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
-		})
-
-		It("起動完了待ちチェック", func() {
-			By("Trying to connect to marmot")
+		It("モック起動待ち ＆ チェック", func() {
 			Eventually(func(g Gomega) {
 				cmd := exec.Command("curl", etcdUrl+"/ping")
 				err := cmd.Run()
@@ -224,21 +223,5 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 			GinkgoWriter.Println(string(jsonByte))
 		})
 
-	})
-
-	Context("コンテナとモックの停止", func() {
-		It("停止コマンド実行", func() {
-			cmd := exec.Command("docker", "kill", containerID)
-			_, err := cmd.CombinedOutput()
-			if err != nil {
-				fmt.Printf("Failed to stop container: %v\n", err)
-			}
-			cmd = exec.Command("docker", "rm", containerID)
-			_, err = cmd.CombinedOutput()
-			if err != nil {
-				fmt.Printf("Failed to remove container: %v\n", err)
-			}
-			cancel() // モックサーバー停止
-		})
 	})
 })

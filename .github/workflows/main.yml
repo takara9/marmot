@@ -63,22 +63,57 @@ jobs:
         sudo -s make test
         cd ../..
 
-  package-marmotd:
-    runs-on: [ self-hosted, runner3 ]
+  package-marmotd-volume:
+    runs-on: [ self-hosted, any ]
     steps:
     - uses: actions/checkout@v5
-    - name: Setup for build
-      run: |
-        make setup
-    - name: 環境セットアップ
-      run: |
-        sudo -E env "PATH=$PATH" ./tools/setup.sh
-        cd ..
     - name: Test pkg/marmotd ボリューム機能テスト
       run: |
         cd pkg/marmotd
         sudo -s make test-volume
         cd ../..
+
+  package-marmotd-server:
+    runs-on: [ self-hosted, any ]
+    steps:
+    - uses: actions/checkout@v5
+    - name: Test pkg/marmotd サーバー機能テスト
+      run: |
+        cd pkg/marmotd
+        sudo -s make test-server
+        cd ../..
+
+  package-marmotd-network-image:
+    runs-on: [ self-hosted, any ]
+    steps:
+    - uses: actions/checkout@v5
+    - name: Test pkg/marmotd ネットワーク機能テスト
+      run: |
+        cd pkg/marmotd
+        sudo -s make test-vnet
+        sudo -s make test-ipnet
+        cd ../..
+    - run: |
+        cd pkg/marmotd
+        sudo -s make test-server-image
+        cd ../..
+  
+ #package-marmotd:
+ #  runs-on: [ self-hosted, runner3 ]
+ #  steps:
+ #  - uses: actions/checkout@v5
+ #  - name: Setup for build
+ #    run: |
+ #      make setup
+ #  - name: 環境セットアップ
+ #    run: |
+ #      sudo -E env "PATH=$PATH" ./tools/setup.sh
+ #      cd ..
+ #  - name: Test pkg/marmotd ボリューム機能テスト
+ #    run: |
+ #      cd pkg/marmotd
+ #       sudo -s make test-volume
+ #       cd ../..
 
   # Label of the job
   marmot-daemon:
@@ -146,17 +181,17 @@ jobs:
     #    sudo rm -fr bin
     #    cd ../..
 
-  cleanup-runner3:
-    runs-on: [ self-hosted, runner3 ]
-    needs: 
-      - package-marmotd
-    if: always() 
-    steps:
-      - name: 各ランナーを掃除
-        run: |
-          pwd
-          ls -al
-          sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+ # cleanup-runner3:
+ #   runs-on: [ self-hosted, runner3 ]
+ #   needs: 
+ #     - package-marmotd
+ #   if: always() 
+ #   steps:
+ #     - name: 各ランナーを掃除
+ #       run: |
+ #         pwd
+ #         ls -al
+ #         sudo -E env "PATH=$PATH" ./tools/cleanup.sh
 
   cleanup-runner1:
     runs-on: [ self-hosted, runner1 ]

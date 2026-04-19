@@ -1,9 +1,11 @@
 package controller
 
 import (
+	"context"
 	"log/slog"
 	"time"
 
+	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
 )
@@ -83,10 +85,24 @@ func (c *controller) imageControllerLoop() {
 			if image.Metadata.Labels != nil && (*image.Metadata.Labels)["source"] == "bootVolume" {
 				slog.Debug("実行中VMからイメージの作成", "image", *image.Metadata.Name, "source", "bootVolume")
 				serverId := (*image.Metadata.Labels)["serverId"].(string)
-				go c.marmot.MakeImageEntryFromRunningVM(serverId, *image.Metadata.Name, image)
+				go func(image api.Image, serverId string) {
+					timeout := marmotd.CurrentConfig().ImageCreateFromVMTimeout()
+					ctx, cancel := context.WithTimeout(context.Background(), timeout)
+					defer cancel()
+					if _, err := c.marmot.MakeImageEntryFromRunningVMWithContext(ctx, serverId, *image.Metadata.Name, image); err != nil {
+						slog.Error("実行中VMからのイメージ作成に失敗", "imageId", image.Id, "serverId", serverId, "timeout", timeout, "err", err)
+					}
+				}(image, serverId)
 			} else {
 				slog.Debug("ダウンロードしてイメージの作成", "image", *image.Metadata.Name, "source", "url")
-				go c.marmot.CreateNewImageManage(image.Id)
+				go func(image api.Image) {
+					timeout := marmotd.CurrentConfig().ImageCreateFromURLTimeout()
+					ctx, cancel := context.WithTimeout(context.Background(), timeout)
+					defer cancel()
+					if _, err := c.marmot.CreateNewImageManageWithContext(ctx, image.Id); err != nil {
+						slog.Error("URLからのイメージ作成に失敗", "imageId", image.Id, "timeout", timeout, "err", err)
+					}
+				}(image)
 			}
 		case db.IMAGE_CREATING:
 			slog.Debug("イメージの作成処理を継続", "image", *image.Metadata.Name)

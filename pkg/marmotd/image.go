@@ -34,7 +34,18 @@ var checkImageVolumeGroup = func(vgName string) error {
 
 // CreateNewImage は、指定されたIDのイメージを新規作成する関数 	コントローラーで使用
 func (m *Marmot) CreateNewImageManage(id string) (*api.Image, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), CurrentConfig().ImageCreateFromURLTimeout())
+	defer cancel()
+	return m.CreateNewImageManageWithContext(ctx, id)
+}
+
+// CreateNewImage は、指定されたIDのイメージを新規作成する関数  コントローラーで使用
+func (m *Marmot) CreateNewImageManageWithContext(ctx context.Context, id string) (*api.Image, error) {
 	slog.Debug("Creating image", "imgId", id)
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	operationTimeout := contextTimeoutHint(ctx)
 
 	// /var/lib/marmot/imagesの存在をチェックして、無ければ作成する
 	if _, err := os.Stat(IMAGE_POOL); os.IsNotExist(err) {
@@ -56,6 +67,13 @@ func (m *Marmot) CreateNewImageManage(id string) (*api.Image, error) {
 		slog.Error("Failed to get image data from DB", "imgId", id, "err", err)
 		return nil, err
 	}
+	markFailed := func(err error) (*api.Image, error) {
+		err = wrapDeadlineExceeded(err, "URL からのイメージ作成", operationTimeout)
+		return nil, m.markImageCreationFailed(image, err)
+	}
+	if err := ctx.Err(); err != nil {
+		return markFailed(err)
+	}
 
 	image.Status.Message = util.StringPtr("イメージの作成処理を開始")
 	if err := m.Db.UpdateImage(id, image); err != nil {
@@ -65,7 +83,7 @@ func (m *Marmot) CreateNewImageManage(id string) (*api.Image, error) {
 
 	if image.Spec == nil || image.Spec.SourceUrl == nil || *image.Spec.SourceUrl == "" {
 		slog.Error("sourceUrl is empty", "imgId", id)
-		return nil, fmt.Errorf("sourceUrl is empty: id=%s", id)
+		return markFailed(fmt.Errorf("sourceUrl is empty: id=%s", id))
 	}
 	src := *image.Spec.SourceUrl
 
@@ -78,13 +96,15 @@ func (m *Marmot) CreateNewImageManage(id string) (*api.Image, error) {
 	downloadPath, err := resolveImagePath(imageDir, src)
 	if err != nil {
 		slog.Error("Failed to resolve image path", "imgId", id, "sourceUrl", src, "err", err)
-		return nil, err
+		return markFailed(err)
 	}
 
 	// イメージをダウンロードする
-	if err := downloadImage(src, downloadPath); err != nil {
+	downloadCtx, downloadCancel := newTimeoutContext(ctx, CurrentConfig().ImageDownloadTimeout())
+	defer downloadCancel()
+	if err := downloadImageWithContext(downloadCtx, src, downloadPath); err != nil {
 		slog.Error("Failed to download image", "imgId", id, "url", src, "err", err)
-		return nil, err
+		return markFailed(err)
 	}
 
 	image.Status.Message = util.StringPtr("OSイメージを設定中")
@@ -97,21 +117,21 @@ func (m *Marmot) CreateNewImageManage(id string) (*api.Image, error) {
 	if err := validateQcowV2Image(downloadPath); err != nil {
 		_ = os.Remove(downloadPath)
 		slog.Error("Downloaded file is not QEMU QCOW Image (v2)", "imgId", id, "path", downloadPath, "err", err)
-		return nil, err
+		return markFailed(err)
 	}
 
 	// QCOW2イメージをカスタマイズする（SSH有効化、ネットワーク設定など）
-	if err := customizeQcowImage(downloadPath); err != nil {
+	if err := customizeQcowImageWithContext(ctx, downloadPath); err != nil {
 		slog.Error("Failed to customize QCOW2 image", "imgId", id, "path", downloadPath, "err", err)
-		return nil, err
+		return markFailed(err)
 	}
 
 	// イメージを16GBに拡張する
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
+	resizeCtx, resizeCancel := newTimeoutContext(ctx, CurrentConfig().ImageResizeTimeout())
+	defer resizeCancel()
 	bootVolumeSizeGB := 16
-	if err := resizeCustomizedImage(ctx, downloadPath, bootVolumeSizeGB); err != nil {
-		return nil, err
+	if err := resizeCustomizedImage(resizeCtx, downloadPath, bootVolumeSizeGB); err != nil {
+		return markFailed(wrapDeadlineExceeded(err, "QCOW2 イメージ拡張", CurrentConfig().ImageResizeTimeout()))
 	}
 
 	image.Spec.Kind = util.StringPtr("os")
@@ -132,7 +152,7 @@ func (m *Marmot) CreateNewImageManage(id string) (*api.Image, error) {
 		lvPath, lvName, err := createBootableLVFromQCOW2(ctx, id, downloadPath, volumeGroup)
 		if err != nil {
 			slog.Error("Failed to create bootable LV from QCOW2", "imgId", id, "path", downloadPath, "volumeGroup", volumeGroup, "err", err)
-			return nil, err
+			return markFailed(err)
 		}
 
 		image.Spec.VolumeGroup = util.StringPtr(volumeGroup)
@@ -147,7 +167,7 @@ func (m *Marmot) CreateNewImageManage(id string) (*api.Image, error) {
 
 	if err := m.Db.UpdateImage(id, image); err != nil {
 		slog.Error("Failed to update image data in DB", "imgId", id, "err", err)
-		return nil, err
+		return markFailed(err)
 	}
 
 	return &image, nil
@@ -168,7 +188,7 @@ func (m *Marmot) GetImageManage(id string) (api.Image, error) {
 // 指定したIDのイメージを削除する関数 （ラップ関数） コントローラーで使用
 func (m *Marmot) DeleteImageManage(id string) error {
 	slog.Debug("Deleting image", "imgId", id)
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), CurrentConfig().ImageDeleteTimeout())
 	defer cancel()
 
 	image, err := m.Db.GetImage(id)
@@ -296,10 +316,21 @@ func resolveImagePath(imageDir, sourceURL string) (string, error) {
 }
 
 func downloadImage(sourceURL, destPath string) error {
-	client := &http.Client{Timeout: 30 * time.Minute}
-	resp, err := client.Get(sourceURL)
+	ctx, cancel := context.WithTimeout(context.Background(), CurrentConfig().ImageDownloadTimeout())
+	defer cancel()
+	return downloadImageWithContext(ctx, sourceURL, destPath)
+}
+
+func downloadImageWithContext(ctx context.Context, sourceURL, destPath string) error {
+	timeout := contextTimeoutHint(ctx)
+	client := &http.Client{Timeout: CurrentConfig().ImageDownloadTimeout()}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURL, nil)
 	if err != nil {
-		return fmt.Errorf("http get failed: %w", err)
+		return fmt.Errorf("create request failed: %w", err)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return wrapDeadlineExceeded(fmt.Errorf("http get failed: %w", err), "イメージのダウンロード", timeout)
 	}
 	defer resp.Body.Close()
 
@@ -316,7 +347,7 @@ func downloadImage(sourceURL, destPath string) error {
 	if _, err := io.Copy(f, resp.Body); err != nil {
 		f.Close()
 		_ = os.Remove(tmpPath)
-		return fmt.Errorf("copy response body failed: %w", err)
+		return wrapDeadlineExceeded(fmt.Errorf("copy response body failed: %w", err), "イメージのダウンロード", timeout)
 	}
 	if err := f.Sync(); err != nil {
 		f.Close()
@@ -360,6 +391,11 @@ func validateQcowV2Image(path string) error {
 }
 
 func customizeQcowImage(imagePath string) error {
+	return customizeQcowImageWithContext(context.Background(), imagePath)
+}
+
+func customizeQcowImageWithContext(ctx context.Context, imagePath string) error {
+	timeout := contextTimeoutHint(ctx)
 	netplanConfig := "network:\n" +
 		"  version: 2\n" +
 		"  ethernets:\n" +
@@ -388,10 +424,10 @@ func customizeQcowImage(imagePath string) error {
 		"--write", "/etc/netplan/00-nic.yaml:" + netplanConfig,
 	}
 
-	cmd := exec.Command("virt-customize", args...)
+	cmd := exec.CommandContext(ctx, "virt-customize", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("virt-customize failed: %w, output: %s", err, strings.TrimSpace(string(output)))
+		return wrapDeadlineExceeded(fmt.Errorf("virt-customize failed: %w, output: %s", err, strings.TrimSpace(string(output))), "QCOW2 イメージ設定", timeout)
 	}
 
 	slog.Debug("virt-customize completed", "imagePath", imagePath, "output", strings.TrimSpace(string(output)))

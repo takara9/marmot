@@ -24,42 +24,55 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 		nodeName          = "hvc"
 		etcdImage         = "ghcr.io/takara9/etcd:3.6.5"
 		etcdContainerName = "etcd-volume"
+		osImage           = "ubuntu-22.04-server-cloudimg-amd64.img"
+		osImageURL        = "http://hmc/" + osImage
 	)
 	var (
 		containerID  string
 		ctx          context.Context
 		cancel       context.CancelFunc
 		marmotServer *marmotd.Server
+		osImageID    string
 	)
 	etcdUrl := "http://127.0.0.1:" + fmt.Sprintf("%d", etcdPort)
 
 	BeforeAll(func(ctx0 SpecContext) {
+		cmd := exec.Command("docker", "run", "-d", "-p", fmt.Sprintf("%d", etcdPort)+":2379", "-p", fmt.Sprintf("%d", etcdPort+1)+":2380", "--rm", etcdImage)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			Fail(fmt.Sprintf("Failed to start container: %s, %v", string(output), err))
+		}
+		containerID = string(output[:12]) // 最初の12文字をIDとして取得
+		fmt.Printf("Container started with ID: %s\n", containerID)
+		time.Sleep(10 * time.Second) // コンテナが起動するまで待機
+
+		By("marmotモックの起動")
+		GinkgoWriter.Println("Start marmot server mock")
+		ctx, cancel = context.WithCancel(context.Background())
+		marmotServer = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
 	})
 
 	AfterAll(func(ctx0 SpecContext) {
-		marmotd.CleanupTestEnvironment()
+		cmd := exec.Command("docker", "kill", containerID)
+		_, err := cmd.CombinedOutput()
+		if err != nil {
+			fmt.Printf("Failed to stop container: %v\n", err)
+		}
+		cancel() // モックサーバー停止
+
+		// /var/lib/marmot/images/9e24c/ubuntu-22.04-server-cloudimg-amd64.img のようなファイルを削除する
+		imagePath := "/var/lib/marmot/images/" + osImageID
+		err = os.RemoveAll(imagePath)
+		Expect(err).NotTo(HaveOccurred())
+
+		// OS論理ボリューム vg1/boot-9e24c のようなものができるはずなので、削除する
+		cmd = exec.Command("lvremove", "-y", "vg1/boot-"+osImageID)
+		err = cmd.Run()
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	Context("テスト環境初期化", func() {
-		It("モックサーバー用etcdの起動", func() {
-			cmd := exec.Command("docker", "run", "-d", "--name", etcdContainerName, "-p", fmt.Sprintf("%d", etcdPort)+":2379", "-p", fmt.Sprintf("%d", etcdPort+1)+":2380", "--rm", etcdImage)
-			output, err := cmd.CombinedOutput()
-			if err != nil {
-				Fail(fmt.Sprintf("Failed to start container: %s, %v", string(output), err))
-			}
-			containerID = string(output[:12]) // 最初の12文字をIDとして取得
-			fmt.Printf("Container started with ID: %s\n", containerID)
-			time.Sleep(10 * time.Second) // コンテナが起動するまで待機
-		})
-
-		It("モックサーバーの起動", func() {
-			GinkgoWriter.Println("Start marmot server mock")
-			ctx, cancel = context.WithCancel(context.Background())
-			marmotServer = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
-		})
-
 		It("起動完了待ちチェック", func() {
-			By("Trying to connect to marmot")
 			Eventually(func(g Gomega) {
 				cmd := exec.Command("curl", etcdUrl+"/ping")
 				err := cmd.Run()
@@ -78,23 +91,23 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 	})
 
 	Context("URLを指定してダウンロードしたイメージからVM起動イメージを作成する", func() {
-		var id string
 		It("URLを指定してイメージのIDを取得", func() {
 			var err error
 			GinkgoWriter.Println("URLを指定してイメージのIDを取得")
-			url := "http://hmc/ubuntu-22.04-server-cloudimg-amd64.img"
-			id, err = marmotServer.Ma.Db.MakeImageEntryFromURL("ubuntu22.04", url)
+			//url := "http://hmc/ubuntu-22.04-server-cloudimg-amd64.img"
+			osImageID, err = marmotServer.Ma.Db.MakeImageEntryFromURL("ubuntu22.04", osImageURL)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("取得したイメージID: ", id)
+			GinkgoWriter.Println("取得したイメージID: ", osImageID)
 		})
 
 		It("ダウンロードとセットアップ", func() {
-			image, err := marmotServer.Ma.CreateNewImageManage(id)
+			image, err := marmotServer.Ma.CreateNewImageManage(osImageID)
 			Expect(err).NotTo(HaveOccurred())
 			jsonBytes, err := json.MarshalIndent(image, "", "  ")
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("Created image: ", string(jsonBytes))
 		})
+
 	})
 
 	Context("LV OSボリューム生成から削除", func() {
@@ -626,22 +639,6 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 		It("Marmotインスタンスのクローズ", func() {
 			err := m.Close()
 			Expect(err).NotTo(HaveOccurred())
-		})
-	})
-
-	Context("コンテナとモックの停止", func() {
-		It("停止コマンド実行", func() {
-			cmd := exec.Command("docker", "kill", containerID)
-			_, err := cmd.CombinedOutput()
-			if err != nil {
-				fmt.Printf("Failed to stop container: %v\n", err)
-			}
-			cmd = exec.Command("docker", "rm", containerID)
-			_, err = cmd.CombinedOutput()
-			if err != nil {
-				fmt.Printf("Failed to remove container: %v\n", err)
-			}
-			cancel() // モックサーバー停止
 		})
 	})
 })
