@@ -17,20 +17,24 @@ import (
 
 var _ = Describe("ImageManagmentTest", Ordered, func() {
 	const (
-		marmotPort        = 8110
-		etcdPort          = 10379
-		etcdctlExe        = "/usr/bin/etcdctl"
-		nodeName          = "hvc"
-		etcdImage         = "ghcr.io/takara9/etcd:3.6.5"
-		etcdContainerName = "etcd-server-image"
+		marmotPort  = 8110
+		etcdPort    = 10379
+		etcdctlExe  = "/usr/bin/etcdctl"
+		nodeName    = "hvc"
+		etcdImage   = "ghcr.io/takara9/etcd:3.6.5"
+		osImage1    = "ubuntu-22.04-server-cloudimg-amd64.img"
+		osImage1URL = "http://hmc/" + osImage1
+		osImage2    = "ubuntu-24.04-server-cloudimg-amd64.img"
+		osImage2URL = "http://hmc/" + osImage2
 	)
 	var (
 		containerID  string
 		ctx          context.Context
 		cancel       context.CancelFunc
 		marmotServer *marmotd.Server
+		osImageid1   string
+		osImageid2   string
 	)
-	etcdUrl := "http://127.0.0.1:" + fmt.Sprintf("%d", etcdPort)
 	marmotEp := "localhost:" + fmt.Sprintf("%d", marmotPort)
 
 	BeforeAll(func(ctx0 SpecContext) {
@@ -40,83 +44,42 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 		}
 		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
 		slog.SetDefault(logger)
+
+		By("開始 etcd container")
+		cmd := exec.Command("docker", "run", "-d", "-p", fmt.Sprintf("%d", etcdPort)+":2379", "--rm", etcdImage)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			Fail(fmt.Sprintf("Failed to start container: %s, %v", string(output), err))
+		}
+		containerID = string(output[:12]) // 最初の12文字をIDとして取得
+		fmt.Printf("Container started with ID: %s\n", containerID)
+
+		By("モックサーバーの起動")
+		ctx, cancel = context.WithCancel(context.Background())
+		marmotServer = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
+
+		By("モックサーバーの起動チェック")
+		Eventually(func(g Gomega) {
+			cmd := exec.Command("curl", "http://"+marmotEp+"/ping")
+			err := cmd.Run()
+			GinkgoWriter.Println(cmd, "err= ", err)
+			g.Expect(err).NotTo(HaveOccurred())
+		}).Should(Succeed())
+
 	})
 
 	AfterAll(func(ctx0 SpecContext) {
 		GinkgoWriter.Println("Cleaning up test environment")
-		if cancel != nil {
-			cancel() // モックサーバーを停止するためにキャンセル関数を呼び出す
-		}
-		if containerID != "" {
-			cmd := exec.Command("docker", "stop", containerID)
-			output, err := cmd.CombinedOutput()
-			if err != nil {
-				GinkgoWriter.Printf("Failed to stop container: %s, %v\n", string(output), err)
-			} else {
-				GinkgoWriter.Printf("Container stopped: %s\n", containerID)
-			}
-		}
-		//marmotd.CleanupTestEnvironment()
+		By("mockサーバーの停止")
+		cancel() // モックサーバーを停止するためにキャンセル関数を呼び出す
+
+		By("etcdコンテナの停止")
+		cmd := exec.Command("docker", "kill", containerID)
+		err := cmd.Run()
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	Context("テスト環境初期化", func() {
-		//var hvs config.Hypervisors_yaml
-
-		It("モックサーバー用etcdの起動", func() {
-			cmd := exec.Command("docker", "run", "-d", "--name", etcdContainerName, "-p", fmt.Sprintf("%d", etcdPort)+":2379", "-p", fmt.Sprintf("%d", etcdPort+1)+":2380", "--rm", etcdImage)
-			output, err := cmd.CombinedOutput()
-			if err != nil {
-				Fail(fmt.Sprintf("Failed to start container: %s, %v", string(output), err))
-			}
-			containerID = string(output[:12]) // 最初の12文字をIDとして取得
-			fmt.Printf("Container started with ID: %s\n", containerID)
-		})
-
-		It("モックサーバーの起動", func() {
-			GinkgoWriter.Println("Start marmot server mock")
-			ctx, cancel = context.WithCancel(context.Background())
-			marmotServer = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
-		})
-
-		It("モックサーバー起動の確認", func() {
-			By("Trying to connect to marmot")
-			Eventually(func(g Gomega) {
-				cmd := exec.Command("curl", "http://"+marmotEp+"/ping")
-				err := cmd.Run()
-				GinkgoWriter.Println(cmd, "err= ", err)
-				g.Expect(err).NotTo(HaveOccurred())
-			}).Should(Succeed())
-		})
-
-		//It("ハイパーバイザーのコンフィグファイルの読み取り", func() {
-		//	err := config.ReadYAML("testdata/hypervisor-config-server.yaml", &hvs)
-		//	Expect(err).NotTo(HaveOccurred())
-		//})
-
-		//It("OSイメージテンプレート", func() {
-		//	for _, hd := range hvs.Imgs {
-		//		err := marmotServer.Ma.Db.SetImageTemplate(hd)
-		//		Expect(err).NotTo(HaveOccurred())
-		//	}
-		//})
-
-		//It("シーケンス番号のリセット", func() {
-		//	for _, sq := range hvs.Seq {
-		//		err := marmotServer.Ma.Db.CreateSeq(sq.Key, sq.Start, sq.Step)
-		//		Expect(err).NotTo(HaveOccurred())
-		//	}
-		//})
-
-		It("モックサーバー起動の確認", func() {
-			By("Trying to connect to marmot")
-			Eventually(func(g Gomega) {
-				cmd := exec.Command("curl", etcdUrl+"/ping")
-				err := cmd.Run()
-				GinkgoWriter.Println(cmd, "err= ", err)
-				g.Expect(err).NotTo(HaveOccurred())
-			}).Should(Succeed())
-		})
-
 		It("LVMの状態確認", func() {
 			out, err := exec.Command("lvs", "vg1").Output()
 			fmt.Println("lvs output:\n", string(out))
@@ -125,18 +88,16 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 	})
 
 	Context("URLを指定してダウンロードしたイメージからVM起動イメージを作成する", func() {
-		var id string
 		It("URLを指定してイメージのIDを取得", func() {
 			var err error
 			GinkgoWriter.Println("URLを指定してイメージのIDを取得")
-			url := "http://hmc/ubuntu-22.04-server-cloudimg-amd64.img"
-			id, err = marmotServer.Ma.Db.MakeImageEntryFromURL("ubuntu-22.04", url)
+			osImageid1, err = marmotServer.Ma.Db.MakeImageEntryFromURL("ubuntu-22.04", osImage1URL)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("取得したイメージID: ", id)
+			GinkgoWriter.Println("取得したイメージID: ", osImageid1)
 		})
 
 		It("ダウンロードとセットアップ", func() {
-			image, err := marmotServer.Ma.CreateNewImageManage(id)
+			image, err := marmotServer.Ma.CreateNewImageManage(osImageid1)
 			Expect(err).NotTo(HaveOccurred())
 			jsonBytes, err := json.MarshalIndent(image, "", "  ")
 			Expect(err).NotTo(HaveOccurred())
@@ -145,18 +106,16 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 	})
 
 	Context("URLを指定してダウンロードしたイメージからVM起動イメージを作成する", func() {
-		var id string
 		It("URLを指定してイメージのIDを取得", func() {
 			var err error
 			GinkgoWriter.Println("URLを指定してイメージのIDを取得")
-			url := "http://hmc/ubuntu-24.04-server-cloudimg-amd64.img"
-			id, err = marmotServer.Ma.Db.MakeImageEntryFromURL("ubuntu-24.04", url)
+			osImageid2, err = marmotServer.Ma.Db.MakeImageEntryFromURL("ubuntu-24.04", osImage2URL)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("取得したイメージID: ", id)
+			GinkgoWriter.Println("取得したイメージID: ", osImageid2)
 		})
 
 		It("ダウンロードとセットアップ", func() {
-			image, err := marmotServer.Ma.CreateNewImageManage(id)
+			image, err := marmotServer.Ma.CreateNewImageManage(osImageid2)
 			Expect(err).NotTo(HaveOccurred())
 			jsonBytes, err := json.MarshalIndent(image, "", "  ")
 			Expect(err).NotTo(HaveOccurred())
@@ -208,5 +167,4 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 			fmt.Println("Deleted image ID: ", (images)[1].Id)
 		})
 	})
-
 })

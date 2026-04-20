@@ -19,6 +19,14 @@ install:
 	rm -f /usr/local/bin/$(PROGRAM)
 	install -m 0755 $(PROGRAM) /usr/local/bin
 
+.PHONY:	set-version
+set-version:
+	sed s/MARMOT_VERSION/${TAG}/ cmd/version._ > cmd/version.go
+
+.PHONY:	download-image
+download-image:
+	mc cp myminio/os-image/ubuntu22.04.img testdata/ubuntu22.04.qcow2
+
 .PHONY: test
 test:
 	$(GO) test . -run TestMarmotd -v -race -count=1 -timeout 20m -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
@@ -31,30 +39,38 @@ test-volume:
 test-server:
 	$(GO) test -ginkgo.focus-file server_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
-.PHONY:	set-version
-set-version:
-	sed s/MARMOT_VERSION/${TAG}/ cmd/version._ > cmd/version.go
+.PHONY: test-vnet
+test-vnet:
+	$(GO) test -ginkgo.focus-file network_vnet_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
-.PHONY:	download-image
-download-image:
-	mc cp myminio/os-image/ubuntu22.04.img testdata/ubuntu22.04.qcow2
+.PHONY: test-ipnet
+test-ipnet:
+	$(GO) test -ginkgo.focus-file network_ipnet_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
-.PHONY: test-network
-test-network:
-	$(GO) test -ginkgo.focus="VirtualPrivateNetworks" -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+.PHONY: test-server-image
+test-server-image:
+	$(GO) test -ginkgo.focus-file server-image_test.go -timeout 60m -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
-.PHONY: test-network2
-test-network2:
-	$(GO) test -ginkgo.focus="VirtualPrivateNetworksUpperlayer" -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+.PHONY: test-osimage
+test-osimage:
+	$(GO) test -ginkgo.focus-file osimage_test.go -timeout 60m -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
-.PHONY: test-image
-test-image:
-	$(GO) test -ginkgo.focus="ImageManagmentTest" -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+.PHONY: test-cloud-init
+test-cloud-init:
+	$(GO) test -ginkgo.focus-file cloud-init_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
-.PHONY: test-image2
-test-image2:
-	$(GO) test -ginkgo.focus="ServerImageCopyingTest" -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+.PHONY: test-timeout
+test-timeout:
+	$(GO) test -ginkgo.focus-file image-timeout_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
-.PHONY: test-iso
-test-iso:
-	$(GO) test -ginkgo.focus="Cloud-InitISO作成テスト" -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+.PHONY: test-backing-store
+test-backing-store:
+	$(GO) test -ginkgo.focus-file image_backing_store_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+
+.PHONY: test-config
+test-config:
+	$(GO) test -ginkgo.focus-file marmotd-config_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+
+.PHONY: test-volume-backing-store
+test-volume-backing-store:
+	$(GO) test -ginkgo.focus-file volume_backing_store_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events

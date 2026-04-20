@@ -12,13 +12,13 @@ import (
 )
 
 var _ = Describe("Image", Ordered, func() {
-	var port int = 10379
+	var port int = 11379
 	var url string = "http://127.0.0.1:" + fmt.Sprintf("%d", port)
 	var containerID string
 
 	BeforeAll(func(ctx SpecContext) {
 		// Dockerコンテナを起動
-		cmd := exec.Command("docker", "run", "-d", "--name", "jobEtcdDb", "-p", fmt.Sprintf("%d:2379", port), "ghcr.io/takara9/etcd:3.6.5")
+		cmd := exec.Command("docker", "run", "-d", "--rm", "-p", fmt.Sprintf("%d:2379", port), "ghcr.io/takara9/etcd:3.6.5")
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to start container: %s, %v", string(output), err))
@@ -36,11 +36,6 @@ var _ = Describe("Image", Ordered, func() {
 		_, err := cmd.CombinedOutput()
 		if err != nil {
 			fmt.Printf("Failed to stop container: %v\n", err)
-		}
-		cmd = exec.Command("docker", "rm", containerID)
-		_, err = cmd.CombinedOutput()
-		if err != nil {
-			fmt.Printf("Failed to remove container: %v\n", err)
 		}
 	}, NodeTimeout(20*time.Second))
 

@@ -2,7 +2,6 @@
 
 echo "Ubuntu 24.04 (noble) のcloud imageをダウンロードしてカスタマイズする"
 QCOW2POOL="/var/lib/marmot/volumes"
-#IMAGE="ubuntu-22.04-server-cloudimg-amd64.img"
 IMAGE="ubuntu-24.04-server-cloudimg-amd64.img"
 IMAGE_TEMPLATE="ubuntu-24.04-template.qcow2"
 
@@ -14,20 +13,18 @@ else
 fi
 cd ${QCOW2POOL}
 
-echo "cloud imageをダウンロードする" 
-echo "環境変数 CI_ENVIRONMENT の値: ${CI_ENVIRONMENT}"
-if [ -z "${CI_ENVIRONMENT}" ]; then
-  echo "環境変数 CI_ENVIRONMENT は定義されていません。インターネットからcloud imageをダウンロードします。"
-  curl -OL https://cloud-images.ubuntu.com/releases/noble/release/${IMAGE}
-
-else
-  #IMAGE="ubuntu-22.04-server-cloudimg-amd64.img"
-  echo "環境変数 CI_ENVIRONMENT は定義されています。社内サーバーからcloud imageをダウンロードします。"
+echo "http://hmc/${IMAGE} にアクセスしてダウンロードの成否を確認する"
+curl -I http://hmc/${IMAGE} |tee  download.log
+if grep -q "200 OK" download.log; then
+  echo "ダウンロード可能: http://hmc/${IMAGE}"
   curl -OL http://hmc/${IMAGE}
+else
+  echo "ダウンロード不可: http://hmc/${IMAGE}。インターネットからcloud imageをダウンロードします。"
+  curl -OL https://cloud-images.ubuntu.com/releases/noble/release/${IMAGE}
 fi
+rm -f download.log
 
 echo "cloud imageのカスタマイズを行う"
-#qemu-img convert -f qcow2 -O qcow2 ${IMAGE} ${IMAGE_TEMPLATE}
 cp ${IMAGE} ${IMAGE_TEMPLATE}
 virt-customize -a ${IMAGE_TEMPLATE} \
   --root-password password:ubuntu \
@@ -70,14 +67,13 @@ qemu-img info ${IMAGE_TEMPLATE}
 
 
 echo "ｑcow2イメージを移動"
-#mv ${IMAGE_TEMPLATE} ${QCOW2POOL}/${IMAGE_TEMPLATE}
 chown libvirt-qemu:kvm ${QCOW2POOL}/${IMAGE_TEMPLATE}
 chmod 644 ${QCOW2POOL}/${IMAGE_TEMPLATE}
 
 
 
 echo "LVMボリュームを作成してcloud imageをコピーする"
-lvcreate -L 4G -n lvos_temp -y vg1
+lvcreate -L 16G -n lvos_temp -y vg1
 modprobe nbd max_part=8
 qemu-nbd --connect=/dev/nbd2 ${IMAGE}
 sleep 3

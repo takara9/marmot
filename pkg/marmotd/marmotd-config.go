@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/takara9/marmot/pkg/db"
 )
@@ -44,6 +45,21 @@ type MarmotdConfig struct {
 	// コントローラーが DeletionTimestamp を検知してから実際に削除処理を
 	// 開始するまでの待機秒数
 	DeletionDelaySeconds int `json:"deletion_delay_seconds"`
+
+	// 実行中 VM からイメージを作成する際の既定タイムアウト秒数
+	ImageCreateFromVMTimeoutSeconds int `json:"image_create_from_vm_timeout_seconds"`
+
+	// URL からイメージを作成する際の既定タイムアウト秒数
+	ImageCreateFromURLTimeoutSeconds int `json:"image_create_from_url_timeout_seconds"`
+
+	// URL からイメージをダウンロードする際のタイムアウト秒数
+	ImageDownloadTimeoutSeconds int `json:"image_download_timeout_seconds"`
+
+	// QCOW2 イメージ拡張処理のタイムアウト秒数
+	ImageResizeTimeoutSeconds int `json:"image_resize_timeout_seconds"`
+
+	// イメージ削除処理のタイムアウト秒数
+	ImageDeleteTimeoutSeconds int `json:"image_delete_timeout_seconds"`
 }
 
 var runtimeConfigState = struct {
@@ -57,14 +73,19 @@ var runtimeConfigState = struct {
 // 指定されていない場合に使用されるデフォルト値を返します。
 func defaultConfig() *MarmotdConfig {
 	return &MarmotdConfig{
-		NodeName:             "hv1",
-		EtcdURL:              "http://127.0.0.1:2379",
-		APIListenAddr:        "0.0.0.0:8750",
-		DNSListenAddr:        "127.0.0.1:53",
-		DNSUpstream:          "8.8.8.8:53",
-		OSVolumeGroup:        db.DefaultOSVolumeGroup,
-		DataVolumeGroup:      db.DefaultDataVolumeGroup,
-		DeletionDelaySeconds: 10,
+		NodeName:                         "hv1",
+		EtcdURL:                          "http://127.0.0.1:2379",
+		APIListenAddr:                    "0.0.0.0:8750",
+		DNSListenAddr:                    "127.0.0.1:53",
+		DNSUpstream:                      "8.8.8.8:53",
+		OSVolumeGroup:                    db.DefaultOSVolumeGroup,
+		DataVolumeGroup:                  db.DefaultDataVolumeGroup,
+		DeletionDelaySeconds:             10,
+		ImageCreateFromVMTimeoutSeconds:  600,
+		ImageCreateFromURLTimeoutSeconds: 1800,
+		ImageDownloadTimeoutSeconds:      1800,
+		ImageResizeTimeoutSeconds:        600,
+		ImageDeleteTimeoutSeconds:        120,
 	}
 }
 
@@ -104,7 +125,42 @@ func normalizeConfig(cfg *MarmotdConfig) *MarmotdConfig {
 	if normalized.DeletionDelaySeconds <= 0 {
 		normalized.DeletionDelaySeconds = defaults.DeletionDelaySeconds
 	}
+	if normalized.ImageCreateFromVMTimeoutSeconds <= 0 {
+		normalized.ImageCreateFromVMTimeoutSeconds = defaults.ImageCreateFromVMTimeoutSeconds
+	}
+	if normalized.ImageCreateFromURLTimeoutSeconds <= 0 {
+		normalized.ImageCreateFromURLTimeoutSeconds = defaults.ImageCreateFromURLTimeoutSeconds
+	}
+	if normalized.ImageDownloadTimeoutSeconds <= 0 {
+		normalized.ImageDownloadTimeoutSeconds = defaults.ImageDownloadTimeoutSeconds
+	}
+	if normalized.ImageResizeTimeoutSeconds <= 0 {
+		normalized.ImageResizeTimeoutSeconds = defaults.ImageResizeTimeoutSeconds
+	}
+	if normalized.ImageDeleteTimeoutSeconds <= 0 {
+		normalized.ImageDeleteTimeoutSeconds = defaults.ImageDeleteTimeoutSeconds
+	}
 	return normalized
+}
+
+func (c *MarmotdConfig) ImageCreateFromVMTimeout() time.Duration {
+	return time.Duration(c.ImageCreateFromVMTimeoutSeconds) * time.Second
+}
+
+func (c *MarmotdConfig) ImageCreateFromURLTimeout() time.Duration {
+	return time.Duration(c.ImageCreateFromURLTimeoutSeconds) * time.Second
+}
+
+func (c *MarmotdConfig) ImageDownloadTimeout() time.Duration {
+	return time.Duration(c.ImageDownloadTimeoutSeconds) * time.Second
+}
+
+func (c *MarmotdConfig) ImageResizeTimeout() time.Duration {
+	return time.Duration(c.ImageResizeTimeoutSeconds) * time.Second
+}
+
+func (c *MarmotdConfig) ImageDeleteTimeout() time.Duration {
+	return time.Duration(c.ImageDeleteTimeoutSeconds) * time.Second
 }
 
 func SetRuntimeConfig(cfg *MarmotdConfig) {

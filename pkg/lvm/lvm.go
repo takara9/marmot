@@ -1,6 +1,7 @@
 package lvm
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os/exec"
@@ -98,6 +99,11 @@ func CheckVG(vgx string) (uint64, uint64, error) {
 
 // 同じサイズの論理ボリュームを作成して、ddでコピーする
 func CopyLogicalVoulume(sourceVg, sourceLv, destVg, destLv string, sizeInByte uint64) error {
+	return CopyLogicalVoulumeWithContext(context.Background(), sourceVg, sourceLv, destVg, destLv, sizeInByte)
+}
+
+// 同じサイズの論理ボリュームを作成して、ddでコピーする
+func CopyLogicalVoulumeWithContext(ctx context.Context, sourceVg, sourceLv, destVg, destLv string, sizeInByte uint64) error {
 	slog.Debug("CopyLogicalVoulume() called", "sourceVg", sourceVg, "sourceLv", sourceLv, "destVg", destVg, "destLv", destLv)
 	tlvm.Verbose = false
 
@@ -108,9 +114,9 @@ func CopyLogicalVoulume(sourceVg, sourceLv, destVg, destLv string, sizeInByte ui
 	}
 
 	// ddコマンドでコピー
-	cmd := fmt.Sprintf("dd if=/dev/%s/%s of=/dev/%s/%s bs=64K", sourceVg, sourceLv, destVg, destLv)
+	cmd := fmt.Sprintf("dd if=/dev/%s/%s of=/dev/%s/%s bs=1M", sourceVg, sourceLv, destVg, destLv)
 	slog.Debug("Executing command", "cmd", cmd)
-	output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+	output, err := exec.CommandContext(ctx, "sh", "-c", cmd).CombinedOutput()
 	if err != nil {
 		slog.Error("Failed to execute dd command", "err", err, "output", string(output))
 		return err
