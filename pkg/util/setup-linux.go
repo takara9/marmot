@@ -1,9 +1,13 @@
 package util
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/crc32"
 	"log"
 	"log/slog"
 	"net/netip"
@@ -41,11 +45,21 @@ func SetupLinux(spec api.Server) error {
 		return err
 	}
 
-	// ホストIDの設定
-	hostidFile := filepath.Join(mountPoint, "etc/machine-id")
-	err = os.WriteFile(hostidFile, []byte(spec.Id), 0644)
+	machineID := machineIDForServer(spec)
+
+	// machine-id は systemd 系の一意識別子として利用する
+	machineIDFile := filepath.Join(mountPoint, "etc/machine-id")
+	err = os.WriteFile(machineIDFile, []byte(machineID), 0644)
 	if err != nil {
 		slog.Error("WriteFile /etc/machine-id failed", "error", err)
+		return err
+	}
+
+	// hostid コマンドは /etc/hostid の 4 バイト値を参照する
+	hostidFile := filepath.Join(mountPoint, "etc/hostid")
+	err = os.WriteFile(hostidFile, hostIDBytes(machineID), 0644)
+	if err != nil {
+		slog.Error("WriteFile /etc/hostid failed", "error", err)
 		return err
 	}
 
@@ -66,6 +80,39 @@ func SetupLinux(spec api.Server) error {
 	}
 
 	return nil
+}
+
+func machineIDForServer(spec api.Server) string {
+	if spec.Metadata != nil && spec.Metadata.Uuid != nil {
+		normalized := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(*spec.Metadata.Uuid), "-", ""))
+		if len(normalized) == 32 {
+			if _, err := hex.DecodeString(normalized); err == nil {
+				return normalized
+			}
+		}
+	}
+
+	seed := strings.TrimSpace(spec.Id)
+	if seed == "" && spec.Metadata != nil && spec.Metadata.Name != nil {
+		seed = strings.TrimSpace(*spec.Metadata.Name)
+	}
+	if seed == "" {
+		seed = "marmot"
+	}
+
+	sum := sha256.Sum256([]byte(seed))
+	return hex.EncodeToString(sum[:16])
+}
+
+func hostIDBytes(machineID string) []byte {
+	hostID := crc32.ChecksumIEEE([]byte(machineID))
+	if hostID == 0 {
+		hostID = 1
+	}
+
+	buf := make([]byte, 4)
+	binary.LittleEndian.PutUint32(buf, hostID)
+	return buf
 }
 
 // LVをマウントポイントへマウント

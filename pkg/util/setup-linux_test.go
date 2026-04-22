@@ -1,10 +1,13 @@
 package util_test
 
 import (
+	"encoding/binary"
 	"fmt"
+	"hash/crc32"
 	"log/slog"
 	"os"
 	"os/exec"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -12,7 +15,21 @@ import (
 	"github.com/takara9/marmot/pkg/util"
 )
 
-var _ = Describe("Linux セットアップ", Ordered, func() {
+func expectedMachineID(uuid string) string {
+	return strings.ToLower(strings.ReplaceAll(uuid, "-", ""))
+}
+
+func expectedHostID(machineID string) []byte {
+	hostID := crc32.ChecksumIEEE([]byte(machineID))
+	if hostID == 0 {
+		hostID = 1
+	}
+	buf := make([]byte, 4)
+	binary.LittleEndian.PutUint32(buf, hostID)
+	return buf
+}
+
+var _ = Describe("Linux セットアップ", Ordered, Label("integration", "requires-root"), func() {
 
 	BeforeAll(func(ctx0 SpecContext) {
 		opts := &slog.HandlerOptions{
@@ -55,6 +72,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 			Id: "a123456",
 			Metadata: &api.Metadata{
 				Name: util.StringPtr("test-linux"),
+				Uuid: util.StringPtr("550e8400-e29b-41d4-a716-446655440000"),
 			},
 			Spec: &api.ServerSpec{
 				BootVolume: &api.Volume{
@@ -89,7 +107,13 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 		It("Linux hostid設定のチェック", func() {
 			data, err := os.ReadFile(mountPoint + "/etc/machine-id")
 			Expect(err).To(BeNil())
-			Expect(string(data)).To(Equal(testSpec.Id))
+			Expect(string(data)).To(Equal(expectedMachineID(*testSpec.Metadata.Uuid)))
+		})
+
+		It("Linux /etc/hostid設定のチェック", func() {
+			data, err := os.ReadFile(mountPoint + "/etc/hostid")
+			Expect(err).To(BeNil())
+			Expect(data).To(Equal(expectedHostID(expectedMachineID(*testSpec.Metadata.Uuid))))
 		})
 
 		It("Netplan設定のチェック", func() {
@@ -110,6 +134,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 			Id: "b123456",
 			Metadata: &api.Metadata{
 				Name: util.StringPtr("test-linux-lvm"),
+				Uuid: util.StringPtr("550e8400-e29b-41d4-a716-446655440001"),
 			},
 			Spec: &api.ServerSpec{
 				BootVolume: &api.Volume{
@@ -146,7 +171,13 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 		It("Linux hostid設定のチェック", func() {
 			data, err := os.ReadFile(mountPoint + "/etc/machine-id")
 			Expect(err).To(BeNil())
-			Expect(string(data)).To(Equal(testSpec.Id))
+			Expect(string(data)).To(Equal(expectedMachineID(*testSpec.Metadata.Uuid)))
+		})
+
+		It("Linux /etc/hostid設定のチェック", func() {
+			data, err := os.ReadFile(mountPoint + "/etc/hostid")
+			Expect(err).To(BeNil())
+			Expect(data).To(Equal(expectedHostID(expectedMachineID(*testSpec.Metadata.Uuid))))
 		})
 
 		It("Netplan設定のチェック", func() {
@@ -167,6 +198,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 			Id: "c123456",
 			Metadata: &api.Metadata{
 				Name: util.StringPtr("test-linux-mh"),
+				Uuid: util.StringPtr("550e8400-e29b-41d4-a716-446655440002"),
 			},
 			Spec: &api.ServerSpec{
 				BootVolume: &api.Volume{
@@ -211,7 +243,13 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 		It("Linux hostid設定のチェック", func() {
 			data, err := os.ReadFile(mountPoint + "/etc/machine-id")
 			Expect(err).To(BeNil())
-			Expect(string(data)).To(Equal(testSpec.Id))
+			Expect(string(data)).To(Equal(expectedMachineID(*testSpec.Metadata.Uuid)))
+		})
+
+		It("Linux /etc/hostid設定のチェック", func() {
+			data, err := os.ReadFile(mountPoint + "/etc/hostid")
+			Expect(err).To(BeNil())
+			Expect(data).To(Equal(expectedHostID(expectedMachineID(*testSpec.Metadata.Uuid))))
 		})
 
 		It("Netplan設定のチェック", func() {
@@ -232,6 +270,7 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 			Id: "d123456",
 			Metadata: &api.Metadata{
 				Name: util.StringPtr("test-linux-mh"),
+				Uuid: util.StringPtr("550e8400-e29b-41d4-a716-446655440003"),
 			},
 			Spec: &api.ServerSpec{
 				BootVolume: &api.Volume{
@@ -328,7 +367,13 @@ var _ = Describe("Linux セットアップ", Ordered, func() {
 		It("Linux hostid設定のチェック", func() {
 			data, err := os.ReadFile(mountPoint + "/etc/machine-id")
 			Expect(err).To(BeNil())
-			Expect(string(data)).To(Equal(testSpec.Id))
+			Expect(string(data)).To(Equal(expectedMachineID(*testSpec.Metadata.Uuid)))
+		})
+
+		It("Linux /etc/hostid設定のチェック", func() {
+			data, err := os.ReadFile(mountPoint + "/etc/hostid")
+			Expect(err).To(BeNil())
+			Expect(data).To(Equal(expectedHostID(expectedMachineID(*testSpec.Metadata.Uuid))))
 		})
 
 		It("Netplan設定のチェック", func() {
