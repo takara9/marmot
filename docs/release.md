@@ -29,3 +29,15 @@ $ make clean
 
 
 参考: https://cli.github.com/manual/gh_release_create
+
+## リリースノート記載例
+
+Issue #285 向けの記載例
+
+```
+- fix(server): VM作成時にguest identityを一意化
+	- /etc/machine-id をMetadata.Uuid優先で生成
+	- /etc/hostid をmachine-id由来の4バイト値で生成
+	- 同一テンプレートから作成した複数VMで hostid が重複しないように改善
+	- 関連テスト: pkg/util/setup-linux_identity_test.go, pkg/util/setup-linux_test.go
+```

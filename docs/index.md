@@ -28,6 +28,7 @@ systemctl status etcd
 
 - [ネットワークの設定方法](network-setup.md)
 - [データベースの初期化方法](hv-admin/README.md)
+- [VMのmachine-idとhostidの生成規則](MEMO-hostid-generation.md)
 
 marmotのインストール
 

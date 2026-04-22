@@ -59,6 +59,19 @@ jobs:
         make test
         cd ../..
 
+  package-util-unit:
+    runs-on: [ self-hosted, any ]
+    needs:
+      - moodule-tests
+    if: always()
+    steps:
+    - uses: actions/checkout@v5
+    - name: ユーティリティ パッケージ unitテスト（integration除外）
+      run: |
+        cd pkg/util
+        make test-unit
+        cd ../..
+
   packages-run-as-root:
     runs-on: [ self-hosted, any ]
     needs: 
@@ -77,7 +90,7 @@ jobs:
     - name: ユーティリティ パッケージ 
       run: | 
         cd pkg/util
-        sudo -s make test
+        sudo -s make test-integration
         cd ../..
 
   package-virsh:
@@ -292,6 +305,7 @@ jobs:
     runs-on: [ self-hosted, any ]
     needs: 
       - packages-run-as-nonroot
+      - package-util-unit
       - packages-run-as-root
       - package-virsh
       - package-marmotd-volume
