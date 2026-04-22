@@ -111,6 +111,9 @@ jobs:
         cd pkg/virt
         sudo -s make test
         cd ../..
+    - name: 仮想ネットワーク削除
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
 
   package-marmotd-volume:
     runs-on: [ self-hosted, any ]
@@ -140,6 +143,9 @@ jobs:
         cd pkg/marmotd
         sudo -s make test-server
         cd ../..
+    - name: 仮想ネットワーク削除
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
 
   package-marmotd-etc:
     runs-on: [ self-hosted, any ]
@@ -148,6 +154,9 @@ jobs:
     if: always()
     steps:
     - uses: actions/checkout@v5
+    - name: 仮想ネットワーク削除
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
     - name: Test pkg/marmotd ネットワーク機能テスト
       run: |
         cd pkg/marmotd
@@ -159,6 +168,9 @@ jobs:
         sudo -s make test-config
         sudo -s make test-volume-backing-store 
         cd ../..
+    - name: 仮想ネットワーク削除
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
 
   package-marmotd-images:
     runs-on: [ self-hosted, any ]
@@ -175,6 +187,9 @@ jobs:
         cd pkg/marmotd
         sudo -s make test-server-image
         cd ../..
+    - name: 仮想ネットワーク削除
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
  
   package-marmotd-osimage:
     runs-on: [ self-hosted, any ]
@@ -217,15 +232,18 @@ jobs:
     steps:
     - uses: actions/checkout@v5
     - name: 仮想ネットワーク作成
-      run: | 
+      run: |
         sudo -E env "PATH=$PATH" ./tools/setup-libvirt-networks.sh
     - name: mactlコマンドのテスト その１
-      run: | 
+      run: |
         cd cmd/mactl
         make mactl-test
         sudo -E env "PATH=$PATH" make test0
         cd ../..
         sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+    - name: 仮想ネットワーク削除
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
 
   mactl-vm-deploy-1:
     runs-on: [ self-hosted, any ]
@@ -235,15 +253,18 @@ jobs:
     steps:
     - uses: actions/checkout@v5
     - name: 仮想ネットワーク作成
-      run: | 
+      run: |
         sudo -E env "PATH=$PATH" ./tools/setup-libvirt-networks.sh
     - name: mactlコマンドのテスト その１
-      run: | 
+      run: |
         cd cmd/mactl
         make mactl-test
         sudo -E env "PATH=$PATH" make test1
         cd ../..
         sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+    - name: 仮想ネットワーク削除
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
 
   mactl-vm-deploy-2:
     runs-on: [ self-hosted, any ]
@@ -252,16 +273,19 @@ jobs:
     if: always()
     steps:
     - uses: actions/checkout@v5
-    - name: 仮想ネットワーク作成
-      run: | 
+    - name: 仮想ネットワーク削除
+      run: |
         sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
     - name: mactlコマンドのテスト その２
-      run: | 
+      run: |
         cd cmd/mactl
         make mactl-test
         sudo -E env "PATH=$PATH" make test2
         cd ../..
         sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+    - name: 仮想ネットワーク削除
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
 
   mactl-vm-deploy-3:
     runs-on: [ self-hosted, any ]
@@ -270,7 +294,7 @@ jobs:
     if: always()
     steps:
     - uses: actions/checkout@v5
-    - name: 仮想ネットワーク作成
+    - name: 仮想ネットワーク削除
       run: | 
         sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
     - name: mactlコマンドのテスト その３
@@ -280,6 +304,9 @@ jobs:
         sudo -E env "PATH=$PATH" make test3
         cd ../..
         sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+    - name: 仮想ネットワーク削除
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
 
 
     #- name: Test cmd/maadm
