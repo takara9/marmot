@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -102,6 +103,14 @@ var serverCreateCmd = &cobra.Command{
 				}
 				if nic.Netmasklen != nil {
 					n.Netmasklen = util.IntPtrInt(*nic.Netmasklen)
+				} else if nic.Netmask != nil {
+					// netmask が数値文字列（CIDRプレフィックス長）の場合、Netmasklen に変換する
+					// 有効範囲: IPv4は0-32、IPv6は0-128
+					if maskLen, err := strconv.Atoi(*nic.Netmask); err == nil && maskLen >= 0 && maskLen <= 128 {
+						n.Netmasklen = util.IntPtrInt(maskLen)
+					} else {
+						fmt.Fprintf(os.Stderr, "Warning: invalid netmask value %q, skipping conversion\n", *nic.Netmask)
+					}
 				}
 
 				// 設定があればルート設定

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -133,10 +134,18 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			if reqNic.Address != nil {
 				// リクエストにIPアドレスが指定されている場合は、そのIPアドレスを使用する
 				ipaddr = *reqNic.Address
-				// netmask に　ビット長が入っているため、以下がバグになる。
 
 				if reqNic.Netmasklen != nil {
 					bitmask = *reqNic.Netmasklen
+				} else if reqNic.Netmask != nil {
+					// netmask が数値文字列（CIDRプレフィックス長）の場合、Netmasklen として使用する
+					// 有効範囲: IPv4は0-32、IPv6は0-128
+					if maskLen, err := strconv.Atoi(*reqNic.Netmask); err == nil && maskLen >= 0 && maskLen <= 128 {
+						bitmask = maskLen
+					} else {
+						slog.Debug("Invalid or missing netmask format, using default 24", "netmask", *reqNic.Netmask)
+						bitmask = 24 // デフォルトのビットマスク長
+					}
 				} else {
 					slog.Debug("Netmask length is not specified, using default 24")
 					bitmask = 24 // デフォルトのビットマスク長
