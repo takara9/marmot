@@ -105,8 +105,11 @@ var serverCreateCmd = &cobra.Command{
 					n.Netmasklen = util.IntPtrInt(*nic.Netmasklen)
 				} else if nic.Netmask != nil {
 					// netmask が数値文字列（CIDRプレフィックス長）の場合、Netmasklen に変換する
-					if maskLen, err := strconv.Atoi(*nic.Netmask); err == nil {
+					// 有効範囲: IPv4は0-32、IPv6は0-128
+					if maskLen, err := strconv.Atoi(*nic.Netmask); err == nil && maskLen >= 0 && maskLen <= 128 {
 						n.Netmasklen = util.IntPtrInt(maskLen)
+					} else {
+						fmt.Fprintf(os.Stderr, "Warning: invalid netmask value %q, skipping conversion\n", *nic.Netmask)
 					}
 				}
 
