@@ -132,6 +132,9 @@ jobs:
     if: always()
     steps:
     - uses: actions/checkout@v5
+    - name: 仮想ネットワーク作成
+      run: | 
+        sudo -E env "PATH=$PATH" ./tools/setup-libvirt-networks.sh
     - name: Test pkg/marmotd サーバー機能テスト
       run: |
         cd pkg/marmotd
