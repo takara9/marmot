@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -102,6 +103,11 @@ var serverCreateCmd = &cobra.Command{
 				}
 				if nic.Netmasklen != nil {
 					n.Netmasklen = util.IntPtrInt(*nic.Netmasklen)
+				} else if nic.Netmask != nil {
+					// netmask が数値文字列（CIDRプレフィックス長）の場合、Netmasklen に変換する
+					if maskLen, err := strconv.Atoi(*nic.Netmask); err == nil {
+						n.Netmasklen = util.IntPtrInt(maskLen)
+					}
 				}
 
 				// 設定があればルート設定
