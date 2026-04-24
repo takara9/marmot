@@ -317,6 +317,12 @@ type ServerInterface interface {
 	// Update Server Information by Id
 	// (PUT /server/{id})
 	ApiUpdateServerById(ctx echo.Context, id string) error
+	// Stop Server by Id
+	// (POST /server/{id}/stop)
+	ApiStopServerById(ctx echo.Context, id string) error
+	// Start Server by Id
+	// (POST /server/{id}/start)
+	ApiStartServerById(ctx echo.Context, id string) error
 	// Get Version
 	// (GET /version)
 	ApiGetVersion(ctx echo.Context) error
@@ -606,6 +612,38 @@ func (w *ServerInterfaceWrapper) ApiUpdateServerById(ctx echo.Context) error {
 	return err
 }
 
+// ApiStopServerById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiStopServerById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiStopServerById(ctx, id)
+	return err
+}
+
+// ApiStartServerById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiStartServerById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiStartServerById(ctx, id)
+	return err
+}
+
 // ApiGetVersion converts echo context to params.
 func (w *ServerInterfaceWrapper) ApiGetVersion(ctx echo.Context) error {
 	var err error
@@ -729,6 +767,8 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.GET(baseURL+"/server/:id", wrapper.ApiGetServerById)
 	router.POST(baseURL+"/server/:id", wrapper.ApiMakeImageEntryFromRunningVMById)
 	router.PUT(baseURL+"/server/:id", wrapper.ApiUpdateServerById)
+	router.POST(baseURL+"/server/:id/stop", wrapper.ApiStopServerById)
+	router.POST(baseURL+"/server/:id/start", wrapper.ApiStartServerById)
 	router.GET(baseURL+"/version", wrapper.ApiGetVersion)
 	router.GET(baseURL+"/volume", wrapper.ApiListVolumes)
 	router.POST(baseURL+"/volume", wrapper.ApiCreateVolume)

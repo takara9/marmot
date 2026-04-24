@@ -573,6 +573,78 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	return id, nil
 }
 
+// サーバーの停止 コントローラーから呼び出される
+func (m *Marmot) StopServerManage(id string) error {
+	slog.Debug("===StopServerManage() is called===", "id", id)
+	sv, err := m.Db.GetServerById(id)
+	if err != nil {
+		slog.Error("GetServerById()", "err", err)
+		return err
+	}
+
+	if sv.Metadata.InstanceName == nil {
+		return fmt.Errorf("server %s has no instance name, cannot stop", id)
+	}
+
+	l, err := virt.NewLibVirtEp("qemu:///system")
+	if err != nil {
+		slog.Error("NewLibVirtEp()", "err", err)
+		return err
+	}
+	defer l.Close()
+
+	if err = l.StopDomain(*sv.Metadata.InstanceName); err != nil {
+		slog.Error("StopDomain()", "err", err)
+		return err
+	}
+
+	sv.Status.StatusCode = db.SERVER_STOPPED
+	sv.Status.Status = util.StringPtr(db.ServerStatus[sv.Status.StatusCode])
+	sv.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+	if err = m.Db.UpdateServer(sv.Id, sv); err != nil {
+		slog.Error("UpdateServer()", "err", err)
+		return err
+	}
+
+	return nil
+}
+
+// サーバーの起動 コントローラーから呼び出される
+func (m *Marmot) StartServerManage(id string) error {
+	slog.Debug("===StartServerManage() is called===", "id", id)
+	sv, err := m.Db.GetServerById(id)
+	if err != nil {
+		slog.Error("GetServerById()", "err", err)
+		return err
+	}
+
+	if sv.Metadata.InstanceName == nil {
+		return fmt.Errorf("server %s has no instance name, cannot start", id)
+	}
+
+	l, err := virt.NewLibVirtEp("qemu:///system")
+	if err != nil {
+		slog.Error("NewLibVirtEp()", "err", err)
+		return err
+	}
+	defer l.Close()
+
+	if err = l.StartDomain(*sv.Metadata.InstanceName); err != nil {
+		slog.Error("StartDomain()", "err", err)
+		return err
+	}
+
+	sv.Status.StatusCode = db.SERVER_RUNNING
+	sv.Status.Status = util.StringPtr(db.ServerStatus[sv.Status.StatusCode])
+	sv.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+	if err = m.Db.UpdateServer(sv.Id, sv); err != nil {
+		slog.Error("UpdateServer()", "err", err)
+		return err
+	}
+
+	return nil
+}
+
 // サーバーの削除 コントローラーから呼び出される
 func (m *Marmot) DeleteServerByIdManage(id string) error {
 	slog.Debug("===DeleteServerById is called===", "id", id)

@@ -298,6 +298,58 @@ paths:
               application/json:
                 schema:
                   $ref: "#/components/schemas/Error"
+  /server/{id}/stop:
+      post:
+        summary: "Stop Server by Id"
+        operationId: apiStopServerById
+        tags:
+          - server
+        parameters:
+          - name: id
+            in: path
+            required: true
+            description: The id of the server to stop
+            schema:
+              type: string
+        responses:
+          "200":
+            description: Accepted the request to stop the server
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Success"
+          default:
+            description: unexpected error
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Error"
+  /server/{id}/start:
+      post:
+        summary: "Start Server by Id"
+        operationId: apiStartServerById
+        tags:
+          - server
+        parameters:
+          - name: id
+            in: path
+            required: true
+            description: The id of the server to start
+            schema:
+              type: string
+        responses:
+          "200":
+            description: Accepted the request to start the server
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Success"
+          default:
+            description: unexpected error
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Error"
   /network:
     post:
       summary: "Create Virtual Network"

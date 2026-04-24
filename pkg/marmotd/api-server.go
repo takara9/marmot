@@ -99,6 +99,36 @@ func (s *Server) ApiUpdateServerById(ctx echo.Context, id string) error {
 	return ctx.JSON(http.StatusOK, resp)
 }
 
+// サーバーの停止
+func (s *Server) ApiStopServerById(ctx echo.Context, id string) error {
+	slog.Debug("===ApiStopServerById() is called ===", "id", id)
+
+	if err := s.Ma.StopServerManage(id); err != nil {
+		slog.Error("StopServerManage()", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	var resp api.Success
+	resp.Id = id
+	resp.Message = util.StringPtr("Server stopped successfully")
+	return ctx.JSON(http.StatusOK, resp)
+}
+
+// サーバーの起動
+func (s *Server) ApiStartServerById(ctx echo.Context, id string) error {
+	slog.Debug("===ApiStartServerById() is called ===", "id", id)
+
+	if err := s.Ma.StartServerManage(id); err != nil {
+		slog.Error("StartServerManage()", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	var resp api.Success
+	resp.Id = id
+	resp.Message = util.StringPtr("Server started successfully")
+	return ctx.JSON(http.StatusOK, resp)
+}
+
 // サーバーからイメージを作成
 func (s *Server) ApiMakeImageEntryFromRunningVMById(ctx echo.Context, serverId string) error {
 	slog.Debug("=== ApiMakeImageEntryFromRunningVMById() is called ===", "id", serverId)
