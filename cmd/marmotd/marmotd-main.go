@@ -112,6 +112,13 @@ func main() {
 		return
 	}
 
+	// ホストコントローラーの開始
+	_, err = controller.StartHostController(cfg.NodeName, cfg.EtcdURL)
+	if err != nil {
+		slog.Error("Failed to start host controller", "err", err)
+		return
+	}
+
 	//startDispatcher()
 	// And we serve HTTP until the world ends.
 	slog.Info("Starting API server", "addr", cfg.APIListenAddr)

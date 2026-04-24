@@ -20,6 +20,34 @@ type Auth struct {
 	User         *string `json:"user,omitempty"`
 }
 
+// HostAllocation defines model for HostAllocation.
+type HostAllocation struct {
+	AllocatedCpuCores *int `json:"allocatedCpuCores,omitempty"`
+	AllocatedMemoryMB *int `json:"allocatedMemoryMB,omitempty"`
+	RunningVMs        *int `json:"runningVMs,omitempty"`
+	StoppedVMs        *int `json:"stoppedVMs,omitempty"`
+	TotalVMs          *int `json:"totalVMs,omitempty"`
+	VirtualNetworks   *int `json:"virtualNetworks,omitempty"`
+}
+
+// HostCapacity defines model for HostCapacity.
+type HostCapacity struct {
+	CpuCores          *int      `json:"cpuCores,omitempty"`
+	DiskCapacityGB    *int      `json:"diskCapacityGB,omitempty"`
+	DiskCount         *int      `json:"diskCount,omitempty"`
+	MemoryMB          *int      `json:"memoryMB,omitempty"`
+	NetworkInterfaces *[]string `json:"networkInterfaces,omitempty"`
+}
+
+// HostStatus defines model for HostStatus.
+type HostStatus struct {
+	Allocation  *HostAllocation `json:"Allocation,omitempty"`
+	Capacity    *HostCapacity   `json:"Capacity,omitempty"`
+	IpAddress   *string         `json:"ipAddress,omitempty"`
+	LastUpdated *time.Time      `json:"lastUpdated,omitempty"`
+	NodeName    *string         `json:"nodeName,omitempty"`
+}
+
 // Error defines model for Error.
 type Error struct {
 	Code    int32  `json:"code"`
@@ -326,6 +354,9 @@ type ServerInterface interface {
 	// Get Version
 	// (GET /version)
 	ApiGetVersion(ctx echo.Context) error
+	// Get Marmot Host Status
+	// (GET /marmot/status)
+	ApiGetMarmotStatus(ctx echo.Context) error
 	// List Volumes
 	// (GET /volume)
 	ApiListVolumes(ctx echo.Context) error
@@ -653,6 +684,15 @@ func (w *ServerInterfaceWrapper) ApiGetVersion(ctx echo.Context) error {
 	return err
 }
 
+// ApiGetMarmotStatus converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiGetMarmotStatus(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiGetMarmotStatus(ctx)
+	return err
+}
+
 // ApiListVolumes converts echo context to params.
 func (w *ServerInterfaceWrapper) ApiListVolumes(ctx echo.Context) error {
 	var err error
@@ -775,5 +815,6 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.DELETE(baseURL+"/volume/:volumeId", wrapper.ApiDeleteVolumeById)
 	router.GET(baseURL+"/volume/:volumeId", wrapper.ApiShowVolumeById)
 	router.PUT(baseURL+"/volume/:volumeId", wrapper.ApiUpdateVolumeById)
+	router.GET(baseURL+"/marmot/status", wrapper.ApiGetMarmotStatus)
 
 }
