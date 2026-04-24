@@ -12,7 +12,8 @@ const (
 )
 
 type hostController struct {
-	marmot *marmotd.Marmot
+	marmot   *marmotd.Marmot
+	stopChan chan struct{}
 }
 
 // ホストコントローラーの開始
@@ -20,6 +21,7 @@ func StartHostController(node string, etcdUrl string) (*hostController, error) {
 	var c hostController
 	var err error
 
+	c.stopChan = make(chan struct{})
 	c.marmot, err = marmotd.NewMarmot(node, etcdUrl)
 	if err != nil {
 		slog.Error("Failed to create marmot instance for host controller", "err", err)
@@ -35,14 +37,23 @@ func StartHostController(node string, etcdUrl string) (*hostController, error) {
 	// 定期実行の開始（10秒間隔）
 	ticker := time.NewTicker(HOST_CONTROLLER_INTERVAL)
 	go func() {
+		defer ticker.Stop()
 		for {
 			select {
 			case <-ticker.C:
 				c.hostControllerLoop()
+			case <-c.stopChan:
+				slog.Info("ホストコントローラー停止")
+				return
 			}
 		}
 	}()
 	return &c, nil
+}
+
+// ホストコントローラーの停止
+func (c *hostController) Stop() {
+	close(c.stopChan)
 }
 
 // ホストコントローラーの制御ループ
