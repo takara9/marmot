@@ -44,51 +44,30 @@ marmotd が稼働する仮想マシンのホストをクラスタ化して、仮
 オブジェクトの重複を避ける機能が必要では？
 
 
+最初は、etcdを共有する。そして、可用性を求められると、etcdは独立したetcdクラスタとして独立させ、可用性を高める。
 
 
-```mermaid
-C4Context
-    title システムコンテキスト図
-    
-    Person(customer, "顧客", "システムを利用するエンドユーザー")
-    System(system, "予約システム", "顧客が予約を管理できるシステム")
-    System_Ext(payment, "決済システム", "支払い処理を行う外部システム")
-    
-    Rel(customer, system, "予約の作成と管理")
-    Rel(system, payment, "支払い処理の依頼")
-    Rel(payment, system, "支払い結果の通知")
-```
+初期構成図
 
 ```mermaid
 architecture-beta
-    group api(cloud)[API Layer]
-    group app(server)[Application Layer]
-    group data(database)[Data Layer]
-    
-    service web(internet)[Web Client] 
-    service gateway(cloud)[API Gateway] in api
-    service auth(server)[Auth Service] in app
-    service order(server)[Order Service] in app
-    service db(database)[Database] in data
-    service cache(disk)[Cache] in data
-    
-    web:R --> L:gateway
-    gateway:B --> T:auth
-    gateway:B --> T:order
-    auth:B --> T:db
-    order:B --> T:db
-    order:R --> L:cache
+    service mactl(internet)[mactl] 
+
+    group api1(server)[Marmotd1]
+    group api2(server)[Marmotd2]
+
+    service marmotd1(server)[marmotd1] in api1
+    service marmotd2(server)[marmotd2] in api2
+    service etcd(database)[Etcd] in api1
+
+    junction x0
+    junction x1
+
+    mactl:B --> T:marmotd1
+    marmotd1:B --> T:etcd
+    marmotd2:B -- T:x1
+    x1:L --> L:etcd
 ```
 
+ノード数が増えて、etcdに可用性が求められると、etcdをクラスタ化して、各marmotd からはetcdのクラスタをアクセスする。
 
-```mermaid
-flowchart TB;
-A[出発する] --> B[買出しを完了させる];
-B --> C[目的地に向かう];
-C -- 晴れている --> D{屋外で BBQ};
-C -- 雨が降っている --> E{屋内で BBQ};
-D --> F[テントの設営];
-E --> G[施設の方に許可を得る];
-F --> H[BBQ 開始]
-G --> H[BBQ 開始]
-```
