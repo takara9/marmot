@@ -105,6 +105,42 @@ func (m *MarmotEndpoint) GetServers() ([]byte, *url.URL, error) {
 	return m.httpRequest2(req)
 }
 
+// サーバーの停止
+func (m *MarmotEndpoint) StopServerById(id string) ([]byte, *url.URL, error) {
+	slog.Debug("===", "StopServerById is called", "===")
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/server/"+id+"/stop")
+	if err != nil {
+		return nil, nil, err
+	}
+	slog.Debug("StopServerById", "reqURL", reqURL)
+
+	req, err := http.NewRequest("POST", reqURL, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	req.Header.Set("User-Agent", "MarmotdClient/1.0")
+	req.Header.Set("Content-Type", "application/json")
+	return m.httpRequest2(req)
+}
+
+// サーバーの起動
+func (m *MarmotEndpoint) StartServerById(id string) ([]byte, *url.URL, error) {
+	slog.Debug("===", "StartServerById is called", "===")
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/server/"+id+"/start")
+	if err != nil {
+		return nil, nil, err
+	}
+	slog.Debug("StartServerById", "reqURL", reqURL)
+
+	req, err := http.NewRequest("POST", reqURL, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	req.Header.Set("User-Agent", "MarmotdClient/1.0")
+	req.Header.Set("Content-Type", "application/json")
+	return m.httpRequest2(req)
+}
+
 func (m *MarmotEndpoint) MakeImageEntryFromRunningVMById(id, name string) ([]byte, *url.URL, error) {
 	slog.Debug("===", "MakeImageEntryFromRunningVMById is called", "===")
 	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/server/"+id)
