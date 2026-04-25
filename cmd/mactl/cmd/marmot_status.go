@@ -105,7 +105,7 @@ func printHostStatus(status api.HostStatus) {
 			diskCap = *c.DiskCapacityGB
 		}
 		fmt.Printf("\n資源搭載量:\n")
-		fmt.Printf("  CPUコア数:      %d\n", cpuCores)
+		fmt.Printf("  vCPU数:         %d\n", cpuCores)
 		fmt.Printf("  メモリ搭載量:   %d MB\n", memoryMB)
 		fmt.Printf("  ディスク本数:   %d\n", diskCount)
 		fmt.Printf("  ディスク容量:   %d GB\n", diskCap)
@@ -144,7 +144,7 @@ func printHostStatus(status api.HostStatus) {
 		fmt.Printf("  VM数（合計）:       %d\n", totalVMs)
 		fmt.Printf("  VM数（稼働中）:     %d\n", runningVMs)
 		fmt.Printf("  VM数（停止中）:     %d\n", stoppedVMs)
-		fmt.Printf("  CPU割当数:          %d コア（稼働中のみ）\n", allocCPU)
+		fmt.Printf("  vCPU割当数:         %d vCPU（稼働中のみ）\n", allocCPU)
 		fmt.Printf("  メモリ割当量:       %d MB（稼働中のみ）\n", allocMem)
 		fmt.Printf("  仮想ネットワーク数: %d\n", vnets)
 	}
