@@ -22,6 +22,7 @@ func (s *Server) ApiCreateNetwork(ctx echo.Context) error {
 		slog.Error("failed to bind request body", "err", err)
 		return echo.NewHTTPError(400, "invalid request body")
 	}
+	assignNodeNameIfUnset(&spec.Metadata, s.Ma.NodeName)
 
 	// デバッグ
 	jsonbytes, err := json.MarshalIndent(spec, "", "    ")

@@ -121,6 +121,7 @@ type Metadata struct {
 	Key          *string                 `json:"key,omitempty"`
 	Labels       *map[string]interface{} `json:"labels,omitempty"`
 	Name         *string                 `json:"name,omitempty"`
+	NodeName     *string                 `json:"nodeName,omitempty"`
 	Uuid         *string                 `json:"uuid,omitempty"`
 }
 

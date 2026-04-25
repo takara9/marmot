@@ -33,8 +33,13 @@ func (s *Server) ApiCreateImage(ctx echo.Context) error {
 		slog.Error("ApiCreateImage()", "err", "Name is required")
 		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: "Name is required"})
 	}
+	assignNodeNameIfUnset(&imageSpec.Metadata, s.Ma.NodeName)
+	assignedNodeName := ""
+	if imageSpec.Metadata != nil && imageSpec.Metadata.NodeName != nil {
+		assignedNodeName = *imageSpec.Metadata.NodeName
+	}
 
-	id, err := s.Ma.Db.MakeImageEntryFromURL(*imageSpec.Metadata.Name, *imageSpec.Spec.SourceUrl)
+	id, err := s.Ma.Db.MakeImageEntryFromURLWithNode(*imageSpec.Metadata.Name, *imageSpec.Spec.SourceUrl, assignedNodeName)
 	if err != nil {
 		slog.Error("ApiCreateImage()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})

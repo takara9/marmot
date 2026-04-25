@@ -39,7 +39,7 @@ func StartVolController(node string, etcdUrl string, deletionDelaySeconds int) (
 		slog.Error("Failed to create marmot instance", "err", err)
 		return nil, err
 	}
-	c.db = c.marmot.Db 
+	c.db = c.marmot.Db
 
 	// 定期実行の開始
 	ticker := time.NewTicker(VOLUME_CONTROLLER_INTERVAL)
@@ -65,6 +65,14 @@ func (c *controller) volumeControllerLoop() {
 	}
 	slog.Debug("取得したボリュームの数", "numVolumes", len(vols))
 	for _, vol := range vols {
+		if ok, assignedNode, reason := evaluateNodeAssignment(vol.Metadata, c.marmot.NodeName); !ok {
+			objectName := ""
+			if vol.Metadata != nil && vol.Metadata.Name != nil {
+				objectName = *vol.Metadata.Name
+			}
+			slog.Debug("別ノード割当のボリュームをスキップ", "volumeId", vol.Id, "volumeName", objectName, "controllerNode", c.marmot.NodeName, "assignedNode", assignedNode, "reason", reason)
+			continue
+		}
 
 		// デバッグ
 		//byte, err := json.MarshalIndent(vol, "", "  ")

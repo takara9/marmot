@@ -878,6 +878,8 @@ components:
       properties:
         id:
           type: string
+        nodeName:
+          type: string
         name:
           type: string
         uuid:
