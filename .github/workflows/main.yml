@@ -343,7 +343,6 @@ jobs:
       - package-marmotd-etc
       - package-marmotd-images
       - package-marmotd-osimage
-    if: always() 
     steps:
     - uses: actions/checkout@v5
 
@@ -354,7 +353,6 @@ jobs:
       - mactl-vm-deploy-1
       - mactl-vm-deploy-2
       - mactl-vm-deploy-3
-    if: always() 
     steps:
     - uses: actions/checkout@v5
 
@@ -363,7 +361,6 @@ jobs:
     needs: 
       - moodule-tests-end
       - system-tests-end
-    if: always() 
     steps:
     - uses: actions/checkout@v5
     - name: 最終クリーンアップ
