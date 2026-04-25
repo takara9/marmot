@@ -79,6 +79,15 @@ func (c *controller) networkControllerLoop() {
 	}
 
 	for _, vnet := range vnets {
+		if ok, assignedNode, reason := evaluateNodeAssignment(vnet.Metadata, c.marmot.NodeName); !ok {
+			objectName := ""
+			if vnet.Metadata != nil && vnet.Metadata.Name != nil {
+				objectName = *vnet.Metadata.Name
+			}
+			slog.Debug("別ノード割当の仮想ネットワークをスキップ", "networkId", vnet.Id, "networkName", objectName, "controllerNode", c.marmot.NodeName, "assignedNode", assignedNode, "reason", reason)
+			continue
+		}
+
 		// 削除タイムスタンプが設定されて一定時間経過した仮想ネットワークのステータスをDELETINGに更新する
 		// エラー中の仮想ネットワークは、対象にしない。
 		if vnet.Status != nil && vnet.Status.StatusCode != db.NETWORK_ERROR {

@@ -51,6 +51,13 @@ func main() {
 		slog.Error("Failed to load config file", "path", *configPath, "err", err)
 		return
 	}
+	// クラスタ構成では設定ファイルより OS のホスト名を優先する。
+	hostname, err := os.Hostname()
+	if err != nil {
+		slog.Warn("Failed to get OS hostname, fallback to configured node name", "configured_node_name", cfg.NodeName, "err", err)
+	} else if hostname != "" {
+		cfg.NodeName = hostname
+	}
 	marmotd.SetRuntimeConfig(cfg)
 	slog.Info("Config loaded",
 		"node_name", cfg.NodeName,

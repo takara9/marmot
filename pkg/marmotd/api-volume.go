@@ -24,6 +24,7 @@ func (s *Server) ApiCreateVolume(ctx echo.Context) error {
 		slog.Error("ApiCreateVolume()", "err", err, "volume", string(volumeString), "err2", err2)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
+	assignNodeNameIfUnset(&volume.Metadata, s.Ma.NodeName)
 
 	// etcdへの登録と状態の変更だけにして、実際のボリュームの作成はコントローラーが実施する
 	requestedVolume, err := s.Ma.Db.CreateVolumeOnDB2(volume)

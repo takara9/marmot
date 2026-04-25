@@ -133,6 +133,9 @@ var _ = Describe("関数テスト", Ordered, func() {
 			err = json.Unmarshal(body, &replyVolume)
 			GinkgoWriter.Println("CreateVolume replyVolume id = ", replyVolume.Id)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(replyVolume.Metadata).NotTo(BeNil())
+			Expect(replyVolume.Metadata.NodeName).NotTo(BeNil())
+			Expect(*replyVolume.Metadata.NodeName).To(Equal(nodeName))
 			Expect(url).To(BeNil())
 		})
 
@@ -180,6 +183,9 @@ var _ = Describe("関数テスト", Ordered, func() {
 			err = json.Unmarshal(body, &replyVolume)
 			GinkgoWriter.Println("CreateVolume replyVolume Id = ", replyVolume.Id)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(replyVolume.Metadata).NotTo(BeNil())
+			Expect(replyVolume.Metadata.NodeName).NotTo(BeNil())
+			Expect(*replyVolume.Metadata.NodeName).To(Equal(nodeName))
 			Expect(url).To(BeNil())
 
 			out, err := exec.Command("ls", "-alhg", "/var/lib/marmot/volumes").Output()
@@ -232,6 +238,9 @@ var _ = Describe("関数テスト", Ordered, func() {
 			err = json.Unmarshal(body, &replyVolume)
 			GinkgoWriter.Println("CreateVolume replyVolume Id = ", replyVolume.Id)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(replyVolume.Metadata).NotTo(BeNil())
+			Expect(replyVolume.Metadata.NodeName).NotTo(BeNil())
+			Expect(*replyVolume.Metadata.NodeName).To(Equal(nodeName))
 			Expect(url).To(BeNil())
 		})
 
@@ -291,6 +300,9 @@ var _ = Describe("関数テスト", Ordered, func() {
 			err = json.Unmarshal(body, &replyVolume)
 			GinkgoWriter.Println("CreateVolume replyVolume Id = ", replyVolume.Id)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(replyVolume.Metadata).NotTo(BeNil())
+			Expect(replyVolume.Metadata.NodeName).NotTo(BeNil())
+			Expect(*replyVolume.Metadata.NodeName).To(Equal(nodeName))
 			Expect(url).To(BeNil())
 
 		})

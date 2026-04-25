@@ -51,6 +51,12 @@ func (d *Database) getUniqueImageID() (string, error) {
 
 // URLのイメージをダウンロードして、それからイメージを作成する
 func (d *Database) MakeImageEntryFromURL(name, url string) (string, error) {
+	return d.MakeImageEntryFromURLWithNode(name, url, "")
+}
+
+// URLのイメージをダウンロードして、それからイメージを作成する。
+// nodeName が指定されている場合は、Metadata.nodeName に記録する。
+func (d *Database) MakeImageEntryFromURLWithNode(name, url, nodeName string) (string, error) {
 	slog.Debug("MakeImageEntryFromURL() called", "name", name, "url", url)
 
 	//一意なIDを発行
@@ -77,6 +83,9 @@ func (d *Database) MakeImageEntryFromURL(name, url string) (string, error) {
 			Message:             util.StringPtr("イメージの作成処理の開始待ち"),
 		},
 	}
+	if nodeName != "" {
+		img.Metadata.NodeName = util.StringPtr(nodeName)
+	}
 	key := ImagePrefix + "/" + id
 	if err := d.PutJSON(key, img); err != nil {
 		slog.Error("MakeImageEntryFromURL()", "err", err)
@@ -101,6 +110,10 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 	if err != nil {
 		slog.Error("MakeImageEntryFromRunningVM() failed to get server by id", "err", err, "serverId", serverId)
 		return api.Image{}, err
+	}
+	var serverNodeName *string
+	if server.Metadata != nil {
+		serverNodeName = server.Metadata.NodeName
 	}
 	bootVol := server.Spec.BootVolume
 
@@ -128,8 +141,9 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 		img = api.Image{
 			Id: id,
 			Metadata: &api.Metadata{
-				Name:   &name,
-				Labels: &labels,
+				Name:     &name,
+				Labels:   &labels,
+				NodeName: serverNodeName,
 			},
 			Spec: &api.ImageSpec{
 				Kind:          bootVol.Spec.Kind, // ポインタの値を直接使用
@@ -155,8 +169,9 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 		img = api.Image{
 			Id: id,
 			Metadata: &api.Metadata{
-				Name:   &name,
-				Labels: &labels,
+				Name:     &name,
+				Labels:   &labels,
+				NodeName: serverNodeName,
 			},
 			Spec: &api.ImageSpec{
 				Kind:          bootVol.Spec.Kind, // ポインタの値を直接使用

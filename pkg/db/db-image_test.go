@@ -71,6 +71,21 @@ var _ = Describe("Image", Ordered, func() {
 				fmt.Println("Created image with ID:", id)
 			})
 
+			It("イメージの作成 #3 nodeName付き", func() {
+				url := "http://hmc/debian-12-genericcloud-amd64.qcow2"
+				id, err = v.MakeImageEntryFromURLWithNode("test-image-3", url, "hv-test-01")
+				Expect(err).NotTo(HaveOccurred())
+				fmt.Println("Created image with ID:", id)
+			})
+
+			It("Keyからイメージ情報を取得 #3 nodeName確認", func() {
+				img, err := v.GetImage(id)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(img.Metadata).NotTo(BeNil())
+				Expect(img.Metadata.NodeName).NotTo(BeNil())
+				Expect(*img.Metadata.NodeName).To(Equal("hv-test-01"))
+			})
+
 			It("Keyからイメージ情報を取得 #2", func() {
 				img, err := v.GetImage(id)
 				Expect(err).NotTo(HaveOccurred())

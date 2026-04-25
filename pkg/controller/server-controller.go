@@ -71,6 +71,15 @@ func (c *controller) serverControllerLoop() {
 	}
 
 	for _, spec := range serverSpec {
+		if ok, assignedNode, reason := evaluateNodeAssignment(spec.Metadata, c.marmot.NodeName); !ok {
+			objectName := ""
+			if spec.Metadata != nil && spec.Metadata.Name != nil {
+				objectName = *spec.Metadata.Name
+			}
+			slog.Debug("別ノード割当のサーバーをスキップ", "serverId", spec.Id, "serverName", objectName, "controllerNode", c.marmot.NodeName, "assignedNode", assignedNode, "reason", reason)
+			continue
+		}
+
 		// 取得したサーバースペック情報の表示とプロビジョニング中サーバーの検出
 		//jsonByte, err := json.MarshalIndent(spec, "", "  ")
 		//if err != nil {

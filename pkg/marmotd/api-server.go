@@ -38,6 +38,7 @@ func (s *Server) ApiCreateServer(ctx echo.Context) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 	slog.Debug("Recived post body", "serverSpec=", virtualServer, "cpu=", virtualServer.Spec.Cpu, "memory=", virtualServer.Spec.Memory, "os", virtualServer.Spec.OsVariant)
+	assignNodeNameIfUnset(&virtualServer.Metadata, s.Ma.NodeName)
 
 	// リクエストをetcdに登録し、正常応答を返す
 	slog.Debug("仮想マシンの使用を付与してDBへ登録、一意のIDを取得")
@@ -148,7 +149,7 @@ func (s *Server) ApiMakeImageEntryFromRunningVMById(ctx echo.Context, serverId s
 	}
 
 	// 新しいイメージ名の有無チェック
-	if image.Metadata.Name == nil && len(*image.Metadata.Name) > 0 {
+	if image.Metadata == nil || image.Metadata.Name == nil || len(*image.Metadata.Name) == 0 {
 		slog.Error("Image name is not set, it must set for new image", "err", err)
 		err := fmt.Errorf("Must set image name")
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})

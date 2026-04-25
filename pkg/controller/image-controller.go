@@ -58,6 +58,15 @@ func (c *controller) imageControllerLoop() {
 	}
 
 	for _, image := range imgaes {
+		if ok, assignedNode, reason := evaluateNodeAssignment(image.Metadata, c.marmot.NodeName); !ok {
+			objectName := ""
+			if image.Metadata != nil && image.Metadata.Name != nil {
+				objectName = *image.Metadata.Name
+			}
+			slog.Debug("別ノード割当のイメージをスキップ", "imageId", image.Id, "imageName", objectName, "controllerNode", c.marmot.NodeName, "assignedNode", assignedNode, "reason", reason)
+			continue
+		}
+
 		// 削除タイムスタンプの処理
 		// 削除のタイムスタンプが一定時間以上経過しているかをチェックして、削除処理を実行する
 		if image.Status != nil && image.Status.DeletionTimeStamp != nil {
