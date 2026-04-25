@@ -3,6 +3,7 @@ package marmotd
 import (
 	"log/slog"
 	"net"
+	"os"
 	"runtime"
 	"syscall"
 	"time"
@@ -31,7 +32,13 @@ func (m *Marmot) CollectHostStatus() (api.HostStatus, error) {
 	var status api.HostStatus
 	now := time.Now()
 	status.LastUpdated = &now
-	status.NodeName = util.StringPtr(m.NodeName)
+	// OSからホスト名を取得
+	hostname, err := os.Hostname()
+	if err != nil {
+		slog.Error("os.Hostname()", "err", err)
+	} else {
+		status.NodeName = util.StringPtr(hostname)
+	}
 
 	// IPアドレスを取得
 	ipAddress := getHostIPAddress()
