@@ -96,6 +96,12 @@ func PatchStruct(dst, src interface{}) {
 		if sf.Kind() == reflect.Struct {
 			// 構造体同士なら再帰的にパッチ
 			PatchStruct(df.Addr().Interface(), sf.Interface())
+		} else if sf.Kind() == reflect.Ptr && sf.Elem().Kind() == reflect.Struct && df.Kind() == reflect.Ptr {
+			// ポインタ先が構造体の場合は、dst を温存しつつ部分更新する
+			if df.IsNil() {
+				df.Set(reflect.New(df.Type().Elem()))
+			}
+			PatchStruct(df.Interface(), sf.Interface())
 		} else {
 			// 基本型ならそのままコピー
 			df.Set(sf)

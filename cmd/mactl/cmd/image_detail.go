@@ -19,14 +19,14 @@ var imageDetailCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		m, err := getClientConfig()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
+			fmt.Fprint(os.Stderr, "Failed to get API client config:", err)
 			os.Exit(1)
 		}
 
 		imageId := args[0]
 		byteBody, _, err := m.ShowImageById(imageId)
 		if err != nil {
-			println("ShowImageById", "err", err)
+			fmt.Fprintln(os.Stderr, "ShowImageById error:", err)
 			return err
 		}
 
@@ -35,7 +35,7 @@ var imageDetailCmd = &cobra.Command{
 		switch outputStyle {
 		case "text":
 			if err := json.Unmarshal(byteBody, &image); err != nil {
-				println("Failed to Unmarshal", err)
+				fmt.Fprintln(os.Stderr, "Failed to Unmarshal:", err)
 				return err
 			}
 			printImageDetails(image)
@@ -44,33 +44,33 @@ var imageDetailCmd = &cobra.Command{
 		case "json":
 			err := json.Unmarshal(byteBody, &data)
 			if err != nil {
-				println("Failed to Unmarshal", err)
+				fmt.Fprintln(os.Stderr, "Failed to Unmarshal:", err)
 				return nil
 			}
 			byteJson, err := json.MarshalIndent(data, "", "  ")
 			if err != nil {
-				println("Failed to Marshal", err)
+				fmt.Fprintln(os.Stderr, "Failed to Marshal:", err)
 				return nil
 			}
-			println(string(byteJson))
+			fmt.Println(string(byteJson))
 			return nil
 
 		case "yaml":
 			var data interface{}
 			if err := json.Unmarshal(byteBody, &data); err != nil {
-				println("Failed to Unmarshal", err)
+				fmt.Fprintln(os.Stderr, "Failed to Unmarshal:", err)
 				return err
 			}
 			yamlBytes, err := yaml.Marshal(data)
 			if err != nil {
-				println("Failed to Marshal", err)
+				fmt.Fprintln(os.Stderr, "Failed to Marshal:", err)
 				return err
 			}
 			fmt.Println(string(yamlBytes))
 			return nil
 
 		default:
-			fmt.Println("output style must set text/json/yaml")
+			fmt.Fprintln(os.Stderr, "output style must set text/json/yaml")
 			return fmt.Errorf("output style must set text/json/yaml")
 		}
 

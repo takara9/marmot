@@ -26,7 +26,7 @@ var serverDetailCmd = &cobra.Command{
 		serverId := args[0]
 		byteBody, _, err := m.GetServerById(serverId)
 		if err != nil {
-			println("GetServerById", "err", err)
+			fmt.Fprintln(os.Stderr, "GetServerById error:", err)
 			return err
 		}
 
@@ -35,7 +35,7 @@ var serverDetailCmd = &cobra.Command{
 		switch outputStyle {
 		case "text":
 			if err := json.Unmarshal(byteBody, &server); err != nil {
-				println("Failed to Unmarshal", err)
+				fmt.Fprintln(os.Stderr, "Failed to Unmarshal:", err)
 				return err
 			}
 			// 別のメソッドに切り出して、サーバーの詳細を表示する
@@ -44,26 +44,26 @@ var serverDetailCmd = &cobra.Command{
 		case "json":
 			err := json.Unmarshal(byteBody, &data)
 			if err != nil {
-				println("Failed to Unmarshal", err)
+				fmt.Fprintln(os.Stderr, "Failed to Unmarshal:", err)
 				return nil
 			}
 			byteJson, err := json.MarshalIndent(data, "", "  ")
 			if err != nil {
-				println("Failed to Marshal", err)
+				fmt.Fprintln(os.Stderr, "Failed to Marshal:", err)
 				return nil
 			}
-			println(string(byteJson))
+			fmt.Println(string(byteJson))
 			return nil
 
 		case "yaml":
 			var data interface{}
 			if err := json.Unmarshal(byteBody, &data); err != nil {
-				println("Failed to Unmarshal", err)
+				fmt.Fprintln(os.Stderr, "Failed to Unmarshal:", err)
 				return err
 			}
 			yamlBytes, err := yaml.Marshal(data)
 			if err != nil {
-				println("Failed to Marshal", err)
+				fmt.Fprintln(os.Stderr, "Failed to Marshal:", err)
 				return err
 			}
 			fmt.Println(string(yamlBytes))

@@ -82,8 +82,13 @@ func printHostStatus(status api.HostStatus) {
 	if status.IpAddress != nil {
 		ipAddress = *status.IpAddress
 	}
+	hostID := "N/A"
+	if status.HostId != nil {
+		hostID = *status.HostId
+	}
 	fmt.Printf("ホスト情報:\n")
 	fmt.Printf("  ノード名:       %s\n", nodeName)
+	fmt.Printf("  hostId:         %s\n", hostID)
 	fmt.Printf("  IPアドレス:     %s\n", ipAddress)
 
 	if status.Capacity != nil {

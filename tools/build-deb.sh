@@ -116,12 +116,24 @@ Description: marmot - VM クラスター管理サービス
  を含みます。
 EOF
 
+echo "DEBIAN/conffiles を生成中..."
+cat > "${PKG_DIR}/DEBIAN/conffiles" <<'CONFFILES'
+/etc/marmot/marmotd.json
+/etc/marmot/.marmot.example
+CONFFILES
+
 echo "DEBIAN/postinst を生成中..."
 cat > "${PKG_DIR}/DEBIAN/postinst" <<'POSTINST'
 #!/bin/bash
 set -e
 
 CONFIG_FILE="/etc/marmot/marmotd.json"
+LEGACY_CONFIG_FILE="/etc/marmot.json"
+
+# 旧配置が存在する環境では、既存の /etc/marmot.json を優先して更新する。
+if [ -f "${LEGACY_CONFIG_FILE}" ]; then
+    CONFIG_FILE="${LEGACY_CONFIG_FILE}"
+fi
 
 if [ -f "${CONFIG_FILE}" ]; then
     NODE_NAME="$(hostname)"

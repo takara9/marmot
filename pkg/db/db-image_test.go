@@ -51,7 +51,7 @@ var _ = Describe("Image", Ordered, func() {
 
 			It("イメージの作成 #1", func() {
 				url := "http://hmc/ubuntu-22.04-server-cloudimg-amd64.img"
-				id, err = v.MakeImageEntryFromURL("test-image-1", url)
+				id, err = v.MakeImageEntryFromURLWithNode("test-image-1", url, "hv-test-01")
 				Expect(err).NotTo(HaveOccurred())
 				fmt.Println("Created image with ID:", id)
 			})
@@ -66,7 +66,7 @@ var _ = Describe("Image", Ordered, func() {
 
 			It("イメージの作成 #2", func() {
 				url := "http://hmc/Rocky-9-GenericCloud.latest.x86_64.qcow2"
-				id, err = v.MakeImageEntryFromURL("test-image-2", url)
+				id, err = v.MakeImageEntryFromURLWithNode("test-image-2", url, "hv-test-02")
 				Expect(err).NotTo(HaveOccurred())
 				fmt.Println("Created image with ID:", id)
 			})
@@ -84,6 +84,25 @@ var _ = Describe("Image", Ordered, func() {
 				Expect(img.Metadata).NotTo(BeNil())
 				Expect(img.Metadata.NodeName).NotTo(BeNil())
 				Expect(*img.Metadata.NodeName).To(Equal("hv-test-01"))
+			})
+
+			It("イメージ名とノード名でイメージを取得できる", func() {
+				if v == nil {
+					var connErr error
+					v, connErr = db.NewDatabase(url)
+					Expect(connErr).NotTo(HaveOccurred())
+				}
+
+				_, err = v.MakeImageEntryFromURLWithNode("test-image-node-aware", "http://hmc/node1.qcow2", "marmot1")
+				Expect(err).NotTo(HaveOccurred())
+				_, err = v.MakeImageEntryFromURLWithNode("test-image-node-aware", "http://hmc/node2.qcow2", "marmot2")
+				Expect(err).NotTo(HaveOccurred())
+
+				img, err := v.FindImageByNameAndNode("test-image-node-aware", "marmot2")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(img.Metadata).NotTo(BeNil())
+				Expect(img.Metadata.NodeName).NotTo(BeNil())
+				Expect(*img.Metadata.NodeName).To(Equal("marmot2"))
 			})
 
 			It("Keyからイメージ情報を取得 #2", func() {

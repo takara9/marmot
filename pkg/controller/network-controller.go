@@ -42,6 +42,8 @@ func StartNetController(node string, etcdUrl string, deletionDelaySeconds int) (
 		return nil, err
 	}
 	c.db = c.marmot.Db
+	c.stopChan = make(chan struct{})
+	c.doneChan = make(chan struct{})
 
 	// 起動時に既存の仮想ネットワークを取得して、データベースに登録する
 	if _, err := c.marmot.GetVirtualNetworksAndPutDB(); err != nil {
@@ -52,10 +54,15 @@ func StartNetController(node string, etcdUrl string, deletionDelaySeconds int) (
 	// 定期実行の開始
 	ticker := time.NewTicker(NETWORK_CONTROLLER_INTERVAL)
 	go func() {
+		defer ticker.Stop()
+		defer close(c.doneChan)
 		for {
 			select {
 			case <-ticker.C:
 				c.networkControllerLoop()
+			case <-c.stopChan:
+				slog.Info("ネットワークコントローラー停止")
+				return
 			}
 		}
 	}()

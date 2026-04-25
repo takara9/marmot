@@ -40,14 +40,21 @@ func StartVolController(node string, etcdUrl string, deletionDelaySeconds int) (
 		return nil, err
 	}
 	c.db = c.marmot.Db
+	c.stopChan = make(chan struct{})
+	c.doneChan = make(chan struct{})
 
 	// 定期実行の開始
 	ticker := time.NewTicker(VOLUME_CONTROLLER_INTERVAL)
 	go func() {
+		defer ticker.Stop()
+		defer close(c.doneChan)
 		for {
 			select {
 			case <-ticker.C:
 				c.volumeControllerLoop()
+			case <-c.stopChan:
+				slog.Info("ボリュームコントローラー停止")
+				return
 			}
 		}
 	}()
@@ -71,6 +78,7 @@ func (c *controller) volumeControllerLoop() {
 				objectName = *vol.Metadata.Name
 			}
 			slog.Debug("別ノード割当のボリュームをスキップ", "volumeId", vol.Id, "volumeName", objectName, "controllerNode", c.marmot.NodeName, "assignedNode", assignedNode, "reason", reason)
+			slog.Debug("ボリュームの詳細情報", "volumeId", vol.Id, "volumeName", objectName, "metadata", vol.Metadata, "status", vol.Status)
 			continue
 		}
 

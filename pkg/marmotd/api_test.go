@@ -25,9 +25,10 @@ var _ = Describe("関数テスト", Ordered, func() {
 		etcdImage  = "ghcr.io/takara9/etcd:3.6.5"
 	)
 	var (
-		containerID string
-		ctx         context.Context
-		cancel      context.CancelFunc
+		containerID    string
+		ctx            context.Context
+		cancel         context.CancelFunc
+		waitServerDone func()
 		//marmotServer *marmotd.Server
 	)
 	marmotEp := "localhost:" + fmt.Sprintf("%d", marmotPort)
@@ -55,7 +56,7 @@ var _ = Describe("関数テスト", Ordered, func() {
 		It("モックサーバーの起動", func() {
 			ctx, cancel = context.WithCancel(context.Background())
 			//marmotServer = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
-			marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
+			_, waitServerDone = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
 		})
 
 		//It("ハイパーバイザーのコンフィグファイルの読み取り", func() {
@@ -397,6 +398,12 @@ var _ = Describe("関数テスト", Ordered, func() {
 				fmt.Printf("Failed to remove container: %v\n", err)
 			}
 			cancel() // モックサーバー停止
+			if cancel != nil {
+				cancel() // モックサーバー停止シグナル
+			}
+			if waitServerDone != nil {
+				waitServerDone() // goroutine の終了を待つ
+			}
 		})
 	})
 })

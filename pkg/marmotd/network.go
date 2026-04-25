@@ -110,6 +110,10 @@ func (m *Marmot) GetVirtualNetworksAndPutDB() ([]api.VirtualNetwork, error) {
 			slog.Debug("Virtual network already exists in ETCD, skipping", "id", net.Id)
 			continue
 		} else if err == db.ErrNotFound {
+			// このノードで発見したネットワークにノード名を付与する
+			if m != nil && m.NodeName != "" {
+				net.Metadata.NodeName = util.StringPtr(m.NodeName)
+			}
 			// データベースに登録
 			if err := m.Db.PutVirtualNetworksETCD(net); err != nil {
 				slog.Error("Failed to put virtual network to ETCD", "err", err)
@@ -323,6 +327,10 @@ func (m *Marmot) CheckVirtualNetworks() error {
 			slog.Debug("Virtual network already exists in ETCD, skipping", "id", vnet.Id)
 			continue
 		} else if err == db.ErrNotFound {
+			// このノードで発見したネットワークにノード名を付与する
+			if m != nil && m.NodeName != "" {
+				vnet.Metadata.NodeName = util.StringPtr(m.NodeName)
+			}
 			// データベースに登録
 			if err := m.Db.PutVirtualNetworksETCD(*vnet); err != nil {
 				slog.Error("Failed to put virtual network to ETCD", "err", err)

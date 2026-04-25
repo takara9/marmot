@@ -686,6 +686,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /marmot/cluster:
+    get:
+      summary: "Get Marmot Cluster Status"
+      description: |
+        Retrieve host status for all cluster members.
+        Each item includes node name, host id, resource capacity and allocation.
+      operationId: apiGetMarmotCluster
+      tags:
+        - marmot
+      responses:
+        "200":
+          description: "Successfully retrieved cluster host statuses."
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HostStatus"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
 components:
   schemas:
@@ -1087,6 +1111,8 @@ components:
       type: object
       properties:
         nodeName:
+          type: string
+        hostId:
           type: string
         ipAddress:
           type: string

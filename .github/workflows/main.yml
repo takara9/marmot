@@ -59,7 +59,7 @@ jobs:
         make test
         cd ../..
 
-  package-util-unit:
+  package-util:
     runs-on: [ self-hosted, any ]
     needs:
       - moodule-tests
@@ -331,11 +331,11 @@ jobs:
   #        ls -al
   #         sudo -E env "PATH=$PATH" ./tools/cleanup.sh
 
-  moodule-tests-end:
+  module-tests-end:
     runs-on: [ self-hosted, any ]
     needs: 
       - packages-run-as-nonroot
-      - package-util-unit
+      - package-util
       - packages-run-as-root
       - package-virsh
       - package-marmotd-volume
@@ -359,7 +359,7 @@ jobs:
   final-cleanup:
     runs-on: [ self-hosted, any ]
     needs: 
-      - moodule-tests-end
+      - module-tests-end
       - system-tests-end
     steps:
     - uses: actions/checkout@v5

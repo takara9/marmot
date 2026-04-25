@@ -28,12 +28,13 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 		osImage2URL = "http://hmc/" + osImage2
 	)
 	var (
-		containerID  string
-		ctx          context.Context
-		cancel       context.CancelFunc
-		marmotServer *marmotd.Server
-		osImageid1   string
-		osImageid2   string
+		containerID    string
+		ctx            context.Context
+		cancel         context.CancelFunc
+		marmotServer   *marmotd.Server
+		waitServerDone func()
+		osImageid1     string
+		osImageid2     string
 	)
 	marmotEp := "localhost:" + fmt.Sprintf("%d", marmotPort)
 
@@ -56,7 +57,7 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 
 		By("モックサーバーの起動")
 		ctx, cancel = context.WithCancel(context.Background())
-		marmotServer = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
+		marmotServer, waitServerDone = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
 
 		By("モックサーバーの起動チェック")
 		Eventually(func(g Gomega) {
@@ -71,7 +72,8 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 	AfterAll(func(ctx0 SpecContext) {
 		GinkgoWriter.Println("Cleaning up test environment")
 		By("mockサーバーの停止")
-		cancel() // モックサーバーを停止するためにキャンセル関数を呼び出す
+		cancel()         // モックサーバー停止シグナル
+		waitServerDone() // goroutine の終了を待つ
 
 		By("etcdコンテナの停止")
 		cmd := exec.Command("docker", "kill", containerID)
@@ -91,7 +93,7 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 		It("URLを指定してイメージのIDを取得", func() {
 			var err error
 			GinkgoWriter.Println("URLを指定してイメージのIDを取得")
-			osImageid1, err = marmotServer.Ma.Db.MakeImageEntryFromURL("ubuntu-22.04", osImage1URL)
+			osImageid1, err = marmotServer.Ma.Db.MakeImageEntryFromURLWithNode("ubuntu-22.04", osImage1URL, nodeName)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("取得したイメージID: ", osImageid1)
 		})
@@ -109,7 +111,7 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 		It("URLを指定してイメージのIDを取得", func() {
 			var err error
 			GinkgoWriter.Println("URLを指定してイメージのIDを取得")
-			osImageid2, err = marmotServer.Ma.Db.MakeImageEntryFromURL("ubuntu-24.04", osImage2URL)
+			osImageid2, err = marmotServer.Ma.Db.MakeImageEntryFromURLWithNode("ubuntu-24.04", osImage2URL, nodeName)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("取得したイメージID: ", osImageid2)
 		})

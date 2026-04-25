@@ -2,47 +2,55 @@ package util
 
 import (
 	"encoding/hex"
+	"testing"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	"github.com/takara9/marmot/api"
 )
 
-var _ = Describe("Guest identity generation", Label("unit", "identity"), func() {
-	Describe("machineIDForServer", func() {
-		It("normalizes Metadata.Uuid into a 32-digit machine-id", func() {
-			spec := api.Server{
-				Id: "abcde",
-				Metadata: &api.Metadata{
-					Uuid: StringPtr("550e8400-e29b-41d4-a716-446655440000"),
-				},
-			}
+func TestMachineIDForServer_NormalizesUUID(t *testing.T) {
+	spec := api.Server{
+		Id: "abcde",
+		Metadata: &api.Metadata{
+			Uuid: StringPtr("550e8400-e29b-41d4-a716-446655440000"),
+		},
+	}
 
-			Expect(machineIDForServer(spec)).To(Equal("550e8400e29b41d4a716446655440000"))
-		})
+	got := machineIDForServer(spec)
+	want := "550e8400e29b41d4a716446655440000"
+	if got != want {
+		t.Fatalf("machineIDForServer() = %s, want %s", got, want)
+	}
+}
 
-		It("falls back to a deterministic 32-digit hex value when UUID is absent", func() {
-			spec := api.Server{Id: "a123456"}
+func TestMachineIDForServer_FallbackDeterministicHex(t *testing.T) {
+	spec := api.Server{Id: "a123456"}
 
-			got1 := machineIDForServer(spec)
-			got2 := machineIDForServer(spec)
+	got1 := machineIDForServer(spec)
+	got2 := machineIDForServer(spec)
 
-			Expect(got1).To(Equal(got2))
-			Expect(got1).To(HaveLen(32))
-			_, err := hex.DecodeString(got1)
-			Expect(err).NotTo(HaveOccurred())
-		})
-	})
+	if got1 != got2 {
+		t.Fatalf("machine-id must be deterministic: %s != %s", got1, got2)
+	}
+	if len(got1) != 32 {
+		t.Fatalf("machine-id length = %d, want 32", len(got1))
+	}
+	if _, err := hex.DecodeString(got1); err != nil {
+		t.Fatalf("machine-id must be hex string: %v", err)
+	}
+}
 
-	Describe("hostIDBytes", func() {
-		It("returns a deterministic 4-byte hostid derived from machine-id", func() {
-			a := hostIDBytes("550e8400e29b41d4a716446655440000")
-			b := hostIDBytes("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-			c := hostIDBytes("550e8400e29b41d4a716446655440000")
+func TestHostIDBytes_DeterministicAndDistinct(t *testing.T) {
+	a := hostIDBytes("550e8400e29b41d4a716446655440000")
+	b := hostIDBytes("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	c := hostIDBytes("550e8400e29b41d4a716446655440000")
 
-			Expect(a).To(HaveLen(4))
-			Expect(a).To(Equal(c))
-			Expect(a).NotTo(Equal(b))
-		})
-	})
-})
+	if len(a) != 4 {
+		t.Fatalf("hostid length = %d, want 4", len(a))
+	}
+	if string(a) != string(c) {
+		t.Fatalf("hostid must be deterministic: %v != %v", a, c)
+	}
+	if string(a) == string(b) {
+		t.Fatalf("different machine-id should produce different hostid: %v == %v", a, b)
+	}
+}

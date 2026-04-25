@@ -8,6 +8,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/util"
 )
 
@@ -38,7 +39,7 @@ func (s *Server) ApiCreateServer(ctx echo.Context) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 	slog.Debug("Recived post body", "serverSpec=", virtualServer, "cpu=", virtualServer.Spec.Cpu, "memory=", virtualServer.Spec.Memory, "os", virtualServer.Spec.OsVariant)
-	assignNodeNameIfUnset(&virtualServer.Metadata, s.Ma.NodeName)
+	// nodeName の割当はスケジューラーが担当する。
 
 	// リクエストをetcdに登録し、正常応答を返す
 	slog.Debug("仮想マシンの使用を付与してDBへ登録、一意のIDを取得")
@@ -101,32 +102,38 @@ func (s *Server) ApiUpdateServerById(ctx echo.Context, id string) error {
 }
 
 // サーバーの停止
+// ステータスを STOPPING に更新してサーバーコントローラーに処理を委譲する
 func (s *Server) ApiStopServerById(ctx echo.Context, id string) error {
 	slog.Debug("===ApiStopServerById() is called ===", "id", id)
 
-	if err := s.Ma.StopServerManage(id); err != nil {
-		slog.Error("StopServerManage()", "err", err)
+	if _, err := s.Ma.Db.GetServerById(id); err != nil {
+		slog.Error("GetServerById()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
+	s.Ma.Db.UpdateServerStatus(id, db.SERVER_STOPPING, "")
+
 	var resp api.Success
 	resp.Id = id
-	resp.Message = util.StringPtr("Server stopped successfully")
+	resp.Message = util.StringPtr("Stop request accepted")
 	return ctx.JSON(http.StatusOK, resp)
 }
 
 // サーバーの起動
+// ステータスを STARTING に更新してサーバーコントローラーに処理を委譲する
 func (s *Server) ApiStartServerById(ctx echo.Context, id string) error {
 	slog.Debug("===ApiStartServerById() is called ===", "id", id)
 
-	if err := s.Ma.StartServerManage(id); err != nil {
-		slog.Error("StartServerManage()", "err", err)
+	if _, err := s.Ma.Db.GetServerById(id); err != nil {
+		slog.Error("GetServerById()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
+	s.Ma.Db.UpdateServerStatus(id, db.SERVER_STARTING, "")
+
 	var resp api.Success
 	resp.Id = id
-	resp.Message = util.StringPtr("Server started successfully")
+	resp.Message = util.StringPtr("Start request accepted")
 	return ctx.JSON(http.StatusOK, resp)
 }
 

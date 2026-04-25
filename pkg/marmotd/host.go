@@ -1,10 +1,15 @@
 package marmotd
 
 import (
+	"fmt"
 	"log/slog"
 	"net"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -12,6 +17,25 @@ import (
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/util"
 )
+
+const testMockHostIDOutput = "0x00000001\n"
+
+var hostIDCommandOutput = func() ([]byte, error) {
+	return exec.Command("hostid").Output()
+}
+
+func runningInTestBinary() bool {
+	return strings.HasSuffix(filepath.Base(os.Args[0]), ".test")
+}
+
+func init() {
+	// テストバイナリ実行時は hostid コマンド依存を避けるためモックを利用する。
+	if runningInTestBinary() {
+		hostIDCommandOutput = func() ([]byte, error) {
+			return []byte(testMockHostIDOutput), nil
+		}
+	}
+}
 
 // ホストの状態情報を収集してetcdに保存する
 func (m *Marmot) CollectAndUpdateHostStatus() error {
@@ -32,12 +56,12 @@ func (m *Marmot) CollectHostStatus() (api.HostStatus, error) {
 	var status api.HostStatus
 	now := time.Now()
 	status.LastUpdated = &now
-	// OSからホスト名を取得
-	hostname, err := os.Hostname()
-	if err != nil {
-		slog.Error("os.Hostname()", "err", err)
-	} else {
-		status.NodeName = util.StringPtr(hostname)
+	if m != nil && m.NodeName != "" {
+		slog.Debug("CollectHostStatus()", "NodeName", m.NodeName)
+		status.NodeName = util.StringPtr(m.NodeName)
+	}
+	if hostID := getHostID(); hostID != "" {
+		status.HostId = util.StringPtr(hostID)
 	}
 
 	// IPアドレスを取得
@@ -61,6 +85,33 @@ func (m *Marmot) CollectHostStatus() (api.HostStatus, error) {
 	status.Allocation = allocation
 
 	return status, nil
+}
+
+// ホストの hostid を8桁16進文字列で取得する
+func getHostID() string {
+	out, err := hostIDCommandOutput()
+	if err == nil {
+		if id, ok := parseHostIDOutput(out); ok {
+			return fmt.Sprintf("%08x", id)
+		}
+		slog.Warn("hostid command returned an unexpected format", "output", strings.TrimSpace(string(out)))
+		return ""
+	}
+	slog.Warn("hostid command failed", "err", err)
+	return ""
+}
+
+func parseHostIDOutput(out []byte) (uint32, bool) {
+	text := strings.TrimSpace(string(out))
+	text = strings.TrimPrefix(strings.ToLower(text), "0x")
+	if text == "" {
+		return 0, false
+	}
+	v, err := strconv.ParseUint(text, 16, 32)
+	if err != nil || v == 0 {
+		return 0, false
+	}
+	return uint32(v), true
 }
 
 // ホストのIPアドレスを取得する
@@ -135,6 +186,10 @@ func collectHostCapacity() (*api.HostCapacity, error) {
 // ホストの割当情報を収集する（etcdのデータから）
 func (m *Marmot) collectHostAllocation() (*api.HostAllocation, error) {
 	var allocation api.HostAllocation
+	currentNode := ""
+	if m != nil {
+		currentNode = strings.TrimSpace(m.NodeName)
+	}
 
 	// サーバー一覧を取得
 	servers, err := m.Db.GetServers()
@@ -143,13 +198,22 @@ func (m *Marmot) collectHostAllocation() (*api.HostAllocation, error) {
 		return nil, err
 	}
 
-	totalVMs := len(servers)
+	totalVMs := 0
 	runningVMs := 0
 	stoppedVMs := 0
 	allocatedCPU := 0
 	allocatedMemory := 0
 
 	for _, server := range servers {
+		// 割当ノード単位で集計する。これにより各ホストの負荷が分離される。
+		if currentNode != "" {
+			if server.Metadata == nil || server.Metadata.NodeName == nil || strings.TrimSpace(*server.Metadata.NodeName) != currentNode {
+				continue
+			}
+		}
+
+		totalVMs++
+
 		if server.Status == nil {
 			continue
 		}

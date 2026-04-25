@@ -2,6 +2,7 @@ package controller
 
 import (
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/takara9/marmot/pkg/marmotd"
@@ -14,6 +15,8 @@ const (
 type hostController struct {
 	marmot   *marmotd.Marmot
 	stopChan chan struct{}
+	doneChan chan struct{}
+	stopOnce sync.Once
 }
 
 // ホストコントローラーの開始
@@ -22,6 +25,7 @@ func StartHostController(node string, etcdUrl string) (*hostController, error) {
 	var err error
 
 	c.stopChan = make(chan struct{})
+	c.doneChan = make(chan struct{})
 	c.marmot, err = marmotd.NewMarmot(node, etcdUrl)
 	if err != nil {
 		slog.Error("Failed to create marmot instance for host controller", "err", err)
@@ -38,6 +42,7 @@ func StartHostController(node string, etcdUrl string) (*hostController, error) {
 	ticker := time.NewTicker(HOST_CONTROLLER_INTERVAL)
 	go func() {
 		defer ticker.Stop()
+		defer close(c.doneChan)
 		for {
 			select {
 			case <-ticker.C:
@@ -53,7 +58,17 @@ func StartHostController(node string, etcdUrl string) (*hostController, error) {
 
 // ホストコントローラーの停止
 func (c *hostController) Stop() {
-	close(c.stopChan)
+	if c == nil {
+		return
+	}
+	c.stopOnce.Do(func() {
+		if c.stopChan != nil {
+			close(c.stopChan)
+		}
+	})
+	if c.doneChan != nil {
+		<-c.doneChan
+	}
 }
 
 // ホストコントローラーの制御ループ

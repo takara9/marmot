@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -22,6 +23,9 @@ type controller struct {
 	Lock          sync.Mutex
 	marmot        *marmotd.Marmot
 	deletionDelay time.Duration // DeletionTimestamp 検知から削除実行までの待機時間
+	stopChan      chan struct{}
+	doneChan      chan struct{}
+	stopOnce      sync.Once
 }
 
 // VMコントローラーの開始
@@ -44,18 +48,40 @@ func StartVmController(node string, etcdUrl string, deletionDelaySeconds int) (*
 		return nil, err
 	}
 	c.db = c.marmot.Db // 正しくないけど
+	c.stopChan = make(chan struct{})
+	c.doneChan = make(chan struct{})
 
 	// 定期実行の開始
 	ticker := time.NewTicker(SERVER_CONTROLLER_INTERVAL)
 	go func() {
+		defer ticker.Stop()
+		defer close(c.doneChan)
 		for {
 			select {
 			case <-ticker.C:
 				c.serverControllerLoop()
+			case <-c.stopChan:
+				slog.Info("サーバーコントローラー停止")
+				return
 			}
 		}
 	}()
 	return &c, nil
+}
+
+// Stop はコントローラーの定期処理を停止し、終了を待機する。
+func (c *controller) Stop() {
+	if c == nil {
+		return
+	}
+	c.stopOnce.Do(func() {
+		if c.stopChan != nil {
+			close(c.stopChan)
+		}
+	})
+	if c.doneChan != nil {
+		<-c.doneChan
+	}
 }
 
 // コントローラーの制御ループ
@@ -71,6 +97,16 @@ func (c *controller) serverControllerLoop() {
 	}
 
 	for _, spec := range serverSpec {
+		// サーバーは必ず nodeName 割当後に処理する。
+		if spec.Metadata == nil || spec.Metadata.NodeName == nil || strings.TrimSpace(*spec.Metadata.NodeName) == "" {
+			objectName := ""
+			if spec.Metadata != nil && spec.Metadata.Name != nil {
+				objectName = *spec.Metadata.Name
+			}
+			slog.Debug("nodeName 未割当サーバーをスキップ", "serverId", spec.Id, "serverName", objectName, "controllerNode", c.marmot.NodeName, "reason", "assigned_node_missing")
+			continue
+		}
+
 		if ok, assignedNode, reason := evaluateNodeAssignment(spec.Metadata, c.marmot.NodeName); !ok {
 			objectName := ""
 			if spec.Metadata != nil && spec.Metadata.Name != nil {
@@ -111,8 +147,22 @@ func (c *controller) serverControllerLoop() {
 			c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_RUNNING, "")
 		case db.SERVER_RUNNING:
 			slog.Debug("稼働中のサーバー検出", "SERVER", spec.Id)
+		case db.SERVER_STOPPING:
+			slog.Debug("停止要求のサーバー検出", "SERVER", spec.Id)
+			if err := c.marmot.StopServerManage(spec.Id); err != nil {
+				slog.Error("StopServerManage()", "err", err)
+				msg := fmt.Sprintf("サーバーの停止に失敗: %v", err)
+				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR, msg)
+			}
 		case db.SERVER_STOPPED:
 			slog.Debug("停止中のサーバー検出", "SERVER", spec.Id)
+		case db.SERVER_STARTING:
+			slog.Debug("起動要求のサーバー検出", "SERVER", spec.Id)
+			if err := c.marmot.StartServerManage(spec.Id); err != nil {
+				slog.Error("StartServerManage()", "err", err)
+				msg := fmt.Sprintf("サーバーの起動に失敗: %v", err)
+				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR, msg)
+			}
 		case db.SERVER_ERROR:
 			slog.Debug("エラー状態のサーバー検出", "SERVER", spec.Id)
 		case db.SERVER_DELETING:

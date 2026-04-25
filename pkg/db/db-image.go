@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -51,7 +52,7 @@ func (d *Database) getUniqueImageID() (string, error) {
 
 // URLのイメージをダウンロードして、それからイメージを作成する
 func (d *Database) MakeImageEntryFromURL(name, url string) (string, error) {
-	return d.MakeImageEntryFromURLWithNode(name, url, "")
+	return "", fmt.Errorf("nodeName is required: use MakeImageEntryFromURLWithNode")
 }
 
 // URLのイメージをダウンロードして、それからイメージを作成する。
@@ -111,11 +112,26 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 		slog.Error("MakeImageEntryFromRunningVM() failed to get server by id", "err", err, "serverId", serverId)
 		return api.Image{}, err
 	}
-	var serverNodeName *string
-	if server.Metadata != nil {
-		serverNodeName = server.Metadata.NodeName
-	}
 	bootVol := server.Spec.BootVolume
+	var serverNodeName *string
+	if server.Metadata != nil && server.Metadata.NodeName != nil {
+		node := strings.TrimSpace(*server.Metadata.NodeName)
+		if node != "" {
+			serverNodeName = util.StringPtr(node)
+		}
+	}
+	if serverNodeName == nil && bootVol.Metadata != nil && bootVol.Metadata.NodeName != nil {
+		node := strings.TrimSpace(*bootVol.Metadata.NodeName)
+		if node != "" {
+			slog.Warn("MakeImageEntryFromRunningVM() server metadata nodeName is empty; using boot volume nodeName", "serverId", serverId, "nodeName", node)
+			serverNodeName = util.StringPtr(node)
+		}
+	}
+	if serverNodeName == nil {
+		err = fmt.Errorf("nodeName is not set for server %s when creating image from running VM", serverId)
+		slog.Error("MakeImageEntryFromRunningVM()", "err", err, "serverId", serverId)
+		return api.Image{}, err
+	}
 
 	// ボリュームがOSボリュームであることを確認
 	if *bootVol.Spec.Kind != "os" {
@@ -378,4 +394,51 @@ func (d *Database) FindImageByName(name string) (api.Image, error) {
 	}
 
 	return api.Image{}, fmt.Errorf("image not found with name: %v", name)
+}
+
+// イメージ名とノード名でイメージを検索する。
+// NodeName が一致するエントリーのみ返す。
+func (d *Database) FindImageByNameAndNode(name, nodeName string) (api.Image, error) {
+	slog.Debug("FindImageByNameAndNode() called", "name", name, "nodeName", nodeName)
+
+	targetNode := strings.TrimSpace(nodeName)
+	if targetNode == "" {
+		return api.Image{}, fmt.Errorf("nodeName is required")
+	}
+
+	resp, err := d.GetByPrefix(ImagePrefix)
+	if err == ErrNotFound {
+		slog.Debug("no images found", "key-prefix", ImagePrefix)
+		return api.Image{}, err
+	} else if err != nil {
+		slog.Error("GetByPrefix() failed", "err", err, "key-prefix", ImagePrefix)
+		return api.Image{}, err
+	}
+
+	for _, kv := range resp.Kvs {
+		var img api.Image
+		err := json.Unmarshal(kv.Value, &img)
+		if err != nil {
+			slog.Error("FindImageByNameAndNode() failed to unmarshal image", "err", err)
+			continue
+		}
+
+		if img.Metadata == nil || img.Metadata.Name == nil {
+			continue
+		}
+		if *img.Metadata.Name != name {
+			continue
+		}
+		if img.Metadata.NodeName == nil || strings.TrimSpace(*img.Metadata.NodeName) == "" {
+			continue
+		}
+
+		if strings.TrimSpace(*img.Metadata.NodeName) != targetNode {
+			continue
+		}
+
+		return img, nil
+	}
+
+	return api.Image{}, fmt.Errorf("image not found with name: %v and nodeName: %v", name, targetNode)
 }

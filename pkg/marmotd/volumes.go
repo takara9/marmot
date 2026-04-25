@@ -18,6 +18,27 @@ import (
 	"github.com/takara9/marmot/pkg/util"
 )
 
+func resolveImageTemplateByVolumeNode(m *Marmot, volSpec api.Volume) (api.Image, error) {
+	osVariant := ""
+	if volSpec.Spec != nil && volSpec.Spec.OsVariant != nil {
+		osVariant = strings.TrimSpace(*volSpec.Spec.OsVariant)
+	}
+	if osVariant == "" {
+		return api.Image{}, errors.New("osVariant is required for os volume")
+	}
+
+	targetNode := ""
+	if volSpec.Metadata != nil && volSpec.Metadata.NodeName != nil {
+		targetNode = strings.TrimSpace(*volSpec.Metadata.NodeName)
+	}
+
+	if targetNode != "" {
+		return m.Db.FindImageByNameAndNode(osVariant, targetNode)
+	}
+
+	return m.Db.FindImageByName(osVariant)
+}
+
 func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 	volSpec, err := m.Db.GetVolumeById(id)
 	if err != nil {
@@ -38,9 +59,9 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
 				return nil, errors.New("osVariant is required for os volume")
 			}
-			img, err := m.Db.FindImageByName(*volSpec.Spec.OsVariant)
+			img, err := resolveImageTemplateByVolumeNode(m, volSpec)
 			if err != nil {
-				slog.Error("failed to get os image template", "err", err)
+				slog.Error("failed to get os image template", "err", err, "osVariant", *volSpec.Spec.OsVariant)
 				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
 				return nil, err
 			}
@@ -101,9 +122,9 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
 				return nil, errors.New("osVariant is required for os volume")
 			}
-			img, err := m.Db.FindImageByName(*volSpec.Spec.OsVariant)
+			img, err := resolveImageTemplateByVolumeNode(m, volSpec)
 			if err != nil {
-				slog.Error("failed to get os image template", "err", err)
+				slog.Error("failed to get os image template", "err", err, "osVariant", *volSpec.Spec.OsVariant)
 				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
 				return nil, err
 			}
