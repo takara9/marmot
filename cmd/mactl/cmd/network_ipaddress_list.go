@@ -42,7 +42,7 @@ var networkIPAddressListCmd = &cobra.Command{
 						continue
 					}
 					fmt.Println("IpNetwork:", ipNetworkId)
-					fmt.Printf("  %2s  %-15s  %-15s  %-10s  %-10s\n", "No", "IP", "NETMASK", "HOST-ID", "NETWORK-ID")
+					fmt.Printf("  %2s  %-15s  %-24s\n", "No", "IP", "HOSTNAME")
 					for i, a := range data {
 						fmt.Printf("  %2d", i+1)
 						if a.IPAddress != nil {
@@ -50,20 +50,10 @@ var networkIPAddressListCmd = &cobra.Command{
 						} else {
 							fmt.Printf("  %-15s", "N/A")
 						}
-						if a.Netmask != nil {
-							fmt.Printf("  %-15s", *a.Netmask)
-						} else {
-							fmt.Printf("  %-15s", "N/A")
-						}
 						if a.HostId != nil {
-							fmt.Printf("  %-10s", *a.HostId)
+							fmt.Printf("  %-24s", *a.HostId)
 						} else {
-							fmt.Printf("  %-10s", "N/A")
-						}
-						if a.NetworkId != nil {
-							fmt.Printf("  %-10s", *a.NetworkId)
-						} else {
-							fmt.Printf("  %-10s", "N/A")
+							fmt.Printf("  %-24s", "N/A")
 						}
 						fmt.Println()
 					}

@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/big"
 	"net/netip"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/takara9/marmot/api"
@@ -51,6 +52,7 @@ func (d *Database) CreateIpNetwork(vnetid string, spec *api.IPNetwork) (string, 
 		slog.Error("CreateIpNetwork()", "err", err, "spec", spec)
 		return "", fmt.Errorf("invalid AddressMaskLen: %v", err)
 	}
+	prefix = prefix.Masked()
 
 	// 既存のネットワークアドレスのリストを取得
 	// IDは返す
@@ -62,17 +64,19 @@ func (d *Database) CreateIpNetwork(vnetid string, spec *api.IPNetwork) (string, 
 
 	// 同一ネットワークアドレスが存在しないことを確認
 	for _, net := range networks {
-		if net.AddressMaskLen != nil && *net.AddressMaskLen == *spec.AddressMaskLen {
-			//slog.Error("CreateIpNetwork()", "err", "Network with the same AddressMaskLen already exists", "spec", spec)
-			return net.Id, fmt.Errorf(ErrAlreadyExists)
-		}
-		// ネットワークアドレスが重複していないことを確認
 		if net.AddressMaskLen != nil {
 			existingPrefix, err := netip.ParsePrefix(*net.AddressMaskLen)
 			if err != nil {
 				slog.Error("CreateIpNetwork()", "err", fmt.Errorf("invalid existing AddressMaskLen: %v", err), "existingSpec", net)
 				continue
 			}
+			existingPrefix = existingPrefix.Masked()
+
+			if existingPrefix == prefix {
+				return net.Id, fmt.Errorf(ErrAlreadyExists)
+			}
+
+			// ネットワークアドレスが重複していないことを確認
 			if prefix.Overlaps(existingPrefix) {
 				//slog.Error("CreateIpNetwork()", "err", "Network overlaps with an existing network", "spec", spec, "existingSpec", net)
 				return net.Id, fmt.Errorf(ErrOverlapsExistingNetwork)
@@ -102,9 +106,10 @@ func (d *Database) CreateIpNetwork(vnetid string, spec *api.IPNetwork) (string, 
 		slog.Error("CreateIpNetwork()", "err", err)
 		return "", err
 	}
+	net.AddressMaskLen = util.StringPtr(prefix.String())
 
 	// IPアドレスの開始と終了アドレスを設定する
-	networkAddr := prefix.Masked().Addr()
+	networkAddr := prefix.Addr()
 	addr := networkAddr.Next()
 	net.Netmasklen = util.IntPtrInt(prefix.Bits())
 	net.StartAddress = util.StringPtr(addr.String())
@@ -168,6 +173,13 @@ func (d *Database) GetIpNetworks(vnetid string) ([]api.IPNetwork, error) {
 	}
 
 	for _, ev := range resp.Kvs {
+		relKey := strings.TrimPrefix(string(ev.Key), key)
+		if relKey == "" || strings.Contains(relKey, "/") {
+			// /ip_network/{id} の直下のみを IPNetwork として扱う。
+			// /ip_network/{id}/ip_address/... は除外する。
+			continue
+		}
+
 		var net api.IPNetwork
 		err := json.Unmarshal(ev.Value, &net)
 		if err != nil {

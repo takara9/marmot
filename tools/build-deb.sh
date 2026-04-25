@@ -121,6 +121,15 @@ cat > "${PKG_DIR}/DEBIAN/postinst" <<'POSTINST'
 #!/bin/bash
 set -e
 
+CONFIG_FILE="/etc/marmot/marmotd.json"
+
+if [ -f "${CONFIG_FILE}" ]; then
+    NODE_NAME="$(hostname)"
+    if [ -n "${NODE_NAME}" ]; then
+        sed -i "s/\"node_name\": \"[^\"]*\"/\"node_name\": \"${NODE_NAME}\"/" "${CONFIG_FILE}"
+    fi
+fi
+
 # LXC を有効化するために libvirtd を停止・無効化して lxcfs を起動する
 if systemctl is-active --quiet libvirtd.service 2>/dev/null; then
     systemctl stop libvirtd.service
