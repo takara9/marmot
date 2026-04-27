@@ -19,6 +19,8 @@ const (
 	SERVER_STOPPED      = 3 // 停止中
 	SERVER_ERROR        = 4 // エラー状態
 	SERVER_DELETING     = 5 // 削除中
+	SERVER_STOPPING     = 6 // 停止処理中
+	SERVER_STARTING     = 7 // 起動処理中
 )
 
 var ServerStatus = map[int]string{
@@ -28,6 +30,8 @@ var ServerStatus = map[int]string{
 	3: "STOPPED",
 	4: "ERROR",
 	5: "DELETING",
+	6: "STOPPING",
+	7: "STARTING",
 }
 
 // サーバーを登録、サーバーを一意に識別するIDを自動生成、サーバーのステータスは、PENDINGで開始
@@ -202,6 +206,40 @@ func (d *Database) UpdateServerStatus(id string, status int, message string) {
 		slog.Error("UpdateServerStatus() UpdateServer() failed", "err", err, "serverId", id)
 		panic(err)
 	}
+}
+
+// AssignNodeToServer は NodeName 未設定のサーバーに対して nodeName を割り当てる。
+// 既に割り当て済みの場合は何もしない。
+// etcd の CAS を利用して競合を防ぐ。
+func (d *Database) AssignNodeToServer(id, nodeName string) error {
+	lockKey := "/lock/server/" + id
+	mutex, err := d.LockKey(lockKey)
+	if err != nil {
+		slog.Error("AssignNodeToServer() failed to lock", "err", err, "serverId", id)
+		return err
+	}
+	defer d.UnlockKey(mutex)
+
+	var server api.Server
+	key := ServerPrefix + "/" + id
+	resp, err := d.GetJSON(key, &server)
+	if err != nil {
+		slog.Error("AssignNodeToServer() GetJSON() failed", "err", err, "serverId", id)
+		return err
+	}
+
+	// 既に NodeName が設定済みの場合はスキップ
+	if server.Metadata != nil && server.Metadata.NodeName != nil && *server.Metadata.NodeName != "" {
+		return nil
+	}
+
+	if server.Metadata == nil {
+		server.Metadata = &api.Metadata{}
+	}
+	server.Metadata.NodeName = util.StringPtr(nodeName)
+
+	expected := resp.Kvs[0].ModRevision
+	return d.PutJSONCAS(key, expected, server)
 }
 
 // サーバーオブジェクトの削除日時をセット

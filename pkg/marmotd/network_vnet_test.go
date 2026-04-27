@@ -27,9 +27,10 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 		etcdContainerName = "etcd-net"
 	)
 	var (
-		containerID string
-		ctx         context.Context
-		cancel      context.CancelFunc
+		containerID    string
+		ctx            context.Context
+		cancel         context.CancelFunc
+		waitServerDone func()
 		//marmotServer *marmotd.Server
 	)
 	etcdUrl := "http://127.0.0.1:" + fmt.Sprintf("%d", etcdPort)
@@ -45,7 +46,7 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 
 		By("モックサーバー起動")
 		ctx, cancel = context.WithCancel(context.Background())
-		marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
+		_, waitServerDone = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
 	})
 
 	AfterAll(func(ctx0 SpecContext) {
@@ -55,7 +56,8 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("モックサーバー停止")
-		cancel() // モックサーバー停止
+		cancel()         // モックサーバー停止シグナル
+		waitServerDone() // goroutine の終了を待つ
 	})
 
 	Context("テスト環境初期化", func() {

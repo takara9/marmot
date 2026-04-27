@@ -33,6 +33,7 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 		ctx             context.Context
 		cancel          context.CancelFunc
 		marmotServer    *marmotd.Server
+		waitServerDone  func()
 		osImageid       string
 		vmId            [5]string
 		bootVolId       []string
@@ -60,7 +61,7 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 
 		By("モックサーバーの起動")
 		ctx, cancel = context.WithCancel(context.Background())
-		marmotServer = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
+		marmotServer, waitServerDone = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
 
 		By("モックサーバー起動の確認")
 		Eventually(func(g Gomega) {
@@ -82,7 +83,8 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 
 	AfterAll(func(ctx0 SpecContext) {
 		By("モックサーバー終了")
-		cancel() // モックサーバー停止
+		cancel()         // モックサーバー停止シグナル
+		waitServerDone() // goroutine の終了を待つ
 
 		By("作成したイメージの削除")
 		err := marmotServer.Ma.DeleteImageManage(osImageid)
@@ -144,7 +146,7 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 	Context("イメージ作成", func() {
 		It("URLを指定してイメージのIDを取得 DB操作のみ", func() {
 			var err error
-			osImageid, err = marmotServer.Ma.Db.MakeImageEntryFromURL("ubuntu22.04", osImageURL)
+			osImageid, err = marmotServer.Ma.Db.MakeImageEntryFromURLWithNode("ubuntu22.04", osImageURL, nodeName)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("取得したイメージID: ", osImageid)
 		})
@@ -291,6 +293,9 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 		It("イメージの作成", func() {
 			img, err := marmotServer.Ma.Db.MakeImageEntryFromRunningVM(vmId[1], "image-1")
 			Expect(err).NotTo(HaveOccurred())
+			Expect(img.Metadata).NotTo(BeNil())
+			Expect(img.Metadata.NodeName).NotTo(BeNil())
+			Expect(*img.Metadata.NodeName).To(Equal(nodeName))
 			copyCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 			defer cancel()
 			createdImageId2, err = marmotServer.Ma.MakeImageEntryFromRunningVMWithContext(copyCtx, vmId[1], "image-1", img)
@@ -299,6 +304,9 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			image, err := marmotServer.Ma.Db.GetImage(createdImageId2)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Created image: ", *image.Metadata.Name)
+			Expect(image.Metadata).NotTo(BeNil())
+			Expect(image.Metadata.NodeName).NotTo(BeNil())
+			Expect(*image.Metadata.NodeName).To(Equal(nodeName))
 			data, err := json.MarshalIndent(image, "", "  ")
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("Created image details: ", string(data))

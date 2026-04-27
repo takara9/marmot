@@ -20,3 +20,16 @@ func (s *Server) ApiGetMarmotStatus(ctx echo.Context) error {
 
 	return ctx.JSON(http.StatusOK, status)
 }
+
+// クラスタ全体のホストステータスを取得するAPIハンドラー
+func (s *Server) ApiGetMarmotCluster(ctx echo.Context) error {
+	slog.Debug("===", "ApiGetMarmotCluster() is called", "===")
+
+	statuses, err := s.Ma.Db.GetAllHostStatus()
+	if err != nil {
+		slog.Error("ApiGetMarmotCluster() GetAllHostStatus() failed", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	return ctx.JSON(http.StatusOK, statuses)
+}

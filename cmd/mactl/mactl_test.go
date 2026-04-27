@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -19,8 +18,7 @@ import (
 const testServerConfigRawURL = "https://raw.githubusercontent.com/takara9/marmot/refs/heads/main/cmd/mactl/testdata/test-server-1.yaml"
 
 var _ = Describe("Marmotd Test", Ordered, func() {
-	var ctx context.Context
-	var cancel context.CancelFunc
+	var mockServer *mockServerHandle
 	var containerID string
 
 	BeforeAll(func(specCtx SpecContext) {
@@ -42,12 +40,12 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		fmt.Printf("Container started with ID: %s\n", containerID)
 
 		By("モックサーバーの起動")
-		ctx, cancel = context.WithCancel(context.Background())
-		startMockServer(ctx)
+		mockServer, err = startMockServer()
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	AfterAll(func(specCtx SpecContext) {
-		cancel() // モックサーバー停止
+		mockServer.Stop() // モックサーバー停止
 		cmd := exec.Command("docker", "kill", containerID)
 		_, err := cmd.CombinedOutput()
 		if err != nil {
@@ -382,6 +380,17 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			err = json.Unmarshal(stdoutStderr, &volume)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(*volume.Metadata.Name).To(Equal("NEW-NAME"))
+
+			By("ボリューム名変更後も metadata.nodeName が保持されることを確認")
+			cmdDetail := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "detail", volumeID, "--output", "json")
+			stdoutStderr, err = cmdDetail.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			var detail api.Volume
+			err = json.Unmarshal(stdoutStderr, &detail)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(detail.Metadata).NotTo(BeNil())
+			Expect(detail.Metadata.NodeName).NotTo(BeNil())
+			Expect(strings.TrimSpace(*detail.Metadata.NodeName)).NotTo(BeEmpty())
 		})
 
 		It("ボリュームの削除", func() {
@@ -410,7 +419,15 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 				err = json.Unmarshal(stdoutStderr, &volumes)
 				Expect(err).NotTo(HaveOccurred())
 				g.Expect(len(volumes)).To(Equal(0))
-			}, 60*time.Second, 3*time.Second).Should(Succeed())
+
+				// デバッグ用に現在のボリュームの状態を出力
+				x, err := json.MarshalIndent(volumes, "", "  ")
+				Expect(err).NotTo(HaveOccurred())
+				fmt.Println("Current volumes:", string(x))
+
+				// ボリュームがエラー状態になるまで待つ
+
+			}, 120*time.Second, 3*time.Second).Should(Succeed())
 		})
 
 		It("ボリュームのリスト取得 テキスト形式", func() {

@@ -28,11 +28,12 @@ var _ = Describe("VirtualPrivateNetworksUpperlayer", Ordered, func() {
 		etcdContainerName = "etcd-net"
 	)
 	var (
-		containerID  string
-		ctx          context.Context
-		cancel       context.CancelFunc
-		marmotServer *marmotd.Server
-		etcdUrl      string = "http://127.0.0.1:" + fmt.Sprintf("%d", etcdPort)
+		containerID    string
+		ctx            context.Context
+		cancel         context.CancelFunc
+		marmotServer   *marmotd.Server
+		waitServerDone func()
+		etcdUrl        string = "http://127.0.0.1:" + fmt.Sprintf("%d", etcdPort)
 	)
 
 	BeforeAll(func(ctx0 SpecContext) {
@@ -65,7 +66,7 @@ var _ = Describe("VirtualPrivateNetworksUpperlayer", Ordered, func() {
 		By("モックサーバーの起動")
 		GinkgoWriter.Println("Start marmot server mock")
 		ctx, cancel = context.WithCancel(context.Background())
-		marmotServer = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
+		marmotServer, waitServerDone = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
 
 		By("Marmotの起動待ちチェック")
 		Eventually(func(g Gomega) {
@@ -80,7 +81,8 @@ var _ = Describe("VirtualPrivateNetworksUpperlayer", Ordered, func() {
 		cmd := exec.Command("docker", "kill", containerID)
 		_, err := cmd.CombinedOutput()
 		Expect(err).NotTo(HaveOccurred())
-		cancel() // モックサーバー停止
+		cancel()         // モックサーバー停止シグナル
+		waitServerDone() // goroutine の終了を待つ
 	})
 
 	Context("起動時の既存仮想ネットワークの取得とデータベースへの登録", func() {

@@ -20,6 +20,12 @@ type Auth struct {
 	User         *string `json:"user,omitempty"`
 }
 
+// Error defines model for Error.
+type Error struct {
+	Code    int32  `json:"code"`
+	Message string `json:"message"`
+}
+
 // HostAllocation defines model for HostAllocation.
 type HostAllocation struct {
 	AllocatedCpuCores *int `json:"allocatedCpuCores,omitempty"`
@@ -43,15 +49,10 @@ type HostCapacity struct {
 type HostStatus struct {
 	Allocation  *HostAllocation `json:"Allocation,omitempty"`
 	Capacity    *HostCapacity   `json:"Capacity,omitempty"`
+	HostId      *string         `json:"hostId,omitempty"`
 	IpAddress   *string         `json:"ipAddress,omitempty"`
 	LastUpdated *time.Time      `json:"lastUpdated,omitempty"`
 	NodeName    *string         `json:"nodeName,omitempty"`
-}
-
-// Error defines model for Error.
-type Error struct {
-	Code    int32  `json:"code"`
-	Message string `json:"message"`
 }
 
 // IPAddress defines model for IPAddress.
@@ -307,6 +308,12 @@ type ServerInterface interface {
 	// Get assigned IP addresses for a specific IP network
 	// (GET /ipnetwork/{id}/addresses)
 	ApiGetIpAddressesByNetwork(ctx echo.Context, id string) error
+	// Get Marmot Cluster Status
+	// (GET /marmot/cluster)
+	ApiGetMarmotCluster(ctx echo.Context) error
+	// Get Marmot Host Status
+	// (GET /marmot/status)
+	ApiGetMarmotStatus(ctx echo.Context) error
 	// Get Network Information
 	// (GET /network)
 	ApiGetNetworks(ctx echo.Context) error
@@ -346,18 +353,15 @@ type ServerInterface interface {
 	// Update Server Information by Id
 	// (PUT /server/{id})
 	ApiUpdateServerById(ctx echo.Context, id string) error
-	// Stop Server by Id
-	// (POST /server/{id}/stop)
-	ApiStopServerById(ctx echo.Context, id string) error
 	// Start Server by Id
 	// (POST /server/{id}/start)
 	ApiStartServerById(ctx echo.Context, id string) error
+	// Stop Server by Id
+	// (POST /server/{id}/stop)
+	ApiStopServerById(ctx echo.Context, id string) error
 	// Get Version
 	// (GET /version)
 	ApiGetVersion(ctx echo.Context) error
-	// Get Marmot Host Status
-	// (GET /marmot/status)
-	ApiGetMarmotStatus(ctx echo.Context) error
 	// List Volumes
 	// (GET /volume)
 	ApiListVolumes(ctx echo.Context) error
@@ -468,6 +472,24 @@ func (w *ServerInterfaceWrapper) ApiGetIpAddressesByNetwork(ctx echo.Context) er
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.ApiGetIpAddressesByNetwork(ctx, id)
+	return err
+}
+
+// ApiGetMarmotCluster converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiGetMarmotCluster(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiGetMarmotCluster(ctx)
+	return err
+}
+
+// ApiGetMarmotStatus converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiGetMarmotStatus(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiGetMarmotStatus(ctx)
 	return err
 }
 
@@ -644,22 +666,6 @@ func (w *ServerInterfaceWrapper) ApiUpdateServerById(ctx echo.Context) error {
 	return err
 }
 
-// ApiStopServerById converts echo context to params.
-func (w *ServerInterfaceWrapper) ApiStopServerById(ctx echo.Context) error {
-	var err error
-	// ------------- Path parameter "id" -------------
-	var id string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
-	}
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.ApiStopServerById(ctx, id)
-	return err
-}
-
 // ApiStartServerById converts echo context to params.
 func (w *ServerInterfaceWrapper) ApiStartServerById(ctx echo.Context) error {
 	var err error
@@ -676,21 +682,28 @@ func (w *ServerInterfaceWrapper) ApiStartServerById(ctx echo.Context) error {
 	return err
 }
 
+// ApiStopServerById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiStopServerById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiStopServerById(ctx, id)
+	return err
+}
+
 // ApiGetVersion converts echo context to params.
 func (w *ServerInterfaceWrapper) ApiGetVersion(ctx echo.Context) error {
 	var err error
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.ApiGetVersion(ctx)
-	return err
-}
-
-// ApiGetMarmotStatus converts echo context to params.
-func (w *ServerInterfaceWrapper) ApiGetMarmotStatus(ctx echo.Context) error {
-	var err error
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.ApiGetMarmotStatus(ctx)
 	return err
 }
 
@@ -795,6 +808,8 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.PUT(baseURL+"/image/:id", wrapper.ApiUpdateImageById)
 	router.GET(baseURL+"/ipnetwork", wrapper.ApiListIpNetworks)
 	router.GET(baseURL+"/ipnetwork/:id/addresses", wrapper.ApiGetIpAddressesByNetwork)
+	router.GET(baseURL+"/marmot/cluster", wrapper.ApiGetMarmotCluster)
+	router.GET(baseURL+"/marmot/status", wrapper.ApiGetMarmotStatus)
 	router.GET(baseURL+"/network", wrapper.ApiGetNetworks)
 	router.POST(baseURL+"/network", wrapper.ApiCreateNetwork)
 	router.DELETE(baseURL+"/network/:id", wrapper.ApiDeleteNetworkById)
@@ -808,14 +823,13 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.GET(baseURL+"/server/:id", wrapper.ApiGetServerById)
 	router.POST(baseURL+"/server/:id", wrapper.ApiMakeImageEntryFromRunningVMById)
 	router.PUT(baseURL+"/server/:id", wrapper.ApiUpdateServerById)
-	router.POST(baseURL+"/server/:id/stop", wrapper.ApiStopServerById)
 	router.POST(baseURL+"/server/:id/start", wrapper.ApiStartServerById)
+	router.POST(baseURL+"/server/:id/stop", wrapper.ApiStopServerById)
 	router.GET(baseURL+"/version", wrapper.ApiGetVersion)
 	router.GET(baseURL+"/volume", wrapper.ApiListVolumes)
 	router.POST(baseURL+"/volume", wrapper.ApiCreateVolume)
 	router.DELETE(baseURL+"/volume/:volumeId", wrapper.ApiDeleteVolumeById)
 	router.GET(baseURL+"/volume/:volumeId", wrapper.ApiShowVolumeById)
 	router.PUT(baseURL+"/volume/:volumeId", wrapper.ApiUpdateVolumeById)
-	router.GET(baseURL+"/marmot/status", wrapper.ApiGetMarmotStatus)
 
 }

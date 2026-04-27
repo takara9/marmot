@@ -20,13 +20,13 @@ func evaluateNodeAssignment(metadata *api.Metadata, nodeName string) (bool, stri
 	}
 	if metadata == nil || metadata.NodeName == nil {
 		if metadata == nil {
-			return true, "", "metadata_missing"
+			return false, "", "metadata_missing"
 		}
-		return true, "", "assigned_node_missing"
+		return false, "", "assigned_node_missing"
 	}
 	assigned := strings.TrimSpace(*metadata.NodeName)
 	if assigned == "" {
-		return true, "", "assigned_node_empty"
+		return false, "", "assigned_node_empty"
 	}
 	if assigned == nodeName {
 		return true, assigned, "assigned_node_match"

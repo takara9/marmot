@@ -20,19 +20,20 @@ import (
 
 var _ = Describe("サーバーテスト", Ordered, func() {
 	const (
-		marmotPort        = 8100
-		etcdPort          = 4379
-		etcdctlExe        = "/usr/bin/etcdctl"
-		nodeName          = "hvc"
-		etcdImage         = "ghcr.io/takara9/etcd:3.6.5"
-		osImage           = "ubuntu-22.04-server-cloudimg-amd64.img"
-		osImageURL        = "http://hmc/" + osImage
+		marmotPort = 8100
+		etcdPort   = 4379
+		etcdctlExe = "/usr/bin/etcdctl"
+		nodeName   = "hvc"
+		etcdImage  = "ghcr.io/takara9/etcd:3.6.5"
+		osImage    = "ubuntu-22.04-server-cloudimg-amd64.img"
+		osImageURL = "http://hmc/" + osImage
 	)
 	var (
 		containerID      string
 		ctx              context.Context
 		cancel           context.CancelFunc
 		marmotServer     *marmotd.Server
+		waitServerDone   func()
 		osImageid        string
 		vm1Id            string
 		vm1BootVolumeId  string
@@ -69,7 +70,10 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		if err != nil {
 			fmt.Printf("Failed to stop container: %v\n", err)
 		}
-		cancel() // モックサーバー停止
+		cancel() // モックサーバー停止シグナル
+		if waitServerDone != nil {
+			waitServerDone() // goroutine の終了を待つ
+		}
 		// /var/lib/marmot/images/9e24c/ubuntu-22.04-server-cloudimg-amd64.img のようなファイルを削除する
 
 		// 以下の後処理は、本来、それぞれの削除関数の中で実施するべきもの
@@ -123,7 +127,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		It("モックサーバーの起動", func() {
 			GinkgoWriter.Println("Start marmot server mock")
 			ctx, cancel = context.WithCancel(context.Background())
-			marmotServer = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
+			marmotServer, waitServerDone = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
 		})
 
 		It("モックサーバー起動の確認", func() {
@@ -162,7 +166,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		It("URLを指定してイメージのIDを取得", func() {
 			var err error
 			GinkgoWriter.Println("URLを指定してイメージのIDを取得")
-			osImageid, err = marmotServer.Ma.Db.MakeImageEntryFromURL("ubuntu22.04", osImageURL)
+			osImageid, err = marmotServer.Ma.Db.MakeImageEntryFromURLWithNode("ubuntu22.04", osImageURL, nodeName)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("取得したイメージID: ", osImageid)
 		})
@@ -232,6 +236,14 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				g.Expect(sv.Status.StatusCode).To(Equal(db.SERVER_RUNNING))
 				vm1BootVolumeId = sv.Spec.BootVolume.Id
 			}, "120s", "10s").Should(Succeed())
+		})
+
+		It("ブートボリュームの metadata.nodeName を保持する", func() {
+			bootVol, err := marmotServer.Ma.GetVolumeById(vm1BootVolumeId)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(bootVol.Metadata).NotTo(BeNil())
+			Expect(bootVol.Metadata.NodeName).NotTo(BeNil())
+			Expect(*bootVol.Metadata.NodeName).To(Equal(nodeName))
 		})
 
 		It("仮想サーバーの削除", func() {
@@ -1167,7 +1179,10 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				if err != nil {
 					fmt.Printf("Failed to remove container: %v\n", err)
 				}
-				cancel() // モックサーバー停止
+				cancel() // モックサーバー停止シグナル
+				if waitServerDone != nil {
+					waitServerDone() // goroutine の終了を待つ
+				}
 			})
 		})
 	*/

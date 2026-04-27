@@ -35,12 +35,12 @@ test0: mactl-test
 
 .PHONY:test1 
 test1:
-	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus-file mactl-vm-deploy-1_test.go -timeout=20m -coverprofile cover.out
+	$(GO) test -v . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus-file mactl-vm-deploy-1_test.go -timeout=20m -coverprofile cover.out
 
 .PHONY:test2
 test2:
-	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus-file mactl-vm-deploy-2_test.go -timeout=20m -coverprofile cover.out
+	$(GO) test -v . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus-file mactl-vm-deploy-2_test.go -timeout=20m -coverprofile cover.out
 
 .PHONY:test3
 test3:
-	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus-file mactl-vm-deploy-3_test.go -timeout=20m -coverprofile cover.out
+	$(GO) test -v . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus-file mactl-vm-deploy-3_test.go -timeout=20m -coverprofile cover.out

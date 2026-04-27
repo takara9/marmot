@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -16,8 +15,7 @@ import (
 )
 
 var _ = Describe("MarmotdTest", Ordered, func() {
-	var ctx context.Context
-	var cancel context.CancelFunc
+	var mockServer *mockServerHandle
 	var containerID string
 
 	BeforeAll(func(specCtx SpecContext) {
@@ -39,12 +37,12 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 		fmt.Printf("Container started with ID: %s\n", containerID)
 
 		By("モックサーバーの起動")
-		ctx, cancel = context.WithCancel(context.Background())
-		startMockServer(ctx)
+		mockServer, err = startMockServer()
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	AfterAll(func(specCtx SpecContext) {
-		cancel() // モックサーバー停止
+		mockServer.Stop() // モックサーバー停止
 		cmd := exec.Command("docker", "kill", containerID)
 		_, err := cmd.CombinedOutput()
 		if err != nil {
@@ -444,6 +442,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Printf("  - %s (%s)\n", *server.Metadata.Name, server.Id)
 				g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_RUNNING)))
+				expectServerBootVolumeNodeName(g, server)
 			}, 120*time.Second, 5*time.Second).Should(Succeed())
 		})
 
@@ -459,6 +458,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Printf("  - %s (%s)\n", *server.Metadata.Name, server.Id)
 				g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_RUNNING)))
+				expectServerBootVolumeNodeName(g, server)
 			}, 120*time.Second, 5*time.Second).Should(Succeed())
 		})
 
@@ -568,6 +568,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 					Expect(err).NotTo(HaveOccurred())
 					GinkgoWriter.Printf("  - %s (%s)\n", *server.Metadata.Name, server.Id)
 					g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_RUNNING)))
+					expectServerBootVolumeNodeName(g, server)
 				}, 120*time.Second, 5*time.Second).Should(Succeed())
 			}
 		})

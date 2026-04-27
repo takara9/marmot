@@ -33,14 +33,21 @@ func StartImageController(node string, etcdUrl string, deletionDelaySeconds int)
 		return nil, err
 	}
 	c.db = c.marmot.Db // 正しくないけど
+	c.stopChan = make(chan struct{})
+	c.doneChan = make(chan struct{})
 
 	// 定期実行の開始
 	ticker := time.NewTicker(IMAGE_CONTROLLER_INTERVAL)
 	go func() {
+		defer ticker.Stop()
+		defer close(c.doneChan)
 		for {
 			select {
 			case <-ticker.C:
 				c.imageControllerLoop()
+			case <-c.stopChan:
+				slog.Info("イメージコントローラー停止")
+				return
 			}
 		}
 	}()

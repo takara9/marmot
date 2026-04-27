@@ -35,6 +35,14 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		return "", err
 	}
 
+	assignedNodeName := strings.TrimSpace(m.NodeName)
+	if serverConfig.Metadata != nil && serverConfig.Metadata.NodeName != nil {
+		if node := strings.TrimSpace(*serverConfig.Metadata.NodeName); node != "" {
+			assignedNodeName = node
+		}
+	}
+	assignNodeNameIfUnset(&serverConfig.Metadata, assignedNodeName)
+
 	slog.Debug("OS指定がなければ、OSバリアントのデフォルトを設定")
 	if serverConfig.Spec.OsVariant == nil {
 		bootVol.Spec.OsVariant = util.StringPtr("ubuntu22.04")
@@ -43,6 +51,8 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 
 	slog.Debug("ブートボリュームの生成と設定")
 	bootVol.Metadata.Name = util.StringPtr("boot-" + serverConfig.Id)
+	// サーバー割当ノードをブートボリュームのメタデータに付与する。
+	assignNodeNameIfUnset(&bootVol.Metadata, assignedNodeName)
 	bootVol.Spec.Kind = util.StringPtr("os")
 	bootVol.Spec.Path = util.StringPtr("")
 	bootVol.Spec.Size = util.IntPtrInt(0)
@@ -363,6 +373,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 
 			if disk.Spec.Type != nil && *disk.Spec.Type == "qcow2" {
 				slog.Debug("qcow2ボリュームを作成", "disk index", i)
+				assignNodeNameIfUnset(&disk.Metadata, assignedNodeName)
 				diskVol, err := m.CreateNewVolumeWithWait(disk)
 				if err != nil {
 					slog.Error("CreateNewVolumeWithWait()", "err", err)
@@ -373,6 +384,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			}
 			if disk.Spec.Type != nil && *disk.Spec.Type == "lvm" {
 				slog.Debug("lvmボリュームを作成", "disk index", i)
+				assignNodeNameIfUnset(&disk.Metadata, assignedNodeName)
 				diskVol, err := m.CreateNewVolumeWithWait(disk)
 				if err != nil {
 					slog.Error("CreateNewVolumeWithWait()", "err", err)

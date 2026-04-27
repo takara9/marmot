@@ -28,11 +28,12 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 		osImageURL        = "http://hmc/" + osImage
 	)
 	var (
-		containerID  string
-		ctx          context.Context
-		cancel       context.CancelFunc
-		marmotServer *marmotd.Server
-		osImageID    string
+		containerID    string
+		ctx            context.Context
+		cancel         context.CancelFunc
+		marmotServer   *marmotd.Server
+		waitServerDone func()
+		osImageID      string
 	)
 	etcdUrl := "http://127.0.0.1:" + fmt.Sprintf("%d", etcdPort)
 
@@ -49,7 +50,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 		By("marmotモックの起動")
 		GinkgoWriter.Println("Start marmot server mock")
 		ctx, cancel = context.WithCancel(context.Background())
-		marmotServer = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
+		marmotServer, waitServerDone = marmotd.StartMockServer(ctx, int(marmotPort), int(etcdPort)) // バックグラウンドで起動する
 	})
 
 	AfterAll(func(ctx0 SpecContext) {
@@ -58,7 +59,8 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 		if err != nil {
 			fmt.Printf("Failed to stop container: %v\n", err)
 		}
-		cancel() // モックサーバー停止
+		cancel()         // モックサーバー停止シグナル
+		waitServerDone() // goroutine の終了を待つ
 
 		// /var/lib/marmot/images/9e24c/ubuntu-22.04-server-cloudimg-amd64.img のようなファイルを削除する
 		imagePath := "/var/lib/marmot/images/" + osImageID
@@ -95,7 +97,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			var err error
 			GinkgoWriter.Println("URLを指定してイメージのIDを取得")
 			//url := "http://hmc/ubuntu-22.04-server-cloudimg-amd64.img"
-			osImageID, err = marmotServer.Ma.Db.MakeImageEntryFromURL("ubuntu22.04", osImageURL)
+			osImageID, err = marmotServer.Ma.Db.MakeImageEntryFromURLWithNode("ubuntu22.04", osImageURL, nodeName)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("取得したイメージID: ", osImageID)
 		})
