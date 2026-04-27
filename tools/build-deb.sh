@@ -142,15 +142,21 @@ if [ -f "${CONFIG_FILE}" ]; then
     fi
 fi
 
+## 以下はとうめん無効化して、変わりに libvirt を有効化する形にする。
 # LXC を有効化するために libvirtd を停止・無効化して lxcfs を起動する
-if systemctl is-active --quiet libvirtd.service 2>/dev/null; then
-    systemctl stop libvirtd.service
-fi
-if systemctl is-enabled --quiet libvirtd.service 2>/dev/null; then
-    systemctl disable libvirtd.service
-fi
-systemctl enable lxcfs.service
-systemctl start lxcfs.service
+#if systemctl is-active --quiet libvirtd.service 2>/dev/null; then
+#    systemctl stop libvirtd.service
+#fi
+#if systemctl is-enabled --quiet libvirtd.service 2>/dev/null; then
+#    systemctl disable libvirtd.service
+#fi
+#systemctl enable lxcfs.service
+#systemctl start lxcfs.service
+
+# libvirt を有効化する
+systemctl enable libvirtd.service
+systemctl start libvirtd.service
+##
 
 systemctl daemon-reload
 systemctl enable marmot.service

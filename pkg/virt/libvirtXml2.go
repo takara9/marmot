@@ -477,6 +477,12 @@ func (l *LibVirtEp) StopDomain(vmname string) error {
 		return err
 	}
 
+	// autostart を disable に変更
+	err = domain.SetAutostart(false)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -489,6 +495,12 @@ func (l *LibVirtEp) StartDomain(vmname string) error {
 
 	// ドメインの開始
 	err = domain.Create()
+	if err != nil {
+		return err
+	}
+
+	// autostart を有効化
+	err = domain.SetAutostart(true)
 	if err != nil {
 		return err
 	}
