@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/labstack/echo/v4"
-	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/controller"
 	internaldns "github.com/takara9/marmot/pkg/internal-dns"
 	"github.com/takara9/marmot/pkg/marmotd"
@@ -80,7 +79,7 @@ func main() {
 	e := echo.New()
 	slog.Debug("Starting api server #2", "nodeName", cfg.NodeName, "etcdURL", cfg.EtcdURL, "apiListenAddr", cfg.APIListenAddr)
 	Server := marmotd.NewServer(cfg.NodeName, cfg.EtcdURL)
-	api.RegisterHandlersWithBaseURL(e, Server, "/api/v1")
+	marmotd.RegisterRoutes(e, Server, "/api/v1")
 
 	// コントローラーの開始
 	slog.Info("Starting controllers", "nodeName", cfg.NodeName, "etcdURL", cfg.EtcdURL, "deletionDelaySeconds", cfg.DeletionDelaySeconds)

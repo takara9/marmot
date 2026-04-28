@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
-	"github.com/takara9/marmot/api"
 )
 
 // StartMockServer はモックサーバーを起動し、サーバーハンドルと goroutine の終了を待つ関数を返す。
@@ -29,7 +28,7 @@ func StartMockServer(ctx context.Context, marmotPort int, etcdPort int) (*Server
 
 	go func() {
 		defer close(done)
-		api.RegisterHandlersWithBaseURL(e, server, "/api/v1")
+		RegisterRoutes(e, server, "/api/v1")
 
 		// サーバー起動
 		go func() {
