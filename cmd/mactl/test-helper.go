@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
-	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/controller"
 	internaldns "github.com/takara9/marmot/pkg/internal-dns"
 	"github.com/takara9/marmot/pkg/marmotd"
@@ -51,7 +50,7 @@ func startMockServer() (*mockServerHandle, error) {
 
 	go func() {
 		defer close(h.done)
-		api.RegisterHandlersWithBaseURL(e, server, "/api/v1")
+		marmotd.RegisterRoutes(e, server, "/api/v1")
 
 		type stopper interface{ Stop() }
 		stoppers := make([]stopper, 0, 6)

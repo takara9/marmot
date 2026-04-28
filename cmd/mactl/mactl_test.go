@@ -482,6 +482,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr))
+			assertImageListTextHeader(stdoutStderr)
 		})
 
 		var volumeID3 string
@@ -523,6 +524,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr))
+			assertImageListTextHeader(stdoutStderr)
 		})
 
 		It("ボリュームリスト取得", func() {

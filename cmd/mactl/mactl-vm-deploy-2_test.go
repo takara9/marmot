@@ -399,6 +399,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr))
+			assertImageListTextHeader(stdoutStderr)
 		})
 	})
 

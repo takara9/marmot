@@ -67,3 +67,7 @@ var imageDeleteCmd = &cobra.Command{
 func init() {
 	imageCmd.AddCommand(imageDeleteCmd)
 }
+
+func init() {
+	imageCmd.AddCommand(imageDeleteCmd)
+}

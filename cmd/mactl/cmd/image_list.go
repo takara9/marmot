@@ -5,12 +5,16 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 	"go.yaml.in/yaml/v3"
 )
+
+var imageListShowAll bool
 
 var imageListCmd = &cobra.Command{
 	Use:   "list",
@@ -30,6 +34,22 @@ var imageListCmd = &cobra.Command{
 			}
 
 			//var data interface{}
+			var allData []api.Image
+			if err := json.Unmarshal(byteBody, &allData); err == nil && !imageListShowAll {
+				var filtered []api.Image
+				for _, image := range allData {
+					if image.Metadata == nil || image.Metadata.Labels == nil || db.GetFollowerSyncRole(*image.Metadata.Labels) != "follower" {
+						filtered = append(filtered, image)
+					}
+				}
+				allData = filtered
+				if len(allData) == 0 {
+					byteBody = []byte("null\n")
+				} else {
+					byteBody, _ = json.Marshal(allData)
+				}
+			}
+
 			var data []api.Image
 			switch outputStyle {
 			case "text":
@@ -46,7 +66,7 @@ var imageListCmd = &cobra.Command{
 					return creationTime(data[i].Status).Before(creationTime(data[j].Status))
 				})
 
-				fmt.Printf("  %2s  %-8s  %-16s  %-12s  %-20s  %-40s\n", "No", "IMAGE-ID", "IMAGE-NAME", "STATUS", "LV-PATH", "QCOW2-PATH")
+				fmt.Printf("  %2s  %-8s  %-16s  %-12s  %-12s  %-7s  %-4s  %-5s  %-25s\n", "No", "IMAGE-ID", "IMAGE-NAME", "STATUS", "NODE-NAME", "ROLE", "LV", "QCOW2", "CREATED-AT")
 				for i, image := range data {
 					fmt.Printf("  %2d", i+1)
 					fmt.Printf("  %-8v", image.Id)
@@ -60,16 +80,21 @@ var imageListCmd = &cobra.Command{
 					} else {
 						fmt.Printf("  %-12v", "N/A")
 					}
-					if image.Spec.LvPath != nil {
-						fmt.Printf("  %-20v", *image.Spec.LvPath)
+					if image.Metadata != nil && image.Metadata.NodeName != nil && strings.TrimSpace(*image.Metadata.NodeName) != "" {
+						fmt.Printf("  %-12v", *image.Metadata.NodeName)
 					} else {
-						fmt.Printf("  %-20v", "N/A")
+						fmt.Printf("  %-12v", "N/A")
 					}
-					if image.Spec.Qcow2Path != nil {
-						fmt.Printf("  %-40v", *image.Spec.Qcow2Path)
-					} else {
-						fmt.Printf("  %-40v", "N/A")
+					role := "master"
+					if image.Metadata != nil && image.Metadata.Labels != nil {
+						if db.GetFollowerSyncRole(*image.Metadata.Labels) == "follower" {
+							role = "replica"
+						}
 					}
+					fmt.Printf("  %-7v", role)
+					fmt.Printf("  %-4v", existsPath(image.Spec, func(s *api.ImageSpec) *string { return s.LvPath }))
+					fmt.Printf("  %-5v", existsPath(image.Spec, func(s *api.ImageSpec) *string { return s.Qcow2Path }))
+					fmt.Printf("  %-25v", timeValue(image.Status, func(s *api.Status) *time.Time { return s.CreationTimeStamp }))
 
 					fmt.Println()
 				}
@@ -114,4 +139,16 @@ var imageListCmd = &cobra.Command{
 
 func init() {
 	imageCmd.AddCommand(imageListCmd)
+	imageListCmd.Flags().BoolVarP(&imageListShowAll, "all", "a", false, "レプリカも含めてすべてのイメージを表示する")
+}
+
+func existsPath[T any](obj *T, selector func(*T) *string) string {
+	if obj == nil {
+		return "no"
+	}
+	value := selector(obj)
+	if value == nil || strings.TrimSpace(*value) == "" {
+		return "no"
+	}
+	return "yes"
 }

@@ -21,6 +21,14 @@ const (
 	IMAGE_AVAILABLE       = 3 // 利用可能
 	IMAGE_DELETING        = 4 // 削除中
 	IMAGE_DELETED         = 5 // 削除済み
+	IMAGE_WAITING         = 6 // ヘッドノードの作成完了待ち
+
+	// Image label keys for distributed sync
+	ImageLabelSyncRole    = "syncRole"
+	ImageLabelHeadImageID = "headImageId"
+	ImageLabelHeadNodeName = "headNodeName"
+	ImageLabelSource      = "source"
+	ImageLabelServerID    = "serverId"
 )
 
 var ImageStatus = map[int]string{
@@ -30,6 +38,96 @@ var ImageStatus = map[int]string{
 	3: "AVAILABLE",
 	4: "DELETING",
 	5: "DELETED",
+	6: "WAITING",
+}
+
+// ==================== Image Label Helpers ====================
+// Follower イメージの sync 情報を etcd オブジェクトに格納するための
+// 型安全なヘルパー関数。これらはラベルに直接作用します。
+
+// SetFollowerSyncLabels は follower イメージの sync 情報をラベルに設定する
+func SetFollowerSyncLabels(labels map[string]interface{}, syncRole, headImageID, headNodeName string) {
+	if labels == nil {
+		return
+	}
+	labels[ImageLabelSyncRole] = syncRole
+	labels[ImageLabelHeadImageID] = strings.TrimSpace(headImageID)
+	if node := strings.TrimSpace(headNodeName); node != "" {
+		labels[ImageLabelHeadNodeName] = node
+	}
+}
+
+// SetImageSourceLabels は image source 情報をラベルに設定する
+func SetImageSourceLabels(labels map[string]interface{}, source string, serverID string) {
+	if labels == nil {
+		return
+	}
+	if src := strings.TrimSpace(source); src != "" {
+		labels[ImageLabelSource] = src
+	}
+	if sID := strings.TrimSpace(serverID); sID != "" {
+		labels[ImageLabelServerID] = sID
+	}
+}
+
+// GetFollowerSyncRole はラベルから syncRole を取得する
+func GetFollowerSyncRole(labels map[string]interface{}) string {
+	if labels == nil {
+		return ""
+	}
+	val, ok := labels[ImageLabelSyncRole].(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(val)
+}
+
+// GetHeadImageID はラベルから headImageId を取得する
+func GetHeadImageID(labels map[string]interface{}) string {
+	if labels == nil {
+		return ""
+	}
+	val, ok := labels[ImageLabelHeadImageID].(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(val)
+}
+
+// GetHeadNodeName はラベルから headNodeName を取得する
+func GetHeadNodeName(labels map[string]interface{}) string {
+	if labels == nil {
+		return ""
+	}
+	val, ok := labels[ImageLabelHeadNodeName].(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(val)
+}
+
+// GetImageSource はラベルから source を取得する
+func GetImageSource(labels map[string]interface{}) string {
+	if labels == nil {
+		return ""
+	}
+	val, ok := labels[ImageLabelSource].(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(val)
+}
+
+// GetImageServerID はラベルから serverId を取得する
+func GetImageServerID(labels map[string]interface{}) string {
+	if labels == nil {
+		return ""
+	}
+	val, ok := labels[ImageLabelServerID].(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(val)
 }
 
 func (d *Database) getUniqueImageID() (string, error) {
@@ -441,4 +539,75 @@ func (d *Database) FindImageByNameAndNode(name, nodeName string) (api.Image, err
 	}
 
 	return api.Image{}, fmt.Errorf("image not found with name: %v and nodeName: %v", name, targetNode)
+}
+
+// MakeFollowerImageEntry creates a follower-side image object that waits for the head image.
+// The follower image keeps headImageId in labels and starts from WAITING status.
+func (d *Database) MakeFollowerImageEntry(headImage api.Image, followerNodeName string, headImageId string) (string, error) {
+	followerNodeName = strings.TrimSpace(followerNodeName)
+	headImageId = strings.TrimSpace(headImageId)
+	if followerNodeName == "" {
+		return "", fmt.Errorf("follower nodeName is required")
+	}
+	if headImageId == "" {
+		return "", fmt.Errorf("head image id is required")
+	}
+	if headImage.Metadata == nil || headImage.Metadata.Name == nil || strings.TrimSpace(*headImage.Metadata.Name) == "" {
+		return "", fmt.Errorf("head image metadata.name is required")
+	}
+
+	id, err := d.getUniqueImageID()
+	if err != nil {
+		slog.Error("MakeFollowerImageEntry() getUniqueImageID failed", "err", err)
+		return "", err
+	}
+
+	labels := make(map[string]interface{})
+
+	// Set sync-related labels using helpers
+	headNodeName := ""
+	if headImage.Metadata.NodeName != nil {
+		headNodeName = *headImage.Metadata.NodeName
+	}
+	SetFollowerSyncLabels(labels, "follower", headImageId, headNodeName)
+
+	// Set source-related labels from head image if present
+	if headImage.Metadata.Labels != nil {
+		source := GetImageSource(*headImage.Metadata.Labels)
+		serverID := GetImageServerID(*headImage.Metadata.Labels)
+		SetImageSourceLabels(labels, source, serverID)
+	}
+
+	imageDir := fmt.Sprintf("/var/lib/marmot/images/%s", id)
+	imagePath := fmt.Sprintf("%s/osimage-%s.qcow2", imageDir, id)
+
+	follower := api.Image{
+		Id: id,
+		Metadata: &api.Metadata{
+			Name:     headImage.Metadata.Name,
+			NodeName: util.StringPtr(followerNodeName),
+			Labels:   &labels,
+		},
+		Spec: &api.ImageSpec{
+			Kind:      util.StringPtr("os"),
+			Type:      util.StringPtr("qcow2"),
+			Qcow2Path: util.StringPtr(imagePath),
+			SourceUrl: nil,
+		},
+		Status: &api.Status{
+			StatusCode:          IMAGE_WAITING,
+			Status:              util.StringPtr(ImageStatus[IMAGE_WAITING]),
+			CreationTimeStamp:   util.TimePtr(time.Now()),
+			LastUpdateTimeStamp: util.TimePtr(time.Now()),
+			Message:             util.StringPtr("ヘッドノードのイメージ作成完了を待機中"),
+		},
+	}
+
+	key := ImagePrefix + "/" + id
+	if err := d.PutJSON(key, follower); err != nil {
+		slog.Error("MakeFollowerImageEntry() PutJSON failed", "err", err)
+		return "", err
+	}
+
+	return id, nil
 }

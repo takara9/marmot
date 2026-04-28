@@ -87,10 +87,37 @@ func (s *Server) ApiGetImageById(ctx echo.Context, id string) error {
 func (s *Server) ApiDeleteImageById(ctx echo.Context, id string) error {
 	slog.Debug("===ApiDeleteImageById() is called ===", "id", id)
 
-	err := s.Ma.Db.SetDeleteTimestampImage(id)
+	// 指定 ID のイメージ名を取得
+	target, err := s.Ma.Db.GetImage(id)
 	if err != nil {
-		slog.Error("ApiDeleteImageById()", "err", err)
+		slog.Error("ApiDeleteImageById() GetImage failed", "id", id, "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+	if target.Metadata == nil || target.Metadata.Name == nil {
+		slog.Error("ApiDeleteImageById() image name is empty", "id", id)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: "image name is empty"})
+	}
+	targetName := *target.Metadata.Name
+
+	// 同じ IMAGE-NAME を持つ全イメージに削除タイムスタンプをセット
+	allImages, err := s.Ma.Db.GetImages()
+	if err != nil {
+		slog.Error("ApiDeleteImageById() GetImages failed", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+	for _, img := range allImages {
+		if img.Metadata == nil || img.Metadata.Name == nil || *img.Metadata.Name != targetName {
+			continue
+		}
+		if img.Status != nil && img.Status.DeletionTimeStamp != nil {
+			// 既に削除予定済みのものはスキップ
+			continue
+		}
+		if setErr := s.Ma.Db.SetDeleteTimestampImage(img.Id); setErr != nil {
+			slog.Error("ApiDeleteImageById() SetDeleteTimestampImage failed", "imageId", img.Id, "err", setErr)
+		} else {
+			slog.Debug("ApiDeleteImageById() 削除タイムスタンプをセット", "imageId", img.Id, "imageName", targetName)
+		}
 	}
 
 	var resp api.Success
