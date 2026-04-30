@@ -1,12 +1,15 @@
 package controller
 
 import (
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
+	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
+	"github.com/takara9/marmot/pkg/virt"
 )
 
 const (
@@ -87,6 +90,22 @@ func (c *controller) networkControllerLoop() {
 
 	for _, vnet := range vnets {
 		if ok, assignedNode, reason := evaluateNodeAssignment(vnet.Metadata, c.marmot.NodeName); !ok {
+			if vnet.Status != nil {
+				switch vnet.Status.StatusCode {
+				case db.NETWORK_ACTIVE:
+					// ACTIVE は全ノードに仮想ネットワーク実体だけを揃える。
+					// IPネットワーク作成を避けるため DeployVirtualNetwork は呼ばない。
+					if err := c.ensureVirtualNetworkPresent(vnet); err != nil {
+						slog.Error("failed to ensure virtual network on follower node", "err", err, "networkId", vnet.Id, "controllerNode", c.marmot.NodeName)
+					}
+				case db.NETWORK_DELETING:
+					// DELETING はフォロワーノードでも libvirt 実体のみ削除する。
+					// DB・IPネットワーク削除はヘッドノードの DeleteVirtualNetwork に任せる。
+					if err := c.ensureVirtualNetworkAbsent(vnet); err != nil {
+						slog.Error("failed to delete virtual network on follower node", "err", err, "networkId", vnet.Id, "controllerNode", c.marmot.NodeName)
+					}
+				}
+			}
 			objectName := ""
 			if vnet.Metadata != nil && vnet.Metadata.Name != nil {
 				objectName = *vnet.Metadata.Name
@@ -171,6 +190,9 @@ func (c *controller) networkControllerLoop() {
 
 			case db.NETWORK_ACTIVE:
 				slog.Debug("利用可能な仮想ネットワークを処理", "networkId", vnet.Id)
+				if err := c.ensureVirtualNetworkPresent(vnet); err != nil {
+					slog.Error("failed to ensure virtual network on node", "err", err, "networkId", vnet.Id, "controllerNode", c.marmot.NodeName)
+				}
 
 			default:
 				slog.Warn("不明なステータスの仮想ネットワークをスキップ", "networkId", vnet.Id, "status", *vnet.Status.Status)
@@ -178,4 +200,52 @@ func (c *controller) networkControllerLoop() {
 		}
 	}
 	// ワークキューから処理を取り出して、処理を実行する
+}
+
+func (c *controller) ensureVirtualNetworkPresent(vnet api.VirtualNetwork) error {
+	if vnet.Metadata == nil || vnet.Metadata.Name == nil || strings.TrimSpace(*vnet.Metadata.Name) == "" {
+		return fmt.Errorf("network metadata.name is required: networkId=%s", vnet.Id)
+	}
+
+	if _, found, err := c.marmot.Virt.GetVirtualNetworkByName(*vnet.Metadata.Name); err == nil && found {
+		return nil
+	}
+
+	xml, err := virt.CreateVirtualNetworkXML(vnet)
+	if err != nil {
+		return err
+	}
+
+	if err := c.marmot.Virt.DefineAndStartVirtualNetwork(*xml); err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "already exists") {
+			return nil
+		}
+		return err
+	}
+
+	return nil
+}
+
+// ensureVirtualNetworkAbsent はフォロワーノードで libvirt ネットワーク実体のみを削除する。
+// DB・IPネットワーク削除はヘッドノードの DeleteVirtualNetwork が担うため、ここでは行わない。
+func (c *controller) ensureVirtualNetworkAbsent(vnet api.VirtualNetwork) error {
+	if vnet.Metadata == nil || vnet.Metadata.Name == nil || strings.TrimSpace(*vnet.Metadata.Name) == "" {
+		return fmt.Errorf("network metadata.name is required: networkId=%s", vnet.Id)
+	}
+
+	_, found, err := c.marmot.Virt.GetVirtualNetworkByName(*vnet.Metadata.Name)
+	if err != nil || !found {
+		// 既に存在しない場合は何もしない
+		return nil
+	}
+
+	if err := c.marmot.Virt.DeleteVirtualNetwork(*vnet.Metadata.Name); err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "not found") {
+			return nil
+		}
+		return err
+	}
+
+	slog.Debug("フォロワーノードで仮想ネットワーク実体を削除", "networkId", vnet.Id, "networkName", *vnet.Metadata.Name, "controllerNode", c.marmot.NodeName)
+	return nil
 }

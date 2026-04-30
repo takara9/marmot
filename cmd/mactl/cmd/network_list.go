@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -45,26 +46,7 @@ var networkListCmd = &cobra.Command{
 
 			switch outputStyle {
 			case "text":
-				for i, network := range data {
-					fmt.Printf("  %2d", i+1)
-					fmt.Printf("  %-10v", network.Id)
-					if network.Metadata.Name != nil {
-						fmt.Printf("  %-20v", *network.Metadata.Name)
-					} else {
-						fmt.Printf("  %-20v", "")
-					}
-					if network.Spec.BridgeName != nil {
-						fmt.Printf("  %-20v", *network.Spec.BridgeName)
-					} else {
-						fmt.Printf("  %-20v", "")
-					}
-					if network.Status != nil && network.Status.Status != nil {
-						fmt.Printf("  %-20v", db.NetworkStatus[network.Status.StatusCode])
-					} else {
-						fmt.Printf("  %-20v", "")
-					}
-					fmt.Println()
-				}
+				fmt.Print(formatNetworkListText(data))
 				return nil
 
 			case "json":
@@ -95,6 +77,34 @@ var networkListCmd = &cobra.Command{
 			}
 		})
 	},
+}
+
+func formatNetworkListText(data []api.VirtualNetwork) string {
+	var builder strings.Builder
+
+	fmt.Fprintf(&builder, "  %2s  %-10s  %-20s  %-12s  %-20s  %-20s\n", "No", "NETWORK-ID", "NETWORK-NAME", "NODE-NAME", "BRIDGE-NAME", "STATUS")
+	for i, network := range data {
+		fmt.Fprintf(&builder, "  %2d  %-10v  %-20v  %-12v  %-20v  %-20v\n",
+			i+1,
+			network.Id,
+			stringValue(network.Metadata, func(m *api.Metadata) *string { return m.Name }),
+			stringValue(network.Metadata, func(m *api.Metadata) *string { return m.NodeName }),
+			stringValue(network.Spec, func(s *api.VirtualNetworkSpec) *string { return s.BridgeName }),
+			networkListStatusLabel(network.Status),
+		)
+	}
+
+	return builder.String()
+}
+
+func networkListStatusLabel(status *api.Status) string {
+	if status == nil || status.Status == nil {
+		return "N/A"
+	}
+	if name, ok := db.NetworkStatus[status.StatusCode]; ok {
+		return name
+	}
+	return fmt.Sprintf("UNKNOWN(%d)", status.StatusCode)
 }
 
 func init() {

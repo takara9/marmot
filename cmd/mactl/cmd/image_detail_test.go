@@ -5,17 +5,17 @@ import (
 	"io"
 	"os"
 	"strings"
-	"testing"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"github.com/takara9/marmot/api"
 )
 
-func captureStdout(t *testing.T, fn func()) string {
-	t.Helper()
+func captureStdout(fn func()) string {
 	old := os.Stdout
 	r, w, err := os.Pipe()
 	if err != nil {
-		t.Fatalf("os.Pipe failed: %v", err)
+		Fail("os.Pipe failed: " + err.Error())
 	}
 	defer r.Close()
 
@@ -27,42 +27,32 @@ func captureStdout(t *testing.T, fn func()) string {
 	fn()
 
 	if err := w.Close(); err != nil {
-		t.Fatalf("stdout close failed: %v", err)
+		Fail("stdout close failed: " + err.Error())
 	}
 
 	var buf bytes.Buffer
 	if _, err := io.Copy(&buf, r); err != nil {
-		t.Fatalf("io.Copy failed: %v", err)
+		Fail("io.Copy failed: " + err.Error())
 	}
 	return buf.String()
 }
 
-func TestPrintImageDetails_NilSafe(t *testing.T) {
-	output := captureStdout(t, func() {
-		printImageDetails(api.Image{Id: "img01"})
+var _ = Describe("printImageDetails", func() {
+	It("prints a nil-safe detail view", func() {
+		output := captureStdout(func() {
+			printImageDetails(api.Image{Id: "img01"})
+		})
+
+		Expect(strings.Contains(output, "Image Details")).To(BeTrue(), output)
+		Expect(strings.Contains(output, "Summary")).To(BeTrue(), output)
+		Expect(strings.Contains(output, "Id:           img01")).To(BeTrue(), output)
+		Expect(strings.Contains(output, "UUID:         N/A")).To(BeTrue(), output)
+		Expect(strings.Contains(output, "State:        N/A")).To(BeTrue(), output)
 	})
+})
 
-	if !strings.Contains(output, "Image Details") {
-		t.Fatalf("expected header in output, got: %s", output)
-	}
-	if !strings.Contains(output, "Summary") {
-		t.Fatalf("expected summary section in output, got: %s", output)
-	}
-	if !strings.Contains(output, "Id:           img01") {
-		t.Fatalf("expected id in output, got: %s", output)
-	}
-	if !strings.Contains(output, "UUID:         N/A") {
-		t.Fatalf("expected N/A uuid in output, got: %s", output)
-	}
-	if !strings.Contains(output, "State:        N/A") {
-		t.Fatalf("expected N/A state in output, got: %s", output)
-	}
-}
-
-func TestFormatImageStatus_UnknownFallback(t *testing.T) {
-	got := formatImageStatus(&api.Status{StatusCode: 99})
-	want := "UNKNOWN(99) (99)"
-	if got != want {
-		t.Fatalf("unexpected status: got=%q want=%q", got, want)
-	}
-}
+var _ = Describe("formatImageStatus", func() {
+	It("falls back for unknown status codes", func() {
+		Expect(formatImageStatus(&api.Status{StatusCode: 99})).To(Equal("UNKNOWN(99) (99)"))
+	})
+})
