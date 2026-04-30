@@ -20,6 +20,12 @@ const (
 	NETWORK_INACTIVE     = 3 // 不活性中
 	NETWORK_ERROR        = 4 // エラー状態
 	NETWORK_DELETING     = 5 // 削除中
+	NETWORK_WAITING      = 6 // ヘッドノードの作成完了待ち
+
+	// Network label keys for distributed sync
+	NetworkLabelSyncRole      = "syncRole"
+	NetworkLabelHeadNetworkID = "headNetworkId"
+	NetworkLabelHeadNodeName  = "headNodeName"
 )
 
 var NetworkStatus = map[int]string{
@@ -29,6 +35,68 @@ var NetworkStatus = map[int]string{
 	3: "INACTIVE",
 	4: "ERROR",
 	5: "DELETING",
+	6: "WAITING",
+}
+
+// SetNetworkSyncLabels sets distributed sync metadata labels for networks.
+func SetNetworkSyncLabels(labels map[string]interface{}, syncRole, headNetworkID, headNodeName string) {
+	if labels == nil {
+		return
+	}
+	labels[NetworkLabelSyncRole] = strings.TrimSpace(syncRole)
+	labels[NetworkLabelHeadNetworkID] = strings.TrimSpace(headNetworkID)
+	if node := strings.TrimSpace(headNodeName); node != "" {
+		labels[NetworkLabelHeadNodeName] = node
+	}
+}
+
+func GetNetworkSyncRole(labels map[string]interface{}) string {
+	if labels == nil {
+		return ""
+	}
+	val, ok := labels[NetworkLabelSyncRole].(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(val)
+}
+
+func GetHeadNetworkID(labels map[string]interface{}) string {
+	if labels == nil {
+		return ""
+	}
+	val, ok := labels[NetworkLabelHeadNetworkID].(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(val)
+}
+
+func GetHeadNetworkNodeName(labels map[string]interface{}) string {
+	if labels == nil {
+		return ""
+	}
+	val, ok := labels[NetworkLabelHeadNodeName].(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(val)
+}
+
+func (d *Database) getUniqueVirtualNetworkID() (string, error) {
+	for {
+		id := uuid.New().String()[:5]
+		key := NetworkPrefix + "/" + id
+		var network api.VirtualNetwork
+		_, err := d.GetJSON(key, &network)
+		if err == ErrNotFound {
+			return id, nil
+		}
+		if err != nil {
+			slog.Error("getUniqueVirtualNetworkID()", "err", err)
+			return "", err
+		}
+	}
 }
 
 // 仮想ネットワークを登録、仮想ネットワークを一意に識別するIDを自動生成
@@ -273,6 +341,9 @@ func (d *Database) UpdateVirtualNetworkStatus(id string, status int) {
 	network.Status.StatusCode = status
 	network.Status.Status = util.StringPtr(NetworkStatus[network.Status.StatusCode])
 	network.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+	if status == NETWORK_ACTIVE {
+		network.Status.Message = nil
+	}
 	if err := d.UpdateVirtualNetworkById(id, network); err != nil {
 		slog.Error("UpdateVirtualNetworkStatus() UpdateVirtualNetwork() failed", "err", err, "networkId", id)
 		panic(err)
@@ -325,4 +396,91 @@ func (d *Database) PutVirtualNetworksETCD(vnet api.VirtualNetwork) error {
 	}
 
 	return nil
+}
+
+// MakeFollowerVirtualNetworkEntry creates a follower-side network object
+// that waits for the head network to become ACTIVE.
+func (d *Database) MakeFollowerVirtualNetworkEntry(headNetwork api.VirtualNetwork, followerNodeName string, headNetworkID string) (string, error) {
+	followerNodeName = strings.TrimSpace(followerNodeName)
+	headNetworkID = strings.TrimSpace(headNetworkID)
+	if followerNodeName == "" {
+		return "", fmt.Errorf("follower nodeName is required")
+	}
+	if headNetworkID == "" {
+		return "", fmt.Errorf("head network id is required")
+	}
+	if headNetwork.Metadata == nil || headNetwork.Metadata.Name == nil || strings.TrimSpace(*headNetwork.Metadata.Name) == "" {
+		return "", fmt.Errorf("head network metadata.name is required")
+	}
+
+	headNodeName := ""
+	if headNetwork.Metadata.NodeName != nil {
+		headNodeName = strings.TrimSpace(*headNetwork.Metadata.NodeName)
+	}
+	if headNodeName == "" {
+		return "", fmt.Errorf("head network nodeName is required")
+	}
+
+	networks, err := d.GetVirtualNetworks()
+	if err != nil {
+		return "", err
+	}
+	for _, n := range networks {
+		if n.Metadata == nil || n.Metadata.NodeName == nil || n.Metadata.Labels == nil {
+			continue
+		}
+		if strings.TrimSpace(*n.Metadata.NodeName) != followerNodeName {
+			continue
+		}
+		labels := *n.Metadata.Labels
+		if GetNetworkSyncRole(labels) == "follower" && GetHeadNetworkID(labels) == headNetworkID {
+			return n.Id, nil
+		}
+	}
+
+	id, err := d.getUniqueVirtualNetworkID()
+	if err != nil {
+		return "", err
+	}
+
+	labels := map[string]interface{}{}
+	SetNetworkSyncLabels(labels, "follower", headNetworkID, headNodeName)
+
+	var spec *api.VirtualNetworkSpec
+	if headNetwork.Spec != nil {
+		specCopy, copyErr := util.DeepCopy(*headNetwork.Spec)
+		if copyErr != nil {
+			return "", copyErr
+		}
+		spec = &specCopy
+	}
+
+	follower := api.VirtualNetwork{
+		Id: id,
+		Metadata: &api.Metadata{
+			Name:     headNetwork.Metadata.Name,
+			NodeName: util.StringPtr(followerNodeName),
+			Labels:   &labels,
+		},
+		Spec: spec,
+		Status: &api.Status{
+			StatusCode:          NETWORK_WAITING,
+			Status:              util.StringPtr(NetworkStatus[NETWORK_WAITING]),
+			CreationTimeStamp:   util.TimePtr(time.Now()),
+			LastUpdateTimeStamp: util.TimePtr(time.Now()),
+			Message:             util.StringPtr("ヘッドノードのネットワーク作成完了を待機中"),
+		},
+	}
+
+	if follower.Spec != nil {
+		follower.Spec.IpNetworkId = nil
+	}
+
+	key := NetworkPrefix + "/" + id
+	if err := d.PutJSON(key, follower); err != nil {
+		slog.Error("MakeFollowerVirtualNetworkEntry() PutJSON failed", "err", err)
+		return "", err
+	}
+
+	return id, nil
 }

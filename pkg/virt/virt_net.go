@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/util"
@@ -148,6 +149,10 @@ func (l *LibVirtEp) GetVirtualNetworkByName(name string) (*libvirt.Network, bool
 
 	net, err := l.Com.LookupNetworkByName(name)
 	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "not found") {
+			slog.Debug("Network not found", "name", name)
+			return nil, false, nil
+		}
 		slog.Error("Error getting network by name", "err", err)
 		return nil, false, err
 	}

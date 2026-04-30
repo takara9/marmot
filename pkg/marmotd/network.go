@@ -233,19 +233,15 @@ func (m *Marmot) DeleteVirtualNetwork(networkId string) error {
 	if err := m.Virt.DeleteVirtualNetwork(*vnet.Metadata.Name); err != nil {
 		m.Db.UpdateVirtualNetworkStatus(networkId, db.NETWORK_ERROR)
 		slog.Error("Failed to delete virtual network", "err", err)
-		//return err
+		return err
 	}
 
 	// 実態が消えたら、データベースからも削除する
-	// 仮想ネットワークのDB　削除処理を実装
-	// --- IPが関連付いている場合は先にIPを削除する必要がある
-	if vnet.Spec.IpNetworkId != nil {
-		// 紐付いたIPネットワークを削除
-		if err := m.Db.DeleteVirtualNetworkById(vnet.Id); err != nil {
-			m.Db.UpdateVirtualNetworkStatus(networkId, db.NETWORK_ERROR)
-			slog.Error("Failed to delete virtual network", "err", err)
-			return err
-		}
+	// DeleteVirtualNetworkById 内で必要に応じて紐付いたIPネットワークも削除する。
+	if err := m.Db.DeleteVirtualNetworkById(vnet.Id); err != nil {
+		m.Db.UpdateVirtualNetworkStatus(networkId, db.NETWORK_ERROR)
+		slog.Error("Failed to delete virtual network", "err", err)
+		return err
 	}
 
 	return nil

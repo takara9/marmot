@@ -90,22 +90,6 @@ func (c *controller) networkControllerLoop() {
 
 	for _, vnet := range vnets {
 		if ok, assignedNode, reason := evaluateNodeAssignment(vnet.Metadata, c.marmot.NodeName); !ok {
-			if vnet.Status != nil {
-				switch vnet.Status.StatusCode {
-				case db.NETWORK_ACTIVE:
-					// ACTIVE は全ノードに仮想ネットワーク実体だけを揃える。
-					// IPネットワーク作成を避けるため DeployVirtualNetwork は呼ばない。
-					if err := c.ensureVirtualNetworkPresent(vnet); err != nil {
-						slog.Error("failed to ensure virtual network on follower node", "err", err, "networkId", vnet.Id, "controllerNode", c.marmot.NodeName)
-					}
-				case db.NETWORK_DELETING:
-					// DELETING はフォロワーノードでも libvirt 実体のみ削除する。
-					// DB・IPネットワーク削除はヘッドノードの DeleteVirtualNetwork に任せる。
-					if err := c.ensureVirtualNetworkAbsent(vnet); err != nil {
-						slog.Error("failed to delete virtual network on follower node", "err", err, "networkId", vnet.Id, "controllerNode", c.marmot.NodeName)
-					}
-				}
-			}
 			objectName := ""
 			if vnet.Metadata != nil && vnet.Metadata.Name != nil {
 				objectName = *vnet.Metadata.Name
@@ -114,10 +98,15 @@ func (c *controller) networkControllerLoop() {
 			continue
 		}
 
+		role := networkSyncRole(vnet.Metadata)
+
 		// 削除タイムスタンプが設定されて一定時間経過した仮想ネットワークのステータスをDELETINGに更新する
 		// エラー中の仮想ネットワークは、対象にしない。
 		if vnet.Status != nil && vnet.Status.StatusCode != db.NETWORK_ERROR {
 			if vnet.Status != nil && vnet.Status.DeletionTimeStamp != nil {
+				if err := c.distributeDeleteIntentToSameNameNetworks(vnet); err != nil {
+					slog.Error("同名ネットワークへの削除意図配布に失敗", "networkId", vnet.Id, "err", err)
+				}
 				deletionTime := *vnet.Status.DeletionTimeStamp
 				if time.Since(deletionTime) > c.deletionDelay {
 					slog.Debug("削除のタイムスタンプが一定時間以上経過している仮想ネットワーク検出", "networkId", vnet.Id)
@@ -142,7 +131,14 @@ func (c *controller) networkControllerLoop() {
 		if vnet.Status != nil && vnet.Status.Status != nil {
 			switch vnet.Status.StatusCode {
 			case db.NETWORK_PENDING:
+				if role == "follower" {
+					c.db.UpdateVirtualNetworkStatus(vnet.Id, db.NETWORK_WAITING)
+					continue
+				}
 				slog.Debug("待ち状態の仮想ネットワークを処理", "networkId", vnet.Id)
+				if err := c.ensureFollowerNetworksWaiting(vnet); err != nil {
+					slog.Error("フォロワー用ネットワークエントリーの作成に失敗", "headNetworkId", vnet.Id, "err", err)
+				}
 				c.db.UpdateVirtualNetworkStatus(vnet.Id, db.NETWORK_PROVISIONING)
 				if err := c.marmot.DeployVirtualNetwork(vnet); err != nil {
 					slog.Error("DeployVirtualNetwork()", "err", err)
@@ -153,15 +149,29 @@ func (c *controller) networkControllerLoop() {
 
 			case db.NETWORK_PROVISIONING:
 				slog.Debug("プロビジョニング中の仮想ネットワークを処理", "networkId", vnet.Id)
+				if role == "follower" {
+					if err := c.reconcileFollowerWaitingNetwork(vnet); err != nil {
+						slog.Error("フォロワーネットワークのプロビジョニング継続に失敗", "networkId", vnet.Id, "err", err)
+						c.db.UpdateVirtualNetworkStatus(vnet.Id, db.NETWORK_ERROR)
+					}
+				}
 
 			case db.NETWORK_DELETING:
 				slog.Debug("削除中の仮想ネットワークを処理", "networkId", vnet.Id)
-				// 削除の処理で、libvirtで実態を消すのと、DBの状態も削除する。
-				if err := c.marmot.DeleteVirtualNetwork(vnet.Id); err != nil {
-					if strings.HasPrefix(err.Error(), "Network not found") {
+				if role == "follower" {
+					if err := c.ensureVirtualNetworkAbsent(vnet); err != nil {
+						slog.Error("failed to delete virtual network on follower node", "err", err, "networkId", vnet.Id, "controllerNode", c.marmot.NodeName)
 						c.db.UpdateVirtualNetworkStatus(vnet.Id, db.NETWORK_ERROR)
 						continue
 					}
+					if err := c.db.DeleteVirtualNetworkById(vnet.Id); err != nil {
+						slog.Error("failed to delete follower network object from DB", "err", err, "networkId", vnet.Id)
+						c.db.UpdateVirtualNetworkStatus(vnet.Id, db.NETWORK_ERROR)
+					}
+					continue
+				}
+				// 削除の処理で、libvirtで実態を消すのと、DBの状態も削除する。
+				if err := c.marmot.DeleteVirtualNetwork(vnet.Id); err != nil {
 					slog.Error("DeleteVirtualNetwork()", "err", err)
 					c.db.UpdateVirtualNetworkStatus(vnet.Id, db.NETWORK_ERROR)
 					continue
@@ -170,6 +180,11 @@ func (c *controller) networkControllerLoop() {
 				}
 			case db.NETWORK_ERROR:
 				slog.Debug("エラー状態の仮想ネットワークを処理", "networkId", vnet.Id)
+				if role != "follower" {
+					if err := c.distributeDeleteIntentToFollowerNetworks(vnet); err != nil {
+						slog.Error("failed to distribute delete intent to follower networks", "headNetworkId", vnet.Id, "err", err)
+					}
+				}
 				// エラーが発生していて、実態がなければ、DBから削除する　未実装
 				_, found, err := c.marmot.Virt.GetVirtualNetworkByName(*vnet.Metadata.Name)
 				if err != nil {
@@ -190,8 +205,21 @@ func (c *controller) networkControllerLoop() {
 
 			case db.NETWORK_ACTIVE:
 				slog.Debug("利用可能な仮想ネットワークを処理", "networkId", vnet.Id)
-				if err := c.ensureVirtualNetworkPresent(vnet); err != nil {
-					slog.Error("failed to ensure virtual network on node", "err", err, "networkId", vnet.Id, "controllerNode", c.marmot.NodeName)
+				if role == "follower" {
+					if err := c.reconcileFollowerActiveNetwork(vnet); err != nil {
+						slog.Error("failed to reconcile follower network", "err", err, "networkId", vnet.Id, "controllerNode", c.marmot.NodeName)
+						c.db.UpdateVirtualNetworkStatus(vnet.Id, db.NETWORK_ERROR)
+					}
+				}
+
+			case db.NETWORK_WAITING:
+				if role != "follower" {
+					continue
+				}
+				slog.Debug("フォロワーネットワークはヘッドノード完了待ち", "networkId", vnet.Id)
+				if err := c.reconcileFollowerWaitingNetwork(vnet); err != nil {
+					slog.Error("フォロワーネットワークの同期開始に失敗", "networkId", vnet.Id, "err", err)
+					c.db.UpdateVirtualNetworkStatus(vnet.Id, db.NETWORK_ERROR)
 				}
 
 			default:
@@ -200,6 +228,205 @@ func (c *controller) networkControllerLoop() {
 		}
 	}
 	// ワークキューから処理を取り出して、処理を実行する
+}
+
+func networkSyncRole(metadata *api.Metadata) string {
+	if metadata == nil || metadata.Labels == nil {
+		return "head"
+	}
+	role := db.GetNetworkSyncRole(*metadata.Labels)
+	if role == "" {
+		return "head"
+	}
+	return role
+}
+
+func (c *controller) ensureFollowerNetworksWaiting(headNetwork api.VirtualNetwork) error {
+	if headNetwork.Metadata == nil || headNetwork.Metadata.Name == nil {
+		return nil
+	}
+
+	headNode := ""
+	if headNetwork.Metadata.NodeName != nil {
+		headNode = strings.TrimSpace(*headNetwork.Metadata.NodeName)
+	}
+	if headNode == "" {
+		return fmt.Errorf("head network nodeName is empty: networkId=%s", headNetwork.Id)
+	}
+
+	nodeStatuses, err := c.marmot.Db.GetAllHostStatus()
+	if err != nil {
+		return err
+	}
+
+	nodes := make(map[string]struct{}, len(nodeStatuses))
+	for _, status := range nodeStatuses {
+		if status.NodeName == nil {
+			continue
+		}
+		node := strings.TrimSpace(*status.NodeName)
+		if node == "" || node == headNode {
+			continue
+		}
+		nodes[node] = struct{}{}
+	}
+
+	for followerNode := range nodes {
+		newFollowerID, createErr := c.marmot.Db.MakeFollowerVirtualNetworkEntry(headNetwork, followerNode, headNetwork.Id)
+		if createErr != nil {
+			slog.Error("フォロワーネットワークエントリー作成失敗", "headNetworkId", headNetwork.Id, "followerNode", followerNode, "err", createErr)
+			continue
+		}
+		slog.Debug("フォロワーネットワークをWAITINGで登録", "headNetworkId", headNetwork.Id, "followerNetworkId", newFollowerID, "followerNode", followerNode)
+	}
+
+	return nil
+}
+
+func (c *controller) distributeDeleteIntentToFollowerNetworks(headNetwork api.VirtualNetwork) error {
+	if headNetwork.Metadata == nil || headNetwork.Metadata.Labels == nil {
+		return nil
+	}
+	labels := *headNetwork.Metadata.Labels
+	if db.GetNetworkSyncRole(labels) == "follower" {
+		return nil
+	}
+
+	networks, err := c.marmot.Db.GetVirtualNetworks()
+	if err != nil {
+		return err
+	}
+
+	for _, network := range networks {
+		if network.Id == headNetwork.Id || network.Metadata == nil || network.Metadata.Labels == nil {
+			continue
+		}
+
+		followerLabels := *network.Metadata.Labels
+		if db.GetNetworkSyncRole(followerLabels) != "follower" {
+			continue
+		}
+		if db.GetHeadNetworkID(followerLabels) != headNetwork.Id {
+			continue
+		}
+
+		if network.Status != nil && network.Status.DeletionTimeStamp != nil {
+			continue
+		}
+
+		if err := c.marmot.Db.SetDeleteTimestampVirtualNetwork(network.Id); err != nil {
+			slog.Error("failed to set deletion timestamp to follower network", "headNetworkId", headNetwork.Id, "followerNetworkId", network.Id, "err", err)
+			continue
+		}
+
+		slog.Debug("head network error detected: delete intent distributed to follower", "headNetworkId", headNetwork.Id, "followerNetworkId", network.Id)
+	}
+
+	return nil
+}
+
+func (c *controller) distributeDeleteIntentToSameNameNetworks(sourceNetwork api.VirtualNetwork) error {
+	if sourceNetwork.Metadata == nil || sourceNetwork.Metadata.Name == nil {
+		return nil
+	}
+	targetName := strings.TrimSpace(*sourceNetwork.Metadata.Name)
+	if targetName == "" {
+		return nil
+	}
+
+	networks, err := c.marmot.Db.GetVirtualNetworks()
+	if err != nil {
+		return err
+	}
+
+	for _, network := range networks {
+		if network.Id == sourceNetwork.Id {
+			continue
+		}
+		if network.Metadata == nil || network.Metadata.Name == nil {
+			continue
+		}
+		if strings.TrimSpace(*network.Metadata.Name) != targetName {
+			continue
+		}
+		if network.Status != nil && network.Status.DeletionTimeStamp != nil {
+			continue
+		}
+
+		if err := c.marmot.Db.SetDeleteTimestampVirtualNetwork(network.Id); err != nil {
+			slog.Error("同名ネットワークへの削除タイムスタンプ設定に失敗", "sourceNetworkId", sourceNetwork.Id, "targetNetworkId", network.Id, "networkName", targetName, "err", err)
+			continue
+		}
+
+		slog.Debug("同名ネットワークへ削除意図を配布", "sourceNetworkId", sourceNetwork.Id, "targetNetworkId", network.Id, "networkName", targetName)
+	}
+
+	return nil
+}
+
+func (c *controller) reconcileFollowerWaitingNetwork(waitingNetwork api.VirtualNetwork) error {
+	if waitingNetwork.Metadata == nil || waitingNetwork.Metadata.Labels == nil {
+		return fmt.Errorf("labels are required for waiting network: networkId=%s", waitingNetwork.Id)
+	}
+	labels := *waitingNetwork.Metadata.Labels
+	headNetworkID := db.GetHeadNetworkID(labels)
+	if headNetworkID == "" {
+		return fmt.Errorf("headNetworkId label is missing: networkId=%s", waitingNetwork.Id)
+	}
+
+	headNetwork, err := c.marmot.Db.GetVirtualNetworkById(headNetworkID)
+	if err != nil {
+		return err
+	}
+	if headNetwork.Status == nil {
+		return fmt.Errorf("head network status is nil: headNetworkId=%s", headNetworkID)
+	}
+
+	switch headNetwork.Status.StatusCode {
+	case db.NETWORK_ACTIVE:
+		c.db.UpdateVirtualNetworkStatus(waitingNetwork.Id, db.NETWORK_PROVISIONING)
+		if err := c.ensureVirtualNetworkPresent(headNetwork); err != nil {
+			return err
+		}
+		c.db.UpdateVirtualNetworkStatus(waitingNetwork.Id, db.NETWORK_ACTIVE)
+	case db.NETWORK_DELETING:
+		c.db.UpdateVirtualNetworkStatus(waitingNetwork.Id, db.NETWORK_DELETING)
+	case db.NETWORK_ERROR:
+		return fmt.Errorf("head network is not available: headNetworkId=%s status=%s", headNetworkID, db.NetworkStatus[headNetwork.Status.StatusCode])
+	default:
+		// WAITING を維持する。
+	}
+
+	return nil
+}
+
+func (c *controller) reconcileFollowerActiveNetwork(followerNetwork api.VirtualNetwork) error {
+	if followerNetwork.Metadata == nil || followerNetwork.Metadata.Labels == nil {
+		return fmt.Errorf("labels are required for follower network: networkId=%s", followerNetwork.Id)
+	}
+	labels := *followerNetwork.Metadata.Labels
+	headNetworkID := db.GetHeadNetworkID(labels)
+	if headNetworkID == "" {
+		return fmt.Errorf("headNetworkId label is missing: networkId=%s", followerNetwork.Id)
+	}
+
+	headNetwork, err := c.marmot.Db.GetVirtualNetworkById(headNetworkID)
+	if err != nil {
+		return err
+	}
+	if headNetwork.Status == nil {
+		return fmt.Errorf("head network status is nil: headNetworkId=%s", headNetworkID)
+	}
+
+	switch headNetwork.Status.StatusCode {
+	case db.NETWORK_ACTIVE:
+		return c.ensureVirtualNetworkPresent(followerNetwork)
+	case db.NETWORK_DELETING:
+		c.db.UpdateVirtualNetworkStatus(followerNetwork.Id, db.NETWORK_DELETING)
+		return nil
+	default:
+		return nil
+	}
 }
 
 func (c *controller) ensureVirtualNetworkPresent(vnet api.VirtualNetwork) error {

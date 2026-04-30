@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -12,6 +13,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/util"
 )
 
 var _ = Describe("MarmotdTest", Ordered, func() {
@@ -131,6 +133,9 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 	})
 
 	Context("基礎ネットワークの準備", func() {
+		var deletePropagationHeadID string
+		var deletePropagationFollowerID string
+
 		It("定義 default", func() {
 			By("定義設定 デファルト")
 			cmd := exec.Command("virsh", "net-define", "testdata/default-network.xml")
@@ -321,6 +326,68 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 				GinkgoWriter.Printf("  - %s (%s)\n", *network.Metadata.Name, network.Id)
 				g.Expect(network.Status.StatusCode).To(Equal(int(db.NETWORK_ACTIVE)))
 			}, 60*time.Second, 3*time.Second).Should(Succeed())
+		})
+
+		It("削除伝播検証用に同名ネットワークオブジェクトを準備", func() {
+			labels := map[string]interface{}{}
+			db.SetNetworkSyncLabels(labels, "head", "", "hvc")
+
+			headSpec := api.VirtualNetwork{
+				Metadata: &api.Metadata{
+					Name:     util.StringPtr("delete-propagation-net"),
+					NodeName: util.StringPtr("hvc"),
+					Labels:   &labels,
+				},
+				Spec: &api.VirtualNetworkSpec{
+					BridgeName: util.StringPtr("default"),
+				},
+			}
+
+			head, err := mockServer.server.Ma.Db.CreateVirtualNetwork(headSpec)
+			Expect(err).NotTo(HaveOccurred())
+			deletePropagationHeadID = head.Id
+			mockServer.server.Ma.Db.UpdateVirtualNetworkStatus(deletePropagationHeadID, db.NETWORK_ACTIVE)
+
+			headFromDB, err := mockServer.server.Ma.Db.GetVirtualNetworkById(deletePropagationHeadID)
+			Expect(err).NotTo(HaveOccurred())
+
+			deletePropagationFollowerID, err = mockServer.server.Ma.Db.MakeFollowerVirtualNetworkEntry(headFromDB, "hvc", deletePropagationHeadID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(deletePropagationFollowerID).NotTo(Equal(deletePropagationHeadID))
+
+			follower, err := mockServer.server.Ma.Db.GetVirtualNetworkById(deletePropagationFollowerID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(follower.Metadata).NotTo(BeNil())
+			Expect(follower.Metadata.Name).NotTo(BeNil())
+			Expect(*follower.Metadata.Name).To(Equal("delete-propagation-net"))
+			Expect(follower.Status).NotTo(BeNil())
+			Expect(follower.Status.DeletionTimeStamp).To(BeNil())
+		})
+
+		It("mactl network delete実行で同名オブジェクトにDeletionTimeStampが伝播する", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "network", "delete", deletePropagationHeadID, "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+
+			Eventually(func(g Gomega) {
+				head, err := mockServer.server.Ma.Db.GetVirtualNetworkById(deletePropagationHeadID)
+				if err == nil {
+					g.Expect(head.Status).NotTo(BeNil())
+					g.Expect(head.Status.DeletionTimeStamp).NotTo(BeNil())
+				} else {
+					// 削除処理が進んでいる場合は、DBエントリーが先に消えることがある。
+					g.Expect(errors.Is(err, db.ErrNotFound)).To(BeTrue())
+				}
+
+				follower, err := mockServer.server.Ma.Db.GetVirtualNetworkById(deletePropagationFollowerID)
+				if err == nil {
+					g.Expect(follower.Status).NotTo(BeNil())
+					g.Expect(follower.Status.DeletionTimeStamp).NotTo(BeNil())
+				} else {
+					g.Expect(errors.Is(err, db.ErrNotFound)).To(BeTrue())
+				}
+			}, 8*time.Second, 1*time.Second).Should(Succeed())
 		})
 
 		It("仮想ネットワークのリスト", func() {

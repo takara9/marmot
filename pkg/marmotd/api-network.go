@@ -9,6 +9,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/util"
 )
 
@@ -23,6 +24,14 @@ func (s *Server) ApiCreateNetwork(ctx echo.Context) error {
 		return echo.NewHTTPError(400, "invalid request body")
 	}
 	assignNodeNameIfUnset(&spec.Metadata, s.Ma.NodeName)
+	if spec.Metadata == nil {
+		spec.Metadata = &api.Metadata{}
+	}
+	if spec.Metadata.Labels == nil {
+		labels := map[string]interface{}{}
+		spec.Metadata.Labels = &labels
+	}
+	db.SetNetworkSyncLabels(*spec.Metadata.Labels, "head", "", s.Ma.NodeName)
 
 	// デバッグ
 	jsonbytes, err := json.MarshalIndent(spec, "", "    ")
@@ -42,13 +51,37 @@ func (s *Server) ApiCreateNetwork(ctx echo.Context) error {
 	return ctx.JSON(201, network)
 }
 
+// 参照のみ
+// 仮想ネットワーク一覧を取得する
+func (s *Server) ApiGetNetworks(ctx echo.Context) error {
+	networks, err := s.Ma.Db.GetVirtualNetworks()
+	if err != nil {
+		slog.Error("failed to get virtual networks", "err", err)
+		return echo.NewHTTPError(500, "failed to get virtual networks")
+	}
+
+	return ctx.JSON(http.StatusOK, networks)
+}
+
+// 参照のみ
+// 指定IDの仮想ネットワークを取得する
+func (s *Server) ApiGetNetworkById(ctx echo.Context, id string) error {
+	network, err := s.Ma.Db.GetVirtualNetworkById(id)
+	if err != nil {
+		slog.Error("failed to get virtual network", "networkId", id, "err", err)
+		return echo.NewHTTPError(404, "virtual network not found")
+	}
+
+	return ctx.JSON(http.StatusOK, network)
+}
+
 // 仮想ネットワークをIDで削除する
 // 実際に削除するのはコントローラー側で、ここではDBに削除タイムスタンプを設定するだけ
 func (s *Server) ApiDeleteNetworkById(ctx echo.Context, id string) error {
 	slog.Debug("===", "ApiDeleteNetworkById is called", "===")
 
 	if err := s.Ma.Db.SetDeleteTimestampVirtualNetwork(id); err != nil {
-		slog.Error("SetDeleteTimestampVirtualNetwork()", "err", err)
+		slog.Error("ApiDeleteNetworkById() SetDeleteTimestampVirtualNetwork failed", "networkId", id, "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
@@ -79,52 +112,24 @@ func (s *Server) ApiUpdateNetworkById(ctx echo.Context, id string) error {
 }
 
 // 参照のみ
-// 仮想ネットワークのリストを取得して返す
-func (s *Server) ApiGetNetworks(ctx echo.Context) error {
-	slog.Debug("===", "ApiGetNetworks is called", "===")
-	networks, err := s.Ma.Db.GetVirtualNetworks()
-	if err != nil {
-		slog.Error("failed to get virtual networks", "err", err)
-		return echo.NewHTTPError(500, "failed to get virtual networks")
-	}
-	return ctx.JSON(200, networks)
-}
-
-// 参照のみ
-// 仮想ネットワークをIDで取得する
-func (s *Server) ApiGetNetworkById(ctx echo.Context, id string) error {
-	network, err := s.Ma.Db.GetVirtualNetworkById(id)
-	if err != nil {
-		slog.Error("failed to get virtual network", "err", err, "networkId", id)
-		return echo.NewHTTPError(500, "failed to get virtual network")
-	}
-	return ctx.JSON(200, network)
-}
-
-// 参照のみ
-// 全てのアサイン済みIPネットワークのリストを取得する
+// 全仮想ネットワーク配下のIPネットワークを一覧取得する
 func (s *Server) ApiListIpNetworks(ctx echo.Context) error {
-	slog.Debug("===", "ApiListIpNetworks is called", "===")
-
-	// 全ての仮想ネットワークを取得
-	networks, err := s.Ma.Db.GetVirtualNetworks()
+	vnets, err := s.Ma.Db.GetVirtualNetworks()
 	if err != nil {
 		slog.Error("failed to get virtual networks", "err", err)
 		return echo.NewHTTPError(500, "failed to get virtual networks")
 	}
 
-	// 全てのIPネットワークを集める
-	var allIpNetworks []api.IPNetwork
-	for _, vnet := range networks {
+	all := make([]api.IPNetwork, 0)
+	for _, vnet := range vnets {
 		ipnets, err := s.Ma.Db.GetIpNetworks(vnet.Id)
 		if err != nil {
-			slog.Error("failed to get ip networks", "err", err, "vnetId", vnet.Id)
 			continue
 		}
-		allIpNetworks = append(allIpNetworks, ipnets...)
+		all = append(all, ipnets...)
 	}
 
-	return ctx.JSON(200, allIpNetworks)
+	return ctx.JSON(http.StatusOK, all)
 }
 
 // 参照のみ
@@ -132,7 +137,6 @@ func (s *Server) ApiListIpNetworks(ctx echo.Context) error {
 func (s *Server) ApiGetIpAddressesByNetwork(ctx echo.Context, id string) error {
 	slog.Debug("===", "ApiGetIpAddressesByNetwork is called", "===", "ipnetId", id)
 
-	// IPネットワークIDから対応する仮想ネットワークIDを検索する
 	networks, err := s.Ma.Db.GetVirtualNetworks()
 	if err != nil {
 		slog.Error("failed to get virtual networks", "err", err)
@@ -163,7 +167,6 @@ func (s *Server) ApiGetIpAddressesByNetwork(ctx echo.Context, id string) error {
 		return echo.NewHTTPError(404, "ip network not found")
 	}
 
-	// IPネットワークに割り当てられたIPアドレスを取得
 	addresses, err := s.Ma.Db.GetAllocatedIPs(vnetId, id)
 	if err != nil {
 		slog.Error("failed to get allocated ips", "err", err, "vnetId", vnetId, "ipnetId", id)
