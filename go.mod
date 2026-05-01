@@ -10,7 +10,7 @@ require (
 	github.com/onsi/gomega v1.39.1
 	go.etcd.io/etcd/client/v3 v3.6.9
 	gopkg.in/yaml.v3 v3.0.1
-	libvirt.org/go/libvirt v1.12001.0
+	libvirt.org/go/libvirt v1.12002.0
 )
 
 require github.com/mattn/go-isatty v0.0.20 // indirect
@@ -21,7 +21,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/takara9/lvm v0.0.0-20260321023221-187aa1e599b9
 	go.yaml.in/yaml/v3 v3.0.4
-	libvirt.org/go/libvirtxml v1.12001.0
+	libvirt.org/go/libvirtxml v1.12002.0
 )
 
 require (
