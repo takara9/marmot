@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/util"
@@ -53,17 +54,30 @@ func CreateVirtualNetworkXML(net api.VirtualNetwork) (*libvirtxml.Network, error
 		},
 		Name: *net.Metadata.Name,
 		UUID: *net.Metadata.Uuid,
-		MAC: &libvirtxml.NetworkMAC{
-			Address: *net.Spec.MacAddress,
-		},
 		Bridge: &libvirtxml.NetworkBridge{
-			Name:  *net.Spec.BridgeName,
-			STP:   "on",
-			Delay: "0",
+			Name: *net.Spec.BridgeName,
 		},
 	}
 
-	if net.Spec.IpAddress != nil && net.Spec.Netmask != nil {
+	if net.Spec.Nat == nil || !*net.Spec.Nat {
+		// OVS ブリッジを利用するネットワークは、libvirt へ Open vSwitch virtualport を明示する。
+		// これにより、先行作成済みブリッジを利用し、Linux bridge の新規作成競合を避ける。
+		netxml.Forward = &libvirtxml.NetworkForward{
+			Mode: "bridge",
+		}
+		netxml.VirtualPort = &libvirtxml.NetworkVirtualPort{
+			Params: &libvirtxml.NetworkVirtualPortParams{
+				OpenVSwitch: &libvirtxml.NetworkVirtualPortParamsOpenVSwitch{},
+			},
+		}
+	}
+
+	// forward mode='bridge' (OVS/Linux bridge) では libvirt が IP を管理しないため
+	// <ip> 要素を含めると "Unsupported <ip> element" エラーになる。
+	// NAT モードでのみ <ip> 要素を付与する（後続の NAT ブロックで上書きされる）。
+	isNat := net.Spec.Nat != nil && *net.Spec.Nat
+
+	if isNat && net.Spec.IpAddress != nil && net.Spec.Netmask != nil {
 		netxml.IPs = []libvirtxml.NetworkIP{
 			{
 				Address: *net.Spec.IpAddress,
@@ -72,7 +86,12 @@ func CreateVirtualNetworkXML(net api.VirtualNetwork) (*libvirtxml.Network, error
 		}
 	}
 
-	if net.Spec.Nat != nil && *net.Spec.Nat == true {
+	if isNat {
+		netxml.MAC = &libvirtxml.NetworkMAC{
+			Address: *net.Spec.MacAddress,
+		}
+		netxml.Bridge.STP = "on"
+		netxml.Bridge.Delay = "0"
 		netxml.Forward = &libvirtxml.NetworkForward{
 			Mode: *net.Spec.ForwardMode,
 			NAT: &libvirtxml.NetworkForwardNAT{
@@ -86,7 +105,7 @@ func CreateVirtualNetworkXML(net api.VirtualNetwork) (*libvirtxml.Network, error
 		}
 	}
 
-	if net.Spec.Dhcp != nil && *net.Spec.Dhcp == true {
+	if isNat && net.Spec.Dhcp != nil && *net.Spec.Dhcp == true {
 		netxml.IPs = []libvirtxml.NetworkIP{
 			{
 				Address: *net.Spec.IpAddress,
@@ -148,6 +167,10 @@ func (l *LibVirtEp) GetVirtualNetworkByName(name string) (*libvirt.Network, bool
 
 	net, err := l.Com.LookupNetworkByName(name)
 	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "not found") {
+			slog.Debug("Network not found", "name", name)
+			return nil, false, nil
+		}
 		slog.Error("Error getting network by name", "err", err)
 		return nil, false, err
 	}
@@ -166,11 +189,22 @@ func (l *LibVirtEp) DeleteVirtualNetwork(name string) error {
 		return nil
 	}
 	if err = net.Destroy(); err != nil {
-		slog.Error("Error destroying network", "err", err)
-		return err
+		msg := strings.ToLower(err.Error())
+		if strings.Contains(msg, "not active") || strings.Contains(msg, "is not active") || strings.Contains(msg, "not running") {
+			slog.Debug("Network already inactive, continue undefine", "name", name, "err", err)
+		} else {
+			slog.Error("Error destroying network", "err", err)
+			return err
+		}
 	}
 	if err := net.Undefine(); err != nil {
+		msg := strings.ToLower(err.Error())
+		if strings.Contains(msg, "not found") {
+			slog.Debug("Network already undefined", "name", name)
+			return nil
+		}
 		slog.Error("Error undefining network", "err", err)
+		return err
 	}
 
 	return nil

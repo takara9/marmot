@@ -990,6 +990,26 @@ components:
           type: string
         iPNetworkAddress:
           type: string
+        overlayMode:
+          type: string
+          description: "Overlay mode for multi-node networks: 'none' (default) or 'vxlan'"
+          enum:
+            - none
+            - vxlan
+        vni:
+          type: integer
+          description: "VXLAN Network Identifier (0-16777215)"
+          minimum: 0
+          maximum: 16777215
+        underlayInterface:
+          type: string
+          description: "Interface name for underlay network"
+        peerPolicy:
+          type: string
+          description: "Policy for VXLAN peer management: 'auto' (full-mesh) or 'manual'"
+          enum:
+            - auto
+            - manual
     IPNetwork:
       type: object
       required:

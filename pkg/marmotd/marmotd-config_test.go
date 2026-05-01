@@ -29,6 +29,7 @@ var _ = Describe("VolumeGroupConfig", func() {
 			Expect(cfg.ImageDownloadTimeoutSeconds).To(Equal(1800))
 			Expect(cfg.ImageResizeTimeoutSeconds).To(Equal(600))
 			Expect(cfg.ImageDeleteTimeoutSeconds).To(Equal(120))
+			Expect(cfg.DefaultUnderlayInterface).To(Equal(""))
 		})
 
 		It("os_volume_group と data_volume_group の設定値を読み込む", func() {
@@ -60,6 +61,19 @@ var _ = Describe("VolumeGroupConfig", func() {
 			Expect(cfg.ImageDownloadTimeoutSeconds).To(Equal(600))
 			Expect(cfg.ImageResizeTimeoutSeconds).To(Equal(180))
 			Expect(cfg.ImageDeleteTimeoutSeconds).To(Equal(45))
+		})
+
+		It("default_underlay_interface の設定値を読み込む", func() {
+			dir := GinkgoT().TempDir()
+			path := filepath.Join(dir, "marmotd.json")
+			content := []byte(`{"default_underlay_interface":"enp2s0"}`)
+
+			err := os.WriteFile(path, content, 0o644)
+			Expect(err).NotTo(HaveOccurred())
+
+			cfg, err := marmotd.LoadConfig(path)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cfg.DefaultUnderlayInterface).To(Equal("enp2s0"))
 		})
 	})
 })

@@ -12,6 +12,42 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for VirtualNetworkSpecOverlayMode.
+const (
+	None  VirtualNetworkSpecOverlayMode = "none"
+	Vxlan VirtualNetworkSpecOverlayMode = "vxlan"
+)
+
+// Valid indicates whether the value is a known member of the VirtualNetworkSpecOverlayMode enum.
+func (e VirtualNetworkSpecOverlayMode) Valid() bool {
+	switch e {
+	case None:
+		return true
+	case Vxlan:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for VirtualNetworkSpecPeerPolicy.
+const (
+	Auto   VirtualNetworkSpecPeerPolicy = "auto"
+	Manual VirtualNetworkSpecPeerPolicy = "manual"
+)
+
+// Valid indicates whether the value is a known member of the VirtualNetworkSpecPeerPolicy enum.
+func (e VirtualNetworkSpecPeerPolicy) Valid() bool {
+	switch e {
+	case Auto:
+		return true
+	case Manual:
+		return true
+	default:
+		return false
+	}
+}
+
 // Auth defines model for Auth.
 type Auth struct {
 	PublicKey    *string `json:"publicKey,omitempty"`
@@ -235,8 +271,26 @@ type VirtualNetworkSpec struct {
 	MacAddress       *string `json:"macAddress,omitempty"`
 	Nat              *bool   `json:"nat,omitempty"`
 	Netmask          *string `json:"netmask,omitempty"`
-	Stp              *bool   `json:"stp,omitempty"`
+
+	// OverlayMode Overlay mode for multi-node networks: 'none' (default) or 'vxlan'
+	OverlayMode *VirtualNetworkSpecOverlayMode `json:"overlayMode,omitempty"`
+
+	// PeerPolicy Policy for VXLAN peer management: 'auto' (full-mesh) or 'manual'
+	PeerPolicy *VirtualNetworkSpecPeerPolicy `json:"peerPolicy,omitempty"`
+	Stp        *bool                         `json:"stp,omitempty"`
+
+	// UnderlayInterface Interface name for underlay network
+	UnderlayInterface *string `json:"underlayInterface,omitempty"`
+
+	// Vni VXLAN Network Identifier (0-16777215)
+	Vni *int `json:"vni,omitempty"`
 }
+
+// VirtualNetworkSpecOverlayMode Overlay mode for multi-node networks: 'none' (default) or 'vxlan'
+type VirtualNetworkSpecOverlayMode string
+
+// VirtualNetworkSpecPeerPolicy Policy for VXLAN peer management: 'auto' (full-mesh) or 'manual'
+type VirtualNetworkSpecPeerPolicy string
 
 // VolSpec defines model for VolSpec.
 type VolSpec struct {

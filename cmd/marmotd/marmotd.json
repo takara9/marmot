@@ -4,6 +4,7 @@
   "api_listen_addr": "0.0.0.0:8750",
   "dns_listen_addr": "127.0.0.1:53",
   "dns_upstream": "8.8.8.8:53",
+  "default_underlay_interface": "",
   "os_volume_group": "vg1",
   "data_volume_group": "vg2",
   "deletion_delay_seconds": 10,
@@ -11,5 +12,6 @@
   "image_create_from_url_timeout_seconds": 1800,
   "image_download_timeout_seconds": 1800,
   "image_resize_timeout_seconds": 600,
-  "image_delete_timeout_seconds": 120
+  "image_delete_timeout_seconds": 120,
+  "default_underlay_interface": "enp2s0"
 }

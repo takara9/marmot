@@ -64,8 +64,12 @@ func (m *Marmot) CollectHostStatus() (api.HostStatus, error) {
 		status.HostId = util.StringPtr(hostID)
 	}
 
-	// IPアドレスを取得
-	ipAddress := getHostIPAddress()
+	// VXLAN underlay は enp2s0 を優先する。
+	ipAddress := getHostIPAddressByInterface("enp2s0")
+	if ipAddress == "" {
+		slog.Warn("enp2s0 address is unavailable; falling back to first active IPv4 address")
+		ipAddress = getHostIPAddress()
+	}
 	status.IpAddress = util.StringPtr(ipAddress)
 
 	// キャパシティ情報を収集
@@ -85,6 +89,43 @@ func (m *Marmot) CollectHostStatus() (api.HostStatus, error) {
 	status.Allocation = allocation
 
 	return status, nil
+}
+
+// 指定インターフェースのIPv4アドレスを取得する。
+func getHostIPAddressByInterface(interfaceName string) string {
+	name := strings.TrimSpace(interfaceName)
+	if name == "" {
+		return ""
+	}
+
+	iface, err := net.InterfaceByName(name)
+	if err != nil {
+		return ""
+	}
+	if iface.Flags&net.FlagLoopback != 0 || iface.Flags&net.FlagUp == 0 {
+		return ""
+	}
+
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return ""
+	}
+
+	for _, addr := range addrs {
+		var ip net.IP
+		switch v := addr.(type) {
+		case *net.IPNet:
+			ip = v.IP
+		case *net.IPAddr:
+			ip = v.IP
+		}
+		if ip == nil || ip.IsLoopback() || ip.To4() == nil {
+			continue
+		}
+		return ip.String()
+	}
+
+	return ""
 }
 
 // ホストの hostid を8桁16進文字列で取得する
