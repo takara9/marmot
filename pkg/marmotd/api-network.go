@@ -33,6 +33,11 @@ func (s *Server) ApiCreateNetwork(ctx echo.Context) error {
 	}
 	db.SetNetworkSyncLabels(*spec.Metadata.Labels, "head", "", s.Ma.NodeName)
 
+	if err := applyVirtualNetworkDefaults(&spec, CurrentConfig(), s.Ma.Db); err != nil {
+		slog.Error("failed to apply virtual network defaults", "err", err)
+		return echo.NewHTTPError(400, err.Error())
+	}
+
 	// デバッグ
 	jsonbytes, err := json.MarshalIndent(spec, "", "    ")
 	if err != nil {

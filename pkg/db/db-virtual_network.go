@@ -222,6 +222,7 @@ func (d *Database) GetVirtualNetworkByName(name string) (api.VirtualNetwork, err
 		return api.VirtualNetwork{}, err
 	}
 
+	var followerCandidate *api.VirtualNetwork
 	for _, kv := range resp.Kvs {
 		//fmt.Println("仮想ネットワークの検索結果", "key", string(kv.Key), "value", string(kv.Value))
 		if strings.Contains(string(kv.Key), "/ip_network/") {
@@ -233,10 +234,25 @@ func (d *Database) GetVirtualNetworkByName(name string) (api.VirtualNetwork, err
 			slog.Error("Unmarshal() failed", "err", err, "key", string(kv.Key))
 			continue
 		}
-		if network.Metadata.Name != nil && *network.Metadata.Name == name {
-			slog.Debug("仮想ネットワークを名前で検索結果", "key", string(kv.Key), "name", name)
-			return network, nil
+		if network.Metadata == nil || network.Metadata.Name == nil || *network.Metadata.Name != name {
+			continue
 		}
+		// フォロワーエントリ（IpNetworkId=nil）は後回しにし、ヘッドエントリを優先して返す。
+		isFollower := network.Metadata.Labels != nil && GetNetworkSyncRole(*network.Metadata.Labels) == "follower"
+		if isFollower {
+			if followerCandidate == nil {
+				cp := network
+				followerCandidate = &cp
+			}
+			continue
+		}
+		slog.Debug("仮想ネットワークを名前で検索結果(head)", "key", string(kv.Key), "name", name)
+		return network, nil
+	}
+
+	if followerCandidate != nil {
+		slog.Debug("仮想ネットワークを名前で検索結果(follower fallback)", "name", name)
+		return *followerCandidate, nil
 	}
 
 	slog.Debug("仮想ネットワークを名前で検索結果なし", "name", name)
@@ -333,20 +349,54 @@ func (d *Database) updateVirtualNetwork(id string, spec api.VirtualNetwork) erro
 
 // 仮想ネットワークオブジェクトのステータスを更新
 func (d *Database) UpdateVirtualNetworkStatus(id string, status int) {
+	d.UpdateVirtualNetworkStatusWithMessage(id, status, "")
+}
+
+// UpdateVirtualNetworkStatusWithMessage はステータスとメッセージを同時に更新する。
+// message が空の場合は、ステータスに応じたデフォルト値を設定。
+func (d *Database) UpdateVirtualNetworkStatusWithMessage(id string, status int, message string) {
 	network, err := d.GetVirtualNetworkById(id)
 	if err != nil {
-		slog.Error("UpdateVirtualNetworkStatus() GetVirtualNetworkById() failed", "err", err, "networkId", id)
+		slog.Error("UpdateVirtualNetworkStatusWithMessage() GetVirtualNetworkById() failed", "err", err, "networkId", id)
 		panic(err)
 	}
 	network.Status.StatusCode = status
 	network.Status.Status = util.StringPtr(NetworkStatus[network.Status.StatusCode])
 	network.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+
+	// メッセージ設定
 	if status == NETWORK_ACTIVE {
 		network.Status.Message = nil
+	} else if message != "" {
+		network.Status.Message = util.StringPtr(message)
+	} else {
+		// デフォルトメッセージ
+		network.Status.Message = util.StringPtr(defaultMessageForStatus(status))
 	}
+
 	if err := d.UpdateVirtualNetworkById(id, network); err != nil {
-		slog.Error("UpdateVirtualNetworkStatus() UpdateVirtualNetwork() failed", "err", err, "networkId", id)
+		slog.Error("UpdateVirtualNetworkStatusWithMessage() UpdateVirtualNetwork() failed", "err", err, "networkId", id)
 		panic(err)
+	}
+}
+
+// defaultMessageForStatus はステータスコードに対するデフォルトメッセージを返す。
+func defaultMessageForStatus(status int) string {
+	switch status {
+	case NETWORK_PENDING:
+		return "provisioning:pending"
+	case NETWORK_PROVISIONING:
+		return "provisioning:in-progress"
+	case NETWORK_WAITING:
+		return "sync:waiting-head"
+	case NETWORK_ERROR:
+		return "error:unknown"
+	case NETWORK_DELETING:
+		return "deletion:in-progress"
+	case NETWORK_INACTIVE:
+		return "inactive"
+	default:
+		return "unknown"
 	}
 }
 

@@ -54,16 +54,20 @@ type VirtualNetwork struct {
 
 // VirtualNetworkSpec defines model for VirtualNetworkSpec.
 type VirtualNetworkSpec struct {
-	BridgeName       *string `yaml:"bridgeName,omitempty"`
-	Dhcp             *bool   `yaml:"dhcp,omitempty"`
-	DhcpEndAddress   *string `yaml:"dhcpEndAddress,omitempty"`
-	DhcpStartAddress *string `yaml:"dhcpStartAddress,omitempty"`
-	ForwardMode      *string `yaml:"forwardMode,omitempty"`
-	IpAddress        *string `yaml:"ipAddress,omitempty"`
-	IpNetworkId      *string `yaml:"ipNetworkId,omitempty"`
-	MacAddress       *string `yaml:"macAddress,omitempty"`
-	Nat              *bool   `yaml:"nat,omitempty"`
-	Netmask          *string `yaml:"netmask,omitempty"`
-	Stp              *bool   `yaml:"stp,omitempty"`
-	IPNetworkAddress *string `yaml:"IPNetworkAddress,omitempty"`
+	BridgeName        *string `yaml:"bridgeName,omitempty"`
+	Dhcp              *bool   `yaml:"dhcp,omitempty"`
+	DhcpEndAddress    *string `yaml:"dhcpEndAddress,omitempty"`
+	DhcpStartAddress  *string `yaml:"dhcpStartAddress,omitempty"`
+	ForwardMode       *string `yaml:"forwardMode,omitempty"`
+	IpAddress         *string `yaml:"ipAddress,omitempty"`
+	IpNetworkId       *string `yaml:"ipNetworkId,omitempty"`
+	MacAddress        *string `yaml:"macAddress,omitempty"`
+	Nat               *bool   `yaml:"nat,omitempty"`
+	Netmask           *string `yaml:"netmask,omitempty"`
+	OverlayMode       *string `yaml:"overlayMode,omitempty"`
+	PeerPolicy        *string `yaml:"peerPolicy,omitempty"`
+	Stp               *bool   `yaml:"stp,omitempty"`
+	UnderlayInterface *string `yaml:"underlayInterface,omitempty"`
+	Vni               *int    `yaml:"vni,omitempty"`
+	IPNetworkAddress  *string `yaml:"IPNetworkAddress,omitempty"`
 }

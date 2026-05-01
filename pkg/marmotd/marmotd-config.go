@@ -34,6 +34,9 @@ type MarmotdConfig struct {
 	// 例: "8.8.8.8:53"
 	DNSUpstream string `json:"dns_upstream"`
 
+	// VXLAN 利用時に underlayInterface が省略された場合の既定インターフェース名
+	DefaultUnderlayInterface string `json:"default_underlay_interface"`
+
 	// OS ボリューム用の LVM Volume Group 名
 	// 例: "vg1"
 	OSVolumeGroup string `json:"os_volume_group"`
@@ -78,6 +81,7 @@ func defaultConfig() *MarmotdConfig {
 		APIListenAddr:                    "0.0.0.0:8750",
 		DNSListenAddr:                    "127.0.0.1:53",
 		DNSUpstream:                      "8.8.8.8:53",
+		DefaultUnderlayInterface:         "",
 		OSVolumeGroup:                    db.DefaultOSVolumeGroup,
 		DataVolumeGroup:                  db.DefaultDataVolumeGroup,
 		DeletionDelaySeconds:             10,
@@ -116,6 +120,7 @@ func normalizeConfig(cfg *MarmotdConfig) *MarmotdConfig {
 	if strings.TrimSpace(normalized.DNSUpstream) == "" {
 		normalized.DNSUpstream = defaults.DNSUpstream
 	}
+	normalized.DefaultUnderlayInterface = strings.TrimSpace(normalized.DefaultUnderlayInterface)
 	if strings.TrimSpace(normalized.OSVolumeGroup) == "" {
 		normalized.OSVolumeGroup = db.DefaultOSVolumeGroup
 	}
