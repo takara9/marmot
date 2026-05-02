@@ -195,7 +195,7 @@ var serverCreateCmd = &cobra.Command{
 				return err
 			}
 			serverMap := data.(map[string]interface{})
-			fmt.Printf("サーバーが作成されました。ID: %v\n", serverMap["id"])
+			fmt.Printf("サーバーの作成要求が受け入れられました。ID: %v\n", serverMap["id"])
 			return nil
 
 		case "json":

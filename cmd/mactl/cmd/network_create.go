@@ -58,7 +58,7 @@ var networkCreateCmd = &cobra.Command{
 				return err
 			}
 			networkMap := data.(map[string]interface{})
-			fmt.Printf("ネットワークが作成されました。ID: %v\n", networkMap["id"])
+			fmt.Printf("ネットワークの作成要求が受け入れられました。ID: %v\n", networkMap["id"])
 			return nil
 
 		case "json":

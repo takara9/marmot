@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -46,36 +47,7 @@ var serverListCmd = &cobra.Command{
 					return creationTime(data[i].Status).Before(creationTime(data[j].Status))
 				})
 
-				fmt.Printf("  %2s  %-10s  %-20s  %-12s  %-3s  %-8s  %-12s  %-15s  %-15s\n", "No", "Server-ID", "Server-Name", "Status", "CPU", "RAM(MB)", "Node", "IP-Address", "Network")
-				for i, server := range data {
-					fmt.Printf("  %2d", i+1)
-					fmt.Printf("  %-10v", server.Id)
-					fmt.Printf("  %-20v", *server.Metadata.Name)
-					fmt.Printf("  %-12v", db.ServerStatus[server.Status.StatusCode])
-					fmt.Printf("  %-3v", *server.Spec.Cpu)
-					fmt.Printf("  %-8v", *server.Spec.Memory)
-					if server.Metadata.NodeName != nil {
-						fmt.Printf("  %-12v", *server.Metadata.NodeName)
-					} else {
-						fmt.Printf("  %-12v", "N/A")
-					}
-					if server.Spec.NetworkInterface != nil {
-						for j, nic := range *server.Spec.NetworkInterface {
-							if j == 0 {
-								if nic.Address != nil {
-									fmt.Printf("  %-15v", *nic.Address)
-									fmt.Printf("  %-15v", nic.Networkname)
-								} else {
-									fmt.Printf("  %-15v", "N/A")
-									fmt.Printf("  %-15v", "N/A")
-								}
-							}
-						}
-					} else {
-						fmt.Printf("  %-15s", "N/A")
-					}
-					fmt.Println()
-				}
+				fmt.Print(formatServerListText(data))
 				return nil
 
 			case "json":
@@ -113,6 +85,109 @@ var serverListCmd = &cobra.Command{
 			}
 		})
 	},
+}
+
+func formatServerListText(data []api.Server) string {
+	var builder strings.Builder
+
+	builder.WriteString(fmt.Sprintf("  %2s  %-10s  %-20s  %-12s  %-3s  %-8s  %-12s  %-15s  %-15s\n", "No", "Server-ID", "Server-Name", "Status", "CPU", "RAM(MB)", "Node", "IP-Address", "Network"))
+	for i, server := range data {
+		networkLines := serverNetworkLines(server)
+		builder.WriteString(fmt.Sprintf("  %2d  %-10v  %-20v  %-12v  %-3v  %-8v  %-12v  %-15v  %-15v\n",
+			i+1,
+			server.Id,
+			serverDisplayName(server),
+			serverStatusText(server),
+			serverCPU(server),
+			serverMemory(server),
+			serverNodeName(server),
+			networkLines[0].address,
+			networkLines[0].network,
+		))
+
+		for _, networkLine := range networkLines[1:] {
+			builder.WriteString(fmt.Sprintf("  %2s  %-10s  %-20s  %-12s  %-3s  %-8s  %-12s  %-15v  %-15v\n",
+				"",
+				"",
+				"",
+				"",
+				"",
+				"",
+				"",
+				networkLine.address,
+				networkLine.network,
+			))
+		}
+	}
+
+	return builder.String()
+}
+
+type serverNetworkLine struct {
+	address string
+	network string
+}
+
+func serverNetworkLines(server api.Server) []serverNetworkLine {
+	if server.Spec == nil || server.Spec.NetworkInterface == nil || len(*server.Spec.NetworkInterface) == 0 {
+		return []serverNetworkLine{{address: "N/A", network: "N/A"}}
+	}
+
+	lines := make([]serverNetworkLine, 0, len(*server.Spec.NetworkInterface))
+	for _, nic := range *server.Spec.NetworkInterface {
+		address := "N/A"
+		if nic.Address != nil && *nic.Address != "" {
+			address = *nic.Address
+		}
+
+		network := nic.Networkname
+		if network == "" {
+			network = "N/A"
+		}
+
+		lines = append(lines, serverNetworkLine{address: address, network: network})
+	}
+
+	if len(lines) == 0 {
+		return []serverNetworkLine{{address: "N/A", network: "N/A"}}
+	}
+
+	return lines
+}
+
+func serverDisplayName(server api.Server) string {
+	if server.Metadata != nil && server.Metadata.Name != nil {
+		return *server.Metadata.Name
+	}
+	return "N/A"
+}
+
+func serverNodeName(server api.Server) string {
+	if server.Metadata != nil && server.Metadata.NodeName != nil {
+		return *server.Metadata.NodeName
+	}
+	return "N/A"
+}
+
+func serverStatusText(server api.Server) string {
+	if server.Status == nil {
+		return "N/A"
+	}
+	return db.ServerStatus[server.Status.StatusCode]
+}
+
+func serverCPU(server api.Server) interface{} {
+	if server.Spec != nil && server.Spec.Cpu != nil {
+		return *server.Spec.Cpu
+	}
+	return "N/A"
+}
+
+func serverMemory(server api.Server) interface{} {
+	if server.Spec != nil && server.Spec.Memory != nil {
+		return *server.Spec.Memory
+	}
+	return "N/A"
 }
 
 func init() {

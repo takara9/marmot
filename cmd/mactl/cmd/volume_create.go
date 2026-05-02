@@ -49,7 +49,7 @@ var volumeCreateCmd = &cobra.Command{
 				return err
 			}
 			serveMap := data.(map[string]any)
-			fmt.Printf("ボリュームが作成されました。 ID: %v\n", serveMap["id"])
+			fmt.Printf("ボリュームの作成要求が受け入れられました。ID: %v\n", serveMap["id"])
 			return nil
 
 		case "json":
