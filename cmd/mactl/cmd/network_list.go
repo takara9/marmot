@@ -138,10 +138,11 @@ func filterNetworksForList(data []api.VirtualNetwork, showAll bool) []api.Virtua
 func formatNetworkListText(data []api.VirtualNetwork) string {
 	var builder strings.Builder
 
-	fmt.Fprintf(&builder, "  %2s  %-10s  %-20s  %-12s  %-20s  %-18s  %-20s\n", "No", "NETWORK-ID", "NETWORK-NAME", "NODE-NAME", "BRIDGE-NAME", "IP-NET", "STATUS")
+	fmt.Fprintf(&builder, "  %2s  %1s%-10s  %-20s  %-12s  %-20s  %-18s  %-20s\n", "No", "", "NETWORK-ID", "NETWORK-NAME", "NODE-NAME", "BRIDGE-NAME", "IP-NET", "STATUS")
 	for i, network := range data {
-		fmt.Fprintf(&builder, "  %2d  %-10v  %-20v  %-12v  %-20v  %-18v  %-20v\n",
+		fmt.Fprintf(&builder, "  %2d  %1s%-10v  %-20v  %-12v  %-20v  %-18v  %-20v\n",
 			i+1,
+			deletionMarker(network.Status),
 			network.Id,
 			stringValue(network.Metadata, func(m *api.Metadata) *string { return m.Name }),
 			stringValue(network.Metadata, func(m *api.Metadata) *string { return m.NodeName }),

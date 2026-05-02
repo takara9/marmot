@@ -22,6 +22,14 @@ func creationTime(s *api.Status) time.Time {
 	return time.Time{}
 }
 
+// deletionMarker は削除要求済み(DeletionTimeStamp != nil)なら "*" を返す。
+func deletionMarker(status *api.Status) string {
+	if status != nil && status.DeletionTimeStamp != nil {
+		return "*"
+	}
+	return ""
+}
+
 // コンフィグからエンドポイントを取り出してセットする
 //
 // 優先順位:
