@@ -32,8 +32,9 @@ func EnsureMarmotConfig() error {
 // MarmotConfig は $HOME/.marmot に保存される複数エンドポイント設定
 type MarmotConfig struct {
 	// Current はアクティブなエンドポイントのインデックス (0始まり)
-	Current   int      `yaml:"current"`
-	Endpoints []string `yaml:"endpoints"`
+	Current          int      `yaml:"current"`
+	Endpoints        []string `yaml:"endpoints"`
+	EndpointComments []string `yaml:"endpointComments,omitempty"`
 }
 
 // MarmotConfigPath は $HOME/.marmot のパスを返す
@@ -51,11 +52,13 @@ func ReadMarmotConfig(path string) (*MarmotConfig, error) {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse %s: %w", path, err)
 	}
+	cfg.NormalizeEndpointComments()
 	return &cfg, nil
 }
 
 // WriteMarmotConfig は MarmotConfig を指定パスに書き込む
 func WriteMarmotConfig(path string, cfg *MarmotConfig) error {
+	cfg.NormalizeEndpointComments()
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
@@ -65,6 +68,25 @@ func WriteMarmotConfig(path string, cfg *MarmotConfig) error {
 		return fmt.Errorf("failed to write %s: %w", path, err)
 	}
 	return nil
+}
+
+// NormalizeEndpointComments は Endpoints と EndpointComments の要素数を揃える。
+func (c *MarmotConfig) NormalizeEndpointComments() {
+	if len(c.EndpointComments) > len(c.Endpoints) {
+		c.EndpointComments = c.EndpointComments[:len(c.Endpoints)]
+		return
+	}
+	for len(c.EndpointComments) < len(c.Endpoints) {
+		c.EndpointComments = append(c.EndpointComments, "")
+	}
+}
+
+// EndpointComment は指定インデックスのコメントを返す。
+func (c *MarmotConfig) EndpointComment(index int) string {
+	if index < 0 || index >= len(c.EndpointComments) {
+		return ""
+	}
+	return c.EndpointComments[index]
 }
 
 // ActiveEndpoint は現在アクティブなエンドポイントURLを返す
