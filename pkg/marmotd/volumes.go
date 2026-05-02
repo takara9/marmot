@@ -39,6 +39,26 @@ func resolveImageTemplateByVolumeNode(m *Marmot, volSpec api.Volume) (api.Image,
 	return m.Db.FindImageByName(osVariant)
 }
 
+func requestedOSVolumeSizeGB(volSpec api.Volume, img api.Image) (int, error) {
+	const defaultOSSizeGB = 16
+
+	requestedSize := defaultOSSizeGB
+	if volSpec.Spec != nil && volSpec.Spec.Size != nil && *volSpec.Spec.Size > 0 {
+		requestedSize = *volSpec.Spec.Size
+	}
+
+	imageSize := defaultOSSizeGB
+	if img.Spec != nil && img.Spec.Size != nil && *img.Spec.Size > 0 {
+		imageSize = *img.Spec.Size
+	}
+
+	if requestedSize < imageSize {
+		return 0, fmt.Errorf("requested os volume size %dGB is smaller than image size %dGB", requestedSize, imageSize)
+	}
+
+	return requestedSize, nil
+}
+
 func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 	volSpec, err := m.Db.GetVolumeById(id)
 	if err != nil {
@@ -66,6 +86,19 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 				return nil, err
 			}
 
+			requestedSizeGB, err := requestedOSVolumeSizeGB(volSpec, img)
+			if err != nil {
+				slog.Error("invalid requested os volume size", "err", err, "volId", volSpec.Id)
+				m.Db.UpdateVolumeStatusMessage(volSpec.Id, db.VOLUME_ERROR, err.Error())
+				return nil, err
+			}
+			volSpec.Spec.Size = util.IntPtrInt(requestedSizeGB)
+
+			imageSizeGB := 16
+			if img.Spec != nil && img.Spec.Size != nil && *img.Spec.Size > 0 {
+				imageSizeGB = *img.Spec.Size
+			}
+
 			//if img.Spec.Qcow2Path == nil || len(*img.Spec.Qcow2Path) == 0 {
 			if img.Spec.Qcow2Path == nil {
 				slog.Error("os image template has no qcow2 path", "", 0)
@@ -79,6 +112,15 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 				slog.Error("failed to copy qcow2 image template", "err", err, "src", *img.Spec.Qcow2Path, "dst", *volSpec.Spec.Path)
 				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
 				return nil, err
+			}
+
+			if requestedSizeGB > imageSizeGB {
+				err = qcow.ResizeQcow(*volSpec.Spec.Path, requestedSizeGB)
+				if err != nil {
+					slog.Error("failed to resize qcow2 os volume", "err", err, "path", *volSpec.Spec.Path, "sizeGB", requestedSizeGB)
+					m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
+					return nil, err
+				}
 			}
 
 			// 取得したLV名とサイズで、データベースを更新

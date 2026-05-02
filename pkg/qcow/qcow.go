@@ -32,6 +32,18 @@ func CreateQcow(path string, size int) error {
 	return nil
 }
 
+// QCOW2 ボリュームの拡張、サイズはGB単位
+func ResizeQcow(path string, size int) error {
+	slog.Debug("Resizing QCOW2 volume", "path", path, "sizeGB", size)
+	cmd := exec.Command("qemu-img", "resize", path, fmt.Sprintf("%dG", size))
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.Error("qemu-img resize failed", "output", string(output))
+		return fmt.Errorf("failed to resize QCOW2 volume at path: %s, error: %v", path, err)
+	}
+	return nil
+}
+
 // QCOW2 ボリュームのコピー
 func CopyQcow(srcPath string, destPath string) error {
 	return CopyQcowWithContext(context.Background(), srcPath, destPath)
