@@ -10,6 +10,7 @@ import (
 
 const (
 	VOLUME_CONTROLLER_INTERVAL = 5 * time.Second
+	VOLUME_STALE_TIMEOUT       = 10 * time.Minute
 )
 
 /*
@@ -96,6 +97,20 @@ func (c *controller) volumeControllerLoop() {
 			if time.Since(deletionTime) > c.deletionDelay {
 				slog.Debug("削除のタイムスタンプが一定時間以上経過しているボリューム検出", "volId", vol.Id)
 				c.marmot.Db.UpdateVolumeStatus(vol.Id, db.VOLUME_DELETING)
+			}
+		}
+
+		// 最終更新から10分以上 ERROR / PROVISIONING が継続している場合は実体ごと自動削除
+		if vol.Status != nil && vol.Status.LastUpdateTimeStamp != nil {
+			isStale := time.Since(*vol.Status.LastUpdateTimeStamp) > VOLUME_STALE_TIMEOUT
+			isTargetState := vol.Status.StatusCode == db.VOLUME_ERROR || vol.Status.StatusCode == db.VOLUME_PROVISIONING
+			if isStale && isTargetState {
+				slog.Warn("最終更新から10分以上放置されたボリュームを削除キューへ登録", "volId", vol.Id, "status", vol.Status.StatusCode, "lastUpdate", vol.Status.LastUpdateTimeStamp)
+				if vol.Status.DeletionTimeStamp == nil {
+					c.db.SetVolumeDeletionTimestamp(vol.Id)
+					slog.Info("放置ボリュームにDeletionTimeStampを設定", "volId", vol.Id)
+				}
+				continue
 			}
 		}
 
