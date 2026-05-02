@@ -103,8 +103,10 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 			volume.Spec.Size = util.IntPtrInt(1) // 1GB
 		}
 	} else if *volume.Spec.Kind == "os" {
-		// OSボリュームのサイズのデフォルト値を設定
-		volume.Spec.Size = util.IntPtrInt(16) // 16GB
+		// OSボリュームはサイズ未指定(または0以下)時のみデフォルト値を設定
+		if volume.Spec.Size == nil || *volume.Spec.Size <= 0 {
+			volume.Spec.Size = util.IntPtrInt(16) // 16GB
+		}
 	}
 
 	// ボリュームタイプのデフォルト値を設定し、パスを決定する

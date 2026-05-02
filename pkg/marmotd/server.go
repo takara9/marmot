@@ -3,6 +3,7 @@ package marmotd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -63,11 +64,23 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	}
 
 	slog.Debug("ボリュームタイプの指定がなければ、デフォルトqcow2を設定", "boot volume type", serverConfig.Spec.BootVolume)
-	if serverConfig.Spec.BootVolume == nil {
+	if serverConfig.Spec.BootVolume == nil || serverConfig.Spec.BootVolume.Spec == nil || serverConfig.Spec.BootVolume.Spec.Type == nil {
 		bootVol.Spec.Type = util.StringPtr("qcow2")
 	} else {
 		bootVol.Spec.Type = serverConfig.Spec.BootVolume.Spec.Type
 		bootVol.Spec.OsVariant = serverConfig.Spec.OsVariant
+	}
+
+	if bootVol.Spec.Type != nil && *bootVol.Spec.Type != "qcow2" &&
+		serverConfig.Spec.BootVolume != nil && serverConfig.Spec.BootVolume.Spec != nil &&
+		serverConfig.Spec.BootVolume.Spec.Size != nil {
+		return "", errors.New("boot_volume.size は boot_volume.type=qcow2 のときのみ指定できます")
+	}
+
+	if bootVol.Spec.Type != nil && *bootVol.Spec.Type == "qcow2" &&
+		serverConfig.Spec.BootVolume != nil && serverConfig.Spec.BootVolume.Spec != nil &&
+		serverConfig.Spec.BootVolume.Spec.Size != nil && *serverConfig.Spec.BootVolume.Spec.Size > 0 {
+		bootVol.Spec.Size = util.IntPtrInt(*serverConfig.Spec.BootVolume.Spec.Size)
 	}
 
 	slog.Debug("ブートディスクにOSの指定がなければ、デフォルトのOSを設定")
