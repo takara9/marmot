@@ -78,7 +78,7 @@ func parseHostIDHex(v string) (uint32, bool) {
 }
 
 // SelectNode はアクティブなホスト群からスコアが最良のノード名を返す。
-// スコアは RunningVMs の数（少ないほど優先）。同点の場合は NodeName 昇順。
+// スコアは割り当て済みVM数（TotalVMs, 少ないほど優先）。同点の場合は NodeName 昇順。
 func SelectNode(statuses []api.HostStatus) (string, error) {
 	active := filterActiveHosts(statuses)
 	if len(active) == 0 {
@@ -97,10 +97,10 @@ func SelectNode(statuses []api.HostStatus) (string, error) {
 	}
 
 	sort.Slice(candidates, func(i, j int) bool {
-		runningI := runningVMs(candidates[i])
-		runningJ := runningVMs(candidates[j])
-		if runningI != runningJ {
-			return runningI < runningJ
+		allocatedI := allocatedVMs(candidates[i])
+		allocatedJ := allocatedVMs(candidates[j])
+		if allocatedI != allocatedJ {
+			return allocatedI < allocatedJ
 		}
 		// 同点の場合はノード名昇順（決定的な選択）
 		return *candidates[i].NodeName < *candidates[j].NodeName
@@ -109,10 +109,10 @@ func SelectNode(statuses []api.HostStatus) (string, error) {
 	return *candidates[0].NodeName, nil
 }
 
-// runningVMs は HostAllocation.RunningVMs の値を返す。未設定の場合は 0。
-func runningVMs(s api.HostStatus) int {
-	if s.Allocation != nil && s.Allocation.RunningVMs != nil {
-		return *s.Allocation.RunningVMs
+// allocatedVMs は HostAllocation.TotalVMs の値を返す。未設定の場合は 0。
+func allocatedVMs(s api.HostStatus) int {
+	if s.Allocation != nil && s.Allocation.TotalVMs != nil {
+		return *s.Allocation.TotalVMs
 	}
 	return 0
 }

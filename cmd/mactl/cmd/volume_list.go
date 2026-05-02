@@ -40,7 +40,7 @@ var volumeListCmd = &cobra.Command{
 					return creationTime(data[i].Status).Before(creationTime(data[j].Status))
 				})
 
-				fmt.Printf("%-2v  %-6v  %-16v  %-4v  %-5v  %-8v  %-12v  %-20v\n", "No", "Id", "Name", "Kind", "Type", "Size(GB)", "Status", "Path")
+				fmt.Printf("%-2v  %-6v  %-16v  %-4v  %-5v  %-8v  %-12v  %-20v\n", "NO", "ID", "NAME", "KIND", "TYPE", "SIZE(GB)", "STATUS", "PATH")
 				for i, v := range data {
 					fmt.Printf("%2d", i+1)
 					fmt.Printf("  %-6v", v.Id)

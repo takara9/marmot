@@ -12,14 +12,14 @@ import (
 )
 
 // テスト用ヘルパー: HostStatus を生成する
-func newHostStatus(nodeName, hostID string, runningVMs int, updatedSecondsAgo int) api.HostStatus {
+func newHostStatus(nodeName, hostID string, totalVMs int, updatedSecondsAgo int) api.HostStatus {
 	t := time.Now().Add(-time.Duration(updatedSecondsAgo) * time.Second)
 	return api.HostStatus{
 		NodeName:    util.StringPtr(nodeName),
 		HostId:      util.StringPtr(hostID),
 		LastUpdated: &t,
 		Allocation: &api.HostAllocation{
-			RunningVMs: util.IntPtrInt(runningVMs),
+			TotalVMs: util.IntPtrInt(totalVMs),
 		},
 	}
 }
@@ -102,8 +102,8 @@ var _ = Describe("スケジューラー", func() {
 	})
 
 	Describe("SelectNode", func() {
-		Context("RunningVMs が異なる複数のアクティブノードがある場合", func() {
-			It("RunningVMs が最小のノードを選択する", func() {
+		Context("割り当て済みVM数(TotalVMs) が異なる複数のアクティブノードがある場合", func() {
+			It("TotalVMs が最小のノードを選択する", func() {
 				statuses := []api.HostStatus{
 					newHostStatus("hv1", "00000001", 5, 5),
 					newHostStatus("hv2", "00000002", 2, 5),
@@ -115,7 +115,7 @@ var _ = Describe("スケジューラー", func() {
 			})
 		})
 
-		Context("RunningVMs が同点の場合", func() {
+		Context("TotalVMs が同点の場合", func() {
 			It("NodeName 辞書順で先頭のノードを選択する（決定的）", func() {
 				statuses := []api.HostStatus{
 					newHostStatus("hv3", "00000003", 3, 5),
@@ -129,7 +129,7 @@ var _ = Describe("スケジューラー", func() {
 		})
 
 		Context("Allocation が未設定のノードがある場合", func() {
-			It("RunningVMs = 0 として扱い選択する", func() {
+			It("TotalVMs = 0 として扱い選択する", func() {
 				t := time.Now().Add(-5 * time.Second)
 				statuses := []api.HostStatus{
 					{NodeName: util.StringPtr("hv1"), HostId: util.StringPtr("00000001"), LastUpdated: &t, Allocation: nil},

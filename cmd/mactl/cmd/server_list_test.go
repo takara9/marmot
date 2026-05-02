@@ -38,7 +38,7 @@ var _ = Describe("formatServerListText", func() {
 
 		lines := strings.Split(strings.TrimSpace(output), "\n")
 		Expect(lines).To(HaveLen(4), output)
-		Expect(lines[0]).To(ContainSubstring("IP-Address"), output)
+		Expect(lines[0]).To(ContainSubstring("IP-ADDRESS"), output)
 		Expect(lines[1]).To(ContainSubstring("3f738"), output)
 		Expect(lines[1]).To(ContainSubstring("192.168.100.2"), output)
 		Expect(lines[1]).To(ContainSubstring("test-net-4"), output)

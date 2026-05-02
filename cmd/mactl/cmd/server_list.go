@@ -90,7 +90,7 @@ var serverListCmd = &cobra.Command{
 func formatServerListText(data []api.Server) string {
 	var builder strings.Builder
 
-	builder.WriteString(fmt.Sprintf("  %2s  %-10s  %-20s  %-12s  %-3s  %-8s  %-12s  %-15s  %-15s\n", "No", "Server-ID", "Server-Name", "Status", "CPU", "RAM(MB)", "Node", "IP-Address", "Network"))
+	builder.WriteString(fmt.Sprintf("  %2s  %-10s  %-20s  %-12s  %-3s  %-8s  %-12s  %-15s  %-15s\n", "NO", "SERVER-ID", "SERVER-NAME", "STATUS", "CPU", "RAM(MB)", "NODE", "IP-ADDRESS", "NETWORK"))
 	for i, server := range data {
 		networkLines := serverNetworkLines(server)
 		builder.WriteString(fmt.Sprintf("  %2d  %-10v  %-20v  %-12v  %-3v  %-8v  %-12v  %-15v  %-15v\n",
