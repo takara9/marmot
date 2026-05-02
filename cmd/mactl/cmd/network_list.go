@@ -59,8 +59,20 @@ var networkListCmd = &cobra.Command{
 				return data[i].Id < data[j].Id
 			})
 			if len(data) == 0 {
-				fmt.Println("No networks found.")
-				return nil
+				switch outputStyle {
+				case "text":
+					fmt.Println("No networks found.")
+					return nil
+				case "json":
+					fmt.Println("[]")
+					return nil
+				case "yaml":
+					fmt.Println("[]")
+					return nil
+				default:
+					fmt.Println("output style must set text/json/yaml")
+					return fmt.Errorf("output style must set text/json/yaml")
+				}
 			}
 
 			switch outputStyle {
