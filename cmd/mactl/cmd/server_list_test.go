@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -38,7 +39,7 @@ var _ = Describe("formatServerListText", func() {
 
 		lines := strings.Split(strings.TrimSpace(output), "\n")
 		Expect(lines).To(HaveLen(4), output)
-		Expect(lines[0]).To(ContainSubstring("IP-Address"), output)
+		Expect(lines[0]).To(ContainSubstring("IP-ADDRESS"), output)
 		Expect(lines[1]).To(ContainSubstring("3f738"), output)
 		Expect(lines[1]).To(ContainSubstring("192.168.100.2"), output)
 		Expect(lines[1]).To(ContainSubstring("test-net-4"), output)
@@ -70,5 +71,25 @@ var _ = Describe("formatServerListText", func() {
 		Expect(lines).To(HaveLen(2), output)
 		Expect(lines[1]).To(ContainSubstring("592a2"), output)
 		Expect(lines[1]).To(ContainSubstring("N/A"), output)
+	})
+
+	It("prefixes ID with * when DeletionTimeStamp is set", func() {
+		name := "test-server-deleting"
+		now := time.Now()
+
+		output := formatServerListText([]api.Server{{
+			Id: "a1b2c",
+			Metadata: &api.Metadata{
+				Name: &name,
+			},
+			Status: &api.Status{
+				StatusCode:         int(db.SERVER_DELETING),
+				DeletionTimeStamp: &now,
+			},
+		}})
+
+		lines := strings.Split(strings.TrimSpace(output), "\n")
+		Expect(lines).To(HaveLen(2), output)
+		Expect(lines[1]).To(ContainSubstring("*a1b2c"), output)
 	})
 })

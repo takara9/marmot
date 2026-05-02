@@ -43,6 +43,26 @@ var _ = Describe("formatNetworkListText", func() {
 		Expect(strings.Contains(output, "10.10.0.0/24")).To(BeTrue(), output)
 		Expect(strings.Contains(output, db.NetworkStatus[int(db.NETWORK_ACTIVE)])).To(BeTrue(), output)
 	})
+
+	It("prefixes ID with * when DeletionTimeStamp is set", func() {
+		now := time.Now()
+		name := "test-net-deleting"
+		statusText := "DELETING"
+
+		output := formatNetworkListText([]api.VirtualNetwork{{
+			Id: "net99",
+			Metadata: &api.Metadata{
+				Name: &name,
+			},
+			Status: &api.Status{
+				Status:            &statusText,
+				StatusCode:        int(db.NETWORK_DELETING),
+				DeletionTimeStamp: &now,
+			},
+		}})
+
+		Expect(strings.Contains(output, "*net99")).To(BeTrue(), output)
+	})
 })
 
 var _ = Describe("network list sort", func() {

@@ -9,16 +9,18 @@ type Auth struct {
 
 // Server defines model for Server.
 type Server struct {
-	Name       string     `yaml:"name"`
-	Cpu        *int       `yaml:"cpu,omitempty"`
-	Memory     *int       `yaml:"memory,omitempty"`
-	OsVariant  *string    `yaml:"os_variant,omitempty"`
-	BootVolume *Volume    `yaml:"boot_volume,omitempty"`
-	Playbook   *string    `yaml:"playbook,omitempty"`
-	Network    *[]Network `yaml:"network,omitempty"`
-	Storage    *[]Volume  `yaml:"storage,omitempty"`
-	Auth       *Auth      `yaml:"auth,omitempty"`
-	Comment    *string    `yaml:"comment,omitempty"`
+	Name           string     `yaml:"name"`
+	Cpu            *int       `yaml:"cpu,omitempty"`
+	Memory         *int       `yaml:"memory,omitempty"`
+	OsVariant      *string    `yaml:"os_variant,omitempty"`
+	BootVolume     *Volume    `yaml:"boot_volume,omitempty"`
+	Playbook       *string    `yaml:"playbook,omitempty"`
+	Network        *[]Network `yaml:"network,omitempty"`
+	Storage        *[]Volume  `yaml:"storage,omitempty"`
+	Auth           *Auth      `yaml:"auth,omitempty"`
+	Comment        *string    `yaml:"comment,omitempty"`
+	Metadata       *Metadata  `yaml:"metadata,omitempty"`
+	MetadataLegacy *Metadata  `yaml:"Metadata,omitempty"`
 }
 
 // Volume defines model for Volume.

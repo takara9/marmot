@@ -66,10 +66,10 @@ var imageListCmd = &cobra.Command{
 					return creationTime(data[i].Status).Before(creationTime(data[j].Status))
 				})
 
-				fmt.Printf("  %2s  %-8s  %-16s  %-12s  %-12s  %-7s  %-4s  %-5s  %-25s\n", "No", "IMAGE-ID", "IMAGE-NAME", "STATUS", "NODE-NAME", "ROLE", "LV", "QCOW2", "CREATED-AT")
+				fmt.Printf("  %2s  %1s%-8s  %-16s  %-12s  %-12s  %-7s  %-4s  %-5s  %-25s\n", "No", "", "IMAGE-ID", "IMAGE-NAME", "STATUS", "NODE-NAME", "ROLE", "LV", "QCOW2", "CREATED-AT")
 				for i, image := range data {
 					fmt.Printf("  %2d", i+1)
-					fmt.Printf("  %-8v", image.Id)
+					fmt.Printf("  %1v%-8v", deletionMarker(image.Status), image.Id)
 					if image.Metadata.Name != nil {
 						fmt.Printf("  %-16v", *image.Metadata.Name)
 					} else {
