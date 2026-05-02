@@ -787,6 +787,13 @@ func (m *Marmot) CreateNewVolumeWithWait(volReq api.Volume) (api.Volume, error) 
 			slog.Debug("ブートボリュームのステータスがAVAILABLEになった", "volume id", vol.Id)
 			break
 		}
+		if vol.Status.StatusCode == db.VOLUME_ERROR {
+			msg := "volume provisioning failed"
+			if vol.Status.Message != nil && len(*vol.Status.Message) > 0 {
+				msg = *vol.Status.Message
+			}
+			return api.Volume{}, fmt.Errorf("volume %s is in error state: %s", vol.Id, msg)
+		}
 		time.Sleep(1 * time.Second)
 	}
 
