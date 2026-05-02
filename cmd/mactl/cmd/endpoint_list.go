@@ -28,15 +28,16 @@ var epListCmd = &cobra.Command{
 			fmt.Println("'mactl ep add <URL>' でエンドポイントを追加してください。")
 			return nil
 		}
+		cfg.NormalizeEndpointComments()
 
-		fmt.Printf("  %-4s  %-8s  %s\n", "No", "Status", "URL")
-		fmt.Printf("  %-4s  %-8s  %s\n", "----", "--------", "-----------------------------")
+		fmt.Printf("  %-4s  %-8s  %-32s  %s\n", "No", "Status", "URL", "Comment")
+		fmt.Printf("  %-4s  %-8s  %-32s  %s\n", "----", "--------", "--------------------------------", "----------------")
 		for i, ep := range cfg.Endpoints {
 			status := "        "
 			if i == cfg.Current {
 				status = "* active"
 			}
-			fmt.Printf("  %-4d  %-8s  %s\n", i+1, status, ep)
+			fmt.Printf("  %-4d  %-8s  %-32s  %s\n", i+1, status, ep, cfg.EndpointComment(i))
 		}
 		return nil
 	},
