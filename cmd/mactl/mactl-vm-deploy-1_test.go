@@ -211,7 +211,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			//Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("DB登録をチェック", func() {
+		It("DB登録をチェック JSON形式", func() {
 			Eventually(func(g Gomega) {
 				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "network", "list", "--output", "json")
 				stdoutStderr, err := cmd.CombinedOutput()
@@ -228,7 +228,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			}, 60*time.Second, 3*time.Second).Should(Succeed())
 		})
 
-		It("仮想ネットワークのリスト", func() {
+		It("仮想ネットワークのリスト テキスト形式", func() {
 			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "network", "list", "--output", "text")
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
