@@ -62,8 +62,8 @@ var serverCreateCmd = &cobra.Command{
 			}
 		}
 
-		if conf.Comment != nil {
-			virtualServer.Metadata.Comment = util.StringPtr(*conf.Comment)
+		if comment := pickServerComment(conf); comment != nil {
+			virtualServer.Metadata.Comment = util.StringPtr(*comment)
 		}
 		// 無設定を許容、デフォルトをAPI側に任せる
 		if conf.Cpu != nil {
@@ -227,4 +227,14 @@ var serverCreateCmd = &cobra.Command{
 func init() {
 	serverCmd.AddCommand(serverCreateCmd)
 	serverCreateCmd.Flags().StringVarP(&configFilename, "configfile", "f", "vm-server.yaml", "Configuration file or raw URL for the server")
+}
+
+func pickServerComment(conf config.Server) *string {
+	if conf.Metadata != nil && conf.Metadata.Comment != nil {
+		return conf.Metadata.Comment
+	}
+	if conf.MetadataLegacy != nil && conf.MetadataLegacy.Comment != nil {
+		return conf.MetadataLegacy.Comment
+	}
+	return conf.Comment
 }
