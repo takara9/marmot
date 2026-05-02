@@ -214,7 +214,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("DB登録をチェック", func() {
+		It("DB登録をチェック JSON形式", func() {
 			Eventually(func(g Gomega) {
 				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "network", "list", "--output", "json")
 				stdoutStderr, err := cmd.CombinedOutput()

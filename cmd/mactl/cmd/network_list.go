@@ -14,6 +14,8 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
+var networkListShowAll bool
+
 var networkListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all networks",
@@ -36,12 +38,41 @@ var networkListCmd = &cobra.Command{
 				println("Failed to Unmarshal", err)
 				return err
 			}
-			sort.Slice(data, func(i, j int) bool {
-				return creationTime(data[i].Status).Before(creationTime(data[j].Status))
+
+			data = filterNetworksForList(data, networkListShowAll)
+
+			sort.SliceStable(data, func(i, j int) bool {
+				ti := creationTime(data[i].Status)
+				tj := creationTime(data[j].Status)
+
+				hasI := !ti.IsZero()
+				hasJ := !tj.IsZero()
+				if hasI != hasJ {
+					// creationTimeStamp が無いデータは末尾に寄せる。
+					return hasI
+				}
+
+				if !ti.Equal(tj) {
+					return ti.Before(tj)
+				}
+
+				return data[i].Id < data[j].Id
 			})
 			if len(data) == 0 {
-				fmt.Println("No networks found.")
-				return nil
+				switch outputStyle {
+				case "text":
+					fmt.Println("No networks found.")
+					return nil
+				case "json":
+					fmt.Println("[]")
+					return nil
+				case "yaml":
+					fmt.Println("[]")
+					return nil
+				default:
+					fmt.Println("output style must set text/json/yaml")
+					return fmt.Errorf("output style must set text/json/yaml")
+				}
 			}
 
 			switch outputStyle {
@@ -58,8 +89,13 @@ var networkListCmd = &cobra.Command{
 				return nil
 
 			case "yaml":
+				jsonBytes, err := json.Marshal(data)
+				if err != nil {
+					fmt.Println("Failed to Marshal", err)
+					return err
+				}
 				var data []config.VirtualNetwork
-				if err := yaml.Unmarshal(byteBody, &data); err != nil {
+				if err := yaml.Unmarshal(jsonBytes, &data); err != nil {
 					println("Failed to Unmarshal", err)
 					return err
 				}
@@ -79,17 +115,38 @@ var networkListCmd = &cobra.Command{
 	},
 }
 
+func filterHeadSyncRoleNetworks(data []api.VirtualNetwork) []api.VirtualNetwork {
+	filtered := make([]api.VirtualNetwork, 0, len(data))
+	for _, network := range data {
+		if network.Metadata == nil || network.Metadata.Labels == nil {
+			continue
+		}
+		if db.GetNetworkSyncRole(*network.Metadata.Labels) == "head" {
+			filtered = append(filtered, network)
+		}
+	}
+	return filtered
+}
+
+func filterNetworksForList(data []api.VirtualNetwork, showAll bool) []api.VirtualNetwork {
+	if showAll {
+		return data
+	}
+	return filterHeadSyncRoleNetworks(data)
+}
+
 func formatNetworkListText(data []api.VirtualNetwork) string {
 	var builder strings.Builder
 
-	fmt.Fprintf(&builder, "  %2s  %-10s  %-20s  %-12s  %-20s  %-20s\n", "No", "NETWORK-ID", "NETWORK-NAME", "NODE-NAME", "BRIDGE-NAME", "STATUS")
+	fmt.Fprintf(&builder, "  %2s  %-10s  %-20s  %-12s  %-20s  %-18s  %-20s\n", "No", "NETWORK-ID", "NETWORK-NAME", "NODE-NAME", "BRIDGE-NAME", "IP-NET", "STATUS")
 	for i, network := range data {
-		fmt.Fprintf(&builder, "  %2d  %-10v  %-20v  %-12v  %-20v  %-20v\n",
+		fmt.Fprintf(&builder, "  %2d  %-10v  %-20v  %-12v  %-20v  %-18v  %-20v\n",
 			i+1,
 			network.Id,
 			stringValue(network.Metadata, func(m *api.Metadata) *string { return m.Name }),
 			stringValue(network.Metadata, func(m *api.Metadata) *string { return m.NodeName }),
 			stringValue(network.Spec, func(s *api.VirtualNetworkSpec) *string { return s.BridgeName }),
+			stringValue(network.Spec, func(s *api.VirtualNetworkSpec) *string { return s.IPNetworkAddress }),
 			networkListStatusLabel(network.Status),
 		)
 	}
@@ -109,4 +166,5 @@ func networkListStatusLabel(status *api.Status) string {
 
 func init() {
 	networkCmd.AddCommand(networkListCmd)
+	networkListCmd.Flags().BoolVarP(&networkListShowAll, "all", "a", false, "head/follower を含めてすべてのネットワークを表示する")
 }
