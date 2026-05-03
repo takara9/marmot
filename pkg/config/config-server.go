@@ -13,10 +13,10 @@ type Server struct {
 	Cpu            *int       `yaml:"cpu,omitempty"`
 	Memory         *int       `yaml:"memory,omitempty"`
 	OsVariant      *string    `yaml:"os_variant,omitempty"`
-	BootVolume     *VolSpec    `yaml:"boot_volume,omitempty"`
+	BootVolume     *VolSpec   `yaml:"boot_volume,omitempty"`
 	Playbook       *string    `yaml:"playbook,omitempty"`
 	Network        *[]Network `yaml:"network,omitempty"`
-	Storage        *[]VolSpec  `yaml:"storage,omitempty"`
+	Storage        *[]VolSpec `yaml:"storage,omitempty"`
 	Auth           *Auth      `yaml:"auth,omitempty"`
 	Comment        *string    `yaml:"comment,omitempty"`
 	Metadata       *Metadata  `yaml:"metadata,omitempty"`
