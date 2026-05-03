@@ -23,7 +23,7 @@ var imageDeleteCmd = &cobra.Command{
 		for _, imageId := range args {
 			byteBody, _, err := m.DeleteImageById(imageId)
 			if err != nil {
-				println("DeleteImageById", "err", err)
+				fmt.Fprintln(cmd.ErrOrStderr(), "DeleteImageById", "err", err)
 				continue
 			}
 

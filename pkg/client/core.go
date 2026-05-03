@@ -2,12 +2,19 @@ package client
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
+
+type apiErrorBody struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
 
 type MarmotClient struct {
 	NodeName string
@@ -68,17 +75,29 @@ func (m *MarmotEndpoint) httpRequest2(req *http.Request) ([]byte, *url.URL, erro
 	resp, err := m.Client.Do(req)
 	if err != nil {
 		return nil, nil, err
-	} else if resp.StatusCode != http.StatusOK &&
-		resp.StatusCode != http.StatusCreated &&
-		resp.StatusCode != http.StatusAccepted &&
-		resp.StatusCode != http.StatusNoContent {
-		return nil, nil, fmt.Errorf("http status code = %d", resp.StatusCode)
 	}
 
 	byteJSON, err := io.ReadAll(resp.Body)
 	defer resp.Body.Close()
 	if err != nil {
 		return nil, nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK &&
+		resp.StatusCode != http.StatusCreated &&
+		resp.StatusCode != http.StatusAccepted &&
+		resp.StatusCode != http.StatusNoContent {
+		msg := strings.TrimSpace(string(byteJSON))
+		var apiErr apiErrorBody
+		if err := json.Unmarshal(byteJSON, &apiErr); err == nil {
+			if strings.TrimSpace(apiErr.Message) != "" {
+				return nil, nil, fmt.Errorf("%s", strings.TrimSpace(apiErr.Message))
+			}
+		}
+		if len(msg) > 0 {
+			return nil, nil, fmt.Errorf("%s", msg)
+		}
+		return nil, nil, fmt.Errorf("http status code = %d", resp.StatusCode)
 	}
 
 	jobURL, err := resp.Location()

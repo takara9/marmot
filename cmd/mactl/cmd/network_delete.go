@@ -23,7 +23,7 @@ var networkDeleteCmd = &cobra.Command{
 		for _, networkId := range args {
 			byteBody, _, err := m.DeleteVirtualNetworkById(networkId)
 			if err != nil {
-				println("DeleteVirtualNetworkById", "err", err)
+				fmt.Fprintln(cmd.ErrOrStderr(), "DeleteVirtualNetworkById", "err", err)
 				continue
 			}
 

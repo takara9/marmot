@@ -23,7 +23,7 @@ var serverDeleteCmd = &cobra.Command{
 		for _, serverId := range args {
 			byteBody, _, err := m.DeleteServerById(serverId)
 			if err != nil {
-				println("DeleteServerById", "err", err)
+				fmt.Fprintln(cmd.ErrOrStderr(), "DeleteServerById", "err", err)
 				continue
 			}
 

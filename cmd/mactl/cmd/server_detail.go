@@ -18,6 +18,7 @@ var serverDetailCmd = &cobra.Command{
 	Short: "Show server details",
 	Args:  cobra.ExactArgs(1), // 引数が1つ必要
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cmd.SilenceUsage = true
 		m, err := getClientConfig()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
@@ -26,8 +27,8 @@ var serverDetailCmd = &cobra.Command{
 		serverId := args[0]
 		byteBody, _, err := m.GetServerById(serverId)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "GetServerById error:", err)
-			return err
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
 		}
 
 		var data interface{}

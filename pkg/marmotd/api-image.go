@@ -3,11 +3,13 @@ package marmotd
 // イメージのAPIハンドラー群
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/util"
 )
 
@@ -79,6 +81,9 @@ func (s *Server) ApiGetImageById(ctx echo.Context, id string) error {
 	image, err := s.Ma.GetImageManage(id)
 	if err != nil {
 		slog.Error("ApiGetImageById()", "err", err)
+		if errors.Is(err, db.ErrNotFound) {
+			return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "IDが存在しません"})
+		}
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 	return ctx.JSON(http.StatusOK, image)
@@ -91,6 +96,9 @@ func (s *Server) ApiDeleteImageById(ctx echo.Context, id string) error {
 	target, err := s.Ma.Db.GetImage(id)
 	if err != nil {
 		slog.Error("ApiDeleteImageById() GetImage failed", "id", id, "err", err)
+		if errors.Is(err, db.ErrNotFound) {
+			return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "IDが存在しません"})
+		}
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 	if target.Metadata == nil || target.Metadata.Name == nil {

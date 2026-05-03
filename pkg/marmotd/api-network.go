@@ -3,6 +3,7 @@ package marmotd
 import (
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -74,7 +75,10 @@ func (s *Server) ApiGetNetworkById(ctx echo.Context, id string) error {
 	network, err := s.Ma.Db.GetVirtualNetworkById(id)
 	if err != nil {
 		slog.Error("failed to get virtual network", "networkId", id, "err", err)
-		return echo.NewHTTPError(404, "virtual network not found")
+		if errors.Is(err, db.ErrNotFound) {
+			return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "IDが存在しません"})
+		}
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
 	return ctx.JSON(http.StatusOK, network)
@@ -85,8 +89,19 @@ func (s *Server) ApiGetNetworkById(ctx echo.Context, id string) error {
 func (s *Server) ApiDeleteNetworkById(ctx echo.Context, id string) error {
 	slog.Debug("===", "ApiDeleteNetworkById is called", "===")
 
+	if _, err := s.Ma.Db.GetVirtualNetworkById(id); err != nil {
+		slog.Error("ApiDeleteNetworkById() GetVirtualNetworkById failed", "networkId", id, "err", err)
+		if errors.Is(err, db.ErrNotFound) {
+			return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "IDが存在しません"})
+		}
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
 	if err := s.Ma.Db.SetDeleteTimestampVirtualNetwork(id); err != nil {
 		slog.Error("ApiDeleteNetworkById() SetDeleteTimestampVirtualNetwork failed", "networkId", id, "err", err)
+		if errors.Is(err, db.ErrNotFound) {
+			return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "IDが存在しません"})
+		}
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
