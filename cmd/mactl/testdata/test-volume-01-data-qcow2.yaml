@@ -1,0 +1,4 @@
+name: test-volume1
+type: qcow2
+kind: data
+size: 2

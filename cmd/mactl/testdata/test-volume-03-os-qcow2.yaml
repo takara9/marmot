@@ -1,0 +1,4 @@
+name: test-volume3
+type: qcow2
+kind: os
+os_variant: ubuntu22.04
