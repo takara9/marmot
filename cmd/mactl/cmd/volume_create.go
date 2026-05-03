@@ -7,32 +7,82 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/util"
 	"go.yaml.in/yaml/v3"
 )
 
+type volumeCreateConfig struct {
+	Name          string  `yaml:"name"`
+	Comment       *string `yaml:"comment,omitempty"`
+	Type          *string `yaml:"type,omitempty"`
+	Kind          *string `yaml:"kind,omitempty"`
+	Size          *int    `yaml:"size,omitempty"`
+	OsVariant     *string `yaml:"os_variant,omitempty"`
+	LogicalVolume *string `yaml:"logical_volume,omitempty"`
+	Path          *string `yaml:"path,omitempty"`
+	Persistent    *bool   `yaml:"persistent,omitempty"`
+	VolumeGroup   *string `yaml:"volume_group,omitempty"`
+}
+
 var volumeCreateCmd = &cobra.Command{
-	Use:   "create",
+	Use:   "create -f FILE.yaml",
 	Short: "Create a new volume",
+	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cmd.SilenceUsage = true
 		m, err := getClientConfig()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
 			os.Exit(1)
 		}
 
+		var conf volumeCreateConfig
+		err = config.ReadYamlConfig(configFilename, &conf)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+
+		if conf.Name == "" {
+			return fmt.Errorf("name is required in the configuration")
+		}
+		if conf.Type == nil || *conf.Type == "" {
+			return fmt.Errorf("type is required in the configuration")
+		}
+		if conf.Kind == nil || *conf.Kind == "" {
+			return fmt.Errorf("kind is required in the configuration")
+		}
+
 		var volume api.Volume = api.Volume{
 			Metadata: &api.Metadata{
-				Name: util.StringPtr(volumeName),
+				Name: util.StringPtr(conf.Name),
 			},
 			Spec: &api.VolSpec{
-				Type: util.StringPtr(volumeType),
-				Kind: util.StringPtr(volumeKind),
-				Size: util.IntPtrInt(volumeSize),
+				Type: util.StringPtr(*conf.Type),
+				Kind: util.StringPtr(*conf.Kind),
 			},
 		}
-		if len(osName) > 0 {
-			volume.Spec.OsVariant = util.StringPtr(osName)
+		if conf.Comment != nil {
+			volume.Metadata.Comment = util.StringPtr(*conf.Comment)
+		}
+		if conf.Size != nil {
+			volume.Spec.Size = util.IntPtrInt(*conf.Size)
+		}
+		if conf.OsVariant != nil {
+			volume.Spec.OsVariant = util.StringPtr(*conf.OsVariant)
+		}
+		if conf.LogicalVolume != nil {
+			volume.Spec.LogicalVolume = util.StringPtr(*conf.LogicalVolume)
+		}
+		if conf.Path != nil {
+			volume.Spec.Path = util.StringPtr(*conf.Path)
+		}
+		if conf.Persistent != nil {
+			volume.Spec.Persistent = util.BoolPtr(*conf.Persistent)
+		}
+		if conf.VolumeGroup != nil {
+			volume.Spec.VolumeGroup = util.StringPtr(*conf.VolumeGroup)
 		}
 
 		byteBody, _, err := m.CreateVolume(volume)
@@ -80,12 +130,6 @@ var volumeCreateCmd = &cobra.Command{
 
 func init() {
 	volumeCmd.AddCommand(volumeCreateCmd)
-	volumeCreateCmd.Flags().StringVarP(&volumeName, "name", "n", "", "Name of the volume")
-	volumeCreateCmd.Flags().StringVarP(&volumeType, "type", "t", "qcow2", "Type of the volume (lvm, qcow2)")
-	volumeCreateCmd.Flags().StringVarP(&volumeKind, "kind", "k", "data", "Kind of the volume (os, data)")
-	volumeCreateCmd.Flags().StringVarP(&osName, "osname", "l", "", "Name of the OS (required for os kind)")
-	volumeCreateCmd.Flags().IntVarP(&volumeSize, "size", "s", 0, "Size of the volume in GB")
-	volumeCreateCmd.MarkFlagRequired("name")
-	volumeCreateCmd.MarkFlagRequired("type")
-	volumeCreateCmd.MarkFlagRequired("kind")
+	volumeCreateCmd.Flags().StringVarP(&configFilename, "configfile", "f", "", "Configuration file or raw URL for the volume")
+	volumeCreateCmd.MarkFlagRequired("configfile")
 }

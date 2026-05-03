@@ -1,0 +1,4 @@
+name: test-origine
+type: lvm
+kind: data
+size: 2

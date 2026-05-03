@@ -123,7 +123,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 		var volumeID string
 		It("ボリュームの作成  data qcow2 2G", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "create", "-n", "test-volume1", "-t", "qcow2", "-k", "data", "-s", "2", "--output", "json")
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "create", "-f", "testdata/test-volume-01-data-qcow2.yaml", "--output", "json")
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr))
@@ -170,7 +170,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		})
 
 		It("ボリュームの作成  data lvm 2G", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "create", "-n", "test-volume2", "-t", "lvm", "-k", "data", "-s", "2", "--output", "json")
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "create", "-f", "testdata/test-volume-02-data-lvm.yaml", "--output", "json")
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr))
@@ -229,7 +229,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 		var volumeID3 string
 		It("ボリュームの作成  os qcow2 失敗ケース", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "create", "-n", "test-volume3", "-t", "qcow2", "-k", "os", "-l", "ubuntu22.04", "--output", "json")
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "create", "-f", "testdata/test-volume-03-os-qcow2.yaml", "--output", "json")
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr))
@@ -246,7 +246,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 		var volumeID4 string
 		It("ボリュームの作成  os lvm 失敗ケース", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "create", "-n", "test-volume4", "-t", "lvm", "-k", "os", "-l", "ubuntu22.04", "--output", "json")
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "create", "-f", "testdata/test-volume-04-os-lvm.yaml", "--output", "json")
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr))
@@ -343,7 +343,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		})
 
 		It("ボリュームの作成 名前変更用", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "create", "-n", "test-origine", "-t", "lvm", "-k", "data", "-s", "2", "--output", "json")
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "create", "-f", "testdata/test-volume-05-rename-source.yaml", "--output", "json")
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr))
@@ -487,7 +487,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 		var volumeID3 string
 		It("ボリュームの作成  os qcow2 成功ケース", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "create", "-n", "boot-volume1", "-t", "qcow2", "-k", "os", "-l", "ubuntu22.04", "--output", "json")
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "create", "-f", "testdata/test-volume-06-boot-qcow2.yaml", "--output", "json")
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr))
@@ -504,7 +504,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 		var volumeID4 string
 		It("ボリュームの作成  os lvm 成功ケース", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "create", "-n", "test-volume2", "-t", "lvm", "-k", "os", "-l", "ubuntu22.04", "--output", "json")
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "volume", "create", "-f", "testdata/test-volume-07-os-lvm-success.yaml", "--output", "json")
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr))

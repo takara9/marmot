@@ -1,0 +1,4 @@
+name: test-volume2
+type: lvm
+kind: os
+os_variant: ubuntu22.04

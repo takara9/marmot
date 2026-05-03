@@ -1,0 +1,4 @@
+name: test-volume2
+type: lvm
+kind: data
+size: 2
