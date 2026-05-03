@@ -3,6 +3,7 @@ package marmotd
 import (
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"time"
@@ -42,6 +43,14 @@ func (s *Server) ApiCreateVolume(ctx echo.Context) error {
 func (s *Server) ApiDeleteVolumeById(ctx echo.Context, id string) error {
 	slog.Debug("===", "ApiDeleteVolumeById() is called", "===", "volumeId", id)
 
+	if _, err := s.Ma.Db.GetVolumeById(id); err != nil {
+		slog.Error("ApiDeleteVolumeById() GetVolumeById failed", "volumeId", id, "err", err)
+		if errors.Is(err, db.ErrNotFound) {
+			return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "IDが存在しません"})
+		}
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
 	// レコードは状態だけを変更して、実際の削除はコントローラーが実施する
 	v := api.Volume{
 		Status: &api.Status{
@@ -53,6 +62,9 @@ func (s *Server) ApiDeleteVolumeById(ctx echo.Context, id string) error {
 	}
 	if err := s.Ma.Db.UpdateVolume(id, v); err != nil {
 		slog.Error("ApiDeleteVolumeById()", "err", err)
+		if errors.Is(err, db.ErrNotFound) {
+			return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "IDが存在しません"})
+		}
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
@@ -85,6 +97,9 @@ func (s *Server) ApiShowVolumeById(ctx echo.Context, volumeId string) error {
 	vol, err := s.Ma.GetVolumeById(volumeId)
 	if err != nil {
 		slog.Error("ApiShowVolumeById()", "err", err)
+		if errors.Is(err, db.ErrNotFound) {
+			return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "IDが存在しません"})
+		}
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 	slog.Debug("ApiShowVolumeById()", "vol", vol)

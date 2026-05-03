@@ -2,6 +2,7 @@ package marmotd
 
 import (
 	_ "embed"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -62,6 +63,9 @@ func (s *Server) ApiGetServerById(ctx echo.Context, id string) error {
 	server, err := s.Ma.GetServerManage(id)
 	if err != nil {
 		slog.Error("ApiGetServerById()", "err", err)
+		if errors.Is(err, db.ErrNotFound) {
+			return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "IDが存在しません"})
+		}
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 	return ctx.JSON(http.StatusOK, server)
@@ -71,8 +75,19 @@ func (s *Server) ApiGetServerById(ctx echo.Context, id string) error {
 func (s *Server) ApiDeleteServerById(ctx echo.Context, id string) error {
 	slog.Debug("===ApiDeleteServerById() is called ===", "id", id)
 
+	if _, err := s.Ma.Db.GetServerById(id); err != nil {
+		slog.Error("ApiDeleteServerById() GetServerById failed", "id", id, "err", err)
+		if errors.Is(err, db.ErrNotFound) {
+			return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "IDが存在しません"})
+		}
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
 	if err := s.Ma.Db.SetDeleteTimestamp(id); err != nil {
 		slog.Error("SetDeleteTimestamp()", "err", err)
+		if errors.Is(err, db.ErrNotFound) {
+			return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "IDが存在しません"})
+		}
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
