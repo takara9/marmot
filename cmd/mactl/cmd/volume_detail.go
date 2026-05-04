@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/db"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -35,7 +37,10 @@ var volumeDetailCmd = &cobra.Command{
 
 			switch outputStyle {
 			case "text":
-				fmt.Println("ボリュームの詳細情報。Id", volumeId)
+				printVolumeDetailReport(data)
+				if len(args) > 1 {
+					fmt.Println()
+				}
 				continue
 
 			case "json":
@@ -69,4 +74,58 @@ var volumeDetailCmd = &cobra.Command{
 
 func init() {
 	volumeCmd.AddCommand(volumeDetailCmd)
+}
+
+func printVolumeDetailReport(volume api.Volume) {
+	fmt.Println("Volume Details")
+	fmt.Println("Summary")
+	printVolumeDetailField("Name", stringValue(volume.Metadata, func(m *api.Metadata) *string { return m.Name }))
+	printVolumeDetailField("Id", formatID(volume.Id))
+	printVolumeDetailField("State", formatVolumeStatus(volume.Status))
+	printVolumeDetailField("Kind", stringValue(volume.Spec, func(s *api.VolSpec) *string { return s.Kind }))
+	printVolumeDetailField("Type", stringValue(volume.Spec, func(s *api.VolSpec) *string { return s.Type }))
+	printVolumeDetailField("Size", intValue(volume.Spec, func(s *api.VolSpec) *int { return s.Size }, " GB"))
+	fmt.Println()
+
+	fmt.Println("Status")
+	printVolumeDetailField("Message", stringValue(volume.Status, func(s *api.Status) *string { return s.Message }))
+	printVolumeDetailField("Created At", timeValue(volume.Status, func(s *api.Status) *time.Time { return s.CreationTimeStamp }))
+	printVolumeDetailField("Last Updated", timeValue(volume.Status, func(s *api.Status) *time.Time { return s.LastUpdateTimeStamp }))
+	fmt.Println()
+
+	fmt.Println("Storage")
+	printVolumeDetailField("Path", stringValue(volume.Spec, func(s *api.VolSpec) *string { return s.Path }))
+	printVolumeDetailField("Volume Group", stringValue(volume.Spec, func(s *api.VolSpec) *string { return s.VolumeGroup }))
+	printVolumeDetailField("Logical Vol.", stringValue(volume.Spec, func(s *api.VolSpec) *string { return s.LogicalVolume }))
+	printVolumeDetailField("OS Variant", stringValue(volume.Spec, func(s *api.VolSpec) *string { return s.OsVariant }))
+	if volume.Spec != nil && volume.Spec.Persistent != nil {
+		printVolumeDetailField("Persistent", boolValue(volume.Spec.Persistent))
+	} else {
+		printVolumeDetailField("Persistent", "N/A")
+	}
+	fmt.Println()
+
+	fmt.Println("Metadata")
+	printVolumeDetailField("Node Name", stringValue(volume.Metadata, func(m *api.Metadata) *string { return m.NodeName }))
+	printVolumeDetailField("UUID", stringValue(volume.Metadata, func(m *api.Metadata) *string { return m.Uuid }))
+	printVolumeDetailField("Comment", stringValue(volume.Metadata, func(m *api.Metadata) *string { return m.Comment }))
+	printVolumeDetailField("Key", stringValue(volume.Metadata, func(m *api.Metadata) *string { return m.Key }))
+}
+
+func printVolumeDetailField(label, value string) {
+	fmt.Printf("  %-13s %s\n", label+":", value)
+}
+
+func formatVolumeStatus(status *api.Status) string {
+	if status == nil {
+		return "N/A"
+	}
+	statusText := db.VolStatus[status.StatusCode]
+	if statusText == "" && status.Status != nil {
+		statusText = *status.Status
+	}
+	if statusText == "" {
+		statusText = fmt.Sprintf("UNKNOWN(%d)", status.StatusCode)
+	}
+	return fmt.Sprintf("%s (%d)", statusText, status.StatusCode)
 }

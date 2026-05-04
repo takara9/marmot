@@ -1,0 +1,11 @@
+name: test-server-37
+cpu: 1
+memory: 1024
+os_variant: ubuntu24.04
+node-selector: "marmot1"
+boot_volume:
+  type: qcow2
+  size: 16
+network:
+  - name: "default"
+comment: "Schedule this server on a specific node"
