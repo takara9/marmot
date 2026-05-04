@@ -26,12 +26,12 @@ type Server struct {
 
 // VolSpec defines model for VolSpec.
 type VolSpec struct {
-	Name               string  `yaml:"name"`
-	Size               *int    `yaml:"size,omitempty"`
-	Comment            *string `yaml:"comment,omitempty"`
-	Type               *string `yaml:"type,omitempty"`
-	Kind               *string `yaml:"kind,omitempty"`
-	PersistentVolumeId *string `yaml:"persistent_volume_id,omitempty"`
+	Name                 string  `yaml:"name"`
+	Size                 *int    `yaml:"size,omitempty"`
+	Comment              *string `yaml:"comment,omitempty"`
+	Type                 *string `yaml:"type,omitempty"`
+	Kind                 *string `yaml:"kind,omitempty"`
+	PersistentVolumeId   *string `yaml:"persistent_volume_id,omitempty"`
 	PersistentVolumeName *string `yaml:"persistent_volume_name,omitempty"`
 }
 

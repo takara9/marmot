@@ -217,7 +217,7 @@ var serverCreateCmd = &cobra.Command{
 			for i, vol := range *conf.Storage {
 				meta := api.Metadata{}
 				volumes[i].Metadata = &meta
-					pvId := ""
+				pvId := ""
 				if vol.PersistentVolumeId != nil && *vol.PersistentVolumeId != "" {
 					pvId = *vol.PersistentVolumeId
 				} else if vol.PersistentVolumeName != nil && *vol.PersistentVolumeName != "" {
