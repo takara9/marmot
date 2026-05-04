@@ -43,8 +43,8 @@ root@marmot-stg:~# lvs
 
 ### ① バックストア作成
 ```
-targetcli /backstores/block create user1 /dev/vg2/lv01
-targetcli /backstores/block create user2 /dev/vg2/lv02
+targetcli /backstores/block create disk1 /dev/vg2/lv01
+targetcli /backstores/block create disk2 /dev/vg2/lv02
 ```
 
 ### ② iSCSI ターゲット作成（ユーザーごと）
@@ -55,8 +55,8 @@ targetcli /iscsi create iqn.2024-01.com.marmot:target-user2
 
 ### ③ LUN 割り当て
 ```
-targetcli /iscsi/iqn.2024-01.com.marmot:target-user1/tpg1/luns create /backstores/block/user1
-targetcli /iscsi/iqn.2024-01.com.marmot:target-user2/tpg1/luns create /backstores/block/user2
+targetcli /iscsi/iqn.2024-01.com.marmot:target-user1/tpg1/luns create /backstores/block/disk1
+targetcli /iscsi/iqn.2024-01.com.marmot:target-user2/tpg1/luns create /backstores/block/disk2
 ```
 
 ### ④ ACL 設定（イニシエーター IQN の紐付け）
@@ -376,3 +376,90 @@ root@client-2:~# dd if=/tmp/testfile of=/dev/null bs=1M iflag=direct
 1073741824 bytes (1.1 GB, 1.0 GiB) copied, 2.15931 s, 497 MB/s
 ```
 
+
+## CHAP を有効化して、任意のイニシエーターからアクセスを受け入れる方法
+
+```
+root@marmot-stg:~# lvcreate --name lv05 --size 2GB vg2
+  Logical volume "lv05" created.
+```
+
+バックストア作成
+```
+root@marmot-stg:~# targetcli /backstores/block create disk5 /dev/vg2/lv05
+Created block storage object disk5 using /dev/vg2/lv05.
+```
+
+iSCSI ターゲット作成（ユーザーごと）
+```
+root@marmot-stg:~# targetcli /iscsi create iqn.2024-01.com.marmot:target-user3
+Created target iqn.2024-01.com.marmot:target-user3.
+Created TPG 1.
+Global pref auto_add_default_portal=true
+Created default portal listening on all IPs (0.0.0.0), port 3260.
+```
+
+LUN 割り当て
+```
+root@marmot-stg:~# targetcli /iscsi/iqn.2024-01.com.marmot:target-user3/tpg1/luns create /backstores/block/disk5
+Created LUN 0.
+```
+
+### CHAP認証を有効化
+```
+targetcli /iscsi/iqn.2024-01.com.marmot:target-user1/tpg1 set attribute authentication=1
+```
+
+### 任意のイニシエーターを受け入れる（ACL自動生成）
+```
+targetcli /iscsi/iqn.2024-01.com.marmot:target-user1/tpg1 set attribute generate_node_acls=1
+```
+
+### TPG レベルで CHAP を設定
+
+```
+targetcli /iscsi/iqn.2024-01.com.marmot:target-user1/tpg1 set auth userid=user1
+targetcli /iscsi/iqn.2024-01.com.marmot:target-user1/tpg1 set auth password=PassUser2123
+```
+
+
+```
+targetcli saveconfig
+```
+
+### 設定確認
+```
+
+```
+
+
+
+## イニシエーター側の設定
+
+対象の仮想マシンの設定
+```
+root@client-3:/etc/iscsi# cat initiatorname.iscsi 
+GenerateName=yes
+```
+
+仮想マシンホストの設定
+
+```
+root@hv2:/home/ubuntu# vi iscsi-secret-user4.xml 
+root@hv2:/home/ubuntu# virsh secret-define iscsi-secret-user4.xml 
+Secret ec9362f0-5057-4edf-875e-90fa1f80efdf created
+
+root@hv2:/home/ubuntu# virsh secret-list 
+ UUID                                   Usage
+-----------------------------------------------------------
+ 26d9b905-4191-42be-bcac-02b09ddd71d2   iscsi iscsi-user2
+ 7cceac19-51ec-4303-b6e7-1374458ffba7   iscsi iscsi-user3
+ ec9362f0-5057-4edf-875e-90fa1f80efdf   iscsi iscsi-user4
+
+root@hv2:/home/ubuntu# TGT=iscsi-user4
+root@hv2:/home/ubuntu# UUID=ec9362f0-5057-4edf-875e-90fa1f80efdf
+root@hv2:/home/ubuntu# AA=$(echo -n 'PassUser2123' | base64)
+root@hv2:/home/ubuntu# printf ${AA} | sudo virsh secret-set-value ${UUID} --file /dev/stdin
+Secret value set
+
+```
