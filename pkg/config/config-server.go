@@ -13,6 +13,7 @@ type Server struct {
 	Cpu            *int       `yaml:"cpu,omitempty"`
 	Memory         *int       `yaml:"memory,omitempty"`
 	OsVariant      *string    `yaml:"os_variant,omitempty"`
+	NodeSelector   *string    `yaml:"node-selector,omitempty"`
 	BootVolume     *VolSpec   `yaml:"boot_volume,omitempty"`
 	Playbook       *string    `yaml:"playbook,omitempty"`
 	Network        *[]Network `yaml:"network,omitempty"`
@@ -25,11 +26,13 @@ type Server struct {
 
 // VolSpec defines model for VolSpec.
 type VolSpec struct {
-	Name    string  `yaml:"name"`
-	Size    *int    `yaml:"size,omitempty"`
-	Comment *string `yaml:"comment,omitempty"`
-	Type    *string `yaml:"type,omitempty"`
-	Kind    *string `yaml:"kind,omitempty"`
+	Name               string  `yaml:"name"`
+	Size               *int    `yaml:"size,omitempty"`
+	Comment            *string `yaml:"comment,omitempty"`
+	Type               *string `yaml:"type,omitempty"`
+	Kind               *string `yaml:"kind,omitempty"`
+	PersistentVolumeId *string `yaml:"persistent_volume_id,omitempty"`
+	PersistentVolumeName *string `yaml:"persistent_volume_name,omitempty"`
 }
 
 type Route struct {

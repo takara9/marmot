@@ -5,15 +5,44 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/client"
 	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/util"
 	"go.yaml.in/yaml/v3"
 )
 
 var configFilename string
+
+// resolveVolumeIdByName は名前でボリュームを検索し、一意に特定できた場合はそのIDを返す。
+// 同名ボリュームが複数ある場合はエラーを返す。
+func resolveVolumeIdByName(m *client.MarmotEndpoint, name string) (string, error) {
+	byteBody, _, err := m.ListVolumes()
+	if err != nil {
+		return "", fmt.Errorf("ListVolumes failed: %w", err)
+	}
+	var volumes []api.Volume
+	if err := json.Unmarshal(byteBody, &volumes); err != nil {
+		return "", fmt.Errorf("failed to parse volume list: %w", err)
+	}
+	var matched []api.Volume
+	for _, v := range volumes {
+		if v.Metadata != nil && v.Metadata.Name != nil && *v.Metadata.Name == name {
+			matched = append(matched, v)
+		}
+	}
+	switch len(matched) {
+	case 0:
+		return "", fmt.Errorf("ボリューム名 %q に一致するボリュームが見つかりません", name)
+	case 1:
+		return matched[0].Id, nil
+	default:
+		return "", fmt.Errorf("ボリューム名 %q に一致するボリュームが複数存在します (%d件)", name, len(matched))
+	}
+}
 
 var serverCreateCmd = &cobra.Command{
 	Use:   "create",
@@ -65,6 +94,12 @@ var serverCreateCmd = &cobra.Command{
 		if comment := pickServerComment(conf); comment != nil {
 			virtualServer.Metadata.Comment = util.StringPtr(*comment)
 		}
+		if conf.NodeSelector != nil {
+			node := strings.TrimSpace(*conf.NodeSelector)
+			if node != "" {
+				virtualServer.Metadata.NodeName = util.StringPtr(node)
+			}
+		}
 		// 無設定を許容、デフォルトをAPI側に任せる
 		if conf.Cpu != nil {
 			virtualServer.Spec.Cpu = util.IntPtrInt(*conf.Cpu)
@@ -79,10 +114,30 @@ var serverCreateCmd = &cobra.Command{
 		}
 
 		if conf.BootVolume != nil {
-			virtualServer.Spec.BootVolume.Metadata.Name = util.StringPtr("boot")
-			virtualServer.Spec.BootVolume.Spec.Type = util.StringPtr(*conf.BootVolume.Type)
-			if conf.BootVolume.Size != nil {
-				virtualServer.Spec.BootVolume.Spec.Size = util.IntPtrInt(*conf.BootVolume.Size)
+			bootPvId := ""
+			if conf.BootVolume.PersistentVolumeId != nil && *conf.BootVolume.PersistentVolumeId != "" {
+				bootPvId = *conf.BootVolume.PersistentVolumeId
+			} else if conf.BootVolume.PersistentVolumeName != nil && *conf.BootVolume.PersistentVolumeName != "" {
+				resolved, err := resolveVolumeIdByName(m, *conf.BootVolume.PersistentVolumeName)
+				if err != nil {
+					fmt.Fprintln(os.Stderr, "boot_volume:", err)
+					return err
+				}
+				bootPvId = resolved
+			}
+			if bootPvId != "" {
+				virtualServer.Spec.BootVolume.Metadata.Id = util.StringPtr(bootPvId)
+				virtualServer.Spec.BootVolume.Id = bootPvId
+				virtualServer.Spec.BootVolume.Metadata.Name = nil
+				virtualServer.Spec.BootVolume.Spec = nil
+			} else {
+				virtualServer.Spec.BootVolume.Metadata.Name = util.StringPtr("boot")
+				if conf.BootVolume.Type != nil {
+					virtualServer.Spec.BootVolume.Spec.Type = util.StringPtr(*conf.BootVolume.Type)
+				}
+				if conf.BootVolume.Size != nil {
+					virtualServer.Spec.BootVolume.Spec.Size = util.IntPtrInt(*conf.BootVolume.Size)
+				}
 			}
 		}
 
@@ -162,11 +217,31 @@ var serverCreateCmd = &cobra.Command{
 			for i, vol := range *conf.Storage {
 				meta := api.Metadata{}
 				volumes[i].Metadata = &meta
+					pvId := ""
+				if vol.PersistentVolumeId != nil && *vol.PersistentVolumeId != "" {
+					pvId = *vol.PersistentVolumeId
+				} else if vol.PersistentVolumeName != nil && *vol.PersistentVolumeName != "" {
+					resolved, err := resolveVolumeIdByName(m, *vol.PersistentVolumeName)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "storage[%d]: %v\n", i, err)
+						return err
+					}
+					pvId = resolved
+				}
+				if pvId != "" {
+					volumes[i].Metadata.Id = util.StringPtr(pvId)
+					volumes[i].Id = pvId
+					continue
+				}
 				volumes[i].Metadata.Name = util.StringPtr(vol.Name)
-				volumes[i].Metadata.Comment = util.StringPtr(*vol.Comment)
+				if vol.Comment != nil {
+					volumes[i].Metadata.Comment = util.StringPtr(*vol.Comment)
+				}
 				spec := api.VolSpec{}
 				volumes[i].Spec = &spec
-				volumes[i].Spec.Size = util.IntPtrInt(*vol.Size)
+				if vol.Size != nil {
+					volumes[i].Spec.Size = util.IntPtrInt(*vol.Size)
+				}
 				if vol.Type == nil {
 					volumes[i].Spec.Type = util.StringPtr("qcow2")
 				} else {
