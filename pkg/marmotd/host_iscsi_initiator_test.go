@@ -109,7 +109,6 @@ var _ = Describe("iSCSI Initiator ID", Label("iscsi-initiator"), func() {
 	})
 })
 
-
 var _ = Describe("iSCSI Initiator ID", Label("iscsi-initiator"), func() {
 	var tempDir string
 
