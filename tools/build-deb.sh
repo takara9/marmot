@@ -107,7 +107,8 @@ Depends: libvirt-daemon-system,
  genisoimage,
  nfs-common,
  lvm2,
- etcd-server
+ etcd-server,
+ open-iscsi
 Section: admin
 Priority: optional
 Description: marmot - VM クラスター管理サービス
@@ -157,6 +158,10 @@ fi
 systemctl enable libvirtd.service
 systemctl start libvirtd.service
 ##
+
+# open-iscsi を有効化して起動する
+systemctl enable iscsid.service
+systemctl start iscsid.service
 
 systemctl daemon-reload
 systemctl enable marmot.service

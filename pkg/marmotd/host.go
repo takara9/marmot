@@ -72,6 +72,11 @@ func (m *Marmot) CollectHostStatus() (api.HostStatus, error) {
 	}
 	status.IpAddress = util.StringPtr(ipAddress)
 
+	// iSCSI イニシエーターID を取得
+	if initiatorID := getISCSIInitiatorID(); initiatorID != "" {
+		status.InitiatorId = util.StringPtr(initiatorID)
+	}
+
 	// キャパシティ情報を収集
 	capacity, err := collectHostCapacity()
 	if err != nil {
@@ -155,7 +160,7 @@ func parseHostIDOutput(out []byte) (uint32, bool) {
 	return uint32(v), true
 }
 
-// ホストのIPアドレスを取得する
+// ホスト のIPアドレスを取得する
 func getHostIPAddress() string {
 	ifaces, err := net.Interfaces()
 	if err != nil {
@@ -183,6 +188,33 @@ func getHostIPAddress() string {
 				continue
 			}
 			return ip.String()
+		}
+	}
+	return ""
+}
+
+// iSCSI イニシエーターID を /etc/iscsi/initiatorname.iscsi から取得する
+func getISCSIInitiatorID() string {
+	initiatornameFile := "/etc/iscsi/initiatorname.iscsi"
+	data, err := os.ReadFile(initiatornameFile)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			slog.Warn("Failed to read initiatorname.iscsi", "err", err)
+		}
+		return ""
+	}
+
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// コメント行をスキップ
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+		// InitiatorName=xxx の形式を探す
+		if strings.HasPrefix(line, "InitiatorName=") {
+			initiatorsName := strings.TrimPrefix(line, "InitiatorName=")
+			return strings.TrimSpace(initiatorsName)
 		}
 	}
 	return ""
