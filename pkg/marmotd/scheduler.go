@@ -116,3 +116,33 @@ func allocatedVMs(s api.HostStatus) int {
 	}
 	return 0
 }
+
+// IsIscsiServer は nodeName が iSCSI ターゲットサーバーを担当するホストかを判定する。
+//
+// 判定ルール:
+//  1. アクティブなホストの HostStatus に IscsiServer=true が存在する場合、
+//     そのホストが担当する（nodeName の IscsiServer が true であれば true を返す）。
+//  2. どのホストにも IscsiServer=true が設定されていない場合は、
+//     アクティブなホストの中で HostId が最小のホスト（= スケジューラーリーダー）が担当する。
+func IsIscsiServer(nodeName string, statuses []api.HostStatus) bool {
+	active := filterActiveHosts(statuses)
+	if len(active) == 0 {
+		return false
+	}
+
+	// IscsiServer=true を持つアクティブなホストが存在するか確認する
+	for _, s := range active {
+		if s.IscsiServer != nil && *s.IscsiServer {
+			// 明示的に指定されているので、自ノードが指定されているかを返す
+			for _, as := range active {
+				if as.NodeName != nil && *as.NodeName == nodeName {
+					return as.IscsiServer != nil && *as.IscsiServer
+				}
+			}
+			return false
+		}
+	}
+
+	// フォールバック: HostId が最小のホスト（スケジューラーリーダー）が担当
+	return IsSchedulerLeader(nodeName, statuses)
+}

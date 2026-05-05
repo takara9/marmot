@@ -75,5 +75,31 @@ var _ = Describe("VolumeGroupConfig", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(cfg.DefaultUnderlayInterface).To(Equal("enp2s0"))
 		})
+
+		It("iscsi_server: true を読み込む", func() {
+			dir := GinkgoT().TempDir()
+			path := filepath.Join(dir, "marmotd.json")
+			content := []byte(`{"iscsi_server":true}`)
+
+			err := os.WriteFile(path, content, 0o644)
+			Expect(err).NotTo(HaveOccurred())
+
+			cfg, err := marmotd.LoadConfig(path)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cfg.IscsiServer).To(BeTrue())
+		})
+
+		It("iscsi_server が未指定の場合は false (既定値)", func() {
+			dir := GinkgoT().TempDir()
+			path := filepath.Join(dir, "marmotd.json")
+			content := []byte(`{"node_name":"hv1"}`)
+
+			err := os.WriteFile(path, content, 0o644)
+			Expect(err).NotTo(HaveOccurred())
+
+			cfg, err := marmotd.LoadConfig(path)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cfg.IscsiServer).To(BeFalse())
+		})
 	})
 })

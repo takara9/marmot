@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -13,6 +14,51 @@ import (
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/util"
 )
+
+func isISCSIDataLVMVolume(volume *api.Volume) bool {
+	if volume == nil || volume.Spec == nil {
+		return false
+	}
+	return volume.Spec.Type != nil && *volume.Spec.Type == "lvm" &&
+		volume.Spec.Kind != nil && *volume.Spec.Kind == "data" &&
+		volume.Spec.Iscsi != nil && *volume.Spec.Iscsi
+}
+
+func findISCSIServerNodeName(statuses []api.HostStatus) string {
+	annotated := annotateIscsiServerStatuses(statuses)
+	for _, status := range annotated {
+		if status.IscsiServer == nil || !*status.IscsiServer || status.NodeName == nil {
+			continue
+		}
+		node := strings.TrimSpace(*status.NodeName)
+		if node != "" {
+			return node
+		}
+	}
+	return ""
+}
+
+func resolveVolumeCreationNode(ma *Marmot, volume *api.Volume) string {
+	fallback := ""
+	if ma != nil {
+		fallback = strings.TrimSpace(ma.NodeName)
+	}
+	if !isISCSIDataLVMVolume(volume) || ma == nil || ma.Db == nil {
+		return fallback
+	}
+
+	statuses, err := ma.Db.GetAllHostStatus()
+	if err != nil {
+		slog.Warn("GetAllHostStatus() failed while resolving iSCSI server node; fallback to request node", "err", err)
+		return fallback
+	}
+
+	node := findISCSIServerNodeName(statuses)
+	if node == "" {
+		return fallback
+	}
+	return node
+}
 
 // ボリュームの生成 implements api.ServerInterface.
 func (s *Server) ApiCreateVolume(ctx echo.Context) error {
@@ -25,7 +71,8 @@ func (s *Server) ApiCreateVolume(ctx echo.Context) error {
 		slog.Error("ApiCreateVolume()", "err", err, "volume", string(volumeString), "err2", err2)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-	assignNodeNameIfUnset(&volume.Metadata, s.Ma.NodeName)
+	assignedNode := resolveVolumeCreationNode(s.Ma, &volume)
+	assignNodeNameIfUnset(&volume.Metadata, assignedNode)
 
 	// etcdへの登録と状態の変更だけにして、実際のボリュームの作成はコントローラーが実施する
 	requestedVolume, err := s.Ma.Db.CreateVolumeOnDB2(volume)

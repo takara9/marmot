@@ -24,6 +24,15 @@ func newHostStatus(nodeName, hostID string, totalVMs int, updatedSecondsAgo int)
 	}
 }
 
+// テスト用ヘルパー: IscsiServer フラグ付き HostStatus を生成する
+func newHostStatusWithIscsi(nodeName, hostID string, updatedSecondsAgo int, iscsiServer bool) api.HostStatus {
+	s := newHostStatus(nodeName, hostID, 0, updatedSecondsAgo)
+	if iscsiServer {
+		s.IscsiServer = util.BoolPtr(true)
+	}
+	return s
+}
+
 var _ = Describe("スケジューラー", func() {
 
 	Describe("IsSchedulerLeader", func() {
@@ -155,6 +164,61 @@ var _ = Describe("スケジューラー", func() {
 			It("ErrNoActiveHosts を返す", func() {
 				_, err := marmotd.SelectNode(nil)
 				Expect(err).To(MatchError(marmotd.ErrNoActiveHosts))
+			})
+		})
+	})
+
+	Describe("IsIscsiServer", func() {
+		Context("IscsiServer=true を持つアクティブなホストが存在する場合", func() {
+			It("IscsiServer=true のホストが true を返す", func() {
+				statuses := []api.HostStatus{
+					newHostStatusWithIscsi("hv1", "00000010", 5, true),
+					newHostStatus("hv2", "00000020", 5, 5),
+					newHostStatus("hv3", "00000030", 5, 5),
+				}
+				Expect(marmotd.IsIscsiServer("hv1", statuses)).To(BeTrue())
+				Expect(marmotd.IsIscsiServer("hv2", statuses)).To(BeFalse())
+				Expect(marmotd.IsIscsiServer("hv3", statuses)).To(BeFalse())
+			})
+
+			It("IscsiServer=true のホストが非アクティブなら、そのホストは候補外になりフォールバックする", func() {
+				statuses := []api.HostStatus{
+					newHostStatusWithIscsi("hv1", "00000010", 60, true), // 非アクティブ
+					newHostStatus("hv2", "00000005", 5, 5),              // hostId 最小
+					newHostStatus("hv3", "00000030", 5, 5),
+				}
+				// IscsiServer=true を持つアクティブなホストが存在しないため hv2(hostId最小) が担当
+				Expect(marmotd.IsIscsiServer("hv1", statuses)).To(BeFalse())
+				Expect(marmotd.IsIscsiServer("hv2", statuses)).To(BeTrue())
+				Expect(marmotd.IsIscsiServer("hv3", statuses)).To(BeFalse())
+			})
+		})
+
+		Context("IscsiServer=true を持つホストが存在しない場合（フォールバック）", func() {
+			It("HostId が最小のホストが担当する", func() {
+				statuses := []api.HostStatus{
+					newHostStatus("hv3", "00000030", 5, 5),
+					newHostStatus("hv1", "00000010", 5, 5),
+					newHostStatus("hv2", "00000020", 5, 5),
+				}
+				Expect(marmotd.IsIscsiServer("hv1", statuses)).To(BeTrue())
+				Expect(marmotd.IsIscsiServer("hv2", statuses)).To(BeFalse())
+				Expect(marmotd.IsIscsiServer("hv3", statuses)).To(BeFalse())
+			})
+		})
+
+		Context("アクティブなホストが存在しない場合", func() {
+			It("false を返す", func() {
+				statuses := []api.HostStatus{
+					newHostStatus("hv1", "00000010", 60, 60),
+				}
+				Expect(marmotd.IsIscsiServer("hv1", statuses)).To(BeFalse())
+			})
+		})
+
+		Context("HostStatus が空の場合", func() {
+			It("false を返す", func() {
+				Expect(marmotd.IsIscsiServer("hv1", nil)).To(BeFalse())
 			})
 		})
 	})
