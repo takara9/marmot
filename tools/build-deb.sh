@@ -108,7 +108,8 @@ Depends: libvirt-daemon-system,
  nfs-common,
  lvm2,
  etcd-server,
- open-iscsi
+ open-iscsi,
+ targetcli-fb
 Section: admin
 Priority: optional
 Description: marmot - VM クラスター管理サービス

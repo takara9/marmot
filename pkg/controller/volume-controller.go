@@ -2,6 +2,7 @@ package controller
 
 import (
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/takara9/marmot/pkg/db"
@@ -122,19 +123,55 @@ func (c *controller) volumeControllerLoop() {
 			c.db.UpdateVolumeStatus(vol.Id, db.VOLUME_PROVISIONING)
 			if _, err := c.marmot.CreateNewVolume(vol.Id); err != nil {
 				slog.Error("CreateNewVolume()", "err", err)
-				c.db.UpdateVolumeStatus(vol.Id, db.VOLUME_ERROR)
+				c.db.UpdateVolumeStatusMessage(vol.Id, db.VOLUME_ERROR, err.Error())
 				continue
 			}
+
+			isISCSIVolume := vol.Spec != nil &&
+				vol.Spec.Type != nil && *vol.Spec.Type == "lvm" &&
+				vol.Spec.Kind != nil && *vol.Spec.Kind == "data" &&
+				vol.Spec.Iscsi != nil && *vol.Spec.Iscsi
+			if isISCSIVolume {
+				if err := c.marmot.ConfigureISCSIForVolumeByID(vol.Id); err != nil {
+					slog.Error("ConfigureISCSIForVolumeByID()", "err", err, "volId", vol.Id)
+					c.db.UpdateVolumeStatusMessage(vol.Id, db.VOLUME_ERROR, err.Error())
+					continue
+				}
+			}
+
 			c.db.UpdateVolumeStatus(vol.Id, db.VOLUME_AVAILABLE)
 		case db.VOLUME_PROVISIONING:
 			slog.Debug("プロビジョニング中のボリュームを処理", "volId", vol.Id)
 
 		case db.VOLUME_DELETING:
 			slog.Debug("削除中のボリュームを処理", "volId", vol.Id)
+			shouldCleanupISCSI := vol.Spec != nil &&
+				vol.Spec.Type != nil && *vol.Spec.Type == "lvm" &&
+				vol.Spec.Kind != nil && *vol.Spec.Kind == "data" &&
+				((vol.Spec.Iscsi != nil && *vol.Spec.Iscsi) ||
+					(vol.Spec.IscsiTargetIqn != nil && strings.TrimSpace(*vol.Spec.IscsiTargetIqn) != ""))
+			if shouldCleanupISCSI {
+				if err := c.marmot.CleanupISCSIForVolumeByID(vol.Id); err != nil {
+					errMsg := strings.ToLower(err.Error())
+					if strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "no such") || strings.Contains(errMsg, "does not exist") {
+						slog.Warn("iSCSI公開解除対象が見つからないため処理を継続", "volId", vol.Id, "err", err)
+					} else {
+						slog.Error("CleanupISCSIForVolumeByID()", "err", err, "volId", vol.Id)
+						c.db.UpdateVolumeStatusMessage(vol.Id, db.VOLUME_ERROR, err.Error())
+						continue
+					}
+				}
+			}
+
 			if err := c.marmot.RemoveVolume(vol.Id); err != nil {
-				slog.Error("RemoveVolume()", "err", err)
-				c.db.UpdateVolumeStatus(vol.Id, db.VOLUME_ERROR)
-				continue
+				errMsg := strings.ToLower(err.Error())
+				if strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "no such") || strings.Contains(errMsg, "does not exist") {
+					slog.Warn("削除対象の実体が見つからないためオブジェクト削除を継続", "volId", vol.Id, "err", err)
+				} else {
+					slog.Error("RemoveVolume()", "err", err)
+					c.db.UpdateVolumeStatusMessage(vol.Id, db.VOLUME_ERROR, err.Error())
+					continue
+				}
 			}
 			c.db.DeleteVolume(vol.Id)
 			slog.Debug("ボリュームの削除成功", "volId", vol.Id)

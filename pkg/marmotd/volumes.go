@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -17,6 +19,197 @@ import (
 	"github.com/takara9/marmot/pkg/qcow"
 	"github.com/takara9/marmot/pkg/util"
 )
+
+var targetcliCommandOutput = func(args ...string) ([]byte, error) {
+	cmd := exec.Command("targetcli", args...)
+	return cmd.CombinedOutput()
+}
+
+func runTargetcliAllowExists(args ...string) error {
+	out, err := targetcliCommandOutput(args...)
+	if err == nil {
+		return nil
+	}
+
+	message := strings.ToLower(strings.TrimSpace(string(out)))
+	if strings.Contains(message, "already exists") || strings.Contains(message, "exists") {
+		return nil
+	}
+
+	return fmt.Errorf("targetcli %v failed: %w: %s", args, err, strings.TrimSpace(string(out)))
+}
+
+func runTargetcliAllowMissing(args ...string) error {
+	out, err := targetcliCommandOutput(args...)
+	if err == nil {
+		return nil
+	}
+
+	message := strings.ToLower(strings.TrimSpace(string(out)))
+	if strings.Contains(message, "not found") || strings.Contains(message, "no such") || strings.Contains(message, "does not exist") {
+		return nil
+	}
+
+	return fmt.Errorf("targetcli %v failed: %w: %s", args, err, strings.TrimSpace(string(out)))
+}
+
+func collectClusterInitiatorIDs(m *Marmot) ([]string, error) {
+	if m == nil || m.Db == nil {
+		return nil, errors.New("marmot db is nil")
+	}
+
+	statuses, err := m.Db.GetAllHostStatus()
+	if err != nil {
+		return nil, err
+	}
+
+	set := make(map[string]struct{})
+	for _, status := range statuses {
+		if status.InitiatorId == nil {
+			continue
+		}
+		id := strings.TrimSpace(*status.InitiatorId)
+		if id == "" {
+			continue
+		}
+		set[id] = struct{}{}
+	}
+
+	ids := make([]string, 0, len(set))
+	for id := range set {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids, nil
+}
+
+func (m *Marmot) configureISCSIForVolume(volSpec *api.Volume) error {
+	if volSpec == nil || volSpec.Spec == nil {
+		return errors.New("volume spec is nil")
+	}
+	if volSpec.Spec.Iscsi == nil || !*volSpec.Spec.Iscsi {
+		return nil
+	}
+
+	if volSpec.Spec.Type == nil || *volSpec.Spec.Type != "lvm" {
+		return errors.New("iscsi volume requires lvm type")
+	}
+	if volSpec.Spec.Kind == nil || *volSpec.Spec.Kind != "data" {
+		return errors.New("iscsi volume is supported only for data kind")
+	}
+	if volSpec.Spec.Path == nil || strings.TrimSpace(*volSpec.Spec.Path) == "" {
+		return errors.New("iscsi volume requires logical volume path")
+	}
+
+	backstoreName := fmt.Sprintf("disk-%s", volSpec.Id)
+	targetIQN := fmt.Sprintf("iqn.2024-01.com.marmot:target-%s", volSpec.Id)
+	targetPath := fmt.Sprintf("/iscsi/%s/tpg1", targetIQN)
+
+	if err := runTargetcliAllowExists("/backstores/block", "create", backstoreName, *volSpec.Spec.Path); err != nil {
+		return err
+	}
+	if err := runTargetcliAllowExists("/iscsi", "create", targetIQN); err != nil {
+		return err
+	}
+	if err := runTargetcliAllowExists(targetPath+"/luns", "create", fmt.Sprintf("/backstores/block/%s", backstoreName)); err != nil {
+		return err
+	}
+
+	initiatorIDs, err := collectClusterInitiatorIDs(m)
+	if err != nil {
+		return err
+	}
+	if len(initiatorIDs) == 0 {
+		slog.Warn("iSCSI ACL の対象となる InitiatorId が HostStatus に見つかりません", "volumeId", volSpec.Id)
+	}
+	for _, initiatorID := range initiatorIDs {
+		if err := runTargetcliAllowExists(targetPath+"/acls", "create", initiatorID); err != nil {
+			return err
+		}
+	}
+
+	if err := runTargetcliAllowExists("saveconfig"); err != nil {
+		return err
+	}
+
+	volSpec.Spec.IscsiTargetIqn = util.StringPtr(targetIQN)
+	if err := m.Db.UpdateVolume(volSpec.Id, *volSpec); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ConfigureISCSIForVolumeByID は指定ボリュームIDに対して iSCSI 公開設定を行う。
+func (m *Marmot) ConfigureISCSIForVolumeByID(id string) error {
+	if len(strings.TrimSpace(id)) == 0 {
+		return errors.New("volume id is required")
+	}
+
+	vol, err := m.Db.GetVolumeById(id)
+	if err != nil {
+		return err
+	}
+
+	return m.configureISCSIForVolume(&vol)
+}
+
+func (m *Marmot) cleanupISCSIForVolume(volSpec *api.Volume) error {
+	if volSpec == nil || volSpec.Spec == nil {
+		return nil
+	}
+
+	// iSCSI を使っていないボリュームは対象外
+	isISCSI := volSpec.Spec.Iscsi != nil && *volSpec.Spec.Iscsi
+	hasTargetIQN := volSpec.Spec.IscsiTargetIqn != nil && strings.TrimSpace(*volSpec.Spec.IscsiTargetIqn) != ""
+	if !isISCSI && !hasTargetIQN {
+		return nil
+	}
+
+	targetIQN := fmt.Sprintf("iqn.2024-01.com.marmot:target-%s", volSpec.Id)
+	if hasTargetIQN {
+		targetIQN = strings.TrimSpace(*volSpec.Spec.IscsiTargetIqn)
+	}
+	backstoreName := fmt.Sprintf("disk-%s", volSpec.Id)
+	targetPath := fmt.Sprintf("/iscsi/%s/tpg1", targetIQN)
+
+	initiatorIDs, err := collectClusterInitiatorIDs(m)
+	if err != nil {
+		slog.Warn("iSCSI ACL の削除対象取得に失敗。ターゲット削除を継続します", "volumeId", volSpec.Id, "err", err)
+	} else {
+		for _, initiatorID := range initiatorIDs {
+			if err := runTargetcliAllowMissing(targetPath+"/acls", "delete", initiatorID); err != nil {
+				return err
+			}
+		}
+	}
+
+	if err := runTargetcliAllowMissing("/iscsi", "delete", targetIQN); err != nil {
+		return err
+	}
+	if err := runTargetcliAllowMissing("/backstores/block", "delete", backstoreName); err != nil {
+		return err
+	}
+	if err := runTargetcliAllowExists("saveconfig"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// CleanupISCSIForVolumeByID は指定ボリュームIDに対して iSCSI 公開解除を行う。
+func (m *Marmot) CleanupISCSIForVolumeByID(id string) error {
+	if len(strings.TrimSpace(id)) == 0 {
+		return errors.New("volume id is required")
+	}
+
+	vol, err := m.Db.GetVolumeById(id)
+	if err != nil {
+		return err
+	}
+
+	return m.cleanupISCSIForVolume(&vol)
+}
 
 func resolveImageTemplateByVolumeNode(m *Marmot, volSpec api.Volume) (api.Image, error) {
 	osVariant := ""
@@ -98,13 +291,13 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 			slog.Debug("qcow2 OSボリュームの生成", "volKind", *volSpec.Spec.Kind, "volId", volSpec.Id, "osVariant", volSpec.Spec.OsVariant)
 			if volSpec.Spec.OsVariant == nil {
 				slog.Error("osVariant is nil in volume spec", "volId", volSpec.Id)
-				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
+				m.Db.UpdateVolumeStatusMessage(volSpec.Id, db.VOLUME_ERROR, "osVariant is required for os volume")
 				return nil, errors.New("osVariant is required for os volume")
 			}
 			img, err := resolveImageTemplateByVolumeNode(m, volSpec)
 			if err != nil {
 				slog.Error("failed to get os image template", "err", err, "osVariant", *volSpec.Spec.OsVariant)
-				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
+				m.Db.UpdateVolumeStatusMessage(volSpec.Id, db.VOLUME_ERROR, err.Error())
 				return nil, err
 			}
 
@@ -124,7 +317,7 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 			//if img.Spec.Qcow2Path == nil || len(*img.Spec.Qcow2Path) == 0 {
 			if img.Spec.Qcow2Path == nil {
 				slog.Error("os image template has no qcow2 path", "", 0)
-				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
+				m.Db.UpdateVolumeStatusMessage(volSpec.Id, db.VOLUME_ERROR, "os image template has no qcow2 path")
 				return nil, errors.New("os image template has no qcow2 path")
 			}
 
@@ -132,7 +325,7 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 			err = qcow.CopyQcow(*img.Spec.Qcow2Path, *volSpec.Spec.Path)
 			if err != nil {
 				slog.Error("failed to copy qcow2 image template", "err", err, "src", *img.Spec.Qcow2Path, "dst", *volSpec.Spec.Path)
-				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
+				m.Db.UpdateVolumeStatusMessage(volSpec.Id, db.VOLUME_ERROR, err.Error())
 				return nil, err
 			}
 
@@ -140,7 +333,7 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 				err = qcow.ResizeQcow(*volSpec.Spec.Path, requestedSizeGB)
 				if err != nil {
 					slog.Error("failed to resize qcow2 os volume", "err", err, "path", *volSpec.Spec.Path, "sizeGB", requestedSizeGB)
-					m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
+					m.Db.UpdateVolumeStatusMessage(volSpec.Id, db.VOLUME_ERROR, err.Error())
 					return nil, err
 				}
 			}
@@ -160,7 +353,7 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 			err = qcow.CreateQcow(*volSpec.Spec.Path, *volSpec.Spec.Size)
 			if err != nil {
 				slog.Error("failed to create qcow2 data volume", "err", err, "path", *volSpec.Spec.Path)
-				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
+				m.Db.UpdateVolumeStatusMessage(volSpec.Id, db.VOLUME_ERROR, err.Error())
 				return nil, err
 			}
 			slog.Debug("Dataボリュームの情報更新 成功", "volId", volSpec.Id)
@@ -172,7 +365,7 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 			return &volSpec, nil
 		default:
 			err := errors.New("unsupported unknown volume kind and type")
-			m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
+			m.Db.UpdateVolumeStatusMessage(volSpec.Id, db.VOLUME_ERROR, err.Error())
 			return nil, err
 		}
 	case "lvm":
@@ -183,13 +376,13 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 			slog.Debug("qcow2 OSボリュームの生成", "volKind", *volSpec.Spec.Kind, "volId", volSpec.Id, "osVariant", volSpec.Spec.OsVariant)
 			if volSpec.Spec.OsVariant == nil {
 				slog.Error("osVariant is nil in volume spec", "volId", volSpec.Id)
-				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
+				m.Db.UpdateVolumeStatusMessage(volSpec.Id, db.VOLUME_ERROR, "osVariant is required for os volume")
 				return nil, errors.New("osVariant is required for os volume")
 			}
 			img, err := resolveImageTemplateByVolumeNode(m, volSpec)
 			if err != nil {
 				slog.Error("failed to get os image template", "err", err, "osVariant", *volSpec.Spec.OsVariant)
-				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
+				m.Db.UpdateVolumeStatusMessage(volSpec.Id, db.VOLUME_ERROR, err.Error())
 				return nil, err
 			}
 
@@ -215,7 +408,7 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 			err = lvm.CreateSnapshot(*img.Spec.VolumeGroup, *img.Spec.LogicalVolume, *volSpec.Spec.LogicalVolume, size)
 			if err != nil {
 				slog.Error("failed to create OS logical volume", "err", err, "vg", *img.Spec.VolumeGroup, "lv", *img.Spec.LogicalVolume)
-				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
+				m.Db.UpdateVolumeStatusMessage(volSpec.Id, db.VOLUME_ERROR, err.Error())
 				return nil, err
 			}
 
@@ -232,7 +425,7 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 			lvSize := uint64(*volSpec.Spec.Size) * 1024 * 1024 * 1024
 			err = lvm.CreateLV(*volSpec.Spec.VolumeGroup, *volSpec.Spec.LogicalVolume, lvSize)
 			if err != nil {
-				m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
+				m.Db.UpdateVolumeStatusMessage(volSpec.Id, db.VOLUME_ERROR, err.Error())
 				return nil, err
 			}
 
@@ -245,14 +438,14 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 			slog.Debug("Dataボリュームの情報更新 成功", "volId", volSpec.Id)
 			return &volSpec, nil
 		default:
-			m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
+			m.Db.UpdateVolumeStatusMessage(volSpec.Id, db.VOLUME_ERROR, "unsupported volume kind")
 			return nil, errors.New("unsupported volume kind")
 		}
 	case "raw":
-		m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
+		m.Db.UpdateVolumeStatusMessage(volSpec.Id, db.VOLUME_ERROR, "unsupported volume type: raw")
 		return nil, errors.New("unsupported volume type")
 	default:
-		m.Db.UpdateVolumeStatus(volSpec.Id, db.VOLUME_ERROR)
+		m.Db.UpdateVolumeStatusMessage(volSpec.Id, db.VOLUME_ERROR, "unsupported volume type: "+*volSpec.Spec.Type)
 		return nil, errors.New("unsupported volume type")
 	}
 }
@@ -270,6 +463,7 @@ func (m *Marmot) RemoveVolume(id string) error {
 	// LV と qcow2ファイルの判断
 	if *vol.Spec.Type == "lvm" {
 		slog.Debug("Removing Logical volume", "id", id)
+
 		// 物理的なボリュームの削除
 		if vol.Spec.VolumeGroup != nil && vol.Spec.LogicalVolume != nil {
 			if err := lvm.RemoveLV(*vol.Spec.VolumeGroup, *vol.Spec.LogicalVolume); err != nil {

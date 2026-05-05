@@ -17,6 +17,7 @@ type volumeCreateConfig struct {
 	Comment       *string `yaml:"comment,omitempty"`
 	Type          *string `yaml:"type,omitempty"`
 	Kind          *string `yaml:"kind,omitempty"`
+	Iscsi         *bool   `yaml:"iscsi,omitempty"`
 	Size          *int    `yaml:"size,omitempty"`
 	OsVariant     *string `yaml:"os_variant,omitempty"`
 	LogicalVolume *string `yaml:"logical_volume,omitempty"`
@@ -68,6 +69,9 @@ var volumeCreateCmd = &cobra.Command{
 		}
 		if conf.Size != nil {
 			volume.Spec.Size = util.IntPtrInt(*conf.Size)
+		}
+		if conf.Iscsi != nil {
+			volume.Spec.Iscsi = util.BoolPtr(*conf.Iscsi)
 		}
 		if conf.OsVariant != nil {
 			volume.Spec.OsVariant = util.StringPtr(*conf.OsVariant)
