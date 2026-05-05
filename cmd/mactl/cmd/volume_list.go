@@ -40,11 +40,15 @@ var volumeListCmd = &cobra.Command{
 					return creationTime(data[i].Status).Before(creationTime(data[j].Status))
 				})
 
-				fmt.Printf("%-2v  %1v%-6v  %-16v  %-10v  %-4v  %-5v  %-8v  %-12v  %-20v\n", "NO", "", "ID", "NAME", "NODE", "KIND", "TYPE", "SIZE(GB)", "STATUS", "PATH")
+				fmt.Printf("%-2v  %1v%-6v  %-16v  %-10v  %-4v  %-5v  %-5v  %-8v  %-12v  %-20v\n", "NO", "", "ID", "NAME", "NODE", "KIND", "TYPE", "iSCSI", "SIZE(GB)", "STATUS", "PATH")
 				for i, v := range data {
 					nodeName := ""
 					if v.Metadata != nil && v.Metadata.NodeName != nil {
 						nodeName = *v.Metadata.NodeName
+					}
+					iscsi := "N"
+					if v.Spec != nil && v.Spec.Iscsi != nil && *v.Spec.Iscsi {
+						iscsi = "Y"
 					}
 					fmt.Printf("%2d", i+1)
 					fmt.Printf("  %1v%-6v", deletionMarker(v.Status), v.Id)
@@ -52,6 +56,7 @@ var volumeListCmd = &cobra.Command{
 					fmt.Printf("  %-10v", nodeName)
 					fmt.Printf("  %-4v", *v.Spec.Kind)
 					fmt.Printf("  %-5v", *v.Spec.Type)
+					fmt.Printf("  %-5v", iscsi)
 					fmt.Printf("  %-8v", *v.Spec.Size)
 					fmt.Printf("  %-12v", db.VolStatus[v.Status.StatusCode])
 					fmt.Printf("  %-20v", *v.Spec.Path)
