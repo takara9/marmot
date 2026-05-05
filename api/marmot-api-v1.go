@@ -88,6 +88,7 @@ type HostStatus struct {
 	HostId      *string         `json:"hostId,omitempty"`
 	InitiatorId *string         `json:"initiatorId,omitempty"`
 	IpAddress   *string         `json:"ipAddress,omitempty"`
+	IscsiServer *bool           `json:"iscsiServer,omitempty"`
 	LastUpdated *time.Time      `json:"lastUpdated,omitempty"`
 	NodeName    *string         `json:"nodeName,omitempty"`
 }

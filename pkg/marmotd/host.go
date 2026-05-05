@@ -96,6 +96,11 @@ func (m *Marmot) CollectHostStatus() (api.HostStatus, error) {
 		status.InitiatorId = util.StringPtr(initiatorID)
 	}
 
+	// iscsi_server 設定が true の場合は IscsiServer フラグをセット
+	if CurrentConfig().IscsiServer {
+		status.IscsiServer = util.BoolPtr(true)
+	}
+
 	// キャパシティ情報を収集
 	capacity, err := collectHostCapacity()
 	if err != nil {

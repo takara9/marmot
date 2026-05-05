@@ -63,6 +63,11 @@ type MarmotdConfig struct {
 
 	// イメージ削除処理のタイムアウト秒数
 	ImageDeleteTimeoutSeconds int `json:"image_delete_timeout_seconds"`
+
+	// このホストが iSCSI ターゲットサーバーを担当するかどうか
+	// true の場合、このホストの volumeコントローラーが iSCSI ターゲットを管理する。
+	// false（省略時）の場合、クラスタ内で HostId が最小のホストが自動的に担当する。
+	IscsiServer bool `json:"iscsi_server"`
 }
 
 var runtimeConfigState = struct {

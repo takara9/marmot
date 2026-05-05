@@ -1142,6 +1142,8 @@ components:
           type: string
         initiatorId:
           type: string
+        iscsiServer:
+          type: boolean
         Capacity:
           $ref: "#/components/schemas/HostCapacity"
         Allocation:

@@ -10,7 +10,7 @@
 - インストール debファイルで、open-iscsi をインストールする。
 - iSCSIターゲットは、/etc/marmot/marmotd.jsonのiscsi_server: true になっているホストの volumeコントローラーが、以下に記述したiSCSIターゲットに関する処理を実行する。
 - 上記設定が無い場合は、クラスタメンバーの中で、ホストIDが一番小さいホストのスケジューラーが担当する。
-- どのホストが iscsi_serverを担当するか判別するために、HostStatusに、Initiator: ture をセットする。
+- どのホストが iscsi_serverを担当するか判別するために、HostStatusに、IscsiServer: true をセットする。
 
 
 ### ブロックストレージ作成のプロセス
