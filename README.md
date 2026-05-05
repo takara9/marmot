@@ -1,66 +1,124 @@
-# Private Micro Cloud "Marmot" 
+# Marmot — プライベートマイクロクラウド
 
 ![マーモットのイメージキャラ](docs/marmot-logo.png)
 
-Marmot（マーモット）は、テスト、学習、実験用に設計された、高速で軽量なプライベートなクラウド環境です。
-YAMLで仮想サーバーのクラスタ構成を定義し、KVMやその他のLinuxネイティブテクノロジーを使用して数秒で起動できます。
+Marmot（マーモット）は、テスト・学習・実験を目的としたプライベートクラウド基盤です。  
+YAML ファイルで仮想サーバーやネットワークの構成を定義し、KVM / LibVirt / Open vSwitch / etcd などの Linux ネイティブテクノロジーを活用して仮想マシンを迅速に起動・管理できます。
 
 ## 特徴
 
-- 高速起動でOSが起動する仮想サーバー
-- YAMLベースの構成
-- LibVirt、etcd、Open vSwitchなどとの統合
-- Ubuntu 20.04以降をサポート
-- OpenAPI v3 ベースのREST-APIで MarmotサーバーをAPI操作
-- ブートボリューム、データボリュームに、LVMとQCOW2の選択が可能
-- LXCの実装も推進中
+- **YAML ベースの宣言的構成** — サーバー・ネットワーク・ボリュームをファイル一枚で定義
+- **LVM / QCOW2 ボリューム対応** — ブートボリューム・データボリューム双方で選択可能
+- **仮想ネットワーク管理** — ホストブリッジ・VXLAN オーバーレイ・VLAN をサポート
+- **マルチホーム対応** — 1 台の VM に複数の仮想ネットワークを割り当て可能
+- **ノードセレクター** — 複数ハイパーバイザーノードへの VM 配置制御
+- **OpenAPI v3 REST API** — `marmotd` サーバーを API で完全制御
+- **etcd による状態管理** — クラスター全体の状態を分散 KV ストアで保持
+- **内部 DNS** — VM に対する名前解決を自動提供
+- **Ubuntu 22.04 / 24.04 サポート**
 
+## コンポーネント
 
-## 使用例
+| コンポーネント | 説明 |
+|---|---|
+| `marmotd` | ハイパーバイザーノード上で動作するデーモン。LibVirt / LVM / OVS を操作して VM を管理する |
+| `mactl` | CLI クライアント。YAML ファイルまたは URL を指定してサーバー・ネットワーク・ボリュームを操作する |
+| `maadm` | 管理者向け補助ツール |
 
-構成ファイルを準備して、mactlコマンドにファイル名をセットして、仮想マシンが構築できます。
+## クイックスタート
+
+### 仮想サーバーの作成
+
+```yaml
+# server.yaml
+name: my-server
+cpu: 2
+memory: 2048
+os_variant: ubuntu22.04
+boot_volume:
+  type: qcow2
+network:
+  - name: "default"
+```
+
+```sh
+mactl server create -f server.yaml
+```
+
+### 仮想ネットワークの作成
+
+```yaml
+# network.yaml
+Metadata:
+  name: my-network
+Spec:
+  forwardMode: bridge
+```
+
+```sh
+mactl network create -f network.yaml
+```
+
+### ローカルファイルの代わりに URL を直接指定することも可能
+
+```sh
+mactl server create -f https://raw.githubusercontent.com/takara9/marmot/refs/heads/main/cmd/mactl/testdata/test-server-03-host-bridge-ip.yaml
+mactl network create -f https://raw.githubusercontent.com/takara9/marmot/refs/heads/main/cmd/mactl/testdata/test-network-02-test-net-2.yaml
+```
+
+### 主な `mactl` サブコマンド
 
 ```
-$ mactl server create -f config.yaml
+mactl server create    # VM を作成
+mactl server delete    # VM を削除
+mactl server start     # VM を起動
+mactl server stop      # VM を停止
+mactl server status    # VM 一覧を表示
+mactl network create   # 仮想ネットワークを作成
+mactl network delete   # 仮想ネットワークを削除
+mactl volume create    # ボリュームを作成
 ```
 
-## インストール方法
+## インストール
 
-作成中
-debパッケージでのインストールを提供予定
+### 1. deb パッケージのインストール
 
+[Releases](https://github.com/takara9/marmot/releases) から最新の `.deb` ファイルをダウンロードしてインストールします。
 
+```sh
+VERSION=0.12.0
+curl -OL https://github.com/takara9/marmot/releases/download/v${VERSION}/marmot_v${VERSION}_amd64.deb
+sudo apt install ./marmot_v${VERSION}_amd64.deb
+```
 
-## *応用例*
-もともとは、自身の検証や学習のために作ったソフトウェアです。
+インストール後のセットアップ手順（etcd の設定・ノード名の設定など）は [docs/INSTALL-MARMOT.md](docs/INSTALL-MARMOT.md) を参照してください。  
+ハイパーバイザーノード自体の構成手順は [docs/INSTALL-SERVER.md](docs/INSTALL-SERVER.md) を参照してください。
 
-- [設定用Ansibles集](https://github.com/takara9/marmot-servers)
-- [Kubernetesクラスタの実行](https://github.com/takara9/marmot-servers/tree/main/kubernetes)
-- [Cephストレージシステムの実行](Https://Github.Com/Takara9/Marmot-servers/tree/main/ceph)
-- [メトリックスとログ分析基盤](https://github.com/takara9/docker_and_k8s/tree/main/4-10_Observability)
-- [GitHub Actionと連携したmarmot開発環境](https://github.com/takara9/marmot/docs/HOWTO-CI.md)
+## 主な依存技術
 
+- [KVM / QEMU](https://www.linux-kvm.org/) — 仮想化
+- [LibVirt](https://libvirt.org/) — VM ライフサイクル管理
+- [Open vSwitch](https://www.openvswitch.org/) — 仮想ネットワーク
+- [etcd](https://etcd.io/) — 分散 KV ストア（クラスター状態管理）
+- [LVM](https://sourceware.org/lvm2/) — 論理ボリューム管理
 
-## アーキテクチャ
-大きく構造を変更中です。以下の図は、これまで採用した進化過程の一つの段階です。
+## 応用例
 
-![Architecture](docs/architecture-1.png)
-
-
-複数のmarmotを導入したサーバーを並列化して、クラウドの様な環境を構築できます。
-
-![Architecture](docs/architecture-2.png)
-
+- [設定用 Ansible 集](https://github.com/takara9/marmot-servers)
+- [Kubernetes クラスターの構築](https://github.com/takara9/marmot-servers/tree/main/kubernetes)
+- [Ceph ストレージシステムの構築](https://github.com/takara9/marmot-servers/tree/main/ceph)
+- [メトリクス・ログ分析基盤](https://github.com/takara9/docker_and_k8s/tree/main/4-10_Observability)
+- [GitHub Actions と連携した CI 環境](docs/HOWTO-CI.md)
 
 ## ライセンス
 
-このプロジェクトはMITライセンスの下で提供されています。詳細は[LICENSE](LICENSE)ファイルをご覧ください。
+MIT License — 詳細は [LICENSE](LICENSE) を参照してください。
 
 ## 貢献
 
-貢献を歓迎します！ガイドラインについては[CONTRIBUTING.md](CONTRIBUTING.md)をご覧ください。
+貢献を歓迎します。ガイドラインは [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
 
 ## 連絡先
 
-メンテナー: [takara9](https://github.com/takara9)
-ご質問や議論については、[GitHub Discussions](https://github.com/takara9/marmot/discussions) をご利用ください。
+メンテナー: [takara9](https://github.com/takara9)  
+ご質問・議論は [GitHub Discussions](https://github.com/takara9/marmot/discussions) へ。
