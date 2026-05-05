@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -17,6 +19,169 @@ import (
 	"github.com/takara9/marmot/pkg/qcow"
 	"github.com/takara9/marmot/pkg/util"
 )
+
+var targetcliCommandOutput = func(args ...string) ([]byte, error) {
+	cmd := exec.Command("targetcli", args...)
+	return cmd.CombinedOutput()
+}
+
+func runTargetcliAllowExists(args ...string) error {
+	out, err := targetcliCommandOutput(args...)
+	if err == nil {
+		return nil
+	}
+
+	message := strings.ToLower(strings.TrimSpace(string(out)))
+	if strings.Contains(message, "already exists") || strings.Contains(message, "exists") {
+		return nil
+	}
+
+	return fmt.Errorf("targetcli %v failed: %w: %s", args, err, strings.TrimSpace(string(out)))
+}
+
+func runTargetcliAllowMissing(args ...string) error {
+	out, err := targetcliCommandOutput(args...)
+	if err == nil {
+		return nil
+	}
+
+	message := strings.ToLower(strings.TrimSpace(string(out)))
+	if strings.Contains(message, "not found") || strings.Contains(message, "no such") || strings.Contains(message, "does not exist") {
+		return nil
+	}
+
+	return fmt.Errorf("targetcli %v failed: %w: %s", args, err, strings.TrimSpace(string(out)))
+}
+
+func collectClusterInitiatorIDs(m *Marmot) ([]string, error) {
+	if m == nil || m.Db == nil {
+		return nil, errors.New("marmot db is nil")
+	}
+
+	statuses, err := m.Db.GetAllHostStatus()
+	if err != nil {
+		return nil, err
+	}
+
+	set := make(map[string]struct{})
+	for _, status := range statuses {
+		if status.InitiatorId == nil {
+			continue
+		}
+		id := strings.TrimSpace(*status.InitiatorId)
+		if id == "" {
+			continue
+		}
+		set[id] = struct{}{}
+	}
+
+	ids := make([]string, 0, len(set))
+	for id := range set {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids, nil
+}
+
+func (m *Marmot) configureISCSIForVolume(volSpec *api.Volume) error {
+	if volSpec == nil || volSpec.Spec == nil {
+		return errors.New("volume spec is nil")
+	}
+	if volSpec.Spec.Iscsi == nil || !*volSpec.Spec.Iscsi {
+		return nil
+	}
+
+	if volSpec.Spec.Type == nil || *volSpec.Spec.Type != "lvm" {
+		return errors.New("iscsi volume requires lvm type")
+	}
+	if volSpec.Spec.Kind == nil || *volSpec.Spec.Kind != "data" {
+		return errors.New("iscsi volume is supported only for data kind")
+	}
+	if volSpec.Spec.Path == nil || strings.TrimSpace(*volSpec.Spec.Path) == "" {
+		return errors.New("iscsi volume requires logical volume path")
+	}
+
+	backstoreName := fmt.Sprintf("disk-%s", volSpec.Id)
+	targetIQN := fmt.Sprintf("iqn.2024-01.com.marmot:target-%s", volSpec.Id)
+	targetPath := fmt.Sprintf("/iscsi/%s/tpg1", targetIQN)
+
+	if err := runTargetcliAllowExists("/backstores/block", "create", backstoreName, *volSpec.Spec.Path); err != nil {
+		return err
+	}
+	if err := runTargetcliAllowExists("/iscsi", "create", targetIQN); err != nil {
+		return err
+	}
+	if err := runTargetcliAllowExists(targetPath+"/luns", "create", fmt.Sprintf("/backstores/block/%s", backstoreName)); err != nil {
+		return err
+	}
+
+	initiatorIDs, err := collectClusterInitiatorIDs(m)
+	if err != nil {
+		return err
+	}
+	if len(initiatorIDs) == 0 {
+		slog.Warn("iSCSI ACL の対象となる InitiatorId が HostStatus に見つかりません", "volumeId", volSpec.Id)
+	}
+	for _, initiatorID := range initiatorIDs {
+		if err := runTargetcliAllowExists(targetPath+"/acls", "create", initiatorID); err != nil {
+			return err
+		}
+	}
+
+	if err := runTargetcliAllowExists("saveconfig"); err != nil {
+		return err
+	}
+
+	volSpec.Spec.IscsiTargetIqn = util.StringPtr(targetIQN)
+	if err := m.Db.UpdateVolume(volSpec.Id, *volSpec); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *Marmot) cleanupISCSIForVolume(volSpec *api.Volume) error {
+	if volSpec == nil || volSpec.Spec == nil {
+		return nil
+	}
+
+	// iSCSI を使っていないボリュームは対象外
+	isISCSI := volSpec.Spec.Iscsi != nil && *volSpec.Spec.Iscsi
+	hasTargetIQN := volSpec.Spec.IscsiTargetIqn != nil && strings.TrimSpace(*volSpec.Spec.IscsiTargetIqn) != ""
+	if !isISCSI && !hasTargetIQN {
+		return nil
+	}
+
+	targetIQN := fmt.Sprintf("iqn.2024-01.com.marmot:target-%s", volSpec.Id)
+	if hasTargetIQN {
+		targetIQN = strings.TrimSpace(*volSpec.Spec.IscsiTargetIqn)
+	}
+	backstoreName := fmt.Sprintf("disk-%s", volSpec.Id)
+	targetPath := fmt.Sprintf("/iscsi/%s/tpg1", targetIQN)
+
+	initiatorIDs, err := collectClusterInitiatorIDs(m)
+	if err != nil {
+		slog.Warn("iSCSI ACL の削除対象取得に失敗。ターゲット削除を継続します", "volumeId", volSpec.Id, "err", err)
+	} else {
+		for _, initiatorID := range initiatorIDs {
+			if err := runTargetcliAllowMissing(targetPath+"/acls", "delete", initiatorID); err != nil {
+				return err
+			}
+		}
+	}
+
+	if err := runTargetcliAllowMissing("/iscsi", "delete", targetIQN); err != nil {
+		return err
+	}
+	if err := runTargetcliAllowMissing("/backstores/block", "delete", backstoreName); err != nil {
+		return err
+	}
+	if err := runTargetcliAllowExists("saveconfig"); err != nil {
+		return err
+	}
+
+	return nil
+}
 
 func resolveImageTemplateByVolumeNode(m *Marmot, volSpec api.Volume) (api.Image, error) {
 	osVariant := ""
@@ -236,6 +401,11 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 				return nil, err
 			}
 
+			if err := m.configureISCSIForVolume(&volSpec); err != nil {
+				m.Db.UpdateVolumeStatusMessage(volSpec.Id, db.VOLUME_ERROR, err.Error())
+				return nil, err
+			}
+
 			slog.Debug("Dataボリュームの生成 成功", "LV Name", *volSpec.Spec.LogicalVolume, "VG Name", *volSpec.Spec.VolumeGroup, "Size", *volSpec.Spec.Size, "volId", volSpec.Id)
 			volSpec.Status.Message = nil
 			volSpec.Status.StatusCode = db.VOLUME_AVAILABLE
@@ -270,6 +440,12 @@ func (m *Marmot) RemoveVolume(id string) error {
 	// LV と qcow2ファイルの判断
 	if *vol.Spec.Type == "lvm" {
 		slog.Debug("Removing Logical volume", "id", id)
+
+		if err := m.cleanupISCSIForVolume(&vol); err != nil {
+			slog.Error("cleanupISCSIForVolume()", "err", err, "volId", id)
+			return err
+		}
+
 		// 物理的なボリュームの削除
 		if vol.Spec.VolumeGroup != nil && vol.Spec.LogicalVolume != nil {
 			if err := lvm.RemoveLV(*vol.Spec.VolumeGroup, *vol.Spec.LogicalVolume); err != nil {

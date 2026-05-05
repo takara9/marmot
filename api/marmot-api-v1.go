@@ -295,14 +295,16 @@ type VirtualNetworkSpecPeerPolicy string
 
 // VolSpec defines model for VolSpec.
 type VolSpec struct {
-	Kind          *string `json:"kind,omitempty"`
-	LogicalVolume *string `json:"logicalVolume,omitempty"`
-	OsVariant     *string `json:"osVariant,omitempty"`
-	Path          *string `json:"path,omitempty"`
-	Persistent    *bool   `json:"persistent,omitempty"`
-	Size          *int    `json:"size,omitempty"`
-	Type          *string `json:"type,omitempty"`
-	VolumeGroup   *string `json:"volumeGroup,omitempty"`
+	Iscsi          *bool   `json:"iscsi,omitempty"`
+	IscsiTargetIqn *string `json:"iscsiTargetIqn,omitempty"`
+	Kind           *string `json:"kind,omitempty"`
+	LogicalVolume  *string `json:"logicalVolume,omitempty"`
+	OsVariant      *string `json:"osVariant,omitempty"`
+	Path           *string `json:"path,omitempty"`
+	Persistent     *bool   `json:"persistent,omitempty"`
+	Size           *int    `json:"size,omitempty"`
+	Type           *string `json:"type,omitempty"`
+	VolumeGroup    *string `json:"volumeGroup,omitempty"`
 }
 
 // Volume defines model for Volume.
