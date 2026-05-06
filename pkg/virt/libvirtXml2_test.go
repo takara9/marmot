@@ -59,9 +59,9 @@ var _ = Describe("VirtualServers", Ordered, func() {
 			vs1.Machine = "pc-q35-4.2"
 
 			vs1.DiskSpecs = []virt.DiskSpec{
-				{"vda", "/dev/vg1/oslv", 3, "raw"},
-				{"vdb", "/dev/vg1/lvdata", 10, "raw"},
-				{"vdc", "/var/lib/marmot/volumes/data-vol-1.qcow2", 11, "qcow2"},
+				{Dev: "vda", Src: "/dev/vg1/oslv", Bus: 3, Type: "raw"},
+				{Dev: "vdb", Src: "/dev/vg1/lvdata", Bus: 10, Type: "raw"},
+				{Dev: "vdc", Src: "/var/lib/marmot/volumes/data-vol-1.qcow2", Bus: 11, Type: "qcow2"},
 			}
 			channelFile := "org.qemu.guest_agent.0"
 
@@ -110,8 +110,8 @@ var _ = Describe("VirtualServers", Ordered, func() {
 			vs2.Machine = "pc-q35-4.2"
 
 			vs2.DiskSpecs = []virt.DiskSpec{
-				{"vda", bootdiskpath, 3, "qcow2"},
-				{"vdb", "/var/lib/marmot/volumes/data-vol-2.qcow2", 10, "qcow2"},
+				{Dev: "vda", Src: bootdiskpath, Bus: 3, Type: "qcow2"},
+				{Dev: "vdb", Src: "/var/lib/marmot/volumes/data-vol-2.qcow2", Bus: 10, Type: "qcow2"},
 			}
 			channelFile := "org.qemu.guest_agent.0"
 			channelPath, err := util.CreateChannelDir(hostname2)

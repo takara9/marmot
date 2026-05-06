@@ -20,10 +20,14 @@ func pciAddr(b, s, f uint) *libvirtxml.DomainAddress {
 func stringPtr(s string) *string { return &s }
 
 type DiskSpec struct {
-	Dev  string
-	Src  string
-	Bus  uint
-	Type string
+	Dev            string
+	Src            string
+	Bus            uint
+	Type           string
+	ISCSITarget    string
+	ISCSIHost      string
+	ISCSIPort      string
+	ISCSIInitiator string
 }
 
 type NetSpec struct {
@@ -170,6 +174,21 @@ func CreateDomainXML(vs ServerSpec) *libvirtxml.Domain {
 				File: &libvirtxml.DomainDiskSourceFile{File: d.Src},
 			}
 			dom.Devices.Disks = append(dom.Devices.Disks, cdrom)
+
+		case "iscsi":
+			disk.Source = &libvirtxml.DomainDiskSource{
+				Network: &libvirtxml.DomainDiskSourceNetwork{
+					Protocol: "iscsi",
+					Name:     d.ISCSITarget,
+					Hosts: []libvirtxml.DomainDiskSourceHost{
+						{Name: d.ISCSIHost, Port: d.ISCSIPort},
+					},
+					Initiator: &libvirtxml.DomainDiskSourceNetworkInitiator{
+						IQN: &libvirtxml.DomainDiskSourceNetworkIQN{Name: d.ISCSIInitiator},
+					},
+				},
+			}
+			dom.Devices.Disks = append(dom.Devices.Disks, disk)
 
 		}
 	}
