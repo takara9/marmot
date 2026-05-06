@@ -15,7 +15,7 @@ import (
 	"github.com/takara9/marmot/pkg/db"
 )
 
-const testServerConfigRawURL = "https://raw.githubusercontent.com/takara9/marmot/refs/heads/main/cmd/mactl/testdata/test-server-1.yaml"
+const testServerConfigRawURL = "https://raw.githubusercontent.com/takara9/marmot/refs/heads/config-server-to-api-server/cmd/mactl/testdata/test-server-1.yaml"
 
 var _ = Describe("Marmotd Test", Ordered, func() {
 	var mockServer *mockServerHandle

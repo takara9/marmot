@@ -1,4 +1,8 @@
-name: test-server-00
-cpu: 1 
-memory: 1024
-comment: "This is a minimum configuration"
+apiVersion: v1
+kind: Server
+Metadata:
+  name: test-server-00
+  comment: "This is a minimum configuration"
+Spec:
+  cpu: 1
+  memory: 1024

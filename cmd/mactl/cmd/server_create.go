@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -54,206 +53,84 @@ var serverCreateCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		var conf config.Server
-		err = config.ReadYamlConfig(configFilename, &conf)
+		var virtualServer api.Server
+		err = config.ReadYamlConfig(configFilename, &virtualServer)
 		if err != nil {
-			println("ReadYamlConfig", "err", err)
 			return err
 		}
 
-		// 名前は必須項目
-		if len(conf.Name) == 0 {
-			fmt.Println("Name is required in the configuration")
-			return fmt.Errorf("name is required in the configuration")
+		// Metadata.name は必須
+		if virtualServer.Metadata == nil || virtualServer.Metadata.Name == nil || *virtualServer.Metadata.Name == "" {
+			return fmt.Errorf("Metadata.name is required in the configuration")
 		}
 
-		var virtualServer api.Server
-		virtualServer.Metadata = &api.Metadata{
-			Name: util.StringPtr(conf.Name),
-		}
-		virtualServer.Spec = &api.ServerSpec{}
-		virtualServer.Spec.BootVolume = &api.Volume{}
-		virtualServer.Spec.Storage = &[]api.Volume{}
-		virtualServer.Spec.BootVolume.Spec = &api.VolSpec{}
-		virtualServer.Spec.BootVolume.Metadata = &api.Metadata{}
-		virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{}
-		virtualServer.Spec.Auth = &api.Auth{}
-
-		if conf.Auth != nil {
-			if conf.Auth.PublicKey != nil {
-				virtualServer.Spec.Auth.PublicKey = util.StringPtr(*conf.Auth.PublicKey)
-			}
-			if conf.Auth.Url != nil {
-				virtualServer.Spec.Auth.Url = util.StringPtr(*conf.Auth.Url)
-			}
-			if conf.Auth.User != nil {
-				virtualServer.Spec.Auth.User = util.StringPtr(*conf.Auth.User)
-			}
-		}
-
-		if comment := pickServerComment(conf); comment != nil {
-			virtualServer.Metadata.Comment = util.StringPtr(*comment)
-		}
-		if conf.NodeSelector != nil {
-			node := strings.TrimSpace(*conf.NodeSelector)
-			if node != "" {
-				virtualServer.Metadata.NodeName = util.StringPtr(node)
-			}
-		}
-		// 無設定を許容、デフォルトをAPI側に任せる
-		if conf.Cpu != nil {
-			virtualServer.Spec.Cpu = util.IntPtrInt(*conf.Cpu)
-		}
-
-		if conf.Memory != nil {
-			virtualServer.Spec.Memory = util.IntPtrInt(*conf.Memory)
-		}
-
-		if conf.OsVariant != nil {
-			virtualServer.Spec.OsVariant = util.StringPtr(*conf.OsVariant)
-		}
-
-		if conf.BootVolume != nil {
-			bootPvId := ""
-			if conf.BootVolume.PersistentVolumeId != nil && *conf.BootVolume.PersistentVolumeId != "" {
-				bootPvId = *conf.BootVolume.PersistentVolumeId
-			} else if conf.BootVolume.PersistentVolumeName != nil && *conf.BootVolume.PersistentVolumeName != "" {
-				resolved, err := resolveVolumeIdByName(m, *conf.BootVolume.PersistentVolumeName)
-				if err != nil {
-					fmt.Fprintln(os.Stderr, "boot_volume:", err)
-					return err
-				}
-				bootPvId = resolved
-			}
-			if bootPvId != "" {
-				virtualServer.Spec.BootVolume.Metadata.Id = util.StringPtr(bootPvId)
-				virtualServer.Spec.BootVolume.Id = bootPvId
-				virtualServer.Spec.BootVolume.Metadata.Name = nil
-				virtualServer.Spec.BootVolume.Spec = nil
-			} else {
-				virtualServer.Spec.BootVolume.Metadata.Name = util.StringPtr("boot")
-				if conf.BootVolume.Type != nil {
-					virtualServer.Spec.BootVolume.Spec.Type = util.StringPtr(*conf.BootVolume.Type)
-				}
-				if conf.BootVolume.Size != nil {
-					virtualServer.Spec.BootVolume.Spec.Size = util.IntPtrInt(*conf.BootVolume.Size)
-				}
-			}
-		}
-
-		if conf.Network != nil {
-			for _, nic := range *conf.Network {
-				// ネットワークの設定があるときの追加設定
-				var n api.NetworkInterface
-				n.Networkname = nic.Name // NameをIDとして使用
-				// 設定があれば固定IP設定
-				if nic.Address != nil {
-					n.Address = util.StringPtr(*nic.Address)
-					n.Dhcp4 = util.BoolPtr(false)
-					n.Dhcp6 = util.BoolPtr(false)
-				}
-				// 設定があればネットマスク設定
-				if nic.Netmask != nil {
-					n.Netmask = util.StringPtr(*nic.Netmask)
-				}
-				if nic.Netmasklen != nil {
-					n.Netmasklen = util.IntPtrInt(*nic.Netmasklen)
-				} else if nic.Netmask != nil {
-					// netmask が数値文字列（CIDRプレフィックス長）の場合、Netmasklen に変換する
-					// 有効範囲: IPv4は0-32、IPv6は0-128
-					if maskLen, err := strconv.Atoi(*nic.Netmask); err == nil && maskLen >= 0 && maskLen <= 128 {
-						n.Netmasklen = util.IntPtrInt(maskLen)
-					} else {
-						fmt.Fprintf(os.Stderr, "Warning: invalid netmask value %q, skipping conversion\n", *nic.Netmask)
-					}
-				}
-
-				// 設定があればルート設定
-				if nic.Routes != nil {
-					routes := make([]api.Route, len(*nic.Routes))
-					for i, r := range *nic.Routes {
-						routes[i].To = util.StringPtr(r.Destination)
-						routes[i].Via = util.StringPtr(r.Gateway)
-					}
-					n.Routes = &routes
-				}
-
-				// VLANの設定があれば対応
-				if nic.Portgroup != nil {
-					n.Portgroup = util.StringPtr(*nic.Portgroup)
-				}
-				// VLANの設定があれば対応
-				if nic.Vlans != nil {
-					vlans := make([]uint, len(*nic.Vlans))
-					for i, v := range *nic.Vlans {
-						vlans[i] = uint(v)
-					}
-					n.Vlans = &vlans
-				}
-				// ネームサーバーの設定があれば対応
-				if nic.Nameservers != nil {
-					n.Nameservers = &api.Nameservers{}
-					if nic.Nameservers.Addresses != nil {
-						n.Nameservers.Addresses = &[]string{}
-						for _, addr := range *nic.Nameservers.Addresses {
-							*n.Nameservers.Addresses = append(*n.Nameservers.Addresses, addr)
-						}
-					}
-					if nic.Nameservers.Search != nil {
-						n.Nameservers.Search = &[]string{}
-						for _, search := range *nic.Nameservers.Search {
-							*n.Nameservers.Search = append(*n.Nameservers.Search, search)
-						}
-					}
-				}
-				// インターフェースの設定追加
-				*virtualServer.Spec.NetworkInterface = append(*virtualServer.Spec.NetworkInterface, n)
-			}
-		}
-
-		// ストレージの追加設定
-		if conf.Storage != nil {
-			volumes := make([]api.Volume, len(*conf.Storage))
-			for i, vol := range *conf.Storage {
-				meta := api.Metadata{}
-				volumes[i].Metadata = &meta
-				pvId := ""
-				if vol.PersistentVolumeId != nil && *vol.PersistentVolumeId != "" {
-					pvId = *vol.PersistentVolumeId
-				} else if vol.PersistentVolumeName != nil && *vol.PersistentVolumeName != "" {
-					resolved, err := resolveVolumeIdByName(m, *vol.PersistentVolumeName)
+		if virtualServer.Spec != nil {
+			// bootVolume の名前解決と既定値設定
+			if virtualServer.Spec.BootVolume != nil {
+				bv := virtualServer.Spec.BootVolume
+				if bv.Id == "" && bv.Spec == nil && bv.Metadata != nil && bv.Metadata.Name != nil && *bv.Metadata.Name != "" {
+					// id 未設定・Spec 無し・名前あり → 名前でボリューム検索
+					pvId, err := resolveVolumeIdByName(m, *bv.Metadata.Name)
 					if err != nil {
-						fmt.Fprintf(os.Stderr, "storage[%d]: %v\n", i, err)
+						fmt.Fprintln(os.Stderr, "bootVolume:", err)
 						return err
 					}
-					pvId = resolved
-				}
-				if pvId != "" {
-					volumes[i].Metadata.Id = util.StringPtr(pvId)
-					volumes[i].Id = pvId
-					continue
-				}
-				volumes[i].Metadata.Name = util.StringPtr(vol.Name)
-				if vol.Comment != nil {
-					volumes[i].Metadata.Comment = util.StringPtr(*vol.Comment)
-				}
-				spec := api.VolSpec{}
-				volumes[i].Spec = &spec
-				if vol.Size != nil {
-					volumes[i].Spec.Size = util.IntPtrInt(*vol.Size)
-				}
-				if vol.Type == nil {
-					volumes[i].Spec.Type = util.StringPtr("qcow2")
-				} else {
-					volumes[i].Spec.Type = util.StringPtr(*vol.Type)
-				}
-				if vol.Kind == nil {
-					volumes[i].Spec.Kind = util.StringPtr("data")
-				} else {
-					volumes[i].Spec.Kind = util.StringPtr(*vol.Kind)
+					bv.Id = pvId
+					bv.Metadata.Id = util.StringPtr(pvId)
+				} else if bv.Id == "" && bv.Spec != nil {
+					// 新規ボリューム：名前未設定なら "boot" をデフォルトに
+					if bv.Metadata == nil {
+						bv.Metadata = &api.Metadata{Name: util.StringPtr("boot")}
+					} else if bv.Metadata.Name == nil {
+						bv.Metadata.Name = util.StringPtr("boot")
+					}
 				}
 			}
-			virtualServer.Spec.Storage = &volumes
+
+			// Storage の名前解決とデフォルト値設定
+			if virtualServer.Spec.Storage != nil {
+				for i := range *virtualServer.Spec.Storage {
+					vol := &(*virtualServer.Spec.Storage)[i]
+					if vol.Id == "" && vol.Spec == nil && vol.Metadata != nil && vol.Metadata.Name != nil && *vol.Metadata.Name != "" {
+						// id 未設定・Spec 無し・名前あり → 名前でボリューム検索
+						pvId, err := resolveVolumeIdByName(m, *vol.Metadata.Name)
+						if err != nil {
+							fmt.Fprintf(os.Stderr, "Storage[%d]: %v\n", i, err)
+							return err
+						}
+						vol.Id = pvId
+						if vol.Metadata != nil {
+							vol.Metadata.Id = util.StringPtr(pvId)
+						}
+					} else if vol.Spec != nil {
+						// 新規ボリューム：type/kind のデフォルト
+						if vol.Spec.Type == nil {
+							vol.Spec.Type = util.StringPtr("qcow2")
+						}
+						if vol.Spec.Kind == nil {
+							vol.Spec.Kind = util.StringPtr("data")
+						}
+					}
+				}
+			}
+
+			// NetworkInterface の後処理
+			if virtualServer.Spec.NetworkInterface != nil {
+				for i := range *virtualServer.Spec.NetworkInterface {
+					nic := &(*virtualServer.Spec.NetworkInterface)[i]
+					// address が設定されていて dhcp4 未設定なら false にする
+					if nic.Address != nil && nic.Dhcp4 == nil {
+						nic.Dhcp4 = util.BoolPtr(false)
+						nic.Dhcp6 = util.BoolPtr(false)
+					}
+					// netmask が数値文字列（CIDR長）の場合、netmasklen に変換
+					if nic.Netmasklen == nil && nic.Netmask != nil {
+						if maskLen, err := strconv.Atoi(*nic.Netmask); err == nil && maskLen >= 0 && maskLen <= 128 {
+							nic.Netmasklen = util.IntPtrInt(maskLen)
+						}
+					}
+				}
+			}
 		}
 
 		byteBody, _, err := m.CreateServer(virtualServer)
@@ -302,14 +179,4 @@ var serverCreateCmd = &cobra.Command{
 func init() {
 	serverCmd.AddCommand(serverCreateCmd)
 	serverCreateCmd.Flags().StringVarP(&configFilename, "configfile", "f", "vm-server.yaml", "Configuration file or raw URL for the server")
-}
-
-func pickServerComment(conf config.Server) *string {
-	if conf.Metadata != nil && conf.Metadata.Comment != nil {
-		return conf.Metadata.Comment
-	}
-	if conf.MetadataLegacy != nil && conf.MetadataLegacy.Comment != nil {
-		return conf.MetadataLegacy.Comment
-	}
-	return conf.Comment
 }

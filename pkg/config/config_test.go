@@ -8,6 +8,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/config"
 )
 
@@ -15,17 +16,20 @@ var _ = Describe("ReadYamlConfig", func() {
 	It("reads a YAML config from a file", func() {
 		tmpDir := GinkgoT().TempDir()
 		configPath := filepath.Join(tmpDir, "server.yaml")
-		content := "name: file-server\ncpu: 2\n"
+		content := "Metadata:\n  name: file-server\nSpec:\n  cpu: 2\n"
 
 		err := os.WriteFile(configPath, []byte(content), 0o600)
 		Expect(err).NotTo(HaveOccurred())
 
-		var conf config.Server
+		var conf api.Server
 		err = config.ReadYamlConfig(configPath, &conf)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(conf.Name).To(Equal("file-server"))
-		Expect(conf.Cpu).NotTo(BeNil())
-		Expect(*conf.Cpu).To(Equal(2))
+		Expect(conf.Metadata).NotTo(BeNil())
+		Expect(conf.Metadata.Name).NotTo(BeNil())
+		Expect(*conf.Metadata.Name).To(Equal("file-server"))
+		Expect(conf.Spec).NotTo(BeNil())
+		Expect(conf.Spec.Cpu).NotTo(BeNil())
+		Expect(*conf.Spec.Cpu).To(Equal(2))
 	})
 
 	It("reads a YAML config from a URL", func() {
@@ -34,23 +38,26 @@ var _ = Describe("ReadYamlConfig", func() {
 				http.NotFound(w, r)
 				return
 			}
-			_, _ = w.Write([]byte("name: url-server\nmemory: 2048\n"))
+			_, _ = w.Write([]byte("Metadata:\n  name: url-server\nSpec:\n  memory: 2048\n"))
 		}))
 		defer server.Close()
 
-		var conf config.Server
+		var conf api.Server
 		err := config.ReadYamlConfig(server.URL+"/server.yaml", &conf)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(conf.Name).To(Equal("url-server"))
-		Expect(conf.Memory).NotTo(BeNil())
-		Expect(*conf.Memory).To(Equal(2048))
+		Expect(conf.Metadata).NotTo(BeNil())
+		Expect(conf.Metadata.Name).NotTo(BeNil())
+		Expect(*conf.Metadata.Name).To(Equal("url-server"))
+		Expect(conf.Spec).NotTo(BeNil())
+		Expect(conf.Spec.Memory).NotTo(BeNil())
+		Expect(*conf.Spec.Memory).To(Equal(2048))
 	})
 
 	It("returns an error when the URL responds with a non-200 status", func() {
 		server := httptest.NewServer(http.NotFoundHandler())
 		defer server.Close()
 
-		var conf config.Server
+		var conf api.Server
 		err := config.ReadYamlConfig(server.URL+"/missing.yaml", &conf)
 		Expect(err).To(HaveOccurred())
 	})
@@ -61,40 +68,24 @@ var _ = Describe("ReadYamlConfig", func() {
 		}))
 		defer server.Close()
 
-		var conf config.Server
+		var conf api.Server
 		err := config.ReadYamlConfig(server.URL, &conf)
 		Expect(err).To(HaveOccurred())
-	})
-
-	It("reads metadata.comment from a YAML config", func() {
-		tmpDir := GinkgoT().TempDir()
-		configPath := filepath.Join(tmpDir, "server-metadata.yaml")
-		content := "name: metadata-server\nmetadata:\n  comment: created-from-metadata\n"
-
-		err := os.WriteFile(configPath, []byte(content), 0o600)
-		Expect(err).NotTo(HaveOccurred())
-
-		var conf config.Server
-		err = config.ReadYamlConfig(configPath, &conf)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(conf.Metadata).NotTo(BeNil())
-		Expect(conf.Metadata.Comment).NotTo(BeNil())
-		Expect(*conf.Metadata.Comment).To(Equal("created-from-metadata"))
 	})
 
 	It("reads Metadata.comment from a YAML config", func() {
 		tmpDir := GinkgoT().TempDir()
 		configPath := filepath.Join(tmpDir, "server-Metadata.yaml")
-		content := "name: metadata-server\nMetadata:\n  comment: created-from-Metadata\n"
+		content := "Metadata:\n  name: metadata-server\n  comment: created-from-Metadata\n"
 
 		err := os.WriteFile(configPath, []byte(content), 0o600)
 		Expect(err).NotTo(HaveOccurred())
 
-		var conf config.Server
+		var conf api.Server
 		err = config.ReadYamlConfig(configPath, &conf)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(conf.MetadataLegacy).NotTo(BeNil())
-		Expect(conf.MetadataLegacy.Comment).NotTo(BeNil())
-		Expect(*conf.MetadataLegacy.Comment).To(Equal("created-from-Metadata"))
+		Expect(conf.Metadata).NotTo(BeNil())
+		Expect(conf.Metadata.Comment).NotTo(BeNil())
+		Expect(*conf.Metadata.Comment).To(Equal("created-from-Metadata"))
 	})
 })
