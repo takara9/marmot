@@ -452,9 +452,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 		var imageID string
 		It("OSイメージの登録", func() {
-			url := "http://hmc/ubuntu-22.04-server-cloudimg-amd64.img"
-			imageName := "ubuntu22.04"
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "image", "create", imageName, url, "--output", "json")
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/config_marmot.conf", "image", "create", "--configfile", "testdata/test-image-01-ubuntu22.yaml", "--output", "json")
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println(string(stdoutStderr))
