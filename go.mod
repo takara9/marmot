@@ -16,7 +16,6 @@ require (
 require github.com/mattn/go-isatty v0.0.20 // indirect
 
 require (
-	github.com/jinzhu/copier v0.4.0
 	github.com/miekg/dns v1.1.72
 	github.com/spf13/cobra v1.10.2
 	github.com/takara9/lvm v0.0.0-20260321023221-187aa1e599b9

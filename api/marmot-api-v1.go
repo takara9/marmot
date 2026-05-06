@@ -50,181 +50,181 @@ func (e VirtualNetworkSpecPeerPolicy) Valid() bool {
 
 // Auth defines model for Auth.
 type Auth struct {
-	PublicKey    *string `json:"publicKey,omitempty"`
-	RootPassword *string `json:"rootPassword,omitempty"`
-	Url          *string `json:"url,omitempty"`
-	User         *string `json:"user,omitempty"`
+	PublicKey    *string `json:"publicKey,omitempty" yaml:"publicKey,omitempty"`
+	RootPassword *string `json:"rootPassword,omitempty" yaml:"rootPassword,omitempty"`
+	Url          *string `json:"url,omitempty" yaml:"url,omitempty"`
+	User         *string `json:"user,omitempty" yaml:"user,omitempty"`
 }
 
 // Error defines model for Error.
 type Error struct {
-	Code    int32  `json:"code"`
-	Message string `json:"message"`
+	Code    int32  `json:"code" yaml:"code"`
+	Message string `json:"message" yaml:"message"`
 }
 
 // HostAllocation defines model for HostAllocation.
 type HostAllocation struct {
-	AllocatedCpuCores *int `json:"allocatedCpuCores,omitempty"`
-	AllocatedMemoryMB *int `json:"allocatedMemoryMB,omitempty"`
-	RunningVMs        *int `json:"runningVMs,omitempty"`
-	StoppedVMs        *int `json:"stoppedVMs,omitempty"`
-	TotalVMs          *int `json:"totalVMs,omitempty"`
-	VirtualNetworks   *int `json:"virtualNetworks,omitempty"`
+	AllocatedCpuCores *int `json:"allocatedCpuCores,omitempty" yaml:"allocatedCpuCores,omitempty"`
+	AllocatedMemoryMB *int `json:"allocatedMemoryMB,omitempty" yaml:"allocatedMemoryMB,omitempty"`
+	RunningVMs        *int `json:"runningVMs,omitempty" yaml:"runningVMs,omitempty"`
+	StoppedVMs        *int `json:"stoppedVMs,omitempty" yaml:"stoppedVMs,omitempty"`
+	TotalVMs          *int `json:"totalVMs,omitempty" yaml:"totalVMs,omitempty"`
+	VirtualNetworks   *int `json:"virtualNetworks,omitempty" yaml:"virtualNetworks,omitempty"`
 }
 
 // HostCapacity defines model for HostCapacity.
 type HostCapacity struct {
-	CpuCores          *int      `json:"cpuCores,omitempty"`
-	DiskCapacityGB    *int      `json:"diskCapacityGB,omitempty"`
-	DiskCount         *int      `json:"diskCount,omitempty"`
-	MemoryMB          *int      `json:"memoryMB,omitempty"`
-	NetworkInterfaces *[]string `json:"networkInterfaces,omitempty"`
+	CpuCores          *int      `json:"cpuCores,omitempty" yaml:"cpuCores,omitempty"`
+	DiskCapacityGB    *int      `json:"diskCapacityGB,omitempty" yaml:"diskCapacityGB,omitempty"`
+	DiskCount         *int      `json:"diskCount,omitempty" yaml:"diskCount,omitempty"`
+	MemoryMB          *int      `json:"memoryMB,omitempty" yaml:"memoryMB,omitempty"`
+	NetworkInterfaces *[]string `json:"networkInterfaces,omitempty" yaml:"networkInterfaces,omitempty"`
 }
 
 // HostStatus defines model for HostStatus.
 type HostStatus struct {
-	Allocation  *HostAllocation `json:"Allocation,omitempty"`
-	Capacity    *HostCapacity   `json:"Capacity,omitempty"`
-	HostId      *string         `json:"hostId,omitempty"`
-	InitiatorId *string         `json:"initiatorId,omitempty"`
-	IpAddress   *string         `json:"ipAddress,omitempty"`
-	IscsiServer *bool           `json:"iscsiServer,omitempty"`
-	LastUpdated *time.Time      `json:"lastUpdated,omitempty"`
-	NodeName    *string         `json:"nodeName,omitempty"`
+	Allocation  *HostAllocation `json:"Allocation,omitempty" yaml:"Allocation,omitempty"`
+	Capacity    *HostCapacity   `json:"Capacity,omitempty" yaml:"Capacity,omitempty"`
+	HostId      *string         `json:"hostId,omitempty" yaml:"hostId,omitempty"`
+	InitiatorId *string         `json:"initiatorId,omitempty" yaml:"initiatorId,omitempty"`
+	IpAddress   *string         `json:"ipAddress,omitempty" yaml:"ipAddress,omitempty"`
+	IscsiServer *bool           `json:"iscsiServer,omitempty" yaml:"iscsiServer,omitempty"`
+	LastUpdated *time.Time      `json:"lastUpdated,omitempty" yaml:"lastUpdated,omitempty"`
+	NodeName    *string         `json:"nodeName,omitempty" yaml:"nodeName,omitempty"`
 }
 
 // IPAddress defines model for IPAddress.
 type IPAddress struct {
-	HostId    *string `json:"HostId,omitempty"`
-	IPAddress *string `json:"IPAddress,omitempty"`
-	Netmask   *string `json:"Netmask,omitempty"`
-	NetworkId *string `json:"NetworkId,omitempty"`
+	HostId    *string `json:"HostId,omitempty" yaml:"HostId,omitempty"`
+	IPAddress *string `json:"IPAddress,omitempty" yaml:"IPAddress,omitempty"`
+	Netmask   *string `json:"Netmask,omitempty" yaml:"Netmask,omitempty"`
+	NetworkId *string `json:"NetworkId,omitempty" yaml:"NetworkId,omitempty"`
 }
 
 // IPNetwork defines model for IPNetwork.
 type IPNetwork struct {
-	AddressMaskLen   *string `json:"AddressMaskLen,omitempty"`
-	EndAddress       *string `json:"EndAddress,omitempty"`
-	Gateway          *string `json:"Gateway,omitempty"`
-	Id               string  `json:"Id"`
-	Netmask          *string `json:"Netmask,omitempty"`
-	Netmasklen       *int    `json:"Netmasklen,omitempty"`
-	NetworkAddress   *string `json:"NetworkAddress,omitempty"`
-	StartAddress     *string `json:"StartAddress,omitempty"`
-	VirtualNetworkId *string `json:"virtualNetworkId,omitempty"`
+	AddressMaskLen   *string `json:"AddressMaskLen,omitempty" yaml:"AddressMaskLen,omitempty"`
+	EndAddress       *string `json:"EndAddress,omitempty" yaml:"EndAddress,omitempty"`
+	Gateway          *string `json:"Gateway,omitempty" yaml:"Gateway,omitempty"`
+	Id               string  `json:"Id" yaml:"Id"`
+	Netmask          *string `json:"Netmask,omitempty" yaml:"Netmask,omitempty"`
+	Netmasklen       *int    `json:"Netmasklen,omitempty" yaml:"Netmasklen,omitempty"`
+	NetworkAddress   *string `json:"NetworkAddress,omitempty" yaml:"NetworkAddress,omitempty"`
+	StartAddress     *string `json:"StartAddress,omitempty" yaml:"StartAddress,omitempty"`
+	VirtualNetworkId *string `json:"virtualNetworkId,omitempty" yaml:"virtualNetworkId,omitempty"`
 }
 
 // Image defines model for Image.
 type Image struct {
-	Metadata *Metadata  `json:"Metadata,omitempty"`
-	Spec     *ImageSpec `json:"Spec,omitempty"`
-	Status   *Status    `json:"Status,omitempty"`
-	Id       string     `json:"id"`
+	Metadata *Metadata  `json:"Metadata,omitempty" yaml:"Metadata,omitempty"`
+	Spec     *ImageSpec `json:"Spec,omitempty" yaml:"Spec,omitempty"`
+	Status   *Status    `json:"Status,omitempty" yaml:"Status,omitempty"`
+	Id       string     `json:"id" yaml:"id"`
 }
 
 // ImageSpec defines model for ImageSpec.
 type ImageSpec struct {
-	Kind          *string `json:"kind,omitempty"`
-	LogicalVolume *string `json:"logicalVolume,omitempty"`
-	LvPath        *string `json:"lvPath,omitempty"`
-	Qcow2Path     *string `json:"qcow2Path,omitempty"`
-	Size          *int    `json:"size,omitempty"`
-	SourceUrl     *string `json:"source_url,omitempty"`
-	Type          *string `json:"type,omitempty"`
-	VolumeGroup   *string `json:"volumeGroup,omitempty"`
+	Kind          *string `json:"kind,omitempty" yaml:"kind,omitempty"`
+	LogicalVolume *string `json:"logicalVolume,omitempty" yaml:"logicalVolume,omitempty"`
+	LvPath        *string `json:"lvPath,omitempty" yaml:"lvPath,omitempty"`
+	Qcow2Path     *string `json:"qcow2Path,omitempty" yaml:"qcow2Path,omitempty"`
+	Size          *int    `json:"size,omitempty" yaml:"size,omitempty"`
+	SourceUrl     *string `json:"source_url,omitempty" yaml:"source_url,omitempty"`
+	Type          *string `json:"type,omitempty" yaml:"type,omitempty"`
+	VolumeGroup   *string `json:"volumeGroup,omitempty" yaml:"volumeGroup,omitempty"`
 }
 
 // Job defines model for Job.
 type Job struct {
-	Metadata *Metadata `json:"Metadata,omitempty"`
-	Spec     *JobSpec  `json:"Spec,omitempty"`
-	Status   *Status   `json:"Status,omitempty"`
-	Id       string    `json:"id"`
+	Metadata *Metadata `json:"Metadata,omitempty" yaml:"Metadata,omitempty"`
+	Spec     *JobSpec  `json:"Spec,omitempty" yaml:"Spec,omitempty"`
+	Status   *Status   `json:"Status,omitempty" yaml:"Status,omitempty"`
+	Id       string    `json:"id" yaml:"id"`
 }
 
 // JobSpec defines model for JobSpec.
 type JobSpec struct {
-	Command     *[]string  `json:"Command,omitempty"`
-	ExitCode    *int       `json:"ExitCode,omitempty"`
-	FinishTime  *time.Time `json:"FinishTime,omitempty"`
-	MaxTime     *time.Time `json:"MaxTime,omitempty"`
-	RequestTime *time.Time `json:"RequestTime,omitempty"`
-	StartTime   *time.Time `json:"StartTime,omitempty"`
+	Command     *[]string  `json:"Command,omitempty" yaml:"Command,omitempty"`
+	ExitCode    *int       `json:"ExitCode,omitempty" yaml:"ExitCode,omitempty"`
+	FinishTime  *time.Time `json:"FinishTime,omitempty" yaml:"FinishTime,omitempty"`
+	MaxTime     *time.Time `json:"MaxTime,omitempty" yaml:"MaxTime,omitempty"`
+	RequestTime *time.Time `json:"RequestTime,omitempty" yaml:"RequestTime,omitempty"`
+	StartTime   *time.Time `json:"StartTime,omitempty" yaml:"StartTime,omitempty"`
 }
 
 // Metadata defines model for Metadata.
 type Metadata struct {
-	Comment      *string                 `json:"comment,omitempty"`
-	Id           *string                 `json:"id,omitempty"`
-	InstanceName *string                 `json:"instanceName,omitempty"`
-	Key          *string                 `json:"key,omitempty"`
-	Labels       *map[string]interface{} `json:"labels,omitempty"`
-	Name         *string                 `json:"name,omitempty"`
-	NodeName     *string                 `json:"nodeName,omitempty"`
-	Uuid         *string                 `json:"uuid,omitempty"`
+	Comment      *string                 `json:"comment,omitempty" yaml:"comment,omitempty"`
+	Id           *string                 `json:"id,omitempty" yaml:"id,omitempty"`
+	InstanceName *string                 `json:"instanceName,omitempty" yaml:"instanceName,omitempty"`
+	Key          *string                 `json:"key,omitempty" yaml:"key,omitempty"`
+	Labels       *map[string]interface{} `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name         *string                 `json:"name,omitempty" yaml:"name,omitempty"`
+	NodeName     *string                 `json:"nodeName,omitempty" yaml:"nodeName,omitempty"`
+	Uuid         *string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 
 // Nameservers defines model for Nameservers.
 type Nameservers struct {
-	Addresses *[]string `json:"addresses,omitempty"`
-	Search    *[]string `json:"search,omitempty"`
+	Addresses *[]string `json:"addresses,omitempty" yaml:"addresses,omitempty"`
+	Search    *[]string `json:"search,omitempty" yaml:"search,omitempty"`
 }
 
 // NetworkInterface defines model for NetworkInterface.
 type NetworkInterface struct {
-	Address     *string      `json:"address,omitempty"`
-	Dhcp4       *bool        `json:"dhcp4,omitempty"`
-	Dhcp6       *bool        `json:"dhcp6,omitempty"`
-	Ethernet    *string      `json:"ethernet,omitempty"`
-	IpGateway   *string      `json:"ipGateway,omitempty"`
-	IpNetworkId *string      `json:"ipNetworkId,omitempty"`
-	Mac         *string      `json:"mac,omitempty"`
-	Nameservers *Nameservers `json:"nameservers,omitempty"`
-	Netmask     *string      `json:"netmask,omitempty"`
-	Netmasklen  *int         `json:"netmasklen,omitempty"`
-	Networkid   string       `json:"networkid"`
-	Networkname string       `json:"networkname"`
-	Portgroup   *string      `json:"portgroup,omitempty"`
-	Routes      *[]Route     `json:"routes,omitempty"`
-	Uuid        *string      `json:"uuid,omitempty"`
-	Vlans       *[]uint      `json:"vlans,omitempty"`
+	Address     *string      `json:"address,omitempty" yaml:"address,omitempty"`
+	Dhcp4       *bool        `json:"dhcp4,omitempty" yaml:"dhcp4,omitempty"`
+	Dhcp6       *bool        `json:"dhcp6,omitempty" yaml:"dhcp6,omitempty"`
+	Ethernet    *string      `json:"ethernet,omitempty" yaml:"ethernet,omitempty"`
+	IpGateway   *string      `json:"ipGateway,omitempty" yaml:"ipGateway,omitempty"`
+	IpNetworkId *string      `json:"ipNetworkId,omitempty" yaml:"ipNetworkId,omitempty"`
+	Mac         *string      `json:"mac,omitempty" yaml:"mac,omitempty"`
+	Nameservers *Nameservers `json:"nameservers,omitempty" yaml:"nameservers,omitempty"`
+	Netmask     *string      `json:"netmask,omitempty" yaml:"netmask,omitempty"`
+	Netmasklen  *int         `json:"netmasklen,omitempty" yaml:"netmasklen,omitempty"`
+	Networkid   string       `json:"networkid" yaml:"networkid"`
+	Networkname string       `json:"networkname" yaml:"networkname"`
+	Portgroup   *string      `json:"portgroup,omitempty" yaml:"portgroup,omitempty"`
+	Routes      *[]Route     `json:"routes,omitempty" yaml:"routes,omitempty"`
+	Uuid        *string      `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Vlans       *[]uint      `json:"vlans,omitempty" yaml:"vlans,omitempty"`
 }
 
 // Pong defines model for Pong.
 type Pong struct {
-	Ping string `json:"ping"`
+	Ping string `json:"ping" yaml:"ping"`
 }
 
 // ReplyMessage defines model for ReplyMessage.
 type ReplyMessage struct {
-	Message string `json:"message"`
+	Message string `json:"message" yaml:"message"`
 }
 
 // Route defines model for Route.
 type Route struct {
-	To  *string `json:"to,omitempty"`
-	Via *string `json:"via,omitempty"`
+	To  *string `json:"to,omitempty" yaml:"to,omitempty"`
+	Via *string `json:"via,omitempty" yaml:"via,omitempty"`
 }
 
 // Server defines model for Server.
 type Server struct {
-	Metadata *Metadata   `json:"Metadata,omitempty"`
-	Spec     *ServerSpec `json:"Spec,omitempty"`
-	Status   *Status     `json:"Status,omitempty"`
-	Id       string      `json:"id"`
+	Metadata *Metadata   `json:"Metadata,omitempty" yaml:"Metadata,omitempty"`
+	Spec     *ServerSpec `json:"Spec,omitempty" yaml:"Spec,omitempty"`
+	Status   *Status     `json:"Status,omitempty" yaml:"Status,omitempty"`
+	Id       string      `json:"id" yaml:"id"`
 }
 
 // ServerSpec defines model for ServerSpec.
 type ServerSpec struct {
-	NetworkInterface *[]NetworkInterface `json:"NetworkInterface,omitempty"`
-	Storage          *[]Volume           `json:"Storage,omitempty"`
-	Auth             *Auth               `json:"auth,omitempty"`
-	BootVolume       *Volume             `json:"bootVolume,omitempty"`
-	Cpu              *int                `json:"cpu,omitempty"`
-	Memory           *int                `json:"memory,omitempty"`
-	OsLv             *string             `json:"osLv,omitempty"`
-	OsVariant        *string             `json:"osVariant,omitempty"`
-	OsVg             *string             `json:"osVg,omitempty"`
+	NetworkInterface *[]NetworkInterface `json:"NetworkInterface,omitempty" yaml:"NetworkInterface,omitempty"`
+	Storage          *[]Volume           `json:"Storage,omitempty" yaml:"Storage,omitempty"`
+	Auth             *Auth               `json:"auth,omitempty" yaml:"auth,omitempty"`
+	BootVolume       *Volume             `json:"bootVolume,omitempty" yaml:"bootVolume,omitempty"`
+	Cpu              *int                `json:"cpu,omitempty" yaml:"cpu,omitempty"`
+	Memory           *int                `json:"memory,omitempty" yaml:"memory,omitempty"`
+	OsLv             *string             `json:"osLv,omitempty" yaml:"osLv,omitempty"`
+	OsVariant        *string             `json:"osVariant,omitempty" yaml:"osVariant,omitempty"`
+	OsVg             *string             `json:"osVg,omitempty" yaml:"osVg,omitempty"`
 }
 
 // Servers defines model for Servers.
@@ -232,60 +232,60 @@ type Servers = []Server
 
 // Status defines model for Status.
 type Status struct {
-	CreationTimeStamp   *time.Time `json:"creationTimeStamp,omitempty"`
-	DeletionTimeStamp   *time.Time `json:"deletionTimeStamp,omitempty"`
-	LastUpdateTimeStamp *time.Time `json:"lastUpdateTimeStamp,omitempty"`
-	Message             *string    `json:"message,omitempty"`
-	Status              *string    `json:"status,omitempty"`
-	StatusCode          int        `json:"statusCode"`
+	CreationTimeStamp   *time.Time `json:"creationTimeStamp,omitempty" yaml:"creationTimeStamp,omitempty"`
+	DeletionTimeStamp   *time.Time `json:"deletionTimeStamp,omitempty" yaml:"deletionTimeStamp,omitempty"`
+	LastUpdateTimeStamp *time.Time `json:"lastUpdateTimeStamp,omitempty" yaml:"lastUpdateTimeStamp,omitempty"`
+	Message             *string    `json:"message,omitempty" yaml:"message,omitempty"`
+	Status              *string    `json:"status,omitempty" yaml:"status,omitempty"`
+	StatusCode          int        `json:"statusCode" yaml:"statusCode"`
 }
 
 // Success defines model for Success.
 type Success struct {
-	Id      string  `json:"id"`
-	Message *string `json:"message,omitempty"`
+	Id      string  `json:"id" yaml:"id"`
+	Message *string `json:"message,omitempty" yaml:"message,omitempty"`
 }
 
 // Version defines model for Version.
 type Version struct {
-	ClientVersion string  `json:"clientVersion"`
-	ServerVersion *string `json:"serverVersion,omitempty"`
+	ClientVersion string  `json:"clientVersion" yaml:"clientVersion"`
+	ServerVersion *string `json:"serverVersion,omitempty" yaml:"serverVersion,omitempty"`
 }
 
 // VirtualNetwork defines model for VirtualNetwork.
 type VirtualNetwork struct {
-	Metadata *Metadata           `json:"Metadata,omitempty"`
-	Spec     *VirtualNetworkSpec `json:"Spec,omitempty"`
-	Status   *Status             `json:"Status,omitempty"`
-	Id       string              `json:"id"`
+	Metadata *Metadata           `json:"Metadata,omitempty" yaml:"Metadata,omitempty"`
+	Spec     *VirtualNetworkSpec `json:"Spec,omitempty" yaml:"Spec,omitempty"`
+	Status   *Status             `json:"Status,omitempty" yaml:"Status,omitempty"`
+	Id       string              `json:"id" yaml:"id"`
 }
 
 // VirtualNetworkSpec defines model for VirtualNetworkSpec.
 type VirtualNetworkSpec struct {
-	BridgeName       *string `json:"bridgeName,omitempty"`
-	Dhcp             *bool   `json:"dhcp,omitempty"`
-	DhcpEndAddress   *string `json:"dhcpEndAddress,omitempty"`
-	DhcpStartAddress *string `json:"dhcpStartAddress,omitempty"`
-	ForwardMode      *string `json:"forwardMode,omitempty"`
-	IPNetworkAddress *string `json:"iPNetworkAddress,omitempty"`
-	IpAddress        *string `json:"ipAddress,omitempty"`
-	IpNetworkId      *string `json:"ipNetworkId,omitempty"`
-	MacAddress       *string `json:"macAddress,omitempty"`
-	Nat              *bool   `json:"nat,omitempty"`
-	Netmask          *string `json:"netmask,omitempty"`
+	BridgeName       *string `json:"bridgeName,omitempty" yaml:"bridgeName,omitempty"`
+	Dhcp             *bool   `json:"dhcp,omitempty" yaml:"dhcp,omitempty"`
+	DhcpEndAddress   *string `json:"dhcpEndAddress,omitempty" yaml:"dhcpEndAddress,omitempty"`
+	DhcpStartAddress *string `json:"dhcpStartAddress,omitempty" yaml:"dhcpStartAddress,omitempty"`
+	ForwardMode      *string `json:"forwardMode,omitempty" yaml:"forwardMode,omitempty"`
+	IPNetworkAddress *string `json:"iPNetworkAddress,omitempty" yaml:"iPNetworkAddress,omitempty"`
+	IpAddress        *string `json:"ipAddress,omitempty" yaml:"ipAddress,omitempty"`
+	IpNetworkId      *string `json:"ipNetworkId,omitempty" yaml:"ipNetworkId,omitempty"`
+	MacAddress       *string `json:"macAddress,omitempty" yaml:"macAddress,omitempty"`
+	Nat              *bool   `json:"nat,omitempty" yaml:"nat,omitempty"`
+	Netmask          *string `json:"netmask,omitempty" yaml:"netmask,omitempty"`
 
 	// OverlayMode Overlay mode for multi-node networks: 'none' (default) or 'vxlan'
-	OverlayMode *VirtualNetworkSpecOverlayMode `json:"overlayMode,omitempty"`
+	OverlayMode *VirtualNetworkSpecOverlayMode `json:"overlayMode,omitempty" yaml:"overlayMode,omitempty"`
 
 	// PeerPolicy Policy for VXLAN peer management: 'auto' (full-mesh) or 'manual'
-	PeerPolicy *VirtualNetworkSpecPeerPolicy `json:"peerPolicy,omitempty"`
-	Stp        *bool                         `json:"stp,omitempty"`
+	PeerPolicy *VirtualNetworkSpecPeerPolicy `json:"peerPolicy,omitempty" yaml:"peerPolicy,omitempty"`
+	Stp        *bool                         `json:"stp,omitempty" yaml:"stp,omitempty"`
 
 	// UnderlayInterface Interface name for underlay network
-	UnderlayInterface *string `json:"underlayInterface,omitempty"`
+	UnderlayInterface *string `json:"underlayInterface,omitempty" yaml:"underlayInterface,omitempty"`
 
 	// Vni VXLAN Network Identifier (0-16777215)
-	Vni *int `json:"vni,omitempty"`
+	Vni *int `json:"vni,omitempty" yaml:"vni,omitempty"`
 }
 
 // VirtualNetworkSpecOverlayMode Overlay mode for multi-node networks: 'none' (default) or 'vxlan'
@@ -296,24 +296,24 @@ type VirtualNetworkSpecPeerPolicy string
 
 // VolSpec defines model for VolSpec.
 type VolSpec struct {
-	Iscsi          *bool   `json:"iscsi,omitempty"`
-	IscsiTargetIqn *string `json:"iscsiTargetIqn,omitempty"`
-	Kind           *string `json:"kind,omitempty"`
-	LogicalVolume  *string `json:"logicalVolume,omitempty"`
-	OsVariant      *string `json:"osVariant,omitempty"`
-	Path           *string `json:"path,omitempty"`
-	Persistent     *bool   `json:"persistent,omitempty"`
-	Size           *int    `json:"size,omitempty"`
-	Type           *string `json:"type,omitempty"`
-	VolumeGroup    *string `json:"volumeGroup,omitempty"`
+	Iscsi          *bool   `json:"iscsi,omitempty" yaml:"iscsi,omitempty"`
+	IscsiTargetIqn *string `json:"iscsiTargetIqn,omitempty" yaml:"iscsiTargetIqn,omitempty"`
+	Kind           *string `json:"kind,omitempty" yaml:"kind,omitempty"`
+	LogicalVolume  *string `json:"logicalVolume,omitempty" yaml:"logicalVolume,omitempty"`
+	OsVariant      *string `json:"osVariant,omitempty" yaml:"osVariant,omitempty"`
+	Path           *string `json:"path,omitempty" yaml:"path,omitempty"`
+	Persistent     *bool   `json:"persistent,omitempty" yaml:"persistent,omitempty"`
+	Size           *int    `json:"size,omitempty" yaml:"size,omitempty"`
+	Type           *string `json:"type,omitempty" yaml:"type,omitempty"`
+	VolumeGroup    *string `json:"volumeGroup,omitempty" yaml:"volumeGroup,omitempty"`
 }
 
 // Volume defines model for Volume.
 type Volume struct {
-	Metadata *Metadata `json:"Metadata,omitempty"`
-	Spec     *VolSpec  `json:"Spec,omitempty"`
-	Status   *Status   `json:"Status,omitempty"`
-	Id       string    `json:"id"`
+	Metadata *Metadata `json:"Metadata,omitempty" yaml:"Metadata,omitempty"`
+	Spec     *VolSpec  `json:"Spec,omitempty" yaml:"Spec,omitempty"`
+	Status   *Status   `json:"Status,omitempty" yaml:"Status,omitempty"`
+	Id       string    `json:"id" yaml:"id"`
 }
 
 // ApiCreateImageJSONRequestBody defines body for ApiCreateImage for application/json ContentType.

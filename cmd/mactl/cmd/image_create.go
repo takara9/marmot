@@ -7,32 +7,35 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/util"
+	"github.com/takara9/marmot/pkg/config"
 	"go.yaml.in/yaml/v3"
 )
 
 var imageCreateCmd = &cobra.Command{
-	Use:   "create [Image Name] [QCOW2 Image URL]",
+	Use:   "create -f FILE.yaml",
 	Short: "Create a new OS template image",
-	Args:  cobra.MinimumNArgs(2), // 引数が1つ必要
+	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cmd.SilenceUsage = true
 		m, err := getClientConfig()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Failed to get API client config:", err)
 			os.Exit(1)
 		}
 
-		if len(args) != 2 {
-			fmt.Fprintln(cmd.ErrOrStderr(), "Usage: mactl image create [Image Name] [QCOW2 Image URL]")
-			return fmt.Errorf("invalid number of arguments")
-		}
 		var image api.Image
-		var spec api.ImageSpec
-		var meta api.Metadata
-		image.Spec = &spec
-		image.Metadata = &meta
-		image.Metadata.Name = util.StringPtr(args[0])
-		image.Spec.SourceUrl = util.StringPtr(args[1])
+		err = config.ReadYamlConfig(configFilename, &image)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+
+		if image.Metadata == nil || image.Metadata.Name == nil || *image.Metadata.Name == "" {
+			return fmt.Errorf("Metadata.name is required in the configuration")
+		}
+		if image.Spec == nil || image.Spec.SourceUrl == nil || *image.Spec.SourceUrl == "" {
+			return fmt.Errorf("Spec.source_url is required in the configuration")
+		}
 
 		byteBody, _, err := m.CreateImage(image)
 		if err != nil {
@@ -78,4 +81,6 @@ var imageCreateCmd = &cobra.Command{
 
 func init() {
 	imageCmd.AddCommand(imageCreateCmd)
+	imageCreateCmd.Flags().StringVarP(&configFilename, "configfile", "f", "", "Configuration file or raw URL for the image")
+	imageCreateCmd.MarkFlagRequired("configfile")
 }

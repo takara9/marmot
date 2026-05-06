@@ -1,19 +1,23 @@
-name: test-server-07
-cpu: 1 
-memory: 1024
-comment: "This is a minimum configuration"
-network:
-  - name: "host-bridge"
-    address: "192.168.1.37"
-    netmask: "24"
-    routes:
-    - destination: "default"
-      gateway: "192.168.1.1"
-    nameservers:
-      addresses:
-      - 192.168.1.9
-      - 8.8.8.8
-      - 8.8.4.4
-      search:
-      - labo.local
-      - lab.local
+apiVersion: v1
+kind: Server
+Metadata:
+  name: test-server-07
+  comment: "This is a minimum configuration"
+Spec:
+  cpu: 1
+  memory: 1024
+  NetworkInterface:
+    - networkname: "host-bridge"
+      address: "192.168.1.37"
+      netmasklen: 24
+      routes:
+        - to: "default"
+          via: "192.168.1.1"
+      nameservers:
+        addresses:
+          - 192.168.1.9
+          - 8.8.8.8
+          - 8.8.4.4
+        search:
+          - labo.local
+          - lab.local

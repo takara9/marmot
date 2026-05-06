@@ -1,10 +1,14 @@
-name: test-server-30
-cpu: 1 
-memory: 1024
-os_variant: ubuntu22.04
-comment: "This is a minimum configuration"
-network:
-  - name: "test-net-2"
-  - name: "test-net-1"
-  - name: "default"
+apiVersion: v1
+kind: Server
+Metadata:
+  name: test-server-30
+  comment: "This is a minimum configuration"
+Spec:
+  cpu: 1
+  memory: 1024
+  osVariant: ubuntu22.04
+  NetworkInterface:
+    - networkname: "test-net-2"
+    - networkname: "test-net-1"
+    - networkname: "default"
 

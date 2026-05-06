@@ -1,21 +1,25 @@
-name: test-server-32
-cpu: 1 
-memory: 1024
-os_variant: ubuntu22.04
-comment: "This is a minimum configuration"
-network:
-  - name: "host-bridge"
-    address: "192.168.1.98"
-    netmask: "24"
-    routes:
-    - destination: "default"
-      gateway: "192.168.1.1"
-    nameservers:
-      addresses:
-      - 192.168.1.9
-      - 8.8.8.8
-      - 8.8.4.4
-      search:
-      - labo.local
-      - lab.local
-  - name: "test-net-1"
+apiVersion: v1
+kind: Server
+Metadata:
+  name: test-server-32
+  comment: "This is a minimum configuration"
+Spec:
+  cpu: 1
+  memory: 1024
+  osVariant: ubuntu22.04
+  NetworkInterface:
+    - networkname: "host-bridge"
+      address: "192.168.1.98"
+      netmasklen: 24
+      routes:
+        - to: "default"
+          via: "192.168.1.1"
+      nameservers:
+        addresses:
+          - 192.168.1.9
+          - 8.8.8.8
+          - 8.8.4.4
+        search:
+          - labo.local
+          - lab.local
+    - networkname: "test-net-1"

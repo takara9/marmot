@@ -1,6 +1,10 @@
-name: test-server-12
-cpu: 1 
-memory: 1024
-comment: "This is a minimum configuration"
-network:
-  - name: "test-net-2"
+apiVersion: v1
+kind: Server
+Metadata:
+  name: test-server-12
+  comment: "This is a minimum configuration"
+Spec:
+  cpu: 1
+  memory: 1024
+  NetworkInterface:
+    - networkname: "test-net-2"

@@ -8,23 +8,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/util"
 	"go.yaml.in/yaml/v3"
 )
-
-type volumeCreateConfig struct {
-	Name          string  `yaml:"name"`
-	Comment       *string `yaml:"comment,omitempty"`
-	Type          *string `yaml:"type,omitempty"`
-	Kind          *string `yaml:"kind,omitempty"`
-	Iscsi         *bool   `yaml:"iscsi,omitempty"`
-	Size          *int    `yaml:"size,omitempty"`
-	OsVariant     *string `yaml:"os_variant,omitempty"`
-	LogicalVolume *string `yaml:"logical_volume,omitempty"`
-	Path          *string `yaml:"path,omitempty"`
-	Persistent    *bool   `yaml:"persistent,omitempty"`
-	VolumeGroup   *string `yaml:"volume_group,omitempty"`
-}
 
 var volumeCreateCmd = &cobra.Command{
 	Use:   "create -f FILE.yaml",
@@ -38,58 +23,24 @@ var volumeCreateCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		var conf volumeCreateConfig
+		var conf api.Volume
 		err = config.ReadYamlConfig(configFilename, &conf)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
 
-		if conf.Name == "" {
-			return fmt.Errorf("name is required in the configuration")
+		if conf.Metadata == nil || conf.Metadata.Name == nil || *conf.Metadata.Name == "" {
+			return fmt.Errorf("Metadata.name is required in the configuration")
 		}
-		if conf.Type == nil || *conf.Type == "" {
-			return fmt.Errorf("type is required in the configuration")
+		if conf.Spec == nil || conf.Spec.Type == nil || *conf.Spec.Type == "" {
+			return fmt.Errorf("Spec.type is required in the configuration")
 		}
-		if conf.Kind == nil || *conf.Kind == "" {
-			return fmt.Errorf("kind is required in the configuration")
-		}
-
-		var volume api.Volume = api.Volume{
-			Metadata: &api.Metadata{
-				Name: util.StringPtr(conf.Name),
-			},
-			Spec: &api.VolSpec{
-				Type: util.StringPtr(*conf.Type),
-				Kind: util.StringPtr(*conf.Kind),
-			},
-		}
-		if conf.Comment != nil {
-			volume.Metadata.Comment = util.StringPtr(*conf.Comment)
-		}
-		if conf.Size != nil {
-			volume.Spec.Size = util.IntPtrInt(*conf.Size)
-		}
-		if conf.Iscsi != nil {
-			volume.Spec.Iscsi = util.BoolPtr(*conf.Iscsi)
-		}
-		if conf.OsVariant != nil {
-			volume.Spec.OsVariant = util.StringPtr(*conf.OsVariant)
-		}
-		if conf.LogicalVolume != nil {
-			volume.Spec.LogicalVolume = util.StringPtr(*conf.LogicalVolume)
-		}
-		if conf.Path != nil {
-			volume.Spec.Path = util.StringPtr(*conf.Path)
-		}
-		if conf.Persistent != nil {
-			volume.Spec.Persistent = util.BoolPtr(*conf.Persistent)
-		}
-		if conf.VolumeGroup != nil {
-			volume.Spec.VolumeGroup = util.StringPtr(*conf.VolumeGroup)
+		if conf.Spec == nil || conf.Spec.Kind == nil || *conf.Spec.Kind == "" {
+			return fmt.Errorf("Spec.kind is required in the configuration")
 		}
 
-		byteBody, _, err := m.CreateVolume(volume)
+		byteBody, _, err := m.CreateVolume(conf)
 		if err != nil {
 			println("CreateVolume", "err", err)
 			return err

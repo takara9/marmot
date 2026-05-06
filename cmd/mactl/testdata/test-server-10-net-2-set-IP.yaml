@@ -1,11 +1,15 @@
-name: test-server-10
-cpu: 1 
-memory: 1024
-comment: "This is a minimum configuration"
-network:
-  - name: "test-net-2"
-    address: "192.168.100.38"
-    netmasklen: 25
-    routes:
-    - destination: "default"
-      gateway: "192.168.100.1"
+apiVersion: v1
+kind: Server
+Metadata:
+  name: test-server-10
+  comment: "This is a minimum configuration"
+Spec:
+  cpu: 1
+  memory: 1024
+  NetworkInterface:
+    - networkname: "test-net-2"
+      address: "192.168.100.38"
+      netmasklen: 25
+      routes:
+        - to: "default"
+          via: "192.168.100.1"

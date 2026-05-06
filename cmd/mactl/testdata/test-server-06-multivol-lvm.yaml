@@ -1,19 +1,29 @@
-name: test-server-06
-cpu: 2
-memory: 2048
-volume_type: qcow2
-os_variant: ubuntu22.04
-boot_volume:
-  type: lvm
-storage:
-  - name: "data-disk-1"
-    size: 10
-    type: lvm
-    comment: "data volume"
-  - name: "data-disk-2"
-    size: 10
-    type: lvm
-    comment: "backup volume"
-network:
-  - name: "host-bridge"
-comment: "This is a test server configuration"
+apiVersion: v1
+kind: Server
+Metadata:
+  name: test-server-06
+  comment: "This is a test server configuration"
+Spec:
+  cpu: 2
+  memory: 2048
+  osVariant: ubuntu22.04
+  bootVolume:
+    Spec:
+      type: lvm
+  NetworkInterface:
+    - networkname: "host-bridge"
+  Storage:
+    - Metadata:
+        name: "data-disk-1"
+        comment: "data volume"
+      Spec:
+        size: 10
+        type: lvm
+        kind: data
+    - Metadata:
+        name: "data-disk-2"
+        comment: "backup volume"
+      Spec:
+        size: 10
+        type: lvm
+        kind: data

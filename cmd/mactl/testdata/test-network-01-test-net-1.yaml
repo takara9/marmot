@@ -1,3 +1,5 @@
+apiVersion: v1
+kind: VirtualNetwork
 Metadata:
   name: test-net-1
 Spec:
