@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: Volume
-Metadata:
-  name: boot-volume1
-Spec:
-  type: qcow2
-  kind: os
-  osVariant: ubuntu22.04
+metadata:
+    name: boot-volume1
+spec:
+    type: qcow2
+    kind: os
+    osVariant: ubuntu22.04

@@ -5,11 +5,9 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/takara9/marmot/pkg/config"
 )
 
 var apiConfigFilename string
-var mactlConfig config.ClientConfig
 var clusterConfigFilename string
 var outputStyle string
 var watchMode bool

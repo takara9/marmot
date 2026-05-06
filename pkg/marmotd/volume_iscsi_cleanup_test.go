@@ -97,3 +97,32 @@ func TestCleanupISCSIForVolumeAllowsMissingResources(t *testing.T) {
 		t.Fatalf("cleanupISCSIForVolume() should ignore missing resources, but got error = %v", err)
 	}
 }
+
+func TestCleanupISCSIForVolumeAllowsMissingBackstoreMessage(t *testing.T) {
+	original := targetcliCommandOutput
+	defer func() { targetcliCommandOutput = original }()
+
+	targetcliCommandOutput = func(args ...string) ([]byte, error) {
+		if len(args) > 0 && args[0] == "saveconfig" {
+			return []byte("saved"), nil
+		}
+		if len(args) >= 2 && args[0] == "/backstores/block" && args[1] == "delete" {
+			return []byte("No storage object named disk-abcde."), errors.New("not found")
+		}
+		return []byte("ok"), nil
+	}
+
+	m := &Marmot{}
+	vol := api.Volume{
+		Id: "abcde",
+		Spec: &api.VolSpec{
+			Type:  util.StringPtr("lvm"),
+			Kind:  util.StringPtr("data"),
+			Iscsi: util.BoolPtr(true),
+		},
+	}
+
+	if err := m.cleanupISCSIForVolume(&vol); err != nil {
+		t.Fatalf("cleanupISCSIForVolume() should ignore missing backstore message, but got error = %v", err)
+	}
+}

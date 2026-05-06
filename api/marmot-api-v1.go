@@ -83,8 +83,8 @@ type HostCapacity struct {
 
 // HostStatus defines model for HostStatus.
 type HostStatus struct {
-	Allocation  *HostAllocation `json:"Allocation,omitempty" yaml:"Allocation,omitempty"`
-	Capacity    *HostCapacity   `json:"Capacity,omitempty" yaml:"Capacity,omitempty"`
+	Allocation  *HostAllocation `json:"allocation,omitempty" yaml:"allocation,omitempty"`
+	Capacity    *HostCapacity   `json:"capacity,omitempty" yaml:"capacity,omitempty"`
 	HostId      *string         `json:"hostId,omitempty" yaml:"hostId,omitempty"`
 	InitiatorId *string         `json:"initiatorId,omitempty" yaml:"initiatorId,omitempty"`
 	IpAddress   *string         `json:"ipAddress,omitempty" yaml:"ipAddress,omitempty"`
@@ -95,30 +95,30 @@ type HostStatus struct {
 
 // IPAddress defines model for IPAddress.
 type IPAddress struct {
-	HostId    *string `json:"HostId,omitempty" yaml:"HostId,omitempty"`
-	IPAddress *string `json:"IPAddress,omitempty" yaml:"IPAddress,omitempty"`
-	Netmask   *string `json:"Netmask,omitempty" yaml:"Netmask,omitempty"`
-	NetworkId *string `json:"NetworkId,omitempty" yaml:"NetworkId,omitempty"`
+	HostId    *string `json:"hostId,omitempty" yaml:"hostId,omitempty"`
+	IPAddress *string `json:"iPAddress,omitempty" yaml:"iPAddress,omitempty"`
+	Netmask   *string `json:"netmask,omitempty" yaml:"netmask,omitempty"`
+	NetworkId *string `json:"networkId,omitempty" yaml:"networkId,omitempty"`
 }
 
 // IPNetwork defines model for IPNetwork.
 type IPNetwork struct {
-	AddressMaskLen   *string `json:"AddressMaskLen,omitempty" yaml:"AddressMaskLen,omitempty"`
-	EndAddress       *string `json:"EndAddress,omitempty" yaml:"EndAddress,omitempty"`
-	Gateway          *string `json:"Gateway,omitempty" yaml:"Gateway,omitempty"`
-	Id               string  `json:"Id" yaml:"Id"`
-	Netmask          *string `json:"Netmask,omitempty" yaml:"Netmask,omitempty"`
-	Netmasklen       *int    `json:"Netmasklen,omitempty" yaml:"Netmasklen,omitempty"`
-	NetworkAddress   *string `json:"NetworkAddress,omitempty" yaml:"NetworkAddress,omitempty"`
-	StartAddress     *string `json:"StartAddress,omitempty" yaml:"StartAddress,omitempty"`
+	AddressMaskLen   *string `json:"addressMaskLen,omitempty" yaml:"addressMaskLen,omitempty"`
+	EndAddress       *string `json:"endAddress,omitempty" yaml:"endAddress,omitempty"`
+	Gateway          *string `json:"gateway,omitempty" yaml:"gateway,omitempty"`
+	Id               string  `json:"id" yaml:"id"`
+	Netmask          *string `json:"netmask,omitempty" yaml:"netmask,omitempty"`
+	Netmasklen       *int    `json:"netmasklen,omitempty" yaml:"netmasklen,omitempty"`
+	NetworkAddress   *string `json:"networkAddress,omitempty" yaml:"networkAddress,omitempty"`
+	StartAddress     *string `json:"startAddress,omitempty" yaml:"startAddress,omitempty"`
 	VirtualNetworkId *string `json:"virtualNetworkId,omitempty" yaml:"virtualNetworkId,omitempty"`
 }
 
 // Image defines model for Image.
 type Image struct {
-	Metadata *Metadata  `json:"Metadata,omitempty" yaml:"Metadata,omitempty"`
-	Spec     *ImageSpec `json:"Spec,omitempty" yaml:"Spec,omitempty"`
-	Status   *Status    `json:"Status,omitempty" yaml:"Status,omitempty"`
+	Metadata *Metadata  `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	Spec     *ImageSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
+	Status   *Status    `json:"status,omitempty" yaml:"status,omitempty"`
 	Id       string     `json:"id" yaml:"id"`
 }
 
@@ -129,27 +129,27 @@ type ImageSpec struct {
 	LvPath        *string `json:"lvPath,omitempty" yaml:"lvPath,omitempty"`
 	Qcow2Path     *string `json:"qcow2Path,omitempty" yaml:"qcow2Path,omitempty"`
 	Size          *int    `json:"size,omitempty" yaml:"size,omitempty"`
-	SourceUrl     *string `json:"source_url,omitempty" yaml:"source_url,omitempty"`
+	SourceUrl     *string `json:"sourceUrl,omitempty" yaml:"sourceUrl,omitempty"`
 	Type          *string `json:"type,omitempty" yaml:"type,omitempty"`
 	VolumeGroup   *string `json:"volumeGroup,omitempty" yaml:"volumeGroup,omitempty"`
 }
 
 // Job defines model for Job.
 type Job struct {
-	Metadata *Metadata `json:"Metadata,omitempty" yaml:"Metadata,omitempty"`
-	Spec     *JobSpec  `json:"Spec,omitempty" yaml:"Spec,omitempty"`
-	Status   *Status   `json:"Status,omitempty" yaml:"Status,omitempty"`
+	Metadata *Metadata `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	Spec     *JobSpec  `json:"spec,omitempty" yaml:"spec,omitempty"`
+	Status   *Status   `json:"status,omitempty" yaml:"status,omitempty"`
 	Id       string    `json:"id" yaml:"id"`
 }
 
 // JobSpec defines model for JobSpec.
 type JobSpec struct {
-	Command     *[]string  `json:"Command,omitempty" yaml:"Command,omitempty"`
-	ExitCode    *int       `json:"ExitCode,omitempty" yaml:"ExitCode,omitempty"`
-	FinishTime  *time.Time `json:"FinishTime,omitempty" yaml:"FinishTime,omitempty"`
-	MaxTime     *time.Time `json:"MaxTime,omitempty" yaml:"MaxTime,omitempty"`
-	RequestTime *time.Time `json:"RequestTime,omitempty" yaml:"RequestTime,omitempty"`
-	StartTime   *time.Time `json:"StartTime,omitempty" yaml:"StartTime,omitempty"`
+	Command     *[]string  `json:"command,omitempty" yaml:"command,omitempty"`
+	ExitCode    *int       `json:"exitCode,omitempty" yaml:"exitCode,omitempty"`
+	FinishTime  *time.Time `json:"finishTime,omitempty" yaml:"finishTime,omitempty"`
+	MaxTime     *time.Time `json:"maxTime,omitempty" yaml:"maxTime,omitempty"`
+	RequestTime *time.Time `json:"requestTime,omitempty" yaml:"requestTime,omitempty"`
+	StartTime   *time.Time `json:"startTime,omitempty" yaml:"startTime,omitempty"`
 }
 
 // Metadata defines model for Metadata.
@@ -208,16 +208,16 @@ type Route struct {
 
 // Server defines model for Server.
 type Server struct {
-	Metadata *Metadata   `json:"Metadata,omitempty" yaml:"Metadata,omitempty"`
-	Spec     *ServerSpec `json:"Spec,omitempty" yaml:"Spec,omitempty"`
-	Status   *Status     `json:"Status,omitempty" yaml:"Status,omitempty"`
+	Metadata *Metadata   `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	Spec     *ServerSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
+	Status   *Status     `json:"status,omitempty" yaml:"status,omitempty"`
 	Id       string      `json:"id" yaml:"id"`
 }
 
 // ServerSpec defines model for ServerSpec.
 type ServerSpec struct {
-	NetworkInterface *[]NetworkInterface `json:"NetworkInterface,omitempty" yaml:"NetworkInterface,omitempty"`
-	Storage          *[]Volume           `json:"Storage,omitempty" yaml:"Storage,omitempty"`
+	NetworkInterface *[]NetworkInterface `json:"networkInterface,omitempty" yaml:"networkInterface,omitempty"`
+	Storage          *[]Volume           `json:"storage,omitempty" yaml:"storage,omitempty"`
 	Auth             *Auth               `json:"auth,omitempty" yaml:"auth,omitempty"`
 	BootVolume       *Volume             `json:"bootVolume,omitempty" yaml:"bootVolume,omitempty"`
 	Cpu              *int                `json:"cpu,omitempty" yaml:"cpu,omitempty"`
@@ -254,9 +254,9 @@ type Version struct {
 
 // VirtualNetwork defines model for VirtualNetwork.
 type VirtualNetwork struct {
-	Metadata *Metadata           `json:"Metadata,omitempty" yaml:"Metadata,omitempty"`
-	Spec     *VirtualNetworkSpec `json:"Spec,omitempty" yaml:"Spec,omitempty"`
-	Status   *Status             `json:"Status,omitempty" yaml:"Status,omitempty"`
+	Metadata *Metadata           `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	Spec     *VirtualNetworkSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
+	Status   *Status             `json:"status,omitempty" yaml:"status,omitempty"`
 	Id       string              `json:"id" yaml:"id"`
 }
 
@@ -310,9 +310,9 @@ type VolSpec struct {
 
 // Volume defines model for Volume.
 type Volume struct {
-	Metadata *Metadata `json:"Metadata,omitempty" yaml:"Metadata,omitempty"`
-	Spec     *VolSpec  `json:"Spec,omitempty" yaml:"Spec,omitempty"`
-	Status   *Status   `json:"Status,omitempty" yaml:"Status,omitempty"`
+	Metadata *Metadata `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	Spec     *VolSpec  `json:"spec,omitempty" yaml:"spec,omitempty"`
+	Status   *Status   `json:"status,omitempty" yaml:"status,omitempty"`
 	Id       string    `json:"id" yaml:"id"`
 }
 

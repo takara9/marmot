@@ -3,6 +3,8 @@ package virt
 import (
 	"fmt"
 	"log/slog"
+	"os/exec"
+	"strings"
 	"time"
 
 	"libvirt.org/go/libvirt"
@@ -389,6 +391,11 @@ func (l *LibVirtEp) DefineAndStartVM(domain libvirtxml.Domain) error {
 
 	// Start VM
 	err = dom.Create()
+	if err != nil && isOVSPortAttachConflict(err) {
+		slog.Warn("domain start failed due to ovs port conflict, attempting stale-port cleanup and retry", "err", err)
+		cleanupStaleOVSPorts()
+		err = dom.Create()
+	}
 	if err != nil {
 		return err
 	}
@@ -401,6 +408,51 @@ func (l *LibVirtEp) DefineAndStartVM(domain libvirtxml.Domain) error {
 	defer dom.Free()
 
 	return nil
+}
+
+func isOVSPortAttachConflict(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "unable to add port") && strings.Contains(msg, "already attached to bridge")
+}
+
+func cleanupStaleOVSPorts() {
+	cmd := exec.Command("ovs-vsctl", "--format=csv", "--data=bare", "--no-headings", "--columns=name,error", "find", "Interface", "error!=\"\"")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.Warn("failed to list ovs interfaces with errors", "err", err, "output", strings.TrimSpace(string(out)))
+		return
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, ",", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		name := strings.TrimSpace(parts[0])
+		errText := strings.Trim(strings.TrimSpace(parts[1]), "\"")
+		if name == "" || errText == "" {
+			continue
+		}
+		if !strings.Contains(strings.ToLower(errText), "no such device") {
+			continue
+		}
+
+		delCmd := exec.Command("ovs-vsctl", "--if-exists", "del-port", name)
+		delOut, delErr := delCmd.CombinedOutput()
+		if delErr != nil {
+			slog.Warn("failed to remove stale ovs port", "port", name, "err", delErr, "output", strings.TrimSpace(string(delOut)))
+			continue
+		}
+		slog.Info("removed stale ovs port", "port", name, "reason", errText)
+	}
 }
 
 func (l *LibVirtEp) ListDomains() ([]string, error) {

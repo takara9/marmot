@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
 )
@@ -97,9 +98,19 @@ func (c *schedulerController) schedulerControllerLoop() {
 		if server.Status == nil || server.Status.StatusCode != db.SERVER_PENDING {
 			continue
 		}
-		// NodeName が既に設定済みの場合はスキップ
-		if server.Metadata != nil && server.Metadata.NodeName != nil &&
-			strings.TrimSpace(*server.Metadata.NodeName) != "" {
+
+		assignedNode := ""
+		if server.Metadata != nil && server.Metadata.NodeName != nil {
+			assignedNode = strings.TrimSpace(*server.Metadata.NodeName)
+		}
+
+		// metadata.nodeName が指定済みの場合は存在チェックのみ行い、未知ノードなら ERROR に更新する。
+		if assignedNode != "" {
+			if !clusterHasNode(statuses, assignedNode) {
+				msg := "metadata.nodeName=" + assignedNode + " はクラスタ内に存在しません"
+				slog.Warn("存在しない nodeName が指定されたサーバーを ERROR に更新", "serverId", server.Id, "nodeName", assignedNode)
+				c.marmot.Db.UpdateServerStatus(server.Id, db.SERVER_ERROR, msg)
+			}
 			continue
 		}
 
@@ -117,4 +128,22 @@ func (c *schedulerController) schedulerControllerLoop() {
 		}
 		slog.Info("サーバーにノードを割り当てました", "serverId", server.Id, "targetNode", targetNode)
 	}
+}
+
+func clusterHasNode(statuses []api.HostStatus, nodeName string) bool {
+	target := strings.TrimSpace(nodeName)
+	if target == "" {
+		return false
+	}
+
+	for _, st := range statuses {
+		if st.NodeName == nil {
+			continue
+		}
+		if strings.TrimSpace(*st.NodeName) == target {
+			return true
+		}
+	}
+
+	return false
 }

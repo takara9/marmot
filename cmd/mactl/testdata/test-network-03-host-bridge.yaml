@@ -1,8 +1,7 @@
 apiVersion: v1
 kind: VirtualNetwork
-Metadata:
-  name: test-net-3
-Spec:
-  #bridgeName: br3
-  forwardMode: bridge
-
+metadata:
+    name: test-net-3
+spec:
+    #bridgeName: br3
+    forwardMode: bridge

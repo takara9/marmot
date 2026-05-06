@@ -1,14 +1,14 @@
 apiVersion: v1
 kind: Server
-Metadata:
-  name: test-server-05
-  comment: "This is a test server configuration"
-Spec:
-  cpu: 2
-  memory: 2048
-  osVariant: ubuntu22.04
-  bootVolume:
-    Spec:
-      type: lvm
-  NetworkInterface:
-    - networkname: "host-bridge"
+metadata:
+    name: test-server-05
+    comment: "This is a test server configuration"
+spec:
+    cpu: 2
+    memory: 2048
+    osVariant: ubuntu22.04
+    bootVolume:
+        spec:
+            type: lvm
+    networkInterface:
+        - networkname: "host-bridge"

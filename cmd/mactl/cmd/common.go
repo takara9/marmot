@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"log/slog"
-	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -33,59 +31,11 @@ func deletionMarker(status *api.Status) string {
 // コンフィグからエンドポイントを取り出してセットする
 //
 // 優先順位:
-//  1. --api フラグで明示指定された URL
+//  1. --api フラグで明示指定された URL または .marmot ファイルパス
 //  2. $HOME/.marmot に登録されたアクティブエンドポイント
 //     ($HOME/.marmot が無い場合は /etc/marmot/.marmot.example からコピーして自動作成)
 func getClientConfig() (*client.MarmotEndpoint, error) {
-	var rawURL string
-
-	if len(apiConfigFilename) > 0 {
-		// --api フラグで URL が直接指定された場合
-		rawURL = apiConfigFilename
-		// URL形式でなければ旧来のファイルパスとして扱う
-		if u, err := url.Parse(apiConfigFilename); err == nil && u.Scheme != "" && u.Host != "" {
-			rawURL = apiConfigFilename
-		} else {
-			// ファイルパスとして読み込む（後方互換）
-			err := config.ReadYamlConfig(apiConfigFilename, &mactlConfig)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read config file: %w", err)
-			}
-			rawURL = mactlConfig.ApiServerUrl
-		}
-	} else {
-		// $HOME/.marmot を保証し（なければサンプルからコピー）、読み込む
-		if err := config.EnsureMarmotConfig(); err != nil {
-			return nil, err
-		}
-		marmotCfgPath := config.MarmotConfigPath()
-		marmotCfg, err := config.ReadMarmotConfig(marmotCfgPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read %s: %w", marmotCfgPath, err)
-		}
-		activeURL, err := marmotCfg.ActiveEndpoint()
-		if err != nil {
-			return nil, err
-		}
-		rawURL = activeURL
-	}
-
-	if len(rawURL) == 0 {
-		rawURL = "http://localhost:8750"
-	}
-
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		slog.Error("mactlConfig", "read error", err)
-		return nil, err
-	}
-
-	return client.NewMarmotdEp(
-		u.Scheme,
-		u.Host,
-		"/api/v1",
-		60,
-	)
+	return config.GetClientConfig2(apiConfigFilename)
 }
 
 // clearScreen はターミナル画面をクリアする。

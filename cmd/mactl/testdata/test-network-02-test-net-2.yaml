@@ -1,8 +1,7 @@
 apiVersion: v1
 kind: VirtualNetwork
-Metadata:
-  name: test-net-2
-Spec:
-  forwardMode: bridge
-  IPNetworkAddress: "192.168.100.0/25"
-
+metadata:
+    name: test-net-2
+spec:
+    forwardMode: bridge
+    iPNetworkAddress: "192.168.100.0/25"
