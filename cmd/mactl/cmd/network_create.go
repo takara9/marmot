@@ -11,6 +11,12 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
+type legacyVirtualNetworkYAML struct {
+	Spec *struct {
+		IPNetworkAddress *string `yaml:"IPNetworkAddress,omitempty"`
+	} `yaml:"Spec,omitempty"`
+}
+
 //var configFilename string
 
 var networkCreateCmd = &cobra.Command{
@@ -28,6 +34,16 @@ var networkCreateCmd = &cobra.Command{
 		if err != nil {
 			println("ReadYamlConfig", "err", err)
 			return err
+		}
+
+		// 後方互換: 旧フォーマットの Spec.IPNetworkAddress も受け付ける
+		if conf.Spec != nil && conf.Spec.IPNetworkAddress == nil {
+			var legacy legacyVirtualNetworkYAML
+			if err := config.ReadYamlConfig(configFilename, &legacy); err == nil {
+				if legacy.Spec != nil && legacy.Spec.IPNetworkAddress != nil {
+					conf.Spec.IPNetworkAddress = legacy.Spec.IPNetworkAddress
+				}
+			}
 		}
 
 		// 名前は必須項目
