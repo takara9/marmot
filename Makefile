@@ -14,6 +14,11 @@ $(PROGRAMS):
 generate:
 	oapi-codegen -config api/config-v1.yaml api/marmot-api-v1.yaml
 	npx @redocly/cli build-docs api/marmot-api-v1.yaml -o api/marmot-api-v1.html
+	# json タグと同じキー名で yaml タグを追加する (omitempty も引き継ぐ)
+	sed -i \
+		-e 's/`json:"\([^"]*\),omitempty"`/`json:"\1,omitempty" yaml:"\1,omitempty"`/g' \
+		-e 's/`json:"\([^"]*\)"`/`json:"\1" yaml:"\1"`/g' \
+		api/marmot-api-v1.go
 	go mod tidy
 
 setup:
