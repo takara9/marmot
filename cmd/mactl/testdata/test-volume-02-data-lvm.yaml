@@ -1,4 +1,8 @@
-name: test-volume2
-type: lvm
-kind: data
-size: 2
+apiVersion: v1
+kind: Volume
+Metadata:
+  name: test-volume2
+Spec:
+  type: lvm
+  kind: data
+  size: 2

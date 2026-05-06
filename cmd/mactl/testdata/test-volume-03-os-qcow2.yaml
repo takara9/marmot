@@ -1,4 +1,8 @@
-name: test-volume3
-type: qcow2
-kind: os
-os_variant: ubuntu22.04
+apiVersion: v1
+kind: Volume
+Metadata:
+  name: test-volume3
+Spec:
+  type: qcow2
+  kind: os
+  osVariant: ubuntu22.04
