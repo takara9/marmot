@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/util"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -24,7 +23,7 @@ var networkCreateCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		var conf config.VirtualNetwork
+		var conf api.VirtualNetwork
 		err = config.ReadYamlConfig(configFilename, &conf)
 		if err != nil {
 			println("ReadYamlConfig", "err", err)
@@ -37,14 +36,7 @@ var networkCreateCmd = &cobra.Command{
 			return fmt.Errorf("name is required in the configuration")
 		}
 
-		var virtualNetwork *api.VirtualNetwork
-		virtualNetwork, err = util.ConvertToJSON(&conf)
-		if err != nil {
-			fmt.Println("ConvertToJSON", "err", err)
-			return err
-		}
-
-		byteBody, _, err := m.CreateVirtualNetwork(*virtualNetwork)
+		byteBody, _, err := m.CreateVirtualNetwork(conf)
 		if err != nil {
 			fmt.Println("CreateVirtualNetwork", "err", err)
 			return err

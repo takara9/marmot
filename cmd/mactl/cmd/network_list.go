@@ -9,7 +9,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/config"
 	"github.com/takara9/marmot/pkg/db"
 	"go.yaml.in/yaml/v3"
 )
@@ -89,16 +88,6 @@ var networkListCmd = &cobra.Command{
 				return nil
 
 			case "yaml":
-				jsonBytes, err := json.Marshal(data)
-				if err != nil {
-					fmt.Println("Failed to Marshal", err)
-					return err
-				}
-				var data []config.VirtualNetwork
-				if err := yaml.Unmarshal(jsonBytes, &data); err != nil {
-					println("Failed to Unmarshal", err)
-					return err
-				}
 				yamlBytes, err := yaml.Marshal(data)
 				if err != nil {
 					fmt.Println("Error:", err)
