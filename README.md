@@ -9,13 +9,14 @@ YAML ファイルで仮想サーバーやネットワークの構成を定義し
 
 - **YAML ベースの宣言的構成** — サーバー・ネットワーク・ボリュームをファイル一枚で定義
 - **LVM / QCOW2 ボリューム対応** — ブートボリューム・データボリューム双方で選択可能
+- **iSCSI ネットワークブロックストレージ** — LVM ボリュームを iSCSI ターゲットとして VM にアタッチ可能
 - **仮想ネットワーク管理** — ホストブリッジ・VXLAN オーバーレイ・VLAN をサポート
 - **マルチホーム対応** — 1 台の VM に複数の仮想ネットワークを割り当て可能
 - **ノードセレクター** — 複数ハイパーバイザーノードへの VM 配置制御
 - **OpenAPI v3 REST API** — `marmotd` サーバーを API で完全制御
 - **etcd による状態管理** — クラスター全体の状態を分散 KV ストアで保持
 - **内部 DNS** — VM に対する名前解決を自動提供
-- **Ubuntu 22.04 / 24.04 サポート**
+- **Ubuntu 24.04 サポート**
 
 ## コンポーネント
 
@@ -34,7 +35,7 @@ YAML ファイルで仮想サーバーやネットワークの構成を定義し
 name: my-server
 cpu: 2
 memory: 2048
-os_variant: ubuntu22.04
+os_variant: ubuntu24.04
 boot_volume:
   type: qcow2
 network:
@@ -73,10 +74,15 @@ mactl server create    # VM を作成
 mactl server delete    # VM を削除
 mactl server start     # VM を起動
 mactl server stop      # VM を停止
-mactl server status    # VM 一覧を表示
+mactl server list      # VM 一覧を表示
+mactl server detail    # VM 詳細を表示
 mactl network create   # 仮想ネットワークを作成
 mactl network delete   # 仮想ネットワークを削除
+mactl network list     # 仮想ネットワーク一覧
 mactl volume create    # ボリュームを作成
+mactl volume list      # ボリューム一覧
+mactl image list       # イメージ一覧
+mactl cluster list     # クラスターノード一覧
 ```
 
 ## インストール
@@ -86,12 +92,12 @@ mactl volume create    # ボリュームを作成
 [Releases](https://github.com/takara9/marmot/releases) から最新の `.deb` ファイルをダウンロードしてインストールします。
 
 ```sh
-VERSION=0.12.0
+VERSION=0.13.0
 curl -OL https://github.com/takara9/marmot/releases/download/v${VERSION}/marmot_v${VERSION}_amd64.deb
 sudo apt install ./marmot_v${VERSION}_amd64.deb
 ```
 
-インストール後のセットアップ手順（etcd の設定・ノード名の設定など）は [docs/INSTALL-MARMOT.md](docs/INSTALL-MARMOT.md) を参照してください。  
+インストール後のセットアップ手順（etcd の設定・LVM・ネットワーク・iSCSI の設定など）は [docs/HOWTO-install-marmot.md](docs/HOWTO-install-marmot.md) を参照してください。  
 ハイパーバイザーノード自体の構成手順は [docs/INSTALL-SERVER.md](docs/INSTALL-SERVER.md) を参照してください。
 
 ## 主な依存技術
@@ -101,6 +107,7 @@ sudo apt install ./marmot_v${VERSION}_amd64.deb
 - [Open vSwitch](https://www.openvswitch.org/) — 仮想ネットワーク
 - [etcd](https://etcd.io/) — 分散 KV ストア（クラスター状態管理）
 - [LVM](https://sourceware.org/lvm2/) — 論理ボリューム管理
+- [open-iscsi / targetcli](https://github.com/open-iscsi/open-iscsi) — iSCSI ネットワークブロックストレージ
 
 ## 応用例
 
@@ -112,7 +119,7 @@ sudo apt install ./marmot_v${VERSION}_amd64.deb
 
 ## ライセンス
 
-MIT License — 詳細は [LICENSE](LICENSE) を参照してください。
+GNU General Public License v3.0 — 詳細は [LICENSE](LICENSE) を参照してください。
 
 ## 貢献
 
