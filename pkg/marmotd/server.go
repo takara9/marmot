@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -18,6 +19,121 @@ import (
 	"github.com/takara9/marmot/pkg/util"
 	"github.com/takara9/marmot/pkg/virt"
 )
+
+func findHostStatusByNodeName(statuses []api.HostStatus, nodeName string) *api.HostStatus {
+	node := strings.TrimSpace(nodeName)
+	if node == "" {
+		return nil
+	}
+	for i := range statuses {
+		if statuses[i].NodeName == nil {
+			continue
+		}
+		if strings.TrimSpace(*statuses[i].NodeName) == node {
+			return &statuses[i]
+		}
+	}
+	return nil
+}
+
+func normalizeISCSITargetName(targetIQN string) string {
+	t := strings.TrimSpace(targetIQN)
+	if t == "" {
+		return ""
+	}
+	if strings.Contains(t, "/") {
+		return t
+	}
+	return t + "/0"
+}
+
+func resolveISCSIServerNode(statuses []api.HostStatus) string {
+	active := filterActiveHosts(statuses)
+	if len(active) == 0 {
+		return ""
+	}
+
+	// 明示設定がある場合はその中から決定的に1つ選ぶ
+	type candidate struct {
+		nodeName string
+		hostID   uint32
+	}
+	var explicits []candidate
+	for _, s := range active {
+		if s.IscsiServer == nil || !*s.IscsiServer || s.NodeName == nil || s.HostId == nil {
+			continue
+		}
+		node := strings.TrimSpace(*s.NodeName)
+		if node == "" {
+			continue
+		}
+		hid, ok := parseHostIDHex(*s.HostId)
+		if !ok {
+			continue
+		}
+		explicits = append(explicits, candidate{nodeName: node, hostID: hid})
+	}
+	if len(explicits) > 0 {
+		sort.Slice(explicits, func(i, j int) bool {
+			if explicits[i].hostID != explicits[j].hostID {
+				return explicits[i].hostID < explicits[j].hostID
+			}
+			return explicits[i].nodeName < explicits[j].nodeName
+		})
+		return explicits[0].nodeName
+	}
+
+	for _, s := range active {
+		if s.NodeName == nil {
+			continue
+		}
+		node := strings.TrimSpace(*s.NodeName)
+		if node == "" {
+			continue
+		}
+		if IsSchedulerLeader(node, statuses) {
+			return node
+		}
+	}
+
+	return ""
+}
+
+func (m *Marmot) resolveISCSIDiskAttachment(nodeName string, disk api.Volume) (targetName, host, port, initiator string, err error) {
+	if m == nil || m.Db == nil {
+		return "", "", "", "", errors.New("marmot db is nil")
+	}
+	if disk.Spec == nil || disk.Spec.IscsiTargetIqn == nil {
+		return "", "", "", "", errors.New("iscsi target iqn is missing")
+	}
+
+	statuses, err := m.Db.GetAllHostStatus()
+	if err != nil {
+		return "", "", "", "", err
+	}
+
+	iscsiServerNode := resolveISCSIServerNode(statuses)
+	if iscsiServerNode == "" {
+		return "", "", "", "", errors.New("failed to resolve iscsi server node")
+	}
+	iscsiServerStatus := findHostStatusByNodeName(statuses, iscsiServerNode)
+	if iscsiServerStatus == nil || iscsiServerStatus.IpAddress == nil || strings.TrimSpace(*iscsiServerStatus.IpAddress) == "" {
+		return "", "", "", "", fmt.Errorf("iscsi server hoststatus ip is missing: %s", iscsiServerNode)
+	}
+
+	initiator = strings.TrimSpace(getISCSIInitiatorID())
+	if initiator == "" {
+		vmHostStatus := findHostStatusByNodeName(statuses, nodeName)
+		if vmHostStatus != nil && vmHostStatus.InitiatorId != nil {
+			initiator = strings.TrimSpace(*vmHostStatus.InitiatorId)
+		}
+	}
+	if initiator == "" {
+		return "", "", "", "", fmt.Errorf("iscsi initiator id is missing on vm host: %s", strings.TrimSpace(nodeName))
+	}
+
+	return normalizeISCSITargetName(*disk.Spec.IscsiTargetIqn), strings.TrimSpace(*iscsiServerStatus.IpAddress), "3260", initiator, nil
+}
 
 // サーバーの生成 コントローラーから呼び出される
 func (m *Marmot) CreateServerManage(id string) (string, error) {
@@ -542,11 +658,21 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 				}
 				virtSpec.DiskSpecs = append(virtSpec.DiskSpecs, ds)
 			case *disk.Spec.Type == "lvm":
-				ds := virt.DiskSpec{
-					Dev:  fmt.Sprintf("vd%c", 'b'+i),
-					Src:  *disk.Spec.Path,
-					Bus:  uint(11 + i),
-					Type: "raw",
+				ds := virt.DiskSpec{Dev: fmt.Sprintf("vd%c", 'b'+i), Bus: uint(11 + i)}
+				isISCSIDataDisk := disk.Spec.Iscsi != nil && *disk.Spec.Iscsi
+				if isISCSIDataDisk {
+					targetName, host, port, initiator, err := m.resolveISCSIDiskAttachment(assignedNodeName, disk)
+					if err != nil {
+						return "", err
+					}
+					ds.Type = "iscsi"
+					ds.ISCSITarget = targetName
+					ds.ISCSIHost = host
+					ds.ISCSIPort = port
+					ds.ISCSIInitiator = initiator
+				} else {
+					ds.Src = *disk.Spec.Path
+					ds.Type = "raw"
 				}
 				virtSpec.DiskSpecs = append(virtSpec.DiskSpecs, ds)
 			}
@@ -558,12 +684,12 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 
 	virtSpec.ChannelSpecs = []virt.ChannelSpec{
 		//{"unix", channelPath + "/" + channelFile, channelFile, "channel0", 1},
-		{"spicevmc", "", "com.redhat.spice.0", "channel1", 2},
+		{Type: "spicevmc", Path: "", Name: "com.redhat.spice.0", Alias: "channel1", Port: 2},
 	}
 	virtSpec.Clocks = []virt.ClockSpec{
-		{"rtc", "catchup", ""},
-		{"pit", "delay", ""},
-		{"hpet", "", "no"},
+		{Name: "rtc", TickPolicy: "catchup", Present: ""},
+		{Name: "pit", TickPolicy: "delay", Present: ""},
+		{Name: "hpet", TickPolicy: "", Present: "no"},
 	}
 
 	dom := virt.CreateDomainXML(virtSpec)
