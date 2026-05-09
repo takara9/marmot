@@ -8,8 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
+	"github.com/takara9/marmot/pkg/util"
 )
 
 const (
@@ -88,6 +90,14 @@ func (c *controller) Stop() {
 func (c *controller) serverControllerLoop() {
 	slog.Debug("サーバーコントローラーの制御ループ実行", "CONTROLLER", time.Now().Format("2006-01-02 15:04:05"))
 
+	clusterHasNodes := true
+	statuses, err := c.marmot.Db.GetAllHostStatus()
+	if err != nil {
+		slog.Warn("GetAllHostStatus() failed; クラスタノード存在確認をスキップ", "err", err)
+	} else {
+		clusterHasNodes = clusterHasAnyNode(statuses)
+	}
+
 	// サーバースペック情報の取得
 	slog.Debug("サーバースペック情報取得", "", "")
 	serverSpec, err := c.marmot.GetServersManage()
@@ -97,8 +107,21 @@ func (c *controller) serverControllerLoop() {
 	}
 
 	for _, spec := range serverSpec {
+		// 削除のタイムスタンプが一定時間以上経過しているかをチェックして、削除処理を実行する
+		if spec.Status != nil && spec.Status.DeletionTimeStamp != nil {
+			deletionTime := *spec.Status.DeletionTimeStamp
+			if time.Since(deletionTime) > c.deletionDelay {
+				slog.Debug("削除のタイムスタンプが一定時間以上経過しているサーバー検出", "SERVER", spec.Id)
+				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_DELETING, "")
+				spec.Status.StatusCode = db.SERVER_DELETING
+				spec.Status.Status = util.StringPtr(db.ServerStatus[db.SERVER_DELETING])
+			}
+		}
+
+		forceDeleteWithoutNode, bypassReason := shouldBypassNodeGateForDeletingServer(spec, statuses)
+
 		// サーバーは必ず nodeName 割当後に処理する。
-		if spec.Metadata == nil || spec.Metadata.NodeName == nil || strings.TrimSpace(*spec.Metadata.NodeName) == "" {
+		if !forceDeleteWithoutNode && (spec.Metadata == nil || spec.Metadata.NodeName == nil || strings.TrimSpace(*spec.Metadata.NodeName) == "") {
 			objectName := ""
 			if spec.Metadata != nil && spec.Metadata.Name != nil {
 				objectName = *spec.Metadata.Name
@@ -107,13 +130,21 @@ func (c *controller) serverControllerLoop() {
 			continue
 		}
 
-		if ok, assignedNode, reason := evaluateNodeAssignment(spec.Metadata, c.marmot.NodeName); !ok {
+		if !forceDeleteWithoutNode {
+			if ok, assignedNode, reason := evaluateNodeAssignment(spec.Metadata, c.marmot.NodeName); !ok {
+				objectName := ""
+				if spec.Metadata != nil && spec.Metadata.Name != nil {
+					objectName = *spec.Metadata.Name
+				}
+				slog.Debug("別ノード割当のサーバーをスキップ", "serverId", spec.Id, "serverName", objectName, "controllerNode", c.marmot.NodeName, "assignedNode", assignedNode, "reason", reason)
+				continue
+			}
+		} else {
 			objectName := ""
 			if spec.Metadata != nil && spec.Metadata.Name != nil {
 				objectName = *spec.Metadata.Name
 			}
-			slog.Debug("別ノード割当のサーバーをスキップ", "serverId", spec.Id, "serverName", objectName, "controllerNode", c.marmot.NodeName, "assignedNode", assignedNode, "reason", reason)
-			continue
+			slog.Warn("nodeName 判定をバイパスして削除を継続", "serverId", spec.Id, "serverName", objectName, "reason", bypassReason)
 		}
 
 		// 取得したサーバースペック情報の表示とプロビジョニング中サーバーの検出
@@ -123,15 +154,6 @@ func (c *controller) serverControllerLoop() {
 		//	continue
 		//}
 		//fmt.Println(string(jsonByte))
-
-		// 削除のタイムスタンプが一定時間以上経過しているかをチェックして、削除処理を実行する
-		if spec.Status != nil && spec.Status.DeletionTimeStamp != nil {
-			deletionTime := *spec.Status.DeletionTimeStamp
-			if time.Since(deletionTime) > c.deletionDelay {
-				slog.Debug("削除のタイムスタンプが一定時間以上経過しているサーバー検出", "SERVER", spec.Id)
-				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_DELETING, "")
-			}
-		}
 
 		// サーバーの状態に応じた処理を実行する
 		switch spec.Status.StatusCode {
@@ -168,11 +190,29 @@ func (c *controller) serverControllerLoop() {
 		case db.SERVER_DELETING:
 			slog.Debug("削除中のサーバー検出", "SERVER", spec.Id)
 
-			// 仮想マシンの削除処理の実行
-			if err := c.marmot.DeleteServerByIdManage(spec.Id); err != nil {
-				slog.Error("DeleteServerById()", "err", err)
-				msg := fmt.Sprintf("サーバーの削除に失敗: %v", err)
-				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR, msg)
+			if !clusterHasNodes {
+				if spec.Spec != nil && spec.Spec.BootVolume != nil && strings.TrimSpace(spec.Spec.BootVolume.Id) != "" {
+					c.marmot.Db.SetVolumeDeletionTimestamp(spec.Spec.BootVolume.Id)
+				}
+				if spec.Spec != nil && spec.Spec.Storage != nil {
+					for _, vol := range *spec.Spec.Storage {
+						if vol.Spec != nil && vol.Spec.Persistent != nil && *vol.Spec.Persistent {
+							continue
+						}
+						if strings.TrimSpace(vol.Id) == "" {
+							continue
+						}
+						c.marmot.Db.SetVolumeDeletionTimestamp(vol.Id)
+					}
+				}
+				slog.Warn("クラスタノード不在のため VM 実体削除をスキップし、サーバー定義削除を継続", "serverId", spec.Id)
+			} else {
+				// 仮想マシンの削除処理の実行
+				if err := c.marmot.DeleteServerByIdManage(spec.Id); err != nil {
+					slog.Error("DeleteServerById()", "err", err)
+					msg := fmt.Sprintf("サーバーの削除に失敗: %v", err)
+					c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR, msg)
+				}
 			}
 
 			// IPアドレス開放処理の実行
@@ -221,4 +261,42 @@ func (c *controller) serverControllerLoop() {
 
 	// ワークキューから処理を取り出して、処理を実行する
 
+}
+
+func clusterHasAnyNode(statuses []api.HostStatus) bool {
+	for _, st := range statuses {
+		if st.NodeName == nil {
+			continue
+		}
+		if strings.TrimSpace(*st.NodeName) != "" {
+			return true
+		}
+	}
+
+	return false
+}
+
+func shouldBypassNodeGateForDeletingServer(spec api.Server, statuses []api.HostStatus) (bool, string) {
+	if spec.Status == nil || spec.Status.StatusCode != db.SERVER_DELETING {
+		return false, ""
+	}
+
+	if !clusterHasAnyNode(statuses) {
+		return true, "cluster_nodes_empty"
+	}
+
+	if spec.Metadata == nil || spec.Metadata.NodeName == nil {
+		return true, "assigned_node_missing"
+	}
+
+	assignedNode := strings.TrimSpace(*spec.Metadata.NodeName)
+	if assignedNode == "" {
+		return true, "assigned_node_empty"
+	}
+
+	if !clusterHasNode(statuses, assignedNode) {
+		return true, "assigned_node_not_found"
+	}
+
+	return false, ""
 }

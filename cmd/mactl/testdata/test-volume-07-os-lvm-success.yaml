@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: Volume
-Metadata:
-  name: test-volume2
-Spec:
-  type: lvm
-  kind: os
-  osVariant: ubuntu22.04
+metadata:
+    name: test-volume2
+spec:
+    type: lvm
+    kind: os
+    osVariant: ubuntu22.04

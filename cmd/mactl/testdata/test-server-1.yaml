@@ -1,29 +1,29 @@
 apiVersion: v1
 kind: Server
-Metadata:
-  name: test-server-1
-  comment: "This is a test server configuration"
-Spec:
-  cpu: 2
-  memory: 2048
-  osVariant: ubuntu22.04
-  bootVolume:
-    Spec:
-      type: qcow2
-  NetworkInterface:
-    - networkname: "default"
-  Storage:
-    - Metadata:
-        name: "data-disk-1"
-        comment: "data volume"
-      Spec:
-        size: 100
-        type: qcow2
-        kind: data
-    - Metadata:
-        name: "data-disk-2"
-        comment: "backup volume"
-      Spec:
-        size: 100
-        type: qcow2
-        kind: data
+metadata:
+    name: test-server-1
+    comment: "This is a test server configuration"
+spec:
+    cpu: 2
+    memory: 2048
+    osVariant: ubuntu22.04
+    bootVolume:
+        spec:
+            type: qcow2
+    networkInterface:
+        - networkname: "default"
+    storage:
+        - metadata:
+            name: "data-disk-1"
+            comment: "data volume"
+          spec:
+            size: 100
+            type: qcow2
+            kind: data
+        - metadata:
+            name: "data-disk-2"
+            comment: "backup volume"
+          spec:
+            size: 100
+            type: qcow2
+            kind: data

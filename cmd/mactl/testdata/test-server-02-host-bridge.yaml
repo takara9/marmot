@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: Server
-Metadata:
-  name: test-server-02
-  comment: "This is a minimum configuration"
-Spec:
-  cpu: 1
-  memory: 1024
-  NetworkInterface:
-    - networkname: "host-bridge"
+metadata:
+    name: test-server-02
+    comment: "This is a minimum configuration"
+spec:
+    cpu: 1
+    memory: 1024
+    networkInterface:
+        - networkname: "host-bridge"

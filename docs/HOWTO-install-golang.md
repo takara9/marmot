@@ -5,8 +5,6 @@
 https://go.dev/dl/
 
 
-1.21 は、現在 libvirtが動かない
-
 ```console
 GOVER=1.21.1
 ```

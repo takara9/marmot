@@ -1,16 +1,16 @@
 apiVersion: v1
 kind: Server
-Metadata:
-  name: test-server-37
-  nodeName: "marmot1"
-  comment: "Schedule this server on a specific node"
-Spec:
-  cpu: 1
-  memory: 1024
-  osVariant: ubuntu24.04
-  bootVolume:
-    Spec:
-      type: qcow2
-      size: 16
-  NetworkInterface:
-    - networkname: "default"
+metadata:
+    name: test-server-37
+    nodeName: "marmot1"
+    comment: "Schedule this server on a specific node"
+spec:
+    cpu: 1
+    memory: 1024
+    osVariant: ubuntu24.04
+    bootVolume:
+        spec:
+            type: qcow2
+            size: 16
+    networkInterface:
+        - networkname: "default"

@@ -805,7 +805,12 @@ func (m *Marmot) DeleteServerByIdManage(id string) error {
 		return err
 	}
 
-	if sv.Metadata.InstanceName != nil {
+	serverName := ""
+	if sv.Metadata != nil && sv.Metadata.Name != nil {
+		serverName = *sv.Metadata.Name
+	}
+
+	if sv.Metadata != nil && sv.Metadata.InstanceName != nil {
 		// サーバーの削除
 		l, err := virt.NewLibVirtEp("qemu:///system")
 		if err != nil {
@@ -823,21 +828,29 @@ func (m *Marmot) DeleteServerByIdManage(id string) error {
 			//	slog.Error("DeleteDomain()", "err", err)
 			//	return err
 			//}
-			slog.Debug("DeleteServerById()", "server is in PROVISIONING state, skipping domain deletion", *sv.Metadata.Name)
+			slog.Debug("DeleteServerById()", "server is in PROVISIONING state, skipping domain deletion", serverName)
 			// return nil 戻さず、削除処理を続行する
 		}
 	}
 
 	// ブートボリュームの削除タイムスタンプのセット
-	m.Db.SetVolumeDeletionTimestamp(sv.Spec.BootVolume.Id)
+	if sv.Spec != nil && sv.Spec.BootVolume != nil && strings.TrimSpace(sv.Spec.BootVolume.Id) != "" {
+		m.Db.SetVolumeDeletionTimestamp(sv.Spec.BootVolume.Id)
+	} else {
+		slog.Warn("DeleteServerByIdManage() boot volume is missing, skipping deletion timestamp", "serverId", id, "serverName", serverName)
+	}
 
 	// データボリュームの削除タイムスタンプのセット
-	if sv.Spec.Storage != nil {
+	if sv.Spec != nil && sv.Spec.Storage != nil {
 		slog.Debug("アタッチされているボリューム削除のため Deletion Timestamp をセット", "ボリューム数", len(*sv.Spec.Storage))
 		for i, vol := range *sv.Spec.Storage {
 			slog.Debug("DeleteServerById()", "index", i, "deleting volume id", vol.Id)
-			if vol.Spec.Persistent != nil && *vol.Spec.Persistent {
+			if vol.Spec != nil && vol.Spec.Persistent != nil && *vol.Spec.Persistent {
 				slog.Debug("DeleteServerById()", "skipping persistent volume", vol.Id)
+				continue
+			}
+			if strings.TrimSpace(vol.Id) == "" {
+				slog.Warn("DeleteServerByIdManage() attached volume id is empty, skipping", "serverId", id, "index", i)
 				continue
 			}
 			m.Db.SetVolumeDeletionTimestamp(vol.Id)

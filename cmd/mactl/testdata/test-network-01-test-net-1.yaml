@@ -1,8 +1,6 @@
 apiVersion: v1
 kind: VirtualNetwork
-Metadata:
-  name: test-net-1
-Spec:
-  forwardMode: bridge
-
-
+metadata:
+    name: test-net-1
+spec:
+    forwardMode: bridge

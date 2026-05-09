@@ -1,21 +1,21 @@
 apiVersion: v1
 kind: Server
-Metadata:
-  name: test-server-36
-  comment: "Attach existing volumes by id"
-Spec:
-  cpu: 1
-  memory: 1024
-  osVariant: ubuntu22.04
-  bootVolume:
-    id: "b7fd113"
-    Metadata:
-      id: "b7fd113"
-  Storage:
-    - id: "data1234"
-      Metadata:
-        id: "data1234"
-    - Metadata:
-        name: "my-data-vol"
-  NetworkInterface:
-    - networkname: "default"
+metadata:
+    name: test-server-36
+    comment: "Attach existing volumes by id"
+spec:
+    cpu: 1
+    memory: 1024
+    osVariant: ubuntu22.04
+    bootVolume:
+        id: "b7fd113"
+        metadata:
+            id: "b7fd113"
+    storage:
+        - id: "data1234"
+          metadata:
+            id: "data1234"
+        - metadata:
+            name: "my-data-vol"
+    networkInterface:
+        - networkname: "default"

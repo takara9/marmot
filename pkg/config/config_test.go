@@ -16,7 +16,7 @@ var _ = Describe("ReadYamlConfig", func() {
 	It("reads a YAML config from a file", func() {
 		tmpDir := GinkgoT().TempDir()
 		configPath := filepath.Join(tmpDir, "server.yaml")
-		content := "Metadata:\n  name: file-server\nSpec:\n  cpu: 2\n"
+		content := "metadata:\n  name: file-server\nspec:\n  cpu: 2\n"
 
 		err := os.WriteFile(configPath, []byte(content), 0o600)
 		Expect(err).NotTo(HaveOccurred())
@@ -38,7 +38,7 @@ var _ = Describe("ReadYamlConfig", func() {
 				http.NotFound(w, r)
 				return
 			}
-			_, _ = w.Write([]byte("Metadata:\n  name: url-server\nSpec:\n  memory: 2048\n"))
+			_, _ = w.Write([]byte("metadata:\n  name: url-server\nspec:\n  memory: 2048\n"))
 		}))
 		defer server.Close()
 
@@ -73,10 +73,10 @@ var _ = Describe("ReadYamlConfig", func() {
 		Expect(err).To(HaveOccurred())
 	})
 
-	It("reads Metadata.comment from a YAML config", func() {
+	It("reads metadata.comment from a YAML config", func() {
 		tmpDir := GinkgoT().TempDir()
-		configPath := filepath.Join(tmpDir, "server-Metadata.yaml")
-		content := "Metadata:\n  name: metadata-server\n  comment: created-from-Metadata\n"
+		configPath := filepath.Join(tmpDir, "server-metadata.yaml")
+		content := "metadata:\n  name: metadata-server\n  comment: created-from-metadata\n"
 
 		err := os.WriteFile(configPath, []byte(content), 0o600)
 		Expect(err).NotTo(HaveOccurred())
@@ -86,6 +86,6 @@ var _ = Describe("ReadYamlConfig", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(conf.Metadata).NotTo(BeNil())
 		Expect(conf.Metadata.Comment).NotTo(BeNil())
-		Expect(*conf.Metadata.Comment).To(Equal("created-from-Metadata"))
+		Expect(*conf.Metadata.Comment).To(Equal("created-from-metadata"))
 	})
 })

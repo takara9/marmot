@@ -72,16 +72,26 @@ func (o *OVSFabric) EnsureVxlanMesh(vnet *api.VirtualNetwork, peers []string) er
 	if vnet.Spec.UnderlayInterface != nil {
 		underlayIf = strings.TrimSpace(*vnet.Spec.UnderlayInterface)
 	}
-	localIP, err := resolveInterfaceIPv4(underlayIf)
-	if err != nil {
-		return err
-	}
 
+	validPeers := make([]string, 0, len(peers))
 	for _, peerIP := range peers {
 		peerIP = strings.TrimSpace(peerIP)
 		if peerIP == "" {
 			continue
 		}
+		validPeers = append(validPeers, peerIP)
+	}
+	if len(validPeers) == 0 {
+		slog.Debug("no vxlan peers resolved, skipping tunnel ensure", "bridge", bridgeName)
+		return nil
+	}
+
+	localIP, err := resolveInterfaceIPv4(underlayIf)
+	if err != nil {
+		return err
+	}
+
+	for _, peerIP := range validPeers {
 
 		// トンネル名はブリッジ毎に一意化し、別ネットワーク間の名前衝突を避ける。
 		tunnelName := tunnelNameForPeer(bridgeName, peerIP)

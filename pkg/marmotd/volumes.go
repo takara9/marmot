@@ -46,7 +46,10 @@ func runTargetcliAllowMissing(args ...string) error {
 	}
 
 	message := strings.ToLower(strings.TrimSpace(string(out)))
-	if strings.Contains(message, "not found") || strings.Contains(message, "no such") || strings.Contains(message, "does not exist") {
+	if strings.Contains(message, "not found") ||
+		strings.Contains(message, "no such") ||
+		strings.Contains(message, "does not exist") ||
+		strings.Contains(message, "no storage object named") {
 		return nil
 	}
 

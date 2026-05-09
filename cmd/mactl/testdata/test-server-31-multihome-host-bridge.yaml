@@ -1,25 +1,25 @@
 apiVersion: v1
 kind: Server
-Metadata:
-  name: test-server-31
-  comment: "This is a minimum configuration"
-Spec:
-  cpu: 1
-  memory: 1024
-  osVariant: ubuntu22.04
-  NetworkInterface:
-    - networkname: "host-bridge"
-      address: "192.168.1.99"
-      netmasklen: 24
-      routes:
-        - to: "default"
-          via: "192.168.1.1"
-      nameservers:
-        addresses:
-          - 192.168.1.9
-          - 8.8.8.8
-          - 8.8.4.4
-        search:
-          - labo.local
-          - lab.local
-    - networkname: "test-net-1"
+metadata:
+    name: test-server-31
+    comment: "This is a minimum configuration"
+spec:
+    cpu: 1
+    memory: 1024
+    osVariant: ubuntu22.04
+    networkInterface:
+        - networkname: "host-bridge"
+          address: "192.168.1.99"
+          netmasklen: 24
+          routes:
+            - to: "default"
+              via: "192.168.1.1"
+          nameservers:
+            addresses:
+                - 192.168.1.9
+                - 8.8.8.8
+                - 8.8.4.4
+            search:
+                - labo.local
+                - lab.local
+        - networkname: "test-net-1"
