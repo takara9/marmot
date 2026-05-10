@@ -45,8 +45,8 @@ var networkIPAddressListCmd = &cobra.Command{
 					fmt.Printf("  %2s  %-15s  %-24s\n", "No", "IP", "HOSTNAME")
 					for i, a := range data {
 						fmt.Printf("  %2d", i+1)
-						if a.IPAddress != nil {
-							fmt.Printf("  %-15s", *a.IPAddress)
+						if a.IpAddress != "" {
+							fmt.Printf("  %-15s", a.IpAddress)
 						} else {
 							fmt.Printf("  %-15s", "N/A")
 						}

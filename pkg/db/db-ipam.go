@@ -330,7 +330,7 @@ func (d *Database) CheckIPnetInUse(vnetId, ipnetId string) (bool, error) {
 func (d *Database) SetIPaddrInUse(vnetId, ipnetId, ip, hostId string) error {
 	var rec api.IPAddress
 	rec.HostId = util.StringPtr(hostId)
-	rec.IPAddress = util.StringPtr(ip)
+	rec.IpAddress = ip
 	rec.NetworkId = util.StringPtr(ipnetId)
 
 	net, err := d.GetIpNetworkById(vnetId, ipnetId)

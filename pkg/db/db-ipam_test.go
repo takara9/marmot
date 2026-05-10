@@ -325,7 +325,7 @@ var _ = Describe("IPAM", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 				fmt.Printf("Allocated IPs for network %s:\n", idIpv4_1)
 				for _, ip := range ips {
-					fmt.Printf("- Host: %s  IP: %s\n", *ip.HostId, *ip.IPAddress)
+					fmt.Printf("- Host: %s  IP: %s\n", *ip.HostId, ip.IpAddress)
 				}
 			})
 
@@ -374,7 +374,7 @@ var _ = Describe("IPAM", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 				fmt.Printf("Allocated IPs for network %s:\n", idIpv6_1)
 				for _, ip := range ips {
-					fmt.Printf("- Host: %s  IP: %s\n", *ip.HostId, *ip.IPAddress)
+					fmt.Printf("- Host: %s  IP: %s\n", *ip.HostId, ip.IpAddress)
 				}
 			})
 
@@ -411,7 +411,7 @@ var _ = Describe("IPAM", Ordered, func() {
 				ips, err := v.GetAllocatedIPs(vnetId, idIpv4_1)
 				Expect(err).NotTo(HaveOccurred())
 				for _, ip := range ips {
-					err = v.ReleaseIP(vnetId, idIpv4_1, *ip.IPAddress)
+					err = v.ReleaseIP(vnetId, idIpv4_1, ip.IpAddress)
 					Expect(err).NotTo(HaveOccurred())
 				}
 			})
@@ -420,7 +420,7 @@ var _ = Describe("IPAM", Ordered, func() {
 				ips, err := v.GetAllocatedIPs(vnetId, idIpv4_2)
 				Expect(err).NotTo(HaveOccurred())
 				for _, ip := range ips {
-					err = v.ReleaseIP(vnetId, idIpv4_2, *ip.IPAddress)
+					err = v.ReleaseIP(vnetId, idIpv4_2, ip.IpAddress)
 					Expect(err).NotTo(HaveOccurred())
 				}
 			})
@@ -429,7 +429,7 @@ var _ = Describe("IPAM", Ordered, func() {
 				ips, err := v.GetAllocatedIPs(vnetId, idIpv6_1)
 				Expect(err).NotTo(HaveOccurred())
 				for _, ip := range ips {
-					err = v.ReleaseIP(vnetId, idIpv6_1, *ip.IPAddress)
+					err = v.ReleaseIP(vnetId, idIpv6_1, ip.IpAddress)
 					Expect(err).NotTo(HaveOccurred())
 				}
 			})

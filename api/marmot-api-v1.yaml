@@ -765,11 +765,11 @@ components:
       properties:
         id:
           type: string
-        Metadata:
+        metadata:
           $ref: "#/components/schemas/Metadata"
-        Status:
+        status:
           $ref: "#/components/schemas/Status"
-        Spec:
+        spec:
           $ref: "#/components/schemas/VolSpec"
     VolSpec:
       type: object
@@ -871,14 +871,20 @@ components:
       type: object
       required:
         - id
+        - apiVersion
+        - kind
       properties:
         id:
           type: string
-        Metadata:
+        apiVersion:
+          type: string
+        kind:
+          type: string
+        metadata:
           $ref: "#/components/schemas/Metadata"
-        Spec:
+        spec:
           $ref: "#/components/schemas/ServerSpec"
-        Status:
+        status:
           $ref: "#/components/schemas/Status"
     Status:
       type: object
@@ -934,12 +940,12 @@ components:
         memory:
           type: integer
           format: int
-        NetworkInterface:
+        networkInterface:
           type: array
           maxItems: 10
           items:
             $ref: "#/components/schemas/NetworkInterface"
-        Storage:
+        storage:
           type: array
           maxItems: 10
           items:
@@ -961,11 +967,11 @@ components:
       properties:
         id:
           type: string
-        Metadata:
+        metadata:
           $ref: "#/components/schemas/Metadata"
-        Spec:
+        spec:
           $ref: "#/components/schemas/VirtualNetworkSpec"
-        Status:
+        status:
           $ref: "#/components/schemas/Status"
     VirtualNetworkSpec:
       type: object
@@ -1017,39 +1023,39 @@ components:
     IPNetwork:
       type: object
       required:
-        - Id
+        - id
       properties:
-        Id:
+        id:
           type: string
-        AddressMaskLen:
+        addressMaskLen:
           type: string
-        StartAddress:
+        startAddress:
           type: string
-        EndAddress:
+        endAddress:
           type: string
         virtualNetworkId:
           type: string
-        NetworkAddress:
+        networkAddress:
           type: string
-        Netmask:
+        netmask:
           type: string
-        Netmasklen:
+        netmasklen:
           type: integer
           format: int
-        Gateway:
+        gateway:
           type: string
     IPAddress:
       type: object
       required:
-        - Address
+        - ipAddress
       properties:
-        NetworkId:
+        networkId:
           type: string
-        IPAddress:
+        ipAddress:
           type: string
-        Netmask:
+        netmask:
           type: string
-        HostId:
+        hostId:
           type: string
     Job:
       type: object
@@ -1058,33 +1064,33 @@ components:
       properties:
         id:
           type: string
-        Metadata:
+        metadata:
           $ref: "#/components/schemas/Metadata"
-        Spec:
+        spec:
           $ref: "#/components/schemas/JobSpec"
-        Status:
+        status:
           $ref: "#/components/schemas/Status"
     JobSpec:
       type: object
       properties:
-        RequestTime:
+        requestTime:
           type: string
           format: date-time
-        StartTime:
+        startTime:
           type: string
           format: date-time
-        FinishTime:
+        finishTime:
           type: string
           format: date-time
-        MaxTime:
+        maxTime:
           type: string
           format: date-time
-        Command:
+        command:
           type: array
           maxItems: 10
           items:
             type: string
-        ExitCode:
+        exitCode:
           type: integer
           format: int
     Image:
@@ -1094,11 +1100,11 @@ components:
       properties:
         id:
           type: string
-        Metadata:
+        metadata:
           $ref: "#/components/schemas/Metadata"
-        Spec:
+        spec:
           $ref: "#/components/schemas/ImageSpec"
-        Status:
+        status:
           $ref: "#/components/schemas/Status"
     ImageSpec:
       type: object
@@ -1144,9 +1150,9 @@ components:
           type: string
         iscsiServer:
           type: boolean
-        Capacity:
+        capacity:
           $ref: "#/components/schemas/HostCapacity"
-        Allocation:
+        allocation:
           $ref: "#/components/schemas/HostAllocation"
         lastUpdated:
           type: string
