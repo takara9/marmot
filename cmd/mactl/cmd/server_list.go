@@ -96,7 +96,7 @@ func formatServerListText(data []api.Server) string {
 		builder.WriteString(fmt.Sprintf("  %2d  %1s%-10v  %-20v  %-12v  %-3v  %-8v  %-12v  %-15v  %-15v\n",
 			i+1,
 			deletionMarker(server.Status),
-			server.Id,
+			api.ServerID(server),
 			serverDisplayName(server),
 			serverStatusText(server),
 			serverCPU(server),

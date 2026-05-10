@@ -17,7 +17,7 @@ var serverUpdateCmd = &cobra.Command{
 		var spec api.Server
 		var meta api.Metadata
 		serverId := args[0]
-		spec.Id = serverId
+		meta.Id = &serverId
 		meta.Name = &serverName
 		spec.Metadata = &meta
 

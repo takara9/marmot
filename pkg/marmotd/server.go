@@ -167,7 +167,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	}
 
 	slog.Debug("ブートボリュームの生成と設定")
-	bootVol.Metadata.Name = util.StringPtr("boot-" + serverConfig.Id)
+	bootVol.Metadata.Name = util.StringPtr("boot-" + api.ServerID(serverConfig))
 	// サーバー割当ノードをブートボリュームのメタデータに付与する。
 	assignNodeNameIfUnset(&bootVol.Metadata, assignedNodeName)
 	bootVol.Spec.Kind = util.StringPtr("os")
@@ -449,7 +449,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		// ループの終わり
 	}
 	// サーバーのネットワーク情報を更新
-	err = m.Db.UpdateServer(serverConfig.Id, serverConfig)
+	err = m.Db.UpdateServer(api.ServerID(serverConfig), serverConfig)
 	if err != nil {
 		slog.Error("UpdateServer()", "err", err)
 		return "", err
@@ -464,7 +464,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 
 	slog.Debug("ブートボリュームのIDをサーバーの構成データに設定", "temp var volume id", bootVolDefined.Id)
 	serverConfig.Spec.BootVolume = &bootVolDefined
-	err = m.Db.UpdateServer(serverConfig.Id, serverConfig)
+	err = m.Db.UpdateServer(api.ServerID(serverConfig), serverConfig)
 	if err != nil {
 		slog.Error("UpdateServer()", "err", err)
 		return "", err
@@ -525,7 +525,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		}
 	}
 
-	fmt.Println("=== データボリュームの情報確認2 ===", "server Id", serverConfig.Id)
+	fmt.Println("=== データボリュームの情報確認2 ===", "server Id", api.ServerID(serverConfig))
 	data3, err := json.MarshalIndent(serverConfig, "", "  ")
 	if err != nil {
 		slog.Error("json.MarshalIndent()", "err", err)
@@ -534,7 +534,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	}
 
 	// データボリュームのIDをサーバーに設定
-	err = m.Db.UpdateServer(serverConfig.Id, serverConfig)
+	err = m.Db.UpdateServer(api.ServerID(serverConfig), serverConfig)
 	if err != nil {
 		slog.Error("UpdateServer()", "err", err)
 		return "", err
@@ -544,9 +544,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	//var virtSpec virt.ServerSpec
 	virtSpec.UUID = *serverConfig.Metadata.Uuid
 	if serverConfig.Metadata != nil && serverConfig.Metadata.Name != nil {
-		virtSpec.Name = *serverConfig.Metadata.Name + "-" + serverConfig.Id // VMを一意に識別する
+		virtSpec.Name = *serverConfig.Metadata.Name + "-" + api.ServerID(serverConfig) // VMを一意に識別する
 	} else {
-		virtSpec.Name = "vm-" + serverConfig.Id
+		virtSpec.Name = "vm-" + api.ServerID(serverConfig)
 	}
 	// サーバーのVM名前をセットし、今後の操作のためにDBを更新する必要がある
 	serverConfig.Metadata.InstanceName = util.StringPtr(virtSpec.Name)
@@ -574,7 +574,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	}
 	slog.Debug("ボリュームの設定が無いときはqcow2をデフォルトとする2", "boot volume ptr", bootVolDefined)
 
-	path := "/var/lib/marmot/isos/" + serverConfig.Id
+	path := "/var/lib/marmot/isos/" + api.ServerID(serverConfig)
 
 	var password string
 	var sshKey string
@@ -715,7 +715,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	serverConfig.Status.StatusCode = db.SERVER_RUNNING
 	serverConfig.Status.Status = util.StringPtr(db.ServerStatus[serverConfig.Status.StatusCode])
 	serverConfig.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
-	err = m.Db.UpdateServer(serverConfig.Id, serverConfig)
+	err = m.Db.UpdateServer(api.ServerID(serverConfig), serverConfig)
 	if err != nil {
 		slog.Error("UpdateServer()", "err", err)
 		return "", err
@@ -752,7 +752,7 @@ func (m *Marmot) StopServerManage(id string) error {
 	sv.Status.StatusCode = db.SERVER_STOPPED
 	sv.Status.Status = util.StringPtr(db.ServerStatus[sv.Status.StatusCode])
 	sv.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
-	if err = m.Db.UpdateServer(sv.Id, sv); err != nil {
+	if err = m.Db.UpdateServer(api.ServerID(sv), sv); err != nil {
 		slog.Error("UpdateServer()", "err", err)
 		return err
 	}
@@ -788,7 +788,7 @@ func (m *Marmot) StartServerManage(id string) error {
 	sv.Status.StatusCode = db.SERVER_RUNNING
 	sv.Status.Status = util.StringPtr(db.ServerStatus[sv.Status.StatusCode])
 	sv.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
-	if err = m.Db.UpdateServer(sv.Id, sv); err != nil {
+	if err = m.Db.UpdateServer(api.ServerID(sv), sv); err != nil {
 		slog.Error("UpdateServer()", "err", err)
 		return err
 	}

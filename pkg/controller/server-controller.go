@@ -111,8 +111,8 @@ func (c *controller) serverControllerLoop() {
 		if spec.Status != nil && spec.Status.DeletionTimeStamp != nil {
 			deletionTime := *spec.Status.DeletionTimeStamp
 			if time.Since(deletionTime) > c.deletionDelay {
-				slog.Debug("削除のタイムスタンプが一定時間以上経過しているサーバー検出", "SERVER", spec.Id)
-				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_DELETING, "")
+				slog.Debug("削除のタイムスタンプが一定時間以上経過しているサーバー検出", "SERVER", api.ServerID(spec))
+				c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_DELETING, "")
 				spec.Status.StatusCode = db.SERVER_DELETING
 				spec.Status.Status = util.StringPtr(db.ServerStatus[db.SERVER_DELETING])
 			}
@@ -126,7 +126,7 @@ func (c *controller) serverControllerLoop() {
 			if spec.Metadata != nil && spec.Metadata.Name != nil {
 				objectName = *spec.Metadata.Name
 			}
-			slog.Debug("nodeName 未割当サーバーをスキップ", "serverId", spec.Id, "serverName", objectName, "controllerNode", c.marmot.NodeName, "reason", "assigned_node_missing")
+			slog.Debug("nodeName 未割当サーバーをスキップ", "serverId", api.ServerID(spec), "serverName", objectName, "controllerNode", c.marmot.NodeName, "reason", "assigned_node_missing")
 			continue
 		}
 
@@ -136,7 +136,7 @@ func (c *controller) serverControllerLoop() {
 				if spec.Metadata != nil && spec.Metadata.Name != nil {
 					objectName = *spec.Metadata.Name
 				}
-				slog.Debug("別ノード割当のサーバーをスキップ", "serverId", spec.Id, "serverName", objectName, "controllerNode", c.marmot.NodeName, "assignedNode", assignedNode, "reason", reason)
+				slog.Debug("別ノード割当のサーバーをスキップ", "serverId", api.ServerID(spec), "serverName", objectName, "controllerNode", c.marmot.NodeName, "assignedNode", assignedNode, "reason", reason)
 				continue
 			}
 		} else {
@@ -144,7 +144,7 @@ func (c *controller) serverControllerLoop() {
 			if spec.Metadata != nil && spec.Metadata.Name != nil {
 				objectName = *spec.Metadata.Name
 			}
-			slog.Warn("nodeName 判定をバイパスして削除を継続", "serverId", spec.Id, "serverName", objectName, "reason", bypassReason)
+			slog.Warn("nodeName 判定をバイパスして削除を継続", "serverId", api.ServerID(spec), "serverName", objectName, "reason", bypassReason)
 		}
 
 		// 取得したサーバースペック情報の表示とプロビジョニング中サーバーの検出
@@ -158,37 +158,37 @@ func (c *controller) serverControllerLoop() {
 		// サーバーの状態に応じた処理を実行する
 		switch spec.Status.StatusCode {
 		case db.SERVER_PENDING:
-			slog.Debug("生成待ち状態のサーバー検出", "SERVER", spec.Id)
-			c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_PROVISIONING, "")
-			if _, err := c.marmot.CreateServerManage(spec.Id); err != nil {
+			slog.Debug("生成待ち状態のサーバー検出", "SERVER", api.ServerID(spec))
+			c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_PROVISIONING, "")
+			if _, err := c.marmot.CreateServerManage(api.ServerID(spec)); err != nil {
 				slog.Error("CreateServerManage()", "err", err)
 				msg := fmt.Sprintf("サーバーのプロビジョニングに失敗した。原因エラー: %v", err)
-				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR, msg)
+				c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_ERROR, msg)
 				continue
 			}
-			c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_RUNNING, "")
+			c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_RUNNING, "")
 		case db.SERVER_RUNNING:
-			slog.Debug("稼働中のサーバー検出", "SERVER", spec.Id)
+			slog.Debug("稼働中のサーバー検出", "SERVER", api.ServerID(spec))
 		case db.SERVER_STOPPING:
-			slog.Debug("停止要求のサーバー検出", "SERVER", spec.Id)
-			if err := c.marmot.StopServerManage(spec.Id); err != nil {
+			slog.Debug("停止要求のサーバー検出", "SERVER", api.ServerID(spec))
+			if err := c.marmot.StopServerManage(api.ServerID(spec)); err != nil {
 				slog.Error("StopServerManage()", "err", err)
 				msg := fmt.Sprintf("サーバーの停止に失敗: %v", err)
-				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR, msg)
+				c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_ERROR, msg)
 			}
 		case db.SERVER_STOPPED:
-			slog.Debug("停止中のサーバー検出", "SERVER", spec.Id)
+			slog.Debug("停止中のサーバー検出", "SERVER", api.ServerID(spec))
 		case db.SERVER_STARTING:
-			slog.Debug("起動要求のサーバー検出", "SERVER", spec.Id)
-			if err := c.marmot.StartServerManage(spec.Id); err != nil {
+			slog.Debug("起動要求のサーバー検出", "SERVER", api.ServerID(spec))
+			if err := c.marmot.StartServerManage(api.ServerID(spec)); err != nil {
 				slog.Error("StartServerManage()", "err", err)
 				msg := fmt.Sprintf("サーバーの起動に失敗: %v", err)
-				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR, msg)
+				c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_ERROR, msg)
 			}
 		case db.SERVER_ERROR:
-			slog.Debug("エラー状態のサーバー検出", "SERVER", spec.Id)
+			slog.Debug("エラー状態のサーバー検出", "SERVER", api.ServerID(spec))
 		case db.SERVER_DELETING:
-			slog.Debug("削除中のサーバー検出", "SERVER", spec.Id)
+			slog.Debug("削除中のサーバー検出", "SERVER", api.ServerID(spec))
 
 			if !clusterHasNodes {
 				if spec.Spec != nil && spec.Spec.BootVolume != nil && strings.TrimSpace(spec.Spec.BootVolume.Id) != "" {
@@ -205,13 +205,13 @@ func (c *controller) serverControllerLoop() {
 						c.marmot.Db.SetVolumeDeletionTimestamp(vol.Id)
 					}
 				}
-				slog.Warn("クラスタノード不在のため VM 実体削除をスキップし、サーバー定義削除を継続", "serverId", spec.Id)
+				slog.Warn("クラスタノード不在のため VM 実体削除をスキップし、サーバー定義削除を継続", "serverId", api.ServerID(spec))
 			} else {
 				// 仮想マシンの削除処理の実行
-				if err := c.marmot.DeleteServerByIdManage(spec.Id); err != nil {
+				if err := c.marmot.DeleteServerByIdManage(api.ServerID(spec)); err != nil {
 					slog.Error("DeleteServerById()", "err", err)
 					msg := fmt.Sprintf("サーバーの削除に失敗: %v", err)
-					c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR, msg)
+					c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_ERROR, msg)
 				}
 			}
 
@@ -245,17 +245,17 @@ func (c *controller) serverControllerLoop() {
 			}
 
 			// データベースから削除する
-			if err := c.marmot.Db.DeleteServerById(spec.Id); err != nil {
+			if err := c.marmot.Db.DeleteServerById(api.ServerID(spec)); err != nil {
 				slog.Error("DeleteServerById()", "err", err)
 				msg := fmt.Sprintf("サーバーのデータベースからの削除に失敗: %v", err)
-				c.marmot.Db.UpdateServerStatus(spec.Id, db.SERVER_ERROR, msg)
+				c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_ERROR, msg)
 			}
 
 		case db.SERVER_PROVISIONING:
-			slog.Debug("プロビジョニング中のサーバー検出", "SERVER", spec.Id)
+			slog.Debug("プロビジョニング中のサーバー検出", "SERVER", api.ServerID(spec))
 
 		default:
-			slog.Warn("不明な状態のサーバー検出", "SERVER", spec.Id, "STATUS", *spec.Status.Status)
+			slog.Warn("不明な状態のサーバー検出", "SERVER", api.ServerID(spec), "STATUS", *spec.Status.Status)
 		}
 	}
 

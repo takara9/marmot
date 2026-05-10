@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -45,13 +46,16 @@ func (d *Database) MakeServerEntry(spec api.Server) (api.Server, error) {
 		slog.Error("CreateServer()", "err", err)
 		return api.Server{}, err
 	}
+	if server.Metadata == nil {
+		server.Metadata = &api.Metadata{}
+	}
 
 	//一意なIDを発行
 	var key string
 	for {
 		server.Metadata.Uuid = util.StringPtr(uuid.New().String())
-		server.Id = (*server.Metadata.Uuid)[:5]
-		key = ServerPrefix + "/" + server.Id
+		api.SetServerID(&server, (*server.Metadata.Uuid)[:5])
+		key = ServerPrefix + "/" + api.ServerID(server)
 		_, err := d.GetJSON(key, &server)
 		if err == ErrNotFound {
 			break
@@ -99,6 +103,7 @@ func (d *Database) GetServerById(id string) (api.Server, error) {
 		slog.Error("GetServerById()", "err", err, "key", key)
 		return api.Server{}, err
 	}
+	api.SetServerID(&server, id)
 	return server, nil
 }
 
@@ -124,6 +129,10 @@ func (d *Database) GetServers() (api.Servers, error) {
 		if err != nil {
 			slog.Error("Unmarshal() failed", "err", err, "key", string(kv.Key))
 			continue
+		}
+		key := string(kv.Key)
+		if idx := strings.LastIndex(key, "/"); idx >= 0 && idx+1 < len(key) {
+			api.SetServerID(&server, key[idx+1:])
 		}
 		servers = append(servers, server)
 	}
@@ -175,9 +184,10 @@ func (d *Database) updateServer(id string, spec api.Server) error {
 	}
 	expected := resp.Kvs[0].ModRevision
 
-	rec.Id = id
+	api.SetServerID(&rec, id)
 	// パッチ適用
 	util.PatchStruct(&rec, spec)
+	api.SetServerID(&rec, id)
 
 	err = d.PutJSONCAS(key, expected, &rec)
 	if err != nil {
@@ -236,6 +246,7 @@ func (d *Database) AssignNodeToServer(id, nodeName string) error {
 	if server.Metadata == nil {
 		server.Metadata = &api.Metadata{}
 	}
+	api.SetServerID(&server, id)
 	server.Metadata.NodeName = util.StringPtr(nodeName)
 
 	expected := resp.Kvs[0].ModRevision

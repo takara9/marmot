@@ -85,7 +85,7 @@ func init() {
 // サーバーの詳細をテキスト形式で表示する関数
 func printServerDetails(server api.Server) {
 	fmt.Println("Server Details")
-	fmt.Printf("  Id:            %s\n", formatID(server.Id))
+	fmt.Printf("  Id:            %s\n", formatID(api.ServerID(server)))
 	fmt.Printf("  UUID:          %s\n", stringValue(server.Metadata, func(m *api.Metadata) *string { return m.Uuid }))
 	fmt.Printf("  Name:          %s\n", stringValue(server.Metadata, func(m *api.Metadata) *string { return m.Name }))
 	fmt.Printf("  Instance Name: %s\n", stringValue(server.Metadata, func(m *api.Metadata) *string { return m.InstanceName }))

@@ -92,7 +92,7 @@ func machineIDForServer(spec api.Server) string {
 		}
 	}
 
-	seed := strings.TrimSpace(spec.Id)
+	seed := strings.TrimSpace(api.ServerID(spec))
 	if seed == "" && spec.Metadata != nil && spec.Metadata.Name != nil {
 		seed = strings.TrimSpace(*spec.Metadata.Name)
 	}

@@ -870,12 +870,9 @@ components:
     Server:
       type: object
       required:
-        - id
         - apiVersion
         - kind
       properties:
-        id:
-          type: string
         apiVersion:
           type: string
         kind:
@@ -1124,7 +1121,7 @@ components:
           format: int
         qcow2Path:
           type: string
-        source_url:
+        sourceUrl:
           type: string
     Auth:
       type: object

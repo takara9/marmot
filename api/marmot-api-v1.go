@@ -129,7 +129,7 @@ type ImageSpec struct {
 	LvPath        *string `json:"lvPath,omitempty" yaml:"lvPath,omitempty"`
 	Qcow2Path     *string `json:"qcow2Path,omitempty" yaml:"qcow2Path,omitempty"`
 	Size          *int    `json:"size,omitempty" yaml:"size,omitempty"`
-	SourceUrl     *string `json:"source_url,omitempty" yaml:"source_url,omitempty"`
+	SourceUrl     *string `json:"sourceUrl,omitempty" yaml:"sourceUrl,omitempty"`
 	Type          *string `json:"type,omitempty" yaml:"type,omitempty"`
 	VolumeGroup   *string `json:"volumeGroup,omitempty" yaml:"volumeGroup,omitempty"`
 }
@@ -209,7 +209,6 @@ type Route struct {
 // Server defines model for Server.
 type Server struct {
 	ApiVersion string      `json:"apiVersion" yaml:"apiVersion"`
-	Id         string      `json:"id" yaml:"id"`
 	Kind       string      `json:"kind" yaml:"kind"`
 	Metadata   *Metadata   `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 	Spec       *ServerSpec `json:"spec,omitempty" yaml:"spec,omitempty"`

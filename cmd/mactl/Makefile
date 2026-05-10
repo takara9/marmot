@@ -2,6 +2,8 @@ GO ?= go
 PROGRAM	= mactl
 GINKGO = /root/go/bin/ginkgo
 
+.PHONY: all $(PROGRAM)
+
 all:	$(PROGRAM)
 
 TAG := $(shell cat ../../TAG)
