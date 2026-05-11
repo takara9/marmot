@@ -142,7 +142,7 @@ func (s *Server) ApiListIpNetworks(ctx echo.Context) error {
 
 	all := make([]api.IPNetwork, 0)
 	for _, vnet := range vnets {
-		ipnets, err := s.Ma.Db.GetIpNetworks(vnet.Id)
+		ipnets, err := s.Ma.Db.GetIpNetworks(api.VirtualNetworkID(vnet))
 		if err != nil {
 			continue
 		}
@@ -166,13 +166,13 @@ func (s *Server) ApiGetIpAddressesByNetwork(ctx echo.Context, id string) error {
 	var vnetId string
 	var found bool
 	for _, vnet := range networks {
-		ipnets, err := s.Ma.Db.GetIpNetworks(vnet.Id)
+		ipnets, err := s.Ma.Db.GetIpNetworks(api.VirtualNetworkID(vnet))
 		if err != nil {
 			continue
 		}
 		for _, ipnet := range ipnets {
 			if ipnet.Id == id {
-				vnetId = vnet.Id
+				vnetId = api.VirtualNetworkID(vnet)
 				found = true
 				break
 			}

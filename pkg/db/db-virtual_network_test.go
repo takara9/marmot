@@ -67,12 +67,12 @@ var _ = Describe("Networks", Ordered, func() {
 				}
 				netSpec, err = v.CreateVirtualNetwork(*net)
 				Expect(err).NotTo(HaveOccurred())
-				fmt.Println("Created network with ID:", netSpec.Id)
+				fmt.Println("Created network with ID:", api.VirtualNetworkID(netSpec))
 			})
 
 			It("Keyからネットワーク情報を取得", func() {
-				GinkgoWriter.Printf("ネットワークID: %s\n", netSpec.Id)
-				net, err := v.GetVirtualNetworkById(netSpec.Id)
+				GinkgoWriter.Printf("ネットワークID: %s\n", api.VirtualNetworkID(netSpec))
+				net, err := v.GetVirtualNetworkById(api.VirtualNetworkID(netSpec))
 				Expect(err).NotTo(HaveOccurred())
 				bytes, err := json.MarshalIndent(net, "", "  ")
 				Expect(err).NotTo(HaveOccurred())
@@ -86,12 +86,12 @@ var _ = Describe("Networks", Ordered, func() {
 						Status:     util.StringPtr(db.NetworkStatus[db.NETWORK_ACTIVE]),
 					},
 				}
-				err = v.UpdateVirtualNetworkById(netSpec.Id, net)
+				err = v.UpdateVirtualNetworkById(api.VirtualNetworkID(netSpec), net)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("Keyからネットワーク情報を取得", func() {
-				net, err := v.GetVirtualNetworkById(netSpec.Id)
+				net, err := v.GetVirtualNetworkById(api.VirtualNetworkID(netSpec))
 				Expect(err).NotTo(HaveOccurred())
 				jsonData, err := json.MarshalIndent(net, "", "  ")
 				Expect(err).NotTo(HaveOccurred())
@@ -114,7 +114,7 @@ var _ = Describe("Networks", Ordered, func() {
 				}
 				netSpec, err := v.CreateVirtualNetwork(*net)
 				Expect(err).NotTo(HaveOccurred())
-				fmt.Println("Created network with ID:", netSpec.Id)
+				fmt.Println("Created network with ID:", api.VirtualNetworkID(netSpec))
 			})
 
 			It("ネットワークの作成 #3", func() {
@@ -132,7 +132,7 @@ var _ = Describe("Networks", Ordered, func() {
 				}
 				netSpec, err := v.CreateVirtualNetwork(*net)
 				Expect(err).NotTo(HaveOccurred())
-				fmt.Println("Created network with ID:", netSpec.Id)
+				fmt.Println("Created network with ID:", api.VirtualNetworkID(netSpec))
 			})
 
 			It("ネットワークの一覧取得", func() {
@@ -148,7 +148,7 @@ var _ = Describe("Networks", Ordered, func() {
 			})
 
 			It("ネットワークの削除", func() {
-				err = v.DeleteVirtualNetworkById(nets[0].Id)
+				err = v.DeleteVirtualNetworkById(api.VirtualNetworkID(nets[0]))
 				Expect(err).NotTo(HaveOccurred())
 			})
 

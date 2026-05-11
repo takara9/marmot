@@ -91,7 +91,7 @@ func getRelatedIPNetworks(m *client.MarmotEndpoint, networkId string) ([]api.IPN
 
 func printNetworkDetails(network api.VirtualNetwork, ipNetworks []api.IPNetwork) {
 	fmt.Println("Network Details")
-	fmt.Printf("  Id:              %s\n", displayID(network.Id))
+	fmt.Printf("  Id:              %s\n", displayID(api.VirtualNetworkID(network)))
 	fmt.Printf("  UUID:            %s\n", metadataString(network.Metadata, func(m *api.Metadata) *string { return m.Uuid }))
 	fmt.Printf("  Name:            %s\n", metadataString(network.Metadata, func(m *api.Metadata) *string { return m.Name }))
 	fmt.Printf("  Status:          %s\n", formatNetworkStatus(network.Status))

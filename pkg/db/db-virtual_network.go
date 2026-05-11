@@ -124,13 +124,20 @@ func (d *Database) CreateVirtualNetwork(spec api.VirtualNetwork) (api.VirtualNet
 		slog.Error("CreateVirtualNetwork()", "err", err)
 		return api.VirtualNetwork{}, err
 	}
+	if network.Metadata == nil {
+		network.Metadata = &api.Metadata{}
+	}
+	if network.Spec == nil {
+		network.Spec = &api.VirtualNetworkSpec{}
+	}
 
 	//一意なIDを発行
 	var key string
 	for {
 		network.Metadata.Uuid = util.StringPtr(uuid.New().String())
-		network.Id = (*network.Metadata.Uuid)[:5]
-		key = NetworkPrefix + "/" + network.Id
+		id := (*network.Metadata.Uuid)[:5]
+		api.SetVirtualNetworkID(&network, id)
+		key = NetworkPrefix + "/" + id
 		_, err := d.GetJSON(key, &network)
 		if err == ErrNotFound {
 			break
@@ -142,7 +149,7 @@ func (d *Database) CreateVirtualNetwork(spec api.VirtualNetwork) (api.VirtualNet
 
 	// ブリッジ名の自動生成
 	if network.Spec.BridgeName == nil {
-		bridgeName := "br-" + network.Id
+		bridgeName := "br-" + api.VirtualNetworkID(network)
 		network.Spec.BridgeName = util.StringPtr(bridgeName)
 	}
 
@@ -189,6 +196,7 @@ func (d *Database) GetVirtualNetworks() ([]api.VirtualNetwork, error) {
 			slog.Error("Unmarshal() failed", "err", err, "key", string(kv.Key))
 			continue
 		}
+		normalizeVirtualNetworkID(&network, string(kv.Key))
 		networks = append(networks, network)
 	}
 
@@ -204,6 +212,7 @@ func (d *Database) GetVirtualNetworkById(id string) (api.VirtualNetwork, error) 
 		slog.Error("GetVirtualNetworkById()", "err", err, "id", id, "key", key) // ここでエラーが発生する。なぜ？？ not found
 		return api.VirtualNetwork{}, err
 	}
+	normalizeVirtualNetworkID(&network, key)
 	return network, nil
 }
 
@@ -234,6 +243,7 @@ func (d *Database) GetVirtualNetworkByName(name string) (api.VirtualNetwork, err
 			slog.Error("Unmarshal() failed", "err", err, "key", string(kv.Key))
 			continue
 		}
+		normalizeVirtualNetworkID(&network, string(kv.Key))
 		if network.Metadata == nil || network.Metadata.Name == nil || *network.Metadata.Name != name {
 			continue
 		}
@@ -335,9 +345,10 @@ func (d *Database) updateVirtualNetwork(id string, spec api.VirtualNetwork) erro
 	}
 	expected := resp.Kvs[0].ModRevision
 
-	rec.Id = id
+	normalizeVirtualNetworkID(&rec, key)
 	// パッチ適用
 	util.PatchStruct(&rec, spec)
+	api.SetVirtualNetworkID(&rec, id)
 
 	err = d.PutJSONCAS(key, expected, &rec)
 	if err != nil {
@@ -431,7 +442,8 @@ func (d *Database) PutVirtualNetworksETCD(vnet api.VirtualNetwork) error {
 	}
 
 	// IDは一意であると信じて処理
-	key := NetworkPrefix + "/" + vnet.Id
+	key := NetworkPrefix + "/" + api.VirtualNetworkID(vnet)
+	api.SetVirtualNetworkID(&network, api.VirtualNetworkID(vnet))
 
 	// ステータスセット、タイムスタンプセット
 	var s api.Status
@@ -446,6 +458,20 @@ func (d *Database) PutVirtualNetworksETCD(vnet api.VirtualNetwork) error {
 	}
 
 	return nil
+}
+
+func normalizeVirtualNetworkID(network *api.VirtualNetwork, key string) {
+	if network == nil {
+		return
+	}
+	if id := api.VirtualNetworkID(*network); id != "" {
+		return
+	}
+	parts := strings.Split(strings.TrimSpace(key), "/")
+	if len(parts) == 0 {
+		return
+	}
+	api.SetVirtualNetworkID(network, parts[len(parts)-1])
 }
 
 // MakeFollowerVirtualNetworkEntry creates a follower-side network object
@@ -484,7 +510,7 @@ func (d *Database) MakeFollowerVirtualNetworkEntry(headNetwork api.VirtualNetwor
 		}
 		labels := *n.Metadata.Labels
 		if GetNetworkSyncRole(labels) == "follower" && GetHeadNetworkID(labels) == headNetworkID {
-			return n.Id, nil
+			return api.VirtualNetworkID(n), nil
 		}
 	}
 
@@ -506,7 +532,6 @@ func (d *Database) MakeFollowerVirtualNetworkEntry(headNetwork api.VirtualNetwor
 	}
 
 	follower := api.VirtualNetwork{
-		Id: id,
 		Metadata: &api.Metadata{
 			Name:     headNetwork.Metadata.Name,
 			NodeName: util.StringPtr(followerNodeName),
@@ -521,6 +546,7 @@ func (d *Database) MakeFollowerVirtualNetworkEntry(headNetwork api.VirtualNetwor
 			Message:             util.StringPtr("ヘッドノードのネットワーク作成完了を待機中"),
 		},
 	}
+	api.SetVirtualNetworkID(&follower, id)
 
 	if follower.Spec != nil {
 		follower.Spec.IpNetworkId = nil

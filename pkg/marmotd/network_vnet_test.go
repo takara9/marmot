@@ -101,11 +101,11 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 			net.Spec.IpAddress = util.StringPtr("192.168.200.0/24")
 			createdNet, err := m.Db.CreateVirtualNetwork(net)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(createdNet.Id).NotTo(BeEmpty())
+			Expect(api.VirtualNetworkID(createdNet)).NotTo(BeEmpty())
 			Expect(createdNet.Metadata.Uuid).NotTo(BeNil())
 			Expect(createdNet.Spec.IpAddress).To(Equal(util.StringPtr("192.168.200.0/24")))
-			GinkgoWriter.Println("Created network ID: ", createdNet.Id)
-			networkId1 = createdNet.Id
+			GinkgoWriter.Println("Created network ID: ", api.VirtualNetworkID(createdNet))
+			networkId1 = api.VirtualNetworkID(createdNet)
 		})
 
 		It("仮想ネットワークの情報取得", func() {
@@ -127,8 +127,8 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 			net.Spec.IpAddress = util.StringPtr("192.168.200.0/24")
 			createdNet, err := m.Db.CreateVirtualNetwork(net)
 			Expect(err).ToNot(HaveOccurred())
-			GinkgoWriter.Println("Created network ID: ", createdNet.Id)
-			networkId2 = createdNet.Id
+			GinkgoWriter.Println("Created network ID: ", api.VirtualNetworkID(createdNet))
+			networkId2 = api.VirtualNetworkID(createdNet)
 		})
 
 		It("仮想ネットワークのステータス更新", func() {
@@ -185,8 +185,8 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 			net.Spec.IpAddress = util.StringPtr("192.168.201.0/24")
 			createdNet, err := m.Db.CreateVirtualNetwork(net)
 			Expect(err).To(HaveOccurred())
-			Expect(createdNet.Id).To(BeEmpty())
-			GinkgoWriter.Println("Created network ID: ", createdNet.Id)
+			Expect(api.VirtualNetworkID(createdNet)).To(BeEmpty())
+			GinkgoWriter.Println("Created network ID: ", api.VirtualNetworkID(createdNet))
 		})
 
 		It("仮想ネットワークの削除タイムスタンプのセット", func() {
@@ -217,7 +217,7 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(nets).To(BeNil())
 			for _, net := range nets {
-				GinkgoWriter.Println("ネットワークID: ", net.Id, " ネットワーク名: ", *net.Metadata.Name, " ステータス: ", db.NetworkStatus[net.Status.StatusCode])
+				GinkgoWriter.Println("ネットワークID: ", api.VirtualNetworkID(net), " ネットワーク名: ", *net.Metadata.Name, " ステータス: ", db.NetworkStatus[net.Status.StatusCode])
 				Expect(net.Status.DeletionTimeStamp).NotTo(BeNil())
 			}
 			jsonByte, err := json.MarshalIndent(nets, "", "  ")

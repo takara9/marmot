@@ -34,6 +34,9 @@ func (m *Marmot) GetVirtualNetworksAndPutDB() ([]api.VirtualNetwork, error) {
 		net.Metadata = &meta
 		net.Spec = &spec
 
+		net.ApiVersion = "v1"
+		net.Kind = "VirtualNetwork"
+
 		// name
 		name, err := n.GetName()
 		if err != nil {
@@ -49,7 +52,7 @@ func (m *Marmot) GetVirtualNetworksAndPutDB() ([]api.VirtualNetwork, error) {
 			continue
 		}
 		net.Metadata.Uuid = util.StringPtr(uuid)
-		net.Id = uuid[:5] // IDはUUIDの先頭8文字を使用
+		api.SetVirtualNetworkID(&net, uuid[:5]) // IDはUUIDの先頭8文字を使用
 
 		// Bridge
 		bridge, err := n.GetBridgeName()
@@ -96,18 +99,18 @@ func (m *Marmot) GetVirtualNetworksAndPutDB() ([]api.VirtualNetwork, error) {
 		existingNet, err := m.Db.GetVirtualNetworkByName(name)
 		if err == nil {
 			if existingNet.Metadata.Uuid != net.Metadata.Uuid {
-				err := m.Db.DeleteVirtualNetworkById(existingNet.Id)
+				err := m.Db.DeleteVirtualNetworkById(api.VirtualNetworkID(existingNet))
 				if err != nil {
-					slog.Error("Failed to delete existing virtual network in ETCD", "err", err, "networkId", existingNet.Id)
+					slog.Error("Failed to delete existing virtual network in ETCD", "err", err, "networkId", api.VirtualNetworkID(existingNet))
 					continue
 				}
 			}
 		}
 
 		// 既にETCDに登録されているか確認
-		_, err = m.Db.GetVirtualNetworkById(net.Id)
+		_, err = m.Db.GetVirtualNetworkById(api.VirtualNetworkID(net))
 		if err == nil {
-			slog.Debug("Virtual network already exists in ETCD, skipping", "id", net.Id)
+			slog.Debug("Virtual network already exists in ETCD, skipping", "id", api.VirtualNetworkID(net))
 			continue
 		} else if err == db.ErrNotFound {
 			// このノードで発見したネットワークにノード名を付与する
@@ -124,7 +127,7 @@ func (m *Marmot) GetVirtualNetworksAndPutDB() ([]api.VirtualNetwork, error) {
 		//net.Status = &api.Status{
 		//	Status: util.IntPtrInt(db.NETWORK_ACTIVE),
 		//}
-		m.Db.UpdateVirtualNetworkStatus(net.Id, db.NETWORK_ACTIVE)
+		m.Db.UpdateVirtualNetworkStatus(api.VirtualNetworkID(net), db.NETWORK_ACTIVE)
 
 		// 戻り値に追加
 		apiNetworks = append(apiNetworks, net)
@@ -135,10 +138,11 @@ func (m *Marmot) GetVirtualNetworksAndPutDB() ([]api.VirtualNetwork, error) {
 // 仮想ネットワークの作成
 // この関数は、PENDING状態のオブジェクトを受け取ることを想定している
 func (m *Marmot) DeployVirtualNetwork(vnet api.VirtualNetwork) error {
-	slog.Debug("DeployVirtualNetwork called", "vnet", vnet.Id)
+	vnetID := api.VirtualNetworkID(vnet)
+	slog.Debug("DeployVirtualNetwork called", "vnet", vnetID)
 
 	// 仮想ネットワークの状態をPROVISIONINGに更新
-	m.Db.UpdateVirtualNetworkStatus(vnet.Id, db.NETWORK_PROVISIONING)
+	m.Db.UpdateVirtualNetworkStatus(vnetID, db.NETWORK_PROVISIONING)
 
 	// 仮想ネットワークのXMLを作成
 	xml, err := virt.CreateVirtualNetworkXML(vnet)
@@ -146,12 +150,12 @@ func (m *Marmot) DeployVirtualNetwork(vnet api.VirtualNetwork) error {
 		slog.Error("Failed to create virtual network XML", "err", err)
 		return err
 	}
-	slog.Debug("Virtual network XML created", "id", vnet.Id)
+	slog.Debug("Virtual network XML created", "id", vnetID)
 
 	// IPネットワークの指定があるかの判定
 	if vnet.Spec.IPNetworkAddress == nil {
 		// 任意のIPネットワーク作成
-		id, err := m.Db.CreateAnyIpNetwork(vnet.Id)
+		id, err := m.Db.CreateAnyIpNetwork(vnetID)
 		if err != nil {
 			slog.Error("Failed to create IP network", "err", err)
 			return err
@@ -162,7 +166,7 @@ func (m *Marmot) DeployVirtualNetwork(vnet api.VirtualNetwork) error {
 		ipNetworkSpec := api.IPNetwork{
 			AddressMaskLen: vnet.Spec.IPNetworkAddress,
 		}
-		id, err := m.Db.CreateIpNetwork(vnet.Id, &ipNetworkSpec)
+		id, err := m.Db.CreateIpNetwork(vnetID, &ipNetworkSpec)
 		if err != nil {
 			slog.Error("Failed to create IP network", "err", err)
 			return err
@@ -177,7 +181,7 @@ func (m *Marmot) DeployVirtualNetwork(vnet api.VirtualNetwork) error {
 	}
 
 	//　仮想ネットワークのデータを更新
-	if err := m.Db.UpdateVirtualNetworkById(vnet.Id, vnet); err != nil {
+	if err := m.Db.UpdateVirtualNetworkById(vnetID, vnet); err != nil {
 		slog.Error("Failed to update virtual network", "err", err)
 		return err
 	}
@@ -186,7 +190,7 @@ func (m *Marmot) DeployVirtualNetwork(vnet api.VirtualNetwork) error {
 	// コントローラーにまかせるか？
 
 	// 仮想ネットワークの状態をACTIVEに更新
-	m.Db.UpdateVirtualNetworkStatus(vnet.Id, db.NETWORK_ACTIVE)
+	m.Db.UpdateVirtualNetworkStatus(vnetID, db.NETWORK_ACTIVE)
 	return nil
 }
 
@@ -238,7 +242,7 @@ func (m *Marmot) DeleteVirtualNetwork(networkId string) error {
 
 	// 実態が消えたら、データベースからも削除する
 	// DeleteVirtualNetworkById 内で必要に応じて紐付いたIPネットワークも削除する。
-	if err := m.Db.DeleteVirtualNetworkById(vnet.Id); err != nil {
+	if err := m.Db.DeleteVirtualNetworkById(api.VirtualNetworkID(vnet)); err != nil {
 		m.Db.UpdateVirtualNetworkStatus(networkId, db.NETWORK_ERROR)
 		slog.Error("Failed to delete virtual network", "err", err)
 		return err
@@ -269,26 +273,27 @@ func (m *Marmot) CheckVirtualNetworks() error {
 		return err
 	}
 	for _, vnet := range vNetworks {
+		vnetID := api.VirtualNetworkID(vnet)
 		_, found, err := m.Virt.GetVirtualNetworkByName(*vnet.Metadata.Name)
 		if err != nil {
-			slog.Error("Error checking virtual network existence", "err", err, "networkId", vnet.Id)
+			slog.Error("Error checking virtual network existence", "err", err, "networkId", vnetID)
 			if !found {
 				// Createから１０分経過しても実態が存在しない場合は、エラーにする
 				if vnet.Status != nil && vnet.Status.CreationTimeStamp != nil {
 					creationTime := *vnet.Status.CreationTimeStamp
 					if time.Since(creationTime) > 10*time.Minute {
-						slog.Debug("仮想ネットワークの実態が存在しないため、エラーにする", "networkId", vnet.Id)
-						m.Db.UpdateVirtualNetworkStatus(vnet.Id, db.NETWORK_ERROR)
+						slog.Debug("仮想ネットワークの実態が存在しないため、エラーにする", "networkId", vnetID)
+						m.Db.UpdateVirtualNetworkStatus(vnetID, db.NETWORK_ERROR)
 						continue
 					}
 				} else {
-					slog.Debug("CreationTimeStamp is nil, skipping error update for now", "networkId", vnet.Id)
+					slog.Debug("CreationTimeStamp is nil, skipping error update for now", "networkId", vnetID)
 				}
 			} else {
 				// 削除予定が無いことを確認して、ACTIVEに更新する
 				if vnet.Status != nil && vnet.Status.DeletionTimeStamp == nil {
-					slog.Debug("仮想ネットワークの実態が存在、削除予定が無いためACTIVEに更新", "networkId", vnet.Id)
-					m.Db.UpdateVirtualNetworkStatus(vnet.Id, db.NETWORK_ACTIVE)
+					slog.Debug("仮想ネットワークの実態が存在、削除予定が無いためACTIVEに更新", "networkId", vnetID)
+					m.Db.UpdateVirtualNetworkStatus(vnetID, db.NETWORK_ACTIVE)
 					continue
 				}
 			}
@@ -318,9 +323,9 @@ func (m *Marmot) CheckVirtualNetworks() error {
 		}
 
 		// 既にETCDに登録されているか確認
-		_, err = m.Db.GetVirtualNetworkById(vnet.Id)
+		_, err = m.Db.GetVirtualNetworkById(api.VirtualNetworkID(*vnet))
 		if err == nil {
-			slog.Debug("Virtual network already exists in ETCD, skipping", "id", vnet.Id)
+			slog.Debug("Virtual network already exists in ETCD, skipping", "id", api.VirtualNetworkID(*vnet))
 			continue
 		} else if err == db.ErrNotFound {
 			// このノードで発見したネットワークにノード名を付与する
@@ -332,7 +337,7 @@ func (m *Marmot) CheckVirtualNetworks() error {
 				slog.Error("Failed to put virtual network to ETCD", "err", err)
 			}
 		}
-		m.Db.UpdateVirtualNetworkStatus(vnet.Id, db.NETWORK_ACTIVE)
+		m.Db.UpdateVirtualNetworkStatus(api.VirtualNetworkID(*vnet), db.NETWORK_ACTIVE)
 	}
 
 	return nil
@@ -361,7 +366,7 @@ func convertLibvirtNetworkToAPINetwork(libnet libvirt.Network) (*api.VirtualNetw
 		return nil, err
 	}
 	net.Metadata.Uuid = util.StringPtr(uuid)
-	net.Id = uuid[:5] // IDはUUIDの先頭8文字を使用
+	api.SetVirtualNetworkID(&net, uuid[:5]) // IDはUUIDの先頭8文字を使用
 
 	// Bridge
 	bridge, err := libnet.GetBridgeName()
