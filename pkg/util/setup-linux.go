@@ -120,11 +120,12 @@ func hostIDBytes(machineID string) []byte {
 //
 //	マウンポイントの絶対パス、使用しているループバックデバイス、エラー
 func MountVolume(v api.Volume) (string, string, error) {
+	volumeID := api.VolumeID(v)
 	// パラメータチェック
 	if v.Spec.Type == nil {
 		return "", "", errors.New("volume type is nil")
 	}
-	if v.Id == "" {
+	if volumeID == "" {
 		return "", "", errors.New("volume id is empty")
 	}
 	if v.Spec.Path == nil {
@@ -140,7 +141,7 @@ func MountVolume(v api.Volume) (string, string, error) {
 	}
 
 	// マウントポイント作成
-	mountPoint := fmt.Sprintf("/mnt/%s", v.Id)
+	mountPoint := fmt.Sprintf("/mnt/%s", volumeID)
 	err := os.Mkdir(mountPoint, 0750)
 	if err != nil && !os.IsExist(err) {
 		err := errors.New("failed mkdir to setup OS-Disk")

@@ -65,13 +65,13 @@ var _ = Describe("Volumes", Ordered, func() {
 				}
 				volSpec, err = v.CreateVolumeOnDB2(*vol)
 				Expect(err).NotTo(HaveOccurred())
-				fmt.Println("Created data volume with ID:", volSpec.Id)
+				fmt.Println("Created data volume with ID:", api.VolumeID(*volSpec))
 			})
 
 			It("Keyからボリューム情報を取得", func() {
-				vol, err := v.GetVolumeById(volSpec.Id)
+				vol, err := v.GetVolumeById(api.VolumeID(*volSpec))
 				Expect(err).NotTo(HaveOccurred())
-				fmt.Printf("Retrieved volume: Id=%s Key=%s Name=%s Path=%s Size=%d Status=%v\n", vol.Id, *vol.Metadata.Key, *vol.Metadata.Name, *vol.Spec.Path, *vol.Spec.Size, db.VolStatus[vol.Status.StatusCode])
+				fmt.Printf("Retrieved volume: Id=%s Key=%s Name=%s Path=%s Size=%d Status=%v\n", api.VolumeID(vol), *vol.Metadata.Key, *vol.Metadata.Name, *vol.Spec.Path, *vol.Spec.Size, db.VolStatus[vol.Status.StatusCode])
 			})
 
 			It("ボリュームの状態更新 #1", func() {
@@ -81,12 +81,12 @@ var _ = Describe("Volumes", Ordered, func() {
 						Status:     util.StringPtr(db.VolStatus[db.VOLUME_AVAILABLE]),
 					},
 				}
-				err = v.UpdateVolume(volSpec.Id, vol)
+				err = v.UpdateVolume(api.VolumeID(*volSpec), vol)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("Keyからボリューム情報を取得", func() {
-				vol, err := v.GetVolumeById(volSpec.Id)
+				vol, err := v.GetVolumeById(api.VolumeID(*volSpec))
 				Expect(err).NotTo(HaveOccurred())
 				jsonData, err := json.MarshalIndent(vol, "", "  ")
 				Expect(err).NotTo(HaveOccurred())
@@ -107,7 +107,7 @@ var _ = Describe("Volumes", Ordered, func() {
 				}
 				volSpec, err := v.CreateVolumeOnDB2(*vol)
 				Expect(err).NotTo(HaveOccurred())
-				fmt.Println("Created data volume with ID:", volSpec.Id)
+				fmt.Println("Created data volume with ID:", api.VolumeID(*volSpec))
 			})
 
 			It("ボリュームの作成 #3", func() {
@@ -124,7 +124,7 @@ var _ = Describe("Volumes", Ordered, func() {
 				}
 				volSpec, err := v.CreateVolumeOnDB2(*vol)
 				Expect(err).NotTo(HaveOccurred())
-				fmt.Println("Created data volume with ID:", volSpec.Id)
+				fmt.Println("Created data volume with ID:", api.VolumeID(*volSpec))
 			})
 
 			It("ボリュームの一覧取得", func() {
@@ -143,7 +143,7 @@ var _ = Describe("Volumes", Ordered, func() {
 				vols, err := v.FindVolumeByName("data01", "data")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(len(vols)).To(Equal(1))
-				err = v.DeleteVolume(vols[0].Id)
+				err = v.DeleteVolume(api.VolumeID(vols[0]))
 				Expect(err).NotTo(HaveOccurred())
 			})
 

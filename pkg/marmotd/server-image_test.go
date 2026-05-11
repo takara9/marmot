@@ -198,7 +198,7 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			data, err := json.MarshalIndent(sv, "", "  ")
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("オブジェクト情報: ", string(data))
-			bootVolId = append(bootVolId, sv.Spec.BootVolume.Id)
+			bootVolId = append(bootVolId, api.VolumeID(*sv.Spec.BootVolume))
 		})
 
 		It("OS起動待ち", func() {
@@ -276,9 +276,9 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			data, err := json.MarshalIndent(sv, "", "  ")
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("オブジェクト情報: ", string(data))
-			bootVolId = append(bootVolId, sv.Spec.BootVolume.Id)
-			dataVolId = append(dataVolId, (*sv.Spec.Storage)[0].Id)
-			dataVolId = append(dataVolId, (*sv.Spec.Storage)[1].Id)
+			bootVolId = append(bootVolId, api.VolumeID(*sv.Spec.BootVolume))
+			dataVolId = append(dataVolId, api.VolumeID((*sv.Spec.Storage)[0]))
+			dataVolId = append(dataVolId, api.VolumeID((*sv.Spec.Storage)[1]))
 		})
 
 		It("OS起動待ち", func() {
@@ -360,7 +360,7 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("サーバー情報: ", string(data))
 			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-			bootVolId = append(bootVolId, sv.Spec.BootVolume.Id)
+			bootVolId = append(bootVolId, api.VolumeID(*sv.Spec.BootVolume))
 		})
 
 		It("OS起動待ち", func() {
@@ -420,7 +420,7 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			fmt.Println("サーバー情報: ", string(data))
 			Expect(*sv.Metadata.Name).To(Equal("test-vm-3"))
 			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-			bootVolId = append(bootVolId, sv.Spec.BootVolume.Id)
+			bootVolId = append(bootVolId, api.VolumeID(*sv.Spec.BootVolume))
 		})
 
 		It("OS起動待ち", func() {
@@ -506,7 +506,7 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("サーバー情報: ", string(data))
 			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-			bootVolId = append(bootVolId, sv.Spec.BootVolume.Id)
+			bootVolId = append(bootVolId, api.VolumeID(*sv.Spec.BootVolume))
 
 		})
 

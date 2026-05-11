@@ -51,7 +51,7 @@ var volumeListCmd = &cobra.Command{
 						iscsi = "Y"
 					}
 					fmt.Printf("%2d", i+1)
-					fmt.Printf("  %1v%-6v", deletionMarker(v.Status), v.Id)
+					fmt.Printf("  %1v%-6v", deletionMarker(v.Status), api.VolumeID(v))
 					fmt.Printf("  %-16v", *v.Metadata.Name)
 					fmt.Printf("  %-10v", nodeName)
 					fmt.Printf("  %-4v", *v.Spec.Kind)

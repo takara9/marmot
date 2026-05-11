@@ -24,11 +24,11 @@ const (
 	IMAGE_WAITING         = 6 // ヘッドノードの作成完了待ち
 
 	// Image label keys for distributed sync
-	ImageLabelSyncRole    = "syncRole"
-	ImageLabelHeadImageID = "headImageId"
+	ImageLabelSyncRole     = "syncRole"
+	ImageLabelHeadImageID  = "headImageId"
 	ImageLabelHeadNodeName = "headNodeName"
-	ImageLabelSource      = "source"
-	ImageLabelServerID    = "serverId"
+	ImageLabelSource       = "source"
+	ImageLabelServerID     = "serverId"
 )
 
 var ImageStatus = map[int]string{
@@ -233,8 +233,8 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 
 	// ボリュームがOSボリュームであることを確認
 	if *bootVol.Spec.Kind != "os" {
-		slog.Error("MakeImageEntryFromRunningVM() volume is not an OS volume", "volumeId", bootVol.Id)
-		return api.Image{}, fmt.Errorf("volume with id %v is not an OS volume", bootVol.Id)
+		slog.Error("MakeImageEntryFromRunningVM() volume is not an OS volume", "volumeId", api.VolumeID(*bootVol))
+		return api.Image{}, fmt.Errorf("volume with id %v is not an OS volume", api.VolumeID(*bootVol))
 	}
 
 	//イメージの基本情報を保存
@@ -303,8 +303,8 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 			},
 		}
 	} else {
-		slog.Error("MakeImageEntryFromRunningVM() unsupported volume type", "volumeId", bootVol.Id, "type", bootVol.Spec.Type)
-		return api.Image{}, fmt.Errorf("unsupported volume type for volume with id %v: %v", bootVol.Id, bootVol.Spec.Type)
+		slog.Error("MakeImageEntryFromRunningVM() unsupported volume type", "volumeId", api.VolumeID(*bootVol), "type", bootVol.Spec.Type)
+		return api.Image{}, fmt.Errorf("unsupported volume type for volume with id %v: %v", api.VolumeID(*bootVol), bootVol.Spec.Type)
 	}
 
 	key := ImagePrefix + "/" + id

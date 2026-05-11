@@ -234,7 +234,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 				g.Expect(sv.Status.StatusCode).To(Equal(db.SERVER_RUNNING))
-				vm1BootVolumeId = sv.Spec.BootVolume.Id
+				vm1BootVolumeId = api.VolumeID(*sv.Spec.BootVolume)
 			}, "120s", "10s").Should(Succeed())
 		})
 
@@ -332,9 +332,9 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("サーバー情報: ", string(data))
 			GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
-			vm2BootVolumeId = sv.Spec.BootVolume.Id
-			vm2DataVolumeId1 = (*sv.Spec.Storage)[0].Id
-			vm2DataVolumeId2 = (*sv.Spec.Storage)[1].Id
+			vm2BootVolumeId = api.VolumeID(*sv.Spec.BootVolume)
+			vm2DataVolumeId1 = api.VolumeID((*sv.Spec.Storage)[0])
+			vm2DataVolumeId2 = api.VolumeID((*sv.Spec.Storage)[1])
 		})
 
 		It("LVMの状態確認", func() {

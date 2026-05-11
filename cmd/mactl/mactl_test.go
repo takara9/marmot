@@ -134,7 +134,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 			Expect(*volume.Metadata.Name).To(Equal("test-volume1"))
 			Expect(*volume.Spec.Size).To(Equal(int(2)))
-			volumeID = volume.Id
+			volumeID = api.VolumeID(volume)
 			fmt.Println("Volume ID:", volumeID)
 		})
 
@@ -181,7 +181,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 			Expect(*volume.Metadata.Name).To(Equal("test-volume2"))
 			Expect(*volume.Spec.Size).To(Equal(int(2)))
-			volumeID = volume.Id
+			volumeID = api.VolumeID(volume)
 			fmt.Println("Volume ID:", volumeID)
 		})
 
@@ -240,7 +240,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 			Expect(*volume.Metadata.Name).To(Equal("test-volume3"))
 			Expect(*volume.Spec.Size).To(Equal(int(16)))
-			volumeID3 = volume.Id
+			volumeID3 = api.VolumeID(volume)
 			fmt.Println("Volume ID:", volumeID3)
 		})
 
@@ -257,7 +257,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 			Expect(*volume.Metadata.Name).To(Equal("test-volume4"))
 			Expect(*volume.Spec.Size).To(Equal(int(16)))
-			volumeID4 = volume.Id
+			volumeID4 = api.VolumeID(volume)
 			fmt.Println("Volume ID:", volumeID4)
 		})
 
@@ -274,7 +274,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 				}
 				GinkgoWriter.Println("Retrieved volumes:")
 				for _, v := range volumes {
-					GinkgoWriter.Printf("  - %s (%s)\n", *v.Metadata.Name, v.Id)
+					GinkgoWriter.Printf("  - %s (%s)\n", *v.Metadata.Name, api.VolumeID(v))
 				}
 				// ボリュームがエラー状態になるまで待つ
 				g.Expect(volumes).To(HaveLen(2))
@@ -314,7 +314,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 				}
 				GinkgoWriter.Println("Retrieved volumes:")
 				for _, v := range volumes {
-					GinkgoWriter.Printf("  - %s (%s)\n", *v.Metadata.Name, v.Id)
+					GinkgoWriter.Printf("  - %s (%s)\n", *v.Metadata.Name, api.VolumeID(v))
 				}
 				// ボリュームがエラー状態になるまで待つ
 				g.Expect(volumes).To(HaveLen(0))
@@ -354,7 +354,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 			Expect(*volume.Metadata.Name).To(Equal("test-origine"))
 			Expect(*volume.Spec.Size).To(Equal(int(2)))
-			volumeID = volume.Id
+			volumeID = api.VolumeID(volume)
 			fmt.Println("Volume ID:", volumeID)
 		})
 
@@ -496,7 +496,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 			Expect(*volume.Metadata.Name).To(Equal("boot-volume1"))
 			Expect(*volume.Spec.Size).To(Equal(int(16)))
-			volumeID3 = volume.Id
+			volumeID3 = api.VolumeID(volume)
 			fmt.Println("Volume ID:", volumeID3)
 		})
 
@@ -513,7 +513,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 			Expect(*volume.Metadata.Name).To(Equal("test-volume2"))
 			Expect(*volume.Spec.Size).To(Equal(int(16)))
-			volumeID4 = volume.Id
+			volumeID4 = api.VolumeID(volume)
 			fmt.Println("Volume ID:", volumeID4)
 		})
 

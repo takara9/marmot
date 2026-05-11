@@ -311,10 +311,11 @@ type VolSpec struct {
 
 // Volume defines model for Volume.
 type Volume struct {
-	Id       string    `json:"id" yaml:"id"`
-	Metadata *Metadata `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-	Spec     *VolSpec  `json:"spec,omitempty" yaml:"spec,omitempty"`
-	Status   *Status   `json:"status,omitempty" yaml:"status,omitempty"`
+	ApiVersion string    `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string    `json:"kind" yaml:"kind"`
+	Metadata   *Metadata `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	Spec       *VolSpec  `json:"spec,omitempty" yaml:"spec,omitempty"`
+	Status     *Status   `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
 // ApiCreateImageJSONRequestBody defines body for ApiCreateImage for application/json ContentType.

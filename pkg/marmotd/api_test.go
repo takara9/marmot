@@ -132,7 +132,7 @@ var _ = Describe("関数テスト", Ordered, func() {
 			body, url, err := marmotClient.CreateVolume(volume)
 			Expect(err).NotTo(HaveOccurred())
 			err = json.Unmarshal(body, &replyVolume)
-			GinkgoWriter.Println("CreateVolume replyVolume id = ", replyVolume.Id)
+			GinkgoWriter.Println("CreateVolume replyVolume id = ", api.VolumeID(replyVolume))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(replyVolume.Metadata).NotTo(BeNil())
 			Expect(replyVolume.Metadata.NodeName).NotTo(BeNil())
@@ -156,8 +156,8 @@ var _ = Describe("関数テスト", Ordered, func() {
 		})
 
 		It("DATAボリューム(qcow2)の削除", func() {
-			GinkgoWriter.Println("受信したボリューム Id = ", replyVolume.Id)
-			body, url, err := marmotClient.DeleteVolumeById(replyVolume.Id)
+			GinkgoWriter.Println("受信したボリューム Id = ", api.VolumeID(replyVolume))
+			body, url, err := marmotClient.DeleteVolumeById(api.VolumeID(replyVolume))
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("DeleteVolumeById body =", string(body))
 			Expect(url).To(BeNil())
@@ -182,7 +182,7 @@ var _ = Describe("関数テスト", Ordered, func() {
 			body, url, err := marmotClient.CreateVolume(vol)
 			Expect(err).NotTo(HaveOccurred())
 			err = json.Unmarshal(body, &replyVolume)
-			GinkgoWriter.Println("CreateVolume replyVolume Id = ", replyVolume.Id)
+			GinkgoWriter.Println("CreateVolume replyVolume Id = ", api.VolumeID(replyVolume))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(replyVolume.Metadata).NotTo(BeNil())
 			Expect(replyVolume.Metadata.NodeName).NotTo(BeNil())
@@ -195,8 +195,8 @@ var _ = Describe("関数テスト", Ordered, func() {
 		})
 
 		It("OSボリューム(qcow2)の削除", func() {
-			GinkgoWriter.Println("受信したボリューム Id = ", replyVolume.Id)
-			body, url, err := marmotClient.DeleteVolumeById(replyVolume.Id)
+			GinkgoWriter.Println("受信したボリューム Id = ", api.VolumeID(replyVolume))
+			body, url, err := marmotClient.DeleteVolumeById(api.VolumeID(replyVolume))
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("DeleteVolumeById body =", string(body))
 			Expect(url).To(BeNil())
@@ -237,7 +237,7 @@ var _ = Describe("関数テスト", Ordered, func() {
 			body, url, err := marmotClient.CreateVolume(volume)
 			Expect(err).NotTo(HaveOccurred())
 			err = json.Unmarshal(body, &replyVolume)
-			GinkgoWriter.Println("CreateVolume replyVolume Id = ", replyVolume.Id)
+			GinkgoWriter.Println("CreateVolume replyVolume Id = ", api.VolumeID(replyVolume))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(replyVolume.Metadata).NotTo(BeNil())
 			Expect(replyVolume.Metadata.NodeName).NotTo(BeNil())
@@ -261,8 +261,8 @@ var _ = Describe("関数テスト", Ordered, func() {
 		})
 
 		It("OSボリューム(LVM)の削除", func() {
-			GinkgoWriter.Println("受信したボリューム Id = ", replyVolume.Id)
-			body, url, err := marmotClient.DeleteVolumeById(replyVolume.Id)
+			GinkgoWriter.Println("受信したボリューム Id = ", api.VolumeID(replyVolume))
+			body, url, err := marmotClient.DeleteVolumeById(api.VolumeID(replyVolume))
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("DeleteVolumeById body =", string(body))
 			Expect(url).To(BeNil())
@@ -299,7 +299,7 @@ var _ = Describe("関数テスト", Ordered, func() {
 			body, url, err := marmotClient.CreateVolume(volume)
 			Expect(err).NotTo(HaveOccurred())
 			err = json.Unmarshal(body, &replyVolume)
-			GinkgoWriter.Println("CreateVolume replyVolume Id = ", replyVolume.Id)
+			GinkgoWriter.Println("CreateVolume replyVolume Id = ", api.VolumeID(replyVolume))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(replyVolume.Metadata).NotTo(BeNil())
 			Expect(replyVolume.Metadata.NodeName).NotTo(BeNil())
@@ -324,12 +324,12 @@ var _ = Describe("関数テスト", Ordered, func() {
 		})
 
 		It("DATAボリューム(LVM)の詳細取得 0001", func() {
-			body, url, err := marmotClient.ShowVolumeById(replyVolume.Id)
+			body, url, err := marmotClient.ShowVolumeById(api.VolumeID(replyVolume))
 			Expect(err).NotTo(HaveOccurred())
 			var vol api.Volume
 			err = json.Unmarshal(body, &vol)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("ShowVolumeById Id  =", vol.Id)
+			GinkgoWriter.Println("ShowVolumeById Id  =", api.VolumeID(vol))
 			GinkgoWriter.Println("ShowVolumeById Key =", *vol.Metadata.Key)
 			GinkgoWriter.Println("ShowVolumeById VolumeName =", *vol.Metadata.Name)
 			Expect(url).To(BeNil())
@@ -340,7 +340,7 @@ var _ = Describe("関数テスト", Ordered, func() {
 			var meta api.Metadata
 			vol.Metadata = &meta
 			vol.Metadata.Name = util.StringPtr("updated-volume-name")
-			body, url, err := marmotClient.UpdateVolumeById(replyVolume.Id, vol)
+			body, url, err := marmotClient.UpdateVolumeById(api.VolumeID(replyVolume), vol)
 			GinkgoWriter.Println("UpdateVolumeById err =", err)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("UpdateVolumeById body =", string(body))
@@ -348,11 +348,11 @@ var _ = Describe("関数テスト", Ordered, func() {
 		})
 
 		It("DATAボリューム(LVM)の詳細取得 0002", func() {
-			body, url, err := marmotClient.ShowVolumeById(replyVolume.Id)
+			body, url, err := marmotClient.ShowVolumeById(api.VolumeID(replyVolume))
 			Expect(err).NotTo(HaveOccurred())
 			var vol api.Volume
 			err = json.Unmarshal(body, &vol)
-			GinkgoWriter.Println("ShowVolumeById Id  =", vol.Id)
+			GinkgoWriter.Println("ShowVolumeById Id  =", api.VolumeID(vol))
 			//GinkgoWriter.Println("ShowVolumeById Key =", *vol.Metadata.Key)
 			GinkgoWriter.Println("ShowVolumeById VolumeName =", *vol.Metadata.Name)
 			Expect(*vol.Metadata.Name).To(Equal("updated-volume-name"))
@@ -360,8 +360,8 @@ var _ = Describe("関数テスト", Ordered, func() {
 		})
 
 		It("DATAボリューム(LVM)の削除", func() {
-			GinkgoWriter.Println("受信したボリューム Id = ", replyVolume.Id)
-			body, url, err := marmotClient.DeleteVolumeById(replyVolume.Id)
+			GinkgoWriter.Println("受信したボリューム Id = ", api.VolumeID(replyVolume))
+			body, url, err := marmotClient.DeleteVolumeById(api.VolumeID(replyVolume))
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("DeleteVolumeById body =", string(body))
 			Expect(url).To(BeNil())
