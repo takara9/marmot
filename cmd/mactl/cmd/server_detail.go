@@ -230,7 +230,7 @@ func printVolumeDetails(indent string, volume *api.Volume) {
 		fmt.Printf("%sN/A\n", indent)
 		return
 	}
-	fmt.Printf("%sId:          %s\n", indent, formatID(volume.Id))
+	fmt.Printf("%sId:          %s\n", indent, formatID(api.VolumeID(*volume)))
 	fmt.Printf("%sName:        %s\n", indent, stringValue(volume.Metadata, func(m *api.Metadata) *string { return m.Name }))
 	fmt.Printf("%sPath:        %s\n", indent, stringValue(volume.Spec, func(s *api.VolSpec) *string { return s.Path }))
 	fmt.Printf("%sType:        %s\n", indent, stringValue(volume.Spec, func(s *api.VolSpec) *string { return s.Type }))

@@ -49,11 +49,11 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 	}
 
 	//一意なIDを発行
-	var id string
-	var key string
+	var id, uuidString, key string
 	for {
 		var tempVol api.Volume
-		id = uuid.New().String()[:5]
+		uuidString = uuid.New().String()
+		id = uuidString[:5]
 		key = VolumePrefix + "/" + id
 		_, err := d.GetJSON(key, &tempVol)
 		if err == ErrNotFound {
@@ -84,8 +84,10 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 		volume.Status = &status
 	}
 
-	volume.Id = id
+	api.SetVolumeID(&volume, id)
 	volume.Metadata.Key = util.StringPtr(key)
+	volume.Metadata.Uuid = util.StringPtr(uuidString)
+	volume.Metadata.Id = util.StringPtr(id)
 	volume.Status.CreationTimeStamp = util.TimePtr(time.Now())
 	volume.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	volume.Status.StatusCode = VOLUME_PENDING
@@ -117,15 +119,15 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 	// QCOW2ボリュームの場合、パスを決定する。OSとDATAでパスを分ける。OSはboot-<id>.qcow2、DATAはdata-<id>.qcow2
 	if *volume.Spec.Type == "qcow2" {
 		if *volume.Spec.Kind == "os" {
-			volume.Spec.Path = util.StringPtr(fmt.Sprintf("/var/lib/marmot/volumes/boot-%s.qcow2", volume.Id))
+			volume.Spec.Path = util.StringPtr(fmt.Sprintf("/var/lib/marmot/volumes/boot-%s.qcow2", api.VolumeID(volume)))
 		} else {
-			volume.Spec.Path = util.StringPtr(fmt.Sprintf("/var/lib/marmot/volumes/data-%s.qcow2", volume.Id))
+			volume.Spec.Path = util.StringPtr(fmt.Sprintf("/var/lib/marmot/volumes/data-%s.qcow2", api.VolumeID(volume)))
 		}
 	}
 
 	// LVMボリュームの場合、パスを決定する
 	if *volume.Spec.Type == "lvm" {
-		configureLVMVolumeSpec(volume.Spec, volume.Id)
+		configureLVMVolumeSpec(volume.Spec, api.VolumeID(volume))
 	}
 
 	// OSボリュームの場合、OsVariantのデフォルト値を設定する  必要か？
@@ -227,7 +229,7 @@ func (d *Database) updateVolume(id string, updateData api.Volume) error {
 	}
 	expected := resp.Kvs[0].ModRevision
 
-	rec.Id = id
+	api.SetVolumeID(&rec, id)
 	// パッチ適用
 	util.PatchStruct(&rec, updateData)
 

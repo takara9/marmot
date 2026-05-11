@@ -169,7 +169,7 @@ func (s *Server) ApiUpdateVolumeById(ctx echo.Context, volumeId string) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 	volume.Metadata.Key = &key
-	volume.Id = volumeId
+	api.SetVolumeID(&volume, volumeId)
 
 	return ctx.JSON(http.StatusOK, volume)
 }

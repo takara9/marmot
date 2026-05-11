@@ -37,7 +37,7 @@ func resolveVolumeIdByName(m *client.MarmotEndpoint, name string) (string, error
 	case 0:
 		return "", fmt.Errorf("ボリューム名 %q に一致するボリュームが見つかりません", name)
 	case 1:
-		return matched[0].Id, nil
+		return api.VolumeID(matched[0]), nil
 	default:
 		return "", fmt.Errorf("ボリューム名 %q に一致するボリュームが複数存在します (%d件)", name, len(matched))
 	}
@@ -75,16 +75,15 @@ var serverCreateCmd = &cobra.Command{
 			// bootVolume の名前解決と既定値設定
 			if virtualServer.Spec.BootVolume != nil {
 				bv := virtualServer.Spec.BootVolume
-				if bv.Id == "" && bv.Spec == nil && bv.Metadata != nil && bv.Metadata.Name != nil && *bv.Metadata.Name != "" {
+				if api.VolumeID(*bv) == "" && bv.Spec == nil && bv.Metadata != nil && bv.Metadata.Name != nil && *bv.Metadata.Name != "" {
 					// id 未設定・Spec 無し・名前あり → 名前でボリューム検索
 					pvId, err := resolveVolumeIdByName(m, *bv.Metadata.Name)
 					if err != nil {
 						fmt.Fprintln(os.Stderr, "bootVolume:", err)
 						return err
 					}
-					bv.Id = pvId
-					bv.Metadata.Id = util.StringPtr(pvId)
-				} else if bv.Id == "" && bv.Spec != nil {
+					api.SetVolumeID(bv, pvId)
+				} else if api.VolumeID(*bv) == "" && bv.Spec != nil {
 					// 新規ボリューム：名前未設定なら "boot" をデフォルトに
 					if bv.Metadata == nil {
 						bv.Metadata = &api.Metadata{Name: util.StringPtr("boot")}
@@ -98,17 +97,14 @@ var serverCreateCmd = &cobra.Command{
 			if virtualServer.Spec.Storage != nil {
 				for i := range *virtualServer.Spec.Storage {
 					vol := &(*virtualServer.Spec.Storage)[i]
-					if vol.Id == "" && vol.Spec == nil && vol.Metadata != nil && vol.Metadata.Name != nil && *vol.Metadata.Name != "" {
+					if api.VolumeID(*vol) == "" && vol.Spec == nil && vol.Metadata != nil && vol.Metadata.Name != nil && *vol.Metadata.Name != "" {
 						// id 未設定・Spec 無し・名前あり → 名前でボリューム検索
 						pvId, err := resolveVolumeIdByName(m, *vol.Metadata.Name)
 						if err != nil {
 							fmt.Fprintf(os.Stderr, "Storage[%d]: %v\n", i, err)
 							return err
 						}
-						vol.Id = pvId
-						if vol.Metadata != nil {
-							vol.Metadata.Id = util.StringPtr(pvId)
-						}
+						api.SetVolumeID(vol, pvId)
 					} else if vol.Spec != nil {
 						// 新規ボリューム：type/kind のデフォルト
 						if vol.Spec.Type == nil {

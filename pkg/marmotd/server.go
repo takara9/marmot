@@ -146,6 +146,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	bootVol.Metadata = &bootVolMeta
 	var virtSpec virt.ServerSpec
 
+	bootVol.ApiVersion = "v1"
+	bootVol.Kind = "Volume"
+
 	serverConfig, err := m.Db.GetServerById(id)
 	if err != nil {
 		slog.Error("GetServerById()", "err", err)
@@ -462,7 +465,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		return "", err
 	}
 
-	slog.Debug("ブートボリュームのIDをサーバーの構成データに設定", "temp var volume id", bootVolDefined.Id)
+	slog.Debug("ブートボリュームのIDをサーバーの構成データに設定", "temp var volume id", api.VolumeID(bootVolDefined))
 	serverConfig.Spec.BootVolume = &bootVolDefined
 	err = m.Db.UpdateServer(api.ServerID(serverConfig), serverConfig)
 	if err != nil {
@@ -482,9 +485,13 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	slog.Debug("データボリュームの生成")
 	if serverConfig.Spec.Storage != nil {
 		for i, disk := range *serverConfig.Spec.Storage {
-			if len(disk.Id) > 0 {
-				slog.Debug("既存ボリュームを使用", "disk index", i, "volume id", disk.Id)
-				diskVol, err := m.GetVolumeById(disk.Id)
+			disk.ApiVersion	= "v1"
+			disk.Kind		= "Volume"
+
+			diskID := api.VolumeID(disk)
+			if len(diskID) > 0 {
+				slog.Debug("既存ボリュームを使用", "disk index", i, "volume id", diskID)
+				diskVol, err := m.GetVolumeById(diskID)
 				if err != nil {
 					slog.Error("GetVolumeById()", "err", err)
 					return "", err
@@ -494,9 +501,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 				var peersistent bool = true
 				diskVol.Spec.Persistent = &peersistent
 
-				slog.Debug("既存ボリュームの情報取得成功", "disk index", i, "volume id", diskVol.Id, "path", diskVol.Spec.Path, "status", diskVol.Status.Status)
+				slog.Debug("既存ボリュームの情報取得成功", "disk index", i, "volume id", api.VolumeID(*diskVol), "path", diskVol.Spec.Path, "status", diskVol.Status.Status)
 				(*serverConfig.Spec.Storage)[i] = *diskVol
-				slog.Debug("既存ボリュームの情報設定成功", "disk index", i, "volume id", diskVol.Id, "disk", disk)
+				slog.Debug("既存ボリュームの情報設定成功", "disk index", i, "volume id", api.VolumeID(*diskVol), "disk", disk)
 				continue
 			}
 
@@ -509,7 +516,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 					return "", err
 				}
 				(*serverConfig.Spec.Storage)[i] = diskVol
-				slog.Debug("データボリューム 作成成功", "disk index", i, "volume id", diskVol.Id)
+				slog.Debug("データボリューム 作成成功", "disk index", i, "volume id", api.VolumeID(diskVol))
 			}
 			if disk.Spec.Type != nil && *disk.Spec.Type == "lvm" {
 				slog.Debug("lvmボリュームを作成", "disk index", i)
@@ -520,7 +527,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 					return "", err
 				}
 				(*serverConfig.Spec.Storage)[i] = diskVol
-				slog.Debug("データボリューム 作成成功", "disk index", i, "volume id", diskVol.Id)
+				slog.Debug("データボリューム 作成成功", "disk index", i, "volume id", api.VolumeID(diskVol))
 			}
 		}
 	}
@@ -834,8 +841,8 @@ func (m *Marmot) DeleteServerByIdManage(id string) error {
 	}
 
 	// ブートボリュームの削除タイムスタンプのセット
-	if sv.Spec != nil && sv.Spec.BootVolume != nil && strings.TrimSpace(sv.Spec.BootVolume.Id) != "" {
-		m.Db.SetVolumeDeletionTimestamp(sv.Spec.BootVolume.Id)
+	if sv.Spec != nil && sv.Spec.BootVolume != nil && strings.TrimSpace(api.VolumeID(*sv.Spec.BootVolume)) != "" {
+		m.Db.SetVolumeDeletionTimestamp(api.VolumeID(*sv.Spec.BootVolume))
 	} else {
 		slog.Warn("DeleteServerByIdManage() boot volume is missing, skipping deletion timestamp", "serverId", id, "serverName", serverName)
 	}
@@ -844,16 +851,17 @@ func (m *Marmot) DeleteServerByIdManage(id string) error {
 	if sv.Spec != nil && sv.Spec.Storage != nil {
 		slog.Debug("アタッチされているボリューム削除のため Deletion Timestamp をセット", "ボリューム数", len(*sv.Spec.Storage))
 		for i, vol := range *sv.Spec.Storage {
-			slog.Debug("DeleteServerById()", "index", i, "deleting volume id", vol.Id)
+			volID := api.VolumeID(vol)
+			slog.Debug("DeleteServerById()", "index", i, "deleting volume id", volID)
 			if vol.Spec != nil && vol.Spec.Persistent != nil && *vol.Spec.Persistent {
-				slog.Debug("DeleteServerById()", "skipping persistent volume", vol.Id)
+				slog.Debug("DeleteServerById()", "skipping persistent volume", volID)
 				continue
 			}
-			if strings.TrimSpace(vol.Id) == "" {
+			if strings.TrimSpace(volID) == "" {
 				slog.Warn("DeleteServerByIdManage() attached volume id is empty, skipping", "serverId", id, "index", i)
 				continue
 			}
-			m.Db.SetVolumeDeletionTimestamp(vol.Id)
+			m.Db.SetVolumeDeletionTimestamp(volID)
 		}
 	}
 
@@ -907,7 +915,7 @@ func (m *Marmot) CreateNewVolumeWithWait(volReq api.Volume) (api.Volume, error) 
 		return api.Volume{}, err
 	}
 
-	volDefined, err := m.CreateNewVolume(vol.Id)
+	volDefined, err := m.CreateNewVolume(api.VolumeID(*vol))
 	if err != nil {
 		slog.Error("CreateNewVolume()", "err", err)
 		//
@@ -915,15 +923,15 @@ func (m *Marmot) CreateNewVolumeWithWait(volReq api.Volume) (api.Volume, error) 
 	}
 
 	for {
-		vol, err := m.GetVolumeById(vol.Id)
+		vol, err := m.GetVolumeById(api.VolumeID(*vol))
 		if err != nil {
 			slog.Error("GetVolumeById()", "err", err)
 			// サーバーとボリュームのステータスをエラーに更新する処理を追加するべき
 			return api.Volume{}, err
 		}
-		slog.Debug("ブートボリュームのステータス確認ループ", "volume id", vol.Id, "status", vol.Status.Status)
+		slog.Debug("ブートボリュームのステータス確認ループ", "volume id", api.VolumeID(*vol), "status", vol.Status.Status)
 		if vol.Status.StatusCode == db.VOLUME_AVAILABLE {
-			slog.Debug("ブートボリュームのステータスがAVAILABLEになった", "volume id", vol.Id)
+			slog.Debug("ブートボリュームのステータスがAVAILABLEになった", "volume id", api.VolumeID(*vol))
 			break
 		}
 		if vol.Status.StatusCode == db.VOLUME_ERROR {
@@ -931,7 +939,7 @@ func (m *Marmot) CreateNewVolumeWithWait(volReq api.Volume) (api.Volume, error) 
 			if vol.Status.Message != nil && len(*vol.Status.Message) > 0 {
 				msg = *vol.Status.Message
 			}
-			return api.Volume{}, fmt.Errorf("volume %s is in error state: %s", vol.Id, msg)
+			return api.Volume{}, fmt.Errorf("volume %s is in error state: %s", api.VolumeID(*vol), msg)
 		}
 		time.Sleep(1 * time.Second)
 	}
@@ -973,9 +981,9 @@ func (m *Marmot) MakeImageEntryFromRunningVMWithContext(ctx context.Context, ser
 	//slog.Debug("MakeImageEntryFromRunningVM()", "boot volume id", serverSpec.Spec.BootVolume.Id)
 
 	// ブートボリュームの情報を取得
-	bootVol, err := m.GetVolumeById(serverSpec.Spec.BootVolume.Id)
+	bootVol, err := m.GetVolumeById(api.VolumeID(*serverSpec.Spec.BootVolume))
 	if err != nil {
-		slog.Error("GetVolumeById()", "err", err, "volume id", serverSpec.Spec.BootVolume.Id)
+		slog.Error("GetVolumeById()", "err", err, "volume id", api.VolumeID(*serverSpec.Spec.BootVolume))
 		return "", markFailed(err)
 	}
 	//slog.Debug("MakeImageEntryFromRunningVM()", "boot volume", bootVol.Spec.Path)

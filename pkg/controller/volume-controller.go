@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
 )
@@ -74,13 +75,14 @@ func (c *controller) volumeControllerLoop() {
 	}
 	slog.Debug("取得したボリュームの数", "numVolumes", len(vols))
 	for _, vol := range vols {
+		volID := api.VolumeID(vol)
 		if ok, assignedNode, reason := evaluateNodeAssignment(vol.Metadata, c.marmot.NodeName); !ok {
 			objectName := ""
 			if vol.Metadata != nil && vol.Metadata.Name != nil {
 				objectName = *vol.Metadata.Name
 			}
-			slog.Debug("別ノード割当のボリュームをスキップ", "volumeId", vol.Id, "volumeName", objectName, "controllerNode", c.marmot.NodeName, "assignedNode", assignedNode, "reason", reason)
-			slog.Debug("ボリュームの詳細情報", "volumeId", vol.Id, "volumeName", objectName, "metadata", vol.Metadata, "status", vol.Status)
+			slog.Debug("別ノード割当のボリュームをスキップ", "volumeId", volID, "volumeName", objectName, "controllerNode", c.marmot.NodeName, "assignedNode", assignedNode, "reason", reason)
+			slog.Debug("ボリュームの詳細情報", "volumeId", volID, "volumeName", objectName, "metadata", vol.Metadata, "status", vol.Status)
 			continue
 		}
 
@@ -96,8 +98,8 @@ func (c *controller) volumeControllerLoop() {
 		if vol.Status != nil && vol.Status.DeletionTimeStamp != nil {
 			deletionTime := *vol.Status.DeletionTimeStamp
 			if time.Since(deletionTime) > c.deletionDelay {
-				slog.Debug("削除のタイムスタンプが一定時間以上経過しているボリューム検出", "volId", vol.Id)
-				c.marmot.Db.UpdateVolumeStatus(vol.Id, db.VOLUME_DELETING)
+				slog.Debug("削除のタイムスタンプが一定時間以上経過しているボリューム検出", "volId", volID)
+				c.marmot.Db.UpdateVolumeStatus(volID, db.VOLUME_DELETING)
 			}
 		}
 
@@ -106,24 +108,24 @@ func (c *controller) volumeControllerLoop() {
 			isStale := time.Since(*vol.Status.LastUpdateTimeStamp) > VOLUME_STALE_TIMEOUT
 			isTargetState := vol.Status.StatusCode == db.VOLUME_ERROR || vol.Status.StatusCode == db.VOLUME_PROVISIONING
 			if isStale && isTargetState {
-				slog.Warn("最終更新から10分以上放置されたボリュームを削除キューへ登録", "volId", vol.Id, "status", vol.Status.StatusCode, "lastUpdate", vol.Status.LastUpdateTimeStamp)
+				slog.Warn("最終更新から10分以上放置されたボリュームを削除キューへ登録", "volId", volID, "status", vol.Status.StatusCode, "lastUpdate", vol.Status.LastUpdateTimeStamp)
 				if vol.Status.DeletionTimeStamp == nil {
-					c.db.SetVolumeDeletionTimestamp(vol.Id)
-					slog.Info("放置ボリュームにDeletionTimeStampを設定", "volId", vol.Id)
+					c.db.SetVolumeDeletionTimestamp(volID)
+					slog.Info("放置ボリュームにDeletionTimeStampを設定", "volId", volID)
 				}
 				continue
 			}
 		}
 
-		slog.Debug("ボリュームの情報", "volId", vol.Id, "volName", *vol.Metadata.Name, "volStatus", *vol.Status.Status)
+		slog.Debug("ボリュームの情報", "volId", volID, "volName", *vol.Metadata.Name, "volStatus", *vol.Status.Status)
 		switch vol.Status.StatusCode {
 		case db.VOLUME_PENDING:
-			slog.Debug("待ち状態のボリュームを処理", "volId", vol.Id)
+			slog.Debug("待ち状態のボリュームを処理", "volId", volID)
 			// 待ち状態のボリュームを処理するコードをここに追加
-			c.db.UpdateVolumeStatus(vol.Id, db.VOLUME_PROVISIONING)
-			if _, err := c.marmot.CreateNewVolume(vol.Id); err != nil {
+			c.db.UpdateVolumeStatus(volID, db.VOLUME_PROVISIONING)
+			if _, err := c.marmot.CreateNewVolume(volID); err != nil {
 				slog.Error("CreateNewVolume()", "err", err)
-				c.db.UpdateVolumeStatusMessage(vol.Id, db.VOLUME_ERROR, err.Error())
+				c.db.UpdateVolumeStatusMessage(volID, db.VOLUME_ERROR, err.Error())
 				continue
 			}
 
@@ -132,63 +134,63 @@ func (c *controller) volumeControllerLoop() {
 				vol.Spec.Kind != nil && *vol.Spec.Kind == "data" &&
 				vol.Spec.Iscsi != nil && *vol.Spec.Iscsi
 			if isISCSIVolume {
-				if err := c.marmot.ConfigureISCSIForVolumeByID(vol.Id); err != nil {
-					slog.Error("ConfigureISCSIForVolumeByID()", "err", err, "volId", vol.Id)
-					c.db.UpdateVolumeStatusMessage(vol.Id, db.VOLUME_ERROR, err.Error())
+				if err := c.marmot.ConfigureISCSIForVolumeByID(volID); err != nil {
+					slog.Error("ConfigureISCSIForVolumeByID()", "err", err, "volId", volID)
+					c.db.UpdateVolumeStatusMessage(volID, db.VOLUME_ERROR, err.Error())
 					continue
 				}
 			}
 
-			c.db.UpdateVolumeStatus(vol.Id, db.VOLUME_AVAILABLE)
+			c.db.UpdateVolumeStatus(volID, db.VOLUME_AVAILABLE)
 		case db.VOLUME_PROVISIONING:
-			slog.Debug("プロビジョニング中のボリュームを処理", "volId", vol.Id)
+			slog.Debug("プロビジョニング中のボリュームを処理", "volId", volID)
 
 		case db.VOLUME_DELETING:
-			slog.Debug("削除中のボリュームを処理", "volId", vol.Id)
+			slog.Debug("削除中のボリュームを処理", "volId", volID)
 			shouldCleanupISCSI := vol.Spec != nil &&
 				vol.Spec.Type != nil && *vol.Spec.Type == "lvm" &&
 				vol.Spec.Kind != nil && *vol.Spec.Kind == "data" &&
 				((vol.Spec.Iscsi != nil && *vol.Spec.Iscsi) ||
 					(vol.Spec.IscsiTargetIqn != nil && strings.TrimSpace(*vol.Spec.IscsiTargetIqn) != ""))
 			if shouldCleanupISCSI {
-				if err := c.marmot.CleanupISCSIForVolumeByID(vol.Id); err != nil {
+				if err := c.marmot.CleanupISCSIForVolumeByID(volID); err != nil {
 					errMsg := strings.ToLower(err.Error())
 					if strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "no such") || strings.Contains(errMsg, "does not exist") {
-						slog.Warn("iSCSI公開解除対象が見つからないため処理を継続", "volId", vol.Id, "err", err)
+						slog.Warn("iSCSI公開解除対象が見つからないため処理を継続", "volId", volID, "err", err)
 					} else {
-						slog.Error("CleanupISCSIForVolumeByID()", "err", err, "volId", vol.Id)
-						c.db.UpdateVolumeStatusMessage(vol.Id, db.VOLUME_ERROR, err.Error())
+						slog.Error("CleanupISCSIForVolumeByID()", "err", err, "volId", volID)
+						c.db.UpdateVolumeStatusMessage(volID, db.VOLUME_ERROR, err.Error())
 						continue
 					}
 				}
 			}
 
-			if err := c.marmot.RemoveVolume(vol.Id); err != nil {
+			if err := c.marmot.RemoveVolume(volID); err != nil {
 				errMsg := strings.ToLower(err.Error())
 				if strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "no such") || strings.Contains(errMsg, "does not exist") {
-					slog.Warn("削除対象の実体が見つからないためオブジェクト削除を継続", "volId", vol.Id, "err", err)
+					slog.Warn("削除対象の実体が見つからないためオブジェクト削除を継続", "volId", volID, "err", err)
 				} else {
 					slog.Error("RemoveVolume()", "err", err)
-					c.db.UpdateVolumeStatusMessage(vol.Id, db.VOLUME_ERROR, err.Error())
+					c.db.UpdateVolumeStatusMessage(volID, db.VOLUME_ERROR, err.Error())
 					continue
 				}
 			}
-			c.db.DeleteVolume(vol.Id)
-			slog.Debug("ボリュームの削除成功", "volId", vol.Id)
+			c.db.DeleteVolume(volID)
+			slog.Debug("ボリュームの削除成功", "volId", volID)
 
 		case db.VOLUME_ERROR:
-			slog.Debug("エラー状態のボリュームを処理", "volId", vol.Id)
+			slog.Debug("エラー状態のボリュームを処理", "volId", volID)
 			// エラー状態のボリュームを処理するコードをここに追加
 		case db.VOLUME_UNAVAILABLE:
-			slog.Debug("実体欠損状態のボリュームを処理", "volId", vol.Id)
+			slog.Debug("実体欠損状態のボリュームを処理", "volId", volID)
 		case db.VOLUME_AVAILABLE:
-			slog.Debug("利用可能なボリュームを処理", "volId", vol.Id)
+			slog.Debug("利用可能なボリュームを処理", "volId", volID)
 			if err := marmotd.CheckVolumeBackingStore(vol); err != nil {
-				slog.Warn("AVAILABLE ボリュームの実体が見つからないため UNAVAILABLE に更新", "volId", vol.Id, "err", err)
-				c.db.UpdateVolumeStatusMessage(vol.Id, db.VOLUME_UNAVAILABLE, err.Error())
+				slog.Warn("AVAILABLE ボリュームの実体が見つからないため UNAVAILABLE に更新", "volId", volID, "err", err)
+				c.db.UpdateVolumeStatusMessage(volID, db.VOLUME_UNAVAILABLE, err.Error())
 			}
 		default:
-			slog.Warn("不明なステータスのボリュームをスキップ", "volId", vol.Id, "status", *vol.Status.Status)
+			slog.Warn("不明なステータスのボリュームをスキップ", "volId", volID, "status", *vol.Status.Status)
 		}
 	}
 	// ワークキューから処理を取り出して、処理を実行する

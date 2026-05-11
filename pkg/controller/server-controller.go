@@ -191,18 +191,18 @@ func (c *controller) serverControllerLoop() {
 			slog.Debug("削除中のサーバー検出", "SERVER", api.ServerID(spec))
 
 			if !clusterHasNodes {
-				if spec.Spec != nil && spec.Spec.BootVolume != nil && strings.TrimSpace(spec.Spec.BootVolume.Id) != "" {
-					c.marmot.Db.SetVolumeDeletionTimestamp(spec.Spec.BootVolume.Id)
+				if spec.Spec != nil && spec.Spec.BootVolume != nil && strings.TrimSpace(api.VolumeID(*spec.Spec.BootVolume)) != "" {
+					c.marmot.Db.SetVolumeDeletionTimestamp(api.VolumeID(*spec.Spec.BootVolume))
 				}
 				if spec.Spec != nil && spec.Spec.Storage != nil {
 					for _, vol := range *spec.Spec.Storage {
 						if vol.Spec != nil && vol.Spec.Persistent != nil && *vol.Spec.Persistent {
 							continue
 						}
-						if strings.TrimSpace(vol.Id) == "" {
+						if strings.TrimSpace(api.VolumeID(vol)) == "" {
 							continue
 						}
-						c.marmot.Db.SetVolumeDeletionTimestamp(vol.Id)
+						c.marmot.Db.SetVolumeDeletionTimestamp(api.VolumeID(vol))
 					}
 				}
 				slog.Warn("クラスタノード不在のため VM 実体削除をスキップし、サーバー定義削除を継続", "serverId", api.ServerID(spec))

@@ -76,7 +76,7 @@ var _ = Describe("Linux セットアップ", Ordered, Label("integration", "requ
 			},
 			Spec: &api.ServerSpec{
 				BootVolume: &api.Volume{
-					Id: "test-linux-boot",
+					Metadata: &api.Metadata{Id: util.StringPtr("test-linux-boot")},
 					Spec: &api.VolSpec{
 						Type: util.StringPtr("qcow2"),
 						Path: util.StringPtr("/var/lib/marmot/volumes/test-linux-qcow2.img"),
@@ -138,7 +138,7 @@ var _ = Describe("Linux セットアップ", Ordered, Label("integration", "requ
 			},
 			Spec: &api.ServerSpec{
 				BootVolume: &api.Volume{
-					Id: "test-linux-boot2",
+					Metadata: &api.Metadata{Id: util.StringPtr("test-linux-boot2")},
 					Spec: &api.VolSpec{
 						Type:          util.StringPtr("lvm"),
 						Path:          util.StringPtr("/dev/mapper/vg1-lvos_test1"),
@@ -202,7 +202,7 @@ var _ = Describe("Linux セットアップ", Ordered, Label("integration", "requ
 			},
 			Spec: &api.ServerSpec{
 				BootVolume: &api.Volume{
-					Id: "test-linux-boot3",
+					Metadata: &api.Metadata{Id: util.StringPtr("test-linux-boot3")},
 					Spec: &api.VolSpec{
 						Type:          util.StringPtr("lvm"),
 						Path:          util.StringPtr("/dev/mapper/vg1-lvos_test2"),
@@ -274,7 +274,7 @@ var _ = Describe("Linux セットアップ", Ordered, Label("integration", "requ
 			},
 			Spec: &api.ServerSpec{
 				BootVolume: &api.Volume{
-					Id: "test-linux-boot4",
+					Metadata: &api.Metadata{Id: util.StringPtr("test-linux-boot4")},
 					Spec: &api.VolSpec{
 						Type:          util.StringPtr("lvm"),
 						Path:          util.StringPtr("/dev/mapper/vg1-lvos_test2"),

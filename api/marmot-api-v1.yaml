@@ -761,10 +761,13 @@ components:
     Volume:
       type: object
       required:
-        - id
+        - apiVersion
+        - kind
       properties:
-        id:
+        apiVersion:
           type: string
+        kind:
+          type: string          
         metadata:
           $ref: "#/components/schemas/Metadata"
         status:
