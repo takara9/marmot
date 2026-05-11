@@ -96,7 +96,7 @@ type HostStatus struct {
 // IPAddress defines model for IPAddress.
 type IPAddress struct {
 	HostId    *string `json:"hostId,omitempty" yaml:"hostId,omitempty"`
-	IPAddress *string `json:"iPAddress,omitempty" yaml:"iPAddress,omitempty"`
+	IpAddress string  `json:"ipAddress" yaml:"ipAddress"`
 	Netmask   *string `json:"netmask,omitempty" yaml:"netmask,omitempty"`
 	NetworkId *string `json:"networkId,omitempty" yaml:"networkId,omitempty"`
 }
@@ -116,10 +116,10 @@ type IPNetwork struct {
 
 // Image defines model for Image.
 type Image struct {
+	Id       string     `json:"id" yaml:"id"`
 	Metadata *Metadata  `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 	Spec     *ImageSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
 	Status   *Status    `json:"status,omitempty" yaml:"status,omitempty"`
-	Id       string     `json:"id" yaml:"id"`
 }
 
 // ImageSpec defines model for ImageSpec.
@@ -136,10 +136,10 @@ type ImageSpec struct {
 
 // Job defines model for Job.
 type Job struct {
+	Id       string    `json:"id" yaml:"id"`
 	Metadata *Metadata `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 	Spec     *JobSpec  `json:"spec,omitempty" yaml:"spec,omitempty"`
 	Status   *Status   `json:"status,omitempty" yaml:"status,omitempty"`
-	Id       string    `json:"id" yaml:"id"`
 }
 
 // JobSpec defines model for JobSpec.
@@ -208,23 +208,24 @@ type Route struct {
 
 // Server defines model for Server.
 type Server struct {
-	Metadata *Metadata   `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-	Spec     *ServerSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
-	Status   *Status     `json:"status,omitempty" yaml:"status,omitempty"`
-	Id       string      `json:"id" yaml:"id"`
+	ApiVersion string      `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string      `json:"kind" yaml:"kind"`
+	Metadata   *Metadata   `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	Spec       *ServerSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
+	Status     *Status     `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
 // ServerSpec defines model for ServerSpec.
 type ServerSpec struct {
-	NetworkInterface *[]NetworkInterface `json:"networkInterface,omitempty" yaml:"networkInterface,omitempty"`
-	Storage          *[]Volume           `json:"storage,omitempty" yaml:"storage,omitempty"`
 	Auth             *Auth               `json:"auth,omitempty" yaml:"auth,omitempty"`
 	BootVolume       *Volume             `json:"bootVolume,omitempty" yaml:"bootVolume,omitempty"`
 	Cpu              *int                `json:"cpu,omitempty" yaml:"cpu,omitempty"`
 	Memory           *int                `json:"memory,omitempty" yaml:"memory,omitempty"`
+	NetworkInterface *[]NetworkInterface `json:"networkInterface,omitempty" yaml:"networkInterface,omitempty"`
 	OsLv             *string             `json:"osLv,omitempty" yaml:"osLv,omitempty"`
 	OsVariant        *string             `json:"osVariant,omitempty" yaml:"osVariant,omitempty"`
 	OsVg             *string             `json:"osVg,omitempty" yaml:"osVg,omitempty"`
+	Storage          *[]Volume           `json:"storage,omitempty" yaml:"storage,omitempty"`
 }
 
 // Servers defines model for Servers.
@@ -254,10 +255,10 @@ type Version struct {
 
 // VirtualNetwork defines model for VirtualNetwork.
 type VirtualNetwork struct {
+	Id       string              `json:"id" yaml:"id"`
 	Metadata *Metadata           `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 	Spec     *VirtualNetworkSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
 	Status   *Status             `json:"status,omitempty" yaml:"status,omitempty"`
-	Id       string              `json:"id" yaml:"id"`
 }
 
 // VirtualNetworkSpec defines model for VirtualNetworkSpec.
@@ -310,10 +311,10 @@ type VolSpec struct {
 
 // Volume defines model for Volume.
 type Volume struct {
+	Id       string    `json:"id" yaml:"id"`
 	Metadata *Metadata `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 	Spec     *VolSpec  `json:"spec,omitempty" yaml:"spec,omitempty"`
 	Status   *Status   `json:"status,omitempty" yaml:"status,omitempty"`
-	Id       string    `json:"id" yaml:"id"`
 }
 
 // ApiCreateImageJSONRequestBody defines body for ApiCreateImage for application/json ContentType.

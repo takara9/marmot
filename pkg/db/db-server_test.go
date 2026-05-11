@@ -65,11 +65,11 @@ var _ = Describe("Servers", Ordered, func() {
 				}
 				serverSpec, err = v.MakeServerEntry(*server)
 				Expect(err).NotTo(HaveOccurred())
-				fmt.Println("Created server with ID:", serverSpec.Id)
+				fmt.Println("Created server with ID:", api.ServerID(serverSpec))
 			})
 
 			It("Keyからサーバー情報を取得", func() {
-				srv, err := v.GetServerById(serverSpec.Id)
+				srv, err := v.GetServerById(api.ServerID(serverSpec))
 				Expect(err).NotTo(HaveOccurred())
 				bytes, err := json.MarshalIndent(srv, "", "  ")
 				Expect(err).NotTo(HaveOccurred())
@@ -83,12 +83,12 @@ var _ = Describe("Servers", Ordered, func() {
 						Status:     util.StringPtr(db.ServerStatus[db.SERVER_RUNNING]),
 					},
 				}
-				err = v.UpdateServer(serverSpec.Id, srv)
+				err = v.UpdateServer(api.ServerID(serverSpec), srv)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("Keyからサーバー情報を取得", func() {
-				srv, err := v.GetServerById(serverSpec.Id)
+				srv, err := v.GetServerById(api.ServerID(serverSpec))
 				Expect(err).NotTo(HaveOccurred())
 				jsonData, err := json.MarshalIndent(srv, "", "  ")
 				Expect(err).NotTo(HaveOccurred())
@@ -107,7 +107,7 @@ var _ = Describe("Servers", Ordered, func() {
 				}
 				serverSpec, err = v.MakeServerEntry(*server)
 				Expect(err).NotTo(HaveOccurred())
-				fmt.Println("Created server with ID:", serverSpec.Id)
+				fmt.Println("Created server with ID:", api.ServerID(serverSpec))
 			})
 
 			It("サーバーの作成 #3", func() {
@@ -122,7 +122,7 @@ var _ = Describe("Servers", Ordered, func() {
 				}
 				serverSpec, err = v.MakeServerEntry(*server)
 				Expect(err).NotTo(HaveOccurred())
-				fmt.Println("Created server with ID:", serverSpec.Id)
+				fmt.Println("Created server with ID:", api.ServerID(serverSpec))
 			})
 
 			It("サーバーの一覧取得", func() {
@@ -141,7 +141,7 @@ var _ = Describe("Servers", Ordered, func() {
 				servers, err := v.GetServers()
 				Expect(err).NotTo(HaveOccurred())
 				Expect(len(servers)).To(Equal(3))
-				err = v.DeleteServerById(servers[0].Id)
+				err = v.DeleteServerById(api.ServerID(servers[0]))
 				Expect(err).NotTo(HaveOccurred())
 			})
 

@@ -49,10 +49,10 @@ func (s *Server) ApiCreateServer(ctx echo.Context) error {
 		slog.Error("ApiCreateServer()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-	slog.Debug("ApiCreateServer()", "Server Id", vm.Id)
+	slog.Debug("ApiCreateServer()", "Server Id", api.ServerID(vm))
 
 	var resp api.Success
-	resp.Id = vm.Id
+	resp.Id = api.ServerID(vm)
 	resp.Message = util.StringPtr("Server created successfully")
 	return ctx.JSON(http.StatusOK, resp)
 }
@@ -178,7 +178,7 @@ func (s *Server) ApiMakeImageEntryFromRunningVMById(ctx echo.Context, serverId s
 	}
 
 	// イメージ作成の登録
-	if _, err := s.Ma.Db.MakeImageEntryFromRunningVM(server.Id, *image.Metadata.Name); err != nil {
+	if _, err := s.Ma.Db.MakeImageEntryFromRunningVM(api.ServerID(server), *image.Metadata.Name); err != nil {
 		slog.Error("Image name is not set, it must set for new image", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}

@@ -59,6 +59,13 @@ var serverCreateCmd = &cobra.Command{
 			return err
 		}
 
+		if virtualServer.ApiVersion == "" {
+			return fmt.Errorf("apiVersion is required in the configuration")
+		}
+		if virtualServer.Kind == "" {
+			return fmt.Errorf("kind is required in the configuration")
+		}
+
 		// Metadata.name は必須
 		if virtualServer.Metadata == nil || virtualServer.Metadata.Name == nil || *virtualServer.Metadata.Name == "" {
 			return fmt.Errorf("Metadata.name is required in the configuration")

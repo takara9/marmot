@@ -108,8 +108,8 @@ func (c *schedulerController) schedulerControllerLoop() {
 		if assignedNode != "" {
 			if !clusterHasNode(statuses, assignedNode) {
 				msg := "metadata.nodeName=" + assignedNode + " はクラスタ内に存在しません"
-				slog.Warn("存在しない nodeName が指定されたサーバーを ERROR に更新", "serverId", server.Id, "nodeName", assignedNode)
-				c.marmot.Db.UpdateServerStatus(server.Id, db.SERVER_ERROR, msg)
+				slog.Warn("存在しない nodeName が指定されたサーバーを ERROR に更新", "serverId", api.ServerID(server), "nodeName", assignedNode)
+				c.marmot.Db.UpdateServerStatus(api.ServerID(server), db.SERVER_ERROR, msg)
 			}
 			continue
 		}
@@ -117,16 +117,16 @@ func (c *schedulerController) schedulerControllerLoop() {
 		// 割り当て先ノードをスコアリングで選定
 		targetNode, err := marmotd.SelectNode(statuses)
 		if err != nil {
-			slog.Error("SelectNode() failed", "err", err, "serverId", server.Id)
+			slog.Error("SelectNode() failed", "err", err, "serverId", api.ServerID(server))
 			continue
 		}
 
 		// ノードを割り当て
-		if err := c.marmot.Db.AssignNodeToServer(server.Id, targetNode); err != nil {
-			slog.Warn("AssignNodeToServer() failed", "err", err, "serverId", server.Id, "targetNode", targetNode)
+		if err := c.marmot.Db.AssignNodeToServer(api.ServerID(server), targetNode); err != nil {
+			slog.Warn("AssignNodeToServer() failed", "err", err, "serverId", api.ServerID(server), "targetNode", targetNode)
 			continue
 		}
-		slog.Info("サーバーにノードを割り当てました", "serverId", server.Id, "targetNode", targetNode)
+		slog.Info("サーバーにノードを割り当てました", "serverId", api.ServerID(server), "targetNode", targetNode)
 	}
 }
 

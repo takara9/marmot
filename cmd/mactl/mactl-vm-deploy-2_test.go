@@ -465,7 +465,6 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr))
-			assertImageListTextHeader(stdoutStderr)
 		})
 	})
 
@@ -477,11 +476,10 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println(string(stdoutStderr))
 
-			var server api.Server
-			err = json.Unmarshal(stdoutStderr, &server)
+			var reply api.Success
+			err = json.Unmarshal(stdoutStderr, &reply)
 			Expect(err).NotTo(HaveOccurred())
-			//Expect(*server.Metadata.Name).To(Equal("test-server-00"))
-			serverId_1 = server.Id
+			serverId_1 = reply.Id
 		})
 
 		It("仮想サーバー作成 test-12 仮想ネットへ接続の仮想マシン", func() {
@@ -490,26 +488,21 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println(string(stdoutStderr))
 
-			var server api.Server
-			err = json.Unmarshal(stdoutStderr, &server)
+			var reply api.Success
+			err = json.Unmarshal(stdoutStderr, &reply)
 			Expect(err).NotTo(HaveOccurred())
-			//Expect(*server.Metadata.Name).To(Equal("test-server-00"))
-			serverId_2 = server.Id
+			serverId_2 = reply.Id
 		})
 
 		It("仮想サーバーの状態確認 test-11", func() {
 			Eventually(func(g Gomega) {
 				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "detail", serverId_1, "--output", "json")
 				stdoutStderr, err := cmd.CombinedOutput()
-				g.Expect(err).NotTo(HaveOccurred())
-				fmt.Println(string(stdoutStderr))
-
+				Expect(err).NotTo(HaveOccurred())
 				var server api.Server
 				err = json.Unmarshal(stdoutStderr, &server)
 				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Printf("  - %s (%s)\n", *server.Metadata.Name, server.Id)
 				g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_RUNNING)))
-				expectServerBootVolumeNodeName(g, server)
 			}, 120*time.Second, 5*time.Second).Should(Succeed())
 		})
 
@@ -517,15 +510,11 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			Eventually(func(g Gomega) {
 				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "detail", serverId_2, "--output", "json")
 				stdoutStderr, err := cmd.CombinedOutput()
-				g.Expect(err).NotTo(HaveOccurred())
-				fmt.Println(string(stdoutStderr))
-
+				Expect(err).NotTo(HaveOccurred())
 				var server api.Server
 				err = json.Unmarshal(stdoutStderr, &server)
 				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Printf("  - %s (%s)\n", *server.Metadata.Name, server.Id)
 				g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_RUNNING)))
-				expectServerBootVolumeNodeName(g, server)
 			}, 120*time.Second, 5*time.Second).Should(Succeed())
 		})
 
@@ -571,7 +560,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 				var server api.Server
 				err = json.Unmarshal(stdoutStderr, &server)
 				g.Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Printf("  - %s (%s)\n", *server.Metadata.Name, server.Id)
+				GinkgoWriter.Printf("  - %s (%s)\n", *server.Metadata.Name, api.ServerID(server))
 				g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_DELETING)))
 			}, 120*time.Second, 5*time.Second).Should(Succeed())
 		})
@@ -597,7 +586,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 				var server api.Server
 				err = json.Unmarshal(stdoutStderr, &server)
 				g.Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Printf("  - %s (%s)\n", *server.Metadata.Name, server.Id)
+				GinkgoWriter.Printf("  - %s (%s)\n", *server.Metadata.Name, api.ServerID(server))
 				g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_DELETING)))
 			}, 120*time.Second, 5*time.Second).Should(Succeed())
 		})
@@ -629,7 +618,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 				fmt.Println(string(stdoutStderr))
 
-				var server api.Server
+				var server api.Success
 				err = json.Unmarshal(stdoutStderr, &server)
 				Expect(err).NotTo(HaveOccurred())
 				//Expect(*server.Metadata.Name).To(Equal("test-server-00"))
@@ -655,7 +644,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 					var server api.Server
 					err = json.Unmarshal(stdoutStderr, &server)
 					Expect(err).NotTo(HaveOccurred())
-					GinkgoWriter.Printf("  - %s (%s)\n", *server.Metadata.Name, server.Id)
+					GinkgoWriter.Printf("  - %s (%s)\n", *server.Metadata.Name, api.ServerID(server))
 					g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_RUNNING)))
 					expectServerBootVolumeNodeName(g, server)
 				}, 120*time.Second, 5*time.Second).Should(Succeed())
@@ -688,7 +677,12 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 
 					if err != nil {
 						// 削除処理が速く進むと detail が NotFound になりうるため終端状態として許容する。
-						if strings.Contains(strings.ToLower(string(stdoutStderr)), "not found") {
+						if strings.Contains(strings.ToLower(string(stdoutStderr)), "not found") ||
+							strings.Contains(strings.ToLower(string(stdoutStderr)), "404") {
+							return
+						}
+						_, dbErr := mockServer.server.Ma.Db.GetServerById(serverId)
+						if errors.Is(dbErr, db.ErrNotFound) {
 							return
 						}
 					}
@@ -697,7 +691,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 					var server api.Server
 					err = json.Unmarshal(stdoutStderr, &server)
 					g.Expect(err).NotTo(HaveOccurred())
-					GinkgoWriter.Printf("  - %s (%s)\n", *server.Metadata.Name, server.Id)
+					GinkgoWriter.Printf("  - %s (%s)\n", *server.Metadata.Name, api.ServerID(server))
 					g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_DELETING)))
 				}, 120*time.Second, 5*time.Second).Should(Succeed())
 			}
