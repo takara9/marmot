@@ -99,9 +99,9 @@ var _ = Describe("VirtualPrivateNetworksUpperlayer", Ordered, func() {
 		})
 		It("ETCDに登録されていることの確認", func() {
 			for _, net := range vnets {
-				networkFromDB, err := marmotServer.Ma.Db.GetVirtualNetworkById(net.Id)
+				networkFromDB, err := marmotServer.Ma.Db.GetVirtualNetworkById(api.VirtualNetworkID(net))
 				Expect(err).NotTo(HaveOccurred())
-				Expect(networkFromDB.Id).To(Equal(net.Id))
+				Expect(api.VirtualNetworkID(networkFromDB)).To(Equal(api.VirtualNetworkID(net)))
 				Expect(networkFromDB.Spec.BridgeName).To(Equal(net.Spec.BridgeName))
 			}
 			GinkgoWriter.Println("All networks are confirmed in ETCD")
@@ -115,9 +115,9 @@ var _ = Describe("VirtualPrivateNetworksUpperlayer", Ordered, func() {
 			GinkgoWriter.Println("Duplicate registration attempted without error")
 			// ETCDに同じネットワークが重複していないことを確認
 			for _, net := range vnets {
-				networkFromDB, err := marmotServer.Ma.Db.GetVirtualNetworkById(net.Id)
+				networkFromDB, err := marmotServer.Ma.Db.GetVirtualNetworkById(api.VirtualNetworkID(net))
 				Expect(err).NotTo(HaveOccurred())
-				Expect(networkFromDB.Id).To(Equal(net.Id))
+				Expect(api.VirtualNetworkID(networkFromDB)).To(Equal(api.VirtualNetworkID(net)))
 			}
 			GinkgoWriter.Println("No duplicate networks found in ETCD")
 		})
@@ -129,8 +129,8 @@ var _ = Describe("VirtualPrivateNetworksUpperlayer", Ordered, func() {
 
 		It("最もシンプルな仮想ネットワークの新規作成", func() {
 			createdNet = api.VirtualNetwork{
-				Id: "testnet",
 				Metadata: &api.Metadata{
+					Id:   util.StringPtr("testnet"),
 					Name: util.StringPtr("testnet"),
 				},
 				Spec: &api.VirtualNetworkSpec{
@@ -143,18 +143,18 @@ var _ = Describe("VirtualPrivateNetworksUpperlayer", Ordered, func() {
 			}
 			createdNet, err = marmotServer.Ma.Db.CreateVirtualNetwork(createdNet)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created Network:", createdNet.Id)
+			GinkgoWriter.Println("Created Network:", api.VirtualNetworkID(createdNet))
 			JsonBytes, err := json.MarshalIndent(createdNet, "", "  ")
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Network JSON:", string(JsonBytes))
 		})
 
 		It("作成した仮想ネットワークの取得", func() {
-			netFromDB, err := marmotServer.Ma.Db.GetVirtualNetworkById(createdNet.Id)
+			netFromDB, err := marmotServer.Ma.Db.GetVirtualNetworkById(api.VirtualNetworkID(createdNet))
 			Expect(err).NotTo(HaveOccurred())
-			Expect(netFromDB.Id).To(Equal(createdNet.Id))
+			Expect(api.VirtualNetworkID(netFromDB)).To(Equal(api.VirtualNetworkID(createdNet)))
 			Expect(netFromDB.Spec.BridgeName).To(Equal(createdNet.Spec.BridgeName))
-			GinkgoWriter.Println("Retrieved Network from DB:", netFromDB.Id)
+			GinkgoWriter.Println("Retrieved Network from DB:", api.VirtualNetworkID(netFromDB))
 			JsonBytes, err := json.MarshalIndent(netFromDB, "", "  ")
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Network JSON:", string(JsonBytes))
@@ -163,21 +163,21 @@ var _ = Describe("VirtualPrivateNetworksUpperlayer", Ordered, func() {
 		It("実態の仮想ネットワークを作成する", func() {
 			err = marmotServer.Ma.DeployVirtualNetwork(createdNet)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Deployed Network:", createdNet.Id)
+			GinkgoWriter.Println("Deployed Network:", api.VirtualNetworkID(createdNet))
 		})
 
 		It("作成したIPネットワークのチェック", func() {
-			GinkgoWriter.Println("Checking associated IP network for Network:", createdNet.Id)
-			vnet, err := marmotServer.Ma.Db.GetVirtualNetworkById(createdNet.Id)
+			GinkgoWriter.Println("Checking associated IP network for Network:", api.VirtualNetworkID(createdNet))
+			vnet, err := marmotServer.Ma.Db.GetVirtualNetworkById(api.VirtualNetworkID(createdNet))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vnet.Spec.IpNetworkId).NotTo(BeNil(), "IP network ID should be set after deployment")
-			GinkgoWriter.Println("Virtual Network after deployment:", vnet.Id, "with IP Network ID:", *vnet.Spec.IpNetworkId)
+			GinkgoWriter.Println("Virtual Network after deployment:", api.VirtualNetworkID(vnet), "with IP Network ID:", *vnet.Spec.IpNetworkId)
 
 			jsonBytes, err := json.MarshalIndent(vnet, "", "  ")
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Network after deployment:", string(jsonBytes))
 
-			ipnet, err := marmotServer.Ma.Db.GetIpNetworkById(vnet.Id, *vnet.Spec.IpNetworkId)
+			ipnet, err := marmotServer.Ma.Db.GetIpNetworkById(api.VirtualNetworkID(vnet), *vnet.Spec.IpNetworkId)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(ipnet.Id).To(Equal(*vnet.Spec.IpNetworkId))
 			Expect(ipnet.AddressMaskLen).NotTo(BeNil())
@@ -188,22 +188,22 @@ var _ = Describe("VirtualPrivateNetworksUpperlayer", Ordered, func() {
 		})
 
 		It("仮想ネットワークの削除", func() {
-			vnet, err := marmotServer.Ma.Db.GetVirtualNetworkById(createdNet.Id)
+			vnet, err := marmotServer.Ma.Db.GetVirtualNetworkById(api.VirtualNetworkID(createdNet))
 			Expect(err).NotTo(HaveOccurred())
 
 			By("仮想ネットワークの削除")
-			GinkgoWriter.Println("Deleteing Network Id:", createdNet.Id)
-			err2 := marmotServer.Ma.DeleteVirtualNetwork(createdNet.Id) // なぜか２回コールされ、２回目でエラーが発生する。どうして２回呼ばれるのか？？
+			GinkgoWriter.Println("Deleteing Network Id:", api.VirtualNetworkID(createdNet))
+			err2 := marmotServer.Ma.DeleteVirtualNetwork(api.VirtualNetworkID(createdNet)) // なぜか２回コールされ、２回目でエラーが発生する。どうして２回呼ばれるのか？？
 			Expect(err2).NotTo(HaveOccurred())
 
 			By("仮想ネットワーク削除の確認")
-			_, err = marmotServer.Ma.Db.GetVirtualNetworkById(createdNet.Id)
+			_, err = marmotServer.Ma.Db.GetVirtualNetworkById(api.VirtualNetworkID(createdNet))
 			Expect(err).To(Equal(db.ErrNotFound))
-			GinkgoWriter.Println("Confirmed deletion of Network:", createdNet.Id)
+			GinkgoWriter.Println("Confirmed deletion of Network:", api.VirtualNetworkID(createdNet))
 
 			By("IPネットワークの削除の確認")
 			GinkgoWriter.Println("Confirmed deletion of IP Network:", *vnet.Spec.IpNetworkId)
-			v, err := marmotServer.Ma.Db.GetIpNetworkById(vnet.Id, *vnet.Spec.IpNetworkId)
+			v, err := marmotServer.Ma.Db.GetIpNetworkById(api.VirtualNetworkID(vnet), *vnet.Spec.IpNetworkId)
 			// ここで NotFound エラーが帰ってこない？？どうして？
 			//Expect(err).To(Equal(db.ErrNotFound))
 			jsonBytes, err := json.MarshalIndent(v, "", "  ")

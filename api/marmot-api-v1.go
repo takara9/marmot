@@ -255,10 +255,11 @@ type Version struct {
 
 // VirtualNetwork defines model for VirtualNetwork.
 type VirtualNetwork struct {
-	Id       string              `json:"id" yaml:"id"`
-	Metadata *Metadata           `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-	Spec     *VirtualNetworkSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
-	Status   *Status             `json:"status,omitempty" yaml:"status,omitempty"`
+	ApiVersion string              `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string              `json:"kind" yaml:"kind"`
+	Metadata   *Metadata           `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	Spec       *VirtualNetworkSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
+	Status     *Status             `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
 // VirtualNetworkSpec defines model for VirtualNetworkSpec.

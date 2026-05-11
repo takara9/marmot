@@ -238,7 +238,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			slog.Error("GetNetworkIdByName()", "err", err)
 			return "", err
 		}
-		net.Networkid = xnet.Id
+		net.Networkid = api.VirtualNetworkID(xnet)
 		net.Networkname = virtSpec.NetSpecs[0].Network
 		net.Mac = &virtSpec.NetSpecs[0].MAC
 		serverConfig.Spec.NetworkInterface = &[]api.NetworkInterface{net}
@@ -272,7 +272,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 				fmt.Println("=== ネットワークインターフェースの情報 ===", "ni", string(jsonBytes0))
 			}
 
-			reqNic.Networkid = vnet.Id // ネットワークIDをセット
+			reqNic.Networkid = api.VirtualNetworkID(vnet) // ネットワークIDをセット
 			if reqNic.Address != nil {
 				// リクエストにIPアドレスが指定されている場合は、そのIPアドレスを使用する
 				ipaddr = *reqNic.Address
@@ -299,7 +299,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 				ipNetAddr := &api.IPNetwork{
 					AddressMaskLen: util.StringPtr(fmt.Sprintf("%s/%d", ipaddr, bitmask)),
 				}
-				ipNetId, err := m.Db.CreateIpNetwork(vnet.Id, ipNetAddr)
+				ipNetId, err := m.Db.CreateIpNetwork(api.VirtualNetworkID(vnet), ipNetAddr)
 				if err != nil {
 					if err.Error() == db.ErrAlreadyExists || err.Error() == db.ErrOverlapsExistingNetwork {
 						//NOP
@@ -309,21 +309,21 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 					}
 				}
 
-				slog.Debug("IPネットワークの作成成功", "network id", vnet.Id, "ip network id", ipNetId, "ip address with mask", ipaddr)
+				slog.Debug("IPネットワークの作成成功", "network id", api.VirtualNetworkID(vnet), "ip network id", ipNetId, "ip address with mask", ipaddr)
 				// ネットワークインターフェースのIPネットワークIDを設定
 				reqNic.IpNetworkId = util.StringPtr(ipNetId)
-				slog.Debug("ネットワークインターフェースのIPネットワークIDを設定成功", "network id", vnet.Id, "ip network id", ipNetId)
+				slog.Debug("ネットワークインターフェースのIPネットワークIDを設定成功", "network id", api.VirtualNetworkID(vnet), "ip network id", ipNetId)
 				// IPアドレスの使用済設定
 
 				// 一致するものが無かったら、そのIPアドレスを割り当てる
-				found, err := m.Db.CheckIPaddrInUse(vnet.Id, ipNetId, ipaddr)
+				found, err := m.Db.CheckIPaddrInUse(api.VirtualNetworkID(vnet), ipNetId, ipaddr)
 				if err != nil {
-					slog.Error("AllocateIP()", "err", err, "vnetId", vnet.Id, "ipnetId", ipNetId, "candidateIP", ipaddr)
+					slog.Error("AllocateIP()", "err", err, "vnetId", api.VirtualNetworkID(vnet), "ipnetId", ipNetId, "candidateIP", ipaddr)
 					return "", err
 				}
 				if !found {
 					slog.Debug("セットさられたIPアドレス", "IP	", ipaddr)
-					m.Db.SetIPaddrInUse(vnet.Id, ipNetId, ipaddr, *serverConfig.Metadata.Name)
+					m.Db.SetIPaddrInUse(api.VirtualNetworkID(vnet), ipNetId, ipaddr, *serverConfig.Metadata.Name)
 					//return ipaddr, nil
 				}
 				// 内部DNSへ登録
@@ -334,15 +334,15 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 				}
 			} else {
 				// IPアドレスの指定が無いので、IPアドレスを割り当て
-				slog.Debug("IPアドレスの割り当て", "network id", vnet.Id, "network name", vnet.Metadata.Name)
+				slog.Debug("IPアドレスの割り当て", "network id", api.VirtualNetworkID(vnet), "network name", vnet.Metadata.Name)
 				if vnet.Spec.IpNetworkId != nil {
-					ipaddr, bitmask, err = m.Db.AllocateIP(vnet.Id, *vnet.Spec.IpNetworkId, *serverConfig.Metadata.Name)
+					ipaddr, bitmask, err = m.Db.AllocateIP(api.VirtualNetworkID(vnet), *vnet.Spec.IpNetworkId, *serverConfig.Metadata.Name)
 					if err != nil {
 						slog.Error("AllocateIP()", "err", err)
 						return "", err
 					}
 
-					ipnet, err = m.Db.GetIpNetworkById(vnet.Id, *vnet.Spec.IpNetworkId)
+					ipnet, err = m.Db.GetIpNetworkById(api.VirtualNetworkID(vnet), *vnet.Spec.IpNetworkId)
 					if err != nil {
 						slog.Error("GetIpNetworkById()", "err", err)
 						return "", err
@@ -354,7 +354,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 						return "", err
 					}
 				} else {
-					slog.Debug("IPネットワークIDが指定されていないため、IPアドレスの割り当てができない", "network id", vnet.Id, "network name", vnet.Metadata.Name)
+					slog.Debug("IPネットワークIDが指定されていないため、IPアドレスの割り当てができない", "network id", api.VirtualNetworkID(vnet), "network name", vnet.Metadata.Name)
 				}
 			}
 
@@ -384,7 +384,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 
 			var ni api.NetworkInterface
 			ni.Networkname = ns.Network
-			ni.Networkid = vnet.Id
+			ni.Networkid = api.VirtualNetworkID(vnet)
 
 			// ここでIP Network Idがセットされた場合、データベースにも保存する必要がある
 			if reqNic.IpNetworkId != nil {

@@ -20,8 +20,8 @@ var _ = Describe("formatNetworkListText", func() {
 		statusText := "ACTIVE"
 
 		output := formatNetworkListText([]api.VirtualNetwork{{
-			Id: "net01",
 			Metadata: &api.Metadata{
+				Id:       strPtr("net01"),
 				Name:     &name,
 				NodeName: &nodeName,
 			},
@@ -50,8 +50,8 @@ var _ = Describe("formatNetworkListText", func() {
 		statusText := "DELETING"
 
 		output := formatNetworkListText([]api.VirtualNetwork{{
-			Id: "net99",
 			Metadata: &api.Metadata{
+				Id:   strPtr("net99"),
 				Name: &name,
 			},
 			Status: &api.Status{
@@ -73,19 +73,19 @@ var _ = Describe("network list sort", func() {
 
 		data := []api.VirtualNetwork{
 			{
-				Id: "net-late",
+				Metadata: &api.Metadata{Id: strPtr("net-late")},
 				Status: &api.Status{
 					CreationTimeStamp: &now,
 				},
 			},
 			{
-				Id: "net-early",
+				Metadata: &api.Metadata{Id: strPtr("net-early")},
 				Status: &api.Status{
 					CreationTimeStamp: &earlier,
 				},
 			},
 			{
-				Id: "net-mid",
+				Metadata: &api.Metadata{Id: strPtr("net-mid")},
 				Status: &api.Status{
 					CreationTimeStamp: &middle,
 				},
@@ -106,12 +106,12 @@ var _ = Describe("network list sort", func() {
 				return ti.Before(tj)
 			}
 
-			return data[i].Id < data[j].Id
+			return api.VirtualNetworkID(data[i]) < api.VirtualNetworkID(data[j])
 		})
 
-		Expect(data[0].Id).To(Equal("net-early"))
-		Expect(data[1].Id).To(Equal("net-mid"))
-		Expect(data[2].Id).To(Equal("net-late"))
+		Expect(api.VirtualNetworkID(data[0])).To(Equal("net-early"))
+		Expect(api.VirtualNetworkID(data[1])).To(Equal("net-mid"))
+		Expect(api.VirtualNetworkID(data[2])).To(Equal("net-late"))
 	})
 })
 
@@ -121,24 +121,24 @@ var _ = Describe("filterHeadSyncRoleNetworks", func() {
 		followerLabels := map[string]interface{}{"syncRole": "follower"}
 
 		data := []api.VirtualNetwork{
-			{Id: "net-head", Metadata: &api.Metadata{Labels: &headLabels}},
-			{Id: "net-follower", Metadata: &api.Metadata{Labels: &followerLabels}},
-			{Id: "net-no-meta"},
-			{Id: "net-no-labels", Metadata: &api.Metadata{}},
+			{Metadata: &api.Metadata{Id: strPtr("net-head"), Labels: &headLabels}},
+			{Metadata: &api.Metadata{Id: strPtr("net-follower"), Labels: &followerLabels}},
+			{Metadata: &api.Metadata{Id: strPtr("net-no-meta")}},
+			{Metadata: &api.Metadata{Id: strPtr("net-no-labels")}},
 		}
 
 		filtered := filterHeadSyncRoleNetworks(data)
 
 		Expect(filtered).To(HaveLen(1))
-		Expect(filtered[0].Id).To(Equal("net-head"))
+		Expect(api.VirtualNetworkID(filtered[0])).To(Equal("net-head"))
 	})
 
 	It("keeps all records when show-all flag is used by skipping this filter", func() {
 		headLabels := map[string]interface{}{"syncRole": "head"}
 		followerLabels := map[string]interface{}{"syncRole": "follower"}
 		data := []api.VirtualNetwork{
-			{Id: "net-head", Metadata: &api.Metadata{Labels: &headLabels}},
-			{Id: "net-follower", Metadata: &api.Metadata{Labels: &followerLabels}},
+			{Metadata: &api.Metadata{Id: strPtr("net-head"), Labels: &headLabels}},
+			{Metadata: &api.Metadata{Id: strPtr("net-follower"), Labels: &followerLabels}},
 		}
 
 		all := filterNetworksForList(data, true)
@@ -146,6 +146,10 @@ var _ = Describe("filterHeadSyncRoleNetworks", func() {
 
 		Expect(all).To(HaveLen(2))
 		Expect(headOnly).To(HaveLen(1))
-		Expect(headOnly[0].Id).To(Equal("net-head"))
+		Expect(api.VirtualNetworkID(headOnly[0])).To(Equal("net-head"))
 	})
 })
+
+func strPtr(s string) *string {
+	return &s
+}

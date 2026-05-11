@@ -226,7 +226,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 				err = json.Unmarshal(stdoutStderr, &networks)
 				g.Expect(err).NotTo(HaveOccurred())
 				for _, n := range networks {
-					GinkgoWriter.Printf("  - %s (%s)\n", *n.Metadata.Name, n.Id)
+					GinkgoWriter.Printf("  - %s (%s)\n", *n.Metadata.Name, api.VirtualNetworkID(n))
 					g.Expect(n.Status.StatusCode).To(Equal(int(db.NETWORK_ACTIVE)))
 				}
 			}, 60*time.Second, 3*time.Second).Should(Succeed())
@@ -250,7 +250,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			err = json.Unmarshal(stdoutStderr, &net)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(*net.Metadata.Name).To(Equal("test-net-1"))
-			netId1 = net.Id
+			netId1 = api.VirtualNetworkID(net)
 		})
 		fmt.Printf("netId1: %s\n", netId1)
 
@@ -264,7 +264,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 				var network api.VirtualNetwork
 				err = json.Unmarshal(stdoutStderr, &network)
 				g.Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Printf("  - %s (%s)\n", *network.Metadata.Name, network.Id)
+				GinkgoWriter.Printf("  - %s (%s)\n", *network.Metadata.Name, api.VirtualNetworkID(network))
 				g.Expect(network.Status.StatusCode).To(Equal(int(db.NETWORK_ACTIVE)))
 			}, 60*time.Second, 3*time.Second).Should(Succeed())
 		})
@@ -280,7 +280,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			err = json.Unmarshal(stdoutStderr, &net)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(*net.Metadata.Name).To(Equal("test-net-2"))
-			netId2 = net.Id
+			netId2 = api.VirtualNetworkID(net)
 		})
 		fmt.Printf("netId2: %s\n", netId2)
 
@@ -294,7 +294,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 				var network api.VirtualNetwork
 				err = json.Unmarshal(stdoutStderr, &network)
 				g.Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Printf("  - %s (%s)\n", *network.Metadata.Name, network.Id)
+				GinkgoWriter.Printf("  - %s (%s)\n", *network.Metadata.Name, api.VirtualNetworkID(network))
 				g.Expect(network.Status.StatusCode).To(Equal(int(db.NETWORK_ACTIVE)))
 			}, 60*time.Second, 3*time.Second).Should(Succeed())
 		})
@@ -310,7 +310,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			err = json.Unmarshal(stdoutStderr, &net)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(*net.Metadata.Name).To(Equal("test-net-3"))
-			netId3 = net.Id
+			netId3 = api.VirtualNetworkID(net)
 		})
 		fmt.Printf("netId3: %s\n", netId3)
 
@@ -324,7 +324,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 				var network api.VirtualNetwork
 				err = json.Unmarshal(stdoutStderr, &network)
 				g.Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Printf("  - %s (%s)\n", *network.Metadata.Name, network.Id)
+				GinkgoWriter.Printf("  - %s (%s)\n", *network.Metadata.Name, api.VirtualNetworkID(network))
 				g.Expect(network.Status.StatusCode).To(Equal(int(db.NETWORK_ACTIVE)))
 			}, 60*time.Second, 3*time.Second).Should(Succeed())
 		})
@@ -346,7 +346,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 
 			head, err := mockServer.server.Ma.Db.CreateVirtualNetwork(headSpec)
 			Expect(err).NotTo(HaveOccurred())
-			deletePropagationHeadID = head.Id
+			deletePropagationHeadID = api.VirtualNetworkID(head)
 			mockServer.server.Ma.Db.UpdateVirtualNetworkStatus(deletePropagationHeadID, db.NETWORK_ACTIVE)
 
 			headFromDB, err := mockServer.server.Ma.Db.GetVirtualNetworkById(deletePropagationHeadID)

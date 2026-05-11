@@ -55,7 +55,7 @@ var networkListCmd = &cobra.Command{
 					return ti.Before(tj)
 				}
 
-				return data[i].Id < data[j].Id
+				return api.VirtualNetworkID(data[i]) < api.VirtualNetworkID(data[j])
 			})
 			if len(data) == 0 {
 				switch outputStyle {
@@ -132,7 +132,7 @@ func formatNetworkListText(data []api.VirtualNetwork) string {
 		fmt.Fprintf(&builder, "  %2d  %1s%-10v  %-20v  %-12v  %-20v  %-18v  %-20v\n",
 			i+1,
 			deletionMarker(network.Status),
-			network.Id,
+			api.VirtualNetworkID(network),
 			stringValue(network.Metadata, func(m *api.Metadata) *string { return m.Name }),
 			stringValue(network.Metadata, func(m *api.Metadata) *string { return m.NodeName }),
 			stringValue(network.Spec, func(s *api.VirtualNetworkSpec) *string { return s.BridgeName }),
