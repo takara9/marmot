@@ -1100,7 +1100,13 @@ components:
       type: object
       required:
         - id
+        - apiVersion
+        - kind
       properties:
+        apiVersion:
+          type: string
+        kind:
+          type: string
         id:
           type: string
         metadata:

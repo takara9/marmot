@@ -13,6 +13,7 @@ import (
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/marmotd"
+	"github.com/takara9/marmot/pkg/util"
 )
 
 var _ = Describe("ImageManagmentTest", Ordered, func() {
@@ -133,12 +134,12 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 			images, err = marmotServer.Ma.GetImagesManage()
 			Expect(err).NotTo(HaveOccurred())
 			for _, image := range images {
-				fmt.Println("ID", image.Id, "Name", *image.Metadata.Name)
+				fmt.Println("ID", image.Metadata.Id, "Name", *image.Metadata.Name)
 			}
 		})
 
 		It("イメージの詳細情報取得 -1", func() {
-			image, err := marmotServer.Ma.GetImageManage((images)[0].Id)
+			image, err := marmotServer.Ma.GetImageManage(util.DerefStrPtr((images)[0].Metadata.Id))
 			Expect(err).NotTo(HaveOccurred())
 			jsonBytes, err := json.MarshalIndent(image, "", "    ")
 			Expect(err).NotTo(HaveOccurred())
@@ -146,7 +147,7 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 		})
 
 		It("イメージの詳細情報取得 -2", func() {
-			image, err := marmotServer.Ma.GetImageManage((images)[1].Id)
+			image, err := marmotServer.Ma.GetImageManage(util.DerefStrPtr((images)[1].Metadata.Id))
 			Expect(err).NotTo(HaveOccurred())
 			jsonBytes, err := json.MarshalIndent(image, "", "    ")
 			Expect(err).NotTo(HaveOccurred())
@@ -154,19 +155,19 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 		})
 
 		It("イメージの削除 -1", func() {
-			err := marmotServer.Ma.DeleteImageManage((images)[0].Id)
+			err := marmotServer.Ma.DeleteImageManage(util.DerefStrPtr((images)[0].Metadata.Id))
 			Expect(err).NotTo(HaveOccurred())
-			_, err = marmotServer.Ma.GetImageManage((images)[0].Id)
+			_, err = marmotServer.Ma.GetImageManage(util.DerefStrPtr((images)[0].Metadata.Id))
 			Expect(err).To(HaveOccurred())
-			fmt.Println("Deleted image ID: ", (images)[0].Id)
+			fmt.Println("Deleted image ID: ", util.DerefStrPtr((images)[0].Metadata.Id))
 		})
 
 		It("イメージの削除 -2", func() {
-			err := marmotServer.Ma.DeleteImageManage((images)[1].Id)
+			err := marmotServer.Ma.DeleteImageManage(util.DerefStrPtr((images)[1].Metadata.Id))
 			Expect(err).NotTo(HaveOccurred())
-			_, err = marmotServer.Ma.GetImageManage((images)[1].Id)
+			_, err = marmotServer.Ma.GetImageManage(util.DerefStrPtr((images)[1].Metadata.Id))
 			Expect(err).To(HaveOccurred())
-			fmt.Println("Deleted image ID: ", (images)[1].Id)
+			fmt.Println("Deleted image ID: ", util.DerefStrPtr((images)[1].Metadata.Id))
 		})
 	})
 })

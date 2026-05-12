@@ -9,6 +9,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/util"
 )
 
 var _ = Describe("Image", Ordered, func() {
@@ -118,8 +119,8 @@ var _ = Describe("Image", Ordered, func() {
 				imgs, err := v.GetImages()
 				Expect(err).NotTo(HaveOccurred())
 				for i, img := range imgs {
-					fmt.Println("Id", img.Id, "Name", *img.Metadata.Name, "Status", db.ImageStatus[img.Status.StatusCode])
-					ids[i] = img.Id
+					fmt.Println("Id", util.DerefStrPtr(img.Metadata.Id), "Name", *img.Metadata.Name, "Status", db.ImageStatus[img.Status.StatusCode])
+					ids[i] = util.DerefStrPtr(img.Metadata.Id)
 				}
 			})
 
@@ -132,8 +133,8 @@ var _ = Describe("Image", Ordered, func() {
 				imgs, err := v.GetImages()
 				Expect(err).NotTo(HaveOccurred())
 				for i, img := range imgs {
-					fmt.Println("Id", img.Id, "Name", *img.Metadata.Name, "Status", db.ImageStatus[img.Status.StatusCode])
-					ids[i] = img.Id
+					fmt.Println("Id", util.DerefStrPtr(img.Metadata.Id), "Name", *img.Metadata.Name, "Status", db.ImageStatus[img.Status.StatusCode])
+					ids[i] = util.DerefStrPtr(img.Metadata.Id)
 				}
 			})
 		})

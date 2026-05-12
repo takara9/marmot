@@ -30,6 +30,13 @@ var imageCreateCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		if image.ApiVersion == "" {
+			return fmt.Errorf("apiVersion is required in the configuration")
+		}
+		if image.Kind == "" {
+			return fmt.Errorf("kind is required in the configuration")
+		}
+
 		if image.Metadata == nil || image.Metadata.Name == nil || *image.Metadata.Name == "" {
 			return fmt.Errorf("Metadata.name is required in the configuration")
 		}

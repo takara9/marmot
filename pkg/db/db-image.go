@@ -130,22 +130,24 @@ func GetImageServerID(labels map[string]interface{}) string {
 	return strings.TrimSpace(val)
 }
 
-func (d *Database) getUniqueImageID() (string, error) {
+func (d *Database) getUniqueImageID() (string, string, error) {
 	var id string
+	var uuidString string
 	var key string
 	for {
 		var tempVol api.Image
-		id = uuid.New().String()[:5]
+		uuidString = uuid.New().String()
+		id = uuidString[:5]
 		key = ImagePrefix + "/" + id
 		_, err := d.GetJSON(key, &tempVol)
 		if err == ErrNotFound {
 			break
 		} else if err != nil {
 			slog.Error("getUniqueImageID()", "err", err)
-			return "", err
+			return "", "", err
 		}
 	}
-	return id, nil
+	return id, uuidString, nil
 }
 
 // URLのイメージをダウンロードして、それからイメージを作成する
@@ -153,13 +155,43 @@ func (d *Database) MakeImageEntryFromURL(name, url string) (string, error) {
 	return "", fmt.Errorf("nodeName is required: use MakeImageEntryFromURLWithNode")
 }
 
+// APIのImage定義をそのまま受け取り、イメージを作成する。
+func (d *Database) MakeImageEntryFromSpec(imageSpec api.Image) (string, error) {
+	if imageSpec.Metadata == nil || imageSpec.Metadata.Name == nil {
+		return "", fmt.Errorf("name is required")
+	}
+	if imageSpec.Spec == nil || imageSpec.Spec.SourceUrl == nil {
+		return "", fmt.Errorf("sourceUrl is required")
+	}
+
+	nodeName := ""
+	if imageSpec.Metadata.NodeName != nil {
+		nodeName = strings.TrimSpace(*imageSpec.Metadata.NodeName)
+	}
+
+	apiVersion := strings.TrimSpace(imageSpec.ApiVersion)
+	if apiVersion == "" {
+		apiVersion = "v1"
+	}
+	kind := strings.TrimSpace(imageSpec.Kind)
+	if kind == "" {
+		kind = "Image"
+	}
+
+	return d.makeImageEntryFromURLWithNodeAndMeta(*imageSpec.Metadata.Name, *imageSpec.Spec.SourceUrl, nodeName, apiVersion, kind)
+}
+
 // URLのイメージをダウンロードして、それからイメージを作成する。
 // nodeName が指定されている場合は、Metadata.nodeName に記録する。
 func (d *Database) MakeImageEntryFromURLWithNode(name, url, nodeName string) (string, error) {
+	return d.makeImageEntryFromURLWithNodeAndMeta(name, url, nodeName, "v1", "Image")
+}
+
+func (d *Database) makeImageEntryFromURLWithNodeAndMeta(name, url, nodeName, apiVersion, kind string) (string, error) {
 	slog.Debug("MakeImageEntryFromURL() called", "name", name, "url", url)
 
 	//一意なIDを発行
-	id, err := d.getUniqueImageID()
+	id, uuidString, err := d.getUniqueImageID()
 	if err != nil {
 		slog.Error("MakeImageEntryFromURL()", "err", err)
 		return "", err
@@ -167,9 +199,12 @@ func (d *Database) MakeImageEntryFromURLWithNode(name, url, nodeName string) (st
 
 	//イメージの基本情報を保存
 	img := api.Image{
-		Id: id,
+		ApiVersion: apiVersion,
+		Kind:       kind,
 		Metadata: &api.Metadata{
 			Name: &name,
+			Id:   util.StringPtr(id),
+			Uuid: util.StringPtr(uuidString),
 		},
 		Spec: &api.ImageSpec{
 			SourceUrl: &url,
@@ -199,7 +234,7 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 	slog.Debug("MakeImageEntryFromRunningVM() called", "name", name, "serverId", serverId)
 
 	//一意なIDを発行
-	id, err := d.getUniqueImageID()
+	id, uuidString, err := d.getUniqueImageID()
 	if err != nil {
 		slog.Error("MakeImageEntryFromRunningVM()", "err", err)
 		return api.Image{}, err
@@ -253,11 +288,14 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 		// イメージのqcow2ボリューム名を設定
 		imagePath := fmt.Sprintf("%s/osimage-%s.qcow2", imageDir, id)
 		img = api.Image{
-			Id: id,
+			ApiVersion: "v1",
+			Kind:       "Image",
 			Metadata: &api.Metadata{
 				Name:     &name,
 				Labels:   &labels,
 				NodeName: serverNodeName,
+				Id:       util.StringPtr(id),
+				Uuid:     util.StringPtr(uuidString),
 			},
 			Spec: &api.ImageSpec{
 				Kind:          bootVol.Spec.Kind, // ポインタの値を直接使用
@@ -281,11 +319,14 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 		logicalVolumePath := fmt.Sprintf("/dev/%s/osimage-%s", *bootVol.Spec.VolumeGroup, id)
 		logicalVolumeName := fmt.Sprintf("osimage-%s", id)
 		img = api.Image{
-			Id: id,
+			ApiVersion: "v1",
+			Kind:       "Image",
 			Metadata: &api.Metadata{
 				Name:     &name,
 				Labels:   &labels,
 				NodeName: serverNodeName,
+				Id:       util.StringPtr(id),
+				Uuid:     util.StringPtr(uuidString),
 			},
 			Spec: &api.ImageSpec{
 				Kind:          bootVol.Spec.Kind, // ポインタの値を直接使用
@@ -326,6 +367,7 @@ func (d *Database) GetImage(id string) (api.Image, error) {
 		slog.Error("GetImage()", "err", err)
 		return api.Image{}, err
 	}
+	normalizeImageMetadataID(&img, id)
 
 	return img, nil
 }
@@ -353,10 +395,42 @@ func (d *Database) GetImages() ([]api.Image, error) {
 			slog.Error("GetImages() failed to unmarshal image", "err", err)
 			continue
 		}
+		normalizeImageMetadataID(&img, imageIDFromKey(string(kv.Key)))
 		images = append(images, img)
 	}
 
 	return images, nil
+}
+
+func imageIDFromKey(key string) string {
+	prefix := ImagePrefix + "/"
+	id := strings.TrimPrefix(strings.TrimSpace(key), prefix)
+	if i := strings.Index(id, "/"); i >= 0 {
+		id = id[:i]
+	}
+	return strings.TrimSpace(id)
+}
+
+func normalizeImageMetadataID(img *api.Image, fallbackID string) {
+	if img == nil {
+		return
+	}
+	if strings.TrimSpace(img.ApiVersion) == "" {
+		img.ApiVersion = "v1"
+	}
+	if strings.TrimSpace(img.Kind) == "" {
+		img.Kind = "Image"
+	}
+	fallbackID = strings.TrimSpace(fallbackID)
+	if fallbackID == "" {
+		return
+	}
+	if img.Metadata == nil {
+		img.Metadata = &api.Metadata{}
+	}
+	if img.Metadata.Id == nil || strings.TrimSpace(*img.Metadata.Id) == "" {
+		img.Metadata.Id = util.StringPtr(fallbackID)
+	}
 }
 
 // IDで特定してイメージを削除する
@@ -437,7 +511,9 @@ func (d *Database) updateImage(id string, spec api.Image) error {
 	}
 	expected := resp.Kvs[0].ModRevision
 
-	rec.Id = id
+	if rec.Metadata != nil {
+		rec.Metadata.Id = util.StringPtr(id)
+	}
 	// パッチ適用
 	util.PatchStruct(&rec, spec)
 
@@ -556,7 +632,7 @@ func (d *Database) MakeFollowerImageEntry(headImage api.Image, followerNodeName 
 		return "", fmt.Errorf("head image metadata.name is required")
 	}
 
-	id, err := d.getUniqueImageID()
+	id, uuidString, err := d.getUniqueImageID()
 	if err != nil {
 		slog.Error("MakeFollowerImageEntry() getUniqueImageID failed", "err", err)
 		return "", err
@@ -582,11 +658,14 @@ func (d *Database) MakeFollowerImageEntry(headImage api.Image, followerNodeName 
 	imagePath := fmt.Sprintf("%s/osimage-%s.qcow2", imageDir, id)
 
 	follower := api.Image{
-		Id: id,
+		ApiVersion: "v1",
+		Kind:       "Image",
 		Metadata: &api.Metadata{
 			Name:     headImage.Metadata.Name,
 			NodeName: util.StringPtr(followerNodeName),
 			Labels:   &labels,
+			Id:       util.StringPtr(id),
+			Uuid:     util.StringPtr(uuidString),
 		},
 		Spec: &api.ImageSpec{
 			Kind:      util.StringPtr("os"),

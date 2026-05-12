@@ -265,6 +265,7 @@ jobs:
     - name: 仮想ネットワーク削除
       run: |
         sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
+        sudo ovs-vsctl list-br | grep "br-" | xargs -I {} sudo ovs-vsctl del-br {}
 
   mactl-vm-deploy-2:
     runs-on: [ self-hosted, any ]
@@ -286,6 +287,7 @@ jobs:
     - name: 仮想ネットワーク削除
       run: |
         sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
+        sudo ovs-vsctl list-br | grep "br-" | xargs -I {} sudo ovs-vsctl del-br {}
 
   mactl-vm-deploy-3:
     runs-on: [ self-hosted, any ]
@@ -307,6 +309,7 @@ jobs:
     - name: 仮想ネットワーク削除
       run: |
         sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
+        sudo ovs-vsctl list-br | grep "br-" | xargs -I {} sudo ovs-vsctl del-br {}
 
 
     #- name: Test cmd/maadm

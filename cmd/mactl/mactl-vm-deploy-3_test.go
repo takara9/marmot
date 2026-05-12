@@ -16,7 +16,6 @@ import (
 	"github.com/takara9/marmot/pkg/db"
 )
 
-
 var _ = Describe("MarmotdTest", Ordered, func() {
 	var mockServer *mockServerHandle
 	var containerID string

@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/util"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -86,7 +87,7 @@ func printImageDetails(image api.Image) {
 	fmt.Println("Image Details")
 	fmt.Println("Summary")
 	printImageDetailField("Name", stringValue(image.Metadata, func(m *api.Metadata) *string { return m.Name }))
-	printImageDetailField("Id", formatID(image.Id))
+	printImageDetailField("Id", formatID(util.DerefStrPtr(image.Metadata.Id)))
 	printImageDetailField("State", formatImageStatus(image.Status))
 	printImageDetailField("Type", stringValue(image.Spec, func(s *api.ImageSpec) *string { return s.Type }))
 	printImageDetailField("Kind", stringValue(image.Spec, func(s *api.ImageSpec) *string { return s.Kind }))
