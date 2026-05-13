@@ -469,7 +469,6 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			var virtualServer api.Server
 			var meta api.Metadata
 			var spec api.ServerSpec
-			virtualServer.Metadata = meta
 			virtualServer.Spec = spec
 			var bootVol api.Volume
 			var specVol api.VolSpec
@@ -480,6 +479,7 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			virtualServer.Spec.BootVolume = &bootVol
 
 			meta.Name = util.StringPtr("test-vm-2")
+			virtualServer.Metadata = meta
 			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
 				{
 					Networkname: "default",
