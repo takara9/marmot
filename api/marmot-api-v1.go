@@ -116,10 +116,11 @@ type IPNetwork struct {
 
 // Image defines model for Image.
 type Image struct {
-	Id       string     `json:"id" yaml:"id"`
-	Metadata *Metadata  `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-	Spec     *ImageSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
-	Status   *Status    `json:"status,omitempty" yaml:"status,omitempty"`
+	ApiVersion string     `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string     `json:"kind" yaml:"kind"`
+	Metadata   *Metadata  `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	Spec       *ImageSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
+	Status     *Status    `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
 // ImageSpec defines model for ImageSpec.

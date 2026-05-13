@@ -1063,7 +1063,9 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 				}
 				GinkgoWriter.Println("Creating Data volume", "volume", v)
 				tmpSpec, err := marmotServer.Ma.CreateNewVolumeWithWait(v)
-				volumeIds = append(volumeIds, tmpSpec.Id)
+				   if tmpSpec.Metadata != nil && tmpSpec.Metadata.Id != nil {
+					   volumeIds = append(volumeIds, *tmpSpec.Metadata.Id)
+				   }
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("Created volume key: ", *tmpSpec.Metadata.Key)
 			})
@@ -1079,7 +1081,9 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 				}
 				GinkgoWriter.Println("Creating Data volume", "volume", v)
 				tmpSpec, err := marmotServer.Ma.CreateNewVolumeWithWait(v)
-				volumeIds = append(volumeIds, tmpSpec.Id)
+				if tmpSpec.Metadata != nil && tmpSpec.Metadata.Id != nil {
+					volumeIds = append(volumeIds, *tmpSpec.Metadata.Id)
+				}
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Println("Created volume key: ", *tmpSpec.Metadata.Key)
 			})

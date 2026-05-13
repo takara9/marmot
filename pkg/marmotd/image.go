@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/takara9/marmot/api"
@@ -31,6 +32,9 @@ var checkImageVolumeGroup = func(vgName string) error {
 	_, _, err := lvm.CheckVG(vgName)
 	return err
 }
+
+// NBD デバイス利用は排他し、同時実行時の /dev/nbdX 競合を避ける。
+var resizeNBDMu sync.Mutex
 
 // CreateNewImage は、指定されたIDのイメージを新規作成する関数 	コントローラーで使用
 func (m *Marmot) CreateNewImageManage(id string) (*api.Image, error) {
@@ -67,6 +71,17 @@ func (m *Marmot) CreateNewImageManageWithContext(ctx context.Context, id string)
 		slog.Error("Failed to get image data from DB", "imgId", id, "err", err)
 		return nil, err
 	}
+	if image.Status == nil {
+		image.Status = &api.Status{}
+	}
+	updateImageMessage := func(message string) error {
+		image.Status.Message = util.StringPtr(message)
+		if err := m.Db.UpdateImage(id, image); err != nil {
+			slog.Error("Failed to update image status in DB", "imgId", id, "err", err)
+			return err
+		}
+		return nil
+	}
 	markFailed := func(err error) (*api.Image, error) {
 		err = wrapDeadlineExceeded(err, "URL からのイメージ作成", operationTimeout)
 		return nil, m.markImageCreationFailed(image, err)
@@ -75,9 +90,7 @@ func (m *Marmot) CreateNewImageManageWithContext(ctx context.Context, id string)
 		return markFailed(err)
 	}
 
-	image.Status.Message = util.StringPtr("イメージの作成処理を開始")
-	if err := m.Db.UpdateImage(id, image); err != nil {
-		slog.Error("Failed to update image status in DB", "imgId", id, "err", err)
+	if err := updateImageMessage("イメージの作成処理を開始"); err != nil {
 		return nil, err
 	}
 
@@ -87,9 +100,7 @@ func (m *Marmot) CreateNewImageManageWithContext(ctx context.Context, id string)
 	}
 	src := *image.Spec.SourceUrl
 
-	image.Status.Message = util.StringPtr("ダウンロード進行中")
-	if err := m.Db.UpdateImage(id, image); err != nil {
-		slog.Error("Failed to update image status in DB", "imgId", id, "err", err)
+	if err := updateImageMessage("ダウンロード進行中"); err != nil {
 		return nil, err
 	}
 
@@ -107,9 +118,7 @@ func (m *Marmot) CreateNewImageManageWithContext(ctx context.Context, id string)
 		return markFailed(err)
 	}
 
-	image.Status.Message = util.StringPtr("OSイメージを設定中")
-	if err := m.Db.UpdateImage(id, image); err != nil {
-		slog.Error("Failed to update image status in DB", "imgId", id, "err", err)
+	if err := updateImageMessage("OSイメージを設定中"); err != nil {
 		return nil, err
 	}
 
@@ -134,6 +143,9 @@ func (m *Marmot) CreateNewImageManageWithContext(ctx context.Context, id string)
 		return markFailed(wrapDeadlineExceeded(err, "QCOW2 イメージ拡張", CurrentConfig().ImageResizeTimeout()))
 	}
 
+	if image.Spec == nil {
+		image.Spec = &api.ImageSpec{}
+	}
 	image.Spec.Kind = util.StringPtr("os")
 	image.Spec.Type = util.StringPtr("qcow2")
 	image.Spec.Qcow2Path = util.StringPtr(downloadPath)
@@ -143,9 +155,7 @@ func (m *Marmot) CreateNewImageManageWithContext(ctx context.Context, id string)
 	if err := ensureImageVolumeGroupAvailable(volumeGroup); err != nil {
 		slog.Warn("OS volume group unavailable; keep qcow2 image only", "imgId", id, "volumeGroup", volumeGroup, "err", err)
 	} else {
-		image.Status.Message = util.StringPtr("OSイメージをロジカルボリュームに転送中")
-		if err := m.Db.UpdateImage(id, image); err != nil {
-			slog.Error("Failed to update image status in DB", "imgId", id, "err", err)
+		if err := updateImageMessage("OSイメージをロジカルボリュームに転送中"); err != nil {
 			return nil, err
 		}
 
@@ -437,8 +447,11 @@ func customizeQcowImageWithContext(ctx context.Context, imagePath string) error 
 // resizeCustomizedImageTo16GB は、QCOW2イメージを16GBへ拡張し、
 // パーティションとファイルシステムを拡張する。
 func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSizeGB int) error {
-	nbdDev := "/dev/nbd1"
-	partDev := "/dev/nbd1p1"
+	resizeNBDMu.Lock()
+	defer resizeNBDMu.Unlock()
+
+	var nbdDev string
+	var partDev string
 
 	// 失敗時でも切断を試みる
 	connected := false
@@ -457,10 +470,31 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 	if err := runCmd(ctx, "qemu-img", "resize", imageTemplatePath, size); err != nil {
 		return err
 	}
-	if err := runCmd(ctx, "qemu-nbd", "-c", nbdDev, imageTemplatePath); err != nil {
-		return err
+
+	var attachErrs []string
+	for i := 0; i < 16; i++ {
+		candidate, err := findFreeNbdDeviceByIndex(i)
+		if err != nil {
+			continue
+		}
+		nbdDev = candidate
+		partDev = nbdDev + "p1"
+
+		// 念のため stale 接続を切る（未接続なら失敗しても無視）
+		_ = runCmd(ctx, "qemu-nbd", "-d", nbdDev)
+		if err := runCmd(ctx, "qemu-nbd", "-c", nbdDev, imageTemplatePath); err != nil {
+			attachErrs = append(attachErrs, fmt.Sprintf("%s: %v", nbdDev, err))
+			continue
+		}
+		connected = true
+		break
 	}
-	connected = true
+	if !connected {
+		if len(attachErrs) == 0 {
+			return fmt.Errorf("qemu-nbd attach failed: no free nbd device found")
+		}
+		return fmt.Errorf("qemu-nbd attach failed: %s", strings.Join(attachErrs, " | "))
+	}
 
 	time.Sleep(3 * time.Second)
 
@@ -489,6 +523,19 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 	}
 
 	return nil
+}
+
+func findFreeNbdDeviceByIndex(i int) (string, error) {
+	devicePath := fmt.Sprintf("/dev/nbd%d", i)
+	sysPath := fmt.Sprintf("/sys/class/block/nbd%d/pid", i)
+
+	if _, err := os.Stat(devicePath); os.IsNotExist(err) {
+		return "", fmt.Errorf("device %s does not exist", devicePath)
+	}
+	if _, err := os.Stat(sysPath); os.IsNotExist(err) {
+		return devicePath, nil
+	}
+	return "", fmt.Errorf("device %s is busy", devicePath)
 }
 
 // runCmd はコマンド実行とエラー出力整形を行うヘルパー。

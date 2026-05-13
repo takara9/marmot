@@ -9,6 +9,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/util"
 )
 
 func captureStdout(fn func()) string {
@@ -40,7 +41,7 @@ func captureStdout(fn func()) string {
 var _ = Describe("printImageDetails", func() {
 	It("prints a nil-safe detail view", func() {
 		output := captureStdout(func() {
-			printImageDetails(api.Image{Id: "img01"})
+			printImageDetails(api.Image{Metadata: &api.Metadata{Id: util.StringPtr("img01")}})
 		})
 
 		Expect(strings.Contains(output, "Image Details")).To(BeTrue(), output)

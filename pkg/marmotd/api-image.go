@@ -21,10 +21,17 @@ func (s *Server) ApiCreateImage(ctx echo.Context) error {
 		slog.Error("ApiCreateImage()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-	slog.Debug("Recived post body", "imageSpec=", imageSpec, "sourceUrl=", imageSpec.Spec.SourceUrl)
 
 	// リクエストをetcdに登録し、正常応答を返す
 	slog.Debug("イメージの使用を付与してDBへ登録、一意のIDを取得")
+	if imageSpec.ApiVersion == "" {
+		slog.Error("ApiCreateImage()", "err", "apiVersion is required")
+		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: "apiVersion is required"})
+	}
+	if imageSpec.Kind == "" {
+		slog.Error("ApiCreateImage()", "err", "kind is required")
+		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: "kind is required"})
+	}
 	// URLの設定チェック
 	if imageSpec.Spec == nil || imageSpec.Spec.SourceUrl == nil {
 		slog.Error("ApiCreateImage()", "err", "SourceUrl is required")
@@ -40,8 +47,9 @@ func (s *Server) ApiCreateImage(ctx echo.Context) error {
 	if imageSpec.Metadata != nil && imageSpec.Metadata.NodeName != nil {
 		assignedNodeName = *imageSpec.Metadata.NodeName
 	}
+	slog.Debug("Received post body", "imageSpec", imageSpec, "sourceUrl", *imageSpec.Spec.SourceUrl, "nodeName", assignedNodeName)
 
-	id, err := s.Ma.Db.MakeImageEntryFromURLWithNode(*imageSpec.Metadata.Name, *imageSpec.Spec.SourceUrl, assignedNodeName)
+	id, err := s.Ma.Db.MakeImageEntryFromSpec(imageSpec)
 	if err != nil {
 		slog.Error("ApiCreateImage()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
@@ -121,10 +129,10 @@ func (s *Server) ApiDeleteImageById(ctx echo.Context, id string) error {
 			// 既に削除予定済みのものはスキップ
 			continue
 		}
-		if setErr := s.Ma.Db.SetDeleteTimestampImage(img.Id); setErr != nil {
-			slog.Error("ApiDeleteImageById() SetDeleteTimestampImage failed", "imageId", img.Id, "err", setErr)
+		if setErr := s.Ma.Db.SetDeleteTimestampImage(util.DerefStrPtr(img.Metadata.Id)); setErr != nil {
+			slog.Error("ApiDeleteImageById() SetDeleteTimestampImage failed", "imageId", util.DerefStrPtr(img.Metadata.Id), "err", setErr)
 		} else {
-			slog.Debug("ApiDeleteImageById() 削除タイムスタンプをセット", "imageId", img.Id, "imageName", targetName)
+			slog.Debug("ApiDeleteImageById() 削除タイムスタンプをセット", "imageId", util.DerefStrPtr(img.Metadata.Id), "imageName", targetName)
 		}
 	}
 

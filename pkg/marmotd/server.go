@@ -485,8 +485,8 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	slog.Debug("データボリュームの生成")
 	if serverConfig.Spec.Storage != nil {
 		for i, disk := range *serverConfig.Spec.Storage {
-			disk.ApiVersion	= "v1"
-			disk.Kind		= "Volume"
+			disk.ApiVersion = "v1"
+			disk.Kind = "Volume"
 
 			diskID := api.VolumeID(disk)
 			if len(diskID) > 0 {
@@ -1040,7 +1040,13 @@ func (m *Marmot) MakeImageEntryFromRunningVMWithContext(ctx context.Context, ser
 	}
 
 	// イメージ情報の登録
-	m.Db.UpdateImageStatus(image.Id, db.IMAGE_AVAILABLE)
+	imageID := util.DerefStrPtr(image.Metadata.Id)
+	if imageID == "" {
+		err := fmt.Errorf("image metadata.id is empty")
+		slog.Error("MakeImageEntryFromRunningVMWithContext()", "err", err, "serverId", serverId, "imageName", name)
+		return "", markFailed(err)
+	}
+	m.Db.UpdateImageStatus(imageID, db.IMAGE_AVAILABLE)
 
-	return image.Id, nil
+	return imageID, nil
 }
