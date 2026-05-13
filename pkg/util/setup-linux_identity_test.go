@@ -56,3 +56,33 @@ func TestHostIDBytes_DeterministicAndDistinct(t *testing.T) {
 		t.Fatalf("different machine-id should produce different hostid: %v == %v", a, b)
 	}
 }
+
+func TestHostnameForServer_UsesMetadataName(t *testing.T) {
+	id := "sv-001"
+	name := "test-vm"
+	spec := api.Server{Metadata: api.Metadata{Id: &id, Name: &name}}
+
+	got := hostnameForServer(spec)
+	if got != "test-vm" {
+		t.Fatalf("hostnameForServer() = %s, want %s", got, "test-vm")
+	}
+}
+
+func TestHostnameForServer_FallsBackToServerID(t *testing.T) {
+	id := "sv-002"
+	spec := api.Server{Metadata: api.Metadata{Id: &id}}
+
+	got := hostnameForServer(spec)
+	if got != "vm-sv-002" {
+		t.Fatalf("hostnameForServer() = %s, want %s", got, "vm-sv-002")
+	}
+}
+
+func TestHostnameForServer_FallsBackToDefault(t *testing.T) {
+	spec := api.Server{}
+
+	got := hostnameForServer(spec)
+	if got != "marmot" {
+		t.Fatalf("hostnameForServer() = %s, want %s", got, "marmot")
+	}
+}

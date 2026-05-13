@@ -37,9 +37,10 @@ func SetupLinux(spec api.Server) error {
 
 	// ホスト名設定
 	hostnameFile := filepath.Join(mountPoint, "etc/hostname")
-	slog.Debug("Setting hostname", "file", hostnameFile, "hostname", *spec.Metadata.Name)
+	hostname := hostnameForServer(spec)
+	slog.Debug("Setting hostname", "file", hostnameFile, "hostname", hostname)
 
-	err = os.WriteFile(hostnameFile, []byte(*spec.Metadata.Name), 0644)
+	err = os.WriteFile(hostnameFile, []byte(hostname), 0644)
 	if err != nil {
 		slog.Error("WriteFile hostname failed", "error", err)
 		return err
@@ -80,6 +81,22 @@ func SetupLinux(spec api.Server) error {
 	}
 
 	return nil
+}
+
+func hostnameForServer(spec api.Server) string {
+	if spec.Metadata.Name != nil {
+		name := strings.TrimSpace(*spec.Metadata.Name)
+		if name != "" {
+			return name
+		}
+	}
+
+	id := strings.TrimSpace(api.ServerID(spec))
+	if id != "" {
+		return "vm-" + id
+	}
+
+	return "marmot"
 }
 
 func machineIDForServer(spec api.Server) string {
