@@ -151,7 +151,7 @@ func (m *MarmotEndpoint) MakeImageEntryFromRunningVMById(id, name string) ([]byt
 
 	var image api.Image
 	var meta api.Metadata
-	image.Metadata = &meta
+	image.Metadata = meta
 	image.Metadata.Name = &name
 
 	byteJSON, err := json.Marshal(image)

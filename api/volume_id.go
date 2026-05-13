@@ -2,7 +2,7 @@ package api
 
 // VolumeID returns the volume identifier stored in metadata.id.
 func VolumeID(v Volume) string {
-	if v.Metadata == nil || v.Metadata.Id == nil {
+	if v.Metadata.Id == nil {
 		return ""
 	}
 	return *v.Metadata.Id
@@ -12,9 +12,6 @@ func VolumeID(v Volume) string {
 func SetVolumeID(v *Volume, id string) {
 	if v == nil {
 		return
-	}
-	if v.Metadata == nil {
-		v.Metadata = &Metadata{}
 	}
 	v.Metadata.Id = &id
 }

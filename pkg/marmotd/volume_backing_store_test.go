@@ -19,7 +19,7 @@ var _ = Describe("Volume backing store", func() {
 			Expect(os.WriteFile(qcow2Path, []byte("qcow2"), 0644)).To(Succeed())
 
 			volume := api.Volume{
-				Spec: &api.VolSpec{
+				Spec: api.VolSpec{
 					Type: util.StringPtr("qcow2"),
 					Path: util.StringPtr(qcow2Path),
 				},
@@ -32,7 +32,7 @@ var _ = Describe("Volume backing store", func() {
 			missingPath := filepath.Join(GinkgoT().TempDir(), "missing.qcow2")
 
 			volume := api.Volume{
-				Spec: &api.VolSpec{
+				Spec: api.VolSpec{
 					Type: util.StringPtr("qcow2"),
 					Path: util.StringPtr(missingPath),
 				},
@@ -45,7 +45,7 @@ var _ = Describe("Volume backing store", func() {
 
 		It("derives the logical volume path when path is empty", func() {
 			volume := api.Volume{
-				Spec: &api.VolSpec{
+				Spec: api.VolSpec{
 					Type:          util.StringPtr("lvm"),
 					VolumeGroup:   util.StringPtr("vg1"),
 					LogicalVolume: util.StringPtr("oslv-demo"),

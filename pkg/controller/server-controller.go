@@ -121,9 +121,9 @@ func (c *controller) serverControllerLoop() {
 		forceDeleteWithoutNode, bypassReason := shouldBypassNodeGateForDeletingServer(spec, statuses)
 
 		// サーバーは必ず nodeName 割当後に処理する。
-		if !forceDeleteWithoutNode && (spec.Metadata == nil || spec.Metadata.NodeName == nil || strings.TrimSpace(*spec.Metadata.NodeName) == "") {
+		if !forceDeleteWithoutNode && (spec.Metadata.NodeName == nil || strings.TrimSpace(*spec.Metadata.NodeName) == "") {
 			objectName := ""
-			if spec.Metadata != nil && spec.Metadata.Name != nil {
+			if spec.Metadata.Name != nil {
 				objectName = *spec.Metadata.Name
 			}
 			slog.Debug("nodeName 未割当サーバーをスキップ", "serverId", api.ServerID(spec), "serverName", objectName, "controllerNode", c.marmot.NodeName, "reason", "assigned_node_missing")
@@ -131,9 +131,9 @@ func (c *controller) serverControllerLoop() {
 		}
 
 		if !forceDeleteWithoutNode {
-			if ok, assignedNode, reason := evaluateNodeAssignment(spec.Metadata, c.marmot.NodeName); !ok {
+			if ok, assignedNode, reason := evaluateNodeAssignment(&spec.Metadata, c.marmot.NodeName); !ok {
 				objectName := ""
-				if spec.Metadata != nil && spec.Metadata.Name != nil {
+				if spec.Metadata.Name != nil {
 					objectName = *spec.Metadata.Name
 				}
 				slog.Debug("別ノード割当のサーバーをスキップ", "serverId", api.ServerID(spec), "serverName", objectName, "controllerNode", c.marmot.NodeName, "assignedNode", assignedNode, "reason", reason)
@@ -141,7 +141,7 @@ func (c *controller) serverControllerLoop() {
 			}
 		} else {
 			objectName := ""
-			if spec.Metadata != nil && spec.Metadata.Name != nil {
+			if spec.Metadata.Name != nil {
 				objectName = *spec.Metadata.Name
 			}
 			slog.Warn("nodeName 判定をバイパスして削除を継続", "serverId", api.ServerID(spec), "serverName", objectName, "reason", bypassReason)
@@ -191,12 +191,12 @@ func (c *controller) serverControllerLoop() {
 			slog.Debug("削除中のサーバー検出", "SERVER", api.ServerID(spec))
 
 			if !clusterHasNodes {
-				if spec.Spec != nil && spec.Spec.BootVolume != nil && strings.TrimSpace(api.VolumeID(*spec.Spec.BootVolume)) != "" {
+				if spec.Spec.BootVolume != nil && strings.TrimSpace(api.VolumeID(*spec.Spec.BootVolume)) != "" {
 					c.marmot.Db.SetVolumeDeletionTimestamp(api.VolumeID(*spec.Spec.BootVolume))
 				}
-				if spec.Spec != nil && spec.Spec.Storage != nil {
+				if spec.Spec.Storage != nil {
 					for _, vol := range *spec.Spec.Storage {
-						if vol.Spec != nil && vol.Spec.Persistent != nil && *vol.Spec.Persistent {
+						if vol.Spec.Persistent != nil && *vol.Spec.Persistent {
 							continue
 						}
 						if strings.TrimSpace(api.VolumeID(vol)) == "" {
@@ -235,7 +235,7 @@ func (c *controller) serverControllerLoop() {
 					}
 
 					// 内部DNSからエントリーを削除する
-					if spec.Metadata != nil && spec.Metadata.Name != nil {
+					if spec.Metadata.Name != nil {
 						if err := c.marmot.Db.DeleteDnsEntryByName(*spec.Metadata.Name, nic.Networkname); err != nil {
 							slog.Error("DeleteDnsEntryByName()", "err", err)
 							continue
@@ -285,7 +285,7 @@ func shouldBypassNodeGateForDeletingServer(spec api.Server, statuses []api.HostS
 		return true, "cluster_nodes_empty"
 	}
 
-	if spec.Metadata == nil || spec.Metadata.NodeName == nil {
+	if spec.Metadata.NodeName == nil {
 		return true, "assigned_node_missing"
 	}
 

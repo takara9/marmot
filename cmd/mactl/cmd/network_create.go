@@ -37,7 +37,7 @@ var networkCreateCmd = &cobra.Command{
 		}
 
 		// 後方互換: 旧フォーマットの Spec.IPNetworkAddress も受け付ける
-		if conf.Spec != nil && conf.Spec.IPNetworkAddress == nil {
+		if conf.Spec.IPNetworkAddress == nil {
 			var legacy legacyVirtualNetworkYAML
 			if err := config.ReadYamlConfig(configFilename, &legacy); err == nil {
 				if legacy.Spec != nil && legacy.Spec.IPNetworkAddress != nil {
@@ -47,7 +47,7 @@ var networkCreateCmd = &cobra.Command{
 		}
 
 		// 名前は必須項目
-		if conf.Metadata == nil || conf.Metadata.Name == nil || len(*conf.Metadata.Name) == 0 {
+		if conf.Metadata.Name == nil || len(*conf.Metadata.Name) == 0 {
 			fmt.Println("Name is required in the configuration")
 			return fmt.Errorf("name is required in the configuration")
 		}

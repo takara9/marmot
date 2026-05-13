@@ -15,11 +15,9 @@ var serverUpdateCmd = &cobra.Command{
 	Short: "Update a server",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var spec api.Server
-		var meta api.Metadata
 		serverId := args[0]
-		meta.Id = &serverId
-		meta.Name = &serverName
-		spec.Metadata = &meta
+		spec.Metadata.Id = &serverId
+		spec.Metadata.Name = &serverName
 
 		m, err := getClientConfig()
 		if err != nil {

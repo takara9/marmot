@@ -103,7 +103,7 @@ func (m *Marmot) resolveISCSIDiskAttachment(nodeName string, disk api.Volume) (t
 	if m == nil || m.Db == nil {
 		return "", "", "", "", errors.New("marmot db is nil")
 	}
-	if disk.Spec == nil || disk.Spec.IscsiTargetIqn == nil {
+	if disk.Spec.IscsiTargetIqn == nil {
 		return "", "", "", "", errors.New("iscsi target iqn is missing")
 	}
 
@@ -142,8 +142,8 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	var bootVol api.Volume
 	var bootVolSpec api.VolSpec
 	var bootVolMeta api.Metadata
-	bootVol.Spec = &bootVolSpec
-	bootVol.Metadata = &bootVolMeta
+	bootVol.Spec = bootVolSpec
+	bootVol.Metadata = bootVolMeta
 	var virtSpec virt.ServerSpec
 
 	bootVol.ApiVersion = "v1"
@@ -156,7 +156,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	}
 
 	assignedNodeName := strings.TrimSpace(m.NodeName)
-	if serverConfig.Metadata != nil && serverConfig.Metadata.NodeName != nil {
+	if serverConfig.Metadata.NodeName != nil {
 		if node := strings.TrimSpace(*serverConfig.Metadata.NodeName); node != "" {
 			assignedNodeName = node
 		}
@@ -183,7 +183,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	}
 
 	slog.Debug("ボリュームタイプの指定がなければ、デフォルトqcow2を設定", "boot volume type", serverConfig.Spec.BootVolume)
-	if serverConfig.Spec.BootVolume == nil || serverConfig.Spec.BootVolume.Spec == nil || serverConfig.Spec.BootVolume.Spec.Type == nil {
+	if serverConfig.Spec.BootVolume == nil || serverConfig.Spec.BootVolume.Spec.Type == nil {
 		bootVol.Spec.Type = util.StringPtr("qcow2")
 	} else {
 		bootVol.Spec.Type = serverConfig.Spec.BootVolume.Spec.Type
@@ -191,13 +191,13 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	}
 
 	if bootVol.Spec.Type != nil && *bootVol.Spec.Type != "qcow2" &&
-		serverConfig.Spec.BootVolume != nil && serverConfig.Spec.BootVolume.Spec != nil &&
+		serverConfig.Spec.BootVolume != nil &&
 		serverConfig.Spec.BootVolume.Spec.Size != nil {
 		return "", errors.New("boot_volume.size は boot_volume.type=qcow2 のときのみ指定できます")
 	}
 
 	if bootVol.Spec.Type != nil && *bootVol.Spec.Type == "qcow2" &&
-		serverConfig.Spec.BootVolume != nil && serverConfig.Spec.BootVolume.Spec != nil &&
+		serverConfig.Spec.BootVolume != nil &&
 		serverConfig.Spec.BootVolume.Spec.Size != nil && *serverConfig.Spec.BootVolume.Spec.Size > 0 {
 		bootVol.Spec.Size = util.IntPtrInt(*serverConfig.Spec.BootVolume.Spec.Size)
 	}
@@ -550,7 +550,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	slog.Debug("ハイパーバイザーのリソース確保")
 	//var virtSpec virt.ServerSpec
 	virtSpec.UUID = *serverConfig.Metadata.Uuid
-	if serverConfig.Metadata != nil && serverConfig.Metadata.Name != nil {
+	if serverConfig.Metadata.Name != nil {
 		virtSpec.Name = *serverConfig.Metadata.Name + "-" + api.ServerID(serverConfig) // VMを一意に識別する
 	} else {
 		virtSpec.Name = "vm-" + api.ServerID(serverConfig)
@@ -813,11 +813,11 @@ func (m *Marmot) DeleteServerByIdManage(id string) error {
 	}
 
 	serverName := ""
-	if sv.Metadata != nil && sv.Metadata.Name != nil {
+	if sv.Metadata.Name != nil {
 		serverName = *sv.Metadata.Name
 	}
 
-	if sv.Metadata != nil && sv.Metadata.InstanceName != nil {
+	if sv.Metadata.InstanceName != nil {
 		// サーバーの削除
 		l, err := virt.NewLibVirtEp("qemu:///system")
 		if err != nil {
@@ -841,19 +841,19 @@ func (m *Marmot) DeleteServerByIdManage(id string) error {
 	}
 
 	// ブートボリュームの削除タイムスタンプのセット
-	if sv.Spec != nil && sv.Spec.BootVolume != nil && strings.TrimSpace(api.VolumeID(*sv.Spec.BootVolume)) != "" {
+	if sv.Spec.BootVolume != nil && strings.TrimSpace(api.VolumeID(*sv.Spec.BootVolume)) != "" {
 		m.Db.SetVolumeDeletionTimestamp(api.VolumeID(*sv.Spec.BootVolume))
 	} else {
 		slog.Warn("DeleteServerByIdManage() boot volume is missing, skipping deletion timestamp", "serverId", id, "serverName", serverName)
 	}
 
 	// データボリュームの削除タイムスタンプのセット
-	if sv.Spec != nil && sv.Spec.Storage != nil {
+	if sv.Spec.Storage != nil {
 		slog.Debug("アタッチされているボリューム削除のため Deletion Timestamp をセット", "ボリューム数", len(*sv.Spec.Storage))
 		for i, vol := range *sv.Spec.Storage {
 			volID := api.VolumeID(vol)
 			slog.Debug("DeleteServerById()", "index", i, "deleting volume id", volID)
-			if vol.Spec != nil && vol.Spec.Persistent != nil && *vol.Spec.Persistent {
+			if vol.Spec.Persistent != nil && *vol.Spec.Persistent {
 				slog.Debug("DeleteServerById()", "skipping persistent volume", volID)
 				continue
 			}

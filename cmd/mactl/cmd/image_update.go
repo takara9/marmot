@@ -15,14 +15,9 @@ var imageUpdateCmd = &cobra.Command{
 	Short: "Update an image",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var spec api.Image
-		var meta api.Metadata
 		imageId := args[0]
-		if spec.Metadata == nil {
-			spec.Metadata = &api.Metadata{}
-		}
 		spec.Metadata.Id = &imageId
-		meta.Name = &imageName
-		spec.Metadata = &meta
+		spec.Metadata.Name = &imageName
 
 		m, err := getClientConfig()
 		if err != nil {

@@ -20,12 +20,12 @@ var _ = Describe("formatNetworkListText", func() {
 		statusText := "ACTIVE"
 
 		output := formatNetworkListText([]api.VirtualNetwork{{
-			Metadata: &api.Metadata{
+			Metadata: api.Metadata{
 				Id:       strPtr("net01"),
 				Name:     &name,
 				NodeName: &nodeName,
 			},
-			Spec: &api.VirtualNetworkSpec{
+			Spec: api.VirtualNetworkSpec{
 				BridgeName:       &bridgeName,
 				IPNetworkAddress: &ipNet,
 			},
@@ -50,7 +50,7 @@ var _ = Describe("formatNetworkListText", func() {
 		statusText := "DELETING"
 
 		output := formatNetworkListText([]api.VirtualNetwork{{
-			Metadata: &api.Metadata{
+			Metadata: api.Metadata{
 				Id:   strPtr("net99"),
 				Name: &name,
 			},
@@ -73,19 +73,19 @@ var _ = Describe("network list sort", func() {
 
 		data := []api.VirtualNetwork{
 			{
-				Metadata: &api.Metadata{Id: strPtr("net-late")},
+				Metadata: api.Metadata{Id: strPtr("net-late")},
 				Status: &api.Status{
 					CreationTimeStamp: &now,
 				},
 			},
 			{
-				Metadata: &api.Metadata{Id: strPtr("net-early")},
+				Metadata: api.Metadata{Id: strPtr("net-early")},
 				Status: &api.Status{
 					CreationTimeStamp: &earlier,
 				},
 			},
 			{
-				Metadata: &api.Metadata{Id: strPtr("net-mid")},
+				Metadata: api.Metadata{Id: strPtr("net-mid")},
 				Status: &api.Status{
 					CreationTimeStamp: &middle,
 				},
@@ -121,10 +121,10 @@ var _ = Describe("filterHeadSyncRoleNetworks", func() {
 		followerLabels := map[string]interface{}{"syncRole": "follower"}
 
 		data := []api.VirtualNetwork{
-			{Metadata: &api.Metadata{Id: strPtr("net-head"), Labels: &headLabels}},
-			{Metadata: &api.Metadata{Id: strPtr("net-follower"), Labels: &followerLabels}},
-			{Metadata: &api.Metadata{Id: strPtr("net-no-meta")}},
-			{Metadata: &api.Metadata{Id: strPtr("net-no-labels")}},
+			{Metadata: api.Metadata{Id: strPtr("net-head"), Labels: &headLabels}},
+			{Metadata: api.Metadata{Id: strPtr("net-follower"), Labels: &followerLabels}},
+			{Metadata: api.Metadata{Id: strPtr("net-no-meta")}},
+			{Metadata: api.Metadata{Id: strPtr("net-no-labels")}},
 		}
 
 		filtered := filterHeadSyncRoleNetworks(data)
@@ -137,8 +137,8 @@ var _ = Describe("filterHeadSyncRoleNetworks", func() {
 		headLabels := map[string]interface{}{"syncRole": "head"}
 		followerLabels := map[string]interface{}{"syncRole": "follower"}
 		data := []api.VirtualNetwork{
-			{Metadata: &api.Metadata{Id: strPtr("net-head"), Labels: &headLabels}},
-			{Metadata: &api.Metadata{Id: strPtr("net-follower"), Labels: &followerLabels}},
+			{Metadata: api.Metadata{Id: strPtr("net-head"), Labels: &headLabels}},
+			{Metadata: api.Metadata{Id: strPtr("net-follower"), Labels: &followerLabels}},
 		}
 
 		all := filterNetworksForList(data, true)

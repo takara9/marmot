@@ -38,7 +38,7 @@ var imageListCmd = &cobra.Command{
 			if err := json.Unmarshal(byteBody, &allData); err == nil && !imageListShowAll {
 				var filtered []api.Image
 				for _, image := range allData {
-					if image.Metadata == nil || image.Metadata.Labels == nil || db.GetFollowerSyncRole(*image.Metadata.Labels) != "follower" {
+					if image.Metadata.Labels == nil || db.GetFollowerSyncRole(*image.Metadata.Labels) != "follower" {
 						filtered = append(filtered, image)
 					}
 				}
@@ -69,7 +69,7 @@ var imageListCmd = &cobra.Command{
 				fmt.Printf("  %2s  %1s%-8s  %-16s  %-12s  %-12s  %-7s  %-4s  %-5s  %-25s\n", "No", "", "IMAGE-ID", "IMAGE-NAME", "STATUS", "NODE-NAME", "ROLE", "LV", "QCOW2", "CREATED-AT")
 				for i, image := range data {
 					fmt.Printf("  %2d", i+1)
-					fmt.Printf("  %1v%-8s", deletionMarker(image.Status), formatID(stringValue(image.Metadata, func(m *api.Metadata) *string { return m.Id })))
+					fmt.Printf("  %1v%-8s", deletionMarker(image.Status), formatID(stringValue(&image.Metadata, func(m *api.Metadata) *string { return m.Id })))
 					if image.Metadata.Name != nil {
 						fmt.Printf("  %-16v", *image.Metadata.Name)
 					} else {
@@ -80,20 +80,20 @@ var imageListCmd = &cobra.Command{
 					} else {
 						fmt.Printf("  %-12v", "N/A")
 					}
-					if image.Metadata != nil && image.Metadata.NodeName != nil && strings.TrimSpace(*image.Metadata.NodeName) != "" {
+					if image.Metadata.NodeName != nil && strings.TrimSpace(*image.Metadata.NodeName) != "" {
 						fmt.Printf("  %-12v", *image.Metadata.NodeName)
 					} else {
 						fmt.Printf("  %-12v", "N/A")
 					}
 					role := "master"
-					if image.Metadata != nil && image.Metadata.Labels != nil {
+					if image.Metadata.Labels != nil {
 						if db.GetFollowerSyncRole(*image.Metadata.Labels) == "follower" {
 							role = "replica"
 						}
 					}
 					fmt.Printf("  %-7v", role)
-					fmt.Printf("  %-4v", existsPath(image.Spec, func(s *api.ImageSpec) *string { return s.LvPath }))
-					fmt.Printf("  %-5v", existsPath(image.Spec, func(s *api.ImageSpec) *string { return s.Qcow2Path }))
+					fmt.Printf("  %-4v", existsPath(&image.Spec, func(s *api.ImageSpec) *string { return s.LvPath }))
+					fmt.Printf("  %-5v", existsPath(&image.Spec, func(s *api.ImageSpec) *string { return s.Qcow2Path }))
 					fmt.Printf("  %-25v", timeValue(image.Status, func(s *api.Status) *time.Time { return s.CreationTimeStamp }))
 
 					fmt.Println()

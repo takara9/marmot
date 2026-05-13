@@ -54,10 +54,10 @@ var _ = Describe("Networks", Ordered, func() {
 
 			It("ネットワークの作成 #1", func() {
 				net := &api.VirtualNetwork{
-					Metadata: &api.Metadata{
+					Metadata: api.Metadata{
 						Name: util.StringPtr("net01"),
 					},
-					Spec: &api.VirtualNetworkSpec{
+					Spec: api.VirtualNetworkSpec{
 						BridgeName:       util.StringPtr("br01"),
 						DhcpEndAddress:   util.StringPtr("192.168.122.0"),
 						DhcpStartAddress: util.StringPtr("192.168.122.254"),
@@ -101,10 +101,10 @@ var _ = Describe("Networks", Ordered, func() {
 
 			It("ネットワークの作成 #2", func() {
 				net := &api.VirtualNetwork{
-					Metadata: &api.Metadata{
+					Metadata: api.Metadata{
 						Name: util.StringPtr("net02"),
 					},
-					Spec: &api.VirtualNetworkSpec{
+					Spec: api.VirtualNetworkSpec{
 						BridgeName:       util.StringPtr("br01"),
 						DhcpEndAddress:   util.StringPtr("192.168.122.0"),
 						DhcpStartAddress: util.StringPtr("192.168.122.254"),
@@ -119,10 +119,10 @@ var _ = Describe("Networks", Ordered, func() {
 
 			It("ネットワークの作成 #3", func() {
 				net := &api.VirtualNetwork{
-					Metadata: &api.Metadata{
+					Metadata: api.Metadata{
 						Name: util.StringPtr("net03"),
 					},
-					Spec: &api.VirtualNetworkSpec{
+					Spec: api.VirtualNetworkSpec{
 						BridgeName:       util.StringPtr("br01"),
 						DhcpEndAddress:   util.StringPtr("192.168.122.0"),
 						DhcpStartAddress: util.StringPtr("192.168.122.254"),

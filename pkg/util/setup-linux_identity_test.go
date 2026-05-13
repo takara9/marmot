@@ -10,7 +10,7 @@ import (
 func TestMachineIDForServer_NormalizesUUID(t *testing.T) {
 	id := "abcde"
 	spec := api.Server{
-		Metadata: &api.Metadata{
+		Metadata: api.Metadata{
 			Id:   &id,
 			Uuid: StringPtr("550e8400-e29b-41d4-a716-446655440000"),
 		},
@@ -25,7 +25,7 @@ func TestMachineIDForServer_NormalizesUUID(t *testing.T) {
 
 func TestMachineIDForServer_FallbackDeterministicHex(t *testing.T) {
 	id := "a123456"
-	spec := api.Server{Metadata: &api.Metadata{Id: &id}}
+	spec := api.Server{Metadata: api.Metadata{Id: &id}}
 
 	got1 := machineIDForServer(spec)
 	got2 := machineIDForServer(spec)

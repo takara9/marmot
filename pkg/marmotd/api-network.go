@@ -25,9 +25,6 @@ func (s *Server) ApiCreateNetwork(ctx echo.Context) error {
 		return echo.NewHTTPError(400, "invalid request body")
 	}
 	assignNodeNameIfUnset(&spec.Metadata, s.Ma.NodeName)
-	if spec.Metadata == nil {
-		spec.Metadata = &api.Metadata{}
-	}
 	if spec.Metadata.Labels == nil {
 		labels := map[string]interface{}{}
 		spec.Metadata.Labels = &labels

@@ -83,7 +83,7 @@ func SetupLinux(spec api.Server) error {
 }
 
 func machineIDForServer(spec api.Server) string {
-	if spec.Metadata != nil && spec.Metadata.Uuid != nil {
+	if spec.Metadata.Uuid != nil {
 		normalized := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(*spec.Metadata.Uuid), "-", ""))
 		if len(normalized) == 32 {
 			if _, err := hex.DecodeString(normalized); err == nil {
@@ -93,7 +93,7 @@ func machineIDForServer(spec api.Server) string {
 	}
 
 	seed := strings.TrimSpace(api.ServerID(spec))
-	if seed == "" && spec.Metadata != nil && spec.Metadata.Name != nil {
+	if seed == "" && spec.Metadata.Name != nil {
 		seed = strings.TrimSpace(*spec.Metadata.Name)
 	}
 	if seed == "" {

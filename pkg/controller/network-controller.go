@@ -94,16 +94,16 @@ func (c *controller) networkControllerLoop(fabric networkfabric.NetworkFabric) {
 
 	for _, vnet := range vnets {
 		vnetID := api.VirtualNetworkID(vnet)
-		if ok, assignedNode, reason := evaluateNodeAssignment(vnet.Metadata, c.marmot.NodeName); !ok {
+		if ok, assignedNode, reason := evaluateNodeAssignment(&vnet.Metadata, c.marmot.NodeName); !ok {
 			objectName := ""
-			if vnet.Metadata != nil && vnet.Metadata.Name != nil {
+			if vnet.Metadata.Name != nil {
 				objectName = *vnet.Metadata.Name
 			}
 			slog.Debug("別ノード割当の仮想ネットワークをスキップ", "networkId", vnetID, "networkName", objectName, "controllerNode", c.marmot.NodeName, "assignedNode", assignedNode, "reason", reason)
 			continue
 		}
 
-		role := networkSyncRole(vnet.Metadata)
+		role := networkSyncRole(&vnet.Metadata)
 
 		// 削除タイムスタンプが設定されて一定時間経過した仮想ネットワークのステータスを DELETING に更新する。
 		// ERROR 状態でも削除要求を優先し、削除フローへ進める。
@@ -262,7 +262,7 @@ func networkSyncRole(metadata *api.Metadata) string {
 }
 
 func (c *controller) ensureFollowerNetworksWaiting(headNetwork api.VirtualNetwork) error {
-	if headNetwork.Metadata == nil || headNetwork.Metadata.Name == nil {
+	if headNetwork.Metadata.Name == nil {
 		return nil
 	}
 
@@ -304,7 +304,7 @@ func (c *controller) ensureFollowerNetworksWaiting(headNetwork api.VirtualNetwor
 }
 
 func (c *controller) distributeDeleteIntentToFollowerNetworks(headNetwork api.VirtualNetwork) error {
-	if headNetwork.Metadata == nil || headNetwork.Metadata.Labels == nil {
+	if headNetwork.Metadata.Labels == nil {
 		return nil
 	}
 	labels := *headNetwork.Metadata.Labels
@@ -318,7 +318,7 @@ func (c *controller) distributeDeleteIntentToFollowerNetworks(headNetwork api.Vi
 	}
 
 	for _, network := range networks {
-		if api.VirtualNetworkID(network) == api.VirtualNetworkID(headNetwork) || network.Metadata == nil || network.Metadata.Labels == nil {
+		if api.VirtualNetworkID(network) == api.VirtualNetworkID(headNetwork) || network.Metadata.Labels == nil {
 			continue
 		}
 
@@ -346,7 +346,7 @@ func (c *controller) distributeDeleteIntentToFollowerNetworks(headNetwork api.Vi
 }
 
 func (c *controller) distributeDeleteIntentToSameNameNetworks(sourceNetwork api.VirtualNetwork) error {
-	if sourceNetwork.Metadata == nil || sourceNetwork.Metadata.Name == nil {
+	if sourceNetwork.Metadata.Name == nil {
 		return nil
 	}
 	targetName := strings.TrimSpace(*sourceNetwork.Metadata.Name)
@@ -363,7 +363,7 @@ func (c *controller) distributeDeleteIntentToSameNameNetworks(sourceNetwork api.
 		if api.VirtualNetworkID(network) == api.VirtualNetworkID(sourceNetwork) {
 			continue
 		}
-		if network.Metadata == nil || network.Metadata.Name == nil {
+		if network.Metadata.Name == nil {
 			continue
 		}
 		if strings.TrimSpace(*network.Metadata.Name) != targetName {
@@ -385,7 +385,7 @@ func (c *controller) distributeDeleteIntentToSameNameNetworks(sourceNetwork api.
 }
 
 func (c *controller) reconcileFollowerWaitingNetwork(waitingNetwork api.VirtualNetwork, fabric networkfabric.NetworkFabric) error {
-	if waitingNetwork.Metadata == nil || waitingNetwork.Metadata.Labels == nil {
+	if waitingNetwork.Metadata.Labels == nil {
 		return fmt.Errorf("labels are required for waiting network: networkId=%s", api.VirtualNetworkID(waitingNetwork))
 	}
 	labels := *waitingNetwork.Metadata.Labels
@@ -424,7 +424,7 @@ func (c *controller) reconcileFollowerWaitingNetwork(waitingNetwork api.VirtualN
 }
 
 func (c *controller) reconcileFollowerActiveNetwork(followerNetwork api.VirtualNetwork, fabric networkfabric.NetworkFabric) error {
-	if followerNetwork.Metadata == nil || followerNetwork.Metadata.Labels == nil {
+	if followerNetwork.Metadata.Labels == nil {
 		return fmt.Errorf("labels are required for follower network: networkId=%s", api.VirtualNetworkID(followerNetwork))
 	}
 	labels := *followerNetwork.Metadata.Labels
@@ -456,7 +456,7 @@ func (c *controller) reconcileFollowerActiveNetwork(followerNetwork api.VirtualN
 }
 
 func (c *controller) ensureVirtualNetworkPresent(vnet api.VirtualNetwork) error {
-	if vnet.Metadata == nil || vnet.Metadata.Name == nil || strings.TrimSpace(*vnet.Metadata.Name) == "" {
+	if vnet.Metadata.Name == nil || strings.TrimSpace(*vnet.Metadata.Name) == "" {
 		return fmt.Errorf("network metadata.name is required: networkId=%s", api.VirtualNetworkID(vnet))
 	}
 
@@ -482,7 +482,7 @@ func (c *controller) ensureVirtualNetworkPresent(vnet api.VirtualNetwork) error 
 // ensureVirtualNetworkAbsent はフォロワーノードで libvirt ネットワーク実体のみを削除する。
 // DB・IPネットワーク削除はヘッドノードの DeleteVirtualNetwork が担うため、ここでは行わない。
 func (c *controller) ensureVirtualNetworkAbsent(vnet api.VirtualNetwork) error {
-	if vnet.Metadata == nil || vnet.Metadata.Name == nil || strings.TrimSpace(*vnet.Metadata.Name) == "" {
+	if vnet.Metadata.Name == nil || strings.TrimSpace(*vnet.Metadata.Name) == "" {
 		return fmt.Errorf("network metadata.name is required: networkId=%s", api.VirtualNetworkID(vnet))
 	}
 
@@ -504,7 +504,7 @@ func (c *controller) ensureVirtualNetworkAbsent(vnet api.VirtualNetwork) error {
 }
 
 func isVxlanOverlay(vnet api.VirtualNetwork) bool {
-	if vnet.Spec == nil || vnet.Spec.OverlayMode == nil {
+	if vnet.Spec.OverlayMode == nil {
 		return false
 	}
 	return strings.EqualFold(string(*vnet.Spec.OverlayMode), "vxlan")
@@ -536,7 +536,7 @@ func (c *controller) ensureVxlanMeshForNetwork(fabric networkfabric.NetworkFabri
 }
 
 func (c *controller) resolveVxlanPeerIPs(vnet api.VirtualNetwork) ([]string, error) {
-	if vnet.Metadata == nil || vnet.Metadata.Name == nil {
+	if vnet.Metadata.Name == nil {
 		return nil, fmt.Errorf("network metadata.name is required: networkId=%s", api.VirtualNetworkID(vnet))
 	}
 
@@ -570,7 +570,7 @@ func (c *controller) resolveVxlanPeerIPs(vnet api.VirtualNetwork) ([]string, err
 	selfNode := strings.TrimSpace(c.marmot.NodeName)
 	peerSet := map[string]struct{}{}
 	for _, n := range networks {
-		if n.Metadata == nil || n.Metadata.Name == nil || n.Metadata.NodeName == nil {
+		if n.Metadata.Name == nil || n.Metadata.NodeName == nil {
 			continue
 		}
 		if strings.TrimSpace(*n.Metadata.Name) != targetName {
@@ -594,7 +594,7 @@ func (c *controller) resolveVxlanPeerIPs(vnet api.VirtualNetwork) ([]string, err
 	}
 
 	peerPolicy := api.Auto
-	if vnet.Spec != nil && vnet.Spec.PeerPolicy != nil {
+	if vnet.Spec.PeerPolicy != nil {
 		peerPolicy = *vnet.Spec.PeerPolicy
 	}
 	if peerPolicy == api.Auto && len(peerSet) == 0 {

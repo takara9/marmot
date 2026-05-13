@@ -53,10 +53,10 @@ var _ = Describe("Volumes", Ordered, func() {
 
 			It("ボリュームの作成 #1", func() {
 				vol := &api.Volume{
-					Metadata: &api.Metadata{
+					Metadata: api.Metadata{
 						Name: util.StringPtr("data01"),
 					},
-					Spec: &api.VolSpec{
+					Spec: api.VolSpec{
 						Path: util.StringPtr("/var/lib/marmot/volumes/data01.qcow2"),
 						Type: util.StringPtr("qcow2"),
 						Kind: util.StringPtr("data"),
@@ -95,10 +95,10 @@ var _ = Describe("Volumes", Ordered, func() {
 
 			It("ボリュームの作成 #2", func() {
 				vol := &api.Volume{
-					Metadata: &api.Metadata{
+					Metadata: api.Metadata{
 						Name: util.StringPtr("data02"),
 					},
-					Spec: &api.VolSpec{
+					Spec: api.VolSpec{
 						Path: util.StringPtr("/var/lib/marmot/volumes/data02.qcow2"),
 						Type: util.StringPtr("qcow2"),
 						Kind: util.StringPtr("data"),
@@ -112,10 +112,10 @@ var _ = Describe("Volumes", Ordered, func() {
 
 			It("ボリュームの作成 #3", func() {
 				vol := &api.Volume{
-					Metadata: &api.Metadata{
+					Metadata: api.Metadata{
 						Name: util.StringPtr("data03"),
 					},
-					Spec: &api.VolSpec{
+					Spec: api.VolSpec{
 						Path: util.StringPtr("/var/lib/marmot/volumes/data03.qcow2"),
 						Type: util.StringPtr("qcow2"),
 						Kind: util.StringPtr("data"),

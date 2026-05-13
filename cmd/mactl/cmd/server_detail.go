@@ -86,9 +86,9 @@ func init() {
 func printServerDetails(server api.Server) {
 	fmt.Println("Server Details")
 	fmt.Printf("  Id:            %s\n", formatID(api.ServerID(server)))
-	fmt.Printf("  UUID:          %s\n", stringValue(server.Metadata, func(m *api.Metadata) *string { return m.Uuid }))
-	fmt.Printf("  Name:          %s\n", stringValue(server.Metadata, func(m *api.Metadata) *string { return m.Name }))
-	fmt.Printf("  Instance Name: %s\n", stringValue(server.Metadata, func(m *api.Metadata) *string { return m.InstanceName }))
+	fmt.Printf("  UUID:          %s\n", stringValue(&server.Metadata, func(m *api.Metadata) *string { return m.Uuid }))
+	fmt.Printf("  Name:          %s\n", stringValue(&server.Metadata, func(m *api.Metadata) *string { return m.Name }))
+	fmt.Printf("  Instance Name: %s\n", stringValue(&server.Metadata, func(m *api.Metadata) *string { return m.InstanceName }))
 	fmt.Printf("  Status:        %s\n", formatServerStatus(server.Status))
 	fmt.Printf("  Message:       %s\n", stringValue(server.Status, func(s *api.Status) *string { return s.Message }))
 	fmt.Println()
@@ -100,22 +100,22 @@ func printServerDetails(server api.Server) {
 	fmt.Println()
 
 	fmt.Println("Resources")
-	fmt.Printf("  OS Variant:    %s\n", stringValue(server.Spec, func(s *api.ServerSpec) *string { return s.OsVariant }))
-	fmt.Printf("  OS Level:      %s\n", stringValue(server.Spec, func(s *api.ServerSpec) *string { return s.OsLv }))
-	fmt.Printf("  CPU:           %s\n", intValue(server.Spec, func(s *api.ServerSpec) *int { return s.Cpu }, " vCPU"))
-	fmt.Printf("  Memory:        %s\n", intValue(server.Spec, func(s *api.ServerSpec) *int { return s.Memory }, " MB"))
+	fmt.Printf("  OS Variant:    %s\n", stringValue(&server.Spec, func(s *api.ServerSpec) *string { return s.OsVariant }))
+	fmt.Printf("  OS Level:      %s\n", stringValue(&server.Spec, func(s *api.ServerSpec) *string { return s.OsLv }))
+	fmt.Printf("  CPU:           %s\n", intValue(&server.Spec, func(s *api.ServerSpec) *int { return s.Cpu }, " vCPU"))
+	fmt.Printf("  Memory:        %s\n", intValue(&server.Spec, func(s *api.ServerSpec) *int { return s.Memory }, " MB"))
 	fmt.Println()
 
 	fmt.Println("Boot Volume")
-	printVolumeSummary(server.Spec, func(s *api.ServerSpec) *api.Volume { return s.BootVolume })
+	printVolumeSummary(&server.Spec, func(s *api.ServerSpec) *api.Volume { return s.BootVolume })
 	fmt.Println()
 
 	fmt.Println("Attached Volumes")
-	printVolumeList(server.Spec, func(s *api.ServerSpec) *[]api.Volume { return s.Storage })
+	printVolumeList(&server.Spec, func(s *api.ServerSpec) *[]api.Volume { return s.Storage })
 	fmt.Println()
 
 	fmt.Println("Network Interfaces")
-	printNetworkInterfaces(server.Spec, func(s *api.ServerSpec) *[]api.NetworkInterface { return s.NetworkInterface })
+	printNetworkInterfaces(&server.Spec, func(s *api.ServerSpec) *[]api.NetworkInterface { return s.NetworkInterface })
 }
 
 func formatID(id string) string {
@@ -231,12 +231,12 @@ func printVolumeDetails(indent string, volume *api.Volume) {
 		return
 	}
 	fmt.Printf("%sId:          %s\n", indent, formatID(api.VolumeID(*volume)))
-	fmt.Printf("%sName:        %s\n", indent, stringValue(volume.Metadata, func(m *api.Metadata) *string { return m.Name }))
-	fmt.Printf("%sPath:        %s\n", indent, stringValue(volume.Spec, func(s *api.VolSpec) *string { return s.Path }))
-	fmt.Printf("%sType:        %s\n", indent, stringValue(volume.Spec, func(s *api.VolSpec) *string { return s.Type }))
-	fmt.Printf("%sVolumeGroup: %s\n", indent, stringValue(volume.Spec, func(s *api.VolSpec) *string { return s.VolumeGroup }))
-	fmt.Printf("%sSize:        %s\n", indent, intValue(volume.Spec, func(s *api.VolSpec) *int { return s.Size }, " GB"))
-	if volume.Spec != nil && volume.Spec.Persistent != nil {
+	fmt.Printf("%sName:        %s\n", indent, stringValue(&volume.Metadata, func(m *api.Metadata) *string { return m.Name }))
+	fmt.Printf("%sPath:        %s\n", indent, stringValue(&volume.Spec, func(s *api.VolSpec) *string { return s.Path }))
+	fmt.Printf("%sType:        %s\n", indent, stringValue(&volume.Spec, func(s *api.VolSpec) *string { return s.Type }))
+	fmt.Printf("%sVolumeGroup: %s\n", indent, stringValue(&volume.Spec, func(s *api.VolSpec) *string { return s.VolumeGroup }))
+	fmt.Printf("%sSize:        %s\n", indent, intValue(&volume.Spec, func(s *api.VolSpec) *int { return s.Size }, " GB"))
+	if volume.Spec.Persistent != nil {
 		fmt.Printf("%sPersistent:  %s\n", indent, boolValue(volume.Spec.Persistent))
 	} else {
 		fmt.Printf("%sPersistent:  N/A\n", indent)

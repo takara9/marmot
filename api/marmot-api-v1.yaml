@@ -763,6 +763,8 @@ components:
       required:
         - apiVersion
         - kind
+        - metadata
+        - spec
       properties:
         apiVersion:
           type: string
@@ -875,6 +877,8 @@ components:
       required:
         - apiVersion
         - kind
+        - metadata
+        - spec
       properties:
         apiVersion:
           type: string
@@ -965,6 +969,8 @@ components:
       required:
         - apiVersion
         - kind
+        - metadata
+        - spec
       properties:
         apiVersion:
           type: string
@@ -1101,6 +1107,8 @@ components:
       required:
         - apiVersion
         - kind
+        - metadata
+        - spec
       properties:
         apiVersion:
           type: string

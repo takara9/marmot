@@ -116,11 +116,11 @@ type IPNetwork struct {
 
 // Image defines model for Image.
 type Image struct {
-	ApiVersion string     `json:"apiVersion" yaml:"apiVersion"`
-	Kind       string     `json:"kind" yaml:"kind"`
-	Metadata   *Metadata  `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-	Spec       *ImageSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
-	Status     *Status    `json:"status,omitempty" yaml:"status,omitempty"`
+	ApiVersion string    `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string    `json:"kind" yaml:"kind"`
+	Metadata   Metadata  `json:"metadata" yaml:"metadata"`
+	Spec       ImageSpec `json:"spec" yaml:"spec"`
+	Status     *Status   `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
 // ImageSpec defines model for ImageSpec.
@@ -209,11 +209,11 @@ type Route struct {
 
 // Server defines model for Server.
 type Server struct {
-	ApiVersion string      `json:"apiVersion" yaml:"apiVersion"`
-	Kind       string      `json:"kind" yaml:"kind"`
-	Metadata   *Metadata   `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-	Spec       *ServerSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
-	Status     *Status     `json:"status,omitempty" yaml:"status,omitempty"`
+	ApiVersion string     `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string     `json:"kind" yaml:"kind"`
+	Metadata   Metadata   `json:"metadata" yaml:"metadata"`
+	Spec       ServerSpec `json:"spec" yaml:"spec"`
+	Status     *Status    `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
 // ServerSpec defines model for ServerSpec.
@@ -256,11 +256,11 @@ type Version struct {
 
 // VirtualNetwork defines model for VirtualNetwork.
 type VirtualNetwork struct {
-	ApiVersion string              `json:"apiVersion" yaml:"apiVersion"`
-	Kind       string              `json:"kind" yaml:"kind"`
-	Metadata   *Metadata           `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-	Spec       *VirtualNetworkSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
-	Status     *Status             `json:"status,omitempty" yaml:"status,omitempty"`
+	ApiVersion string             `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string             `json:"kind" yaml:"kind"`
+	Metadata   Metadata           `json:"metadata" yaml:"metadata"`
+	Spec       VirtualNetworkSpec `json:"spec" yaml:"spec"`
+	Status     *Status            `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
 // VirtualNetworkSpec defines model for VirtualNetworkSpec.
@@ -313,11 +313,11 @@ type VolSpec struct {
 
 // Volume defines model for Volume.
 type Volume struct {
-	ApiVersion string    `json:"apiVersion" yaml:"apiVersion"`
-	Kind       string    `json:"kind" yaml:"kind"`
-	Metadata   *Metadata `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-	Spec       *VolSpec  `json:"spec,omitempty" yaml:"spec,omitempty"`
-	Status     *Status   `json:"status,omitempty" yaml:"status,omitempty"`
+	ApiVersion string   `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string   `json:"kind" yaml:"kind"`
+	Metadata   Metadata `json:"metadata" yaml:"metadata"`
+	Spec       VolSpec  `json:"spec" yaml:"spec"`
+	Status     *Status  `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
 // ApiCreateImageJSONRequestBody defines body for ApiCreateImage for application/json ContentType.

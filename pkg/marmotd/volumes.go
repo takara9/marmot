@@ -87,7 +87,7 @@ func collectClusterInitiatorIDs(m *Marmot) ([]string, error) {
 }
 
 func (m *Marmot) configureISCSIForVolume(volSpec *api.Volume) error {
-	if volSpec == nil || volSpec.Spec == nil {
+	if volSpec == nil {
 		return errors.New("volume spec is nil")
 	}
 	volumeID := api.VolumeID(*volSpec)
@@ -159,7 +159,7 @@ func (m *Marmot) ConfigureISCSIForVolumeByID(id string) error {
 }
 
 func (m *Marmot) cleanupISCSIForVolume(volSpec *api.Volume) error {
-	if volSpec == nil || volSpec.Spec == nil {
+	if volSpec == nil {
 		return nil
 	}
 	volumeID := api.VolumeID(*volSpec)
@@ -218,7 +218,7 @@ func (m *Marmot) CleanupISCSIForVolumeByID(id string) error {
 
 func resolveImageTemplateByVolumeNode(m *Marmot, volSpec api.Volume) (api.Image, error) {
 	osVariant := ""
-	if volSpec.Spec != nil && volSpec.Spec.OsVariant != nil {
+	if volSpec.Spec.OsVariant != nil {
 		osVariant = strings.TrimSpace(*volSpec.Spec.OsVariant)
 	}
 	if osVariant == "" {
@@ -226,7 +226,7 @@ func resolveImageTemplateByVolumeNode(m *Marmot, volSpec api.Volume) (api.Image,
 	}
 
 	targetNode := ""
-	if volSpec.Metadata != nil && volSpec.Metadata.NodeName != nil {
+	if volSpec.Metadata.NodeName != nil {
 		targetNode = strings.TrimSpace(*volSpec.Metadata.NodeName)
 	}
 
@@ -238,10 +238,6 @@ func resolveImageTemplateByVolumeNode(m *Marmot, volSpec api.Volume) (api.Image,
 }
 
 func resolveImageLVPath(img api.Image) (string, error) {
-	if img.Spec == nil {
-		return "", errors.New("image spec is nil")
-	}
-
 	if img.Spec.LvPath != nil && strings.TrimSpace(*img.Spec.LvPath) != "" {
 		return strings.TrimSpace(*img.Spec.LvPath), nil
 	}
@@ -259,7 +255,7 @@ func requestedOSVolumeSizeGB(volSpec api.Volume, img api.Image) (int, error) {
 	const maxOSSizeGB = 100
 
 	requestedSize := defaultOSSizeGB
-	if volSpec.Spec != nil && volSpec.Spec.Size != nil && *volSpec.Spec.Size > 0 {
+	if volSpec.Spec.Size != nil && *volSpec.Spec.Size > 0 {
 		requestedSize = *volSpec.Spec.Size
 	}
 
@@ -268,7 +264,7 @@ func requestedOSVolumeSizeGB(volSpec api.Volume, img api.Image) (int, error) {
 	}
 
 	imageSize := defaultOSSizeGB
-	if img.Spec != nil && img.Spec.Size != nil && *img.Spec.Size > 0 {
+	if img.Spec.Size != nil && *img.Spec.Size > 0 {
 		imageSize = *img.Spec.Size
 	}
 
@@ -316,7 +312,7 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 			volSpec.Spec.Size = util.IntPtrInt(requestedSizeGB)
 
 			imageSizeGB := 16
-			if img.Spec != nil && img.Spec.Size != nil && *img.Spec.Size > 0 {
+			if img.Spec.Size != nil && *img.Spec.Size > 0 {
 				imageSizeGB = *img.Spec.Size
 			}
 
@@ -562,11 +558,7 @@ func (m *Marmot) UpdateVolumeById(id string, volSpec api.Volume) (*api.Volume, e
 }
 
 func CheckVolumeBackingStore(volume api.Volume) error {
-	if volume.Spec == nil {
-		return nil
-	}
-
-	backingPath, backingType := getVolumeBackingStore(volume.Spec)
+	backingPath, backingType := getVolumeBackingStore(&volume.Spec)
 	if backingPath == "" {
 		return nil
 	}

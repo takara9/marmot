@@ -31,8 +31,8 @@ func (m *Marmot) GetVirtualNetworksAndPutDB() ([]api.VirtualNetwork, error) {
 		var net api.VirtualNetwork
 		var meta api.Metadata
 		var spec api.VirtualNetworkSpec
-		net.Metadata = &meta
-		net.Spec = &spec
+		net.Metadata = meta
+		net.Spec = spec
 
 		net.ApiVersion = "v1"
 		net.Kind = "VirtualNetwork"
@@ -348,8 +348,8 @@ func convertLibvirtNetworkToAPINetwork(libnet libvirt.Network) (*api.VirtualNetw
 	var net api.VirtualNetwork
 	var meta api.Metadata
 	var spec api.VirtualNetworkSpec
-	net.Metadata = &meta
-	net.Spec = &spec
+	net.Metadata = meta
+	net.Spec = spec
 
 	// name
 	name, err := libnet.GetName()

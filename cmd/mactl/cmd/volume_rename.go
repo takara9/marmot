@@ -25,8 +25,6 @@ var volumeRenameCmd = &cobra.Command{
 		volumeId := args[0]
 		newName := args[1]
 		var volume api.Volume
-		var meta api.Metadata
-		volume.Metadata = &meta
 		volume.Metadata.Name = util.StringPtr(newName)
 
 		byteBody, _, err := m.UpdateVolumeById(volumeId, volume)

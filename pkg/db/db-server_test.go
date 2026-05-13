@@ -55,10 +55,10 @@ var _ = Describe("Servers", Ordered, func() {
 
 			It("サーバーの作成 #1", func() {
 				server = &api.Server{
-					Metadata: &api.Metadata{
+					Metadata: api.Metadata{
 						Name: util.StringPtr("server01"),
 					},
-					Spec: &api.ServerSpec{
+					Spec: api.ServerSpec{
 						Cpu:    util.IntPtrInt(2),
 						Memory: util.IntPtrInt(4096),
 					},
@@ -97,10 +97,10 @@ var _ = Describe("Servers", Ordered, func() {
 
 			It("サーバーの作成 #2", func() {
 				server = &api.Server{
-					Metadata: &api.Metadata{
+					Metadata: api.Metadata{
 						Name: util.StringPtr("server02"),
 					},
-					Spec: &api.ServerSpec{
+					Spec: api.ServerSpec{
 						Cpu:    util.IntPtrInt(2),
 						Memory: util.IntPtrInt(4096),
 					},
@@ -112,10 +112,10 @@ var _ = Describe("Servers", Ordered, func() {
 
 			It("サーバーの作成 #3", func() {
 				server = &api.Server{
-					Metadata: &api.Metadata{
+					Metadata: api.Metadata{
 						Name: util.StringPtr("server03"),
 					},
-					Spec: &api.ServerSpec{
+					Spec: api.ServerSpec{
 						Cpu:    util.IntPtrInt(2),
 						Memory: util.IntPtrInt(4096),
 					},

@@ -120,9 +120,9 @@ var _ = Describe("関数テスト", Ordered, func() {
 		It("DATAボリューム(qcow2)の作成", func() {
 			var volume api.Volume
 			var spec api.VolSpec
-			volume.Spec = &spec
+			volume.Spec = spec
 			var meta api.Metadata
-			volume.Metadata = &meta
+			volume.Metadata = meta
 
 			volume.Metadata.Name = util.StringPtr("test-volume-001")
 			volume.Spec.Type = util.StringPtr("qcow2")
@@ -170,9 +170,9 @@ var _ = Describe("関数テスト", Ordered, func() {
 		It("OSボリューム(qcow2)の作成", func() {
 			var vol api.Volume
 			var meta api.Metadata
-			vol.Metadata = &meta
+			vol.Metadata = meta
 			var spec api.VolSpec
-			vol.Spec = &spec
+			vol.Spec = spec
 
 			vol.Metadata.Name = util.StringPtr("test-volume-002")
 			vol.Spec.Type = util.StringPtr("qcow2")
@@ -226,9 +226,9 @@ var _ = Describe("関数テスト", Ordered, func() {
 		It("OSボリューム(LVM)の作成", func() {
 			var volume api.Volume
 			var spec api.VolSpec
-			volume.Spec = &spec
+			volume.Spec = spec
 			var meta api.Metadata
-			volume.Metadata = &meta
+			volume.Metadata = meta
 
 			volume.Metadata.Name = util.StringPtr("test-volume-002")
 			volume.Spec.Type = util.StringPtr("lvm")
@@ -287,9 +287,9 @@ var _ = Describe("関数テスト", Ordered, func() {
 		It("DATAボリューム(LVM)の作成 0000", func() {
 			var volume api.Volume
 			var spec api.VolSpec
-			volume.Spec = &spec
+			volume.Spec = spec
 			var meta api.Metadata
-			volume.Metadata = &meta
+			volume.Metadata = meta
 
 			volume.Metadata.Name = util.StringPtr("test-volume-002")
 			volume.Spec.Type = util.StringPtr("lvm")
@@ -338,7 +338,7 @@ var _ = Describe("関数テスト", Ordered, func() {
 		It("DATAボリューム(LVM)の情報更新", func() {
 			var vol api.Volume
 			var meta api.Metadata
-			vol.Metadata = &meta
+			vol.Metadata = meta
 			vol.Metadata.Name = util.StringPtr("updated-volume-name")
 			body, url, err := marmotClient.UpdateVolumeById(api.VolumeID(replyVolume), vol)
 			GinkgoWriter.Println("UpdateVolumeById err =", err)

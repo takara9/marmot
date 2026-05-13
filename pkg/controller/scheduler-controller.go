@@ -100,7 +100,7 @@ func (c *schedulerController) schedulerControllerLoop() {
 		}
 
 		assignedNode := ""
-		if server.Metadata != nil && server.Metadata.NodeName != nil {
+		if server.Metadata.NodeName != nil {
 			assignedNode = strings.TrimSpace(*server.Metadata.NodeName)
 		}
 

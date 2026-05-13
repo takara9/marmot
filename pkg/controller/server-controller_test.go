@@ -78,7 +78,7 @@ func TestShouldBypassNodeGateForDeletingServer(t *testing.T) {
 			name: "assigned node not found",
 			spec: api.Server{
 				Status: deletingStatus,
-				Metadata: &api.Metadata{
+				Metadata: api.Metadata{
 					NodeName: util.StringPtr("ws1"),
 				},
 			},
@@ -90,7 +90,7 @@ func TestShouldBypassNodeGateForDeletingServer(t *testing.T) {
 			name: "assigned node found",
 			spec: api.Server{
 				Status: deletingStatus,
-				Metadata: &api.Metadata{
+				Metadata: api.Metadata{
 					NodeName: util.StringPtr("hvc"),
 				},
 			},

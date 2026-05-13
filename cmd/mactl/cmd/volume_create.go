@@ -30,13 +30,13 @@ var volumeCreateCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		if conf.Metadata == nil || conf.Metadata.Name == nil || *conf.Metadata.Name == "" {
+		if conf.Metadata.Name == nil || *conf.Metadata.Name == "" {
 			return fmt.Errorf("Metadata.name is required in the configuration")
 		}
-		if conf.Spec == nil || conf.Spec.Type == nil || *conf.Spec.Type == "" {
+		if conf.Spec.Type == nil || *conf.Spec.Type == "" {
 			return fmt.Errorf("Spec.type is required in the configuration")
 		}
-		if conf.Spec == nil || conf.Spec.Kind == nil || *conf.Spec.Kind == "" {
+		if conf.Spec.Kind == nil || *conf.Spec.Kind == "" {
 			return fmt.Errorf("Spec.kind is required in the configuration")
 		}
 

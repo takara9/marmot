@@ -107,7 +107,7 @@ var networkListCmd = &cobra.Command{
 func filterHeadSyncRoleNetworks(data []api.VirtualNetwork) []api.VirtualNetwork {
 	filtered := make([]api.VirtualNetwork, 0, len(data))
 	for _, network := range data {
-		if network.Metadata == nil || network.Metadata.Labels == nil {
+		if network.Metadata.Labels == nil {
 			continue
 		}
 		if db.GetNetworkSyncRole(*network.Metadata.Labels) == "head" {
@@ -133,10 +133,10 @@ func formatNetworkListText(data []api.VirtualNetwork) string {
 			i+1,
 			deletionMarker(network.Status),
 			api.VirtualNetworkID(network),
-			stringValue(network.Metadata, func(m *api.Metadata) *string { return m.Name }),
-			stringValue(network.Metadata, func(m *api.Metadata) *string { return m.NodeName }),
-			stringValue(network.Spec, func(s *api.VirtualNetworkSpec) *string { return s.BridgeName }),
-			stringValue(network.Spec, func(s *api.VirtualNetworkSpec) *string { return s.IPNetworkAddress }),
+			stringValue(&network.Metadata, func(m *api.Metadata) *string { return m.Name }),
+			stringValue(&network.Metadata, func(m *api.Metadata) *string { return m.NodeName }),
+			stringValue(&network.Spec, func(s *api.VirtualNetworkSpec) *string { return s.BridgeName }),
+			stringValue(&network.Spec, func(s *api.VirtualNetworkSpec) *string { return s.IPNetworkAddress }),
 			networkListStatusLabel(network.Status),
 		)
 	}
