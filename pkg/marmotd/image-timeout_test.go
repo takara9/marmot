@@ -105,7 +105,7 @@ var _ = Describe("Image timeout helpers", func() {
 
 		It("returns nil when error is nil", func() {
 			m := &Marmot{}
-			image := api.Image{Metadata: &api.Metadata{Id: util.StringPtr("img-1")}}
+			image := api.Image{Metadata: api.Metadata{Id: util.StringPtr("img-1")}}
 
 			Expect(m.markImageCreationFailed(image, nil)).To(BeNil())
 		})
@@ -113,7 +113,7 @@ var _ = Describe("Image timeout helpers", func() {
 		It("updates the image object when status exists", func() {
 			m := &Marmot{}
 			image := api.Image{
-				Metadata: &api.Metadata{Id: util.StringPtr("img-2")},
+				Metadata: api.Metadata{Id: util.StringPtr("img-2")},
 				Status: &api.Status{
 					StatusCode: db.IMAGE_CREATING,
 				},
@@ -144,7 +144,7 @@ var _ = Describe("Image timeout helpers", func() {
 
 		It("falls back to status message update when status is nil", func() {
 			m := &Marmot{}
-			image := api.Image{Metadata: &api.Metadata{Id: util.StringPtr("img-3")}}
+			image := api.Image{Metadata: api.Metadata{Id: util.StringPtr("img-3")}}
 			baseErr := errors.New("timeout")
 
 			called := false
@@ -167,7 +167,7 @@ var _ = Describe("Image timeout helpers", func() {
 		It("keeps returning the original error even if image update fails", func() {
 			m := &Marmot{}
 			image := api.Image{
-				Metadata: &api.Metadata{Id: util.StringPtr("img-4")},
+				Metadata: api.Metadata{Id: util.StringPtr("img-4")},
 				Status:   &api.Status{},
 			}
 			baseErr := errors.New("write failed")
@@ -183,7 +183,7 @@ var _ = Describe("Image timeout helpers", func() {
 		It("can build a failed image message from a deadline error", func() {
 			m := &Marmot{}
 			image := api.Image{
-				Metadata: &api.Metadata{Id: util.StringPtr("img-5")},
+				Metadata: api.Metadata{Id: util.StringPtr("img-5")},
 				Status:   &api.Status{},
 			}
 

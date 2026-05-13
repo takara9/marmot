@@ -55,11 +55,11 @@ var _ = Describe("Networks", Ordered, func() {
 	Context("仮想ネットワークの作成", func() {
 		It("仮想ネットワークの定義-20,21  IPなし", func() {
 			net := &api.VirtualNetwork{
-				Metadata: &api.Metadata{
+				Metadata: api.Metadata{
 					Name: util.StringPtr("test-net-0"),
 					Uuid: util.StringPtr(uuid.New().String()),
 				},
-				Spec: &api.VirtualNetworkSpec{
+				Spec: api.VirtualNetworkSpec{
 					BridgeName: util.StringPtr("virbr-test0"),
 				},
 			}
@@ -86,11 +86,11 @@ var _ = Describe("Networks", Ordered, func() {
 
 		It("仮想ネットワークの定義-22,23  IPあり、NATなし", func() {
 			net := &api.VirtualNetwork{
-				Metadata: &api.Metadata{
+				Metadata: api.Metadata{
 					Name: util.StringPtr("test-net-1"),
 					Uuid: util.StringPtr(uuid.New().String()),
 				},
-				Spec: &api.VirtualNetworkSpec{
+				Spec: api.VirtualNetworkSpec{
 					BridgeName: util.StringPtr("virbr-test1"),
 					IpAddress:  util.StringPtr("192.168.200.1"),
 					Netmask:    util.StringPtr("255.255.255.0"),
@@ -119,11 +119,11 @@ var _ = Describe("Networks", Ordered, func() {
 
 		It("仮想ネットワークの定義-24,25  IPあり、NATなし", func() {
 			net := &api.VirtualNetwork{
-				Metadata: &api.Metadata{
+				Metadata: api.Metadata{
 					Name: util.StringPtr("test-net-2"),
 					Uuid: util.StringPtr(uuid.New().String()),
 				},
-				Spec: &api.VirtualNetworkSpec{
+				Spec: api.VirtualNetworkSpec{
 					BridgeName:       util.StringPtr("virbr-test2"),
 					IpAddress:        util.StringPtr("192.168.200.2"),
 					Netmask:          util.StringPtr("255.255.255.0"),
@@ -154,11 +154,11 @@ var _ = Describe("Networks", Ordered, func() {
 
 		It("仮想ネットワークの定義-26,27  IPあり、NATあり", func() {
 			net := &api.VirtualNetwork{
-				Metadata: &api.Metadata{
+				Metadata: api.Metadata{
 					Name: util.StringPtr("test-net-3"),
 					Uuid: util.StringPtr(uuid.New().String()),
 				},
-				Spec: &api.VirtualNetworkSpec{
+				Spec: api.VirtualNetworkSpec{
 					BridgeName:       util.StringPtr("virbr-test3"),
 					IpAddress:        util.StringPtr("192.168.200.1"),
 					Netmask:          util.StringPtr("255.255.255.0"),

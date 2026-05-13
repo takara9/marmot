@@ -157,10 +157,10 @@ func (d *Database) MakeImageEntryFromURL(name, url string) (string, error) {
 
 // APIのImage定義をそのまま受け取り、イメージを作成する。
 func (d *Database) MakeImageEntryFromSpec(imageSpec api.Image) (string, error) {
-	if imageSpec.Metadata == nil || imageSpec.Metadata.Name == nil {
+	if imageSpec.Metadata.Name == nil {
 		return "", fmt.Errorf("name is required")
 	}
-	if imageSpec.Spec == nil || imageSpec.Spec.SourceUrl == nil {
+	if imageSpec.Spec.SourceUrl == nil {
 		return "", fmt.Errorf("sourceUrl is required")
 	}
 
@@ -201,12 +201,12 @@ func (d *Database) makeImageEntryFromURLWithNodeAndMeta(name, url, nodeName, api
 	img := api.Image{
 		ApiVersion: apiVersion,
 		Kind:       kind,
-		Metadata: &api.Metadata{
+		Metadata: api.Metadata{
 			Name: &name,
 			Id:   util.StringPtr(id),
 			Uuid: util.StringPtr(uuidString),
 		},
-		Spec: &api.ImageSpec{
+		Spec: api.ImageSpec{
 			SourceUrl: &url,
 		},
 		Status: &api.Status{
@@ -247,13 +247,13 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 	}
 	bootVol := server.Spec.BootVolume
 	var serverNodeName *string
-	if server.Metadata != nil && server.Metadata.NodeName != nil {
+	if server.Metadata.NodeName != nil {
 		node := strings.TrimSpace(*server.Metadata.NodeName)
 		if node != "" {
 			serverNodeName = util.StringPtr(node)
 		}
 	}
-	if serverNodeName == nil && bootVol.Metadata != nil && bootVol.Metadata.NodeName != nil {
+	if serverNodeName == nil && bootVol.Metadata.NodeName != nil {
 		node := strings.TrimSpace(*bootVol.Metadata.NodeName)
 		if node != "" {
 			slog.Warn("MakeImageEntryFromRunningVM() server metadata nodeName is empty; using boot volume nodeName", "serverId", serverId, "nodeName", node)
@@ -290,14 +290,14 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 		img = api.Image{
 			ApiVersion: "v1",
 			Kind:       "Image",
-			Metadata: &api.Metadata{
+			Metadata: api.Metadata{
 				Name:     &name,
 				Labels:   &labels,
 				NodeName: serverNodeName,
 				Id:       util.StringPtr(id),
 				Uuid:     util.StringPtr(uuidString),
 			},
-			Spec: &api.ImageSpec{
+			Spec: api.ImageSpec{
 				Kind:          bootVol.Spec.Kind, // ポインタの値を直接使用
 				Type:          bootVol.Spec.Type,
 				VolumeGroup:   nil,
@@ -321,14 +321,14 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 		img = api.Image{
 			ApiVersion: "v1",
 			Kind:       "Image",
-			Metadata: &api.Metadata{
+			Metadata: api.Metadata{
 				Name:     &name,
 				Labels:   &labels,
 				NodeName: serverNodeName,
 				Id:       util.StringPtr(id),
 				Uuid:     util.StringPtr(uuidString),
 			},
-			Spec: &api.ImageSpec{
+			Spec: api.ImageSpec{
 				Kind:          bootVol.Spec.Kind, // ポインタの値を直接使用
 				Type:          bootVol.Spec.Type,
 				VolumeGroup:   bootVol.Spec.VolumeGroup,
@@ -425,9 +425,6 @@ func normalizeImageMetadataID(img *api.Image, fallbackID string) {
 	if fallbackID == "" {
 		return
 	}
-	if img.Metadata == nil {
-		img.Metadata = &api.Metadata{}
-	}
 	if img.Metadata.Id == nil || strings.TrimSpace(*img.Metadata.Id) == "" {
 		img.Metadata.Id = util.StringPtr(fallbackID)
 	}
@@ -511,9 +508,7 @@ func (d *Database) updateImage(id string, spec api.Image) error {
 	}
 	expected := resp.Kvs[0].ModRevision
 
-	if rec.Metadata != nil {
-		rec.Metadata.Id = util.StringPtr(id)
-	}
+	rec.Metadata.Id = util.StringPtr(id)
 	// パッチ適用
 	util.PatchStruct(&rec, spec)
 
@@ -562,7 +557,7 @@ func (d *Database) FindImageByName(name string) (api.Image, error) {
 			slog.Error("FindImageByName() failed to unmarshal image", "err", err)
 			continue
 		}
-		if img.Metadata != nil && img.Metadata.Name != nil && *img.Metadata.Name == name {
+		if img.Metadata.Name != nil && *img.Metadata.Name == name {
 			return img, nil
 		}
 	}
@@ -597,7 +592,7 @@ func (d *Database) FindImageByNameAndNode(name, nodeName string) (api.Image, err
 			continue
 		}
 
-		if img.Metadata == nil || img.Metadata.Name == nil {
+		if img.Metadata.Name == nil {
 			continue
 		}
 		if *img.Metadata.Name != name {
@@ -628,7 +623,7 @@ func (d *Database) MakeFollowerImageEntry(headImage api.Image, followerNodeName 
 	if headImageId == "" {
 		return "", fmt.Errorf("head image id is required")
 	}
-	if headImage.Metadata == nil || headImage.Metadata.Name == nil || strings.TrimSpace(*headImage.Metadata.Name) == "" {
+	if headImage.Metadata.Name == nil || strings.TrimSpace(*headImage.Metadata.Name) == "" {
 		return "", fmt.Errorf("head image metadata.name is required")
 	}
 
@@ -660,14 +655,14 @@ func (d *Database) MakeFollowerImageEntry(headImage api.Image, followerNodeName 
 	follower := api.Image{
 		ApiVersion: "v1",
 		Kind:       "Image",
-		Metadata: &api.Metadata{
+		Metadata: api.Metadata{
 			Name:     headImage.Metadata.Name,
 			NodeName: util.StringPtr(followerNodeName),
 			Labels:   &labels,
 			Id:       util.StringPtr(id),
 			Uuid:     util.StringPtr(uuidString),
 		},
-		Spec: &api.ImageSpec{
+		Spec: api.ImageSpec{
 			Kind:      util.StringPtr("os"),
 			Type:      util.StringPtr("qcow2"),
 			Qcow2Path: util.StringPtr(imagePath),

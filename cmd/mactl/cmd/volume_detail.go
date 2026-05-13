@@ -79,12 +79,12 @@ func init() {
 func printVolumeDetailReport(volume api.Volume) {
 	fmt.Println("Volume Details")
 	fmt.Println("Summary")
-	printVolumeDetailField("Name", stringValue(volume.Metadata, func(m *api.Metadata) *string { return m.Name }))
+	printVolumeDetailField("Name", stringValue(&volume.Metadata, func(m *api.Metadata) *string { return m.Name }))
 	printVolumeDetailField("Id", formatID(api.VolumeID(volume)))
 	printVolumeDetailField("State", formatVolumeStatus(volume.Status))
-	printVolumeDetailField("Kind", stringValue(volume.Spec, func(s *api.VolSpec) *string { return s.Kind }))
-	printVolumeDetailField("Type", stringValue(volume.Spec, func(s *api.VolSpec) *string { return s.Type }))
-	printVolumeDetailField("Size", intValue(volume.Spec, func(s *api.VolSpec) *int { return s.Size }, " GB"))
+	printVolumeDetailField("Kind", stringValue(&volume.Spec, func(s *api.VolSpec) *string { return s.Kind }))
+	printVolumeDetailField("Type", stringValue(&volume.Spec, func(s *api.VolSpec) *string { return s.Type }))
+	printVolumeDetailField("Size", intValue(&volume.Spec, func(s *api.VolSpec) *int { return s.Size }, " GB"))
 	fmt.Println()
 
 	fmt.Println("Status")
@@ -94,11 +94,11 @@ func printVolumeDetailReport(volume api.Volume) {
 	fmt.Println()
 
 	fmt.Println("Storage")
-	printVolumeDetailField("Path", stringValue(volume.Spec, func(s *api.VolSpec) *string { return s.Path }))
-	printVolumeDetailField("Volume Group", stringValue(volume.Spec, func(s *api.VolSpec) *string { return s.VolumeGroup }))
-	printVolumeDetailField("Logical Vol.", stringValue(volume.Spec, func(s *api.VolSpec) *string { return s.LogicalVolume }))
-	printVolumeDetailField("OS Variant", stringValue(volume.Spec, func(s *api.VolSpec) *string { return s.OsVariant }))
-	if volume.Spec != nil && volume.Spec.Persistent != nil {
+	printVolumeDetailField("Path", stringValue(&volume.Spec, func(s *api.VolSpec) *string { return s.Path }))
+	printVolumeDetailField("Volume Group", stringValue(&volume.Spec, func(s *api.VolSpec) *string { return s.VolumeGroup }))
+	printVolumeDetailField("Logical Vol.", stringValue(&volume.Spec, func(s *api.VolSpec) *string { return s.LogicalVolume }))
+	printVolumeDetailField("OS Variant", stringValue(&volume.Spec, func(s *api.VolSpec) *string { return s.OsVariant }))
+	if volume.Spec.Persistent != nil {
 		printVolumeDetailField("Persistent", boolValue(volume.Spec.Persistent))
 	} else {
 		printVolumeDetailField("Persistent", "N/A")
@@ -106,10 +106,10 @@ func printVolumeDetailReport(volume api.Volume) {
 	fmt.Println()
 
 	fmt.Println("Metadata")
-	printVolumeDetailField("Node Name", stringValue(volume.Metadata, func(m *api.Metadata) *string { return m.NodeName }))
-	printVolumeDetailField("UUID", stringValue(volume.Metadata, func(m *api.Metadata) *string { return m.Uuid }))
-	printVolumeDetailField("Comment", stringValue(volume.Metadata, func(m *api.Metadata) *string { return m.Comment }))
-	printVolumeDetailField("Key", stringValue(volume.Metadata, func(m *api.Metadata) *string { return m.Key }))
+	printVolumeDetailField("Node Name", stringValue(&volume.Metadata, func(m *api.Metadata) *string { return m.NodeName }))
+	printVolumeDetailField("UUID", stringValue(&volume.Metadata, func(m *api.Metadata) *string { return m.Uuid }))
+	printVolumeDetailField("Comment", stringValue(&volume.Metadata, func(m *api.Metadata) *string { return m.Comment }))
+	printVolumeDetailField("Key", stringValue(&volume.Metadata, func(m *api.Metadata) *string { return m.Key }))
 }
 
 func printVolumeDetailField(label, value string) {

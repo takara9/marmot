@@ -196,8 +196,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			var spec api.ServerSpec
 			var err error
 			meta.Name = util.StringPtr("test-vm-1")
-			virtualServer.Metadata = &meta
-			virtualServer.Spec = &spec
+			virtualServer.Metadata = meta
+			virtualServer.Spec = spec
 			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
 				{
 					Networkname: "default",
@@ -258,11 +258,11 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			var meta api.Metadata
 			var spec api.ServerSpec
 			var err error
-			virtualServer.Spec = &spec
+			virtualServer.Spec = spec
 
 			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
 			meta.Name = util.StringPtr("test-vm-2")
-			virtualServer.Metadata = &meta
+			virtualServer.Metadata = meta
 
 			By("NICの接続先ネットワークを設定")
 			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
@@ -274,20 +274,20 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			By("データディスクのスペックを設定")
 			virtualServer.Spec.Storage = &[]api.Volume{
 				{
-					Metadata: &api.Metadata{
+					Metadata: api.Metadata{
 						Name: util.StringPtr("data-disk-1"),
 					},
-					Spec: &api.VolSpec{
+					Spec: api.VolSpec{
 						Type: util.StringPtr("qcow2"),
 						Kind: util.StringPtr("data"),
 						Size: util.IntPtrInt(100), //MB
 					},
 				},
 				{
-					Metadata: &api.Metadata{
+					Metadata: api.Metadata{
 						Name: util.StringPtr("data-disk-2"),
 					},
-					Spec: &api.VolSpec{
+					Spec: api.VolSpec{
 						Type: util.StringPtr("qcow2"),
 						Kind: util.StringPtr("data"),
 						Size: util.IntPtrInt(200), //MB
@@ -371,14 +371,14 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				var virtualServer api.Server
 				var meta api.Metadata
 				var spec api.ServerSpec
-				virtualServer.Metadata = &meta
-				virtualServer.Spec = &spec
+				virtualServer.Metadata = meta
+				virtualServer.Spec = spec
 
 				var bootVol api.Volume
 				var specVol api.VolSpec
 				var metaVol api.Metadata
-				bootVol.Metadata = &metaVol
-				bootVol.Spec = &specVol
+				bootVol.Metadata = metaVol
+				bootVol.Spec = specVol
 				virtualServer.Spec.BootVolume = &bootVol
 				var err error
 
@@ -438,17 +438,17 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				var meta api.Metadata
 				var spec api.ServerSpec
 				var err error
-				virtualServer.Spec = &spec
+				virtualServer.Spec = spec
 
 				var bootVol api.Volume
 				var specVol api.VolSpec
 				var metaVol api.Metadata
-				bootVol.Metadata = &metaVol
-				bootVol.Spec = &specVol
+				bootVol.Metadata = metaVol
+				bootVol.Spec = specVol
 
 				By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
 				meta.Name = util.StringPtr("test-vm-4")
-				virtualServer.Metadata = &meta
+				virtualServer.Metadata = meta
 
 				By("NICの接続先ネットワークを設定")
 				virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
@@ -464,20 +464,20 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				By("データディスクのスペックを設定")
 				virtualServer.Spec.Storage = &[]api.Volume{
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-1"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
 						},
 					},
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-2"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(2), //GB
@@ -529,14 +529,14 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				var meta api.Metadata
 				var spec api.ServerSpec
 				var err error
-				virtualServer.Spec = &spec
-				virtualServer.Metadata = &meta
+				virtualServer.Spec = spec
+				virtualServer.Metadata = meta
 
 				var bootVol api.Volume
 				var specVol api.VolSpec
 				var metaVol api.Metadata
-				bootVol.Metadata = &metaVol
-				bootVol.Spec = &specVol
+				bootVol.Metadata = metaVol
+				bootVol.Spec = specVol
 
 				By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
 				virtualServer.Metadata.Name = util.StringPtr("test-vm-5")
@@ -555,20 +555,20 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				By("データディスクのスペックを設定")
 				virtualServer.Spec.Storage = &[]api.Volume{
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-1"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
 						},
 					},
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-2"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("qcow2"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
@@ -620,18 +620,18 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				var virtualServer api.Server
 				var meta api.Metadata
 				var spec api.ServerSpec
-				virtualServer.Spec = &spec
+				virtualServer.Spec = spec
 
 				var bootVol api.Volume
 				var specVol api.VolSpec
 				var metaVol api.Metadata
-				bootVol.Metadata = &metaVol
-				bootVol.Spec = &specVol
+				bootVol.Metadata = metaVol
+				bootVol.Spec = specVol
 				virtualServer.Spec.BootVolume = &bootVol
 
 				By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
 				meta.Name = util.StringPtr("test-vm-6")
-				virtualServer.Metadata = &meta
+				virtualServer.Metadata = meta
 
 				By("NICの接続先ネットワークを設定")
 				virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
@@ -646,100 +646,100 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				By("データディスクのスペックを設定")
 				virtualServer.Spec.Storage = &[]api.Volume{
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-1"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("qcow2"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
 						},
 					},
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-2"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("qcow2"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
 						},
 					},
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-3"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("qcow2"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
 						},
 					},
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-4"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("qcow2"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
 						},
 					},
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-5"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("qcow2"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
 						},
 					},
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-6"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("qcow2"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
 						},
 					},
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-7"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("qcow2"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
 						},
 					},
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-8"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("qcow2"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
 						},
 					},
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-9"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("qcow2"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
 						},
 					},
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-10"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("qcow2"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
@@ -790,18 +790,18 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				var meta api.Metadata
 				var spec api.ServerSpec
 				var err error
-				virtualServer.Spec = &spec
+				virtualServer.Spec = spec
 
 				var bootVol api.Volume
 				var specVol api.VolSpec
 				var metaVol api.Metadata
-				bootVol.Metadata = &metaVol
-				bootVol.Spec = &specVol
+				bootVol.Metadata = metaVol
+				bootVol.Spec = specVol
 				virtualServer.Spec.BootVolume = &bootVol
 
 				By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
 				meta.Name = util.StringPtr("test-vm-7")
-				virtualServer.Metadata = &meta
+				virtualServer.Metadata = meta
 
 				By("NICの接続先ネットワークを設定")
 				virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
@@ -815,100 +815,100 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				By("データディスクのスペックを設定")
 				virtualServer.Spec.Storage = &[]api.Volume{
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-1"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
 						},
 					},
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-2"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
 						},
 					},
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-3"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
 						},
 					},
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-4"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
 						},
 					},
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-5"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
 						},
 					},
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-6"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
 						},
 					},
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-7"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
 						},
 					},
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-8"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
 						},
 					},
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-9"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
 						},
 					},
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-10"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
@@ -959,10 +959,10 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 
 			It("DATA論理ボリュームの生成1", func() {
 				v := api.Volume{
-					Metadata: &api.Metadata{
+					Metadata: api.Metadata{
 						Name: ut.StringPtr("precreated-volume-001"),
 					},
-					Spec: &api.VolSpec{
+					Spec: api.VolSpec{
 						Size: ut.IntPtrInt(100),
 					},
 				}
@@ -977,10 +977,10 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 
 			It("DATA論理ボリュームの生成2", func() {
 				v := api.Volume{
-					Metadata: &api.Metadata{
+					Metadata: api.Metadata{
 						Name: ut.StringPtr("precreated-volume-002"),
 					},
-					Spec: &api.VolSpec{
+					Spec: api.VolSpec{
 						Size: ut.IntPtrInt(200),
 					},
 				}
@@ -997,13 +997,13 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				var virtualServer api.Server
 				var meta api.Metadata
 				var spec api.ServerSpec
-				virtualServer.Spec = &spec
+				virtualServer.Spec = spec
 
 				var err error
 
 				By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
 				meta.Name = util.StringPtr(hostname)
-				virtualServer.Metadata = &meta
+				virtualServer.Metadata = meta
 
 				By("NICの接続先ネットワークを設定")
 				virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
@@ -1073,11 +1073,11 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				var virtualServer api.Server
 				var meta api.Metadata
 				var spec api.ServerSpec
-				virtualServer.Spec = &spec
+				virtualServer.Spec = spec
 				var err error
 
 				meta.Name = util.StringPtr("test-vm-9")
-				virtualServer.Metadata = &meta
+				virtualServer.Metadata = meta
 				virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
 					{
 						Networkname: "default",
@@ -1091,30 +1091,30 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				}
 				spec.Storage = &[]api.Volume{
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-1"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
 						},
 					},
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-2"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB
 						},
 					},
 					{
-						Metadata: &api.Metadata{
+						Metadata: api.Metadata{
 							Name: util.StringPtr("data-disk-3"),
 						},
-						Spec: &api.VolSpec{
+						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
 							Kind: util.StringPtr("data"),
 							Size: util.IntPtrInt(1), //GB

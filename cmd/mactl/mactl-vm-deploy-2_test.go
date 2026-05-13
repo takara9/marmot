@@ -334,12 +334,12 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			db.SetNetworkSyncLabels(labels, "head", "", "hvc")
 
 			headSpec := api.VirtualNetwork{
-				Metadata: &api.Metadata{
+				Metadata: api.Metadata{
 					Name:     util.StringPtr("delete-propagation-net"),
 					NodeName: util.StringPtr("hvc"),
 					Labels:   &labels,
 				},
-				Spec: &api.VirtualNetworkSpec{
+				Spec: api.VirtualNetworkSpec{
 					BridgeName: util.StringPtr("default"),
 				},
 			}

@@ -129,11 +129,11 @@ var _ = Describe("VirtualPrivateNetworksUpperlayer", Ordered, func() {
 
 		It("最もシンプルな仮想ネットワークの新規作成", func() {
 			createdNet = api.VirtualNetwork{
-				Metadata: &api.Metadata{
+				Metadata: api.Metadata{
 					Id:   util.StringPtr("testnet"),
 					Name: util.StringPtr("testnet"),
 				},
-				Spec: &api.VirtualNetworkSpec{
+				Spec: api.VirtualNetworkSpec{
 					BridgeName: util.StringPtr("testbridge"),
 				},
 				Status: &api.Status{

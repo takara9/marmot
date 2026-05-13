@@ -125,10 +125,10 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 		It("OS論理ボリュームの生成", func() {
 			v := api.Volume{
-				Metadata: &api.Metadata{
+				Metadata: api.Metadata{
 					Name: ut.StringPtr("test-os-volume-001"),
 				},
-				Spec: &api.VolSpec{
+				Spec: api.VolSpec{
 					Type:      ut.StringPtr("lvm"),
 					Kind:      ut.StringPtr("os"),
 					OsVariant: ut.StringPtr("ubuntu22.04"),
@@ -177,10 +177,10 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 		It("OS論理ボリュームの生成 （失敗ケース)", func() {
 			v := api.Volume{
-				Metadata: &api.Metadata{
+				Metadata: api.Metadata{
 					Name: ut.StringPtr("test-os-volume-001"),
 				},
-				Spec: &api.VolSpec{
+				Spec: api.VolSpec{
 					Type:      ut.StringPtr("lvm"),
 					Kind:      ut.StringPtr("os"),
 					OsVariant: ut.StringPtr("ubuntu22.NOXIST"),
@@ -195,10 +195,10 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 		It("OS論理ボリュームの生成 （失敗ケース)", func() {
 			v := api.Volume{
-				Metadata: &api.Metadata{
+				Metadata: api.Metadata{
 					Name: ut.StringPtr("test-os-volume-001"),
 				},
-				Spec: &api.VolSpec{
+				Spec: api.VolSpec{
 					Type:      ut.StringPtr("noexist"),
 					Kind:      ut.StringPtr("os"),
 					OsVariant: ut.StringPtr("ubuntu22.04"),
@@ -277,10 +277,10 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			v := api.Volume{
-				Metadata: &api.Metadata{
+				Metadata: api.Metadata{
 					Name: ut.StringPtr("test-data-volume-001"),
 				},
-				Spec: &api.VolSpec{
+				Spec: api.VolSpec{
 					Type: ut.StringPtr("lvm"),
 					Kind: ut.StringPtr("data"),
 					Size: ut.IntPtrInt(1), // 1GB
@@ -318,10 +318,10 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 		It("OS論理ボリュームの生成1", func() {
 			v := api.Volume{
-				Metadata: &api.Metadata{
+				Metadata: api.Metadata{
 					Name: ut.StringPtr("test-os-volume-001"),
 				},
-				Spec: &api.VolSpec{
+				Spec: api.VolSpec{
 					Type:      ut.StringPtr("lvm"),
 					Kind:      ut.StringPtr("os"),
 					OsVariant: ut.StringPtr("ubuntu22.04"),
@@ -340,10 +340,10 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 		It("OS論理ボリュームの生成2", func() {
 			v := api.Volume{
-				Metadata: &api.Metadata{
+				Metadata: api.Metadata{
 					Name: ut.StringPtr("test-os-volume-002"),
 				},
-				Spec: &api.VolSpec{
+				Spec: api.VolSpec{
 					Type:      ut.StringPtr("lvm"),
 					Kind:      ut.StringPtr("os"),
 					OsVariant: ut.StringPtr("ubuntu22.04"),
@@ -361,10 +361,10 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 		It("DATA論理ボリュームの生成1", func() {
 			v := api.Volume{
-				Metadata: &api.Metadata{
+				Metadata: api.Metadata{
 					Name: ut.StringPtr("test-data-volume-001"),
 				},
-				Spec: &api.VolSpec{
+				Spec: api.VolSpec{
 					Type: ut.StringPtr("lvm"),
 					Kind: ut.StringPtr("data"),
 					Size: ut.IntPtrInt(1),
@@ -383,10 +383,10 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 		It("DATA論理ボリュームの生成2", func() {
 			v := api.Volume{
-				Metadata: &api.Metadata{
+				Metadata: api.Metadata{
 					Name: ut.StringPtr("test-data-volume-002"),
 				},
-				Spec: &api.VolSpec{
+				Spec: api.VolSpec{
 					Type: ut.StringPtr("lvm"),
 					Kind: ut.StringPtr("data"),
 					Size: ut.IntPtrInt(1),
@@ -510,10 +510,10 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 		It("qcow2ボリュームの生成", func() {
 			v := api.Volume{
-				Metadata: &api.Metadata{
+				Metadata: api.Metadata{
 					Name: ut.StringPtr("test-qcow2-volume-001"),
 				},
-				Spec: &api.VolSpec{
+				Spec: api.VolSpec{
 					Type:      ut.StringPtr("qcow2"),
 					Kind:      ut.StringPtr("os"),
 					OsVariant: ut.StringPtr("ubuntu22.04"),
@@ -586,10 +586,10 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 		It("データボリュームの生成と削除", func() {
 			v := api.Volume{
-				Metadata: &api.Metadata{
+				Metadata: api.Metadata{
 					Name: ut.StringPtr("test-qcow2-volume-003"),
 				},
-				Spec: &api.VolSpec{
+				Spec: api.VolSpec{
 					Type: ut.StringPtr("qcow2"),
 					Kind: ut.StringPtr("data"),
 					Size: ut.IntPtrInt(1),

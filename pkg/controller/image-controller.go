@@ -73,9 +73,9 @@ func (c *controller) imageControllerLoop() {
 	}
 
 	for _, image := range imgaes {
-		if ok, assignedNode, reason := evaluateNodeAssignment(image.Metadata, c.marmot.NodeName); !ok {
+		if ok, assignedNode, reason := evaluateNodeAssignment(&image.Metadata, c.marmot.NodeName); !ok {
 			objectName := ""
-			if image.Metadata != nil && image.Metadata.Name != nil {
+			if image.Metadata.Name != nil {
 				objectName = *image.Metadata.Name
 			}
 			slog.Debug("別ノード割当のイメージをスキップ", "imageId", util.DerefStrPtr(image.Metadata.Id), "imageName", objectName, "controllerNode", c.marmot.NodeName, "assignedNode", assignedNode, "reason", reason)
@@ -174,7 +174,7 @@ func (c *controller) imageControllerLoop() {
 }
 
 func (c *controller) ensureFollowerImagesWaiting(headImage api.Image) error {
-	if headImage.Metadata == nil || headImage.Metadata.Name == nil {
+	if headImage.Metadata.Name == nil {
 		return nil
 	}
 
@@ -216,7 +216,7 @@ func (c *controller) ensureFollowerImagesWaiting(headImage api.Image) error {
 }
 
 func (c *controller) startFollowerSync(waitingImage api.Image) error {
-	if waitingImage.Metadata == nil || waitingImage.Metadata.Labels == nil {
+	if waitingImage.Metadata.Labels == nil {
 		return fmt.Errorf("labels are required for waiting image: imageId=%s", util.DerefStrPtr(waitingImage.Metadata.Id))
 	}
 	labels := *waitingImage.Metadata.Labels
@@ -253,7 +253,7 @@ func (c *controller) startFollowerSync(waitingImage api.Image) error {
 }
 
 func (c *controller) syncFollowerImageFromHead(followerImage api.Image, headImage api.Image) error {
-	if headImage.Metadata == nil || headImage.Metadata.NodeName == nil {
+	if headImage.Metadata.NodeName == nil {
 		return fmt.Errorf("head image nodeName is required: headImageId=%s", util.DerefStrPtr(headImage.Metadata.Id))
 	}
 	headNode := strings.TrimSpace(*headImage.Metadata.NodeName)
@@ -275,10 +275,6 @@ func (c *controller) syncFollowerImageFromHead(followerImage api.Image, headImag
 	if err != nil {
 		return err
 	}
-	if followerLatest.Spec == nil {
-		followerLatest.Spec = &api.ImageSpec{}
-	}
-
 	destinationPath := ""
 	if followerLatest.Spec.Qcow2Path != nil {
 		destinationPath = strings.TrimSpace(*followerLatest.Spec.Qcow2Path)
@@ -304,10 +300,10 @@ func (c *controller) syncFollowerImageFromHead(followerImage api.Image, headImag
 	followerLatest.Spec.Kind = util.StringPtr("os")
 	followerLatest.Spec.Type = util.StringPtr("qcow2")
 	followerLatest.Spec.SourceUrl = nil
-	if headImage.Spec != nil && headImage.Spec.Size != nil {
+	if headImage.Spec.Size != nil {
 		followerLatest.Spec.Size = util.IntPtrInt(*headImage.Spec.Size)
 	}
-	if followerLatest.Metadata != nil && followerLatest.Metadata.Labels != nil {
+	if followerLatest.Metadata.Labels != nil {
 		labels := *followerLatest.Metadata.Labels
 		db.SetFollowerSyncLabels(labels, "follower", util.DerefStrPtr(headImage.Metadata.Id), headNode)
 		followerLatest.Metadata.Labels = &labels

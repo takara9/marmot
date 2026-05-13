@@ -76,9 +76,9 @@ func (c *controller) volumeControllerLoop() {
 	slog.Debug("取得したボリュームの数", "numVolumes", len(vols))
 	for _, vol := range vols {
 		volID := api.VolumeID(vol)
-		if ok, assignedNode, reason := evaluateNodeAssignment(vol.Metadata, c.marmot.NodeName); !ok {
+		if ok, assignedNode, reason := evaluateNodeAssignment(&vol.Metadata, c.marmot.NodeName); !ok {
 			objectName := ""
-			if vol.Metadata != nil && vol.Metadata.Name != nil {
+			if vol.Metadata.Name != nil {
 				objectName = *vol.Metadata.Name
 			}
 			slog.Debug("別ノード割当のボリュームをスキップ", "volumeId", volID, "volumeName", objectName, "controllerNode", c.marmot.NodeName, "assignedNode", assignedNode, "reason", reason)
@@ -129,8 +129,7 @@ func (c *controller) volumeControllerLoop() {
 				continue
 			}
 
-			isISCSIVolume := vol.Spec != nil &&
-				vol.Spec.Type != nil && *vol.Spec.Type == "lvm" &&
+			isISCSIVolume := vol.Spec.Type != nil && *vol.Spec.Type == "lvm" &&
 				vol.Spec.Kind != nil && *vol.Spec.Kind == "data" &&
 				vol.Spec.Iscsi != nil && *vol.Spec.Iscsi
 			if isISCSIVolume {
@@ -147,8 +146,7 @@ func (c *controller) volumeControllerLoop() {
 
 		case db.VOLUME_DELETING:
 			slog.Debug("削除中のボリュームを処理", "volId", volID)
-			shouldCleanupISCSI := vol.Spec != nil &&
-				vol.Spec.Type != nil && *vol.Spec.Type == "lvm" &&
+			shouldCleanupISCSI := vol.Spec.Type != nil && *vol.Spec.Type == "lvm" &&
 				vol.Spec.Kind != nil && *vol.Spec.Kind == "data" &&
 				((vol.Spec.Iscsi != nil && *vol.Spec.Iscsi) ||
 					(vol.Spec.IscsiTargetIqn != nil && strings.TrimSpace(*vol.Spec.IscsiTargetIqn) != ""))

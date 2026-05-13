@@ -86,12 +86,12 @@ func init() {
 func printImageDetails(image api.Image) {
 	fmt.Println("Image Details")
 	fmt.Println("Summary")
-	printImageDetailField("Name", stringValue(image.Metadata, func(m *api.Metadata) *string { return m.Name }))
+	printImageDetailField("Name", stringValue(&image.Metadata, func(m *api.Metadata) *string { return m.Name }))
 	printImageDetailField("Id", formatID(util.DerefStrPtr(image.Metadata.Id)))
 	printImageDetailField("State", formatImageStatus(image.Status))
-	printImageDetailField("Type", stringValue(image.Spec, func(s *api.ImageSpec) *string { return s.Type }))
-	printImageDetailField("Kind", stringValue(image.Spec, func(s *api.ImageSpec) *string { return s.Kind }))
-	printImageDetailField("Size", intValue(image.Spec, func(s *api.ImageSpec) *int { return s.Size }, " GB"))
+	printImageDetailField("Type", stringValue(&image.Spec, func(s *api.ImageSpec) *string { return s.Type }))
+	printImageDetailField("Kind", stringValue(&image.Spec, func(s *api.ImageSpec) *string { return s.Kind }))
+	printImageDetailField("Size", intValue(&image.Spec, func(s *api.ImageSpec) *int { return s.Size }, " GB"))
 	fmt.Println()
 
 	fmt.Println("Status")
@@ -101,17 +101,17 @@ func printImageDetails(image api.Image) {
 	fmt.Println()
 
 	fmt.Println("Storage")
-	printImageDetailField("Volume Group", stringValue(image.Spec, func(s *api.ImageSpec) *string { return s.VolumeGroup }))
-	printImageDetailField("Logical Vol.", stringValue(image.Spec, func(s *api.ImageSpec) *string { return s.LogicalVolume }))
-	printImageDetailField("LV Path", stringValue(image.Spec, func(s *api.ImageSpec) *string { return s.LvPath }))
-	printImageDetailField("QCOW2 Path", stringValue(image.Spec, func(s *api.ImageSpec) *string { return s.Qcow2Path }))
-	printImageDetailField("Source URL", stringValue(image.Spec, func(s *api.ImageSpec) *string { return s.SourceUrl }))
+	printImageDetailField("Volume Group", stringValue(&image.Spec, func(s *api.ImageSpec) *string { return s.VolumeGroup }))
+	printImageDetailField("Logical Vol.", stringValue(&image.Spec, func(s *api.ImageSpec) *string { return s.LogicalVolume }))
+	printImageDetailField("LV Path", stringValue(&image.Spec, func(s *api.ImageSpec) *string { return s.LvPath }))
+	printImageDetailField("QCOW2 Path", stringValue(&image.Spec, func(s *api.ImageSpec) *string { return s.Qcow2Path }))
+	printImageDetailField("Source URL", stringValue(&image.Spec, func(s *api.ImageSpec) *string { return s.SourceUrl }))
 	fmt.Println()
 
 	fmt.Println("Metadata")
-	printImageDetailField("Node Name", stringValue(image.Metadata, func(m *api.Metadata) *string { return m.NodeName }))
-	printImageDetailField("UUID", stringValue(image.Metadata, func(m *api.Metadata) *string { return m.Uuid }))
-	printImageDetailField("Comment", stringValue(image.Metadata, func(m *api.Metadata) *string { return m.Comment }))
+	printImageDetailField("Node Name", stringValue(&image.Metadata, func(m *api.Metadata) *string { return m.NodeName }))
+	printImageDetailField("UUID", stringValue(&image.Metadata, func(m *api.Metadata) *string { return m.Uuid }))
+	printImageDetailField("Comment", stringValue(&image.Metadata, func(m *api.Metadata) *string { return m.Comment }))
 }
 
 func printImageDetailField(label, value string) {

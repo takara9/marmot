@@ -41,7 +41,7 @@ func captureStdout(fn func()) string {
 var _ = Describe("printImageDetails", func() {
 	It("prints a nil-safe detail view", func() {
 		output := captureStdout(func() {
-			printImageDetails(api.Image{Metadata: &api.Metadata{Id: util.StringPtr("img01")}})
+			printImageDetails(api.Image{Metadata: api.Metadata{Id: util.StringPtr("img01")}})
 		})
 
 		Expect(strings.Contains(output, "Image Details")).To(BeTrue(), output)

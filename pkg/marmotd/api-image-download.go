@@ -23,7 +23,7 @@ func (s *Server) ApiDownloadImageQcow2ById(ctx echo.Context) error {
 		slog.Error("ApiDownloadImageQcow2ById() failed to get image", "id", id, "err", err)
 		return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: err.Error()})
 	}
-	if image.Spec == nil || image.Spec.Qcow2Path == nil || strings.TrimSpace(*image.Spec.Qcow2Path) == "" {
+	if image.Spec.Qcow2Path == nil || strings.TrimSpace(*image.Spec.Qcow2Path) == "" {
 		return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "qcow2 path is not set"})
 	}
 

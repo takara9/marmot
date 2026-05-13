@@ -21,8 +21,8 @@ func TestCleanupISCSIForVolumeRunsTargetAndBackstoreDelete(t *testing.T) {
 
 	m := &Marmot{}
 	vol := api.Volume{
-		Metadata: &api.Metadata{Id: util.StringPtr("abcde")},
-		Spec: &api.VolSpec{
+		Metadata: api.Metadata{Id: util.StringPtr("abcde")},
+		Spec: api.VolSpec{
 			Type:           util.StringPtr("lvm"),
 			Kind:           util.StringPtr("data"),
 			Iscsi:          util.BoolPtr(true),
@@ -56,8 +56,8 @@ func TestCleanupISCSIForVolumeSkipsNonISCSIVolume(t *testing.T) {
 
 	m := &Marmot{}
 	vol := api.Volume{
-		Metadata: &api.Metadata{Id: util.StringPtr("abcde")},
-		Spec: &api.VolSpec{
+		Metadata: api.Metadata{Id: util.StringPtr("abcde")},
+		Spec: api.VolSpec{
 			Type:  util.StringPtr("lvm"),
 			Kind:  util.StringPtr("data"),
 			Iscsi: util.BoolPtr(false),
@@ -85,8 +85,8 @@ func TestCleanupISCSIForVolumeAllowsMissingResources(t *testing.T) {
 
 	m := &Marmot{}
 	vol := api.Volume{
-		Metadata: &api.Metadata{Id: util.StringPtr("abcde")},
-		Spec: &api.VolSpec{
+		Metadata: api.Metadata{Id: util.StringPtr("abcde")},
+		Spec: api.VolSpec{
 			Type:  util.StringPtr("lvm"),
 			Kind:  util.StringPtr("data"),
 			Iscsi: util.BoolPtr(true),
@@ -114,8 +114,8 @@ func TestCleanupISCSIForVolumeAllowsMissingBackstoreMessage(t *testing.T) {
 
 	m := &Marmot{}
 	vol := api.Volume{
-		Metadata: &api.Metadata{Id: util.StringPtr("abcde")},
-		Spec: &api.VolSpec{
+		Metadata: api.Metadata{Id: util.StringPtr("abcde")},
+		Spec: api.VolSpec{
 			Type:  util.StringPtr("lvm"),
 			Kind:  util.StringPtr("data"),
 			Iscsi: util.BoolPtr(true),

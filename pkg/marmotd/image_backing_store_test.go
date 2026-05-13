@@ -23,7 +23,7 @@ var _ = Describe("Image backing store", func() {
 			Expect(os.WriteFile(lvPath, []byte("lv"), 0644)).To(Succeed())
 
 			image := api.Image{
-				Spec: &api.ImageSpec{
+				Spec: api.ImageSpec{
 					Qcow2Path: util.StringPtr(qcow2Path),
 					LvPath:    util.StringPtr(lvPath),
 				},
@@ -37,7 +37,7 @@ var _ = Describe("Image backing store", func() {
 			missingPath := filepath.Join(tempDir, "missing.qcow2")
 
 			image := api.Image{
-				Spec: &api.ImageSpec{
+				Spec: api.ImageSpec{
 					Qcow2Path: util.StringPtr(missingPath),
 				},
 			}
@@ -49,7 +49,7 @@ var _ = Describe("Image backing store", func() {
 
 		It("derives the logical volume path when lvPath is empty", func() {
 			image := api.Image{
-				Spec: &api.ImageSpec{
+				Spec: api.ImageSpec{
 					VolumeGroup:   util.StringPtr("vg1"),
 					LogicalVolume: util.StringPtr("boot-image"),
 				},

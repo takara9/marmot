@@ -33,18 +33,18 @@ func (s *Server) ApiCreateImage(ctx echo.Context) error {
 		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: "kind is required"})
 	}
 	// URLの設定チェック
-	if imageSpec.Spec == nil || imageSpec.Spec.SourceUrl == nil {
+	if imageSpec.Spec.SourceUrl == nil {
 		slog.Error("ApiCreateImage()", "err", "SourceUrl is required")
 		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: "SourceUrl is required"})
 	}
 	// 名前の設定チェック
-	if imageSpec.Metadata == nil || imageSpec.Metadata.Name == nil {
+	if imageSpec.Metadata.Name == nil {
 		slog.Error("ApiCreateImage()", "err", "Name is required")
 		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: "Name is required"})
 	}
 	assignNodeNameIfUnset(&imageSpec.Metadata, s.Ma.NodeName)
 	assignedNodeName := ""
-	if imageSpec.Metadata != nil && imageSpec.Metadata.NodeName != nil {
+	if imageSpec.Metadata.NodeName != nil {
 		assignedNodeName = *imageSpec.Metadata.NodeName
 	}
 	slog.Debug("Received post body", "imageSpec", imageSpec, "sourceUrl", *imageSpec.Spec.SourceUrl, "nodeName", assignedNodeName)
@@ -109,7 +109,7 @@ func (s *Server) ApiDeleteImageById(ctx echo.Context, id string) error {
 		}
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-	if target.Metadata == nil || target.Metadata.Name == nil {
+	if target.Metadata.Name == nil {
 		slog.Error("ApiDeleteImageById() image name is empty", "id", id)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: "image name is empty"})
 	}
@@ -122,7 +122,7 @@ func (s *Server) ApiDeleteImageById(ctx echo.Context, id string) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 	for _, img := range allImages {
-		if img.Metadata == nil || img.Metadata.Name == nil || *img.Metadata.Name != targetName {
+		if img.Metadata.Name == nil || *img.Metadata.Name != targetName {
 			continue
 		}
 		if img.Status != nil && img.Status.DeletionTimeStamp != nil {

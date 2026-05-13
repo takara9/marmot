@@ -14,20 +14,19 @@ var _ = Describe("PatchStruct", func() {
 		newName := "new"
 
 		dst := api.Volume{
-			Metadata: &api.Metadata{
+			Metadata: api.Metadata{
 				Name:     &oldName,
 				NodeName: &oldNode,
 			},
 		}
 		src := api.Volume{
-			Metadata: &api.Metadata{
+			Metadata: api.Metadata{
 				Name: &newName,
 			},
 		}
 
 		util.PatchStruct(&dst, &src)
 
-		Expect(dst.Metadata).NotTo(BeNil())
 		Expect(dst.Metadata.Name).NotTo(BeNil())
 		Expect(*dst.Metadata.Name).To(Equal(newName))
 		Expect(dst.Metadata.NodeName).NotTo(BeNil())
@@ -39,14 +38,13 @@ var _ = Describe("PatchStruct", func() {
 
 		dst := api.Volume{}
 		src := api.Volume{
-			Metadata: &api.Metadata{
+			Metadata: api.Metadata{
 				Name: &newName,
 			},
 		}
 
 		util.PatchStruct(&dst, &src)
 
-		Expect(dst.Metadata).NotTo(BeNil())
 		Expect(dst.Metadata.Name).NotTo(BeNil())
 		Expect(*dst.Metadata.Name).To(Equal(newName))
 	})

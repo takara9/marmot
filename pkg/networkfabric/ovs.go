@@ -28,7 +28,7 @@ func NewOVSFabric() *OVSFabric {
 
 // EnsureBridge は OVS ブリッジを作成または確認する。
 func (o *OVSFabric) EnsureBridge(vnet *api.VirtualNetwork) error {
-	if vnet == nil || vnet.Spec == nil || vnet.Spec.BridgeName == nil {
+	if vnet == nil || vnet.Spec.BridgeName == nil {
 		return fmt.Errorf("invalid vnet or missing bridge name")
 	}
 
@@ -55,7 +55,7 @@ func (o *OVSFabric) EnsureBridge(vnet *api.VirtualNetwork) error {
 
 // EnsureVxlanMesh はピアノードへの VXLAN トンネルを作成・確認する。
 func (o *OVSFabric) EnsureVxlanMesh(vnet *api.VirtualNetwork, peers []string) error {
-	if vnet == nil || vnet.Spec == nil || vnet.Spec.BridgeName == nil {
+	if vnet == nil || vnet.Spec.BridgeName == nil {
 		return fmt.Errorf("invalid vnet or missing bridge name")
 	}
 
@@ -202,7 +202,7 @@ func resolveInterfaceIPv4(interfaceName string) (string, error) {
 
 // PruneVxlanMesh は残すべきピア以外のトンネルを削除する。
 func (o *OVSFabric) PruneVxlanMesh(vnet *api.VirtualNetwork, remainPeers []string) error {
-	if vnet == nil || vnet.Spec == nil || vnet.Spec.BridgeName == nil {
+	if vnet == nil || vnet.Spec.BridgeName == nil {
 		return fmt.Errorf("invalid vnet or missing bridge name")
 	}
 
@@ -474,7 +474,7 @@ func delFlows(bridgeName string, match string) error {
 
 // DeleteBridge はブリッジをすべて削除する。
 func (o *OVSFabric) DeleteBridge(vnet *api.VirtualNetwork) error {
-	if vnet == nil || vnet.Spec == nil || vnet.Spec.BridgeName == nil {
+	if vnet == nil || vnet.Spec.BridgeName == nil {
 		return fmt.Errorf("invalid vnet or missing bridge name")
 	}
 
@@ -501,7 +501,7 @@ func (o *OVSFabric) DeleteBridge(vnet *api.VirtualNetwork) error {
 
 // GetBridgeStatus はブリッジ状態を返す。
 func (o *OVSFabric) GetBridgeStatus(vnet *api.VirtualNetwork) (bool, int, error) {
-	if vnet == nil || vnet.Spec == nil || vnet.Spec.BridgeName == nil {
+	if vnet == nil || vnet.Spec.BridgeName == nil {
 		return false, 0, fmt.Errorf("invalid vnet or missing bridge name")
 	}
 

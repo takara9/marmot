@@ -11,7 +11,7 @@ var _ = Describe("VirtualNetworkDefaults", func() {
 	Describe("applyVirtualNetworkDefaults", func() {
 		It("defaults overlayMode to vxlan and peerPolicy to auto when omitted", func() {
 			network := api.VirtualNetwork{
-				Spec: &api.VirtualNetworkSpec{
+				Spec: api.VirtualNetworkSpec{
 					Vni: util.IntPtrInt(100),
 				},
 			}
@@ -27,7 +27,7 @@ var _ = Describe("VirtualNetworkDefaults", func() {
 		It("does not force peerPolicy for non-vxlan overlays", func() {
 			overlayMode := api.None
 			network := api.VirtualNetwork{
-				Spec: &api.VirtualNetworkSpec{
+				Spec: api.VirtualNetworkSpec{
 					OverlayMode: &overlayMode,
 				},
 			}
@@ -41,9 +41,9 @@ var _ = Describe("VirtualNetworkDefaults", func() {
 	Describe("nextAvailableVNI", func() {
 		It("uses the first free VNI from 100", func() {
 			networks := []api.VirtualNetwork{
-				{Spec: &api.VirtualNetworkSpec{Vni: util.IntPtrInt(100)}},
-				{Spec: &api.VirtualNetworkSpec{Vni: util.IntPtrInt(101)}},
-				{Spec: &api.VirtualNetworkSpec{Vni: util.IntPtrInt(103)}},
+				{Spec: api.VirtualNetworkSpec{Vni: util.IntPtrInt(100)}},
+				{Spec: api.VirtualNetworkSpec{Vni: util.IntPtrInt(101)}},
+				{Spec: api.VirtualNetworkSpec{Vni: util.IntPtrInt(103)}},
 			}
 
 			vni, err := nextAvailableVNI(networks)
@@ -53,8 +53,8 @@ var _ = Describe("VirtualNetworkDefaults", func() {
 
 		It("ignores invalid existing VNI values", func() {
 			networks := []api.VirtualNetwork{
-				{Spec: &api.VirtualNetworkSpec{Vni: util.IntPtrInt(-1)}},
-				{Spec: &api.VirtualNetworkSpec{Vni: util.IntPtrInt(0)}},
+				{Spec: api.VirtualNetworkSpec{Vni: util.IntPtrInt(-1)}},
+				{Spec: api.VirtualNetworkSpec{Vni: util.IntPtrInt(0)}},
 			}
 
 			vni, err := nextAvailableVNI(networks)

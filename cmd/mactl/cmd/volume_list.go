@@ -43,11 +43,11 @@ var volumeListCmd = &cobra.Command{
 				fmt.Printf("%-2v  %1v%-6v  %-16v  %-10v  %-4v  %-5v  %-5v  %-8v  %-12v  %-20v\n", "NO", "", "ID", "NAME", "NODE", "KIND", "TYPE", "iSCSI", "SIZE(GB)", "STATUS", "PATH")
 				for i, v := range data {
 					nodeName := ""
-					if v.Metadata != nil && v.Metadata.NodeName != nil {
+					if v.Metadata.NodeName != nil {
 						nodeName = *v.Metadata.NodeName
 					}
 					iscsi := "N"
-					if v.Spec != nil && v.Spec.Iscsi != nil && *v.Spec.Iscsi {
+					if v.Spec.Iscsi != nil && *v.Spec.Iscsi {
 						iscsi = "Y"
 					}
 					fmt.Printf("%2d", i+1)

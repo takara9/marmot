@@ -71,14 +71,6 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 		return nil, err
 	}
 	// ID、Key、Statusを設定する
-	if volume.Metadata == nil {
-		var metadata api.Metadata
-		volume.Metadata = &metadata
-	}
-	if volume.Spec == nil {
-		var spec api.VolSpec
-		volume.Spec = &spec
-	}
 	if volume.Status == nil {
 		var status api.Status
 		volume.Status = &status
@@ -127,7 +119,7 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 
 	// LVMボリュームの場合、パスを決定する
 	if *volume.Spec.Type == "lvm" {
-		configureLVMVolumeSpec(volume.Spec, api.VolumeID(volume))
+		configureLVMVolumeSpec(&volume.Spec, api.VolumeID(volume))
 	}
 
 	// OSボリュームの場合、OsVariantのデフォルト値を設定する  必要か？
@@ -270,13 +262,6 @@ func (d *Database) GetVolumes() ([]api.Volume, error) {
 	}
 	for _, kv := range resp.Kvs {
 		var vol api.Volume
-		var volSpec api.VolSpec
-		vol.Spec = &volSpec
-		var Metadata api.Metadata
-		vol.Metadata = &Metadata
-		var Status api.Status
-		vol.Status = &Status
-
 		err := json.Unmarshal([]byte(kv.Value), &vol)
 		if err != nil {
 			slog.Error("Unmarshal() failed", "err", err, "key", string(kv.Key))
@@ -305,13 +290,6 @@ func (d *Database) ListVolumes(kind string) ([]api.Volume, error) {
 	}
 	for _, kv := range resp.Kvs {
 		var vol api.Volume
-		var volSpec api.VolSpec
-		vol.Spec = &volSpec
-		var Metadata api.Metadata
-		vol.Metadata = &Metadata
-		var Status api.Status
-		vol.Status = &Status
-
 		err := json.Unmarshal([]byte(kv.Value), &vol)
 		if err != nil {
 			slog.Error("Unmarshal() failed", "err", err, "key", string(kv.Key))

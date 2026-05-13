@@ -46,9 +46,6 @@ func (d *Database) MakeServerEntry(spec api.Server) (api.Server, error) {
 		slog.Error("CreateServer()", "err", err)
 		return api.Server{}, err
 	}
-	if server.Metadata == nil {
-		server.Metadata = &api.Metadata{}
-	}
 
 	//一意なIDを発行
 	var key string
@@ -239,13 +236,10 @@ func (d *Database) AssignNodeToServer(id, nodeName string) error {
 	}
 
 	// 既に NodeName が設定済みの場合はスキップ
-	if server.Metadata != nil && server.Metadata.NodeName != nil && *server.Metadata.NodeName != "" {
+	if server.Metadata.NodeName != nil && *server.Metadata.NodeName != "" {
 		return nil
 	}
 
-	if server.Metadata == nil {
-		server.Metadata = &api.Metadata{}
-	}
 	api.SetServerID(&server, id)
 	server.Metadata.NodeName = util.StringPtr(nodeName)
 

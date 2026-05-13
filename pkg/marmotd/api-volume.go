@@ -16,7 +16,7 @@ import (
 )
 
 func isISCSIDataLVMVolume(volume *api.Volume) bool {
-	if volume == nil || volume.Spec == nil {
+	if volume == nil {
 		return false
 	}
 	return volume.Spec.Type != nil && *volume.Spec.Type == "lvm" &&

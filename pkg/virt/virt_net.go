@@ -14,9 +14,6 @@ import (
 
 func CreateVirtualNetworkXML(net api.VirtualNetwork) (*libvirtxml.Network, error) {
 	// 入力チェック
-	if net.Metadata == nil {
-		return nil, fmt.Errorf("Metadata is required")
-	}
 	if net.Metadata.Name == nil {
 		return nil, fmt.Errorf("Metadata.Name is required")
 	}

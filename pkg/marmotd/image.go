@@ -94,7 +94,7 @@ func (m *Marmot) CreateNewImageManageWithContext(ctx context.Context, id string)
 		return nil, err
 	}
 
-	if image.Spec == nil || image.Spec.SourceUrl == nil || *image.Spec.SourceUrl == "" {
+	if image.Spec.SourceUrl == nil || *image.Spec.SourceUrl == "" {
 		slog.Error("sourceUrl is empty", "imgId", id)
 		return markFailed(fmt.Errorf("sourceUrl is empty: id=%s", id))
 	}
@@ -143,9 +143,6 @@ func (m *Marmot) CreateNewImageManageWithContext(ctx context.Context, id string)
 		return markFailed(wrapDeadlineExceeded(err, "QCOW2 イメージ拡張", CurrentConfig().ImageResizeTimeout()))
 	}
 
-	if image.Spec == nil {
-		image.Spec = &api.ImageSpec{}
-	}
 	image.Spec.Kind = util.StringPtr("os")
 	image.Spec.Type = util.StringPtr("qcow2")
 	image.Spec.Qcow2Path = util.StringPtr(downloadPath)
@@ -207,31 +204,29 @@ func (m *Marmot) DeleteImageManage(id string) error {
 		return err
 	}
 
-	if image.Spec != nil {
-		if image.Spec.LvPath != nil && strings.TrimSpace(*image.Spec.LvPath) != "" {
-			lvPath := strings.TrimSpace(*image.Spec.LvPath)
-			slog.Debug("*** Attempting to remove logical volume ***", "imgId", id, "lvPath", lvPath)
-			if err := runCmd(ctx, "lvdisplay", lvPath); err == nil {
-				for i := 0; i < 10; i++ {
-					err := runCmd(ctx, "lvremove", "-y", lvPath)
-					if err == nil {
-						slog.Debug("Logical volume removed successfully", "imgId", id, "lvPath", lvPath)
-						break
-					}
-					slog.Warn("Failed to remove logical volume, retrying...", "imgId", id, "lvPath", lvPath, "attempt", i+1, "err", err)
-					time.Sleep(3 * time.Second)
+	if image.Spec.LvPath != nil && strings.TrimSpace(*image.Spec.LvPath) != "" {
+		lvPath := strings.TrimSpace(*image.Spec.LvPath)
+		slog.Debug("*** Attempting to remove logical volume ***", "imgId", id, "lvPath", lvPath)
+		if err := runCmd(ctx, "lvdisplay", lvPath); err == nil {
+			for i := 0; i < 10; i++ {
+				err := runCmd(ctx, "lvremove", "-y", lvPath)
+				if err == nil {
+					slog.Debug("Logical volume removed successfully", "imgId", id, "lvPath", lvPath)
+					break
 				}
-			} else {
-				slog.Debug("Logical volume not found, skip remove", "imgId", id, "lvPath", lvPath)
+				slog.Warn("Failed to remove logical volume, retrying...", "imgId", id, "lvPath", lvPath, "attempt", i+1, "err", err)
+				time.Sleep(3 * time.Second)
 			}
+		} else {
+			slog.Debug("Logical volume not found, skip remove", "imgId", id, "lvPath", lvPath)
 		}
+	}
 
-		if image.Spec.Qcow2Path != nil && strings.TrimSpace(*image.Spec.Qcow2Path) != "" {
-			qcowPath := strings.TrimSpace(*image.Spec.Qcow2Path)
-			if err := os.Remove(qcowPath); err != nil && !os.IsNotExist(err) {
-				slog.Error("Failed to remove qcow2 file", "imgId", id, "path", qcowPath, "err", err)
-				return err
-			}
+	if image.Spec.Qcow2Path != nil && strings.TrimSpace(*image.Spec.Qcow2Path) != "" {
+		qcowPath := strings.TrimSpace(*image.Spec.Qcow2Path)
+		if err := os.Remove(qcowPath); err != nil && !os.IsNotExist(err) {
+			slog.Error("Failed to remove qcow2 file", "imgId", id, "path", qcowPath, "err", err)
+			return err
 		}
 	}
 
@@ -251,10 +246,6 @@ func (m *Marmot) UpdateImageManage(id string, image api.Image) error {
 }
 
 func CheckImageBackingStore(image api.Image) error {
-	if image.Spec == nil {
-		return nil
-	}
-
 	missing := make([]string, 0, 2)
 
 	if qcow2Path := strings.TrimSpace(util.OrDefault(image.Spec.Qcow2Path, "")); qcow2Path != "" {
@@ -267,7 +258,7 @@ func CheckImageBackingStore(image api.Image) error {
 		}
 	}
 
-	if lvPath := getImageLogicalVolumePath(image.Spec); lvPath != "" {
+	if lvPath := getImageLogicalVolumePath(&image.Spec); lvPath != "" {
 		if _, err := os.Stat(lvPath); err != nil {
 			if os.IsNotExist(err) {
 				missing = append(missing, fmt.Sprintf("logical volume %s", lvPath))

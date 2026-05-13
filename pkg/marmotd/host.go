@@ -340,7 +340,7 @@ func (m *Marmot) collectHostAllocation() (*api.HostAllocation, error) {
 	for _, server := range servers {
 		// 割当ノード単位で集計する。これにより各ホストの負荷が分離される。
 		if currentNode != "" {
-			if server.Metadata == nil || server.Metadata.NodeName == nil || strings.TrimSpace(*server.Metadata.NodeName) != currentNode {
+			if server.Metadata.NodeName == nil || strings.TrimSpace(*server.Metadata.NodeName) != currentNode {
 				continue
 			}
 		}
@@ -354,13 +354,11 @@ func (m *Marmot) collectHostAllocation() (*api.HostAllocation, error) {
 		case db.SERVER_RUNNING:
 			runningVMs++
 			// 稼働中のサーバーのみCPUとメモリを集計
-			if server.Spec != nil {
-				if server.Spec.Cpu != nil {
-					allocatedCPU += *server.Spec.Cpu
-				}
-				if server.Spec.Memory != nil {
-					allocatedMemory += *server.Spec.Memory
-				}
+			if server.Spec.Cpu != nil {
+				allocatedCPU += *server.Spec.Cpu
+			}
+			if server.Spec.Memory != nil {
+				allocatedMemory += *server.Spec.Memory
 			}
 		case db.SERVER_STOPPED:
 			stoppedVMs++

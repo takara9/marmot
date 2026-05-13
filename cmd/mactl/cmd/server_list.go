@@ -131,7 +131,7 @@ type serverNetworkLine struct {
 }
 
 func serverNetworkLines(server api.Server) []serverNetworkLine {
-	if server.Spec == nil || server.Spec.NetworkInterface == nil || len(*server.Spec.NetworkInterface) == 0 {
+	if server.Spec.NetworkInterface == nil || len(*server.Spec.NetworkInterface) == 0 {
 		return []serverNetworkLine{{address: "N/A", network: "N/A"}}
 	}
 
@@ -158,14 +158,14 @@ func serverNetworkLines(server api.Server) []serverNetworkLine {
 }
 
 func serverDisplayName(server api.Server) string {
-	if server.Metadata != nil && server.Metadata.Name != nil {
+	if server.Metadata.Name != nil {
 		return *server.Metadata.Name
 	}
 	return "N/A"
 }
 
 func serverNodeName(server api.Server) string {
-	if server.Metadata != nil && server.Metadata.NodeName != nil {
+	if server.Metadata.NodeName != nil {
 		return *server.Metadata.NodeName
 	}
 	return "N/A"
@@ -179,14 +179,14 @@ func serverStatusText(server api.Server) string {
 }
 
 func serverCPU(server api.Server) interface{} {
-	if server.Spec != nil && server.Spec.Cpu != nil {
+	if server.Spec.Cpu != nil {
 		return *server.Spec.Cpu
 	}
 	return "N/A"
 }
 
 func serverMemory(server api.Server) interface{} {
-	if server.Spec != nil && server.Spec.Memory != nil {
+	if server.Spec.Memory != nil {
 		return *server.Spec.Memory
 	}
 	return "N/A"

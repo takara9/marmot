@@ -124,12 +124,6 @@ func (d *Database) CreateVirtualNetwork(spec api.VirtualNetwork) (api.VirtualNet
 		slog.Error("CreateVirtualNetwork()", "err", err)
 		return api.VirtualNetwork{}, err
 	}
-	if network.Metadata == nil {
-		network.Metadata = &api.Metadata{}
-	}
-	if network.Spec == nil {
-		network.Spec = &api.VirtualNetworkSpec{}
-	}
 
 	//一意なIDを発行
 	var key string
@@ -244,7 +238,7 @@ func (d *Database) GetVirtualNetworkByName(name string) (api.VirtualNetwork, err
 			continue
 		}
 		normalizeVirtualNetworkID(&network, string(kv.Key))
-		if network.Metadata == nil || network.Metadata.Name == nil || *network.Metadata.Name != name {
+		if network.Metadata.Name == nil || *network.Metadata.Name != name {
 			continue
 		}
 		// フォロワーエントリ（IpNetworkId=nil）は後回しにし、ヘッドエントリを優先して返す。
@@ -485,7 +479,7 @@ func (d *Database) MakeFollowerVirtualNetworkEntry(headNetwork api.VirtualNetwor
 	if headNetworkID == "" {
 		return "", fmt.Errorf("head network id is required")
 	}
-	if headNetwork.Metadata == nil || headNetwork.Metadata.Name == nil || strings.TrimSpace(*headNetwork.Metadata.Name) == "" {
+	if headNetwork.Metadata.Name == nil || strings.TrimSpace(*headNetwork.Metadata.Name) == "" {
 		return "", fmt.Errorf("head network metadata.name is required")
 	}
 
@@ -502,7 +496,7 @@ func (d *Database) MakeFollowerVirtualNetworkEntry(headNetwork api.VirtualNetwor
 		return "", err
 	}
 	for _, n := range networks {
-		if n.Metadata == nil || n.Metadata.NodeName == nil || n.Metadata.Labels == nil {
+		if n.Metadata.NodeName == nil || n.Metadata.Labels == nil {
 			continue
 		}
 		if strings.TrimSpace(*n.Metadata.NodeName) != followerNodeName {
@@ -522,17 +516,13 @@ func (d *Database) MakeFollowerVirtualNetworkEntry(headNetwork api.VirtualNetwor
 	labels := map[string]interface{}{}
 	SetNetworkSyncLabels(labels, "follower", headNetworkID, headNodeName)
 
-	var spec *api.VirtualNetworkSpec
-	if headNetwork.Spec != nil {
-		specCopy, copyErr := util.DeepCopy(*headNetwork.Spec)
-		if copyErr != nil {
-			return "", copyErr
-		}
-		spec = &specCopy
+	spec, copyErr := util.DeepCopy(headNetwork.Spec)
+	if copyErr != nil {
+		return "", copyErr
 	}
 
 	follower := api.VirtualNetwork{
-		Metadata: &api.Metadata{
+		Metadata: api.Metadata{
 			Name:     headNetwork.Metadata.Name,
 			NodeName: util.StringPtr(followerNodeName),
 			Labels:   &labels,
@@ -548,9 +538,7 @@ func (d *Database) MakeFollowerVirtualNetworkEntry(headNetwork api.VirtualNetwor
 	}
 	api.SetVirtualNetworkID(&follower, id)
 
-	if follower.Spec != nil {
-		follower.Spec.IpNetworkId = nil
-	}
+	follower.Spec.IpNetworkId = nil
 
 	key := NetworkPrefix + "/" + id
 	if err := d.PutJSON(key, follower); err != nil {

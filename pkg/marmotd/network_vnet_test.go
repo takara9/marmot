@@ -95,8 +95,8 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 			var net api.VirtualNetwork
 			var meta api.Metadata
 			var spec api.VirtualNetworkSpec
-			net.Metadata = &meta
-			net.Spec = &spec
+			net.Metadata = meta
+			net.Spec = spec
 			net.Metadata.Name = util.StringPtr("test-network")
 			net.Spec.IpAddress = util.StringPtr("192.168.200.0/24")
 			createdNet, err := m.Db.CreateVirtualNetwork(net)
@@ -121,8 +121,8 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 			var net api.VirtualNetwork
 			var meta api.Metadata
 			var spec api.VirtualNetworkSpec
-			net.Metadata = &meta
-			net.Spec = &spec
+			net.Metadata = meta
+			net.Spec = spec
 			net.Metadata.Name = util.StringPtr("test-network2")
 			net.Spec.IpAddress = util.StringPtr("192.168.200.0/24")
 			createdNet, err := m.Db.CreateVirtualNetwork(net)
@@ -151,7 +151,7 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 		It("稼働ネットワークの情報更新", func() {
 			var net api.VirtualNetwork
 			var spec api.VirtualNetworkSpec
-			net.Spec = &spec
+			net.Spec = spec
 			net.Spec.Dhcp = util.BoolPtr(true)
 			err := m.Db.UpdateVirtualNetworkById(networkId1, net)
 			Expect(err).NotTo(HaveOccurred())
@@ -179,8 +179,8 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 			var net api.VirtualNetwork
 			var meta api.Metadata
 			var spec api.VirtualNetworkSpec
-			net.Metadata = &meta
-			net.Spec = &spec
+			net.Metadata = meta
+			net.Spec = spec
 			net.Metadata.Name = util.StringPtr("test-network2")
 			net.Spec.IpAddress = util.StringPtr("192.168.201.0/24")
 			createdNet, err := m.Db.CreateVirtualNetwork(net)

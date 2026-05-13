@@ -1198,7 +1198,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 
 				var defaultVnetID string
 				for _, v := range vnets {
-					if v.Metadata != nil && v.Metadata.Name != nil && *v.Metadata.Name == "test-net-2" {
+					if v.Metadata.Name != nil && *v.Metadata.Name == "test-net-2" {
 						defaultVnetID = api.VirtualNetworkID(v)
 						break
 					}

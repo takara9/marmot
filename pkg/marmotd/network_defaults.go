@@ -13,7 +13,7 @@ const autoVNIStart = 100
 const maxVNI = 16777215
 
 func applyVirtualNetworkDefaults(network *api.VirtualNetwork, cfg *MarmotdConfig, database *db.Database) error {
-	if network == nil || network.Spec == nil {
+	if network == nil {
 		return nil
 	}
 	if network.Spec.OverlayMode == nil {
@@ -59,7 +59,7 @@ func applyVirtualNetworkDefaults(network *api.VirtualNetwork, cfg *MarmotdConfig
 func nextAvailableVNI(networks []api.VirtualNetwork) (int, error) {
 	used := make(map[int]struct{}, len(networks))
 	for _, network := range networks {
-		if network.Spec == nil || network.Spec.Vni == nil {
+		if network.Spec.Vni == nil {
 			continue
 		}
 		vni := *network.Spec.Vni

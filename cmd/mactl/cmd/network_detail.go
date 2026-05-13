@@ -92,8 +92,8 @@ func getRelatedIPNetworks(m *client.MarmotEndpoint, networkId string) ([]api.IPN
 func printNetworkDetails(network api.VirtualNetwork, ipNetworks []api.IPNetwork) {
 	fmt.Println("Network Details")
 	fmt.Printf("  Id:              %s\n", displayID(api.VirtualNetworkID(network)))
-	fmt.Printf("  UUID:            %s\n", metadataString(network.Metadata, func(m *api.Metadata) *string { return m.Uuid }))
-	fmt.Printf("  Name:            %s\n", metadataString(network.Metadata, func(m *api.Metadata) *string { return m.Name }))
+	fmt.Printf("  UUID:            %s\n", metadataString(&network.Metadata, func(m *api.Metadata) *string { return m.Uuid }))
+	fmt.Printf("  Name:            %s\n", metadataString(&network.Metadata, func(m *api.Metadata) *string { return m.Name }))
 	fmt.Printf("  Status:          %s\n", formatNetworkStatus(network.Status))
 	fmt.Printf("  Created At:      %s\n", statusTime(network.Status, func(s *api.Status) *time.Time { return s.CreationTimeStamp }))
 	fmt.Printf("  Last Updated:    %s\n", statusTime(network.Status, func(s *api.Status) *time.Time { return s.LastUpdateTimeStamp }))
@@ -101,18 +101,18 @@ func printNetworkDetails(network api.VirtualNetwork, ipNetworks []api.IPNetwork)
 	fmt.Println()
 
 	fmt.Println("Connectivity")
-	fmt.Printf("  Bridge Name:     %s\n", specString(network.Spec, func(s *api.VirtualNetworkSpec) *string { return s.BridgeName }))
-	fmt.Printf("  Forward Mode:    %s\n", specString(network.Spec, func(s *api.VirtualNetworkSpec) *string { return s.ForwardMode }))
-	fmt.Printf("  IP Address:      %s\n", specString(network.Spec, func(s *api.VirtualNetworkSpec) *string { return s.IpAddress }))
-	fmt.Printf("  Netmask:         %s\n", specString(network.Spec, func(s *api.VirtualNetworkSpec) *string { return s.Netmask }))
-	fmt.Printf("  MAC Address:     %s\n", specString(network.Spec, func(s *api.VirtualNetworkSpec) *string { return s.MacAddress }))
-	fmt.Printf("  DHCP:            %s\n", specBool(network.Spec, func(s *api.VirtualNetworkSpec) *bool { return s.Dhcp }))
+	fmt.Printf("  Bridge Name:     %s\n", specString(&network.Spec, func(s *api.VirtualNetworkSpec) *string { return s.BridgeName }))
+	fmt.Printf("  Forward Mode:    %s\n", specString(&network.Spec, func(s *api.VirtualNetworkSpec) *string { return s.ForwardMode }))
+	fmt.Printf("  IP Address:      %s\n", specString(&network.Spec, func(s *api.VirtualNetworkSpec) *string { return s.IpAddress }))
+	fmt.Printf("  Netmask:         %s\n", specString(&network.Spec, func(s *api.VirtualNetworkSpec) *string { return s.Netmask }))
+	fmt.Printf("  MAC Address:     %s\n", specString(&network.Spec, func(s *api.VirtualNetworkSpec) *string { return s.MacAddress }))
+	fmt.Printf("  DHCP:            %s\n", specBool(&network.Spec, func(s *api.VirtualNetworkSpec) *bool { return s.Dhcp }))
 	fmt.Printf("  DHCP Range:      %s\n", formatRange(
-		specString(network.Spec, func(s *api.VirtualNetworkSpec) *string { return s.DhcpStartAddress }),
-		specString(network.Spec, func(s *api.VirtualNetworkSpec) *string { return s.DhcpEndAddress }),
+		specString(&network.Spec, func(s *api.VirtualNetworkSpec) *string { return s.DhcpStartAddress }),
+		specString(&network.Spec, func(s *api.VirtualNetworkSpec) *string { return s.DhcpEndAddress }),
 	))
-	fmt.Printf("  NAT:             %s\n", specBool(network.Spec, func(s *api.VirtualNetworkSpec) *bool { return s.Nat }))
-	fmt.Printf("  STP:             %s\n", specBool(network.Spec, func(s *api.VirtualNetworkSpec) *bool { return s.Stp }))
+	fmt.Printf("  NAT:             %s\n", specBool(&network.Spec, func(s *api.VirtualNetworkSpec) *bool { return s.Nat }))
+	fmt.Printf("  STP:             %s\n", specBool(&network.Spec, func(s *api.VirtualNetworkSpec) *bool { return s.Stp }))
 	fmt.Println()
 
 	fmt.Println("Related IP Networks")
@@ -140,7 +140,7 @@ func printRelatedIPNetworks(ipNetworks []api.IPNetwork) {
 }
 
 func printNetworkDNS(network api.VirtualNetwork) {
-	name := metadataString(network.Metadata, func(m *api.Metadata) *string { return m.Name })
+	name := metadataString(&network.Metadata, func(m *api.Metadata) *string { return m.Name })
 	if name == "N/A" {
 		fmt.Println("  DNS Name:        N/A")
 		fmt.Println("  Note:            Network name is not set, so DNS subdomain cannot be determined.")
