@@ -171,14 +171,14 @@ func (s *Server) ApiMakeImageEntryFromRunningVMById(ctx echo.Context, serverId s
 	}
 
 	// 新しいイメージ名の有無チェック
-	if image.Metadata.Name == nil || len(*image.Metadata.Name) == 0 {
+	if image.Metadata.Name == "" {
 		slog.Error("Image name is not set, it must set for new image", "err", err)
 		err := fmt.Errorf("Must set image name")
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
 	// イメージ作成の登録
-	if _, err := s.Ma.Db.MakeImageEntryFromRunningVM(api.ServerID(server), *image.Metadata.Name); err != nil {
+	if _, err := s.Ma.Db.MakeImageEntryFromRunningVM(api.ServerID(server), image.Metadata.Name); err != nil {
 		slog.Error("Image name is not set, it must set for new image", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}

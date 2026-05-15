@@ -99,7 +99,7 @@ func (d *Job) EntryJob(name string, cmd ...string) (string, error) {
 	slog.Debug("EntryJob()", "jobId", job.Id, "name", name, "cmd", cmd)
 	x := time.Now()
 	job.Spec.RequestTime = util.TimePtr(x)
-	job.Metadata.Name = util.StringPtr(name)
+	job.Metadata.Name = name
 	for _, c := range cmd {
 		*job.Spec.Command = append(*job.Spec.Command, c)
 	}
@@ -241,7 +241,7 @@ func (d *Job) RunJob(job api.Job) error {
 	}
 	defer file.Close()
 
-	fmt.Fprintf(file, "Job Name: [%v] ID [%v] at %v\n", *job.Metadata.Name, job.Id, *job.Spec.RequestTime)
+	fmt.Fprintf(file, "Job Name: [%v] ID [%v] at %v\n", job.Metadata.Name, job.Id, *job.Spec.RequestTime)
 
 	// ジョブ状態の更新 （ここだけ別関数にして排他制御を入れるのが良いかも）
 	key := JobPrefix + "/" + job.Id

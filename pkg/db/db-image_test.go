@@ -119,7 +119,7 @@ var _ = Describe("Image", Ordered, func() {
 				imgs, err := v.GetImages()
 				Expect(err).NotTo(HaveOccurred())
 				for i, img := range imgs {
-					fmt.Println("Id", util.DerefStrPtr(img.Metadata.Id), "Name", *img.Metadata.Name, "Status", db.ImageStatus[img.Status.StatusCode])
+					fmt.Println("Id", util.DerefStrPtr(img.Metadata.Id), "Name", img.Metadata.Name, "Status", db.ImageStatus[img.Status.StatusCode])
 					ids[i] = util.DerefStrPtr(img.Metadata.Id)
 				}
 			})
@@ -133,7 +133,7 @@ var _ = Describe("Image", Ordered, func() {
 				imgs, err := v.GetImages()
 				Expect(err).NotTo(HaveOccurred())
 				for i, img := range imgs {
-					fmt.Println("Id", util.DerefStrPtr(img.Metadata.Id), "Name", *img.Metadata.Name, "Status", db.ImageStatus[img.Status.StatusCode])
+					fmt.Println("Id", util.DerefStrPtr(img.Metadata.Id), "Name", img.Metadata.Name, "Status", db.ImageStatus[img.Status.StatusCode])
 					ids[i] = util.DerefStrPtr(img.Metadata.Id)
 				}
 			})

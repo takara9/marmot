@@ -70,11 +70,7 @@ var imageListCmd = &cobra.Command{
 				for i, image := range data {
 					fmt.Printf("  %2d", i+1)
 					fmt.Printf("  %1v%-8s", deletionMarker(image.Status), formatID(stringValue(&image.Metadata, func(m *api.Metadata) *string { return m.Id })))
-					if image.Metadata.Name != nil {
-						fmt.Printf("  %-16v", *image.Metadata.Name)
-					} else {
-						fmt.Printf("  %-16v", "N/A")
-					}
+				fmt.Printf("  %-16v", image.Metadata.Name)
 					if image.Status.Status != nil {
 						fmt.Printf("  %-12v", db.ImageStatus[image.Status.StatusCode])
 					} else {

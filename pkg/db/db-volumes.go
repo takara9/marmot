@@ -38,8 +38,8 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 	slog.Debug("CreateVolume2()", "vol", inputVol)
 
 	// ボリュームに名前があれば、その名前でロックする
-	if inputVol.Metadata.Name != nil {
-		lockKey := "/lock/volume/" + *inputVol.Metadata.Name
+	if inputVol.Metadata.Name != "" {
+		lockKey := "/lock/volume/" + inputVol.Metadata.Name
 		mutex, err := d.LockKey(lockKey)
 		if err != nil {
 			slog.Error("failed to lock", "err", err, "key", lockKey)
@@ -86,8 +86,8 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 	volume.Status.Status = util.StringPtr(VolStatus[volume.Status.StatusCode])
 
 	// 指定が無い項目についてデフォルト値を設定する
-	if volume.Metadata.Name == nil {
-		volume.Metadata.Name = util.StringPtr("vol-" + id)
+	if volume.Metadata.Name == "" {
+		volume.Metadata.Name = "vol-" + id
 	}
 	// OSかDATAかの種別で、サイズのデフォルト値を変える
 	if volume.Spec.Kind == nil {
@@ -332,7 +332,7 @@ func (d *Database) FindVolumeByName(name, kind string) ([]api.Volume, error) {
 			slog.Error("Unmarshal() failed", "err", err, "key", string(kv.Key))
 			continue
 		}
-		if vol.Metadata.Name != nil && *vol.Metadata.Name == name {
+		if vol.Metadata.Name == name {
 			if vol.Spec.Kind != nil && *vol.Spec.Kind == kind {
 				volumes = append(volumes, vol)
 			}

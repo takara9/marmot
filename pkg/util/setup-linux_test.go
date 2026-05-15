@@ -71,7 +71,7 @@ var _ = Describe("Linux セットアップ", Ordered, Label("integration", "requ
 		testSpec := api.Server{
 			Metadata: api.Metadata{
 				Id:   util.StringPtr("a123456"),
-				Name: util.StringPtr("test-linux"),
+				Name: "test-linux",
 				Uuid: util.StringPtr("550e8400-e29b-41d4-a716-446655440000"),
 			},
 			Spec: api.ServerSpec{
@@ -101,7 +101,7 @@ var _ = Describe("Linux セットアップ", Ordered, Label("integration", "requ
 		It("ホスト名設定のチェック", func() {
 			data, err := os.ReadFile(mountPoint + "/etc/hostname")
 			Expect(err).To(BeNil())
-			Expect(string(data)).To(Equal(*testSpec.Metadata.Name))
+			Expect(string(data)).To(Equal(testSpec.Metadata.Name))
 		})
 
 		It("Linux hostid設定のチェック", func() {
@@ -133,7 +133,7 @@ var _ = Describe("Linux セットアップ", Ordered, Label("integration", "requ
 		testSpec := api.Server{
 			Metadata: api.Metadata{
 				Id:   util.StringPtr("b123456"),
-				Name: util.StringPtr("test-linux-lvm"),
+				Name: "test-linux-lvm",
 				Uuid: util.StringPtr("550e8400-e29b-41d4-a716-446655440001"),
 			},
 			Spec: api.ServerSpec{
@@ -165,7 +165,7 @@ var _ = Describe("Linux セットアップ", Ordered, Label("integration", "requ
 		It("ホスト名設定のチェック", func() {
 			data, err := os.ReadFile(mountPoint + "/etc/hostname")
 			Expect(err).To(BeNil())
-			Expect(string(data)).To(Equal(*testSpec.Metadata.Name))
+			Expect(string(data)).To(Equal(testSpec.Metadata.Name))
 		})
 
 		It("Linux hostid設定のチェック", func() {
@@ -197,7 +197,7 @@ var _ = Describe("Linux セットアップ", Ordered, Label("integration", "requ
 		testSpec := api.Server{
 			Metadata: api.Metadata{
 				Id:   util.StringPtr("c123456"),
-				Name: util.StringPtr("test-linux-mh"),
+				Name: "test-linux-mh",
 				Uuid: util.StringPtr("550e8400-e29b-41d4-a716-446655440002"),
 			},
 			Spec: api.ServerSpec{
@@ -237,7 +237,7 @@ var _ = Describe("Linux セットアップ", Ordered, Label("integration", "requ
 		It("ホスト名設定のチェック", func() {
 			data, err := os.ReadFile(mountPoint + "/etc/hostname")
 			Expect(err).To(BeNil())
-			Expect(string(data)).To(Equal(*testSpec.Metadata.Name))
+			Expect(string(data)).To(Equal(testSpec.Metadata.Name))
 		})
 
 		It("Linux hostid設定のチェック", func() {
@@ -269,7 +269,7 @@ var _ = Describe("Linux セットアップ", Ordered, Label("integration", "requ
 		testSpec := api.Server{
 			Metadata: api.Metadata{
 				Id:   util.StringPtr("d123456"),
-				Name: util.StringPtr("test-linux-mh"),
+				Name: "test-linux-mh",
 				Uuid: util.StringPtr("550e8400-e29b-41d4-a716-446655440003"),
 			},
 			Spec: api.ServerSpec{
@@ -361,7 +361,7 @@ var _ = Describe("Linux セットアップ", Ordered, Label("integration", "requ
 		It("ホスト名設定のチェック", func() {
 			data, err := os.ReadFile(mountPoint + "/etc/hostname")
 			Expect(err).To(BeNil())
-			Expect(string(data)).To(Equal(*testSpec.Metadata.Name))
+			Expect(string(data)).To(Equal(testSpec.Metadata.Name))
 		})
 
 		It("Linux hostid設定のチェック", func() {

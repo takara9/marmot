@@ -111,8 +111,8 @@ func (d *Database) CreateVirtualNetwork(spec api.VirtualNetwork) (api.VirtualNet
 		return api.VirtualNetwork{}, err
 	}
 	for _, n := range networks {
-		if n.Metadata.Name != nil && spec.Metadata.Name != nil && *n.Metadata.Name == *spec.Metadata.Name {
-			err := fmt.Errorf("network with the same name already exists: %s", *spec.Metadata.Name)
+		if n.Metadata.Name == spec.Metadata.Name {
+			err := fmt.Errorf("network with the same name already exists: %s", spec.Metadata.Name)
 			slog.Error("CreateVirtualNetwork()", "err", err)
 			return api.VirtualNetwork{}, err
 		}
@@ -238,7 +238,7 @@ func (d *Database) GetVirtualNetworkByName(name string) (api.VirtualNetwork, err
 			continue
 		}
 		normalizeVirtualNetworkID(&network, string(kv.Key))
-		if network.Metadata.Name == nil || *network.Metadata.Name != name {
+		if network.Metadata.Name != name {
 			continue
 		}
 		// フォロワーエントリ（IpNetworkId=nil）は後回しにし、ヘッドエントリを優先して返す。
@@ -479,7 +479,7 @@ func (d *Database) MakeFollowerVirtualNetworkEntry(headNetwork api.VirtualNetwor
 	if headNetworkID == "" {
 		return "", fmt.Errorf("head network id is required")
 	}
-	if headNetwork.Metadata.Name == nil || strings.TrimSpace(*headNetwork.Metadata.Name) == "" {
+	if headNetwork.Metadata.Name == "" {
 		return "", fmt.Errorf("head network metadata.name is required")
 	}
 

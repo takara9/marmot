@@ -86,7 +86,7 @@ func init() {
 func printImageDetails(image api.Image) {
 	fmt.Println("Image Details")
 	fmt.Println("Summary")
-	printImageDetailField("Name", stringValue(&image.Metadata, func(m *api.Metadata) *string { return m.Name }))
+	printImageDetailField("Name", image.Metadata.Name)
 	printImageDetailField("Id", formatID(util.DerefStrPtr(image.Metadata.Id)))
 	printImageDetailField("State", formatImageStatus(image.Status))
 	printImageDetailField("Type", stringValue(&image.Spec, func(s *api.ImageSpec) *string { return s.Type }))

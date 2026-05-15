@@ -133,7 +133,7 @@ func formatNetworkListText(data []api.VirtualNetwork) string {
 			i+1,
 			deletionMarker(network.Status),
 			api.VirtualNetworkID(network),
-			stringValue(&network.Metadata, func(m *api.Metadata) *string { return m.Name }),
+			network.Metadata.Name,
 			stringValue(&network.Metadata, func(m *api.Metadata) *string { return m.NodeName }),
 			stringValue(&network.Spec, func(s *api.VirtualNetworkSpec) *string { return s.BridgeName }),
 			stringValue(&network.Spec, func(s *api.VirtualNetworkSpec) *string { return s.IPNetworkAddress }),

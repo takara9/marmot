@@ -22,11 +22,11 @@ var _ = Describe("formatNetworkListText", func() {
 		output := formatNetworkListText([]api.VirtualNetwork{{
 			Metadata: api.Metadata{
 				Id:       strPtr("net01"),
-				Name:     &name,
+				Name: name,
 				NodeName: &nodeName,
 			},
 			Spec: api.VirtualNetworkSpec{
-				BridgeName:       &bridgeName,
+				BridgeName: &bridgeName,
 				IPNetworkAddress: &ipNet,
 			},
 			Status: &api.Status{
@@ -52,7 +52,7 @@ var _ = Describe("formatNetworkListText", func() {
 		output := formatNetworkListText([]api.VirtualNetwork{{
 			Metadata: api.Metadata{
 				Id:   strPtr("net99"),
-				Name: &name,
+				Name: name,
 			},
 			Status: &api.Status{
 				Status:            &statusText,

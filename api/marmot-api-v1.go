@@ -160,7 +160,7 @@ type Metadata struct {
 	InstanceName *string                 `json:"instanceName,omitempty" yaml:"instanceName,omitempty"`
 	Key          *string                 `json:"key,omitempty" yaml:"key,omitempty"`
 	Labels       *map[string]interface{} `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Name         *string                 `json:"name,omitempty" yaml:"name,omitempty"`
+	Name         string                  `json:"name" yaml:"name"`
 	NodeName     *string                 `json:"nodeName,omitempty" yaml:"nodeName,omitempty"`
 	Uuid         *string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }

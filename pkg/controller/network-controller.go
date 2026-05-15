@@ -95,10 +95,7 @@ func (c *controller) networkControllerLoop(fabric networkfabric.NetworkFabric) {
 	for _, vnet := range vnets {
 		vnetID := api.VirtualNetworkID(vnet)
 		if ok, assignedNode, reason := evaluateNodeAssignment(&vnet.Metadata, c.marmot.NodeName); !ok {
-			objectName := ""
-			if vnet.Metadata.Name != nil {
-				objectName = *vnet.Metadata.Name
-			}
+			objectName := vnet.Metadata.Name
 			slog.Debug("別ノード割当の仮想ネットワークをスキップ", "networkId", vnetID, "networkName", objectName, "controllerNode", c.marmot.NodeName, "assignedNode", assignedNode, "reason", reason)
 			continue
 		}
@@ -262,7 +259,7 @@ func networkSyncRole(metadata *api.Metadata) string {
 }
 
 func (c *controller) ensureFollowerNetworksWaiting(headNetwork api.VirtualNetwork) error {
-	if headNetwork.Metadata.Name == nil {
+	if strings.TrimSpace(headNetwork.Metadata.Name) == "" {
 		return nil
 	}
 
@@ -346,10 +343,10 @@ func (c *controller) distributeDeleteIntentToFollowerNetworks(headNetwork api.Vi
 }
 
 func (c *controller) distributeDeleteIntentToSameNameNetworks(sourceNetwork api.VirtualNetwork) error {
-	if sourceNetwork.Metadata.Name == nil {
+	if strings.TrimSpace(sourceNetwork.Metadata.Name) == "" {
 		return nil
 	}
-	targetName := strings.TrimSpace(*sourceNetwork.Metadata.Name)
+	targetName := strings.TrimSpace(sourceNetwork.Metadata.Name)
 	if targetName == "" {
 		return nil
 	}
@@ -363,10 +360,10 @@ func (c *controller) distributeDeleteIntentToSameNameNetworks(sourceNetwork api.
 		if api.VirtualNetworkID(network) == api.VirtualNetworkID(sourceNetwork) {
 			continue
 		}
-		if network.Metadata.Name == nil {
+		if strings.TrimSpace(network.Metadata.Name) == "" {
 			continue
 		}
-		if strings.TrimSpace(*network.Metadata.Name) != targetName {
+		if strings.TrimSpace(network.Metadata.Name) != targetName {
 			continue
 		}
 		if network.Status != nil && network.Status.DeletionTimeStamp != nil {
@@ -456,11 +453,11 @@ func (c *controller) reconcileFollowerActiveNetwork(followerNetwork api.VirtualN
 }
 
 func (c *controller) ensureVirtualNetworkPresent(vnet api.VirtualNetwork) error {
-	if vnet.Metadata.Name == nil || strings.TrimSpace(*vnet.Metadata.Name) == "" {
+	if strings.TrimSpace(vnet.Metadata.Name) == "" {
 		return fmt.Errorf("network metadata.name is required: networkId=%s", api.VirtualNetworkID(vnet))
 	}
 
-	if _, found, err := c.marmot.Virt.GetVirtualNetworkByName(*vnet.Metadata.Name); err == nil && found {
+	if _, found, err := c.marmot.Virt.GetVirtualNetworkByName(vnet.Metadata.Name); err == nil && found {
 		return nil
 	}
 
@@ -482,24 +479,24 @@ func (c *controller) ensureVirtualNetworkPresent(vnet api.VirtualNetwork) error 
 // ensureVirtualNetworkAbsent はフォロワーノードで libvirt ネットワーク実体のみを削除する。
 // DB・IPネットワーク削除はヘッドノードの DeleteVirtualNetwork が担うため、ここでは行わない。
 func (c *controller) ensureVirtualNetworkAbsent(vnet api.VirtualNetwork) error {
-	if vnet.Metadata.Name == nil || strings.TrimSpace(*vnet.Metadata.Name) == "" {
+	if strings.TrimSpace(vnet.Metadata.Name) == "" {
 		return fmt.Errorf("network metadata.name is required: networkId=%s", api.VirtualNetworkID(vnet))
 	}
 
-	_, found, err := c.marmot.Virt.GetVirtualNetworkByName(*vnet.Metadata.Name)
+	_, found, err := c.marmot.Virt.GetVirtualNetworkByName(vnet.Metadata.Name)
 	if err != nil || !found {
 		// 既に存在しない場合は何もしない
 		return nil
 	}
 
-	if err := c.marmot.Virt.DeleteVirtualNetwork(*vnet.Metadata.Name); err != nil {
+	if err := c.marmot.Virt.DeleteVirtualNetwork(vnet.Metadata.Name); err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "not found") {
 			return nil
 		}
 		return err
 	}
 
-	slog.Debug("フォロワーノードで仮想ネットワーク実体を削除", "networkId", api.VirtualNetworkID(vnet), "networkName", *vnet.Metadata.Name, "controllerNode", c.marmot.NodeName)
+	slog.Debug("フォロワーノードで仮想ネットワーク実体を削除", "networkId", api.VirtualNetworkID(vnet), "networkName", vnet.Metadata.Name, "controllerNode", c.marmot.NodeName)
 	return nil
 }
 
@@ -536,11 +533,11 @@ func (c *controller) ensureVxlanMeshForNetwork(fabric networkfabric.NetworkFabri
 }
 
 func (c *controller) resolveVxlanPeerIPs(vnet api.VirtualNetwork) ([]string, error) {
-	if vnet.Metadata.Name == nil {
+	if strings.TrimSpace(vnet.Metadata.Name) == "" {
 		return nil, fmt.Errorf("network metadata.name is required: networkId=%s", api.VirtualNetworkID(vnet))
 	}
 
-	targetName := strings.TrimSpace(*vnet.Metadata.Name)
+	targetName := strings.TrimSpace(vnet.Metadata.Name)
 	if targetName == "" {
 		return nil, fmt.Errorf("network metadata.name is empty: networkId=%s", api.VirtualNetworkID(vnet))
 	}
@@ -570,10 +567,10 @@ func (c *controller) resolveVxlanPeerIPs(vnet api.VirtualNetwork) ([]string, err
 	selfNode := strings.TrimSpace(c.marmot.NodeName)
 	peerSet := map[string]struct{}{}
 	for _, n := range networks {
-		if n.Metadata.Name == nil || n.Metadata.NodeName == nil {
+		if strings.TrimSpace(n.Metadata.Name) == "" || n.Metadata.NodeName == nil {
 			continue
 		}
-		if strings.TrimSpace(*n.Metadata.Name) != targetName {
+		if strings.TrimSpace(n.Metadata.Name) != targetName {
 			continue
 		}
 		if n.Status != nil && n.Status.StatusCode == db.NETWORK_DELETING {

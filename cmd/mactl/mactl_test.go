@@ -132,7 +132,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			err = json.Unmarshal(stdoutStderr, &volume)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(*volume.Metadata.Name).To(Equal("test-volume1"))
+			Expect(volume.Metadata.Name).To(Equal("test-volume1"))
 			Expect(*volume.Spec.Size).To(Equal(int(2)))
 			volumeID = api.VolumeID(volume)
 			fmt.Println("Volume ID:", volumeID)
@@ -179,7 +179,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			err = json.Unmarshal(stdoutStderr, &volume)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(*volume.Metadata.Name).To(Equal("test-volume2"))
+			Expect(volume.Metadata.Name).To(Equal("test-volume2"))
 			Expect(*volume.Spec.Size).To(Equal(int(2)))
 			volumeID = api.VolumeID(volume)
 			fmt.Println("Volume ID:", volumeID)
@@ -238,7 +238,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			err = json.Unmarshal(stdoutStderr, &volume)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(*volume.Metadata.Name).To(Equal("test-volume3"))
+			Expect(volume.Metadata.Name).To(Equal("test-volume3"))
 			Expect(*volume.Spec.Size).To(Equal(int(16)))
 			volumeID3 = api.VolumeID(volume)
 			fmt.Println("Volume ID:", volumeID3)
@@ -255,7 +255,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			err = json.Unmarshal(stdoutStderr, &volume)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(*volume.Metadata.Name).To(Equal("test-volume4"))
+			Expect(volume.Metadata.Name).To(Equal("test-volume4"))
 			Expect(*volume.Spec.Size).To(Equal(int(16)))
 			volumeID4 = api.VolumeID(volume)
 			fmt.Println("Volume ID:", volumeID4)
@@ -274,7 +274,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 				}
 				GinkgoWriter.Println("Retrieved volumes:")
 				for _, v := range volumes {
-					GinkgoWriter.Printf("  - %s (%s)\n", *v.Metadata.Name, api.VolumeID(v))
+					GinkgoWriter.Printf("  - %s (%s)\n", v.Metadata.Name, api.VolumeID(v))
 				}
 				// ボリュームがエラー状態になるまで待つ
 				g.Expect(volumes).To(HaveLen(2))
@@ -314,7 +314,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 				}
 				GinkgoWriter.Println("Retrieved volumes:")
 				for _, v := range volumes {
-					GinkgoWriter.Printf("  - %s (%s)\n", *v.Metadata.Name, api.VolumeID(v))
+					GinkgoWriter.Printf("  - %s (%s)\n", v.Metadata.Name, api.VolumeID(v))
 				}
 				// ボリュームがエラー状態になるまで待つ
 				g.Expect(volumes).To(HaveLen(0))
@@ -352,7 +352,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			err = json.Unmarshal(stdoutStderr, &volume)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(*volume.Metadata.Name).To(Equal("test-origine"))
+			Expect(volume.Metadata.Name).To(Equal("test-origine"))
 			Expect(*volume.Spec.Size).To(Equal(int(2)))
 			volumeID = api.VolumeID(volume)
 			fmt.Println("Volume ID:", volumeID)
@@ -379,7 +379,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			var volume api.Volume
 			err = json.Unmarshal(stdoutStderr, &volume)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(*volume.Metadata.Name).To(Equal("NEW-NAME"))
+			Expect(volume.Metadata.Name).To(Equal("NEW-NAME"))
 
 			By("ボリューム名変更後も metadata.nodeName が保持されることを確認")
 			cmdDetail := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "volume", "detail", volumeID, "--output", "json")
@@ -494,7 +494,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			err = json.Unmarshal(stdoutStderr, &volume)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(*volume.Metadata.Name).To(Equal("boot-volume1"))
+			Expect(volume.Metadata.Name).To(Equal("boot-volume1"))
 			Expect(*volume.Spec.Size).To(Equal(int(16)))
 			volumeID3 = api.VolumeID(volume)
 			fmt.Println("Volume ID:", volumeID3)
@@ -511,7 +511,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			err = json.Unmarshal(stdoutStderr, &volume)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(*volume.Metadata.Name).To(Equal("test-volume2"))
+			Expect(volume.Metadata.Name).To(Equal("test-volume2"))
 			Expect(*volume.Spec.Size).To(Equal(int(16)))
 			volumeID4 = api.VolumeID(volume)
 			fmt.Println("Volume ID:", volumeID4)

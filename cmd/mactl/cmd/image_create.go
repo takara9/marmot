@@ -37,7 +37,7 @@ var imageCreateCmd = &cobra.Command{
 			return fmt.Errorf("kind is required in the configuration")
 		}
 
-		if image.Metadata.Name == nil || *image.Metadata.Name == "" {
+		if image.Metadata.Name == "" {
 			return fmt.Errorf("Metadata.name is required in the configuration")
 		}
 		if image.Spec.SourceUrl == nil || *image.Spec.SourceUrl == "" {

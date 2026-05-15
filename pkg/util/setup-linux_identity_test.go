@@ -60,7 +60,7 @@ func TestHostIDBytes_DeterministicAndDistinct(t *testing.T) {
 func TestHostnameForServer_UsesMetadataName(t *testing.T) {
 	id := "sv-001"
 	name := "test-vm"
-	spec := api.Server{Metadata: api.Metadata{Id: &id, Name: &name}}
+	spec := api.Server{Metadata: api.Metadata{Id: &id, Name: name}}
 
 	got := hostnameForServer(spec)
 	if got != "test-vm" {

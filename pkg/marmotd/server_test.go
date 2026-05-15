@@ -195,7 +195,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			var meta api.Metadata
 			var spec api.ServerSpec
 			var err error
-			meta.Name = util.StringPtr("test-vm-1")
+			meta.Name = "test-vm-1"
 			virtualServer.Metadata = meta
 			virtualServer.Spec = spec
 			virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
@@ -215,8 +215,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			GinkgoWriter.Println("取得する仮想サーバーID:", vm1Id)
 			sv, err := marmotServer.Ma.GetServerManage(vm1Id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
-			Expect(*sv.Metadata.Name).To(Equal("test-vm-1"))
+			GinkgoWriter.Println("サーバー名: ", sv.Metadata.Name)
+			Expect(sv.Metadata.Name).To(Equal("test-vm-1"))
 			data, err := json.MarshalIndent(sv, "", "  ")
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("サーバー情報: ", string(data))
@@ -261,7 +261,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			virtualServer.Spec = spec
 
 			By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
-			meta.Name = util.StringPtr("test-vm-2")
+			meta.Name = "test-vm-2"
 			virtualServer.Metadata = meta
 
 			By("NICの接続先ネットワークを設定")
@@ -275,7 +275,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			virtualServer.Spec.Storage = &[]api.Volume{
 				{
 					Metadata: api.Metadata{
-						Name: util.StringPtr("data-disk-1"),
+						Name: "data-disk-1",
 					},
 					Spec: api.VolSpec{
 						Type: util.StringPtr("qcow2"),
@@ -285,7 +285,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				},
 				{
 					Metadata: api.Metadata{
-						Name: util.StringPtr("data-disk-2"),
+						Name: "data-disk-2",
 					},
 					Spec: api.VolSpec{
 						Type: util.StringPtr("qcow2"),
@@ -326,8 +326,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			GinkgoWriter.Println("取得する仮想サーバーID:", vm2Id)
 			sv, err := marmotServer.Ma.GetServerManage(vm2Id)
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
-			Expect(*sv.Metadata.Name).To(Equal("test-vm-2"))
+			GinkgoWriter.Println("サーバー名: ", sv.Metadata.Name)
+			Expect(sv.Metadata.Name).To(Equal("test-vm-2"))
 			data, err := json.MarshalIndent(sv, "", "  ")
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("サーバー情報: ", string(data))
@@ -382,7 +382,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				virtualServer.Spec.BootVolume = &bootVol
 				var err error
 
-				virtualServer.Metadata.Name = util.StringPtr("test-vm-3")
+				virtualServer.Metadata.Name = "test-vm-3"
 				virtualServer.Spec.BootVolume.Spec.Type = util.StringPtr("lvm")
 				virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
 					{
@@ -403,11 +403,11 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				GinkgoWriter.Println("取得する仮想サーバーID:", id)
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
+				GinkgoWriter.Println("サーバー名: ", sv.Metadata.Name)
 				data, err := json.MarshalIndent(sv, "", "  ")
 				Expect(err).NotTo(HaveOccurred())
 				fmt.Println("サーバー情報: ", string(data))
-				Expect(*sv.Metadata.Name).To(Equal("test-vm-3"))
+				Expect(sv.Metadata.Name).To(Equal("test-vm-3"))
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 			})
 
@@ -447,7 +447,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				bootVol.Spec = specVol
 
 				By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
-				meta.Name = util.StringPtr("test-vm-4")
+				meta.Name = "test-vm-4"
 				virtualServer.Metadata = meta
 
 				By("NICの接続先ネットワークを設定")
@@ -465,7 +465,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				virtualServer.Spec.Storage = &[]api.Volume{
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-1"),
+							Name: "data-disk-1",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
@@ -475,7 +475,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					},
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-2"),
+							Name: "data-disk-2",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
@@ -497,8 +497,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				GinkgoWriter.Println("取得する仮想サーバーID:", id)
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
-				Expect(*sv.Metadata.Name).To(Equal("test-vm-4"))
+				GinkgoWriter.Println("サーバー名: ", sv.Metadata.Name)
+				Expect(sv.Metadata.Name).To(Equal("test-vm-4"))
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 			})
 
@@ -539,7 +539,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				bootVol.Spec = specVol
 
 				By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
-				virtualServer.Metadata.Name = util.StringPtr("test-vm-5")
+				virtualServer.Metadata.Name = "test-vm-5"
 
 				By("NICの接続先ネットワークを設定")
 				virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
@@ -556,7 +556,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				virtualServer.Spec.Storage = &[]api.Volume{
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-1"),
+							Name: "data-disk-1",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
@@ -566,7 +566,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					},
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-2"),
+							Name: "data-disk-2",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("qcow2"),
@@ -588,8 +588,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				GinkgoWriter.Println("取得する仮想サーバーID:", id)
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
-				Expect(*sv.Metadata.Name).To(Equal("test-vm-5"))
+				GinkgoWriter.Println("サーバー名: ", sv.Metadata.Name)
+				Expect(sv.Metadata.Name).To(Equal("test-vm-5"))
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 			})
 
@@ -630,7 +630,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				virtualServer.Spec.BootVolume = &bootVol
 
 				By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
-				meta.Name = util.StringPtr("test-vm-6")
+				meta.Name = "test-vm-6"
 				virtualServer.Metadata = meta
 
 				By("NICの接続先ネットワークを設定")
@@ -647,7 +647,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				virtualServer.Spec.Storage = &[]api.Volume{
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-1"),
+							Name: "data-disk-1",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("qcow2"),
@@ -657,7 +657,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					},
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-2"),
+							Name: "data-disk-2",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("qcow2"),
@@ -667,7 +667,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					},
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-3"),
+							Name: "data-disk-3",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("qcow2"),
@@ -677,7 +677,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					},
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-4"),
+							Name: "data-disk-4",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("qcow2"),
@@ -687,7 +687,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					},
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-5"),
+							Name: "data-disk-5",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("qcow2"),
@@ -697,7 +697,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					},
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-6"),
+							Name: "data-disk-6",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("qcow2"),
@@ -707,7 +707,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					},
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-7"),
+							Name: "data-disk-7",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("qcow2"),
@@ -717,7 +717,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					},
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-8"),
+							Name: "data-disk-8",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("qcow2"),
@@ -727,7 +727,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					},
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-9"),
+							Name: "data-disk-9",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("qcow2"),
@@ -737,7 +737,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					},
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-10"),
+							Name: "data-disk-10",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("qcow2"),
@@ -758,8 +758,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				GinkgoWriter.Println("取得する仮想サーバーID:", id)
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
-				Expect(*sv.Metadata.Name).To(Equal("test-vm-6"))
+				GinkgoWriter.Println("サーバー名: ", sv.Metadata.Name)
+				Expect(sv.Metadata.Name).To(Equal("test-vm-6"))
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 			})
 
@@ -800,7 +800,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				virtualServer.Spec.BootVolume = &bootVol
 
 				By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
-				meta.Name = util.StringPtr("test-vm-7")
+				meta.Name = "test-vm-7"
 				virtualServer.Metadata = meta
 
 				By("NICの接続先ネットワークを設定")
@@ -816,7 +816,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				virtualServer.Spec.Storage = &[]api.Volume{
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-1"),
+							Name: "data-disk-1",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
@@ -826,7 +826,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					},
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-2"),
+							Name: "data-disk-2",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
@@ -836,7 +836,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					},
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-3"),
+							Name: "data-disk-3",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
@@ -846,7 +846,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					},
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-4"),
+							Name: "data-disk-4",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
@@ -856,7 +856,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					},
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-5"),
+							Name: "data-disk-5",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
@@ -866,7 +866,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					},
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-6"),
+							Name: "data-disk-6",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
@@ -876,7 +876,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					},
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-7"),
+							Name: "data-disk-7",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
@@ -886,7 +886,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					},
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-8"),
+							Name: "data-disk-8",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
@@ -896,7 +896,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					},
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-9"),
+							Name: "data-disk-9",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
@@ -906,7 +906,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					},
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-10"),
+							Name: "data-disk-10",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
@@ -927,8 +927,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				GinkgoWriter.Println("取得する仮想サーバーID:", id)
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
-				Expect(*sv.Metadata.Name).To(Equal("test-vm-7"))
+				GinkgoWriter.Println("サーバー名: ", sv.Metadata.Name)
+				Expect(sv.Metadata.Name).To(Equal("test-vm-7"))
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status)
 			})
 
@@ -960,7 +960,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			It("DATA論理ボリュームの生成1", func() {
 				v := api.Volume{
 					Metadata: api.Metadata{
-						Name: ut.StringPtr("precreated-volume-001"),
+						Name: "precreated-volume-001",
 					},
 					Spec: api.VolSpec{
 						Size: ut.IntPtrInt(100),
@@ -978,7 +978,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			It("DATA論理ボリュームの生成2", func() {
 				v := api.Volume{
 					Metadata: api.Metadata{
-						Name: ut.StringPtr("precreated-volume-002"),
+						Name: "precreated-volume-002",
 					},
 					Spec: api.VolSpec{
 						Size: ut.IntPtrInt(200),
@@ -1002,7 +1002,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				var err error
 
 				By("仮想サーバーのホスト名を設定、OSへの設定は未実装")
-				meta.Name = util.StringPtr(hostname)
+				meta.Name = hostname
 				virtualServer.Metadata = meta
 
 				By("NICの接続先ネットワークを設定")
@@ -1035,8 +1035,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				GinkgoWriter.Println("取得する仮想サーバーID:", serverId)
 				sv, err := marmotServer.Ma.GetServerById(serverId)
 				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
-				Expect(*sv.Metadata.Name).To(Equal(hostname))
+				GinkgoWriter.Println("サーバー名: ", sv.Metadata.Name)
+				Expect(sv.Metadata.Name).To(Equal(hostname))
 				GinkgoWriter.Println("サーバーステータス: ", *sv.Status.Status)
 			})
 
@@ -1076,7 +1076,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				virtualServer.Spec = spec
 				var err error
 
-				meta.Name = util.StringPtr("test-vm-9")
+				meta.Name = "test-vm-9"
 				virtualServer.Metadata = meta
 				virtualServer.Spec.NetworkInterface = &[]api.NetworkInterface{
 					{
@@ -1092,7 +1092,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				spec.Storage = &[]api.Volume{
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-1"),
+							Name: "data-disk-1",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
@@ -1102,7 +1102,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					},
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-2"),
+							Name: "data-disk-2",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
@@ -1112,7 +1112,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 					},
 					{
 						Metadata: api.Metadata{
-							Name: util.StringPtr("data-disk-3"),
+							Name: "data-disk-3",
 						},
 						Spec: api.VolSpec{
 							Type: util.StringPtr("lvm"),
@@ -1134,8 +1134,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				GinkgoWriter.Println("取得する仮想サーバーID:", id)
 				sv, err := marmotServer.Ma.GetServerById(id)
 				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Println("サーバー名: ", *sv.Metadata.Name)
-				Expect(*sv.Metadata.Name).To(Equal("test-vm-9"))
+				GinkgoWriter.Println("サーバー名: ", sv.Metadata.Name)
+				Expect(sv.Metadata.Name).To(Equal("test-vm-9"))
 				data, err := json.MarshalIndent(sv, "", "  ")
 				Expect(err).NotTo(HaveOccurred())
 				fmt.Println("サーバー情報: ", string(data))

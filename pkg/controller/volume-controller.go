@@ -77,10 +77,7 @@ func (c *controller) volumeControllerLoop() {
 	for _, vol := range vols {
 		volID := api.VolumeID(vol)
 		if ok, assignedNode, reason := evaluateNodeAssignment(&vol.Metadata, c.marmot.NodeName); !ok {
-			objectName := ""
-			if vol.Metadata.Name != nil {
-				objectName = *vol.Metadata.Name
-			}
+			objectName := vol.Metadata.Name
 			slog.Debug("別ノード割当のボリュームをスキップ", "volumeId", volID, "volumeName", objectName, "controllerNode", c.marmot.NodeName, "assignedNode", assignedNode, "reason", reason)
 			slog.Debug("ボリュームの詳細情報", "volumeId", volID, "volumeName", objectName, "metadata", vol.Metadata, "status", vol.Status)
 			continue
@@ -117,7 +114,7 @@ func (c *controller) volumeControllerLoop() {
 			}
 		}
 
-		slog.Debug("ボリュームの情報", "volId", volID, "volName", *vol.Metadata.Name, "volStatus", *vol.Status.Status)
+		slog.Debug("ボリュームの情報", "volId", volID, "volName", vol.Metadata.Name, "volStatus", *vol.Status.Status)
 		switch vol.Status.StatusCode {
 		case db.VOLUME_PENDING:
 			slog.Debug("待ち状態のボリュームを処理", "volId", volID)

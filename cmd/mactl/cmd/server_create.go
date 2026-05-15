@@ -29,7 +29,7 @@ func resolveVolumeIdByName(m *client.MarmotEndpoint, name string) (string, error
 	}
 	var matched []api.Volume
 	for _, v := range volumes {
-		if v.Metadata.Name != nil && *v.Metadata.Name == name {
+		if v.Metadata.Name == name {
 			matched = append(matched, v)
 		}
 	}
@@ -67,7 +67,7 @@ var serverCreateCmd = &cobra.Command{
 		}
 
 		// Metadata.name は必須
-		if virtualServer.Metadata.Name == nil || *virtualServer.Metadata.Name == "" {
+		if virtualServer.Metadata.Name == "" {
 			return fmt.Errorf("Metadata.name is required in the configuration")
 		}
 
@@ -75,19 +75,19 @@ var serverCreateCmd = &cobra.Command{
 			// bootVolume の名前解決と既定値設定
 			if virtualServer.Spec.BootVolume != nil {
 				bv := virtualServer.Spec.BootVolume
-				if api.VolumeID(*bv) == "" && bv.Spec.Type == nil && bv.Spec.Kind == nil && bv.Spec.Size == nil && bv.Spec.OsVariant == nil && bv.Spec.Path == nil && bv.Metadata.Name != nil && *bv.Metadata.Name != "" {
-					// id 未設定・Spec 無し・名前あり → 名前でボリューム検索
-					pvId, err := resolveVolumeIdByName(m, *bv.Metadata.Name)
+			if api.VolumeID(*bv) == "" && bv.Spec.Type == nil && bv.Spec.Kind == nil && bv.Spec.Size == nil && bv.Spec.OsVariant == nil && bv.Spec.Path == nil && bv.Metadata.Name != "" {
+				// id 未設定・Spec 無し・名前あり → 名前でボリューム検索
+				pvId, err := resolveVolumeIdByName(m, bv.Metadata.Name)
 					if err != nil {
 						fmt.Fprintln(os.Stderr, "bootVolume:", err)
 						return err
 					}
 					api.SetVolumeID(bv, pvId)
-				} else if api.VolumeID(*bv) == "" {
-					// 新規ボリューム：名前未設定なら "boot" をデフォルトに
-					if bv.Metadata.Name == nil {
-						bv.Metadata.Name = util.StringPtr("boot")
-					}
+				   } else if api.VolumeID(*bv) == "" {
+					   // 新規ボリューム：名前未設定なら "boot" をデフォルトに
+					   if bv.Metadata.Name == "" {
+						   bv.Metadata.Name = "boot"
+					   }
 				}
 			}
 
@@ -95,9 +95,9 @@ var serverCreateCmd = &cobra.Command{
 			if virtualServer.Spec.Storage != nil {
 				for i := range *virtualServer.Spec.Storage {
 					vol := &(*virtualServer.Spec.Storage)[i]
-					if api.VolumeID(*vol) == "" && vol.Spec.Type == nil && vol.Spec.Kind == nil && vol.Spec.Size == nil && vol.Spec.OsVariant == nil && vol.Spec.Path == nil && vol.Metadata.Name != nil && *vol.Metadata.Name != "" {
+					if api.VolumeID(*vol) == "" && vol.Spec.Type == nil && vol.Spec.Kind == nil && vol.Spec.Size == nil && vol.Spec.OsVariant == nil && vol.Spec.Path == nil && vol.Metadata.Name != "" {
 						// id 未設定・Spec 無し・名前あり → 名前でボリューム検索
-						pvId, err := resolveVolumeIdByName(m, *vol.Metadata.Name)
+						pvId, err := resolveVolumeIdByName(m, vol.Metadata.Name)
 						if err != nil {
 							fmt.Fprintf(os.Stderr, "Storage[%d]: %v\n", i, err)
 							return err

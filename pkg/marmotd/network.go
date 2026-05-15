@@ -43,7 +43,7 @@ func (m *Marmot) GetVirtualNetworksAndPutDB() ([]api.VirtualNetwork, error) {
 			slog.Error("Failed to get virtual network name", "err", err)
 			continue
 		}
-		net.Metadata.Name = util.StringPtr(name)
+		net.Metadata.Name = name
 
 		// uuid
 		uuid, err := n.GetUUIDString()
@@ -208,7 +208,7 @@ func (m *Marmot) DeleteVirtualNetwork(networkId string) error {
 		return err
 	}
 
-	fmt.Println("==== Deleting virtual network:", *vnet.Metadata.Name, "====")
+	fmt.Println("==== Deleting virtual network:", vnet.Metadata.Name, "====")
 	jsonBytes, err := json.MarshalIndent(vnet, "", "  ")
 	if err != nil {
 		slog.Error("Failed to marshal virtual network for deletion", "err", err)
@@ -234,7 +234,7 @@ func (m *Marmot) DeleteVirtualNetwork(networkId string) error {
 
 	// 実態を先に消す
 	// 仮想ネットワークの実態　削除処理を実装
-	if err := m.Virt.DeleteVirtualNetwork(*vnet.Metadata.Name); err != nil {
+	if err := m.Virt.DeleteVirtualNetwork(vnet.Metadata.Name); err != nil {
 		m.Db.UpdateVirtualNetworkStatus(networkId, db.NETWORK_ERROR)
 		slog.Error("Failed to delete virtual network", "err", err)
 		return err
@@ -274,7 +274,7 @@ func (m *Marmot) CheckVirtualNetworks() error {
 	}
 	for _, vnet := range vNetworks {
 		vnetID := api.VirtualNetworkID(vnet)
-		_, found, err := m.Virt.GetVirtualNetworkByName(*vnet.Metadata.Name)
+		_, found, err := m.Virt.GetVirtualNetworkByName(vnet.Metadata.Name)
 		if err != nil {
 			slog.Error("Error checking virtual network existence", "err", err, "networkId", vnetID)
 			if !found {
@@ -314,10 +314,10 @@ func (m *Marmot) CheckVirtualNetworks() error {
 		}
 
 		// 同じ名前のネットワークが既にETCDに登録されている場合は、何もしない。
-		_, err = m.Db.GetVirtualNetworkByName(*vnet.Metadata.Name)
+		_, err = m.Db.GetVirtualNetworkByName(vnet.Metadata.Name)
 		if err != nil {
 			if err != db.ErrNotFound {
-				slog.Error("Failed to check existing virtual network in ETCD", "err", err, "networkName", *vnet.Metadata.Name)
+				slog.Error("Failed to check existing virtual network in ETCD", "err", err, "networkName", vnet.Metadata.Name)
 				continue
 			}
 		}
@@ -357,7 +357,7 @@ func convertLibvirtNetworkToAPINetwork(libnet libvirt.Network) (*api.VirtualNetw
 		slog.Error("Failed to get virtual network name", "err", err)
 		return nil, err
 	}
-	net.Metadata.Name = util.StringPtr(name)
+	net.Metadata.Name = name
 
 	// uuid
 	uuid, err := libnet.GetUUIDString()

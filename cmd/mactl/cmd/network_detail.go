@@ -93,7 +93,7 @@ func printNetworkDetails(network api.VirtualNetwork, ipNetworks []api.IPNetwork)
 	fmt.Println("Network Details")
 	fmt.Printf("  Id:              %s\n", displayID(api.VirtualNetworkID(network)))
 	fmt.Printf("  UUID:            %s\n", metadataString(&network.Metadata, func(m *api.Metadata) *string { return m.Uuid }))
-	fmt.Printf("  Name:            %s\n", metadataString(&network.Metadata, func(m *api.Metadata) *string { return m.Name }))
+	fmt.Printf("  Name:            %s\n", network.Metadata.Name)
 	fmt.Printf("  Status:          %s\n", formatNetworkStatus(network.Status))
 	fmt.Printf("  Created At:      %s\n", statusTime(network.Status, func(s *api.Status) *time.Time { return s.CreationTimeStamp }))
 	fmt.Printf("  Last Updated:    %s\n", statusTime(network.Status, func(s *api.Status) *time.Time { return s.LastUpdateTimeStamp }))
@@ -140,8 +140,8 @@ func printRelatedIPNetworks(ipNetworks []api.IPNetwork) {
 }
 
 func printNetworkDNS(network api.VirtualNetwork) {
-	name := metadataString(&network.Metadata, func(m *api.Metadata) *string { return m.Name })
-	if name == "N/A" {
+	name := network.Metadata.Name
+	if name == "" {
 		fmt.Println("  DNS Name:        N/A")
 		fmt.Println("  Note:            Network name is not set, so DNS subdomain cannot be determined.")
 		return

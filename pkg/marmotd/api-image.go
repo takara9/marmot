@@ -38,7 +38,7 @@ func (s *Server) ApiCreateImage(ctx echo.Context) error {
 		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: "SourceUrl is required"})
 	}
 	// 名前の設定チェック
-	if imageSpec.Metadata.Name == nil {
+	if imageSpec.Metadata.Name == "" {
 		slog.Error("ApiCreateImage()", "err", "Name is required")
 		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: "Name is required"})
 	}
@@ -109,11 +109,11 @@ func (s *Server) ApiDeleteImageById(ctx echo.Context, id string) error {
 		}
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-	if target.Metadata.Name == nil {
+	if target.Metadata.Name == "" {
 		slog.Error("ApiDeleteImageById() image name is empty", "id", id)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: "image name is empty"})
 	}
-	targetName := *target.Metadata.Name
+	targetName := target.Metadata.Name
 
 	// 同じ IMAGE-NAME を持つ全イメージに削除タイムスタンプをセット
 	allImages, err := s.Ma.Db.GetImages()
@@ -122,7 +122,7 @@ func (s *Server) ApiDeleteImageById(ctx echo.Context, id string) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 	for _, img := range allImages {
-		if img.Metadata.Name == nil || *img.Metadata.Name != targetName {
+		if img.Metadata.Name == "" || img.Metadata.Name != targetName {
 			continue
 		}
 		if img.Status != nil && img.Status.DeletionTimeStamp != nil {
