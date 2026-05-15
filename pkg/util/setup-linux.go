@@ -84,11 +84,9 @@ func SetupLinux(spec api.Server) error {
 }
 
 func hostnameForServer(spec api.Server) string {
-	if spec.Metadata.Name != "" {
-		name := strings.TrimSpace(spec.Metadata.Name)
-		if name != "" {
-			return name
-		}
+	name := strings.TrimSpace(spec.Metadata.Name)
+	if name != "" {
+		return name
 	}
 
 	id := strings.TrimSpace(api.ServerID(spec))
@@ -110,7 +108,7 @@ func machineIDForServer(spec api.Server) string {
 	}
 
 	seed := strings.TrimSpace(api.ServerID(spec))
-	if seed == "" && spec.Metadata.Name != "" {
+	if seed == "" {
 		seed = strings.TrimSpace(spec.Metadata.Name)
 	}
 	if seed == "" {

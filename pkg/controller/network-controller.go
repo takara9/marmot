@@ -117,8 +117,8 @@ func (c *controller) networkControllerLoop(fabric networkfabric.NetworkFabric) {
 		}
 		//fmt.Println("======================================================")
 		//fmt.Println("仮想ネットワーク: ", "ID=", vnet.Id)
-		//if vnet.Metadata != nil && vnet.Metadata.Name != nil {
-		//	fmt.Println("ネットワーク 名前=", *vnet.Metadata.Name)
+		//if strings.TrimSpace(vnet.Metadata.Name) != "" {
+		//	fmt.Println("ネットワーク 名前=", vnet.Metadata.Name)
 		//}
 		//byte, err := json.MarshalIndent(vnet, "", "  ")
 		//if err != nil {

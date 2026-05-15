@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
@@ -171,14 +172,15 @@ func (s *Server) ApiMakeImageEntryFromRunningVMById(ctx echo.Context, serverId s
 	}
 
 	// 新しいイメージ名の有無チェック
-	if image.Metadata.Name == "" {
+	imageName := strings.TrimSpace(image.Metadata.Name)
+	if imageName == "" {
 		slog.Error("Image name is not set, it must set for new image", "err", err)
 		err := fmt.Errorf("Must set image name")
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
 	// イメージ作成の登録
-	if _, err := s.Ma.Db.MakeImageEntryFromRunningVM(api.ServerID(server), image.Metadata.Name); err != nil {
+	if _, err := s.Ma.Db.MakeImageEntryFromRunningVM(api.ServerID(server), imageName); err != nil {
 		slog.Error("Image name is not set, it must set for new image", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}

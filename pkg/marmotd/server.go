@@ -547,14 +547,14 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		return "", err
 	}
 
-	       slog.Debug("ハイパーバイザーのリソース確保")
-	       //var virtSpec virt.ServerSpec
-	       virtSpec.UUID = *serverConfig.Metadata.Uuid
-	       if serverConfig.Metadata.Name != "" {
-		       virtSpec.Name = serverConfig.Metadata.Name + "-" + api.ServerID(serverConfig) // VMを一意に識別する
-	       } else {
-		       virtSpec.Name = "vm-" + api.ServerID(serverConfig)
-	       }
+	slog.Debug("ハイパーバイザーのリソース確保")
+	//var virtSpec virt.ServerSpec
+	virtSpec.UUID = *serverConfig.Metadata.Uuid
+	if strings.TrimSpace(serverConfig.Metadata.Name) != "" {
+		virtSpec.Name = strings.TrimSpace(serverConfig.Metadata.Name) + "-" + api.ServerID(serverConfig) // VMを一意に識別する
+	} else {
+		virtSpec.Name = "vm-" + api.ServerID(serverConfig)
+	}
 	// サーバーのVM名前をセットし、今後の操作のためにDBを更新する必要がある
 	serverConfig.Metadata.InstanceName = util.StringPtr(virtSpec.Name)
 
@@ -812,7 +812,7 @@ func (m *Marmot) DeleteServerByIdManage(id string) error {
 		return err
 	}
 
-	       serverName := sv.Metadata.Name
+	serverName := sv.Metadata.Name
 
 	if sv.Metadata.InstanceName != nil {
 		// サーバーの削除

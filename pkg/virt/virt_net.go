@@ -14,9 +14,11 @@ import (
 
 func CreateVirtualNetworkXML(net api.VirtualNetwork) (*libvirtxml.Network, error) {
 	// 入力チェック
-	       if net.Metadata.Name == "" {
-		       return nil, fmt.Errorf("Metadata.Name is required")
-	       }
+	name := strings.TrimSpace(net.Metadata.Name)
+	if name == "" {
+		return nil, fmt.Errorf("Metadata.Name is required")
+	}
+	net.Metadata.Name = name
 	if net.Metadata.Uuid == nil {
 		return nil, fmt.Errorf("Metadata.Uuid is required")
 	}
@@ -44,17 +46,17 @@ func CreateVirtualNetworkXML(net api.VirtualNetwork) (*libvirtxml.Network, error
 		net.Spec.MacAddress = util.StringPtr(mac.String())
 	}
 
-	       netxml := &libvirtxml.Network{
-		       XMLName: xml.Name{
-			       Space: "",
-			       Local: net.Metadata.Name,
-		       },
-		       Name: net.Metadata.Name,
-		       UUID: *net.Metadata.Uuid,
-		       Bridge: &libvirtxml.NetworkBridge{
-			       Name: *net.Spec.BridgeName,
-		       },
-	       }
+	netxml := &libvirtxml.Network{
+		XMLName: xml.Name{
+			Space: "",
+			Local: net.Metadata.Name,
+		},
+		Name: net.Metadata.Name,
+		UUID: *net.Metadata.Uuid,
+		Bridge: &libvirtxml.NetworkBridge{
+			Name: *net.Spec.BridgeName,
+		},
+	}
 
 	if net.Spec.Nat == nil || !*net.Spec.Nat {
 		// OVS ブリッジを利用するネットワークは、libvirt へ Open vSwitch virtualport を明示する。

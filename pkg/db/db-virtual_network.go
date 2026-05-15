@@ -479,7 +479,7 @@ func (d *Database) MakeFollowerVirtualNetworkEntry(headNetwork api.VirtualNetwor
 	if headNetworkID == "" {
 		return "", fmt.Errorf("head network id is required")
 	}
-	if headNetwork.Metadata.Name == "" {
+	if strings.TrimSpace(headNetwork.Metadata.Name) == "" {
 		return "", fmt.Errorf("head network metadata.name is required")
 	}
 

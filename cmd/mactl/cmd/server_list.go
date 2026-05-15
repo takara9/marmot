@@ -158,8 +158,8 @@ func serverNetworkLines(server api.Server) []serverNetworkLine {
 }
 
 func serverDisplayName(server api.Server) string {
-	if server.Metadata.Name != "" {
-		return server.Metadata.Name
+	if strings.TrimSpace(server.Metadata.Name) != "" {
+		return strings.TrimSpace(server.Metadata.Name)
 	}
 	return "N/A"
 }

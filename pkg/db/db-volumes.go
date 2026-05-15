@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -38,8 +39,8 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 	slog.Debug("CreateVolume2()", "vol", inputVol)
 
 	// ボリュームに名前があれば、その名前でロックする
-	if inputVol.Metadata.Name != "" {
-		lockKey := "/lock/volume/" + inputVol.Metadata.Name
+	if strings.TrimSpace(inputVol.Metadata.Name) != "" {
+		lockKey := "/lock/volume/" + strings.TrimSpace(inputVol.Metadata.Name)
 		mutex, err := d.LockKey(lockKey)
 		if err != nil {
 			slog.Error("failed to lock", "err", err, "key", lockKey)
@@ -86,8 +87,11 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 	volume.Status.Status = util.StringPtr(VolStatus[volume.Status.StatusCode])
 
 	// 指定が無い項目についてデフォルト値を設定する
-	if volume.Metadata.Name == "" {
+	name := strings.TrimSpace(volume.Metadata.Name)
+	if name == "" {
 		volume.Metadata.Name = "vol-" + id
+	} else {
+		volume.Metadata.Name = name
 	}
 	// OSかDATAかの種別で、サイズのデフォルト値を変える
 	if volume.Spec.Kind == nil {
