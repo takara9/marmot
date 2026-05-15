@@ -97,7 +97,7 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 			var spec api.VirtualNetworkSpec
 			net.Metadata = meta
 			net.Spec = spec
-			net.Metadata.Name = util.StringPtr("test-network")
+			net.Metadata.Name = "test-network"
 			net.Spec.IpAddress = util.StringPtr("192.168.200.0/24")
 			createdNet, err := m.Db.CreateVirtualNetwork(net)
 			Expect(err).NotTo(HaveOccurred())
@@ -123,7 +123,7 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 			var spec api.VirtualNetworkSpec
 			net.Metadata = meta
 			net.Spec = spec
-			net.Metadata.Name = util.StringPtr("test-network2")
+			net.Metadata.Name = "test-network2"
 			net.Spec.IpAddress = util.StringPtr("192.168.200.0/24")
 			createdNet, err := m.Db.CreateVirtualNetwork(net)
 			Expect(err).ToNot(HaveOccurred())
@@ -181,7 +181,7 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 			var spec api.VirtualNetworkSpec
 			net.Metadata = meta
 			net.Spec = spec
-			net.Metadata.Name = util.StringPtr("test-network2")
+			net.Metadata.Name = "test-network2"
 			net.Spec.IpAddress = util.StringPtr("192.168.201.0/24")
 			createdNet, err := m.Db.CreateVirtualNetwork(net)
 			Expect(err).To(HaveOccurred())
@@ -217,7 +217,7 @@ var _ = Describe("VirtualPrivateNetworks", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(nets).To(BeNil())
 			for _, net := range nets {
-				GinkgoWriter.Println("ネットワークID: ", api.VirtualNetworkID(net), " ネットワーク名: ", *net.Metadata.Name, " ステータス: ", db.NetworkStatus[net.Status.StatusCode])
+				GinkgoWriter.Println("ネットワークID: ", api.VirtualNetworkID(net), " ネットワーク名: ", net.Metadata.Name, " ステータス: ", db.NetworkStatus[net.Status.StatusCode])
 				Expect(net.Status.DeletionTimeStamp).NotTo(BeNil())
 			}
 			jsonByte, err := json.MarshalIndent(nets, "", "  ")

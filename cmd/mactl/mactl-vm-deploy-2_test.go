@@ -226,7 +226,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 				err = json.Unmarshal(stdoutStderr, &networks)
 				g.Expect(err).NotTo(HaveOccurred())
 				for _, n := range networks {
-					GinkgoWriter.Printf("  - %s (%s)\n", *n.Metadata.Name, api.VirtualNetworkID(n))
+					GinkgoWriter.Printf("  - %s (%s)\n", n.Metadata.Name, api.VirtualNetworkID(n))
 					g.Expect(n.Status.StatusCode).To(Equal(int(db.NETWORK_ACTIVE)))
 				}
 			}, 60*time.Second, 3*time.Second).Should(Succeed())
@@ -249,7 +249,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			var net api.VirtualNetwork
 			err = json.Unmarshal(stdoutStderr, &net)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(*net.Metadata.Name).To(Equal("test-net-1"))
+			Expect(net.Metadata.Name).To(Equal("test-net-1"))
 			netId1 = api.VirtualNetworkID(net)
 		})
 		fmt.Printf("netId1: %s\n", netId1)
@@ -264,7 +264,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 				var network api.VirtualNetwork
 				err = json.Unmarshal(stdoutStderr, &network)
 				g.Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Printf("  - %s (%s)\n", *network.Metadata.Name, api.VirtualNetworkID(network))
+				GinkgoWriter.Printf("  - %s (%s)\n", network.Metadata.Name, api.VirtualNetworkID(network))
 				g.Expect(network.Status.StatusCode).To(Equal(int(db.NETWORK_ACTIVE)))
 			}, 60*time.Second, 3*time.Second).Should(Succeed())
 		})
@@ -279,7 +279,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			var net api.VirtualNetwork
 			err = json.Unmarshal(stdoutStderr, &net)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(*net.Metadata.Name).To(Equal("test-net-2"))
+			Expect(net.Metadata.Name).To(Equal("test-net-2"))
 			netId2 = api.VirtualNetworkID(net)
 		})
 		fmt.Printf("netId2: %s\n", netId2)
@@ -294,7 +294,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 				var network api.VirtualNetwork
 				err = json.Unmarshal(stdoutStderr, &network)
 				g.Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Printf("  - %s (%s)\n", *network.Metadata.Name, api.VirtualNetworkID(network))
+				GinkgoWriter.Printf("  - %s (%s)\n", network.Metadata.Name, api.VirtualNetworkID(network))
 				g.Expect(network.Status.StatusCode).To(Equal(int(db.NETWORK_ACTIVE)))
 			}, 60*time.Second, 3*time.Second).Should(Succeed())
 		})
@@ -309,7 +309,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			var net api.VirtualNetwork
 			err = json.Unmarshal(stdoutStderr, &net)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(*net.Metadata.Name).To(Equal("test-net-3"))
+			Expect(net.Metadata.Name).To(Equal("test-net-3"))
 			netId3 = api.VirtualNetworkID(net)
 		})
 		fmt.Printf("netId3: %s\n", netId3)
@@ -324,7 +324,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 				var network api.VirtualNetwork
 				err = json.Unmarshal(stdoutStderr, &network)
 				g.Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Printf("  - %s (%s)\n", *network.Metadata.Name, api.VirtualNetworkID(network))
+				GinkgoWriter.Printf("  - %s (%s)\n", network.Metadata.Name, api.VirtualNetworkID(network))
 				g.Expect(network.Status.StatusCode).To(Equal(int(db.NETWORK_ACTIVE)))
 			}, 60*time.Second, 3*time.Second).Should(Succeed())
 		})
@@ -335,7 +335,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 
 			headSpec := api.VirtualNetwork{
 				Metadata: api.Metadata{
-					Name:     util.StringPtr("delete-propagation-net"),
+					Name: "delete-propagation-net",
 					NodeName: util.StringPtr("hvc"),
 					Labels:   &labels,
 				},
@@ -360,7 +360,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(follower.Metadata).NotTo(BeNil())
 			Expect(follower.Metadata.Name).NotTo(BeNil())
-			Expect(*follower.Metadata.Name).To(Equal("delete-propagation-net"))
+			Expect(follower.Metadata.Name).To(Equal("delete-propagation-net"))
 			Expect(follower.Status).NotTo(BeNil())
 			Expect(follower.Status.DeletionTimeStamp).To(BeNil())
 		})
@@ -560,7 +560,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 				var server api.Server
 				err = json.Unmarshal(stdoutStderr, &server)
 				g.Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Printf("  - %s (%s)\n", *server.Metadata.Name, api.ServerID(server))
+				GinkgoWriter.Printf("  - %s (%s)\n", server.Metadata.Name, api.ServerID(server))
 				g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_DELETING)))
 			}, 120*time.Second, 5*time.Second).Should(Succeed())
 		})
@@ -586,7 +586,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 				var server api.Server
 				err = json.Unmarshal(stdoutStderr, &server)
 				g.Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Printf("  - %s (%s)\n", *server.Metadata.Name, api.ServerID(server))
+				GinkgoWriter.Printf("  - %s (%s)\n", server.Metadata.Name, api.ServerID(server))
 				g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_DELETING)))
 			}, 120*time.Second, 5*time.Second).Should(Succeed())
 		})
@@ -621,7 +621,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 				var server api.Success
 				err = json.Unmarshal(stdoutStderr, &server)
 				Expect(err).NotTo(HaveOccurred())
-				//Expect(*server.Metadata.Name).To(Equal("test-server-00"))
+				//Expect(server.Metadata.Name).To(Equal("test-server-00"))
 				switch i {
 				case 20:
 					serverId_1 = server.Id
@@ -644,7 +644,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 					var server api.Server
 					err = json.Unmarshal(stdoutStderr, &server)
 					Expect(err).NotTo(HaveOccurred())
-					GinkgoWriter.Printf("  - %s (%s)\n", *server.Metadata.Name, api.ServerID(server))
+					GinkgoWriter.Printf("  - %s (%s)\n", server.Metadata.Name, api.ServerID(server))
 					g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_RUNNING)))
 					expectServerBootVolumeNodeName(g, server)
 				}, 120*time.Second, 5*time.Second).Should(Succeed())
@@ -691,7 +691,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 					var server api.Server
 					err = json.Unmarshal(stdoutStderr, &server)
 					g.Expect(err).NotTo(HaveOccurred())
-					GinkgoWriter.Printf("  - %s (%s)\n", *server.Metadata.Name, api.ServerID(server))
+					GinkgoWriter.Printf("  - %s (%s)\n", server.Metadata.Name, api.ServerID(server))
 					g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_DELETING)))
 				}, 120*time.Second, 5*time.Second).Should(Succeed())
 			}

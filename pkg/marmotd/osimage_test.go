@@ -134,7 +134,7 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 			images, err = marmotServer.Ma.GetImagesManage()
 			Expect(err).NotTo(HaveOccurred())
 			for _, image := range images {
-				fmt.Println("ID", image.Metadata.Id, "Name", *image.Metadata.Name)
+				fmt.Println("ID", image.Metadata.Id, "Name", image.Metadata.Name)
 			}
 		})
 

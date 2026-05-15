@@ -157,7 +157,7 @@ func (d *Database) MakeImageEntryFromURL(name, url string) (string, error) {
 
 // APIのImage定義をそのまま受け取り、イメージを作成する。
 func (d *Database) MakeImageEntryFromSpec(imageSpec api.Image) (string, error) {
-	if imageSpec.Metadata.Name == nil {
+	if strings.TrimSpace(imageSpec.Metadata.Name) == "" {
 		return "", fmt.Errorf("name is required")
 	}
 	if imageSpec.Spec.SourceUrl == nil {
@@ -178,7 +178,7 @@ func (d *Database) MakeImageEntryFromSpec(imageSpec api.Image) (string, error) {
 		kind = "Image"
 	}
 
-	return d.makeImageEntryFromURLWithNodeAndMeta(*imageSpec.Metadata.Name, *imageSpec.Spec.SourceUrl, nodeName, apiVersion, kind)
+	return d.makeImageEntryFromURLWithNodeAndMeta(strings.TrimSpace(imageSpec.Metadata.Name), *imageSpec.Spec.SourceUrl, nodeName, apiVersion, kind)
 }
 
 // URLのイメージをダウンロードして、それからイメージを作成する。
@@ -202,7 +202,7 @@ func (d *Database) makeImageEntryFromURLWithNodeAndMeta(name, url, nodeName, api
 		ApiVersion: apiVersion,
 		Kind:       kind,
 		Metadata: api.Metadata{
-			Name: &name,
+			Name: name,
 			Id:   util.StringPtr(id),
 			Uuid: util.StringPtr(uuidString),
 		},
@@ -291,7 +291,7 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 			ApiVersion: "v1",
 			Kind:       "Image",
 			Metadata: api.Metadata{
-				Name:     &name,
+				Name:     name,
 				Labels:   &labels,
 				NodeName: serverNodeName,
 				Id:       util.StringPtr(id),
@@ -322,7 +322,7 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 			ApiVersion: "v1",
 			Kind:       "Image",
 			Metadata: api.Metadata{
-				Name:     &name,
+				Name:     name,
 				Labels:   &labels,
 				NodeName: serverNodeName,
 				Id:       util.StringPtr(id),
@@ -557,7 +557,7 @@ func (d *Database) FindImageByName(name string) (api.Image, error) {
 			slog.Error("FindImageByName() failed to unmarshal image", "err", err)
 			continue
 		}
-		if img.Metadata.Name != nil && *img.Metadata.Name == name {
+		if img.Metadata.Name == name {
 			return img, nil
 		}
 	}
@@ -592,10 +592,10 @@ func (d *Database) FindImageByNameAndNode(name, nodeName string) (api.Image, err
 			continue
 		}
 
-		if img.Metadata.Name == nil {
+		if strings.TrimSpace(img.Metadata.Name) == "" {
 			continue
 		}
-		if *img.Metadata.Name != name {
+		if strings.TrimSpace(img.Metadata.Name) != strings.TrimSpace(name) {
 			continue
 		}
 		if img.Metadata.NodeName == nil || strings.TrimSpace(*img.Metadata.NodeName) == "" {
@@ -623,7 +623,7 @@ func (d *Database) MakeFollowerImageEntry(headImage api.Image, followerNodeName 
 	if headImageId == "" {
 		return "", fmt.Errorf("head image id is required")
 	}
-	if headImage.Metadata.Name == nil || strings.TrimSpace(*headImage.Metadata.Name) == "" {
+	if strings.TrimSpace(headImage.Metadata.Name) == "" {
 		return "", fmt.Errorf("head image metadata.name is required")
 	}
 

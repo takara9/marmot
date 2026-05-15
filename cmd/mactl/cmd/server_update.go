@@ -17,7 +17,7 @@ var serverUpdateCmd = &cobra.Command{
 		var spec api.Server
 		serverId := args[0]
 		spec.Metadata.Id = &serverId
-		spec.Metadata.Name = &serverName
+			   spec.Metadata.Name = serverName
 
 		m, err := getClientConfig()
 		if err != nil {

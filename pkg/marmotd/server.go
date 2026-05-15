@@ -170,7 +170,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	}
 
 	slog.Debug("ブートボリュームの生成と設定")
-	bootVol.Metadata.Name = util.StringPtr("boot-" + api.ServerID(serverConfig))
+	bootVol.Metadata.Name = "boot-" + api.ServerID(serverConfig)
 	// サーバー割当ノードをブートボリュームのメタデータに付与する。
 	assignNodeNameIfUnset(&bootVol.Metadata, assignedNodeName)
 	bootVol.Spec.Kind = util.StringPtr("os")
@@ -323,12 +323,12 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 				}
 				if !found {
 					slog.Debug("セットさられたIPアドレス", "IP	", ipaddr)
-					m.Db.SetIPaddrInUse(api.VirtualNetworkID(vnet), ipNetId, ipaddr, *serverConfig.Metadata.Name)
+					m.Db.SetIPaddrInUse(api.VirtualNetworkID(vnet), ipNetId, ipaddr, serverConfig.Metadata.Name)
 					//return ipaddr, nil
 				}
 				// 内部DNSへ登録
-				slog.Debug("内部DNSへ登録", "hostname", *serverConfig.Metadata.Name, "subdomain", reqNic.Networkname, "ip address", ipaddr)
-				if err := m.Db.PutDnsEntry(*serverConfig.Metadata.Name, reqNic.Networkname, ipaddr); err != nil {
+				slog.Debug("内部DNSへ登録", "hostname", serverConfig.Metadata.Name, "subdomain", reqNic.Networkname, "ip address", ipaddr)
+				if err := m.Db.PutDnsEntry(serverConfig.Metadata.Name, reqNic.Networkname, ipaddr); err != nil {
 					slog.Error("PutDnsEntry()", "err", err)
 					return "", err
 				}
@@ -336,7 +336,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 				// IPアドレスの指定が無いので、IPアドレスを割り当て
 				slog.Debug("IPアドレスの割り当て", "network id", api.VirtualNetworkID(vnet), "network name", vnet.Metadata.Name)
 				if vnet.Spec.IpNetworkId != nil {
-					ipaddr, bitmask, err = m.Db.AllocateIP(api.VirtualNetworkID(vnet), *vnet.Spec.IpNetworkId, *serverConfig.Metadata.Name)
+					ipaddr, bitmask, err = m.Db.AllocateIP(api.VirtualNetworkID(vnet), *vnet.Spec.IpNetworkId, serverConfig.Metadata.Name)
 					if err != nil {
 						slog.Error("AllocateIP()", "err", err)
 						return "", err
@@ -348,8 +348,8 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 						return "", err
 					}
 					// 内部DNSへ登録
-					slog.Debug("内部DNSへ登録", "hostname", *serverConfig.Metadata.Name, "subdomain", reqNic.Networkname, "ip address", ipaddr)
-					if err := m.Db.PutDnsEntry(*serverConfig.Metadata.Name, reqNic.Networkname, ipaddr); err != nil {
+					slog.Debug("内部DNSへ登録", "hostname", serverConfig.Metadata.Name, "subdomain", reqNic.Networkname, "ip address", ipaddr)
+					if err := m.Db.PutDnsEntry(serverConfig.Metadata.Name, reqNic.Networkname, ipaddr); err != nil {
 						slog.Error("PutDnsEntry()", "err", err)
 						return "", err
 					}
@@ -550,8 +550,8 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	slog.Debug("ハイパーバイザーのリソース確保")
 	//var virtSpec virt.ServerSpec
 	virtSpec.UUID = *serverConfig.Metadata.Uuid
-	if serverConfig.Metadata.Name != nil {
-		virtSpec.Name = *serverConfig.Metadata.Name + "-" + api.ServerID(serverConfig) // VMを一意に識別する
+	if strings.TrimSpace(serverConfig.Metadata.Name) != "" {
+		virtSpec.Name = strings.TrimSpace(serverConfig.Metadata.Name) + "-" + api.ServerID(serverConfig) // VMを一意に識別する
 	} else {
 		virtSpec.Name = "vm-" + api.ServerID(serverConfig)
 	}
@@ -812,10 +812,7 @@ func (m *Marmot) DeleteServerByIdManage(id string) error {
 		return err
 	}
 
-	serverName := ""
-	if sv.Metadata.Name != nil {
-		serverName = *sv.Metadata.Name
-	}
+	serverName := sv.Metadata.Name
 
 	if sv.Metadata.InstanceName != nil {
 		// サーバーの削除

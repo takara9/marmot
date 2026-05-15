@@ -17,7 +17,7 @@ var imageUpdateCmd = &cobra.Command{
 		var spec api.Image
 		imageId := args[0]
 		spec.Metadata.Id = &imageId
-		spec.Metadata.Name = &imageName
+			   spec.Metadata.Name = imageName
 
 		m, err := getClientConfig()
 		if err != nil {

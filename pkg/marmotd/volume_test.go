@@ -126,7 +126,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 		It("OS論理ボリュームの生成", func() {
 			v := api.Volume{
 				Metadata: api.Metadata{
-					Name: ut.StringPtr("test-os-volume-001"),
+					Name: "test-os-volume-001",
 				},
 				Spec: api.VolSpec{
 					Type:      ut.StringPtr("lvm"),
@@ -139,7 +139,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			volSpec, err = m.CreateNewVolume(api.VolumeID(*vol))
 			Expect(err).NotTo(HaveOccurred())
-			GinkgoWriter.Println("Created volume key: ", *volSpec.Metadata.Name)
+			GinkgoWriter.Println("Created volume key: ", volSpec.Metadata.Name)
 		})
 
 		It("OS論理ボリュームの削除", func() {
@@ -156,7 +156,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("ボリューム のリスト数:", "volume count=", len(vols))
 			for i, v := range vols {
-				GinkgoWriter.Println("index=", i, "volKey=", *v.Metadata.Name)
+				GinkgoWriter.Println("index=", i, "volKey=", v.Metadata.Name)
 			}
 			out, err := exec.Command("lvs").Output()
 			GinkgoWriter.Println("lvs output:\n", string(out))
@@ -168,7 +168,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("DATA 論理ボリューム のリスト数:", "volume count=", len(vols))
 			for i, v := range vols {
-				GinkgoWriter.Println("index=", i, "volKey=", *v.Metadata.Name)
+				GinkgoWriter.Println("index=", i, "volKey=", v.Metadata.Name)
 			}
 			out, err := exec.Command("lvs").Output()
 			GinkgoWriter.Println("lvs output:\n", string(out))
@@ -178,7 +178,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 		It("OS論理ボリュームの生成 （失敗ケース)", func() {
 			v := api.Volume{
 				Metadata: api.Metadata{
-					Name: ut.StringPtr("test-os-volume-001"),
+					Name: "test-os-volume-001",
 				},
 				Spec: api.VolSpec{
 					Type:      ut.StringPtr("lvm"),
@@ -196,7 +196,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 		It("OS論理ボリュームの生成 （失敗ケース)", func() {
 			v := api.Volume{
 				Metadata: api.Metadata{
-					Name: ut.StringPtr("test-os-volume-001"),
+					Name: "test-os-volume-001",
 				},
 				Spec: api.VolSpec{
 					Type:      ut.StringPtr("noexist"),
@@ -278,7 +278,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 
 			v := api.Volume{
 				Metadata: api.Metadata{
-					Name: ut.StringPtr("test-data-volume-001"),
+					Name: "test-data-volume-001",
 				},
 				Spec: api.VolSpec{
 					Type: ut.StringPtr("lvm"),
@@ -319,7 +319,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 		It("OS論理ボリュームの生成1", func() {
 			v := api.Volume{
 				Metadata: api.Metadata{
-					Name: ut.StringPtr("test-os-volume-001"),
+					Name: "test-os-volume-001",
 				},
 				Spec: api.VolSpec{
 					Type:      ut.StringPtr("lvm"),
@@ -341,7 +341,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 		It("OS論理ボリュームの生成2", func() {
 			v := api.Volume{
 				Metadata: api.Metadata{
-					Name: ut.StringPtr("test-os-volume-002"),
+					Name: "test-os-volume-002",
 				},
 				Spec: api.VolSpec{
 					Type:      ut.StringPtr("lvm"),
@@ -362,7 +362,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 		It("DATA論理ボリュームの生成1", func() {
 			v := api.Volume{
 				Metadata: api.Metadata{
-					Name: ut.StringPtr("test-data-volume-001"),
+					Name: "test-data-volume-001",
 				},
 				Spec: api.VolSpec{
 					Type: ut.StringPtr("lvm"),
@@ -384,7 +384,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 		It("DATA論理ボリュームの生成2", func() {
 			v := api.Volume{
 				Metadata: api.Metadata{
-					Name: ut.StringPtr("test-data-volume-002"),
+					Name: "test-data-volume-002",
 				},
 				Spec: api.VolSpec{
 					Type: ut.StringPtr("lvm"),
@@ -511,7 +511,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 		It("qcow2ボリュームの生成", func() {
 			v := api.Volume{
 				Metadata: api.Metadata{
-					Name: ut.StringPtr("test-qcow2-volume-001"),
+					Name: "test-qcow2-volume-001",
 				},
 				Spec: api.VolSpec{
 					Type:      ut.StringPtr("qcow2"),
@@ -587,7 +587,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 		It("データボリュームの生成と削除", func() {
 			v := api.Volume{
 				Metadata: api.Metadata{
-					Name: ut.StringPtr("test-qcow2-volume-003"),
+					Name: "test-qcow2-volume-003",
 				},
 				Spec: api.VolSpec{
 					Type: ut.StringPtr("qcow2"),

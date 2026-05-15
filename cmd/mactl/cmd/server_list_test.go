@@ -23,7 +23,7 @@ var _ = Describe("formatServerListText", func() {
 		output := formatServerListText([]api.Server{{
 			Metadata: api.Metadata{
 				Id:       util.StringPtr("3f738"),
-				Name:     &name,
+				Name: name,
 				NodeName: &nodeName,
 			},
 			Spec: api.ServerSpec{
@@ -59,7 +59,7 @@ var _ = Describe("formatServerListText", func() {
 		output := formatServerListText([]api.Server{{
 			Metadata: api.Metadata{
 				Id:   util.StringPtr("592a2"),
-				Name: &name,
+				Name: name,
 			},
 			Spec: api.ServerSpec{
 				Cpu:    &cpu,
@@ -81,7 +81,7 @@ var _ = Describe("formatServerListText", func() {
 		output := formatServerListText([]api.Server{{
 			Metadata: api.Metadata{
 				Id:   util.StringPtr("a1b2c"),
-				Name: &name,
+				Name: name,
 			},
 			Status: &api.Status{
 				StatusCode:         int(db.SERVER_DELETING),

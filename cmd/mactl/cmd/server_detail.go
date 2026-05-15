@@ -87,7 +87,7 @@ func printServerDetails(server api.Server) {
 	fmt.Println("Server Details")
 	fmt.Printf("  Id:            %s\n", formatID(api.ServerID(server)))
 	fmt.Printf("  UUID:          %s\n", stringValue(&server.Metadata, func(m *api.Metadata) *string { return m.Uuid }))
-	fmt.Printf("  Name:          %s\n", stringValue(&server.Metadata, func(m *api.Metadata) *string { return m.Name }))
+	fmt.Printf("  Name:          %s\n", server.Metadata.Name)
 	fmt.Printf("  Instance Name: %s\n", stringValue(&server.Metadata, func(m *api.Metadata) *string { return m.InstanceName }))
 	fmt.Printf("  Status:        %s\n", formatServerStatus(server.Status))
 	fmt.Printf("  Message:       %s\n", stringValue(server.Status, func(s *api.Status) *string { return s.Message }))
@@ -231,7 +231,7 @@ func printVolumeDetails(indent string, volume *api.Volume) {
 		return
 	}
 	fmt.Printf("%sId:          %s\n", indent, formatID(api.VolumeID(*volume)))
-	fmt.Printf("%sName:        %s\n", indent, stringValue(&volume.Metadata, func(m *api.Metadata) *string { return m.Name }))
+	fmt.Printf("%sName:        %s\n", indent, volume.Metadata.Name)
 	fmt.Printf("%sPath:        %s\n", indent, stringValue(&volume.Spec, func(s *api.VolSpec) *string { return s.Path }))
 	fmt.Printf("%sType:        %s\n", indent, stringValue(&volume.Spec, func(s *api.VolSpec) *string { return s.Type }))
 	fmt.Printf("%sVolumeGroup: %s\n", indent, stringValue(&volume.Spec, func(s *api.VolSpec) *string { return s.VolumeGroup }))

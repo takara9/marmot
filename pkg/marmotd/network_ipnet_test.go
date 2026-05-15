@@ -131,7 +131,7 @@ var _ = Describe("VirtualPrivateNetworksUpperlayer", Ordered, func() {
 			createdNet = api.VirtualNetwork{
 				Metadata: api.Metadata{
 					Id:   util.StringPtr("testnet"),
-					Name: util.StringPtr("testnet"),
+					Name: "testnet",
 				},
 				Spec: api.VirtualNetworkSpec{
 					BridgeName: util.StringPtr("testbridge"),

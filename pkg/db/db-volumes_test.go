@@ -54,7 +54,7 @@ var _ = Describe("Volumes", Ordered, func() {
 			It("ボリュームの作成 #1", func() {
 				vol := &api.Volume{
 					Metadata: api.Metadata{
-						Name: util.StringPtr("data01"),
+						Name: "data01",
 					},
 					Spec: api.VolSpec{
 						Path: util.StringPtr("/var/lib/marmot/volumes/data01.qcow2"),
@@ -71,7 +71,7 @@ var _ = Describe("Volumes", Ordered, func() {
 			It("Keyからボリューム情報を取得", func() {
 				vol, err := v.GetVolumeById(api.VolumeID(*volSpec))
 				Expect(err).NotTo(HaveOccurred())
-				fmt.Printf("Retrieved volume: Id=%s Key=%s Name=%s Path=%s Size=%d Status=%v\n", api.VolumeID(vol), *vol.Metadata.Key, *vol.Metadata.Name, *vol.Spec.Path, *vol.Spec.Size, db.VolStatus[vol.Status.StatusCode])
+				fmt.Printf("Retrieved volume: Id=%s Key=%s Name=%s Path=%s Size=%d Status=%v\n", api.VolumeID(vol), *vol.Metadata.Key, vol.Metadata.Name, *vol.Spec.Path, *vol.Spec.Size, db.VolStatus[vol.Status.StatusCode])
 			})
 
 			It("ボリュームの状態更新 #1", func() {
@@ -96,7 +96,7 @@ var _ = Describe("Volumes", Ordered, func() {
 			It("ボリュームの作成 #2", func() {
 				vol := &api.Volume{
 					Metadata: api.Metadata{
-						Name: util.StringPtr("data02"),
+						Name: "data02",
 					},
 					Spec: api.VolSpec{
 						Path: util.StringPtr("/var/lib/marmot/volumes/data02.qcow2"),
@@ -113,7 +113,7 @@ var _ = Describe("Volumes", Ordered, func() {
 			It("ボリュームの作成 #3", func() {
 				vol := &api.Volume{
 					Metadata: api.Metadata{
-						Name: util.StringPtr("data03"),
+						Name: "data03",
 					},
 					Spec: api.VolSpec{
 						Path: util.StringPtr("/var/lib/marmot/volumes/data03.qcow2"),

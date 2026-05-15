@@ -122,28 +122,19 @@ func (c *controller) serverControllerLoop() {
 
 		// サーバーは必ず nodeName 割当後に処理する。
 		if !forceDeleteWithoutNode && (spec.Metadata.NodeName == nil || strings.TrimSpace(*spec.Metadata.NodeName) == "") {
-			objectName := ""
-			if spec.Metadata.Name != nil {
-				objectName = *spec.Metadata.Name
-			}
+			objectName := spec.Metadata.Name
 			slog.Debug("nodeName 未割当サーバーをスキップ", "serverId", api.ServerID(spec), "serverName", objectName, "controllerNode", c.marmot.NodeName, "reason", "assigned_node_missing")
 			continue
 		}
 
 		if !forceDeleteWithoutNode {
 			if ok, assignedNode, reason := evaluateNodeAssignment(&spec.Metadata, c.marmot.NodeName); !ok {
-				objectName := ""
-				if spec.Metadata.Name != nil {
-					objectName = *spec.Metadata.Name
-				}
+				objectName := spec.Metadata.Name
 				slog.Debug("別ノード割当のサーバーをスキップ", "serverId", api.ServerID(spec), "serverName", objectName, "controllerNode", c.marmot.NodeName, "assignedNode", assignedNode, "reason", reason)
 				continue
 			}
 		} else {
-			objectName := ""
-			if spec.Metadata.Name != nil {
-				objectName = *spec.Metadata.Name
-			}
+			objectName := spec.Metadata.Name
 			slog.Warn("nodeName 判定をバイパスして削除を継続", "serverId", api.ServerID(spec), "serverName", objectName, "reason", bypassReason)
 		}
 
@@ -235,8 +226,8 @@ func (c *controller) serverControllerLoop() {
 					}
 
 					// 内部DNSからエントリーを削除する
-					if spec.Metadata.Name != nil {
-						if err := c.marmot.Db.DeleteDnsEntryByName(*spec.Metadata.Name, nic.Networkname); err != nil {
+					if strings.TrimSpace(spec.Metadata.Name) != "" {
+						if err := c.marmot.Db.DeleteDnsEntryByName(spec.Metadata.Name, nic.Networkname); err != nil {
 							slog.Error("DeleteDnsEntryByName()", "err", err)
 							continue
 						}

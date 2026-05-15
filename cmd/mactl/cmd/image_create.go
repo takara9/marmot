@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -37,10 +38,10 @@ var imageCreateCmd = &cobra.Command{
 			return fmt.Errorf("kind is required in the configuration")
 		}
 
-		if image.Metadata.Name == nil || *image.Metadata.Name == "" {
+		if strings.TrimSpace(image.Metadata.Name) == "" {
 			return fmt.Errorf("Metadata.name is required in the configuration")
 		}
-		if image.Spec.SourceUrl == nil || *image.Spec.SourceUrl == "" {
+		if image.Spec.SourceUrl == nil || strings.TrimSpace(*image.Spec.SourceUrl) == "" {
 			return fmt.Errorf("Spec.source_url is required in the configuration")
 		}
 

@@ -79,7 +79,7 @@ func init() {
 func printVolumeDetailReport(volume api.Volume) {
 	fmt.Println("Volume Details")
 	fmt.Println("Summary")
-	printVolumeDetailField("Name", stringValue(&volume.Metadata, func(m *api.Metadata) *string { return m.Name }))
+	printVolumeDetailField("Name", volume.Metadata.Name)
 	printVolumeDetailField("Id", formatID(api.VolumeID(volume)))
 	printVolumeDetailField("State", formatVolumeStatus(volume.Status))
 	printVolumeDetailField("Kind", stringValue(&volume.Spec, func(s *api.VolSpec) *string { return s.Kind }))
