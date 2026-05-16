@@ -72,6 +72,19 @@ jobs:
         make test-unit
         cd ../..
 
+  mactl-unit-tests:
+    runs-on: [ self-hosted, any ]
+    needs:
+      - moodule-tests
+    if: always()
+    steps:
+    - uses: actions/checkout@v5
+    - name: mactl コマンド ユニットテスト
+      run: |
+        cd cmd/mactl
+        go test ./cmd -v -ginkgo.v -timeout=5m
+        cd ../..
+
   packages-run-as-root:
     runs-on: [ self-hosted, any ]
     needs: 
