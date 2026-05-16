@@ -13,14 +13,11 @@ import (
 var manifestFile string
 
 var createCmd = &cobra.Command{
-	Use:   "create RESOURCE [NAME]",
+	Use:   "create [RESOURCE]",
 	Short: "Create a resource from a file or stdin",
-	Long:  `Create a resource (server/srv, image/img, volume/vol, network/net) from a manifest file or stdin`,
-	Args:  cobra.MinimumNArgs(1),
+	Long:  `Create a resource (server/srv, image/img, volume/vol, network/net) from a manifest file or stdin. If RESOURCE is omitted, it is inferred from manifest kind.`,
+	Args:  cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		resourceName := args[0]
-		resourceName = normalizeResourceName(resourceName)
-
 		// マニフェストファイルが指定されていない場合はエラー
 		if manifestFile == "" {
 			return fmt.Errorf("flag -f is required for create command")
@@ -32,10 +29,28 @@ var createCmd = &cobra.Command{
 			return fmt.Errorf("failed to load manifest: %w", err)
 		}
 
-		// マニフェストの Kind をチェック
+		// マニフェストの kind を取得
 		kind := ""
 		if k, ok := manifest["kind"].(string); ok {
 			kind = k
+		}
+
+		var resourceName string
+		if len(args) > 0 {
+			resourceName = normalizeResourceName(args[0])
+		} else {
+			switch GetManifestType(kind) {
+			case ManifestTypeServer:
+				resourceName = "server"
+			case ManifestTypeImage:
+				resourceName = "image"
+			case ManifestTypeVolume:
+				resourceName = "volume"
+			case ManifestTypeNetwork:
+				resourceName = "network"
+			default:
+				return fmt.Errorf("failed to infer resource type from kind %q", kind)
+			}
 		}
 
 		expectedKind := GetKindFromResourceName(resourceName)
@@ -81,6 +96,9 @@ func createServer(manifest map[string]interface{}) error {
 	if strings.TrimSpace(server.Metadata.Name) == "" {
 		return fmt.Errorf("metadata.name is required")
 	}
+
+	// storage[].spec.type/kind の既定値を補完
+	ApplyServerDefaults(server)
 
 	// サーバーが既に存在するかチェック
 	list, _, err := m.GetServers()

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/util"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -83,13 +84,13 @@ func isURL(source string) bool {
 // normalizeResourceName リソース名を正規化（短縮形を長いフォームに変換）
 func normalizeResourceName(resource string) string {
 	switch strings.ToLower(resource) {
-	case "srv":
+	case "srv", "servers":
 		return "server"
-	case "img":
+	case "img", "images":
 		return "image"
-	case "vol":
+	case "vol", "volumes":
 		return "volume"
-	case "net":
+	case "net", "networks":
 		return "network"
 	default:
 		return strings.ToLower(resource)
@@ -142,6 +143,24 @@ func ManifestToServer(manifest map[string]interface{}) (*api.Server, error) {
 	}
 
 	return &server, nil
+}
+
+// ApplyServerDefaults は server.spec.storage 配下の既定値を補完する。
+// storage[].spec.type が未指定なら qcow2、storage[].spec.kind が未指定なら data を設定する。
+func ApplyServerDefaults(server *api.Server) {
+	if server == nil || server.Spec.Storage == nil {
+		return
+	}
+
+	for i := range *server.Spec.Storage {
+		vol := &(*server.Spec.Storage)[i]
+		if vol.Spec.Type == nil || strings.TrimSpace(*vol.Spec.Type) == "" {
+			vol.Spec.Type = util.StringPtr("qcow2")
+		}
+		if vol.Spec.Kind == nil || strings.TrimSpace(*vol.Spec.Kind) == "" {
+			vol.Spec.Kind = util.StringPtr("data")
+		}
+	}
 }
 
 // ManifestToImage マニフェストを Image 構造体に変換

@@ -607,9 +607,16 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	}
 
 	isoPath, err := GenerateCloudInitISO(path, password, sshKey, username)
+	if err != nil {
+		slog.Error("GenerateCloudInitISO()", "err", err)
+		return "", err
+	}
 
 	switch {
 	case *bootVolDefined.Spec.Type == "qcow2":
+		if bootVolDefined.Spec.Path == nil || strings.TrimSpace(*bootVolDefined.Spec.Path) == "" {
+			return "", fmt.Errorf("boot volume path is required for qcow2")
+		}
 		virtSpec.DiskSpecs = []virt.DiskSpec{
 			{
 				Dev:  "vda",
@@ -626,6 +633,12 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		}
 	case *bootVolDefined.Spec.Type == "lvm":
 		// ＊＊＊　パスは createNewVolume で設定されるべき　＊＊＊
+		if bootVolDefined.Spec.VolumeGroup == nil || strings.TrimSpace(*bootVolDefined.Spec.VolumeGroup) == "" {
+			return "", fmt.Errorf("boot volume volumeGroup is required for lvm")
+		}
+		if bootVolDefined.Spec.LogicalVolume == nil || strings.TrimSpace(*bootVolDefined.Spec.LogicalVolume) == "" {
+			return "", fmt.Errorf("boot volume logicalVolume is required for lvm")
+		}
 		lvPath := fmt.Sprintf("/dev/%s/%s", *bootVolDefined.Spec.VolumeGroup, *bootVolDefined.Spec.LogicalVolume)
 		virtSpec.DiskSpecs = []virt.DiskSpec{
 			{
@@ -657,6 +670,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			}
 			switch {
 			case *disk.Spec.Type == "qcow2":
+				if disk.Spec.Path == nil || strings.TrimSpace(*disk.Spec.Path) == "" {
+					return "", fmt.Errorf("storage[%d] path is required for qcow2", i)
+				}
 				ds := virt.DiskSpec{
 					Dev:  fmt.Sprintf("vd%c", 'b'+i),
 					Src:  *disk.Spec.Path,
@@ -678,6 +694,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 					ds.ISCSIPort = port
 					ds.ISCSIInitiator = initiator
 				} else {
+					if disk.Spec.Path == nil || strings.TrimSpace(*disk.Spec.Path) == "" {
+						return "", fmt.Errorf("storage[%d] path is required for lvm", i)
+					}
 					ds.Src = *disk.Spec.Path
 					ds.Type = "raw"
 				}

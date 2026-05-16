@@ -3,10 +3,15 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"math"
+	"path/filepath"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/db"
 )
 
 var getCmd = &cobra.Command{
@@ -281,18 +286,120 @@ func convertLabels(labels *map[string]interface{}) map[string]interface{} {
 	return *labels
 }
 
+func formatMemoryGB(memoryMB *int) string {
+	if memoryMB == nil {
+		return "-"
+	}
+	gb := float64(*memoryMB) / 1024.0
+	if gb == math.Trunc(gb) {
+		return fmt.Sprintf("%.0f", gb)
+	}
+	return fmt.Sprintf("%.1f", gb)
+}
+
+func formatServerIPCIDR(s api.Server) string {
+	if s.Spec.NetworkInterface == nil {
+		return "-"
+	}
+
+	entries := make([]string, 0)
+	for _, nic := range *s.Spec.NetworkInterface {
+		if nic.Address == nil || strings.TrimSpace(*nic.Address) == "" {
+			continue
+		}
+
+		address := strings.TrimSpace(*nic.Address)
+		if nic.Netmasklen != nil {
+			entries = append(entries, fmt.Sprintf("%s/%d", address, *nic.Netmasklen))
+			continue
+		}
+		if nic.Netmask != nil && strings.TrimSpace(*nic.Netmask) != "" {
+			entries = append(entries, fmt.Sprintf("%s/%s", address, strings.TrimSpace(*nic.Netmask)))
+			continue
+		}
+		entries = append(entries, address)
+	}
+
+	if len(entries) == 0 {
+		return "-"
+	}
+	return strings.Join(entries, ",")
+}
+
+func formatServerAge(status *api.Status) string {
+	ct := creationTime(status)
+	if ct.IsZero() {
+		return "-"
+	}
+
+	elapsed := time.Since(ct)
+	if elapsed < 0 {
+		return "0s"
+	}
+
+	if elapsed < time.Minute {
+		return fmt.Sprintf("%ds", int(elapsed.Seconds()))
+	}
+	if elapsed < time.Hour {
+		return fmt.Sprintf("%dm", int(elapsed.Minutes()))
+	}
+	if elapsed < 24*time.Hour {
+		return fmt.Sprintf("%dh", int(elapsed.Hours()))
+	}
+	if elapsed < 30*24*time.Hour {
+		return fmt.Sprintf("%dd", int(elapsed.Hours()/24))
+	}
+
+	return ct.Local().Format("2006-01-02")
+}
+
+func truncatePath(path string, max int) string {
+	if max <= 0 {
+		return ""
+	}
+	if len(path) <= max {
+		return path
+	}
+	base := filepath.Base(path)
+	baseWithPrefix := ".../" + base
+	if len(baseWithPrefix) <= max {
+		return baseWithPrefix
+	}
+	if max <= 3 {
+		return path[:max]
+	}
+	return "..." + path[len(path)-(max-3):]
+}
+
 // 出力関数
 func outputServers(servers []api.Server) error {
 	switch outputStyle {
 	case "text":
-		fmt.Println("NAME                APIVERSION  KIND    STATUS")
-		fmt.Println("----                ----------  ----    ------")
+		sort.SliceStable(servers, func(i, j int) bool {
+			return creationTime(servers[i].Status).Before(creationTime(servers[j].Status))
+		})
+		fmt.Println("NAME            KIND    CPU  MEM(GB)  STATUS        AGE      IP/CIDR")
+		fmt.Println("----            ----    ---  -------  ------        ---      -------")
 		for _, s := range servers {
 			status := ""
 			if s.Status != nil && s.Status.Status != nil {
 				status = *s.Status.Status
 			}
-			fmt.Printf("%-20s  %-10s  %-7s  %s\n", s.Metadata.Name, s.ApiVersion, s.Kind, status)
+
+			cpu := "-"
+			if s.Spec.Cpu != nil {
+				cpu = fmt.Sprintf("%d", *s.Spec.Cpu)
+			}
+
+			fmt.Printf("%-14s  %-6s  %-3s  %-7s  %-12s  %-7s  %s\n",
+				s.Metadata.Name,
+				s.Kind,
+				cpu,
+				formatMemoryGB(s.Spec.Memory),
+				status,
+				formatServerAge(s.Status),
+				formatServerIPCIDR(s),
+			)
 		}
 		return nil
 
@@ -317,14 +424,49 @@ func outputServers(servers []api.Server) error {
 func outputImages(images []api.Image) error {
 	switch outputStyle {
 	case "text":
-		fmt.Println("NAME                APIVERSION  KIND    SOURCE URL")
-		fmt.Println("----                ----------  ----    ----------")
+		sort.SliceStable(images, func(i, j int) bool {
+			return creationTime(images[i].Status).Before(creationTime(images[j].Status))
+		})
+		fmt.Println("NAME            NODE-NAME  STATUS     ROLE   LV   QCOW2  AGE")
+		fmt.Println("----            ---------  ------     ----   --   -----  ---")
 		for _, img := range images {
-			sourceUrl := ""
-			if img.Spec.SourceUrl != nil {
-				sourceUrl = *img.Spec.SourceUrl
+			nodeName := "-"
+			if img.Metadata.NodeName != nil && strings.TrimSpace(*img.Metadata.NodeName) != "" {
+				nodeName = strings.TrimSpace(*img.Metadata.NodeName)
 			}
-			fmt.Printf("%-20s  %-10s  %-7s  %s\n", img.Metadata.Name, img.ApiVersion, img.Kind, sourceUrl)
+
+			status := "-"
+			if img.Status != nil && img.Status.Status != nil && strings.TrimSpace(*img.Status.Status) != "" {
+				status = strings.TrimSpace(*img.Status.Status)
+			}
+
+			role := "master"
+			if img.Metadata.Labels != nil {
+				if db.GetFollowerSyncRole(*img.Metadata.Labels) == "follower" {
+					role = "replica"
+				}
+			}
+
+			hasLV := "no"
+			if (img.Spec.LvPath != nil && strings.TrimSpace(*img.Spec.LvPath) != "") ||
+				(img.Spec.LogicalVolume != nil && strings.TrimSpace(*img.Spec.LogicalVolume) != "") {
+				hasLV = "yes"
+			}
+
+			hasQcow2 := "no"
+			if img.Spec.Qcow2Path != nil && strings.TrimSpace(*img.Spec.Qcow2Path) != "" {
+				hasQcow2 = "yes"
+			}
+
+			fmt.Printf("%-14s  %-9s  %-9s  %-5s  %-3s  %-5s  %s\n",
+				img.Metadata.Name,
+				nodeName,
+				status,
+				role,
+				hasLV,
+				hasQcow2,
+				formatServerAge(img.Status),
+			)
 		}
 		return nil
 
@@ -346,18 +488,58 @@ func outputImages(images []api.Image) error {
 func outputVolumes(volumes []api.Volume) error {
 	switch outputStyle {
 	case "text":
-		fmt.Println("NAME                APIVERSION  KIND    SIZE(GB)  TYPE")
-		fmt.Println("----                ----------  ----    --------  ----")
+		sort.SliceStable(volumes, func(i, j int) bool {
+			return creationTime(volumes[i].Status).Before(creationTime(volumes[j].Status))
+		})
+		fmt.Println("NAME          NODE  KIND  TYPE   iSCSI  SIZE(GB)  STATUS     PATH                  AGE")
+		fmt.Println("----          ----  ----  ----   -----  --------  ------     ----                  ---")
 		for _, v := range volumes {
 			size := 0
 			if v.Spec.Size != nil {
 				size = *v.Spec.Size
 			}
+
+			node := "-"
+			if v.Metadata.NodeName != nil && strings.TrimSpace(*v.Metadata.NodeName) != "" {
+				node = strings.TrimSpace(*v.Metadata.NodeName)
+			}
+
+			volKind := "-"
+			if v.Spec.Kind != nil && strings.TrimSpace(*v.Spec.Kind) != "" {
+				volKind = strings.TrimSpace(*v.Spec.Kind)
+			}
+
 			volType := ""
 			if v.Spec.Type != nil {
 				volType = *v.Spec.Type
 			}
-			fmt.Printf("%-20s  %-10s  %-7s  %-8d  %s\n", v.Metadata.Name, v.ApiVersion, v.Kind, size, volType)
+
+			iscsi := "-"
+			if v.Spec.Iscsi != nil {
+				iscsi = fmt.Sprintf("%t", *v.Spec.Iscsi)
+			}
+
+			status := "-"
+			if v.Status != nil && v.Status.Status != nil && strings.TrimSpace(*v.Status.Status) != "" {
+				status = strings.TrimSpace(*v.Status.Status)
+			}
+
+			path := "-"
+			if v.Spec.Path != nil && strings.TrimSpace(*v.Spec.Path) != "" {
+				path = truncatePath(strings.TrimSpace(*v.Spec.Path), 22)
+			}
+
+			fmt.Printf("%-12s  %-4s  %-4s  %-5s  %-5s  %-8d  %-9s  %-20s  %s\n",
+				v.Metadata.Name,
+				node,
+				volKind,
+				volType,
+				iscsi,
+				size,
+				status,
+				path,
+				formatServerAge(v.Status),
+			)
 		}
 		return nil
 
@@ -379,10 +561,40 @@ func outputVolumes(volumes []api.Volume) error {
 func outputNetworks(networks []api.VirtualNetwork) error {
 	switch outputStyle {
 	case "text":
-		fmt.Println("NAME                APIVERSION  KIND")
-		fmt.Println("----                ----------  ----")
+		sort.SliceStable(networks, func(i, j int) bool {
+			return creationTime(networks[i].Status).Before(creationTime(networks[j].Status))
+		})
+		fmt.Println("NAME            NODE-NAME  BRIDGE-NAME   IP-NET             STATUS   AGE")
+		fmt.Println("----            ---------  -----------   ------             ------   ---")
 		for _, n := range networks {
-			fmt.Printf("%-20s  %-10s  %s\n", n.Metadata.Name, n.ApiVersion, n.Kind)
+			nodeName := "-"
+			if n.Metadata.NodeName != nil && strings.TrimSpace(*n.Metadata.NodeName) != "" {
+				nodeName = strings.TrimSpace(*n.Metadata.NodeName)
+			}
+
+			bridgeName := "-"
+			if n.Spec.BridgeName != nil && strings.TrimSpace(*n.Spec.BridgeName) != "" {
+				bridgeName = strings.TrimSpace(*n.Spec.BridgeName)
+			}
+
+			ipNet := "-"
+			if n.Spec.IPNetworkAddress != nil && strings.TrimSpace(*n.Spec.IPNetworkAddress) != "" {
+				ipNet = strings.TrimSpace(*n.Spec.IPNetworkAddress)
+			}
+
+			status := "-"
+			if n.Status != nil && n.Status.Status != nil && strings.TrimSpace(*n.Status.Status) != "" {
+				status = strings.TrimSpace(*n.Status.Status)
+			}
+
+			fmt.Printf("%-14s  %-9s  %-12s  %-18s  %-7s  %s\n",
+				n.Metadata.Name,
+				nodeName,
+				bridgeName,
+				ipNet,
+				status,
+				formatServerAge(n.Status),
+			)
 		}
 		return nil
 

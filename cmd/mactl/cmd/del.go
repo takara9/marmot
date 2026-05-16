@@ -15,9 +15,8 @@ var delCmd = &cobra.Command{
 	Long:  `Delete a resource (server/srv, image/img, volume/vol, network/net) with NAME specified.`,
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		resourceName := args[0]
+		resourceName := normalizeResourceName(args[0])
 		objectName := args[1]
-		resourceName = normalizeResourceName(resourceName)
 
 		// リソースタイプに応じて処理を分岐
 		switch strings.ToLower(resourceName) {
