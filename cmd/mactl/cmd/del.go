@@ -62,9 +62,12 @@ func deleteServer(name string) error {
 	if found == nil {
 		return fmt.Errorf("server %q not found", name)
 	}
+	if found.Metadata.Id == nil {
+		return fmt.Errorf("server %q has no id", name)
+	}
 
 	// サーバーを削除
-		_, _, err = m.DeleteServerById(api.ServerID(*found))
+		_, _, err = m.DeleteServerById(*found.Metadata.Id)
 	if err != nil {
 		return fmt.Errorf("failed to delete server: %w", err)
 	}
@@ -100,6 +103,9 @@ func deleteImage(name string) error {
 
 	if found == nil {
 		return fmt.Errorf("image %q not found", name)
+	}
+	if found.Metadata.Id == nil {
+		return fmt.Errorf("image %q has no id", name)
 	}
 
 	// イメージを削除
@@ -140,9 +146,12 @@ func deleteVolume(name string) error {
 	if found == nil {
 		return fmt.Errorf("volume %q not found", name)
 	}
+	if found.Metadata.Id == nil {
+		return fmt.Errorf("volume %q has no id", name)
+	}
 
 	// ボリュームを削除
-		_, _, err = m.DeleteVolumeById(api.VolumeID(*found))
+		_, _, err = m.DeleteVolumeById(*found.Metadata.Id)
 	if err != nil {
 		return fmt.Errorf("failed to delete volume: %w", err)
 	}
@@ -179,9 +188,12 @@ func deleteNetwork(name string) error {
 	if found == nil {
 		return fmt.Errorf("network %q not found", name)
 	}
+	if found.Metadata.Id == nil {
+		return fmt.Errorf("network %q has no id", name)
+	}
 
 	// ネットワークを削除
-		_, _, err = m.DeleteVirtualNetworkById(api.VirtualNetworkID(*found))
+		_, _, err = m.DeleteVirtualNetworkById(*found.Metadata.Id)
 	if err != nil {
 		return fmt.Errorf("failed to delete network: %w", err)
 	}

@@ -32,14 +32,18 @@ YAML ファイルで仮想サーバーやネットワークの構成を定義し
 
 ```yaml
 # server.yaml
-name: my-server
-cpu: 2
-memory: 2048
-os_variant: ubuntu24.04
-boot_volume:
-  type: qcow2
-network:
-  - name: "default"
+apiVersion: v1
+kind: Server
+metadata:
+  name: my-server
+spec:
+  cpu: 2
+  memory: 2048
+  osVariant: ubuntu24.04
+  bootVolume:
+    type: qcow2
+  networkInterface:
+    - networkname: "default"
 ```
 
 ```sh
@@ -50,15 +54,20 @@ mactl server create -f server.yaml
 
 ```yaml
 # network.yaml
-Metadata:
+apiVersion: v1
+kind: VirtualNetwork
+metadata:
   name: my-network
-Spec:
+spec:
   forwardMode: bridge
+  iPNetworkAddress: "192.168.100.0/25"
 ```
 
 ```sh
 mactl network create -f network.yaml
 ```
+
+補足: YAML キー名は OpenAPI スキーマに合わせた `camelCase`（例: `bootVolume`, `networkInterface`）を使用してください。
 
 ### ローカルファイルの代わりに URL を直接指定することも可能
 
@@ -76,13 +85,25 @@ mactl server start     # VM を起動
 mactl server stop      # VM を停止
 mactl server list      # VM 一覧を表示
 mactl server detail    # VM 詳細を表示
+mactl server update    # VM 設定を更新
 mactl network create   # 仮想ネットワークを作成
 mactl network delete   # 仮想ネットワークを削除
 mactl network list     # 仮想ネットワーク一覧
+mactl network detail   # 仮想ネットワーク詳細
 mactl volume create    # ボリュームを作成
+mactl volume delete    # ボリュームを削除
 mactl volume list      # ボリューム一覧
+mactl volume detail    # ボリューム詳細
+mactl volume rename    # ボリューム名変更
+mactl image create     # イメージを作成
+mactl image delete     # イメージを削除
 mactl image list       # イメージ一覧
+mactl image detail     # イメージ詳細
+mactl image update     # イメージを更新
+mactl endpoint list    # 接続先一覧
+mactl endpoint set     # 接続先切り替え
 mactl cluster list     # クラスターノード一覧
+mactl status           # marmotd の状態を表示
 ```
 
 ## インストール
@@ -92,13 +113,13 @@ mactl cluster list     # クラスターノード一覧
 [Releases](https://github.com/takara9/marmot/releases) から最新の `.deb` ファイルをダウンロードしてインストールします。
 
 ```sh
-VERSION=0.13.0
+VERSION=x.y.z
 curl -OL https://github.com/takara9/marmot/releases/download/v${VERSION}/marmot_v${VERSION}_amd64.deb
 sudo apt install ./marmot_v${VERSION}_amd64.deb
 ```
 
 インストール後のセットアップ手順（etcd の設定・LVM・ネットワーク・iSCSI の設定など）は [docs/HOWTO-install-marmot.md](docs/HOWTO-install-marmot.md) を参照してください。  
-ハイパーバイザーノード自体の構成手順は [docs/INSTALL-SERVER.md](docs/INSTALL-SERVER.md) を参照してください。
+ハイパーバイザーノード自体の構成手順は [docs/HOWTO-setup-vm-runner.md](docs/HOWTO-setup-vm-runner.md) と [docs/MEMO-SETUP-SERVER.md](docs/MEMO-SETUP-SERVER.md) を参照してください。
 
 ## 主な依存技術
 
