@@ -9,11 +9,13 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/client"
 	"golang.org/x/term"
 )
 
@@ -57,7 +59,10 @@ var consoleCmd = &cobra.Command{
 			return fmt.Errorf("server %q not found", serverName)
 		}
 
-		hostPort := strings.TrimSpace(m.HostPort)
+		hostPort, err := resolveConsoleTargetHostPort(m, *server)
+		if err != nil {
+			return err
+		}
 		if hostPort == "" {
 			return fmt.Errorf("API host is required")
 		}
@@ -156,6 +161,98 @@ func copyConsoleInput(dst io.Writer, src io.Reader) error {
 			return err
 		}
 	}
+}
+
+func resolveConsoleTargetHostPort(m *client.MarmotEndpoint, server api.Server) (string, error) {
+	if m == nil {
+		return "", fmt.Errorf("API client config is required")
+	}
+
+	defaultHostPort := strings.TrimSpace(m.HostPort)
+	if defaultHostPort == "" {
+		return "", fmt.Errorf("API host is required")
+	}
+
+	targetNode := ""
+	if server.Metadata.NodeName != nil {
+		targetNode = strings.TrimSpace(*server.Metadata.NodeName)
+	}
+	if targetNode == "" {
+		return defaultHostPort, nil
+	}
+
+	localNode := ""
+	if body, _, err := m.GetMarmotStatus(); err == nil {
+		var status api.HostStatus
+		if uerr := json.Unmarshal(body, &status); uerr == nil && status.NodeName != nil {
+			localNode = strings.TrimSpace(*status.NodeName)
+		}
+	}
+	if localNode != "" && localNode == targetNode {
+		return defaultHostPort, nil
+	}
+
+	body, _, err := m.GetMarmotCluster()
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve target marmotd for node %q: %w", targetNode, err)
+	}
+
+	var statuses []api.HostStatus
+	if err := json.Unmarshal(body, &statuses); err != nil {
+		return "", fmt.Errorf("failed to parse cluster status: %w", err)
+	}
+
+	targetHostPort, err := hostPortForNode(statuses, targetNode, defaultHostPort)
+	if err != nil {
+		return "", err
+	}
+
+	return targetHostPort, nil
+}
+
+func hostPortForNode(statuses []api.HostStatus, targetNode, defaultHostPort string) (string, error) {
+	targetNode = strings.TrimSpace(targetNode)
+	if targetNode == "" {
+		return strings.TrimSpace(defaultHostPort), nil
+	}
+
+	port, err := portFromHostPort(defaultHostPort)
+	if err != nil {
+		return "", err
+	}
+
+	for _, status := range statuses {
+		if status.NodeName == nil || strings.TrimSpace(*status.NodeName) != targetNode {
+			continue
+		}
+		if status.IpAddress == nil || strings.TrimSpace(*status.IpAddress) == "" {
+			return "", fmt.Errorf("node %q has no ipAddress in cluster status", targetNode)
+		}
+		return net.JoinHostPort(strings.TrimSpace(*status.IpAddress), port), nil
+	}
+
+	return "", fmt.Errorf("node %q was not found in cluster status", targetNode)
+}
+
+func portFromHostPort(hostPort string) (string, error) {
+	hostPort = strings.TrimSpace(hostPort)
+	if hostPort == "" {
+		return "", fmt.Errorf("API host is required")
+	}
+
+	if _, port, err := net.SplitHostPort(hostPort); err == nil {
+		return port, nil
+	}
+
+	idx := strings.LastIndex(hostPort, ":")
+	if idx <= 0 || idx == len(hostPort)-1 {
+		return "", fmt.Errorf("invalid API host: %s", hostPort)
+	}
+	port := hostPort[idx+1:]
+	if _, err := strconv.Atoi(port); err != nil {
+		return "", fmt.Errorf("invalid API host: %s", hostPort)
+	}
+	return port, nil
 }
 
 func init() {

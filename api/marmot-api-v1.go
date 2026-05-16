@@ -413,6 +413,9 @@ type ServerInterface interface {
 	// Create image from Server Object by Id
 	// (POST /server/{id})
 	ApiMakeImageEntryFromRunningVMById(ctx echo.Context, id string) error
+	// Connect to Server Console by Id
+	// (GET /server/{id}/console)
+	ApiConsoleServerById(ctx echo.Context, id string) error
 	// Update Server Information by Id
 	// (PUT /server/{id})
 	ApiUpdateServerById(ctx echo.Context, id string) error
@@ -713,6 +716,22 @@ func (w *ServerInterfaceWrapper) ApiMakeImageEntryFromRunningVMById(ctx echo.Con
 	return err
 }
 
+// ApiConsoleServerById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiConsoleServerById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiConsoleServerById(ctx, id)
+	return err
+}
+
 // ApiUpdateServerById converts echo context to params.
 func (w *ServerInterfaceWrapper) ApiUpdateServerById(ctx echo.Context) error {
 	var err error
@@ -902,6 +921,7 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.GET(options.BaseURL+"/server", wrapper.ApiGetServers, options.OperationMiddlewares["apiGetServers"]...)
 	router.POST(options.BaseURL+"/server", wrapper.ApiCreateServer, options.OperationMiddlewares["apiCreateServer"]...)
 	router.DELETE(options.BaseURL+"/server/:id", wrapper.ApiDeleteServerById, options.OperationMiddlewares["apiDeleteServerById"]...)
+	router.GET(options.BaseURL+"/server/:id/console", wrapper.ApiConsoleServerById, options.OperationMiddlewares["apiConsoleServerById"]...)
 	router.GET(options.BaseURL+"/server/:id", wrapper.ApiGetServerById, options.OperationMiddlewares["apiGetServerById"]...)
 	router.POST(options.BaseURL+"/server/:id", wrapper.ApiMakeImageEntryFromRunningVMById, options.OperationMiddlewares["apiMakeImageEntryFromRunningVMById"]...)
 	router.PUT(options.BaseURL+"/server/:id", wrapper.ApiUpdateServerById, options.OperationMiddlewares["apiUpdateServerById"]...)

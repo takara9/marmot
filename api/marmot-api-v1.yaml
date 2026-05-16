@@ -324,6 +324,33 @@ paths:
               application/json:
                 schema:
                   $ref: "#/components/schemas/Error"
+  /server/{id}/console:
+      get:
+        summary: "Connect to Server Console by Id"
+        operationId: apiConsoleServerById
+        tags:
+          - server
+        parameters:
+          - name: id
+            in: path
+            required: true
+            description: The id of the server to connect console
+            schema:
+              type: string
+        responses:
+          "200":
+            description: Connected to the server console stream
+            content:
+              text/plain:
+                schema:
+                  type: string
+                  format: binary
+          default:
+            description: unexpected error
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Error"
   /server/{id}/start:
       post:
         summary: "Start Server by Id"

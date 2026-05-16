@@ -778,6 +778,7 @@ func (m *Marmot) StopServerManage(id string) error {
 
 	sv.Status.StatusCode = db.SERVER_STOPPED
 	sv.Status.Status = util.StringPtr(db.ServerStatus[sv.Status.StatusCode])
+	sv.Status.Console = util.StringPtr("")
 	sv.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	if err = m.Db.UpdateServer(api.ServerID(sv), sv); err != nil {
 		slog.Error("UpdateServer()", "err", err)

@@ -15,8 +15,8 @@ import (
 )
 
 // ApiConsoleServerById upgrades the HTTP connection and relays it to screen on the server host.
-func (s *Server) ApiConsoleServerById(ctx echo.Context) error {
-	id := strings.TrimSpace(ctx.Param("id"))
+func (s *Server) ApiConsoleServerById(ctx echo.Context, id string) error {
+	id = strings.TrimSpace(id)
 	if id == "" {
 		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: "server id is required"})
 	}
