@@ -12,6 +12,7 @@ var clusterConfigFilename string
 var outputStyle string
 var watchMode bool
 var watchInterval int
+var labelSelector string
 
 //var m *client.MarmotEndpoint
 

@@ -1,0 +1,302 @@
+package cmd
+
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"github.com/spf13/cobra"
+	"github.com/takara9/marmot/api"
+	"go.yaml.in/yaml/v3"
+)
+
+var manifestFile string
+
+var createCmd = &cobra.Command{
+	Use:   "create [RESOURCE]",
+	Short: "Create a resource from a file or stdin",
+	Long:  `Create a resource (server/srv, image/img, volume/vol, network/net) from a manifest file or stdin. If RESOURCE is omitted, it is inferred from manifest kind.`,
+	Args:  cobra.RangeArgs(0, 1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// マニフェストファイルが指定されていない場合はエラー
+		if manifestFile == "" {
+			return fmt.Errorf("flag -f is required for create command")
+		}
+
+		// マニフェストを読み込む
+		manifest, err := LoadManifest(manifestFile)
+		if err != nil {
+			return fmt.Errorf("failed to load manifest: %w", err)
+		}
+
+		// マニフェストの kind を取得
+		kind := ""
+		if k, ok := manifest["kind"].(string); ok {
+			kind = k
+		}
+
+		var resourceName string
+		if len(args) > 0 {
+			resourceName = normalizeResourceName(args[0])
+		} else {
+			switch GetManifestType(kind) {
+			case ManifestTypeServer:
+				resourceName = "server"
+			case ManifestTypeImage:
+				resourceName = "image"
+			case ManifestTypeVolume:
+				resourceName = "volume"
+			case ManifestTypeNetwork:
+				resourceName = "network"
+			default:
+				return fmt.Errorf("failed to infer resource type from kind %q", kind)
+			}
+		}
+
+		expectedKind := GetKindFromResourceName(resourceName)
+		if kind != "" && kind != expectedKind {
+			return fmt.Errorf("manifest kind %q does not match resource type %q", kind, resourceName)
+		}
+
+		// リソースタイプに応じて処理を分岐
+		switch strings.ToLower(resourceName) {
+		case "server":
+			return createServer(manifest)
+		case "image":
+			return createImage(manifest)
+		case "volume":
+			return createVolume(manifest)
+		case "network":
+			return createNetwork(manifest)
+		default:
+			return fmt.Errorf("unknown resource type: %s", resourceName)
+		}
+	},
+}
+
+func createServer(manifest map[string]interface{}) error {
+	m, err := getClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	// Server オブジェクトに変換
+	server, err := ManifestToServer(manifest)
+	if err != nil {
+		return fmt.Errorf("failed to convert manifest to server: %w", err)
+	}
+
+	// 必須フィールドの確認
+	if server.ApiVersion == "" {
+		return fmt.Errorf("apiVersion is required")
+	}
+	if server.Kind == "" {
+		return fmt.Errorf("kind is required")
+	}
+	if strings.TrimSpace(server.Metadata.Name) == "" {
+		return fmt.Errorf("metadata.name is required")
+	}
+
+	// storage[].spec.type/kind の既定値を補完
+	ApplyServerDefaults(server)
+
+	// サーバーが既に存在するかチェック
+	list, _, err := m.GetServers()
+	if err == nil {
+		var servers []api.Server
+		json.Unmarshal(list, &servers)
+		for _, s := range servers {
+			if s.Metadata.Name == server.Metadata.Name {
+				return fmt.Errorf("server %q already exists", server.Metadata.Name)
+			}
+		}
+	}
+
+	// サーバーを作成
+	byteBody, _, err := m.CreateServer(*server)
+	if err != nil {
+		return fmt.Errorf("failed to create server: %w", err)
+	}
+
+	// レスポンス処理
+	return processCreateResponse(byteBody)
+}
+
+func createImage(manifest map[string]interface{}) error {
+	m, err := getClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	// Image オブジェクトに変換
+	image, err := ManifestToImage(manifest)
+	if err != nil {
+		return fmt.Errorf("failed to convert manifest to image: %w", err)
+	}
+
+	// 必須フィールドの確認
+	if image.ApiVersion == "" {
+		return fmt.Errorf("apiVersion is required")
+	}
+	if image.Kind == "" {
+		return fmt.Errorf("kind is required")
+	}
+	if strings.TrimSpace(image.Metadata.Name) == "" {
+		return fmt.Errorf("metadata.name is required")
+	}
+	if image.Spec.SourceUrl == nil || strings.TrimSpace(*image.Spec.SourceUrl) == "" {
+		return fmt.Errorf("spec.sourceUrl is required")
+	}
+
+	// イメージが既に存在するかチェック
+	list, _, err := m.GetImages()
+	if err == nil {
+		var images []api.Image
+		json.Unmarshal(list, &images)
+		for _, img := range images {
+			if img.Metadata.Name == image.Metadata.Name {
+				return fmt.Errorf("image %q already exists", image.Metadata.Name)
+			}
+		}
+	}
+
+	// イメージを作成
+	byteBody, _, err := m.CreateImage(*image)
+	if err != nil {
+		return fmt.Errorf("failed to create image: %w", err)
+	}
+
+	return processCreateResponse(byteBody)
+}
+
+func createVolume(manifest map[string]interface{}) error {
+	m, err := getClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	// Volume オブジェクトに変換
+	volume, err := ManifestToVolume(manifest)
+	if err != nil {
+		return fmt.Errorf("failed to convert manifest to volume: %w", err)
+	}
+
+	// 必須フィールドの確認
+	if volume.ApiVersion == "" {
+		return fmt.Errorf("apiVersion is required")
+	}
+	if volume.Kind == "" {
+		return fmt.Errorf("kind is required")
+	}
+	if strings.TrimSpace(volume.Metadata.Name) == "" {
+		return fmt.Errorf("metadata.name is required")
+	}
+	if volume.Spec.Type == nil || strings.TrimSpace(*volume.Spec.Type) == "" {
+		return fmt.Errorf("spec.type is required")
+	}
+	if volume.Spec.Kind == nil || strings.TrimSpace(*volume.Spec.Kind) == "" {
+		return fmt.Errorf("spec.kind is required")
+	}
+
+	// ボリュームが既に存在するかチェック
+	list, _, err := m.ListVolumes()
+	if err == nil {
+		var volumes []api.Volume
+		json.Unmarshal(list, &volumes)
+		for _, vol := range volumes {
+			if vol.Metadata.Name == volume.Metadata.Name {
+				return fmt.Errorf("volume %q already exists", volume.Metadata.Name)
+			}
+		}
+	}
+
+	// ボリュームを作成
+	byteBody, _, err := m.CreateVolume(*volume)
+	if err != nil {
+		return fmt.Errorf("failed to create volume: %w", err)
+	}
+
+	return processCreateResponse(byteBody)
+}
+
+func createNetwork(manifest map[string]interface{}) error {
+	m, err := getClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	// VirtualNetwork オブジェクトに変換
+	network, err := ManifestToVirtualNetwork(manifest)
+	if err != nil {
+		return fmt.Errorf("failed to convert manifest to network: %w", err)
+	}
+
+	// 必須フィールドの確認
+	if network.ApiVersion == "" {
+		return fmt.Errorf("apiVersion is required")
+	}
+	if network.Kind == "" {
+		return fmt.Errorf("kind is required")
+	}
+	if strings.TrimSpace(network.Metadata.Name) == "" {
+		return fmt.Errorf("metadata.name is required")
+	}
+
+	// ネットワークが既に存在するかチェック
+	list, _, err := m.GetVirtualNetworks()
+	if err == nil {
+		var networks []api.VirtualNetwork
+		json.Unmarshal(list, &networks)
+		for _, net := range networks {
+			if net.Metadata.Name == network.Metadata.Name {
+				return fmt.Errorf("network %q already exists", network.Metadata.Name)
+			}
+		}
+	}
+
+	// ネットワークを作成
+	byteBody, _, err := m.CreateVirtualNetwork(*network)
+	if err != nil {
+		return fmt.Errorf("failed to create network: %w", err)
+	}
+
+	return processCreateResponse(byteBody)
+}
+
+func processCreateResponse(byteBody []byte) error {
+	switch outputStyle {
+	case "text":
+		var data any
+		if err := json.Unmarshal(byteBody, &data); err != nil {
+			return fmt.Errorf("failed to parse response: %w", err)
+		}
+		serveMap := data.(map[string]any)
+		fmt.Printf("リソースの作成要求が受け入れられました。ID: %v\n", serveMap["id"])
+		return nil
+
+	case "json":
+		fmt.Println(string(byteBody))
+		return nil
+
+	case "yaml":
+		var data interface{}
+		if err := json.Unmarshal(byteBody, &data); err != nil {
+			return fmt.Errorf("failed to parse response: %w", err)
+		}
+		yamlBytes, err := yaml.Marshal(data)
+		if err != nil {
+			return fmt.Errorf("failed to marshal to YAML: %w", err)
+		}
+		fmt.Println(string(yamlBytes))
+		return nil
+
+	default:
+		return fmt.Errorf("output style must be text/json/yaml")
+	}
+}
+
+func init() {
+	rootCmd.AddCommand(createCmd)
+	createCmd.Flags().StringVarP(&manifestFile, "file", "f", "", "Manifest file, URL, or - for stdin")
+	createCmd.MarkFlagRequired("file")
+}
