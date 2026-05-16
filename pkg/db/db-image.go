@@ -203,7 +203,7 @@ func (d *Database) makeImageEntryFromURLWithNodeAndMeta(name, url, nodeName, api
 		Kind:       kind,
 		Metadata: api.Metadata{
 			Name: name,
-			Id:   util.StringPtr(id),
+			Id: id,
 			Uuid: util.StringPtr(uuidString),
 		},
 		Spec: api.ImageSpec{
@@ -294,7 +294,7 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 				Name:     name,
 				Labels:   &labels,
 				NodeName: serverNodeName,
-				Id:       util.StringPtr(id),
+				Id: id,
 				Uuid:     util.StringPtr(uuidString),
 			},
 			Spec: api.ImageSpec{
@@ -325,7 +325,7 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 				Name:     name,
 				Labels:   &labels,
 				NodeName: serverNodeName,
-				Id:       util.StringPtr(id),
+				Id: id,
 				Uuid:     util.StringPtr(uuidString),
 			},
 			Spec: api.ImageSpec{
@@ -425,8 +425,8 @@ func normalizeImageMetadataID(img *api.Image, fallbackID string) {
 	if fallbackID == "" {
 		return
 	}
-	if img.Metadata.Id == nil || strings.TrimSpace(*img.Metadata.Id) == "" {
-		img.Metadata.Id = util.StringPtr(fallbackID)
+	if strings.TrimSpace(img.Metadata.Id) == "" {
+		img.Metadata.Id = fallbackID
 	}
 }
 
@@ -508,7 +508,7 @@ func (d *Database) updateImage(id string, spec api.Image) error {
 	}
 	expected := resp.Kvs[0].ModRevision
 
-	rec.Metadata.Id = util.StringPtr(id)
+	rec.Metadata.Id = id
 	// パッチ適用
 	util.PatchStruct(&rec, spec)
 
@@ -659,7 +659,7 @@ func (d *Database) MakeFollowerImageEntry(headImage api.Image, followerNodeName 
 			Name:     headImage.Metadata.Name,
 			NodeName: util.StringPtr(followerNodeName),
 			Labels:   &labels,
-			Id:       util.StringPtr(id),
+			Id: id,
 			Uuid:     util.StringPtr(uuidString),
 		},
 		Spec: api.ImageSpec{

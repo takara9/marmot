@@ -139,7 +139,7 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 		})
 
 		It("イメージの詳細情報取得 -1", func() {
-			image, err := marmotServer.Ma.GetImageManage(util.DerefStrPtr((images)[0].Metadata.Id))
+			image, err := marmotServer.Ma.GetImageManage((images)[0].Metadata.Id)
 			Expect(err).NotTo(HaveOccurred())
 			jsonBytes, err := json.MarshalIndent(image, "", "    ")
 			Expect(err).NotTo(HaveOccurred())
@@ -147,7 +147,7 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 		})
 
 		It("イメージの詳細情報取得 -2", func() {
-			image, err := marmotServer.Ma.GetImageManage(util.DerefStrPtr((images)[1].Metadata.Id))
+			image, err := marmotServer.Ma.GetImageManage((images)[1].Metadata.Id)
 			Expect(err).NotTo(HaveOccurred())
 			jsonBytes, err := json.MarshalIndent(image, "", "    ")
 			Expect(err).NotTo(HaveOccurred())
@@ -155,19 +155,19 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 		})
 
 		It("イメージの削除 -1", func() {
-			err := marmotServer.Ma.DeleteImageManage(util.DerefStrPtr((images)[0].Metadata.Id))
+			err := marmotServer.Ma.DeleteImageManage((images)[0].Metadata.Id)
 			Expect(err).NotTo(HaveOccurred())
-			_, err = marmotServer.Ma.GetImageManage(util.DerefStrPtr((images)[0].Metadata.Id))
+			_, err = marmotServer.Ma.GetImageManage((images)[0].Metadata.Id)
 			Expect(err).To(HaveOccurred())
-			fmt.Println("Deleted image ID: ", util.DerefStrPtr((images)[0].Metadata.Id))
+			fmt.Println("Deleted image ID: ", (images)[0].Metadata.Id)
 		})
 
 		It("イメージの削除 -2", func() {
-			err := marmotServer.Ma.DeleteImageManage(util.DerefStrPtr((images)[1].Metadata.Id))
+			err := marmotServer.Ma.DeleteImageManage((images)[1].Metadata.Id)
 			Expect(err).NotTo(HaveOccurred())
-			_, err = marmotServer.Ma.GetImageManage(util.DerefStrPtr((images)[1].Metadata.Id))
+			_, err = marmotServer.Ma.GetImageManage((images)[1].Metadata.Id)
 			Expect(err).To(HaveOccurred())
-			fmt.Println("Deleted image ID: ", util.DerefStrPtr((images)[1].Metadata.Id))
+			fmt.Println("Deleted image ID: ", (images)[1].Metadata.Id)
 		})
 	})
 })

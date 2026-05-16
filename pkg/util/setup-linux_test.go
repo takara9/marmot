@@ -70,13 +70,13 @@ var _ = Describe("Linux セットアップ", Ordered, Label("integration", "requ
 		// テスト用のサーバースペックを定義
 		testSpec := api.Server{
 			Metadata: api.Metadata{
-				Id:   util.StringPtr("a123456"),
+				Id: "a123456",
 				Name: "test-linux",
 				Uuid: util.StringPtr("550e8400-e29b-41d4-a716-446655440000"),
 			},
 			Spec: api.ServerSpec{
 				BootVolume: &api.Volume{
-					Metadata: api.Metadata{Id: util.StringPtr("test-linux-boot")},
+					Metadata: api.Metadata{Id: "test-linux-boot"},
 					Spec: api.VolSpec{
 						Type: util.StringPtr("qcow2"),
 						Path: util.StringPtr("/var/lib/marmot/volumes/test-linux-qcow2.img"),
@@ -132,13 +132,13 @@ var _ = Describe("Linux セットアップ", Ordered, Label("integration", "requ
 		// テスト用のサーバースペックを定義
 		testSpec := api.Server{
 			Metadata: api.Metadata{
-				Id:   util.StringPtr("b123456"),
+				Id: "b123456",
 				Name: "test-linux-lvm",
 				Uuid: util.StringPtr("550e8400-e29b-41d4-a716-446655440001"),
 			},
 			Spec: api.ServerSpec{
 				BootVolume: &api.Volume{
-					Metadata: api.Metadata{Id: util.StringPtr("test-linux-boot2")},
+					Metadata: api.Metadata{Id: "test-linux-boot2"},
 					Spec: api.VolSpec{
 						Type:          util.StringPtr("lvm"),
 						Path:          util.StringPtr("/dev/mapper/vg1-lvos_test1"),
@@ -196,13 +196,13 @@ var _ = Describe("Linux セットアップ", Ordered, Label("integration", "requ
 	Context("複数NIC設定のテスト", func() {
 		testSpec := api.Server{
 			Metadata: api.Metadata{
-				Id:   util.StringPtr("c123456"),
+				Id: "c123456",
 				Name: "test-linux-mh",
 				Uuid: util.StringPtr("550e8400-e29b-41d4-a716-446655440002"),
 			},
 			Spec: api.ServerSpec{
 				BootVolume: &api.Volume{
-					Metadata: api.Metadata{Id: util.StringPtr("test-linux-boot3")},
+					Metadata: api.Metadata{Id: "test-linux-boot3"},
 					Spec: api.VolSpec{
 						Type:          util.StringPtr("lvm"),
 						Path:          util.StringPtr("/dev/mapper/vg1-lvos_test2"),
@@ -268,13 +268,13 @@ var _ = Describe("Linux セットアップ", Ordered, Label("integration", "requ
 	Context("最大NIC設定のテスト", func() {
 		testSpec := api.Server{
 			Metadata: api.Metadata{
-				Id:   util.StringPtr("d123456"),
+				Id: "d123456",
 				Name: "test-linux-mh",
 				Uuid: util.StringPtr("550e8400-e29b-41d4-a716-446655440003"),
 			},
 			Spec: api.ServerSpec{
 				BootVolume: &api.Volume{
-					Metadata: api.Metadata{Id: util.StringPtr("test-linux-boot4")},
+					Metadata: api.Metadata{Id: "test-linux-boot4"},
 					Spec: api.VolSpec{
 						Type:          util.StringPtr("lvm"),
 						Path:          util.StringPtr("/dev/mapper/vg1-lvos_test2"),

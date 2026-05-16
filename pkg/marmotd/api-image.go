@@ -130,10 +130,10 @@ func (s *Server) ApiDeleteImageById(ctx echo.Context, id string) error {
 			// 既に削除予定済みのものはスキップ
 			continue
 		}
-		if setErr := s.Ma.Db.SetDeleteTimestampImage(util.DerefStrPtr(img.Metadata.Id)); setErr != nil {
-			slog.Error("ApiDeleteImageById() SetDeleteTimestampImage failed", "imageId", util.DerefStrPtr(img.Metadata.Id), "err", setErr)
+		if setErr := s.Ma.Db.SetDeleteTimestampImage(img.Metadata.Id); setErr != nil {
+			slog.Error("ApiDeleteImageById() SetDeleteTimestampImage failed", "imageId", img.Metadata.Id, "err", setErr)
 		} else {
-			slog.Debug("ApiDeleteImageById() 削除タイムスタンプをセット", "imageId", util.DerefStrPtr(img.Metadata.Id), "imageName", targetName)
+			slog.Debug("ApiDeleteImageById() 削除タイムスタンプをセット", "imageId", img.Metadata.Id, "imageName", targetName)
 		}
 	}
 

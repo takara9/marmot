@@ -16,7 +16,7 @@ var serverUpdateCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var spec api.Server
 		serverId := args[0]
-		spec.Metadata.Id = &serverId
+	spec.Metadata.Id = serverId
 			   spec.Metadata.Name = serverName
 
 		m, err := getClientConfig()

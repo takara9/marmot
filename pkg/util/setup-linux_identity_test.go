@@ -11,7 +11,7 @@ func TestMachineIDForServer_NormalizesUUID(t *testing.T) {
 	id := "abcde"
 	spec := api.Server{
 		Metadata: api.Metadata{
-			Id:   &id,
+			Id:   id,
 			Uuid: StringPtr("550e8400-e29b-41d4-a716-446655440000"),
 		},
 	}
@@ -25,7 +25,7 @@ func TestMachineIDForServer_NormalizesUUID(t *testing.T) {
 
 func TestMachineIDForServer_FallbackDeterministicHex(t *testing.T) {
 	id := "a123456"
-	spec := api.Server{Metadata: api.Metadata{Id: &id}}
+	spec := api.Server{Metadata: api.Metadata{Id: id}}
 
 	got1 := machineIDForServer(spec)
 	got2 := machineIDForServer(spec)
@@ -60,7 +60,7 @@ func TestHostIDBytes_DeterministicAndDistinct(t *testing.T) {
 func TestHostnameForServer_UsesMetadataName(t *testing.T) {
 	id := "sv-001"
 	name := "test-vm"
-	spec := api.Server{Metadata: api.Metadata{Id: &id, Name: name}}
+	spec := api.Server{Metadata: api.Metadata{Id: id, Name: name}}
 
 	got := hostnameForServer(spec)
 	if got != "test-vm" {
@@ -70,7 +70,7 @@ func TestHostnameForServer_UsesMetadataName(t *testing.T) {
 
 func TestHostnameForServer_FallsBackToServerID(t *testing.T) {
 	id := "sv-002"
-	spec := api.Server{Metadata: api.Metadata{Id: &id}}
+	spec := api.Server{Metadata: api.Metadata{Id: id}}
 
 	got := hostnameForServer(spec)
 	if got != "vm-sv-002" {

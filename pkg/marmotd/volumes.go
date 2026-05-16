@@ -390,7 +390,7 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 
 			imageLVPath, err := resolveImageLVPath(img)
 			if err != nil {
-				slog.Error("failed to resolve lvm image path", "err", err, "imageId", util.DerefStrPtr(img.Metadata.Id))
+				slog.Error("failed to resolve lvm image path", "err", err, "imageId", img.Metadata.Id)
 				m.Db.UpdateVolumeStatusMessage(volumeID, db.VOLUME_ERROR, err.Error())
 				return nil, err
 			}
