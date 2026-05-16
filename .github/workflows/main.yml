@@ -359,6 +359,7 @@ jobs:
       - package-marmotd-etc
       - package-marmotd-images
       - package-marmotd-osimage
+      - mactl-unit-tests
     steps:
     - uses: actions/checkout@v5
 
