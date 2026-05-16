@@ -153,12 +153,12 @@ var _ = Describe("VirtualServers", Ordered, func() {
 		})
 
 		It("仮想マシンのドメインの定義-1", func() {
-			err := l.DefineAndStartVM(*dom1)
+			_, err := l.DefineAndStartVM(*dom1)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("仮想マシンのドメインの定義-2", func() {
-			err := l.DefineAndStartVM(*dom2)
+			_, err := l.DefineAndStartVM(*dom2)
 			Expect(err).NotTo(HaveOccurred())
 		})
 

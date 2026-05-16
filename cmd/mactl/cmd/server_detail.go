@@ -91,6 +91,7 @@ func printServerDetails(server api.Server) {
 	fmt.Printf("  Instance Name: %s\n", stringValue(&server.Metadata, func(m *api.Metadata) *string { return m.InstanceName }))
 	fmt.Printf("  Status:        %s\n", formatServerStatus(server.Status))
 	fmt.Printf("  Message:       %s\n", stringValue(server.Status, func(s *api.Status) *string { return s.Message }))
+	fmt.Printf("  Console:       %s\n", stringValue(server.Status, func(s *api.Status) *string { return s.Console }))
 	fmt.Println()
 
 	fmt.Println("Lifecycle")
