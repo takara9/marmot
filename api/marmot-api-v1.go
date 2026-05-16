@@ -238,6 +238,7 @@ type Status struct {
 	DeletionTimeStamp   *time.Time `json:"deletionTimeStamp,omitempty" yaml:"deletionTimeStamp,omitempty"`
 	LastUpdateTimeStamp *time.Time `json:"lastUpdateTimeStamp,omitempty" yaml:"lastUpdateTimeStamp,omitempty"`
 	Message             *string    `json:"message,omitempty" yaml:"message,omitempty"`
+	Console             *string    `json:"console,omitempty" yaml:"console,omitempty"`
 	Status              *string    `json:"status,omitempty" yaml:"status,omitempty"`
 	StatusCode          int        `json:"statusCode" yaml:"statusCode"`
 }

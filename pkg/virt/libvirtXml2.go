@@ -376,18 +376,19 @@ func CreateDomainXML(vs ServerSpec) *libvirtxml.Domain {
 }
 
 // 構造体で渡すのが良い
-func (l *LibVirtEp) DefineAndStartVM(domain libvirtxml.Domain) error {
+func (l *LibVirtEp) DefineAndStartVM(domain libvirtxml.Domain) (string, error) {
 	xmlString, err := domain.Marshal()
 	if err != nil {
 		fmt.Println("Error marshaling domain XML:", err)
-		return err
+		return "", err
 	}
 
 	// Create VM
 	dom, err := l.Com.DomainDefineXML(xmlString)
 	if err != nil {
-		return err
+		return "", err
 	}
+	defer dom.Free()
 
 	// Start VM
 	err = dom.Create()
@@ -397,17 +398,21 @@ func (l *LibVirtEp) DefineAndStartVM(domain libvirtxml.Domain) error {
 		err = dom.Create()
 	}
 	if err != nil {
-		return err
+		return "", err
+	}
+
+	consolePath, err := GetDomainConsolePath(dom)
+	if err != nil {
+		return "", err
 	}
 
 	//オートスタートを設定しないと、HVの再起動からの復帰時、停止している。
 	err = dom.SetAutostart(true)
 	if err != nil {
-		return err
+		return "", err
 	}
-	defer dom.Free()
 
-	return nil
+	return consolePath, nil
 }
 
 func isOVSPortAttachConflict(err error) bool {

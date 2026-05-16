@@ -731,7 +731,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 
 	slog.Debug("仮想マシンの定義と起動")
 
-	err = l.DefineAndStartVM(*dom)
+	consolePath, err := l.DefineAndStartVM(*dom)
 	if err != nil {
 		slog.Error("DefineAndStartVM()", "err", err) // ここで No such file or directory エラーになる
 		return "", err
@@ -740,6 +740,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	// ステータスを利用可能に更新、更新日時もセット
 	serverConfig.Status.StatusCode = db.SERVER_RUNNING
 	serverConfig.Status.Status = util.StringPtr(db.ServerStatus[serverConfig.Status.StatusCode])
+	serverConfig.Status.Console = util.StringPtr(consolePath)
 	serverConfig.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	err = m.Db.UpdateServer(api.ServerID(serverConfig), serverConfig)
 	if err != nil {
@@ -811,8 +812,22 @@ func (m *Marmot) StartServerManage(id string) error {
 		return err
 	}
 
+	dom, err := l.Com.LookupDomainByName(*sv.Metadata.InstanceName)
+	if err != nil {
+		slog.Error("LookupDomainByName()", "err", err)
+		return err
+	}
+	defer dom.Free()
+
+	consolePath, err := virt.GetDomainConsolePath(dom)
+	if err != nil {
+		slog.Error("GetDomainConsolePath()", "err", err)
+		return err
+	}
+
 	sv.Status.StatusCode = db.SERVER_RUNNING
 	sv.Status.Status = util.StringPtr(db.ServerStatus[sv.Status.StatusCode])
+	sv.Status.Console = util.StringPtr(consolePath)
 	sv.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	if err = m.Db.UpdateServer(api.ServerID(sv), sv); err != nil {
 		slog.Error("UpdateServer()", "err", err)
