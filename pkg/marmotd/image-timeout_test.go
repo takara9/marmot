@@ -9,7 +9,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/util"
 )
 
 var _ = Describe("Image timeout helpers", func() {

@@ -13,7 +13,6 @@ import (
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/marmotd"
-	"github.com/takara9/marmot/pkg/util"
 )
 
 var _ = Describe("ImageManagmentTest", Ordered, func() {
