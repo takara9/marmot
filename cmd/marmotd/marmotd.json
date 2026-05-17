@@ -22,7 +22,7 @@
     },
     {
       "name": "ubuntu24.04",
-      "url": "https://cloud-images.ubuntu.com/releases/lunar/release/ubuntu-24.04-server-cloudimg-amd64.img",
+      "url": "https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img",
       "osName": "ubuntu",
       "osVersion": "24.04"
     }

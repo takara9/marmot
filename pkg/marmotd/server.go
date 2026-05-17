@@ -15,6 +15,7 @@ import (
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/lvm"
+	"github.com/takara9/marmot/pkg/networkfabric"
 	"github.com/takara9/marmot/pkg/qcow"
 	"github.com/takara9/marmot/pkg/util"
 	"github.com/takara9/marmot/pkg/virt"
@@ -741,6 +742,13 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		}
 	}
 
+	// VM 起動直前に、VXLAN ネットワークの OVS ブリッジ存在を再確認する。
+	// ネットワークコントローラーとのタイミング競合でブリッジがまだ見えない場合に備える。
+	if err := m.ensureVxlanBridgesForServer(serverConfig); err != nil {
+		slog.Error("ensureVxlanBridgesForServer()", "err", err)
+		return "", err
+	}
+
 	dom := virt.CreateDomainXML(virtSpec)
 	xml, err := dom.Marshal()
 	fmt.Println("Generated", "libvirt XML:\n", string(xml))
@@ -783,6 +791,14 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			consolePath, err = l.DefineAndStartVM(*dom)
 		}
 	}
+	if err != nil && isLibvirtBridgeDeviceMissingError(err) {
+		slog.Warn("bridge device not ready; retrying after ensuring vxlan bridges", "err", err)
+		if ensureErr := m.ensureVxlanBridgesForServer(serverConfig); ensureErr != nil {
+			slog.Error("ensureVxlanBridgesForServer() on retry", "err", ensureErr)
+		} else {
+			consolePath, err = l.DefineAndStartVM(*dom)
+		}
+	}
 	if err != nil {
 		slog.Error("DefineAndStartVM()", "err", err) // ここで No such file or directory エラーになる
 		return "", err
@@ -808,6 +824,52 @@ func isLibvirtNetworkNotFoundError(err error) bool {
 	}
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "network not found") || strings.Contains(msg, "no network with matching name")
+}
+
+func isLibvirtBridgeDeviceMissingError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "cannot get interface mtu") || strings.Contains(msg, "no such device")
+}
+
+func isVxlanOverlayNetwork(vnet api.VirtualNetwork) bool {
+	if vnet.Spec.OverlayMode == nil {
+		return false
+	}
+	return strings.EqualFold(string(*vnet.Spec.OverlayMode), "vxlan")
+}
+
+func (m *Marmot) ensureVxlanBridgesForServer(serverConfig api.Server) error {
+	if serverConfig.Spec.NetworkInterface == nil {
+		return nil
+	}
+
+	fabric := networkfabric.NewOVSFabric()
+	for _, nic := range *serverConfig.Spec.NetworkInterface {
+		networkName := strings.TrimSpace(nic.Networkname)
+		if networkName == "" {
+			continue
+		}
+
+		vnet, err := m.Db.GetVirtualNetworkByName(networkName)
+		if err != nil {
+			return fmt.Errorf("failed to lookup virtual network %s: %w", networkName, err)
+		}
+		if !isVxlanOverlayNetwork(vnet) {
+			continue
+		}
+		if vnet.Spec.BridgeName == nil || strings.TrimSpace(*vnet.Spec.BridgeName) == "" {
+			return fmt.Errorf("vxlan network %s has no bridgeName", networkName)
+		}
+
+		if err := fabric.EnsureBridge(&vnet); err != nil {
+			return fmt.Errorf("failed to ensure bridge for network %s: %w", networkName, err)
+		}
+	}
+
+	return nil
 }
 
 // サーバーの停止 コントローラーから呼び出される

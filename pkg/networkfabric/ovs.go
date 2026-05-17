@@ -1,6 +1,7 @@
 package networkfabric
 
 import (
+	"context"
 	"fmt"
 	"hash/fnv"
 	"log/slog"
@@ -8,6 +9,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/takara9/marmot/api"
 )
@@ -19,7 +21,10 @@ type OVSFabric struct {
 	// 必要に応じて設定を保持（例: underlay_interface）
 }
 
-const splitHorizonCookie = "0x6d61726d6f740001"
+const (
+	splitHorizonCookie = "0x6d61726d6f740001"
+	ovsCommandTimeout = 30 * time.Second
+)
 
 // NewOVSFabric は OVSFabric インスタンスを生成する。
 func NewOVSFabric() *OVSFabric {
@@ -35,16 +40,43 @@ func (o *OVSFabric) EnsureBridge(vnet *api.VirtualNetwork) error {
 	bridgeName := *vnet.Spec.BridgeName
 
 	// ブリッジ存在確認
-	cmd := exec.Command("ovs-vsctl", "br-exists", bridgeName)
+	checkCtx, checkCancel := context.WithTimeout(context.Background(), ovsCommandTimeout)
+	defer checkCancel()
+	cmd := exec.CommandContext(checkCtx, "ovs-vsctl", "br-exists", bridgeName)
 	if err := cmd.Run(); err == nil {
 		// ブリッジ既存
 		slog.Debug("OVS bridge already exists", "bridge", bridgeName)
 		return nil
+	} else if checkCtx.Err() == context.DeadlineExceeded {
+		return fmt.Errorf("timeout while checking OVS bridge %s", bridgeName)
 	}
 
 	// ブリッジ作成
-	cmd = exec.Command("ovs-vsctl", "add-br", bridgeName)
+	addCtx, addCancel := context.WithTimeout(context.Background(), ovsCommandTimeout)
+	defer addCancel()
+	cmd = exec.CommandContext(addCtx, "ovs-vsctl", "--may-exist", "add-br", bridgeName)
 	if output, err := cmd.CombinedOutput(); err != nil {
+		if addCtx.Err() == context.DeadlineExceeded {
+			// タイムアウトでも作成完了している場合があるため、再確認して存在すれば成功扱いにする。
+			recheckCtx, recheckCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer recheckCancel()
+			recheckCmd := exec.CommandContext(recheckCtx, "ovs-vsctl", "br-exists", bridgeName)
+			if recheckErr := recheckCmd.Run(); recheckErr == nil {
+				slog.Warn("OVS bridge create timed out but bridge exists", "bridge", bridgeName)
+				return nil
+			}
+			return fmt.Errorf("timeout while creating bridge %s", bridgeName)
+		}
+
+		// エラーでも競合で既存化している場合があるため再確認する。
+		recheckCtx, recheckCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer recheckCancel()
+		recheckCmd := exec.CommandContext(recheckCtx, "ovs-vsctl", "br-exists", bridgeName)
+		if recheckErr := recheckCmd.Run(); recheckErr == nil {
+			slog.Warn("OVS bridge create returned error but bridge exists", "bridge", bridgeName, "err", err, "output", string(output))
+			return nil
+		}
+
 		slog.Error("failed to create OVS bridge", "bridge", bridgeName, "err", err, "output", string(output))
 		return fmt.Errorf("failed to create bridge %s: %w", bridgeName, err)
 	}
@@ -253,6 +285,13 @@ func reconcileSplitHorizonFlows(bridgeName string) error {
 	vxlanPorts, err := listVxlanPortsOnBridge(bridgeName)
 	if err != nil {
 		return err
+	}
+	if len(vxlanPorts) == 0 {
+		// VXLAN ポートが無い場合は split-horizon フローは不要。
+		// 単一ノード時やブリッジ初期化直後に ovs-ofctl が
+		// "not a bridge or a socket" を返すケースを避ける。
+		slog.Debug("no vxlan ports on bridge, skipping split-horizon flow reconciliation", "bridge", bridgeName)
+		return nil
 	}
 
 	accessPorts, err := listAccessPortsOnBridge(bridgeName)
