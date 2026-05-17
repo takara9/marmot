@@ -26,6 +26,8 @@ const (
 	ovsCommandTimeout = 30 * time.Second
 )
 
+const bridgeDeviceWaitTimeout = 10 * time.Second
+
 // NewOVSFabric は OVSFabric インスタンスを生成する。
 func NewOVSFabric() *OVSFabric {
 	return &OVSFabric{}
@@ -44,9 +46,21 @@ func (o *OVSFabric) EnsureBridge(vnet *api.VirtualNetwork) error {
 	defer checkCancel()
 	cmd := exec.CommandContext(checkCtx, "ovs-vsctl", "br-exists", bridgeName)
 	if err := cmd.Run(); err == nil {
-		// ブリッジ既存
-		slog.Debug("OVS bridge already exists", "bridge", bridgeName)
-		return nil
+		// OVS DB 上にあっても Linux 側デバイスが無いケースがあるため確認する。
+		if waitLinuxBridgeDeviceReady(bridgeName, bridgeDeviceWaitTimeout) {
+			slog.Debug("OVS bridge already exists", "bridge", bridgeName)
+			return nil
+		}
+
+		slog.Warn("OVS bridge exists in OVSDB but Linux device is missing; recreating bridge", "bridge", bridgeName)
+		if err := recreateBridge(bridgeName); err != nil {
+			return err
+		}
+		if waitLinuxBridgeDeviceReady(bridgeName, bridgeDeviceWaitTimeout) {
+			slog.Info("OVS bridge recreated and Linux device became ready", "bridge", bridgeName)
+			return nil
+		}
+		return fmt.Errorf("bridge %s exists in OVSDB but Linux device is not ready", bridgeName)
 	} else if checkCtx.Err() == context.DeadlineExceeded {
 		return fmt.Errorf("timeout while checking OVS bridge %s", bridgeName)
 	}
@@ -81,8 +95,56 @@ func (o *OVSFabric) EnsureBridge(vnet *api.VirtualNetwork) error {
 		return fmt.Errorf("failed to create bridge %s: %w", bridgeName, err)
 	}
 
+	if !waitLinuxBridgeDeviceReady(bridgeName, bridgeDeviceWaitTimeout) {
+		return fmt.Errorf("bridge %s created in OVSDB but Linux device is not ready", bridgeName)
+	}
+
 	slog.Info("OVS bridge created", "bridge", bridgeName)
 	return nil
+}
+
+func recreateBridge(bridgeName string) error {
+	delCtx, delCancel := context.WithTimeout(context.Background(), ovsCommandTimeout)
+	defer delCancel()
+	delCmd := exec.CommandContext(delCtx, "ovs-vsctl", "--if-exists", "del-br", bridgeName)
+	if output, err := delCmd.CombinedOutput(); err != nil {
+		if delCtx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("timeout while deleting stale bridge %s", bridgeName)
+		}
+		return fmt.Errorf("failed to delete stale bridge %s: %w (output=%s)", bridgeName, err, strings.TrimSpace(string(output)))
+	}
+
+	addCtx, addCancel := context.WithTimeout(context.Background(), ovsCommandTimeout)
+	defer addCancel()
+	addCmd := exec.CommandContext(addCtx, "ovs-vsctl", "--may-exist", "add-br", bridgeName)
+	if output, err := addCmd.CombinedOutput(); err != nil {
+		if addCtx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("timeout while recreating bridge %s", bridgeName)
+		}
+		return fmt.Errorf("failed to recreate bridge %s: %w (output=%s)", bridgeName, err, strings.TrimSpace(string(output)))
+	}
+
+	return nil
+}
+
+func waitLinuxBridgeDeviceReady(bridgeName string, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for {
+		if linuxBridgeDeviceExists(bridgeName) {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+}
+
+func linuxBridgeDeviceExists(bridgeName string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "ip", "link", "show", bridgeName)
+	return cmd.Run() == nil
 }
 
 // EnsureVxlanMesh はピアノードへの VXLAN トンネルを作成・確認する。
