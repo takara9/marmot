@@ -164,6 +164,18 @@ systemctl start libvirtd.service
 systemctl enable iscsid.service
 systemctl start iscsid.service
 
+# Open vSwitch を有効化して起動する
+if systemctl list-unit-files | grep -q '^openvswitch-switch\.service'; then
+    systemctl enable openvswitch-switch.service
+    systemctl start openvswitch-switch.service
+elif systemctl list-unit-files | grep -q '^ovs-vswitchd\.service'; then
+    # ディストリ差異向けのフォールバック
+    systemctl enable ovsdb-server.service || true
+    systemctl start ovsdb-server.service || true
+    systemctl enable ovs-vswitchd.service
+    systemctl start ovs-vswitchd.service
+fi
+
 systemctl daemon-reload
 systemctl enable marmot.service
 systemctl start marmot.service
@@ -172,62 +184,9 @@ echo ""
 echo "============================================================"
 echo " marmot のインストールが完了しました"
 echo "============================================================"
-echo ""
-echo "【次のステップ1】LVM ボリュームグループの設定 (環境に応じて実施)"
-echo ""
-echo "  ディスクを確認する:"
-echo "    lsblk"
-echo ""
-echo "  Physical Volume を作成する (例: /dev/vdc, /dev/vdd を使用):"
-echo "    pvcreate /dev/vdc"
-echo "    pvcreate /dev/vdd"
-echo ""
-echo "  Volume Group を作成する:"
-echo "    vgcreate vg1 /dev/vdc"
-echo "    vgcreate vg2 /dev/vdd"
-echo ""
-echo "  Logical Volume を作成する (例: テンプレート用 16GB):"
-echo "    lvcreate --name lv01 --size 16GB vg1"
-echo ""
-echo "  確認:"
-echo "    vgs"
-echo "    lvs"
-echo ""
-echo "------------------------------------------------------------"
-echo ""
-echo "【次のステップ2】ネットワーク (OVS ブリッジ) の設定 (環境に応じて実施)"
-echo ""
-echo "  (1) OVS ブリッジを作成して物理ポートを接続し、VLANトランクを設定する:"
-echo "    ovs-vsctl add-br ovsbr0"
-echo "    ovs-vsctl add-port ovsbr0 <物理NIC名>          # 例: enp4s0f0"
-echo "    ovs-vsctl set port <物理NIC名> trunk=1001,1002"
-echo "    ovs-vsctl show"
-echo ""
-echo "  (2) netplan でブリッジ (br0) を設定し、IPアドレスを割り当てる:"
-echo "    vi /etc/netplan/00-nic.yaml"
-echo "    netplan apply"
-echo ""
-echo "  (3) libvirt 仮想ネットワークを定義・有効化する:"
-echo "    virsh net-define ovs-network.xml"
-echo "    virsh net-start ovs-network"
-echo "    virsh net-autostart ovs-network"
-echo "    virsh net-define host-bridge.xml"
-echo "    virsh net-start host-bridge"
-echo "    virsh net-autostart host-bridge"
-echo "    virsh net-list"
-echo ""
-echo "  詳細は以下のドキュメントを参照してください:"
-echo "    docs/HOWTO-setup-vm-runner.md"
-echo "    docs/network-setup.md"
-echo ""
-echo "------------------------------------------------------------"
-echo ""
-echo "【次のステップ3】marmot サービスの起動"
-echo ""
-echo "  クライアント設定を配置する (サンプルをコピーして編集):"
-echo "    cp /etc/marmot/.marmot.example ~/.marmot"
-echo "    vi ~/.marmot"
-echo ""
+echo "自動的に VM起動イメージをダウンロードしています..."
+echo " この処理は環境によって数分かかることがあります。"
+echo " mactl get images でダウンロード状況を確認できます。"
 echo "============================================================"
 
 exit 0

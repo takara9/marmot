@@ -259,21 +259,19 @@ func createNetplanConfig(filePath string, nicName string, config bridgeConfigInf
 `, config.Gateway)
 	}
 
-	// Add nameservers if available
-	if config.Nameserver != "" {
-		yaml += `      nameservers:
+	// Add nameservers with default 8.8.8.8
+	yaml += `      nameservers:
 `
-		yaml += `        addresses:
+	yaml += `        addresses:
+`
+	yaml += `          - 8.8.8.8
+`
+
+	if config.Domain != "" {
+		yaml += `        search:
 `
 		yaml += fmt.Sprintf(`          - %s
-`, config.Nameserver)
-
-		if config.Domain != "" {
-			yaml += `        search:
-`
-			yaml += fmt.Sprintf(`          - %s
 `, config.Domain)
-		}
 	}
 
 	// Add bridge parameters

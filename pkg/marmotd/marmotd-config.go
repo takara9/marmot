@@ -12,6 +12,25 @@ import (
 
 const DefaultConfigPath = "/etc/marmot/marmotd.json"
 
+// OSImage represents an OS image configuration to be automatically provisioned
+type OSImage struct {
+	// イメージの名前
+	// 例: "ubuntu22.04"
+	Name string `json:"name"`
+
+	// イメージの URL
+	// 例: "https://cloud-images.ubuntu.com/releases/jammy/release/ubuntu-22.04-server-cloudimg-amd64.img"
+	URL string `json:"url"`
+
+	// OS の名前
+	// 例: "ubuntu"
+	OSName string `json:"osName"`
+
+	// OS のバージョン
+	// 例: "22.04"
+	OSVersion string `json:"osVersion"`
+}
+
 // MarmotdConfig は /etc/marmot/marmotd.json で設定可能なパラメータを保持します。
 type MarmotdConfig struct {
 	// ハイパーバイザーのノード名
@@ -68,6 +87,10 @@ type MarmotdConfig struct {
 	// true の場合、このホストの volumeコントローラーが iSCSI ターゲットを管理する。
 	// false（省略時）の場合、クラスタ内で HostId が最小のホストが自動的に担当する。
 	IscsiServer bool `json:"iscsi_server"`
+
+	// 起動時に自動ダウンロード・登録する OS イメージの一覧
+	// marmotd 起動時に各イメージをチェックし、存在しなければ登録する
+	OSImages []OSImage `json:"os_images"`
 }
 
 var runtimeConfigState = struct {

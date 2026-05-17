@@ -139,31 +139,11 @@ func (c *controller) networkControllerLoop(fabric networkfabric.NetworkFabric) {
 				if err := c.ensureFollowerNetworksWaiting(vnet); err != nil {
 					slog.Error("フォロワー用ネットワークエントリーの作成に失敗", "headNetworkId", vnetID, "err", err)
 				}
-				c.db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_PROVISIONING, "fabric:ensure-bridge")
-
-				// OVS ブリッジ作成
-				if err := fabric.EnsureBridge(&vnet); err != nil {
-					slog.Error("failed to ensure bridge", "networkId", vnetID, "err", err)
-					c.db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_ERROR, "fabric:bridge-failed:"+err.Error())
+				if err := c.reconcileHeadProvisioningNetwork(vnet, fabric); err != nil {
+					slog.Error("head network provisioning failed", "networkId", vnetID, "err", err)
+					c.db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_ERROR, err.Error())
 					continue
 				}
-
-				// VXLAN トンネル作成（ピア取得は簡略版：スキップ待機）
-				// 本来はホスト一覧から underlay IP を取得する必要がある
-				// 当面は libvirt 作成成功後の ACTIVE で実行
-				c.db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_PROVISIONING, "libvirt:define-start")
-
-				if err := c.marmot.DeployVirtualNetwork(vnet); err != nil {
-					slog.Error("DeployVirtualNetwork()", "err", err)
-					c.db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_ERROR, "libvirt:deploy-failed:"+err.Error())
-					continue
-				}
-				if err := c.ensureVxlanMeshForNetwork(fabric, vnet); err != nil {
-					slog.Error("failed to ensure vxlan mesh on head", "networkId", vnetID, "err", err)
-					c.db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_ERROR, "fabric:vxlan-failed:"+err.Error())
-					continue
-				}
-				c.db.UpdateVirtualNetworkStatus(vnetID, db.NETWORK_ACTIVE)
 
 			case db.NETWORK_PROVISIONING:
 				slog.Debug("プロビジョニング中の仮想ネットワークを処理", "networkId", vnetID)
@@ -171,6 +151,11 @@ func (c *controller) networkControllerLoop(fabric networkfabric.NetworkFabric) {
 					if err := c.reconcileFollowerWaitingNetwork(vnet, fabric); err != nil {
 						slog.Error("フォロワーネットワークのプロビジョニング継続に失敗", "networkId", vnetID, "err", err)
 						c.db.UpdateVirtualNetworkStatus(vnetID, db.NETWORK_ERROR)
+					}
+				} else {
+					if err := c.reconcileHeadProvisioningNetwork(vnet, fabric); err != nil {
+						slog.Error("head network provisioning resume failed", "networkId", vnetID, "err", err)
+						c.db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_ERROR, err.Error())
 					}
 				}
 
@@ -245,6 +230,35 @@ func (c *controller) networkControllerLoop(fabric networkfabric.NetworkFabric) {
 		}
 	}
 	// ワークキューから処理を取り出して、処理を実行する
+}
+
+func (c *controller) reconcileHeadProvisioningNetwork(vnet api.VirtualNetwork, fabric networkfabric.NetworkFabric) error {
+	vnetID := api.VirtualNetworkID(vnet)
+
+	c.db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_PROVISIONING, "fabric:ensure-bridge")
+	if err := fabric.EnsureBridge(&vnet); err != nil {
+		return fmt.Errorf("fabric:bridge-failed:%w", err)
+	}
+
+	c.db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_PROVISIONING, "libvirt:define-start")
+	net, found, err := c.marmot.Virt.GetVirtualNetworkByName(vnet.Metadata.Name)
+	if err != nil {
+		return fmt.Errorf("libvirt:lookup-failed:%w", err)
+	}
+	if !found {
+		if err := c.marmot.DeployVirtualNetwork(vnet); err != nil {
+			return fmt.Errorf("libvirt:deploy-failed:%w", err)
+		}
+	} else {
+		defer net.Free()
+	}
+
+	if err := c.ensureVxlanMeshForNetwork(fabric, vnet); err != nil {
+		return fmt.Errorf("fabric:vxlan-failed:%w", err)
+	}
+
+	c.db.UpdateVirtualNetworkStatus(vnetID, db.NETWORK_ACTIVE)
+	return nil
 }
 
 func networkSyncRole(metadata *api.Metadata) string {

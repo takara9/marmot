@@ -37,7 +37,7 @@ func main() {
 	// Setup slog
 	opts := &slog.HandlerOptions{
 		AddSource: true,
-		//Level:     slog.LevelDebug,
+		Level:     slog.LevelDebug,
 	}
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
 	slog.SetDefault(logger)
@@ -84,6 +84,12 @@ func main() {
 	slog.Debug("Starting api server #2", "nodeName", cfg.NodeName, "etcdURL", cfg.EtcdURL, "apiListenAddr", cfg.APIListenAddr)
 	Server := marmotd.NewServer(cfg.NodeName, cfg.EtcdURL)
 	marmotd.RegisterRoutes(e, Server, "/api/v1")
+
+	// Provision OS images from configuration
+	if err := marmotd.ProvisionOSImages(Server.Ma, cfg.OSImages); err != nil {
+		slog.Warn("OS image provisioning encountered an error", "err", err)
+		// Continue startup even if provisioning fails
+	}
 
 	// コントローラーの開始
 	slog.Info("Starting controllers", "nodeName", cfg.NodeName, "etcdURL", cfg.EtcdURL, "deletionDelaySeconds", cfg.DeletionDelaySeconds)
