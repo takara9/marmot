@@ -160,7 +160,7 @@ func (d *Database) MakeImageEntryFromSpec(imageSpec api.Image) (string, error) {
 	if strings.TrimSpace(imageSpec.Metadata.Name) == "" {
 		return "", fmt.Errorf("name is required")
 	}
-	if imageSpec.Spec.SourceUrl == nil {
+	if imageSpec.Spec.SourceUrl == nil || strings.TrimSpace(*imageSpec.Spec.SourceUrl) == "" {
 		return "", fmt.Errorf("sourceUrl is required")
 	}
 
@@ -178,7 +178,45 @@ func (d *Database) MakeImageEntryFromSpec(imageSpec api.Image) (string, error) {
 		kind = "Image"
 	}
 
-	return d.makeImageEntryFromURLWithNodeAndMeta(strings.TrimSpace(imageSpec.Metadata.Name), *imageSpec.Spec.SourceUrl, nodeName, apiVersion, kind)
+	// 一意なIDを発行
+	id, uuidString, err := d.getUniqueImageID()
+	if err != nil {
+		slog.Error("MakeImageEntryFromSpec()", "err", err)
+		return "", err
+	}
+
+	sourceURL := strings.TrimSpace(*imageSpec.Spec.SourceUrl)
+	spec := imageSpec.Spec
+	spec.SourceUrl = &sourceURL
+
+	img := api.Image{
+		ApiVersion: apiVersion,
+		Kind:       kind,
+		Metadata: api.Metadata{
+			Name: strings.TrimSpace(imageSpec.Metadata.Name),
+			Id:   id,
+			Uuid: util.StringPtr(uuidString),
+		},
+		Spec: spec,
+		Status: &api.Status{
+			StatusCode:          IMAGE_PENDING,
+			Status:              util.StringPtr(ImageStatus[IMAGE_PENDING]),
+			CreationTimeStamp:   util.TimePtr(time.Now()),
+			LastUpdateTimeStamp: util.TimePtr(time.Now()),
+			Message:             util.StringPtr("イメージの作成処理の開始待ち"),
+		},
+	}
+	if nodeName != "" {
+		img.Metadata.NodeName = util.StringPtr(nodeName)
+	}
+
+	key := ImagePrefix + "/" + id
+	if err := d.PutJSON(key, img); err != nil {
+		slog.Error("MakeImageEntryFromSpec()", "err", err)
+		return "", err
+	}
+
+	return id, nil
 }
 
 // URLのイメージをダウンロードして、それからイメージを作成する。

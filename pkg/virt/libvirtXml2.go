@@ -70,6 +70,8 @@ type ServerSpec struct {
 	NetSpecs     []NetSpec
 	ChannelSpecs []ChannelSpec
 	Clocks       []ClockSpec
+	OsName       string
+	OsVersion    string
 }
 
 type LibVirtEp struct {
@@ -372,7 +374,30 @@ func CreateDomainXML(vs ServerSpec) *libvirtxml.Domain {
 		dom.Clock.Timer = append(dom.Clock.Timer, timer)
 	}
 
+	// libosinfo メタデータの設定
+	if vs.OsName != "" && vs.OsVersion != "" {
+		metaXML := buildLibosInfoXML(vs.OsName, vs.OsVersion)
+		if metaXML != "" {
+			dom.Metadata = &libvirtxml.DomainMetadata{XML: metaXML}
+		}
+	}
+
 	return dom
+}
+
+// buildLibosInfoXML は osName と osVersion から libosinfo の XML 文字列を生成する。
+func buildLibosInfoXML(osName, osVersion string) string {
+	var osID string
+	switch strings.ToLower(osName) {
+	case "ubuntu":
+		osID = fmt.Sprintf("http://ubuntu.com/ubuntu/%s", osVersion)
+	default:
+		return ""
+	}
+	return fmt.Sprintf(
+		`<libosinfo:libosinfo xmlns:libosinfo="http://libosinfo.org/xmlns/libvirt/domain/1.0"><libosinfo:os id="%s"/></libosinfo:libosinfo>`,
+		osID,
+	)
 }
 
 // 構造体で渡すのが良い

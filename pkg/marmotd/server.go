@@ -220,15 +220,6 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			slog.Error("GenerateRandomMAC()", "err", err)
 			return "", err
 		}
-		virtSpec.NetSpecs = []virt.NetSpec{
-			{
-				MAC:     mac.String(),
-				Network: "default",
-				PortID:  uuid.New().String(),
-				Bridge:  "virbr0",
-				Bus:     1,
-			},
-		}
 		// サーバーのネットワーク情報を更新
 		var net api.NetworkInterface
 
@@ -238,8 +229,21 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			slog.Error("GetNetworkIdByName()", "err", err)
 			return "", err
 		}
+
+		defaultNS := virt.NetSpec{
+			MAC:    mac.String(),
+			PortID: uuid.New().String(),
+			Bus:    1,
+		}
+		if xnet.Spec.BridgeName != nil && strings.TrimSpace(*xnet.Spec.BridgeName) != "" {
+			defaultNS.Bridge = strings.TrimSpace(*xnet.Spec.BridgeName)
+		} else {
+			defaultNS.Network = xnet.Metadata.Name
+		}
+		virtSpec.NetSpecs = []virt.NetSpec{defaultNS}
+
 		net.Networkid = api.VirtualNetworkID(xnet)
-		net.Networkname = virtSpec.NetSpecs[0].Network
+		net.Networkname = xnet.Metadata.Name
 		net.Mac = &virtSpec.NetSpecs[0].MAC
 		serverConfig.Spec.NetworkInterface = &[]api.NetworkInterface{net}
 	} else {
@@ -364,11 +368,14 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 				busno += 4 // diskとバス番号が被らないようにする
 			}
 			ns := virt.NetSpec{
-				MAC:     mac.String(),
-				Network: reqNic.Networkname, // virsh のネットワーク名をセットする
-				PortID:  uuid.New().String(),
-				Bridge:  "virbr0",
-				Bus:     busno,
+				MAC:    mac.String(),
+				PortID: uuid.New().String(),
+				Bus:    busno,
+			}
+			if vnet.Spec.BridgeName != nil && strings.TrimSpace(*vnet.Spec.BridgeName) != "" {
+				ns.Bridge = strings.TrimSpace(*vnet.Spec.BridgeName)
+			} else {
+				ns.Network = vnet.Metadata.Name // libvirt network がある場合はこちらを使用
 			}
 
 			// VLAN対応
@@ -383,7 +390,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			virtSpec.NetSpecs = append(virtSpec.NetSpecs, ns)
 
 			var ni api.NetworkInterface
-			ni.Networkname = ns.Network
+			ni.Networkname = reqNic.Networkname
 			ni.Networkid = api.VirtualNetworkID(vnet)
 
 			// ここでIP Network Idがセットされた場合、データベースにも保存する必要がある
@@ -716,6 +723,19 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		{Name: "rtc", TickPolicy: "catchup", Present: ""},
 		{Name: "pit", TickPolicy: "delay", Present: ""},
 		{Name: "hpet", TickPolicy: "", Present: "no"},
+	}
+
+	// イメージのOSメタデータを取得してvirtSpecに設定
+	if bootVol.Spec.OsVariant != nil {
+		img, imgErr := resolveImageTemplateByVolumeNode(m, bootVol)
+		if imgErr == nil {
+			if img.Spec.OsName != nil {
+				virtSpec.OsName = *img.Spec.OsName
+			}
+			if img.Spec.OsVersion != nil {
+				virtSpec.OsVersion = *img.Spec.OsVersion
+			}
+		}
 	}
 
 	dom := virt.CreateDomainXML(virtSpec)

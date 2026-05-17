@@ -133,6 +133,8 @@ type ImageSpec struct {
 	SourceUrl     *string `json:"sourceUrl,omitempty" yaml:"sourceUrl,omitempty"`
 	Type          *string `json:"type,omitempty" yaml:"type,omitempty"`
 	VolumeGroup   *string `json:"volumeGroup,omitempty" yaml:"volumeGroup,omitempty"`
+	OsName        *string `json:"osName,omitempty" yaml:"osName,omitempty"`
+	OsVersion     *string `json:"osVersion,omitempty" yaml:"osVersion,omitempty"`
 }
 
 // Job defines model for Job.
