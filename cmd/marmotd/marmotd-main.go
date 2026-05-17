@@ -10,6 +10,7 @@ import (
 	"github.com/takara9/marmot/pkg/controller"
 	internaldns "github.com/takara9/marmot/pkg/internal-dns"
 	"github.com/takara9/marmot/pkg/marmotd"
+	"github.com/takara9/marmot/pkg/util"
 )
 
 var controllerCounter uint64 = 0
@@ -72,6 +73,9 @@ func main() {
 		"image_download_timeout_seconds", cfg.ImageDownloadTimeoutSeconds,
 		"image_resize_timeout_seconds", cfg.ImageResizeTimeoutSeconds,
 		"image_delete_timeout_seconds", cfg.ImageDeleteTimeoutSeconds)
+
+	// Setup host-bridge for libvirt
+	util.SetupHostBridge()
 
 	// REST-APIサーバーの処理
 	slog.Info("Starting api server", "nodeName", cfg.NodeName, "etcdURL", cfg.EtcdURL, "apiListenAddr", cfg.APIListenAddr)
