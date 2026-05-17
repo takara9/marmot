@@ -94,7 +94,9 @@ mactl cluster list     # クラスターノード一覧
 ```sh
 VERSION=0.13.0
 curl -OL https://github.com/takara9/marmot/releases/download/v${VERSION}/marmot_v${VERSION}_amd64.deb
-sudo apt install ./marmot_v${VERSION}_amd64.deb
+sudo install -m 0644 ./marmot_v${VERSION}_amd64.deb /tmp/
+sudo apt install /tmp/marmot_v${VERSION}_amd64.deb
+sudo rm -f /tmp/marmot_v${VERSION}_amd64.deb
 ```
 
 インストール後のセットアップ手順（etcd の設定・LVM・ネットワーク・iSCSI の設定など）は [docs/HOWTO-install-marmot.md](docs/HOWTO-install-marmot.md) を参照してください。  
