@@ -220,15 +220,6 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			slog.Error("GenerateRandomMAC()", "err", err)
 			return "", err
 		}
-		virtSpec.NetSpecs = []virt.NetSpec{
-			{
-				MAC:     mac.String(),
-				Network: "default",
-				PortID:  uuid.New().String(),
-				Bridge:  "virbr0",
-				Bus:     1,
-			},
-		}
 		// サーバーのネットワーク情報を更新
 		var net api.NetworkInterface
 
@@ -238,8 +229,22 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			slog.Error("GetNetworkIdByName()", "err", err)
 			return "", err
 		}
+
+		defaultNS := virt.NetSpec{
+			MAC:     mac.String(),
+			Network: xnet.Metadata.Name,
+			PortID:  uuid.New().String(),
+			Bus:     1,
+		}
+		// default ネットワークが libvirt 側に見えない環境向けのフォールバック。
+		if strings.EqualFold(xnet.Metadata.Name, "default") && xnet.Spec.BridgeName != nil && strings.TrimSpace(*xnet.Spec.BridgeName) != "" {
+			defaultNS.Bridge = strings.TrimSpace(*xnet.Spec.BridgeName)
+			defaultNS.Network = ""
+		}
+		virtSpec.NetSpecs = []virt.NetSpec{defaultNS}
+
 		net.Networkid = api.VirtualNetworkID(xnet)
-		net.Networkname = virtSpec.NetSpecs[0].Network
+		net.Networkname = xnet.Metadata.Name
 		net.Mac = &virtSpec.NetSpecs[0].MAC
 		serverConfig.Spec.NetworkInterface = &[]api.NetworkInterface{net}
 	} else {
@@ -365,10 +370,15 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			}
 			ns := virt.NetSpec{
 				MAC:     mac.String(),
-				Network: reqNic.Networkname, // virsh のネットワーク名をセットする
+				Network: vnet.Metadata.Name,
 				PortID:  uuid.New().String(),
-				Bridge:  "virbr0",
 				Bus:     busno,
+			}
+			// 通常は libvirt network 名で接続する。
+			// default のみ、環境差異により network が見えないケース向けに bridge へフォールバックする。
+			if strings.EqualFold(vnet.Metadata.Name, "default") && vnet.Spec.BridgeName != nil && strings.TrimSpace(*vnet.Spec.BridgeName) != "" {
+				ns.Bridge = strings.TrimSpace(*vnet.Spec.BridgeName)
+				ns.Network = ""
 			}
 
 			// VLAN対応
@@ -383,7 +393,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			virtSpec.NetSpecs = append(virtSpec.NetSpecs, ns)
 
 			var ni api.NetworkInterface
-			ni.Networkname = ns.Network
+			ni.Networkname = reqNic.Networkname
 			ni.Networkid = api.VirtualNetworkID(vnet)
 
 			// ここでIP Network Idがセットされた場合、データベースにも保存する必要がある
@@ -718,6 +728,19 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		{Name: "hpet", TickPolicy: "", Present: "no"},
 	}
 
+	// イメージのOSメタデータを取得してvirtSpecに設定
+	if bootVol.Spec.OsVariant != nil {
+		img, imgErr := resolveImageTemplateByVolumeNode(m, bootVol)
+		if imgErr == nil {
+			if img.Spec.OsName != nil {
+				virtSpec.OsName = *img.Spec.OsName
+			}
+			if img.Spec.OsVersion != nil {
+				virtSpec.OsVersion = *img.Spec.OsVersion
+			}
+		}
+	}
+
 	dom := virt.CreateDomainXML(virtSpec)
 	xml, err := dom.Marshal()
 	fmt.Println("Generated", "libvirt XML:\n", string(xml))
@@ -732,6 +755,34 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	slog.Debug("仮想マシンの定義と起動")
 
 	consolePath, err := l.DefineAndStartVM(*dom)
+	if err != nil && isLibvirtNetworkNotFoundError(err) {
+		slog.Warn("network source failed; retrying with bridge fallback", "err", err)
+		fallbackApplied := false
+		for i := range virtSpec.NetSpecs {
+			ns := &virtSpec.NetSpecs[i]
+			if strings.TrimSpace(ns.Network) == "" {
+				continue
+			}
+			vnet, lookupErr := m.Db.GetVirtualNetworkByName(ns.Network)
+			if lookupErr != nil {
+				slog.Warn("bridge fallback skipped: virtual network lookup failed", "network", ns.Network, "err", lookupErr)
+				continue
+			}
+			if vnet.Spec.BridgeName == nil || strings.TrimSpace(*vnet.Spec.BridgeName) == "" {
+				continue
+			}
+			ns.Bridge = strings.TrimSpace(*vnet.Spec.BridgeName)
+			ns.Network = ""
+			fallbackApplied = true
+		}
+		if fallbackApplied {
+			dom = virt.CreateDomainXML(virtSpec)
+			if xml2, marshalErr := dom.Marshal(); marshalErr == nil {
+				fmt.Println("Generated", "libvirt XML (fallback):\n", string(xml2))
+			}
+			consolePath, err = l.DefineAndStartVM(*dom)
+		}
+	}
 	if err != nil {
 		slog.Error("DefineAndStartVM()", "err", err) // ここで No such file or directory エラーになる
 		return "", err
@@ -749,6 +800,14 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	}
 
 	return id, nil
+}
+
+func isLibvirtNetworkNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "network not found") || strings.Contains(msg, "no network with matching name")
 }
 
 // サーバーの停止 コントローラーから呼び出される

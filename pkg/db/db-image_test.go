@@ -8,8 +8,13 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 )
+
+func stringPtr(v string) *string {
+	return &v
+}
 
 var _ = Describe("Image", Ordered, func() {
 	var port int = 11379
@@ -103,6 +108,40 @@ var _ = Describe("Image", Ordered, func() {
 				Expect(img.Metadata).NotTo(BeNil())
 				Expect(img.Metadata.NodeName).NotTo(BeNil())
 				Expect(*img.Metadata.NodeName).To(Equal("marmot2"))
+			})
+
+			It("MakeImageEntryFromSpec が osName/osVersion を保持する", func() {
+				if v == nil {
+					var connErr error
+					v, connErr = db.NewDatabase(url)
+					Expect(connErr).NotTo(HaveOccurred())
+				}
+
+				req := api.Image{
+					ApiVersion: "v1",
+					Kind:       "Image",
+					Metadata: api.Metadata{
+						Name:     "test-image-spec-os",
+						NodeName: stringPtr("hv-test-03"),
+					},
+					Spec: api.ImageSpec{
+						SourceUrl: stringPtr("https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img"),
+						OsName:    stringPtr("ubuntu"),
+						OsVersion: stringPtr("24.04"),
+					},
+				}
+
+				createdID, createErr := v.MakeImageEntryFromSpec(req)
+				Expect(createErr).NotTo(HaveOccurred())
+
+				img, getErr := v.GetImage(createdID)
+				Expect(getErr).NotTo(HaveOccurred())
+				Expect(img.Spec.SourceUrl).NotTo(BeNil())
+				Expect(*img.Spec.SourceUrl).To(Equal("https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img"))
+				Expect(img.Spec.OsName).NotTo(BeNil())
+				Expect(*img.Spec.OsName).To(Equal("ubuntu"))
+				Expect(img.Spec.OsVersion).NotTo(BeNil())
+				Expect(*img.Spec.OsVersion).To(Equal("24.04"))
 			})
 
 			It("Keyからイメージ情報を取得 #2", func() {
