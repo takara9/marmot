@@ -34,6 +34,15 @@ func SetupHostBridge() bool {
 
 	// Get DHCP information from current interface
 	bridgeConfig := getBridgeConfig(primaryNIC)
+	if bridgeConfig.IPAddress == "" || bridgeConfig.Gateway == "" {
+		slog.Warn(
+			"Required network information is missing; aborting host-bridge setup without changing netplan",
+			"nic", primaryNIC,
+			"ip_address", bridgeConfig.IPAddress,
+			"gateway", bridgeConfig.Gateway,
+		)
+		return false
+	}
 
 	// Backup existing netplan files
 	if err := backupNetplanFiles(); err != nil {
