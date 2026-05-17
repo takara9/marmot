@@ -16,7 +16,7 @@ var imageUpdateCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var spec api.Image
 		imageId := args[0]
-		spec.Metadata.Id = &imageId
+	spec.Metadata.Id = imageId
 			   spec.Metadata.Name = imageName
 
 		m, err := getClientConfig()

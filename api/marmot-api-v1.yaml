@@ -944,6 +944,7 @@ components:
       type: object
       required:
         - name
+        - id
       properties:
         id:
           type: string

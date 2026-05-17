@@ -9,7 +9,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/util"
 )
 
 var _ = Describe("Image timeout helpers", func() {
@@ -105,7 +104,7 @@ var _ = Describe("Image timeout helpers", func() {
 
 		It("returns nil when error is nil", func() {
 			m := &Marmot{}
-			image := api.Image{Metadata: api.Metadata{Id: util.StringPtr("img-1")}}
+			image := api.Image{Metadata: api.Metadata{Id: "img-1"}}
 
 			Expect(m.markImageCreationFailed(image, nil)).To(BeNil())
 		})
@@ -113,7 +112,7 @@ var _ = Describe("Image timeout helpers", func() {
 		It("updates the image object when status exists", func() {
 			m := &Marmot{}
 			image := api.Image{
-				Metadata: api.Metadata{Id: util.StringPtr("img-2")},
+				Metadata: api.Metadata{Id: "img-2"},
 				Status: &api.Status{
 					StatusCode: db.IMAGE_CREATING,
 				},
@@ -132,7 +131,7 @@ var _ = Describe("Image timeout helpers", func() {
 			err := m.markImageCreationFailed(image, baseErr)
 
 			Expect(err).To(MatchError(baseErr))
-			Expect(util.DerefStrPtr(updated.Metadata.Id)).To(Equal("img-2"))
+			Expect(updated.Metadata.Id).To(Equal("img-2"))
 			Expect(updated.Status).NotTo(BeNil())
 			Expect(updated.Status.StatusCode).To(Equal(db.IMAGE_CREATION_FAILED))
 			Expect(updated.Status.Status).NotTo(BeNil())
@@ -144,7 +143,7 @@ var _ = Describe("Image timeout helpers", func() {
 
 		It("falls back to status message update when status is nil", func() {
 			m := &Marmot{}
-			image := api.Image{Metadata: api.Metadata{Id: util.StringPtr("img-3")}}
+			image := api.Image{Metadata: api.Metadata{Id: "img-3"}}
 			baseErr := errors.New("timeout")
 
 			called := false
@@ -167,7 +166,7 @@ var _ = Describe("Image timeout helpers", func() {
 		It("keeps returning the original error even if image update fails", func() {
 			m := &Marmot{}
 			image := api.Image{
-				Metadata: api.Metadata{Id: util.StringPtr("img-4")},
+				Metadata: api.Metadata{Id: "img-4"},
 				Status:   &api.Status{},
 			}
 			baseErr := errors.New("write failed")
@@ -183,7 +182,7 @@ var _ = Describe("Image timeout helpers", func() {
 		It("can build a failed image message from a deadline error", func() {
 			m := &Marmot{}
 			image := api.Image{
-				Metadata: api.Metadata{Id: util.StringPtr("img-5")},
+				Metadata: api.Metadata{Id: "img-5"},
 				Status:   &api.Status{},
 			}
 

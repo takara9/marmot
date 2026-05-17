@@ -75,7 +75,7 @@ func (c *controller) imageControllerLoop() {
 	for _, image := range imgaes {
 		if ok, assignedNode, reason := evaluateNodeAssignment(&image.Metadata, c.marmot.NodeName); !ok {
 			objectName := image.Metadata.Name
-			slog.Debug("別ノード割当のイメージをスキップ", "imageId", util.DerefStrPtr(image.Metadata.Id), "imageName", objectName, "controllerNode", c.marmot.NodeName, "assignedNode", assignedNode, "reason", reason)
+			slog.Debug("別ノード割当のイメージをスキップ", "imageId", image.Metadata.Id, "imageName", objectName, "controllerNode", c.marmot.NodeName, "assignedNode", assignedNode, "reason", reason)
 			continue
 		}
 
@@ -85,7 +85,7 @@ func (c *controller) imageControllerLoop() {
 			deletionTime := *image.Status.DeletionTimeStamp
 			if time.Since(deletionTime) > c.deletionDelay {
 				slog.Debug("削除のタイムスタンプが一定時間以上経過しているイメージ検出", "IMAGE", image.Metadata.Name)
-				c.marmot.Db.UpdateImageStatus(util.DerefStrPtr(image.Metadata.Id), db.IMAGE_DELETING)
+				c.marmot.Db.UpdateImageStatus(image.Metadata.Id, db.IMAGE_DELETING)
 			}
 		}
 
@@ -102,9 +102,9 @@ func (c *controller) imageControllerLoop() {
 		case db.IMAGE_PENDING:
 			slog.Debug("イメージの作成処理を実行", "image", image.Metadata.Name)
 			if err := c.ensureFollowerImagesWaiting(image); err != nil {
-				slog.Error("フォロワー用イメージエントリーの作成に失敗", "headImageId", util.DerefStrPtr(image.Metadata.Id), "err", err)
+				slog.Error("フォロワー用イメージエントリーの作成に失敗", "headImageId", image.Metadata.Id, "err", err)
 			}
-			c.marmot.Db.UpdateImageStatus(util.DerefStrPtr(image.Metadata.Id), db.IMAGE_CREATING)
+			c.marmot.Db.UpdateImageStatus(image.Metadata.Id, db.IMAGE_CREATING)
 			// ラベルの存在をチェック
 			if image.Metadata.Labels != nil {
 				source := db.GetImageSource(*image.Metadata.Labels)
@@ -116,7 +116,7 @@ func (c *controller) imageControllerLoop() {
 						ctx, cancel := context.WithTimeout(context.Background(), timeout)
 						defer cancel()
 						if _, err := c.marmot.MakeImageEntryFromRunningVMWithContext(ctx, serverId, image.Metadata.Name, image); err != nil {
-							slog.Error("実行中VMからのイメージ作成に失敗", "imageId", util.DerefStrPtr(image.Metadata.Id), "serverId", serverId, "timeout", timeout, "err", err)
+							slog.Error("実行中VMからのイメージ作成に失敗", "imageId", image.Metadata.Id, "serverId", serverId, "timeout", timeout, "err", err)
 						}
 					}(image, serverId)
 				} else {
@@ -125,8 +125,8 @@ func (c *controller) imageControllerLoop() {
 						timeout := marmotd.CurrentConfig().ImageCreateFromURLTimeout()
 						ctx, cancel := context.WithTimeout(context.Background(), timeout)
 						defer cancel()
-						if _, err := c.marmot.CreateNewImageManageWithContext(ctx, util.DerefStrPtr(image.Metadata.Id)); err != nil {
-							slog.Error("URLからのイメージ作成に失敗", "imageId", util.DerefStrPtr(image.Metadata.Id), "timeout", timeout, "err", err)
+						if _, err := c.marmot.CreateNewImageManageWithContext(ctx, image.Metadata.Id); err != nil {
+							slog.Error("URLからのイメージ作成に失敗", "imageId", image.Metadata.Id, "timeout", timeout, "err", err)
 						}
 					}(image)
 				}
@@ -136,8 +136,8 @@ func (c *controller) imageControllerLoop() {
 					timeout := marmotd.CurrentConfig().ImageCreateFromURLTimeout()
 					ctx, cancel := context.WithTimeout(context.Background(), timeout)
 					defer cancel()
-					if _, err := c.marmot.CreateNewImageManageWithContext(ctx, util.DerefStrPtr(image.Metadata.Id)); err != nil {
-						slog.Error("URLからのイメージ作成に失敗", "imageId", util.DerefStrPtr(image.Metadata.Id), "timeout", timeout, "err", err)
+					if _, err := c.marmot.CreateNewImageManageWithContext(ctx, image.Metadata.Id); err != nil {
+						slog.Error("URLからのイメージ作成に失敗", "imageId", image.Metadata.Id, "timeout", timeout, "err", err)
 					}
 				}(image)
 			}
@@ -147,7 +147,7 @@ func (c *controller) imageControllerLoop() {
 		case db.IMAGE_WAITING:
 			slog.Debug("イメージはヘッドノード完了待ち", "image", image.Metadata.Name)
 			if err := c.startFollowerSync(image); err != nil {
-				slog.Error("フォロワーイメージの同期開始に失敗", "imageId", util.DerefStrPtr(image.Metadata.Id), "err", err)
+				slog.Error("フォロワーイメージの同期開始に失敗", "imageId", image.Metadata.Id, "err", err)
 			}
 		case db.IMAGE_CREATION_FAILED:
 			slog.Debug("イメージの作成に失敗", "image", image.Metadata.Name)
@@ -155,12 +155,12 @@ func (c *controller) imageControllerLoop() {
 		case db.IMAGE_AVAILABLE:
 			slog.Debug("イメージは利用可能", "image", image.Metadata.Name)
 			if err := marmotd.CheckImageBackingStore(image); err != nil {
-				slog.Warn("AVAILABLE イメージの実体が見つからないため DELETED に更新", "imageId", util.DerefStrPtr(image.Metadata.Id), "err", err)
-				c.marmot.Db.UpdateImageStatusMessage(util.DerefStrPtr(image.Metadata.Id), db.IMAGE_DELETED, err.Error())
+				slog.Warn("AVAILABLE イメージの実体が見つからないため DELETED に更新", "imageId", image.Metadata.Id, "err", err)
+				c.marmot.Db.UpdateImageStatusMessage(image.Metadata.Id, db.IMAGE_DELETED, err.Error())
 			}
 		case db.IMAGE_DELETING:
 			slog.Debug("イメージの削除処理を実行", "image", image.Metadata.Name)
-			err := c.marmot.DeleteImageManage(util.DerefStrPtr(image.Metadata.Id))
+			err := c.marmot.DeleteImageManage(image.Metadata.Id)
 			if err != nil {
 				slog.Error("DeleteImageById()", "err", err)
 			}
@@ -180,7 +180,7 @@ func (c *controller) ensureFollowerImagesWaiting(headImage api.Image) error {
 		headNode = strings.TrimSpace(*headImage.Metadata.NodeName)
 	}
 	if headNode == "" {
-		return fmt.Errorf("head image nodeName is empty: imageId=%s", util.DerefStrPtr(headImage.Metadata.Id))
+		return fmt.Errorf("head image nodeName is empty: imageId=%s", headImage.Metadata.Id)
 	}
 
 	nodeStatuses, err := c.marmot.Db.GetAllHostStatus()
@@ -201,12 +201,12 @@ func (c *controller) ensureFollowerImagesWaiting(headImage api.Image) error {
 	}
 
 	for followerNode := range nodes {
-		newFollowerId, createErr := c.marmot.Db.MakeFollowerImageEntry(headImage, followerNode, util.DerefStrPtr(headImage.Metadata.Id))
+		newFollowerId, createErr := c.marmot.Db.MakeFollowerImageEntry(headImage, followerNode, headImage.Metadata.Id)
 		if createErr != nil {
-			slog.Error("フォロワーイメージエントリー作成失敗", "headImageId", util.DerefStrPtr(headImage.Metadata.Id), "followerNode", followerNode, "err", createErr)
+			slog.Error("フォロワーイメージエントリー作成失敗", "headImageId", headImage.Metadata.Id, "followerNode", followerNode, "err", createErr)
 			continue
 		}
-		slog.Debug("フォロワーイメージをWAITINGで登録", "headImageId", util.DerefStrPtr(headImage.Metadata.Id), "followerImageId", newFollowerId, "followerNode", followerNode)
+		slog.Debug("フォロワーイメージをWAITINGで登録", "headImageId", headImage.Metadata.Id, "followerImageId", newFollowerId, "followerNode", followerNode)
 	}
 
 	return nil
@@ -214,12 +214,12 @@ func (c *controller) ensureFollowerImagesWaiting(headImage api.Image) error {
 
 func (c *controller) startFollowerSync(waitingImage api.Image) error {
 	if waitingImage.Metadata.Labels == nil {
-		return fmt.Errorf("labels are required for waiting image: imageId=%s", util.DerefStrPtr(waitingImage.Metadata.Id))
+		return fmt.Errorf("labels are required for waiting image: imageId=%s", waitingImage.Metadata.Id)
 	}
 	labels := *waitingImage.Metadata.Labels
 	headImageID := db.GetHeadImageID(labels)
 	if headImageID == "" {
-		return fmt.Errorf("headImageId label is missing: imageId=%s", util.DerefStrPtr(waitingImage.Metadata.Id))
+		return fmt.Errorf("headImageId label is missing: imageId=%s", waitingImage.Metadata.Id)
 	}
 
 	headImage, err := c.marmot.Db.GetImage(headImageID)
@@ -232,16 +232,16 @@ func (c *controller) startFollowerSync(waitingImage api.Image) error {
 
 	switch headImage.Status.StatusCode {
 	case db.IMAGE_AVAILABLE:
-		c.marmot.Db.UpdateImageStatusMessage(util.DerefStrPtr(waitingImage.Metadata.Id), db.IMAGE_CREATING, "ヘッドノードからQCOW2イメージを取得中")
+		c.marmot.Db.UpdateImageStatusMessage(waitingImage.Metadata.Id, db.IMAGE_CREATING, "ヘッドノードからQCOW2イメージを取得中")
 		go func(image api.Image, head api.Image) {
 			if err := c.syncFollowerImageFromHead(image, head); err != nil {
-				slog.Error("フォロワーイメージ同期に失敗", "imageId", util.DerefStrPtr(image.Metadata.Id), "headImageId", util.DerefStrPtr(head.Metadata.Id), "err", err)
-				c.marmot.Db.UpdateImageStatusMessage(util.DerefStrPtr(image.Metadata.Id), db.IMAGE_CREATION_FAILED, err.Error())
+				slog.Error("フォロワーイメージ同期に失敗", "imageId", image.Metadata.Id, "headImageId", head.Metadata.Id, "err", err)
+				c.marmot.Db.UpdateImageStatusMessage(image.Metadata.Id, db.IMAGE_CREATION_FAILED, err.Error())
 			}
 		}(waitingImage, headImage)
 	case db.IMAGE_CREATION_FAILED, db.IMAGE_DELETED:
-		msg := fmt.Sprintf("head image is not available: headImageId=%s status=%s", util.DerefStrPtr(headImage.Metadata.Id), util.OrDefault(headImage.Status.Status, ""))
-		c.marmot.Db.UpdateImageStatusMessage(util.DerefStrPtr(waitingImage.Metadata.Id), db.IMAGE_CREATION_FAILED, msg)
+		msg := fmt.Sprintf("head image is not available: headImageId=%s status=%s", headImage.Metadata.Id, util.OrDefault(headImage.Status.Status, ""))
+		c.marmot.Db.UpdateImageStatusMessage(waitingImage.Metadata.Id, db.IMAGE_CREATION_FAILED, msg)
 	default:
 		// WAITING を維持する。
 	}
@@ -251,11 +251,11 @@ func (c *controller) startFollowerSync(waitingImage api.Image) error {
 
 func (c *controller) syncFollowerImageFromHead(followerImage api.Image, headImage api.Image) error {
 	if headImage.Metadata.NodeName == nil {
-		return fmt.Errorf("head image nodeName is required: headImageId=%s", util.DerefStrPtr(headImage.Metadata.Id))
+		return fmt.Errorf("head image nodeName is required: headImageId=%s", headImage.Metadata.Id)
 	}
 	headNode := strings.TrimSpace(*headImage.Metadata.NodeName)
 	if headNode == "" {
-		return fmt.Errorf("head image nodeName is empty: headImageId=%s", util.DerefStrPtr(headImage.Metadata.Id))
+		return fmt.Errorf("head image nodeName is empty: headImageId=%s", headImage.Metadata.Id)
 	}
 
 	headHostStatus, err := c.marmot.Db.GetHostStatus(headNode)
@@ -266,9 +266,9 @@ func (c *controller) syncFollowerImageFromHead(followerImage api.Image, headImag
 		return fmt.Errorf("head node ipAddress is empty: node=%s", headNode)
 	}
 	headIP := strings.TrimSpace(*headHostStatus.IpAddress)
-	headURL := buildHeadImageDownloadURL(headIP, util.DerefStrPtr(headImage.Metadata.Id))
+	headURL := buildHeadImageDownloadURL(headIP, headImage.Metadata.Id)
 
-	followerLatest, err := c.marmot.Db.GetImage(util.DerefStrPtr(followerImage.Metadata.Id))
+	followerLatest, err := c.marmot.Db.GetImage(followerImage.Metadata.Id)
 	if err != nil {
 		return err
 	}
@@ -277,7 +277,7 @@ func (c *controller) syncFollowerImageFromHead(followerImage api.Image, headImag
 		destinationPath = strings.TrimSpace(*followerLatest.Spec.Qcow2Path)
 	}
 	if destinationPath == "" {
-		followerID := util.DerefStrPtr(followerLatest.Metadata.Id)
+		followerID := followerLatest.Metadata.Id
 		imageDir := filepath.Join("/var/lib/marmot/images", followerID)
 		destinationPath = filepath.Join(imageDir, fmt.Sprintf("osimage-%s.qcow2", followerID))
 		followerLatest.Spec.Qcow2Path = util.StringPtr(destinationPath)
@@ -302,7 +302,7 @@ func (c *controller) syncFollowerImageFromHead(followerImage api.Image, headImag
 	}
 	if followerLatest.Metadata.Labels != nil {
 		labels := *followerLatest.Metadata.Labels
-		db.SetFollowerSyncLabels(labels, "follower", util.DerefStrPtr(headImage.Metadata.Id), headNode)
+		db.SetFollowerSyncLabels(labels, "follower", headImage.Metadata.Id, headNode)
 		followerLatest.Metadata.Labels = &labels
 	}
 
@@ -311,7 +311,7 @@ func (c *controller) syncFollowerImageFromHead(followerImage api.Image, headImag
 	followerLatest.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	followerLatest.Status.Message = nil
 
-	if err := c.marmot.Db.UpdateImage(util.DerefStrPtr(followerLatest.Metadata.Id), followerLatest); err != nil {
+	if err := c.marmot.Db.UpdateImage(followerLatest.Metadata.Id, followerLatest); err != nil {
 		return err
 	}
 

@@ -103,7 +103,7 @@ func deleteImage(name string) error {
 	}
 
 	// イメージを削除
-		_, _, err = m.DeleteImageById(*found.Metadata.Id)
+	_, _, err = m.DeleteImageById(found.Metadata.Id)
 	if err != nil {
 		return fmt.Errorf("failed to delete image: %w", err)
 	}

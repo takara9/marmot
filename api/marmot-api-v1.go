@@ -156,7 +156,7 @@ type JobSpec struct {
 // Metadata defines model for Metadata.
 type Metadata struct {
 	Comment      *string                 `json:"comment,omitempty" yaml:"comment,omitempty"`
-	Id           *string                 `json:"id,omitempty" yaml:"id,omitempty"`
+	Id           string                  `json:"id" yaml:"id"`
 	InstanceName *string                 `json:"instanceName,omitempty" yaml:"instanceName,omitempty"`
 	Key          *string                 `json:"key,omitempty" yaml:"key,omitempty"`
 	Labels       *map[string]interface{} `json:"labels,omitempty" yaml:"labels,omitempty"`
@@ -234,11 +234,11 @@ type Servers = []Server
 
 // Status defines model for Status.
 type Status struct {
+	Console             *string    `json:"console,omitempty" yaml:"console,omitempty"`
 	CreationTimeStamp   *time.Time `json:"creationTimeStamp,omitempty" yaml:"creationTimeStamp,omitempty"`
 	DeletionTimeStamp   *time.Time `json:"deletionTimeStamp,omitempty" yaml:"deletionTimeStamp,omitempty"`
 	LastUpdateTimeStamp *time.Time `json:"lastUpdateTimeStamp,omitempty" yaml:"lastUpdateTimeStamp,omitempty"`
 	Message             *string    `json:"message,omitempty" yaml:"message,omitempty"`
-	Console             *string    `json:"console,omitempty" yaml:"console,omitempty"`
 	Status              *string    `json:"status,omitempty" yaml:"status,omitempty"`
 	StatusCode          int        `json:"statusCode" yaml:"statusCode"`
 }
@@ -413,12 +413,12 @@ type ServerInterface interface {
 	// Create image from Server Object by Id
 	// (POST /server/{id})
 	ApiMakeImageEntryFromRunningVMById(ctx echo.Context, id string) error
-	// Connect to Server Console by Id
-	// (GET /server/{id}/console)
-	ApiConsoleServerById(ctx echo.Context, id string) error
 	// Update Server Information by Id
 	// (PUT /server/{id})
 	ApiUpdateServerById(ctx echo.Context, id string) error
+	// Connect to Server Console by Id
+	// (GET /server/{id}/console)
+	ApiConsoleServerById(ctx echo.Context, id string) error
 	// Start Server by Id
 	// (POST /server/{id}/start)
 	ApiStartServerById(ctx echo.Context, id string) error
@@ -716,22 +716,6 @@ func (w *ServerInterfaceWrapper) ApiMakeImageEntryFromRunningVMById(ctx echo.Con
 	return err
 }
 
-// ApiConsoleServerById converts echo context to params.
-func (w *ServerInterfaceWrapper) ApiConsoleServerById(ctx echo.Context) error {
-	var err error
-	// ------------- Path parameter "id" -------------
-	var id string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
-	}
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.ApiConsoleServerById(ctx, id)
-	return err
-}
-
 // ApiUpdateServerById converts echo context to params.
 func (w *ServerInterfaceWrapper) ApiUpdateServerById(ctx echo.Context) error {
 	var err error
@@ -745,6 +729,22 @@ func (w *ServerInterfaceWrapper) ApiUpdateServerById(ctx echo.Context) error {
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.ApiUpdateServerById(ctx, id)
+	return err
+}
+
+// ApiConsoleServerById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiConsoleServerById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiConsoleServerById(ctx, id)
 	return err
 }
 
@@ -921,10 +921,10 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.GET(options.BaseURL+"/server", wrapper.ApiGetServers, options.OperationMiddlewares["apiGetServers"]...)
 	router.POST(options.BaseURL+"/server", wrapper.ApiCreateServer, options.OperationMiddlewares["apiCreateServer"]...)
 	router.DELETE(options.BaseURL+"/server/:id", wrapper.ApiDeleteServerById, options.OperationMiddlewares["apiDeleteServerById"]...)
-	router.GET(options.BaseURL+"/server/:id/console", wrapper.ApiConsoleServerById, options.OperationMiddlewares["apiConsoleServerById"]...)
 	router.GET(options.BaseURL+"/server/:id", wrapper.ApiGetServerById, options.OperationMiddlewares["apiGetServerById"]...)
 	router.POST(options.BaseURL+"/server/:id", wrapper.ApiMakeImageEntryFromRunningVMById, options.OperationMiddlewares["apiMakeImageEntryFromRunningVMById"]...)
 	router.PUT(options.BaseURL+"/server/:id", wrapper.ApiUpdateServerById, options.OperationMiddlewares["apiUpdateServerById"]...)
+	router.GET(options.BaseURL+"/server/:id/console", wrapper.ApiConsoleServerById, options.OperationMiddlewares["apiConsoleServerById"]...)
 	router.POST(options.BaseURL+"/server/:id/start", wrapper.ApiStartServerById, options.OperationMiddlewares["apiStartServerById"]...)
 	router.POST(options.BaseURL+"/server/:id/stop", wrapper.ApiStopServerById, options.OperationMiddlewares["apiStopServerById"]...)
 	router.GET(options.BaseURL+"/version", wrapper.ApiGetVersion, options.OperationMiddlewares["apiGetVersion"]...)

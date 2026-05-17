@@ -170,9 +170,7 @@ func applyImage(manifest map[string]interface{}) error {
 		for _, img := range images {
 			if img.Metadata.Name == image.Metadata.Name {
 				exists = true
-				if img.Metadata.Id != nil {
-					existingId = *img.Metadata.Id
-				}
+				existingId = img.Metadata.Id
 				break
 			}
 		}
@@ -181,7 +179,7 @@ func applyImage(manifest map[string]interface{}) error {
 	var byteBody []byte
 	if exists {
 		// 更新
-		image.Metadata.Id = &existingId
+		image.Metadata.Id = existingId
 		byteBody, _, err = m.UpdateImageById(existingId, *image)
 		if err != nil {
 			return fmt.Errorf("failed to update image: %w", err)

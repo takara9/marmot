@@ -80,7 +80,6 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 	api.SetVolumeID(&volume, id)
 	volume.Metadata.Key = util.StringPtr(key)
 	volume.Metadata.Uuid = util.StringPtr(uuidString)
-	volume.Metadata.Id = util.StringPtr(id)
 	volume.Status.CreationTimeStamp = util.TimePtr(time.Now())
 	volume.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	volume.Status.StatusCode = VOLUME_PENDING

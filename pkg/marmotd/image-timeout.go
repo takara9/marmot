@@ -13,7 +13,7 @@ import (
 )
 
 var updateImageRecord = func(m *Marmot, image api.Image) error {
-	return m.Db.UpdateImage(util.DerefStrPtr(image.Metadata.Id), image)
+	return m.Db.UpdateImage(image.Metadata.Id, image)
 }
 
 var updateImageFailureStatus = func(m *Marmot, imageID, message string) {
@@ -71,6 +71,6 @@ func (m *Marmot) markImageCreationFailed(image api.Image, err error) error {
 		return err
 	}
 
-	updateImageFailureStatus(m, util.DerefStrPtr(image.Metadata.Id), err.Error())
+	updateImageFailureStatus(m, image.Metadata.Id, err.Error())
 	return err
 }

@@ -8,7 +8,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
-	"github.com/takara9/marmot/pkg/util"
 )
 
 var _ = Describe("formatServerListText", func() {
@@ -22,8 +21,8 @@ var _ = Describe("formatServerListText", func() {
 
 		output := formatServerListText([]api.Server{{
 			Metadata: api.Metadata{
-				Id:       util.StringPtr("3f738"),
-				Name: name,
+				Id:       "3f738",
+				Name:     name,
 				NodeName: &nodeName,
 			},
 			Spec: api.ServerSpec{
@@ -58,7 +57,7 @@ var _ = Describe("formatServerListText", func() {
 
 		output := formatServerListText([]api.Server{{
 			Metadata: api.Metadata{
-				Id:   util.StringPtr("592a2"),
+				Id:   "592a2",
 				Name: name,
 			},
 			Spec: api.ServerSpec{
@@ -80,11 +79,11 @@ var _ = Describe("formatServerListText", func() {
 
 		output := formatServerListText([]api.Server{{
 			Metadata: api.Metadata{
-				Id:   util.StringPtr("a1b2c"),
+				Id:   "a1b2c",
 				Name: name,
 			},
 			Status: &api.Status{
-				StatusCode:         int(db.SERVER_DELETING),
+				StatusCode:        int(db.SERVER_DELETING),
 				DeletionTimeStamp: &now,
 			},
 		}})

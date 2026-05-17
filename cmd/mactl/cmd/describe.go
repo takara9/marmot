@@ -79,8 +79,8 @@ func describeServerText(s *api.Server) error {
 	}
 
 	id := "-"
-	if s.Metadata.Id != nil && strings.TrimSpace(*s.Metadata.Id) != "" {
-		id = strings.TrimSpace(*s.Metadata.Id)
+	if strings.TrimSpace(s.Metadata.Id) != "" {
+		id = strings.TrimSpace(s.Metadata.Id)
 	}
 
 	statusText := "-"
@@ -320,8 +320,8 @@ func toStorageRow(role string, v *api.Volume) storageRow {
 	if strings.TrimSpace(v.Metadata.Name) != "" {
 		r.name = strings.TrimSpace(v.Metadata.Name)
 	}
-	if v.Metadata.Id != nil && strings.TrimSpace(*v.Metadata.Id) != "" {
-		r.id = strings.TrimSpace(*v.Metadata.Id)
+	if strings.TrimSpace(v.Metadata.Id) != "" {
+		r.id = strings.TrimSpace(v.Metadata.Id)
 	}
 	if v.Spec.Type != nil && strings.TrimSpace(*v.Spec.Type) != "" {
 		r.vType = strings.TrimSpace(*v.Spec.Type)
@@ -384,8 +384,8 @@ func describeImageText(img *api.Image) error {
 	}
 
 	id := "-"
-	if img.Metadata.Id != nil && strings.TrimSpace(*img.Metadata.Id) != "" {
-		id = strings.TrimSpace(*img.Metadata.Id)
+	if strings.TrimSpace(img.Metadata.Id) != "" {
+		id = strings.TrimSpace(img.Metadata.Id)
 	}
 	nodeName := "-"
 	if img.Metadata.NodeName != nil && strings.TrimSpace(*img.Metadata.NodeName) != "" {
@@ -506,8 +506,8 @@ func describeVolumeText(v *api.Volume) error {
 	}
 
 	id := "-"
-	if v.Metadata.Id != nil && strings.TrimSpace(*v.Metadata.Id) != "" {
-		id = strings.TrimSpace(*v.Metadata.Id)
+	if strings.TrimSpace(v.Metadata.Id) != "" {
+		id = strings.TrimSpace(v.Metadata.Id)
 	}
 	nodeName := "-"
 	if v.Metadata.NodeName != nil && strings.TrimSpace(*v.Metadata.NodeName) != "" {
@@ -637,8 +637,8 @@ func describeNetworkText(n *api.VirtualNetwork) error {
 	}
 
 	id := "-"
-	if n.Metadata.Id != nil && strings.TrimSpace(*n.Metadata.Id) != "" {
-		id = strings.TrimSpace(*n.Metadata.Id)
+	if strings.TrimSpace(n.Metadata.Id) != "" {
+		id = strings.TrimSpace(n.Metadata.Id)
 	}
 
 	nodeName := "-"

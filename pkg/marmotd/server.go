@@ -1072,7 +1072,7 @@ func (m *Marmot) MakeImageEntryFromRunningVMWithContext(ctx context.Context, ser
 	}
 
 	// イメージ情報の登録
-	imageID := util.DerefStrPtr(image.Metadata.Id)
+	imageID := image.Metadata.Id
 	if imageID == "" {
 		err := fmt.Errorf("image metadata.id is empty")
 		slog.Error("MakeImageEntryFromRunningVMWithContext()", "err", err, "serverId", serverId, "imageName", name)

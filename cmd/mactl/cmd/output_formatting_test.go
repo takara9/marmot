@@ -8,7 +8,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/util"
 )
 
 var _ = Describe("Output formatting", func() {
@@ -18,7 +17,7 @@ var _ = Describe("Output formatting", func() {
 				{
 					Metadata: api.Metadata{
 						Name: "server1",
-						Id:   util.StringPtr("srv-001"),
+						Id:   "srv-001",
 					},
 				},
 			}
@@ -44,7 +43,7 @@ var _ = Describe("Output formatting", func() {
 			server := &api.Server{
 				Metadata: api.Metadata{
 					Name: "test-server",
-					Id:   util.StringPtr("srv-001"),
+					Id:   "srv-001",
 				},
 			}
 
@@ -59,7 +58,7 @@ var _ = Describe("Output formatting", func() {
 			network := &api.VirtualNetwork{
 				Metadata: api.Metadata{
 					Name: "test-net",
-					Id:   util.StringPtr("net-001"),
+					Id:   "net-001",
 				},
 			}
 
@@ -74,7 +73,7 @@ var _ = Describe("Output formatting", func() {
 			volume := &api.Volume{
 				Metadata: api.Metadata{
 					Name: "test-vol",
-					Id:   util.StringPtr("vol-001"),
+					Id:   "vol-001",
 				},
 			}
 
@@ -89,7 +88,7 @@ var _ = Describe("Output formatting", func() {
 			image := &api.Image{
 				Metadata: api.Metadata{
 					Name: "test-img",
-					Id:   util.StringPtr("img-001"),
+					Id:   "img-001",
 				},
 			}
 
