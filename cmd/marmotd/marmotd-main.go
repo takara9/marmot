@@ -65,6 +65,7 @@ func main() {
 		"api_listen_addr", cfg.APIListenAddr,
 		"dns_listen_addr", cfg.DNSListenAddr,
 		"dns_upstream", cfg.DNSUpstream,
+		"dns_upstream_allow_cidrs", cfg.DNSUpstreamAllowCIDRs,
 		"os_volume_group", cfg.OSVolumeGroup,
 		"data_volume_group", cfg.DataVolumeGroup,
 		"deletion_delay_seconds", cfg.DeletionDelaySeconds,
@@ -76,10 +77,6 @@ func main() {
 
 	// Setup host-bridge for libvirt
 	util.SetupHostBridge()
-	if err := util.SetupLocalResolver(); err != nil {
-		slog.Error("Failed to setup local resolver", "err", err)
-		return
-	}
 
 	// REST-APIサーバーの処理
 	slog.Info("Starting api server", "nodeName", cfg.NodeName, "etcdURL", cfg.EtcdURL, "apiListenAddr", cfg.APIListenAddr)
@@ -88,12 +85,6 @@ func main() {
 	slog.Debug("Starting api server #2", "nodeName", cfg.NodeName, "etcdURL", cfg.EtcdURL, "apiListenAddr", cfg.APIListenAddr)
 	Server := marmotd.NewServer(cfg.NodeName, cfg.EtcdURL)
 	marmotd.RegisterRoutes(e, Server, "/api/v1")
-
-	// Provision OS images from configuration
-	if err := marmotd.ProvisionOSImages(Server.Ma, cfg.OSImages); err != nil {
-		slog.Warn("OS image provisioning encountered an error", "err", err)
-		// Continue startup even if provisioning fails
-	}
 
 	// コントローラーの開始
 	slog.Info("Starting controllers", "nodeName", cfg.NodeName, "etcdURL", cfg.EtcdURL, "deletionDelaySeconds", cfg.DeletionDelaySeconds)
@@ -123,6 +114,18 @@ func main() {
 	if err != nil {
 		slog.Error("Failed to start DNS server", "err", err)
 		return
+	}
+
+	// ローカルリゾルバーの初期化（内部DNSの起動成功後に切り替える）
+	if err := util.SetupLocalResolver(cfg.DNSListenAddr); err != nil {
+		slog.Error("Failed to setup local resolver", "err", err)
+		return
+	}
+
+	// Provision OS images from configuration
+	if err := marmotd.ProvisionOSImages(Server.Ma, cfg.OSImages); err != nil {
+		slog.Warn("OS image provisioning encountered an error", "err", err)
+		// Continue startup even if provisioning fails
 	}
 
 	// イメージコントローラーの開始

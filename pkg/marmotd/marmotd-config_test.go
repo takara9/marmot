@@ -101,5 +101,18 @@ var _ = Describe("VolumeGroupConfig", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(cfg.IscsiServer).To(BeFalse())
 		})
+
+		It("dns_upstream_allow_cidrs の設定値を読み込む", func() {
+			dir := GinkgoT().TempDir()
+			path := filepath.Join(dir, "marmotd.json")
+			content := []byte(`{"dns_upstream_allow_cidrs":["192.168.1.0/24"," fd00::/64 ",""]}`)
+
+			err := os.WriteFile(path, content, 0o644)
+			Expect(err).NotTo(HaveOccurred())
+
+			cfg, err := marmotd.LoadConfig(path)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cfg.DNSUpstreamAllowCIDRs).To(Equal([]string{"192.168.1.0/24", "fd00::/64"}))
+		})
 	})
 })

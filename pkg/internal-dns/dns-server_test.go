@@ -3,8 +3,18 @@ package internaldns
 import (
 	"errors"
 	"net"
+	"net/netip"
 	"testing"
 )
+
+type stubAddr struct {
+	network string
+	addr    string
+}
+
+func (a stubAddr) Network() string { return a.network }
+
+func (a stubAddr) String() string { return a.addr }
 
 func TestDecodeDNSRecordIP(t *testing.T) {
 	tests := []struct {
@@ -89,6 +99,145 @@ func TestDomainToMarmotPath(t *testing.T) {
 			got := DomainToMarmotPath(tt.domain)
 			if got != tt.want {
 				t.Fatalf("path mismatch: want=%q got=%q", tt.want, got)
+			}
+		})
+	}
+}
+
+func TestShouldForwardUpstream(t *testing.T) {
+	tests := []struct {
+		name string
+		addr net.Addr
+		want bool
+	}{
+		{
+			name: "loopback IPv4",
+			addr: &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 53000},
+			want: true,
+		},
+		{
+			name: "loopback IPv6",
+			addr: &net.UDPAddr{IP: net.ParseIP("::1"), Port: 53000},
+			want: true,
+		},
+		{
+			name: "non loopback IPv4",
+			addr: &net.UDPAddr{IP: net.ParseIP("192.168.1.10"), Port: 53000},
+			want: false,
+		},
+		{
+			name: "malformed addr string",
+			addr: stubAddr{network: "udp", addr: "bad-addr"},
+			want: false,
+		},
+		{
+			name: "nil addr",
+			addr: nil,
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := shouldForwardUpstream(tt.addr, nil)
+			if got != tt.want {
+				t.Fatalf("forward mismatch: want=%v got=%v", tt.want, got)
+			}
+		})
+	}
+}
+
+
+func TestShouldForwardUpstreamWithAllowlist(t *testing.T) {
+	allowed := []netip.Prefix{
+		netip.MustParsePrefix("192.168.1.0/24"),
+		netip.MustParsePrefix("fd00::/64"),
+	}
+
+	tests := []struct {
+		name string
+		addr net.Addr
+		want bool
+	}{
+		{
+			name: "allowed IPv4",
+			addr: &net.UDPAddr{IP: net.ParseIP("192.168.1.10"), Port: 53000},
+			want: true,
+		},
+		{
+			name: "allowed IPv6 ula",
+			addr: &net.UDPAddr{IP: net.ParseIP("fd00::10"), Port: 53000},
+			want: true,
+		},
+		{
+			name: "not listed private IPv4",
+			addr: &net.UDPAddr{IP: net.ParseIP("10.0.0.10"), Port: 53000},
+			want: false,
+		},
+		{
+			name: "not listed link local IPv4",
+			addr: &net.UDPAddr{IP: net.ParseIP("169.254.10.20"), Port: 53000},
+			want: false,
+		},
+		{
+			name: "public IPv4",
+			addr: &net.UDPAddr{IP: net.ParseIP("8.8.8.8"), Port: 53000},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := shouldForwardUpstream(tt.addr, allowed)
+			if got != tt.want {
+				t.Fatalf("forward mismatch: want=%v got=%v", tt.want, got)
+			}
+		})
+	}
+}
+
+func TestParseAllowedUpstreamCIDRs(t *testing.T) {
+	tests := []struct {
+		name    string
+		cidrs   []string
+		want    []netip.Prefix
+		wantErr bool
+	}{
+		{
+			name:  "valid list",
+			cidrs: []string{"192.168.1.12/24", "fd00::1/64"},
+			want: []netip.Prefix{
+				netip.MustParsePrefix("192.168.1.0/24"),
+				netip.MustParsePrefix("fd00::/64"),
+			},
+		},
+		{
+			name:    "invalid cidr",
+			cidrs:   []string{"not-a-cidr"},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseAllowedUpstreamCIDRs(tt.cidrs)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(got) != len(tt.want) {
+				t.Fatalf("prefix count mismatch: want=%d got=%d", len(tt.want), len(got))
+			}
+			for index := range tt.want {
+				if got[index] != tt.want[index] {
+					t.Fatalf("prefix mismatch at %d: want=%s got=%s", index, tt.want[index], got[index])
+				}
 			}
 		})
 	}

@@ -63,6 +63,11 @@ func SetupHostBridge() bool {
 		return false
 	}
 
+	// Flush IP addresses from the physical NIC to avoid duplicate IP
+	if err := flushIPAddr(primaryNIC); err != nil {
+		slog.Warn("Failed to flush IP addresses from NIC", "nic", primaryNIC, "err", err)
+	}
+
 	// Wait for bridge to be created
 	time.Sleep(2 * time.Second)
 
@@ -74,6 +79,16 @@ func SetupHostBridge() bool {
 
 	slog.Info("Host-bridge setup completed successfully")
 	return true
+}
+
+// flushIPAddr removes all IP addresses from the given NIC
+func flushIPAddr(nic string) error {
+	cmd := exec.Command("ip", "addr", "flush", "dev", nic)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("flush IP failed: %v, output: %s", err, string(output))
+	}
+	return nil
 }
 
 // bridgeExists checks if a bridge with given name exists
