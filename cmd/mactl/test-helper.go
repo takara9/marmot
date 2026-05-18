@@ -87,7 +87,11 @@ func startMockServer() (*mockServerHandle, error) {
 		}
 		stoppers = append(stoppers, netController)
 
-		_, err = internaldns.StartInternalDNSServer(ctx, nodeName, etcdEp, nil)
+		dnsCfg := &marmotd.MarmotdConfig{
+			DNSListenAddr: "127.0.0.1:1053",
+			DNSUpstream:   "8.8.8.8:53",
+		}
+		_, err = internaldns.StartInternalDNSServer(ctx, nodeName, etcdEp, dnsCfg)
 		if err != nil {
 			slog.Error("Failed to start DNS server", "err", err)
 			stopControllers()
