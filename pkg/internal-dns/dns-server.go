@@ -2,6 +2,8 @@ package internaldns
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"log/slog"
@@ -14,6 +16,8 @@ import (
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
 )
+
+var errInvalidDNSRecordIP = errors.New("invalid IP address in DNS record")
 
 type controller struct {
 	db       *db.Database
@@ -113,8 +117,12 @@ func (c *controller) handleRequest(w dns.ResponseWriter, r *dns.Msg) {
 	}
 
 	if len(resp.Kvs) > 0 {
-		ipStr := string(resp.Kvs[0].Value)
-		ip := net.ParseIP(ipStr[1 : len(ipStr)-1])
+		ip, ipStr, err := decodeDNSRecordIP(resp.Kvs[0].Value)
+		if err != nil {
+			slog.Error("Failed to decode DNS record", "err", err, "key", etcdKey)
+			dns.HandleFailed(w, r)
+			return
+		}
 
 		if ip != nil && q.Qtype == dns.TypeA {
 			log.Printf("Resolved from etcd: %s -> %s", q.Name[:len(q.Name)-1], ipStr)
@@ -137,6 +145,18 @@ func (c *controller) handleRequest(w dns.ResponseWriter, r *dns.Msg) {
 		return
 	}
 	w.WriteMsg(reply)
+}
+
+func decodeDNSRecordIP(raw []byte) (net.IP, string, error) {
+	var ipStr string
+	if err := json.Unmarshal(raw, &ipStr); err != nil {
+		return nil, "", err
+	}
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return nil, ipStr, errInvalidDNSRecordIP
+	}
+	return ip, ipStr, nil
 }
 
 // DomainToMarmotPath はドメイン名を /marmot/dns/ 形式のパスに変換します

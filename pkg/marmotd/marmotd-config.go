@@ -107,7 +107,7 @@ func defaultConfig() *MarmotdConfig {
 		NodeName:                         "hv1",
 		EtcdURL:                          "http://127.0.0.1:2379",
 		APIListenAddr:                    "0.0.0.0:8750",
-		DNSListenAddr:                    "127.0.0.1:53",
+		DNSListenAddr:                    "0.0.0.0:53",
 		DNSUpstream:                      "8.8.8.8:53",
 		DefaultUnderlayInterface:         "",
 		OSVolumeGroup:                    db.DefaultOSVolumeGroup,

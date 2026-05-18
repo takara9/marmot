@@ -76,6 +76,10 @@ func main() {
 
 	// Setup host-bridge for libvirt
 	util.SetupHostBridge()
+	if err := util.SetupLocalResolver(); err != nil {
+		slog.Error("Failed to setup local resolver", "err", err)
+		return
+	}
 
 	// REST-APIサーバーの処理
 	slog.Info("Starting api server", "nodeName", cfg.NodeName, "etcdURL", cfg.EtcdURL, "apiListenAddr", cfg.APIListenAddr)
