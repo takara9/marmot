@@ -2,8 +2,11 @@
   "node_name": "localhost",
   "etcd_url": "http://127.0.0.1:2379",
   "api_listen_addr": "0.0.0.0:8750",
-  "dns_listen_addr": "127.0.0.1:53",
+  "dns_listen_addr": "",
   "dns_upstream": "8.8.8.8:53",
+  "dns_upstream_allow_cidrs": [
+    "192.168.1.0/24"
+  ],
   "default_underlay_interface": "",
   "os_volume_group": "vg1",
   "data_volume_group": "vg2",

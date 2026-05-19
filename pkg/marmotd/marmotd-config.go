@@ -2,7 +2,9 @@ package marmotd
 
 import (
 	"encoding/json"
+	"net"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -53,6 +55,10 @@ type MarmotdConfig struct {
 	// 例: "8.8.8.8:53"
 	DNSUpstream string `json:"dns_upstream"`
 
+	// upstream DNS 転送を許可する送信元 CIDR の一覧
+	// 例: ["192.168.1.0/24", "fd00::/64"]
+	DNSUpstreamAllowCIDRs []string `json:"dns_upstream_allow_cidrs"`
+
 	// VXLAN 利用時に underlayInterface が省略された場合の既定インターフェース名
 	DefaultUnderlayInterface string `json:"default_underlay_interface"`
 
@@ -100,6 +106,11 @@ var runtimeConfigState = struct {
 	cfg: defaultConfig(),
 }
 
+var listInterfaces = net.Interfaces
+var listInterfaceAddrs = func(iface net.Interface) ([]net.Addr, error) {
+	return iface.Addrs()
+}
+
 // defaultConfig はコンフィグファイルが存在しない場合や一部フィールドが
 // 指定されていない場合に使用されるデフォルト値を返します。
 func defaultConfig() *MarmotdConfig {
@@ -107,8 +118,9 @@ func defaultConfig() *MarmotdConfig {
 		NodeName:                         "hv1",
 		EtcdURL:                          "http://127.0.0.1:2379",
 		APIListenAddr:                    "0.0.0.0:8750",
-		DNSListenAddr:                    "127.0.0.1:53",
+		DNSListenAddr:                    "0.0.0.0:53",
 		DNSUpstream:                      "8.8.8.8:53",
+		DNSUpstreamAllowCIDRs:            nil,
 		DefaultUnderlayInterface:         "",
 		OSVolumeGroup:                    db.DefaultOSVolumeGroup,
 		DataVolumeGroup:                  db.DefaultDataVolumeGroup,
@@ -143,10 +155,25 @@ func normalizeConfig(cfg *MarmotdConfig) *MarmotdConfig {
 		normalized.APIListenAddr = defaults.APIListenAddr
 	}
 	if strings.TrimSpace(normalized.DNSListenAddr) == "" {
-		normalized.DNSListenAddr = defaults.DNSListenAddr
+		if resolved, ok := resolveDNSListenAddrFromInterfaces(); ok {
+			normalized.DNSListenAddr = resolved
+		} else {
+			normalized.DNSListenAddr = defaults.DNSListenAddr
+		}
 	}
 	if strings.TrimSpace(normalized.DNSUpstream) == "" {
 		normalized.DNSUpstream = defaults.DNSUpstream
+	}
+	if len(normalized.DNSUpstreamAllowCIDRs) > 0 {
+		allowed := normalized.DNSUpstreamAllowCIDRs[:0]
+		for _, cidr := range normalized.DNSUpstreamAllowCIDRs {
+			cidr = strings.TrimSpace(cidr)
+			if cidr == "" {
+				continue
+			}
+			allowed = append(allowed, cidr)
+		}
+		normalized.DNSUpstreamAllowCIDRs = allowed
 	}
 	normalized.DefaultUnderlayInterface = strings.TrimSpace(normalized.DefaultUnderlayInterface)
 	if strings.TrimSpace(normalized.OSVolumeGroup) == "" {
@@ -174,6 +201,59 @@ func normalizeConfig(cfg *MarmotdConfig) *MarmotdConfig {
 		normalized.ImageDeleteTimeoutSeconds = defaults.ImageDeleteTimeoutSeconds
 	}
 	return normalized
+}
+
+func resolveDNSListenAddrFromInterfaces() (string, bool) {
+	ifaces, err := listInterfaces()
+	if err != nil {
+		return "", false
+	}
+
+	sort.Slice(ifaces, func(i, j int) bool {
+		return ifaces[i].Index < ifaces[j].Index
+	})
+
+	startIdx := 0
+	for i, iface := range ifaces {
+		if iface.Name == "lo" {
+			startIdx = i + 1
+			break
+		}
+	}
+
+	for i := startIdx; i < len(ifaces); i++ {
+		iface := ifaces[i]
+		addrs, err := listInterfaceAddrs(iface)
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			if ip := extractIPv4(addr); ip != nil {
+				return net.JoinHostPort(ip.String(), "53"), true
+			}
+		}
+	}
+
+	return "", false
+}
+
+func extractIPv4(addr net.Addr) net.IP {
+	switch v := addr.(type) {
+	case *net.IPNet:
+		ip := v.IP.To4()
+		if ip == nil || ip.IsLoopback() {
+			return nil
+		}
+		return ip
+	case *net.IPAddr:
+		ip := v.IP.To4()
+		if ip == nil || ip.IsLoopback() {
+			return nil
+		}
+		return ip
+	default:
+		return nil
+	}
 }
 
 func (c *MarmotdConfig) ImageCreateFromVMTimeout() time.Duration {
