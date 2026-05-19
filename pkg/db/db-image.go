@@ -490,10 +490,11 @@ func (d *Database) UpdateImageStatusMessage(id string, status int, message strin
 	}
 	image.Status.StatusCode = status
 	image.Status.Status = util.StringPtr(ImageStatus[status])
+	// 状態が変わるたびにメッセージを消す（ポインタをnilにする）
+	image.Status.Message = nil
+	// 必要なら新しいメッセージをセット
 	if len(message) > 0 {
 		image.Status.Message = util.StringPtr(message)
-	} else {
-		image.Status.Message = nil
 	}
 	image.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	if err := d.UpdateImage(id, image); err != nil {
