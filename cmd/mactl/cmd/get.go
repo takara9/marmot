@@ -375,54 +375,54 @@ func truncatePath(path string, max int) string {
 func outputServers(servers []api.Server) error {
 	switch outputStyle {
 	case "text":
-		   sort.SliceStable(servers, func(i, j int) bool {
-			   return creationTime(servers[i].Status).Before(creationTime(servers[j].Status))
-		   })
-		   fmt.Println("SERVER-NAME           STATUS        CPU  RAM(MB)   NODE          IP-ADDRESS       NETWORK")
-		   fmt.Println("-----------           ------        ---  -------   ----          ----------       -------")
-		   for _, s := range servers {
-			   node := "N/A"
-			   if s.Metadata.NodeName != nil && *s.Metadata.NodeName != "" {
-				   node = *s.Metadata.NodeName
-			   }
-			   cpu := "-"
-			   if s.Spec.Cpu != nil {
-				   cpu = fmt.Sprintf("%d", *s.Spec.Cpu)
-			   }
-			   ram := "-"
-			   if s.Spec.Memory != nil {
-				   ram = fmt.Sprintf("%d", *s.Spec.Memory)
-			   }
-			   status := "-"
-			   if s.Status != nil && s.Status.Status != nil && *s.Status.Status != "" {
-				   status = *s.Status.Status
-			   }
-			   // ネットワーク情報取得（server_list.goのロジック流用）
-			   networkLines := serverNetworkLines(s)
-			   // 1行目
-			   fmt.Printf("%-22s  %-12s  %-3s  %-7s   %-12s  %-15s  %-15s\n",
-				   s.Metadata.Name,
-				   status,
-				   cpu,
-				   ram,
-				   node,
-				   networkLines[0].address,
-				   networkLines[0].network,
-			   )
-			   // 2行目以降（複数NIC対応）
-			   for _, networkLine := range networkLines[1:] {
-				   fmt.Printf("%-22s  %-12s  %-3s  %-7s   %-12s  %-15s  %-15s\n",
-					   "",
-					   "",
-					   "",
-					   "",
-					   "",
-					   networkLine.address,
-					   networkLine.network,
-				   )
-			   }
-		   }
-		   return nil
+		sort.SliceStable(servers, func(i, j int) bool {
+			return creationTime(servers[i].Status).Before(creationTime(servers[j].Status))
+		})
+		fmt.Println("SERVER-NAME           STATUS        CPU  RAM(MB)   NODE          IP-ADDRESS       NETWORK")
+		fmt.Println("-----------           ------        ---  -------   ----          ----------       -------")
+		for _, s := range servers {
+			node := "N/A"
+			if s.Metadata.NodeName != nil && *s.Metadata.NodeName != "" {
+				node = *s.Metadata.NodeName
+			}
+			cpu := "-"
+			if s.Spec.Cpu != nil {
+				cpu = fmt.Sprintf("%d", *s.Spec.Cpu)
+			}
+			ram := "-"
+			if s.Spec.Memory != nil {
+				ram = fmt.Sprintf("%d", *s.Spec.Memory)
+			}
+			status := "-"
+			if s.Status != nil && s.Status.Status != nil && *s.Status.Status != "" {
+				status = *s.Status.Status
+			}
+			// ネットワーク情報取得（server_list.goのロジック流用）
+			networkLines := serverNetworkLines(s)
+			// 1行目
+			fmt.Printf("%-22s  %-12s  %-3s  %-7s   %-12s  %-15s  %-15s\n",
+				s.Metadata.Name,
+				status,
+				cpu,
+				ram,
+				node,
+				networkLines[0].address,
+				networkLines[0].network,
+			)
+			// 2行目以降（複数NIC対応）
+			for _, networkLine := range networkLines[1:] {
+				fmt.Printf("%-22s  %-12s  %-3s  %-7s   %-12s  %-15s  %-15s\n",
+					"",
+					"",
+					"",
+					"",
+					"",
+					networkLine.address,
+					networkLine.network,
+				)
+			}
+		}
+		return nil
 
 	case "json":
 		data, _ := json.MarshalIndent(servers, "", "  ")
@@ -585,8 +585,8 @@ func outputNetworks(networks []api.VirtualNetwork) error {
 		sort.SliceStable(networks, func(i, j int) bool {
 			return creationTime(networks[i].Status).Before(creationTime(networks[j].Status))
 		})
-			   fmt.Println("NAME            NODE-NAME  BRIDGE-NAME   STATUS   AGE  IP-NET")
-			   fmt.Println("----            ---------  -----------   ------   ---  ------")
+		fmt.Println("NAME            NODE-NAME  BRIDGE-NAME   STATUS   AGE  IP-NET")
+		fmt.Println("----            ---------  -----------   ------   ---  ------")
 		for _, n := range networks {
 			nodeName := "-"
 			if n.Metadata.NodeName != nil && strings.TrimSpace(*n.Metadata.NodeName) != "" {
@@ -608,14 +608,14 @@ func outputNetworks(networks []api.VirtualNetwork) error {
 				status = strings.TrimSpace(*n.Status.Status)
 			}
 
-				   fmt.Printf("%-14s  %-9s  %-12s  %-7s  %-8s  %-18s\n",
-					   n.Metadata.Name,
-					   nodeName,
-					   bridgeName,
-					   status,
-					   formatServerAge(n.Status),
-					   ipNet,
-				   )
+			fmt.Printf("%-14s  %-9s  %-12s  %-7s  %-8s  %-18s\n",
+				n.Metadata.Name,
+				nodeName,
+				bridgeName,
+				status,
+				formatServerAge(n.Status),
+				ipNet,
+			)
 		}
 		return nil
 
