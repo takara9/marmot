@@ -30,18 +30,18 @@ var getCmd = &cobra.Command{
 		}
 
 		// リソースタイプに応じて処理を分岐
-		switch strings.ToLower(resourceName) {
-		case "server":
-			return getServerResources(resourceSpec)
-		case "image":
-			return getImageResources(resourceSpec)
-		case "volume":
-			return getVolumeResources(resourceSpec)
-		case "network":
-			return getNetworkResources(resourceSpec)
-		default:
-			return fmt.Errorf("unknown resource type: %s", resourceName)
-		}
+			   switch strings.ToLower(resourceName) {
+			   case "server", "node", "no":
+				   return getServerResources(resourceSpec)
+			   case "image":
+				   return getImageResources(resourceSpec)
+			   case "volume":
+				   return getVolumeResources(resourceSpec)
+			   case "network":
+				   return getNetworkResources(resourceSpec)
+			   default:
+				   return fmt.Errorf("unknown resource type: %s", resourceName)
+			   }
 	},
 }
 
@@ -378,10 +378,29 @@ func outputServers(servers []api.Server) error {
 		sort.SliceStable(servers, func(i, j int) bool {
 			return creationTime(servers[i].Status).Before(creationTime(servers[j].Status))
 		})
-		fmt.Println("SERVER-NAME           STATUS        CPU  RAM(MB)   NODE          IP-ADDRESS       NETWORK")
-		fmt.Println("-----------           ------        ---  -------   ----          ----------       -------")
+		//fmt.Println("NAME            NODE       STATUS     CPU  RAM(MB)  IP-ADDRESS       NETWORK")
+		//fmt.Println("----            ----       ------     ---  -------  ----------       -------")
+		fmt.Printf("%-15s  %-8s  %-12s  %-3s  %-7s  %-15s  %-15s\n",
+			"NAME",
+			"NODE",
+			"STATUS",
+			"CPU",
+			"RAM(MB)",
+			"IP-ADDRESS",
+			"NETWORK",
+		)
+		fmt.Printf("%-15s  %-8s  %-12s  %-3s  %-7s  %-15s  %-15s\n",
+			"----",
+			"----",
+			"------",
+			"---",
+			"-------",
+			"----------",
+			"-------",
+		)
+
 		for _, s := range servers {
-			node := "N/A"
+			node := "-"
 			if s.Metadata.NodeName != nil && *s.Metadata.NodeName != "" {
 				node = *s.Metadata.NodeName
 			}
@@ -397,21 +416,18 @@ func outputServers(servers []api.Server) error {
 			if s.Status != nil && s.Status.Status != nil && *s.Status.Status != "" {
 				status = *s.Status.Status
 			}
-			// ネットワーク情報取得（server_list.goのロジック流用）
 			networkLines := serverNetworkLines(s)
-			// 1行目
-			fmt.Printf("%-22s  %-12s  %-3s  %-7s   %-12s  %-15s  %-15s\n",
+			fmt.Printf("%-15s  %-8s  %-12s  %-3s  %-7s  %-15s  %-15s\n",
 				s.Metadata.Name,
+				node,
 				status,
 				cpu,
 				ram,
-				node,
 				networkLines[0].address,
 				networkLines[0].network,
 			)
-			// 2行目以降（複数NIC対応）
 			for _, networkLine := range networkLines[1:] {
-				fmt.Printf("%-22s  %-12s  %-3s  %-7s   %-12s  %-15s  %-15s\n",
+				fmt.Printf("%-15s  %-8s  %-12s  %-3s  %-7s  %-15s  %-15s\n",
 					"",
 					"",
 					"",
@@ -585,8 +601,23 @@ func outputNetworks(networks []api.VirtualNetwork) error {
 		sort.SliceStable(networks, func(i, j int) bool {
 			return creationTime(networks[i].Status).Before(creationTime(networks[j].Status))
 		})
-		fmt.Println("NAME            NODE-NAME  BRIDGE-NAME   STATUS   AGE  IP-NET")
-		fmt.Println("----            ---------  -----------   ------   ---  ------")
+		fmt.Printf("%-14s  %-9s  %-12s  %-12s  %-8s  %-14s\n",
+			"NAME",
+			"NODE",
+			"BRIDGE",
+			"STATUS",
+			"AGE",
+			"IP-NET",
+		)
+		fmt.Printf("%-14s  %-9s  %-12s  %-12s  %-8s  %-14s\n",
+			"----",
+			"---------",
+			"-----------",
+			"----------",
+			"---",
+			"--------------",
+		)
+
 		for _, n := range networks {
 			nodeName := "-"
 			if n.Metadata.NodeName != nil && strings.TrimSpace(*n.Metadata.NodeName) != "" {
@@ -608,7 +639,7 @@ func outputNetworks(networks []api.VirtualNetwork) error {
 				status = strings.TrimSpace(*n.Status.Status)
 			}
 
-			fmt.Printf("%-14s  %-9s  %-12s  %-7s  %-8s  %-18s\n",
+			fmt.Printf("%-14s  %-9s  %-12s  %-12s  %-8s  %-14s\n",
 				n.Metadata.Name,
 				nodeName,
 				bridgeName,
