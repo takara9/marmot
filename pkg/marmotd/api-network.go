@@ -116,6 +116,10 @@ func (s *Server) ApiUpdateNetworkById(ctx echo.Context, id string) error {
 		slog.Error("failed to bind request body", "err", err)
 		return echo.NewHTTPError(400, "invalid request body")
 	}
+	if err := validateVirtualNetworkSecurityPolicy(spec.Spec.SecurityPolicy); err != nil {
+		slog.Error("failed to validate virtual network security policy", "networkId", id, "err", err)
+		return echo.NewHTTPError(400, err.Error())
+	}
 
 	if err := s.Ma.Db.UpdateVirtualNetworkById(id, spec); err != nil {
 		slog.Error("failed to update virtual network", "err", err, "networkId", id)

@@ -36,6 +36,77 @@ var _ = Describe("VirtualNetworkDefaults", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(network.Spec.PeerPolicy).To(BeNil())
 		})
+
+		It("accepts valid security policy", func() {
+			network := api.VirtualNetwork{
+				Spec: api.VirtualNetworkSpec{
+					Vni: util.IntPtrInt(100),
+					SecurityPolicy: &api.VirtualNetworkSecurityPolicy{
+						DefaultAction: api.Deny,
+						Rules: []api.VirtualNetworkSecurityRule{
+							{
+								Direction:    api.Ingress,
+								Protocol:     api.Tcp,
+								RemoteCidr:   "10.0.0.0/24",
+								PortRangeMin: 22,
+								PortRangeMax: 22,
+							},
+						},
+					},
+				},
+			}
+
+			err := applyVirtualNetworkDefaults(&network, nil, nil)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("rejects invalid security policy cidr", func() {
+			network := api.VirtualNetwork{
+				Spec: api.VirtualNetworkSpec{
+					Vni: util.IntPtrInt(100),
+					SecurityPolicy: &api.VirtualNetworkSecurityPolicy{
+						DefaultAction: api.Deny,
+						Rules: []api.VirtualNetworkSecurityRule{
+							{
+								Direction:    api.Ingress,
+								Protocol:     api.Tcp,
+								RemoteCidr:   "10.0.0.999/24",
+								PortRangeMin: 22,
+								PortRangeMax: 22,
+							},
+						},
+					},
+				},
+			}
+
+			err := applyVirtualNetworkDefaults(&network, nil, nil)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("remoteCidr"))
+		})
+
+		It("rejects invalid security policy port range", func() {
+			network := api.VirtualNetwork{
+				Spec: api.VirtualNetworkSpec{
+					Vni: util.IntPtrInt(100),
+					SecurityPolicy: &api.VirtualNetworkSecurityPolicy{
+						DefaultAction: api.Deny,
+						Rules: []api.VirtualNetworkSecurityRule{
+							{
+								Direction:    api.Egress,
+								Protocol:     api.Udp,
+								RemoteCidr:   "0.0.0.0/0",
+								PortRangeMin: 1000,
+								PortRangeMax: 100,
+							},
+						},
+					},
+				},
+			}
+
+			err := applyVirtualNetworkDefaults(&network, nil, nil)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("portRangeMin"))
+		})
 	})
 
 	Describe("nextAvailableVNI", func() {

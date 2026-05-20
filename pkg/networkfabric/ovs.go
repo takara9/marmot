@@ -22,8 +22,9 @@ type OVSFabric struct {
 }
 
 const (
-	splitHorizonCookie = "0x6d61726d6f740001"
-	ovsCommandTimeout = 30 * time.Second
+	splitHorizonCookie   = "0x6d61726d6f740001"
+	securityPolicyCookie = "0x6d61726d6f740002"
+	ovsCommandTimeout    = 30 * time.Second
 )
 
 const bridgeDeviceWaitTimeout = 10 * time.Second
@@ -343,6 +344,142 @@ func (o *OVSFabric) PruneVxlanMesh(vnet *api.VirtualNetwork, remainPeers []strin
 	return nil
 }
 
+// ApplySecurityPolicy は仮想ネットワークの securityPolicy を OVS フローへ反映する。
+func (o *OVSFabric) ApplySecurityPolicy(vnet *api.VirtualNetwork) error {
+	if vnet == nil || vnet.Spec.BridgeName == nil {
+		return fmt.Errorf("invalid vnet or missing bridge name")
+	}
+
+	bridgeName := strings.TrimSpace(*vnet.Spec.BridgeName)
+	if bridgeName == "" {
+		return fmt.Errorf("invalid vnet or missing bridge name")
+	}
+
+	if err := reconcileSecurityPolicyFlows(bridgeName, vnet.Spec.SecurityPolicy); err != nil {
+		return fmt.Errorf("failed to reconcile security policy flows on %s: %w", bridgeName, err)
+	}
+
+	return nil
+}
+
+func reconcileSecurityPolicyFlows(bridgeName string, policy *api.VirtualNetworkSecurityPolicy) error {
+	desired, err := buildSecurityPolicyFlows(policy)
+	if err != nil {
+		return err
+	}
+
+	current, err := getCurrentCookieFlows(bridgeName, securityPolicyCookie)
+	if err == nil && flowSetsEqual(current, desired) {
+		slog.Debug("security policy flows unchanged, skipping", "bridge", bridgeName)
+		return nil
+	}
+
+	if err := syncFlowsAtomicallyWithCookie(bridgeName, securityPolicyCookie, desired); err != nil {
+		return err
+	}
+
+	if policy == nil {
+		slog.Info("security policy cleared", "bridge", bridgeName)
+	} else {
+		slog.Info("security policy flows reconciled", "bridge", bridgeName, "rules", len(policy.Rules))
+	}
+
+	return nil
+}
+
+func buildSecurityPolicyFlows(policy *api.VirtualNetworkSecurityPolicy) ([]string, error) {
+	if policy == nil {
+		return []string{}, nil
+	}
+	if !policy.DefaultAction.Valid() {
+		return nil, fmt.Errorf("invalid security policy defaultAction: %s", policy.DefaultAction)
+	}
+	if len(policy.Rules) == 0 {
+		return nil, fmt.Errorf("security policy rules must not be empty")
+	}
+
+	flows := []string{
+		fmt.Sprintf("cookie=%s,priority=300,ip,ct_state=+trk+est,actions=NORMAL", securityPolicyCookie),
+		fmt.Sprintf("cookie=%s,priority=300,ip,ct_state=+trk+rel,actions=NORMAL", securityPolicyCookie),
+	}
+
+	for idx, rule := range policy.Rules {
+		priority := 260 - idx
+		if priority <= 121 {
+			return nil, fmt.Errorf("too many security policy rules: %d", len(policy.Rules))
+		}
+		flow, err := compileSecurityPolicyRuleFlow(rule, priority)
+		if err != nil {
+			return nil, fmt.Errorf("invalid security policy rule %d: %w", idx, err)
+		}
+		flows = append(flows, flow)
+	}
+
+	// 未追跡パケットを conntrack へ送る。
+	flows = append(flows, fmt.Sprintf("cookie=%s,priority=120,ip,ct_state=-trk,actions=ct(table=0)", securityPolicyCookie))
+	newConnectionActions := "drop"
+	if policy.DefaultAction == api.Allow {
+		newConnectionActions = "ct(commit),NORMAL"
+	}
+	// 新規接続で許可ルール未一致時の扱いは defaultAction に従う。
+	flows = append(flows, fmt.Sprintf("cookie=%s,priority=110,ip,ct_state=+trk+new,actions=%s", securityPolicyCookie, newConnectionActions))
+	// ARP など非 IP は従来どおり NORMAL に流す。
+	flows = append(flows, fmt.Sprintf("cookie=%s,priority=0,actions=NORMAL", securityPolicyCookie))
+
+	return flows, nil
+}
+
+func compileSecurityPolicyRuleFlow(rule api.VirtualNetworkSecurityRule, priority int) (string, error) {
+	if !rule.Direction.Valid() {
+		return "", fmt.Errorf("invalid direction: %s", rule.Direction)
+	}
+	if !rule.Protocol.Valid() {
+		return "", fmt.Errorf("invalid protocol: %s", rule.Protocol)
+	}
+	if _, _, err := net.ParseCIDR(strings.TrimSpace(rule.RemoteCidr)); err != nil {
+		return "", fmt.Errorf("invalid remoteCidr: %s", rule.RemoteCidr)
+	}
+	if rule.PortRangeMin < 1 || rule.PortRangeMin > 65535 || rule.PortRangeMax < 1 || rule.PortRangeMax > 65535 {
+		return "", fmt.Errorf("invalid port range: %d-%d", rule.PortRangeMin, rule.PortRangeMax)
+	}
+	if rule.PortRangeMin > rule.PortRangeMax {
+		return "", fmt.Errorf("portRangeMin must be <= portRangeMax")
+	}
+
+	parts := []string{
+		fmt.Sprintf("cookie=%s", securityPolicyCookie),
+		fmt.Sprintf("priority=%d", priority),
+		"ip",
+		"ct_state=-trk",
+	}
+
+	switch rule.Direction {
+	case api.Ingress:
+		parts = append(parts, fmt.Sprintf("nw_src=%s", strings.TrimSpace(rule.RemoteCidr)))
+	case api.Egress:
+		parts = append(parts, fmt.Sprintf("nw_dst=%s", strings.TrimSpace(rule.RemoteCidr)))
+	default:
+		return "", fmt.Errorf("invalid direction: %s", rule.Direction)
+	}
+
+	switch rule.Protocol {
+	case api.Tcp:
+		parts = append(parts, "tcp")
+	case api.Udp:
+		parts = append(parts, "udp")
+	default:
+		return "", fmt.Errorf("invalid protocol: %s", rule.Protocol)
+	}
+
+	if rule.PortRangeMin == rule.PortRangeMax {
+		parts = append(parts, fmt.Sprintf("tp_dst=%d", rule.PortRangeMin))
+	} else {
+		parts = append(parts, fmt.Sprintf("tp_dst=%d-%d", rule.PortRangeMin, rule.PortRangeMax))
+	}
+
+	return strings.Join(parts, ",") + ",actions=ct(commit),NORMAL", nil
+}
+
 func reconcileSplitHorizonFlows(bridgeName string) error {
 	vxlanPorts, err := listVxlanPortsOnBridge(bridgeName)
 	if err != nil {
@@ -443,8 +580,16 @@ func syncFlowsFallback(bridgeName string, flows []string) error {
 // getCurrentSplitHorizonFlows は現在 OVS に投入されている cookie 一致フローの
 // actions 文字列スライスを返す（比較用の簡易表現）。
 func getCurrentSplitHorizonFlows(bridgeName string) ([]string, error) {
+	output, err := getCurrentCookieFlows(bridgeName, splitHorizonCookie)
+	if err != nil {
+		return nil, err
+	}
+	return output, nil
+}
+
+func getCurrentCookieFlows(bridgeName string, cookie string) ([]string, error) {
 	cmd := exec.Command("ovs-ofctl", "-O", "OpenFlow13", "dump-flows", bridgeName,
-		fmt.Sprintf("cookie=%s/-1", splitHorizonCookie))
+		fmt.Sprintf("cookie=%s/-1", cookie))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("dump-flows failed: %w", err)
@@ -461,6 +606,34 @@ func getCurrentSplitHorizonFlows(bridgeName string) ([]string, error) {
 		}
 	}
 	return result, nil
+}
+
+func syncFlowsAtomicallyWithCookie(bridgeName string, cookie string, flows []string) error {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "del_flows cookie=%s/-1\n", cookie)
+	for _, f := range flows {
+		fmt.Fprintf(&sb, "add_flow %s\n", f)
+	}
+
+	cmd := exec.Command("ovs-ofctl", "-O", "OpenFlow13", "bundle", bridgeName, "-")
+	cmd.Stdin = strings.NewReader(sb.String())
+	if output, err := cmd.CombinedOutput(); err != nil {
+		slog.Warn("ovs-ofctl bundle not supported, falling back to non-atomic update", "bridge", bridgeName, "err", err, "output", strings.TrimSpace(string(output)))
+		return syncFlowsFallbackWithCookie(bridgeName, cookie, flows)
+	}
+	return nil
+}
+
+func syncFlowsFallbackWithCookie(bridgeName string, cookie string, flows []string) error {
+	if err := delFlows(bridgeName, fmt.Sprintf("cookie=%s/-1", cookie)); err != nil {
+		return err
+	}
+	for _, f := range flows {
+		if err := addFlow(bridgeName, f); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // flowSetsEqual は2つのフロー記述リストが同じ内容かを順序非依存で比較する。

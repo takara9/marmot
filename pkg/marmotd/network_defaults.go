@@ -2,6 +2,7 @@ package marmotd
 
 import (
 	"fmt"
+	"net"
 	"strings"
 
 	"github.com/takara9/marmot/api"
@@ -15,6 +16,9 @@ const maxVNI = 16777215
 func applyVirtualNetworkDefaults(network *api.VirtualNetwork, cfg *MarmotdConfig, database *db.Database) error {
 	if network == nil {
 		return nil
+	}
+	if err := validateVirtualNetworkSecurityPolicy(network.Spec.SecurityPolicy); err != nil {
+		return err
 	}
 	if network.Spec.OverlayMode == nil {
 		overlayMode := api.Vxlan
@@ -53,6 +57,41 @@ func applyVirtualNetworkDefaults(network *api.VirtualNetwork, cfg *MarmotdConfig
 		return err
 	}
 	network.Spec.Vni = util.IntPtrInt(vni)
+	return nil
+}
+
+func validateVirtualNetworkSecurityPolicy(policy *api.VirtualNetworkSecurityPolicy) error {
+	if policy == nil {
+		return nil
+	}
+	if !policy.DefaultAction.Valid() {
+		return fmt.Errorf("invalid securityPolicy.defaultAction: %s", policy.DefaultAction)
+	}
+	if len(policy.Rules) == 0 {
+		return fmt.Errorf("securityPolicy.rules must not be empty")
+	}
+
+	for idx, rule := range policy.Rules {
+		if !rule.Direction.Valid() {
+			return fmt.Errorf("invalid securityPolicy.rules[%d].direction: %s", idx, rule.Direction)
+		}
+		if !rule.Protocol.Valid() {
+			return fmt.Errorf("invalid securityPolicy.rules[%d].protocol: %s", idx, rule.Protocol)
+		}
+		if _, _, err := net.ParseCIDR(strings.TrimSpace(rule.RemoteCidr)); err != nil {
+			return fmt.Errorf("invalid securityPolicy.rules[%d].remoteCidr: %s", idx, rule.RemoteCidr)
+		}
+		if rule.PortRangeMin < 1 || rule.PortRangeMin > 65535 {
+			return fmt.Errorf("invalid securityPolicy.rules[%d].portRangeMin: %d", idx, rule.PortRangeMin)
+		}
+		if rule.PortRangeMax < 1 || rule.PortRangeMax > 65535 {
+			return fmt.Errorf("invalid securityPolicy.rules[%d].portRangeMax: %d", idx, rule.PortRangeMax)
+		}
+		if rule.PortRangeMin > rule.PortRangeMax {
+			return fmt.Errorf("invalid securityPolicy.rules[%d]: portRangeMin must be <= portRangeMax", idx)
+		}
+	}
+
 	return nil
 }
 

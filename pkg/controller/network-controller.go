@@ -150,7 +150,7 @@ func (c *controller) networkControllerLoop(fabric networkfabric.NetworkFabric) {
 				if role == "follower" {
 					if err := c.reconcileFollowerWaitingNetwork(vnet, fabric); err != nil {
 						slog.Error("フォロワーネットワークのプロビジョニング継続に失敗", "networkId", vnetID, "err", err)
-						c.db.UpdateVirtualNetworkStatus(vnetID, db.NETWORK_ERROR)
+						c.db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_ERROR, err.Error())
 					}
 				} else {
 					if err := c.reconcileHeadProvisioningNetwork(vnet, fabric); err != nil {
@@ -205,12 +205,12 @@ func (c *controller) networkControllerLoop(fabric networkfabric.NetworkFabric) {
 				if role == "follower" {
 					if err := c.reconcileFollowerActiveNetwork(vnet, fabric); err != nil {
 						slog.Error("failed to reconcile follower network", "err", err, "networkId", vnetID, "controllerNode", c.marmot.NodeName)
-						c.db.UpdateVirtualNetworkStatus(vnetID, db.NETWORK_ERROR)
+						c.db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_ERROR, err.Error())
 					}
 				} else {
 					if err := c.ensureVxlanMeshForNetwork(fabric, vnet); err != nil {
 						slog.Error("failed to reconcile head vxlan mesh", "err", err, "networkId", vnetID, "controllerNode", c.marmot.NodeName)
-						c.db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_ERROR, "fabric:vxlan-failed:"+err.Error())
+						c.db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_ERROR, err.Error())
 					}
 				}
 
@@ -221,7 +221,7 @@ func (c *controller) networkControllerLoop(fabric networkfabric.NetworkFabric) {
 				slog.Debug("フォロワーネットワークはヘッドノード完了待ち", "networkId", vnetID)
 				if err := c.reconcileFollowerWaitingNetwork(vnet, fabric); err != nil {
 					slog.Error("フォロワーネットワークの同期開始に失敗", "networkId", vnetID, "err", err)
-					c.db.UpdateVirtualNetworkStatus(vnetID, db.NETWORK_ERROR)
+					c.db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_ERROR, err.Error())
 				}
 
 			default:
@@ -253,8 +253,9 @@ func (c *controller) reconcileHeadProvisioningNetwork(vnet api.VirtualNetwork, f
 		defer net.Free()
 	}
 
+	c.db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_PROVISIONING, "fabric:ensure-vxlan-mesh")
 	if err := c.ensureVxlanMeshForNetwork(fabric, vnet); err != nil {
-		return fmt.Errorf("fabric:vxlan-failed:%w", err)
+		return err
 	}
 
 	c.db.UpdateVirtualNetworkStatus(vnetID, db.NETWORK_ACTIVE)
@@ -527,20 +528,24 @@ func (c *controller) ensureVxlanMeshForNetwork(fabric networkfabric.NetworkFabri
 	}
 
 	if err := fabric.EnsureBridge(&vnet); err != nil {
-		return fmt.Errorf("ensure bridge failed: %w", err)
+		return fmt.Errorf("fabric:ensure-bridge-failed:%w", err)
 	}
 
 	peers, err := c.resolveVxlanPeerIPs(vnet)
 	if err != nil {
-		return err
+		return fmt.Errorf("fabric:resolve-vxlan-peers-failed:%w", err)
 	}
 
 	if err := fabric.EnsureVxlanMesh(&vnet, peers); err != nil {
-		return fmt.Errorf("ensure vxlan mesh failed: %w", err)
+		return fmt.Errorf("fabric:ensure-vxlan-mesh-failed:%w", err)
 	}
 
 	if err := fabric.PruneVxlanMesh(&vnet, peers); err != nil {
-		return fmt.Errorf("prune vxlan mesh failed: %w", err)
+		return fmt.Errorf("fabric:prune-vxlan-mesh-failed:%w", err)
+	}
+
+	if err := fabric.ApplySecurityPolicy(&vnet); err != nil {
+		return fmt.Errorf("fabric:apply-security-policy-failed:%w", err)
 	}
 
 	return nil

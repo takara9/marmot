@@ -30,6 +30,10 @@ type NetworkFabric interface {
 	// GetBridgeStatus はブリッジ存在状態と peer 数を返す。
 	// 監視・drift 検知用。
 	GetBridgeStatus(vnet *api.VirtualNetwork) (exists bool, peerCount int, err error)
+
+	// ApplySecurityPolicy は仮想ネットワークの securityPolicy を OVS フローへ反映する。
+	// policy が未指定の場合は、当該ネットワーク向けのセキュリティフローを削除する。
+	ApplySecurityPolicy(vnet *api.VirtualNetwork) error
 }
 
 // PeerNode はメッシュ構成用のピア情報。

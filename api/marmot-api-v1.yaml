@@ -1061,6 +1061,53 @@ components:
           enum:
             - auto
             - manual
+        securityPolicy:
+          $ref: "#/components/schemas/VirtualNetworkSecurityPolicy"
+    VirtualNetworkSecurityPolicy:
+      type: object
+      required:
+        - defaultAction
+        - rules
+      properties:
+        defaultAction:
+          type: string
+          enum:
+            - allow
+            - deny
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/VirtualNetworkSecurityRule"
+    VirtualNetworkSecurityRule:
+      type: object
+      required:
+        - direction
+        - protocol
+        - remoteCidr
+        - portRangeMin
+        - portRangeMax
+      properties:
+        direction:
+          type: string
+          enum:
+            - ingress
+            - egress
+        protocol:
+          type: string
+          enum:
+            - tcp
+            - udp
+        remoteCidr:
+          type: string
+          description: "Source or destination CIDR depending on direction"
+        portRangeMin:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        portRangeMax:
+          type: integer
+          minimum: 1
+          maximum: 65535
     IPNetwork:
       type: object
       required:

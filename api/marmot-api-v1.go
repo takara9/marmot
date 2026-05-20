@@ -12,6 +12,60 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for VirtualNetworkSecurityPolicyDefaultAction.
+const (
+	Allow VirtualNetworkSecurityPolicyDefaultAction = "allow"
+	Deny  VirtualNetworkSecurityPolicyDefaultAction = "deny"
+)
+
+// Valid indicates whether the value is a known member of the VirtualNetworkSecurityPolicyDefaultAction enum.
+func (e VirtualNetworkSecurityPolicyDefaultAction) Valid() bool {
+	switch e {
+	case Allow:
+		return true
+	case Deny:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for VirtualNetworkSecurityRuleDirection.
+const (
+	Egress  VirtualNetworkSecurityRuleDirection = "egress"
+	Ingress VirtualNetworkSecurityRuleDirection = "ingress"
+)
+
+// Valid indicates whether the value is a known member of the VirtualNetworkSecurityRuleDirection enum.
+func (e VirtualNetworkSecurityRuleDirection) Valid() bool {
+	switch e {
+	case Egress:
+		return true
+	case Ingress:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for VirtualNetworkSecurityRuleProtocol.
+const (
+	Tcp VirtualNetworkSecurityRuleProtocol = "tcp"
+	Udp VirtualNetworkSecurityRuleProtocol = "udp"
+)
+
+// Valid indicates whether the value is a known member of the VirtualNetworkSecurityRuleProtocol enum.
+func (e VirtualNetworkSecurityRuleProtocol) Valid() bool {
+	switch e {
+	case Tcp:
+		return true
+	case Udp:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for VirtualNetworkSpecOverlayMode.
 const (
 	None  VirtualNetworkSpecOverlayMode = "none"
@@ -128,13 +182,13 @@ type ImageSpec struct {
 	Kind          *string `json:"kind,omitempty" yaml:"kind,omitempty"`
 	LogicalVolume *string `json:"logicalVolume,omitempty" yaml:"logicalVolume,omitempty"`
 	LvPath        *string `json:"lvPath,omitempty" yaml:"lvPath,omitempty"`
+	OsName        *string `json:"osName,omitempty" yaml:"osName,omitempty"`
+	OsVersion     *string `json:"osVersion,omitempty" yaml:"osVersion,omitempty"`
 	Qcow2Path     *string `json:"qcow2Path,omitempty" yaml:"qcow2Path,omitempty"`
 	Size          *int    `json:"size,omitempty" yaml:"size,omitempty"`
 	SourceUrl     *string `json:"sourceUrl,omitempty" yaml:"sourceUrl,omitempty"`
 	Type          *string `json:"type,omitempty" yaml:"type,omitempty"`
 	VolumeGroup   *string `json:"volumeGroup,omitempty" yaml:"volumeGroup,omitempty"`
-	OsName        *string `json:"osName,omitempty" yaml:"osName,omitempty"`
-	OsVersion     *string `json:"osVersion,omitempty" yaml:"osVersion,omitempty"`
 }
 
 // Job defines model for Job.
@@ -266,6 +320,32 @@ type VirtualNetwork struct {
 	Status     *Status            `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
+// VirtualNetworkSecurityPolicy defines model for VirtualNetworkSecurityPolicy.
+type VirtualNetworkSecurityPolicy struct {
+	DefaultAction VirtualNetworkSecurityPolicyDefaultAction `json:"defaultAction" yaml:"defaultAction"`
+	Rules         []VirtualNetworkSecurityRule              `json:"rules" yaml:"rules"`
+}
+
+// VirtualNetworkSecurityPolicyDefaultAction defines model for VirtualNetworkSecurityPolicy.DefaultAction.
+type VirtualNetworkSecurityPolicyDefaultAction string
+
+// VirtualNetworkSecurityRule defines model for VirtualNetworkSecurityRule.
+type VirtualNetworkSecurityRule struct {
+	Direction    VirtualNetworkSecurityRuleDirection `json:"direction" yaml:"direction"`
+	PortRangeMax int                                 `json:"portRangeMax" yaml:"portRangeMax"`
+	PortRangeMin int                                 `json:"portRangeMin" yaml:"portRangeMin"`
+	Protocol     VirtualNetworkSecurityRuleProtocol  `json:"protocol" yaml:"protocol"`
+
+	// RemoteCidr Source or destination CIDR depending on direction
+	RemoteCidr string `json:"remoteCidr" yaml:"remoteCidr"`
+}
+
+// VirtualNetworkSecurityRuleDirection defines model for VirtualNetworkSecurityRule.Direction.
+type VirtualNetworkSecurityRuleDirection string
+
+// VirtualNetworkSecurityRuleProtocol defines model for VirtualNetworkSecurityRule.Protocol.
+type VirtualNetworkSecurityRuleProtocol string
+
 // VirtualNetworkSpec defines model for VirtualNetworkSpec.
 type VirtualNetworkSpec struct {
 	BridgeName       *string `json:"bridgeName,omitempty" yaml:"bridgeName,omitempty"`
@@ -284,8 +364,9 @@ type VirtualNetworkSpec struct {
 	OverlayMode *VirtualNetworkSpecOverlayMode `json:"overlayMode,omitempty" yaml:"overlayMode,omitempty"`
 
 	// PeerPolicy Policy for VXLAN peer management: 'auto' (full-mesh) or 'manual'
-	PeerPolicy *VirtualNetworkSpecPeerPolicy `json:"peerPolicy,omitempty" yaml:"peerPolicy,omitempty"`
-	Stp        *bool                         `json:"stp,omitempty" yaml:"stp,omitempty"`
+	PeerPolicy     *VirtualNetworkSpecPeerPolicy `json:"peerPolicy,omitempty" yaml:"peerPolicy,omitempty"`
+	SecurityPolicy *VirtualNetworkSecurityPolicy `json:"securityPolicy,omitempty" yaml:"securityPolicy,omitempty"`
+	Stp            *bool                         `json:"stp,omitempty" yaml:"stp,omitempty"`
 
 	// UnderlayInterface Interface name for underlay network
 	UnderlayInterface *string `json:"underlayInterface,omitempty" yaml:"underlayInterface,omitempty"`
