@@ -31,7 +31,7 @@ var getCmd = &cobra.Command{
 
 		// リソースタイプに応じて処理を分岐
 		switch strings.ToLower(resourceName) {
-		case "server":
+		case "server", "node", "no":
 			return getServerResources(resourceSpec)
 		case "image":
 			return getImageResources(resourceSpec)
@@ -378,28 +378,65 @@ func outputServers(servers []api.Server) error {
 		sort.SliceStable(servers, func(i, j int) bool {
 			return creationTime(servers[i].Status).Before(creationTime(servers[j].Status))
 		})
-		fmt.Println("NAME            KIND    CPU  MEM(GB)  STATUS        AGE      IP/CIDR")
-		fmt.Println("----            ----    ---  -------  ------        ---      -------")
-		for _, s := range servers {
-			status := ""
-			if s.Status != nil && s.Status.Status != nil {
-				status = *s.Status.Status
-			}
+		//fmt.Println("NAME            NODE       STATUS     CPU  RAM(MB)  IP-ADDRESS       NETWORK")
+		//fmt.Println("----            ----       ------     ---  -------  ----------       -------")
+		fmt.Printf("%-15s  %-8s  %-12s  %-3s  %-7s  %-15s  %-15s\n",
+			"NAME",
+			"NODE",
+			"STATUS",
+			"CPU",
+			"RAM(MB)",
+			"IP-ADDRESS",
+			"NETWORK",
+		)
+		fmt.Printf("%-15s  %-8s  %-12s  %-3s  %-7s  %-15s  %-15s\n",
+			"----",
+			"----",
+			"------",
+			"---",
+			"-------",
+			"----------",
+			"-------",
+		)
 
+		for _, s := range servers {
+			node := "-"
+			if s.Metadata.NodeName != nil && *s.Metadata.NodeName != "" {
+				node = *s.Metadata.NodeName
+			}
 			cpu := "-"
 			if s.Spec.Cpu != nil {
 				cpu = fmt.Sprintf("%d", *s.Spec.Cpu)
 			}
-
-			fmt.Printf("%-14s  %-6s  %-3s  %-7s  %-12s  %-7s  %s\n",
+			ram := "-"
+			if s.Spec.Memory != nil {
+				ram = fmt.Sprintf("%d", *s.Spec.Memory)
+			}
+			status := "-"
+			if s.Status != nil && s.Status.Status != nil && *s.Status.Status != "" {
+				status = *s.Status.Status
+			}
+			networkLines := serverNetworkLines(s)
+			fmt.Printf("%-15s  %-8s  %-12s  %-3s  %-7s  %-15s  %-15s\n",
 				s.Metadata.Name,
-				s.Kind,
-				cpu,
-				formatMemoryGB(s.Spec.Memory),
+				node,
 				status,
-				formatServerAge(s.Status),
-				formatServerIPCIDR(s),
+				cpu,
+				ram,
+				networkLines[0].address,
+				networkLines[0].network,
 			)
+			for _, networkLine := range networkLines[1:] {
+				fmt.Printf("%-15s  %-8s  %-12s  %-3s  %-7s  %-15s  %-15s\n",
+					"",
+					"",
+					"",
+					"",
+					"",
+					networkLine.address,
+					networkLine.network,
+				)
+			}
 		}
 		return nil
 
@@ -564,8 +601,23 @@ func outputNetworks(networks []api.VirtualNetwork) error {
 		sort.SliceStable(networks, func(i, j int) bool {
 			return creationTime(networks[i].Status).Before(creationTime(networks[j].Status))
 		})
-		fmt.Println("NAME            NODE-NAME  BRIDGE-NAME   IP-NET             STATUS   AGE")
-		fmt.Println("----            ---------  -----------   ------             ------   ---")
+		fmt.Printf("%-14s  %-9s  %-12s  %-12s  %-8s  %-14s\n",
+			"NAME",
+			"NODE",
+			"BRIDGE",
+			"STATUS",
+			"AGE",
+			"IP-NET",
+		)
+		fmt.Printf("%-14s  %-9s  %-12s  %-12s  %-8s  %-14s\n",
+			"----",
+			"---------",
+			"-----------",
+			"----------",
+			"---",
+			"--------------",
+		)
+
 		for _, n := range networks {
 			nodeName := "-"
 			if n.Metadata.NodeName != nil && strings.TrimSpace(*n.Metadata.NodeName) != "" {
@@ -587,13 +639,13 @@ func outputNetworks(networks []api.VirtualNetwork) error {
 				status = strings.TrimSpace(*n.Status.Status)
 			}
 
-			fmt.Printf("%-14s  %-9s  %-12s  %-18s  %-7s  %s\n",
+			fmt.Printf("%-14s  %-9s  %-12s  %-12s  %-8s  %-14s\n",
 				n.Metadata.Name,
 				nodeName,
 				bridgeName,
-				ipNet,
 				status,
 				formatServerAge(n.Status),
+				ipNet,
 			)
 		}
 		return nil
