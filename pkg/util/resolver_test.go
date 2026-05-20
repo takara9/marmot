@@ -1,6 +1,69 @@
 package util
 
-import "testing"
+import (
+	"os"
+	"testing"
+)
+
+func TestCurrentNameserverInResolvConf(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		wantNS  string
+		wantErr bool
+	}{
+		{
+			name:    "single nameserver",
+			content: "# comment\nnameserver 127.0.0.1\noptions edns0\n",
+			wantNS:  "127.0.0.1",
+		},
+		{
+			name:    "multiple nameservers returns first",
+			content: "nameserver 192.168.1.1\nnameserver 8.8.8.8\n",
+			wantNS:  "192.168.1.1",
+		},
+		{
+			name:    "marmotd generated format",
+			content: "# generate by marmotd\nnameserver 192.168.122.10\noptions edns0 trust-ad\nsearch host-bridge\n",
+			wantNS:  "192.168.122.10",
+		},
+		{
+			name:    "no nameserver entry",
+			content: "# only comments\n",
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			f, err := os.CreateTemp(t.TempDir(), "resolv.conf")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := f.WriteString(tc.content); err != nil {
+				t.Fatal(err)
+			}
+			f.Close()
+
+			// Temporarily override ReadFile target by writing to a known path and
+			// testing the helper via a wrapper that accepts a path argument.
+			data, _ := os.ReadFile(f.Name())
+			got, gotErr := parseNameserverFromResolvConf(string(data))
+			if tc.wantErr {
+				if gotErr == nil {
+					t.Fatalf("expected error but got nameserver %q", got)
+				}
+				return
+			}
+			if gotErr != nil {
+				t.Fatalf("unexpected error: %v", gotErr)
+			}
+			if got != tc.wantNS {
+				t.Fatalf("got %q, want %q", got, tc.wantNS)
+			}
+		})
+	}
+}
 
 func TestNameserverForDNSListenAddr(t *testing.T) {
 	tests := []struct {

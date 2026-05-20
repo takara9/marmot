@@ -12,8 +12,16 @@ import (
 const marmotResolvConfTemplate = "# generate by marmotd\nnameserver %s\noptions edns0 trust-ad\nsearch host-bridge\n"
 
 // SetupLocalResolver disables systemd-resolved and rewrites /etc/resolv.conf for marmot internal DNS.
+// If /etc/resolv.conf already has a nameserver entry that matches the IP derived from dnsListenAddr,
+// it skips the rewrite entirely.
 func SetupLocalResolver(dnsListenAddr string) error {
 	nameserver := nameserverForDNSListenAddr(dnsListenAddr)
+
+	if current, err := currentNameserverInResolvConf(); err == nil && current == nameserver {
+		slog.Info("resolv.conf nameserver already matches dns_listen_addr; skipping rewrite", "nameserver", nameserver)
+		return nil
+	}
+
 	resolvConfContent := fmt.Sprintf(marmotResolvConfTemplate, nameserver)
 
 	if err := runSystemctlResolved("stop"); err != nil {
@@ -29,6 +37,29 @@ func SetupLocalResolver(dnsListenAddr string) error {
 		return fmt.Errorf("write /etc/resolv.conf: %w", err)
 	}
 	return nil
+}
+
+// currentNameserverInResolvConf returns the first nameserver IP found in /etc/resolv.conf.
+func currentNameserverInResolvConf() (string, error) {
+	data, err := os.ReadFile("/etc/resolv.conf")
+	if err != nil {
+		return "", err
+	}
+	return parseNameserverFromResolvConf(string(data))
+}
+
+// parseNameserverFromResolvConf extracts the first nameserver IP from resolv.conf content.
+func parseNameserverFromResolvConf(content string) (string, error) {
+	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "nameserver") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				return fields[1], nil
+			}
+		}
+	}
+	return "", fmt.Errorf("no nameserver entry found in /etc/resolv.conf")
 }
 
 func nameserverForDNSListenAddr(dnsListenAddr string) string {
