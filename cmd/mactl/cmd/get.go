@@ -30,18 +30,18 @@ var getCmd = &cobra.Command{
 		}
 
 		// リソースタイプに応じて処理を分岐
-			   switch strings.ToLower(resourceName) {
-			   case "server", "node", "no":
-				   return getServerResources(resourceSpec)
-			   case "image":
-				   return getImageResources(resourceSpec)
-			   case "volume":
-				   return getVolumeResources(resourceSpec)
-			   case "network":
-				   return getNetworkResources(resourceSpec)
-			   default:
-				   return fmt.Errorf("unknown resource type: %s", resourceName)
-			   }
+		switch strings.ToLower(resourceName) {
+		case "server", "node", "no":
+			return getServerResources(resourceSpec)
+		case "image":
+			return getImageResources(resourceSpec)
+		case "volume":
+			return getVolumeResources(resourceSpec)
+		case "network":
+			return getNetworkResources(resourceSpec)
+		default:
+			return fmt.Errorf("unknown resource type: %s", resourceName)
+		}
 	},
 }
 
