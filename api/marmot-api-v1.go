@@ -128,13 +128,13 @@ type ImageSpec struct {
 	Kind          *string `json:"kind,omitempty" yaml:"kind,omitempty"`
 	LogicalVolume *string `json:"logicalVolume,omitempty" yaml:"logicalVolume,omitempty"`
 	LvPath        *string `json:"lvPath,omitempty" yaml:"lvPath,omitempty"`
+	OsName        *string `json:"osName,omitempty" yaml:"osName,omitempty"`
+	OsVersion     *string `json:"osVersion,omitempty" yaml:"osVersion,omitempty"`
 	Qcow2Path     *string `json:"qcow2Path,omitempty" yaml:"qcow2Path,omitempty"`
 	Size          *int    `json:"size,omitempty" yaml:"size,omitempty"`
 	SourceUrl     *string `json:"sourceUrl,omitempty" yaml:"sourceUrl,omitempty"`
 	Type          *string `json:"type,omitempty" yaml:"type,omitempty"`
 	VolumeGroup   *string `json:"volumeGroup,omitempty" yaml:"volumeGroup,omitempty"`
-	OsName        *string `json:"osName,omitempty" yaml:"osName,omitempty"`
-	OsVersion     *string `json:"osVersion,omitempty" yaml:"osVersion,omitempty"`
 }
 
 // Job defines model for Job.
@@ -283,7 +283,7 @@ type VirtualNetworkSpec struct {
 	// OverlayMode Overlay mode for multi-node networks: 'none' (default) or 'vxlan'
 	OverlayMode *VirtualNetworkSpecOverlayMode `json:"overlayMode,omitempty" yaml:"overlayMode,omitempty"`
 
-	// PeerPolicy Policy for VXLAN peer management: 'auto' (full-mesh) or 'manual'
+	// PeerPolicy Policy for VXLAN peer management: 'auto' (hub-spoke) or 'manual'
 	PeerPolicy *VirtualNetworkSpecPeerPolicy `json:"peerPolicy,omitempty" yaml:"peerPolicy,omitempty"`
 	Stp        *bool                         `json:"stp,omitempty" yaml:"stp,omitempty"`
 
@@ -297,7 +297,7 @@ type VirtualNetworkSpec struct {
 // VirtualNetworkSpecOverlayMode Overlay mode for multi-node networks: 'none' (default) or 'vxlan'
 type VirtualNetworkSpecOverlayMode string
 
-// VirtualNetworkSpecPeerPolicy Policy for VXLAN peer management: 'auto' (full-mesh) or 'manual'
+// VirtualNetworkSpecPeerPolicy Policy for VXLAN peer management: 'auto' (hub-spoke) or 'manual'
 type VirtualNetworkSpecPeerPolicy string
 
 // VolSpec defines model for VolSpec.

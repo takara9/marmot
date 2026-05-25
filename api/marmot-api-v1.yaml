@@ -1057,7 +1057,7 @@ components:
           description: "Interface name for underlay network"
         peerPolicy:
           type: string
-          description: "Policy for VXLAN peer management: 'auto' (full-mesh) or 'manual'"
+          description: "Policy for VXLAN peer management: 'auto' (hub-spoke) or 'manual'"
           enum:
             - auto
             - manual
