@@ -17,7 +17,7 @@ import (
 var getCmd = &cobra.Command{
 	Use:   "get RESOURCE [NAME]",
 	Short: "Get resource(s) of a specific type",
-	Long:  `Get resource(s) (server/srv, image/img, volume/vol, network/net). If NAME is provided, show only that resource. Otherwise, list all resources.`,
+	Long:  `Get resource(s) (server/srv, image/img, volume/vol, network/net, gateway/gw). If NAME is provided, show only that resource. Otherwise, list all resources.`,
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		resourceName := args[0]
@@ -39,6 +39,8 @@ var getCmd = &cobra.Command{
 			return getVolumeResources(resourceSpec)
 		case "network":
 			return getNetworkResources(resourceSpec)
+		case "gateway":
+			return getGatewayResources(resourceSpec)
 		default:
 			return fmt.Errorf("unknown resource type: %s", resourceName)
 		}
@@ -197,6 +199,41 @@ func getNetworkResources(name string) error {
 	return runList(listFn)
 }
 
+func getGatewayResources(name string) error {
+	listFn := func() error {
+		m, err := getClientConfig()
+		if err != nil {
+			return fmt.Errorf("failed to get client config: %w", err)
+		}
+
+		list, _, err := m.GetGateways()
+		if err != nil {
+			return fmt.Errorf("failed to list gateways: %w", err)
+		}
+
+		var gateways []api.Gateway
+		if err := json.Unmarshal(list, &gateways); err != nil {
+			return fmt.Errorf("failed to parse gateways: %w", err)
+		}
+
+		if name != "" {
+			gateways = filterGatewaysByName(gateways, name)
+			if len(gateways) == 0 {
+				fmt.Printf("no gateway found with name %q\n", name)
+				return nil
+			}
+		}
+
+		if labelSelector != "" {
+			gateways = filterGatewaysByLabel(gateways, labelSelector)
+		}
+
+		return outputGateways(gateways)
+	}
+
+	return runList(listFn)
+}
+
 // フィルター関数
 func filterServersByName(servers []api.Server, name string) []api.Server {
 	var result []api.Server
@@ -273,6 +310,26 @@ func filterNetworksByLabel(networks []api.VirtualNetwork, labelFilter string) []
 	for _, n := range networks {
 		if MatchesLabel(convertLabels(n.Metadata.Labels), labelFilter) {
 			result = append(result, n)
+		}
+	}
+	return result
+}
+
+func filterGatewaysByName(gateways []api.Gateway, name string) []api.Gateway {
+	var result []api.Gateway
+	for _, g := range gateways {
+		if g.Metadata.Name == name {
+			result = append(result, g)
+		}
+	}
+	return result
+}
+
+func filterGatewaysByLabel(gateways []api.Gateway, labelFilter string) []api.Gateway {
+	var result []api.Gateway
+	for _, g := range gateways {
+		if MatchesLabel(convertLabels(g.Metadata.Labels), labelFilter) {
+			result = append(result, g)
 		}
 	}
 	return result
@@ -657,6 +714,66 @@ func outputNetworks(networks []api.VirtualNetwork) error {
 
 	case "yaml":
 		data, _ := json.Marshal(networks)
+		fmt.Println(string(data))
+		return nil
+
+	default:
+		return fmt.Errorf("output style must be text/json/yaml")
+	}
+}
+
+func outputGateways(gateways []api.Gateway) error {
+	switch outputStyle {
+	case "text":
+		sort.SliceStable(gateways, func(i, j int) bool {
+			return creationTime(gateways[i].Status).Before(creationTime(gateways[j].Status))
+		})
+		fmt.Printf("%-14s  %-14s  %-16s  %-12s  %-8s\n",
+			"NAME",
+			"INTERNAL-NET",
+			"PUBLIC-IP",
+			"STATUS",
+			"AGE",
+		)
+		fmt.Printf("%-14s  %-14s  %-16s  %-12s  %-8s\n",
+			"----",
+			"------------",
+			"---------",
+			"------",
+			"---",
+		)
+
+		for _, g := range gateways {
+			internalNet := "-"
+			if strings.TrimSpace(g.Spec.InternalVirtualNetwork) != "" {
+				internalNet = strings.TrimSpace(g.Spec.InternalVirtualNetwork)
+			}
+			publicIP := "-"
+			if strings.TrimSpace(g.Spec.BindPublicIpAddress) != "" {
+				publicIP = strings.TrimSpace(g.Spec.BindPublicIpAddress)
+			}
+			status := "-"
+			if g.Status != nil && g.Status.Status != nil && strings.TrimSpace(*g.Status.Status) != "" {
+				status = strings.TrimSpace(*g.Status.Status)
+			}
+
+			fmt.Printf("%-14s  %-14s  %-16s  %-12s  %-8s\n",
+				g.Metadata.Name,
+				internalNet,
+				publicIP,
+				status,
+				formatServerAge(g.Status),
+			)
+		}
+		return nil
+
+	case "json":
+		data, _ := json.MarshalIndent(gateways, "", "  ")
+		fmt.Println(string(data))
+		return nil
+
+	case "yaml":
+		data, _ := json.Marshal(gateways)
 		fmt.Println(string(data))
 		return nil
 

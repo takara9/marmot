@@ -513,6 +513,125 @@ paths:
               application/json:
                 schema:
                   $ref: "#/components/schemas/Error"
+  /gateway:
+    post:
+      summary: "Create Gateway"
+      operationId: apiCreateGateway
+      tags:
+        - gateway
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Gateway"
+      responses:
+        "201":
+          description: Created the Gateway
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Gateway"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      summary: "List Gateways"
+      operationId: apiGetGateways
+      tags:
+        - gateway
+      responses:
+        "200":
+          description: List of Gateways
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Gateway"
+  /gateway/{id}:
+    get:
+      summary: "Info for a specific gateway"
+      operationId: apiGetGatewayById
+      tags:
+        - gateway
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the gateway to retrieve
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Gateway details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Gateway"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      summary: "Update Gateway"
+      operationId: apiUpdateGatewayById
+      tags:
+        - gateway
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the gateway to update
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Gateway"
+      responses:
+        "200":
+          description: Updated the Gateway
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Success"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: "Delete Gateway"
+      operationId: apiDeleteGatewayById
+      tags:
+        - gateway
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the gateway to delete
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Accepted the request to delete the gateway
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Success"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /image:
     post:
       summary: "Create Image"
@@ -1061,6 +1180,42 @@ components:
           enum:
             - auto
             - manual
+    Gateway:
+      type: object
+      required:
+        - apiVersion
+        - kind
+        - metadata
+        - spec
+      properties:
+        apiVersion:
+          type: string
+        kind:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+        spec:
+          $ref: "#/components/schemas/GatewaySpec"
+        status:
+          $ref: "#/components/schemas/Status"
+    GatewaySpec:
+      type: object
+      required:
+        - bindPublicIpAddress
+        - internalServerName
+        - internalVirtualNetwork
+        - serverPorts
+      properties:
+        bindPublicIpAddress:
+          type: string
+        internalServerName:
+          type: string
+        internalVirtualNetwork:
+          type: string
+        serverPorts:
+          type: array
+          items:
+            type: string
     IPNetwork:
       type: object
       required:

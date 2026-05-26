@@ -14,6 +14,7 @@ var _ = Describe("kubectl-like commands", Ordered, func() {
 				"images":   "image",
 				"networks": "network",
 				"volumes":  "volume",
+				"gateways": "gateway",
 			}
 
 			for input, expected := range testCases {
@@ -28,6 +29,7 @@ var _ = Describe("kubectl-like commands", Ordered, func() {
 				"img": "image",
 				"vol": "volume",
 				"net": "network",
+				"gw":  "gateway",
 			}
 
 			for input, expected := range testCases {
@@ -51,6 +53,7 @@ var _ = Describe("kubectl-like commands", Ordered, func() {
 			Expect(GetKindFromResourceName("image")).To(Equal("Image"))
 			Expect(GetKindFromResourceName("network")).To(Equal("VirtualNetwork"))
 			Expect(GetKindFromResourceName("volume")).To(Equal("Volume"))
+			Expect(GetKindFromResourceName("gateway")).To(Equal("Gateway"))
 		})
 
 		It("handles aliases", func() {

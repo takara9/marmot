@@ -22,6 +22,7 @@ const (
 	ManifestTypeImage   ManifestType = "Image"
 	ManifestTypeVolume  ManifestType = "Volume"
 	ManifestTypeNetwork ManifestType = "VirtualNetwork"
+	ManifestTypeGateway ManifestType = "Gateway"
 	ManifestTypeUnknown ManifestType = "Unknown"
 )
 
@@ -92,6 +93,8 @@ func normalizeResourceName(resource string) string {
 		return "volume"
 	case "net", "networks":
 		return "network"
+	case "gw", "gateways":
+		return "gateway"
 	default:
 		return strings.ToLower(resource)
 	}
@@ -108,6 +111,8 @@ func GetManifestType(kind string) ManifestType {
 		return ManifestTypeVolume
 	case "virtualnetwork":
 		return ManifestTypeNetwork
+	case "gateway":
+		return ManifestTypeGateway
 	default:
 		return ManifestTypeUnknown
 	}
@@ -125,6 +130,8 @@ func GetKindFromResourceName(resource string) string {
 		return "Volume"
 	case "network":
 		return "VirtualNetwork"
+	case "gateway":
+		return "Gateway"
 	default:
 		return ""
 	}
@@ -206,6 +213,21 @@ func ManifestToVirtualNetwork(manifest map[string]interface{}) (*api.VirtualNetw
 	}
 
 	return &network, nil
+}
+
+// ManifestToGateway マニフェストを Gateway 構造体に変換
+func ManifestToGateway(manifest map[string]interface{}) (*api.Gateway, error) {
+	data, err := json.Marshal(manifest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal manifest: %w", err)
+	}
+
+	var gateway api.Gateway
+	if err := json.Unmarshal(data, &gateway); err != nil {
+		return nil, fmt.Errorf("failed to parse as Gateway: %w", err)
+	}
+
+	return &gateway, nil
 }
 
 // ExtractMetadataName マニフェストからメタデータ名を抽出

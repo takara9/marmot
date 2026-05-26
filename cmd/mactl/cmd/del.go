@@ -12,7 +12,7 @@ import (
 var delCmd = &cobra.Command{
 	Use:   "del RESOURCE NAME",
 	Short: "Delete a resource",
-	Long:  `Delete a resource (server/srv, image/img, volume/vol, network/net) with NAME specified.`,
+	Long:  `Delete a resource (server/srv, image/img, volume/vol, network/net, gateway/gw) with NAME specified.`,
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		resourceName := normalizeResourceName(args[0])
@@ -28,6 +28,8 @@ var delCmd = &cobra.Command{
 			return deleteVolume(objectName)
 		case "network":
 			return deleteNetwork(objectName)
+		case "gateway":
+			return deleteGateway(objectName)
 		default:
 			return fmt.Errorf("unknown resource type: %s", resourceName)
 		}
@@ -40,7 +42,7 @@ func deleteServer(name string) error {
 		return fmt.Errorf("failed to get client config: %w", err)
 	}
 
-		list, _, err := m.GetServers()
+	list, _, err := m.GetServers()
 	if err != nil {
 		return fmt.Errorf("failed to list servers: %w", err)
 	}
@@ -64,7 +66,7 @@ func deleteServer(name string) error {
 	}
 
 	// サーバーを削除
-		_, _, err = m.DeleteServerById(api.ServerID(*found))
+	_, _, err = m.DeleteServerById(api.ServerID(*found))
 	if err != nil {
 		return fmt.Errorf("failed to delete server: %w", err)
 	}
@@ -79,7 +81,7 @@ func deleteImage(name string) error {
 		return fmt.Errorf("failed to get client config: %w", err)
 	}
 
-		list, _, err := m.GetImages()
+	list, _, err := m.GetImages()
 	if err != nil {
 		return fmt.Errorf("failed to list images: %w", err)
 	}
@@ -142,7 +144,7 @@ func deleteVolume(name string) error {
 	}
 
 	// ボリュームを削除
-		_, _, err = m.DeleteVolumeById(api.VolumeID(*found))
+	_, _, err = m.DeleteVolumeById(api.VolumeID(*found))
 	if err != nil {
 		return fmt.Errorf("failed to delete volume: %w", err)
 	}
@@ -157,7 +159,7 @@ func deleteNetwork(name string) error {
 		return fmt.Errorf("failed to get client config: %w", err)
 	}
 
-		list, _, err := m.GetVirtualNetworks()
+	list, _, err := m.GetVirtualNetworks()
 	if err != nil {
 		return fmt.Errorf("failed to list networks: %w", err)
 	}
@@ -181,12 +183,51 @@ func deleteNetwork(name string) error {
 	}
 
 	// ネットワークを削除
-		_, _, err = m.DeleteVirtualNetworkById(api.VirtualNetworkID(*found))
+	_, _, err = m.DeleteVirtualNetworkById(api.VirtualNetworkID(*found))
 	if err != nil {
 		return fmt.Errorf("failed to delete network: %w", err)
 	}
 
 	fmt.Printf("network %q deleted successfully\n", name)
+	return nil
+}
+
+func deleteGateway(name string) error {
+	m, err := getClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	list, _, err := m.GetGateways()
+	if err != nil {
+		return fmt.Errorf("failed to list gateways: %w", err)
+	}
+
+	var gateways []api.Gateway
+	if err := json.Unmarshal(list, &gateways); err != nil {
+		return fmt.Errorf("failed to parse gateways: %w", err)
+	}
+
+	matches := make([]api.Gateway, 0)
+	for _, g := range gateways {
+		if g.Metadata.Name == name {
+			matches = append(matches, g)
+		}
+	}
+
+	if len(matches) == 0 {
+		return fmt.Errorf("gateway %q not found", name)
+	}
+	if len(matches) > 1 {
+		return fmt.Errorf("multiple gateways found with name %q; please delete by id via API", name)
+	}
+
+	_, _, err = m.DeleteGatewayById(api.GatewayID(matches[0]))
+	if err != nil {
+		return fmt.Errorf("failed to delete gateway: %w", err)
+	}
+
+	fmt.Printf("gateway %q deleted successfully\n", name)
 	return nil
 }
 
