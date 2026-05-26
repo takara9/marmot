@@ -366,24 +366,40 @@ func reconcileSplitHorizonFlows(bridgeName string) error {
 	if len(accessPorts) > 0 {
 		parts := make([]string, 0, len(accessPorts))
 		for _, ap := range accessPorts {
-			ofport, err := getInterfaceOfport(ap)
+			ofport, ready, err := getInterfaceOfportIfReady(ap)
 			if err != nil {
 				return err
 			}
+			if !ready {
+				slog.Warn("access port ofport is not ready, skipping from split-horizon actions", "bridge", bridgeName, "port", ap)
+				continue
+			}
 			parts = append(parts, fmt.Sprintf("output:%d", ofport))
 		}
-		accessActions = strings.Join(parts, ",")
+		if len(parts) > 0 {
+			accessActions = strings.Join(parts, ",")
+		}
 	}
 
 	// 投入すべきフローセットを構築する。
 	desired := make([]string, 0, 1+len(vxlanPorts))
 	desired = append(desired, fmt.Sprintf("cookie=%s,priority=0,actions=NORMAL", splitHorizonCookie))
+	readyVxlanPorts := 0
 	for _, port := range vxlanPorts {
-		ofport, err := getInterfaceOfport(port)
+		ofport, ready, err := getInterfaceOfportIfReady(port)
 		if err != nil {
 			return err
 		}
+		if !ready {
+			slog.Warn("vxlan port ofport is not ready, skipping split-horizon rule for now", "bridge", bridgeName, "port", port)
+			continue
+		}
+		readyVxlanPorts++
 		desired = append(desired, fmt.Sprintf("cookie=%s,priority=300,in_port=%d,dl_dst=01:00:00:00:00:00/01:00:00:00:00:00,actions=%s", splitHorizonCookie, ofport, accessActions))
+	}
+	if readyVxlanPorts == 0 {
+		slog.Debug("all vxlan ports are not ready, skipping split-horizon flow reconciliation", "bridge", bridgeName)
+		return nil
 	}
 
 	// 現在のフローセットと比較して変化がなければスキップする。
@@ -399,7 +415,7 @@ func reconcileSplitHorizonFlows(bridgeName string) error {
 		return err
 	}
 
-	slog.Info("split-horizon flows reconciled", "bridge", bridgeName, "vxlanPorts", len(vxlanPorts), "accessPorts", len(accessPorts))
+	slog.Info("split-horizon flows reconciled", "bridge", bridgeName, "vxlanPorts", readyVxlanPorts, "accessPorts", len(accessPorts))
 	return nil
 }
 
@@ -539,20 +555,42 @@ func listVxlanPortsOnBridge(bridgeName string) ([]string, error) {
 }
 
 func getInterfaceOfport(portName string) (int, error) {
+	ofport, ready, err := getInterfaceOfportIfReady(portName)
+	if err != nil {
+		return 0, err
+	}
+	if !ready {
+		return 0, fmt.Errorf("invalid ofport for interface %s: not ready", portName)
+	}
+	return ofport, nil
+}
+
+func getInterfaceOfportIfReady(portName string) (int, bool, error) {
 	cmd := exec.Command("ovs-vsctl", "get", "interface", portName, "ofport")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return 0, fmt.Errorf("ovs-vsctl get interface %s ofport failed: %w (output=%s)", portName, err, strings.TrimSpace(string(output)))
+		return 0, false, fmt.Errorf("ovs-vsctl get interface %s ofport failed: %w (output=%s)", portName, err, strings.TrimSpace(string(output)))
 	}
 
-	text := strings.TrimSpace(string(output))
+	ofport, ready, parseErr := parseInterfaceOfport(strings.TrimSpace(string(output)))
+	if parseErr != nil {
+		return 0, false, fmt.Errorf("invalid ofport for interface %s: %w", portName, parseErr)
+	}
+	return ofport, ready, nil
+}
+
+func parseInterfaceOfport(raw string) (int, bool, error) {
+	text := strings.TrimSpace(raw)
 	text = strings.Trim(text, "\"")
 	ofport, convErr := strconv.Atoi(text)
-	if convErr != nil || ofport <= 0 {
-		return 0, fmt.Errorf("invalid ofport for interface %s: %q", portName, text)
+	if convErr != nil {
+		return 0, false, fmt.Errorf("%q", text)
+	}
+	if ofport <= 0 {
+		return 0, false, nil
 	}
 
-	return ofport, nil
+	return ofport, true, nil
 }
 
 func addFlow(bridgeName string, flow string) error {
