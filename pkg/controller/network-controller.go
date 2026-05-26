@@ -547,6 +547,11 @@ func (c *controller) ensureVxlanMeshForNetwork(fabric networkfabric.NetworkFabri
 		return fmt.Errorf("ensure bridge failed: %w", err)
 	}
 
+	if vxlanPeerPolicy(vnet) == api.Manual {
+		slog.Debug("peerPolicy=manual: skip automatic vxlan ensure/prune", "networkId", api.VirtualNetworkID(vnet), "networkName", vnet.Metadata.Name)
+		return nil
+	}
+
 	peers, err := c.resolveVxlanPeerIPs(vnet)
 	if err != nil {
 		return err
@@ -620,10 +625,7 @@ func (c *controller) resolveVxlanPeerIPs(vnet api.VirtualNetwork) ([]string, err
 		}
 	}
 
-	peerPolicy := api.Auto
-	if vnet.Spec.PeerPolicy != nil {
-		peerPolicy = *vnet.Spec.PeerPolicy
-	}
+	peerPolicy := vxlanPeerPolicy(vnet)
 	if peerPolicy == api.Manual {
 		return nil, nil
 	}
@@ -679,12 +681,49 @@ func (c *controller) reconcileVxlanHubFailovers(vnets []api.VirtualNetwork, stat
 
 	activeByNode := collectActiveHostStatusByNode(statuses, time.Now())
 	for _, group := range groups {
-		if err := c.reconcileVxlanHubFailoverForGroup(group.networks, activeByNode); err != nil {
+		if err := c.reconcileVxlanHubFailoverForNetworkName(group.name, activeByNode); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func (c *controller) reconcileVxlanHubFailoverForNetworkName(networkName string, activeByNode map[string]api.HostStatus) error {
+	name := strings.TrimSpace(networkName)
+	if name == "" {
+		return nil
+	}
+
+	mutex, err := c.db.LockKey(failoverLockKeyForNetworkName(name))
+	if err != nil {
+		return err
+	}
+	defer c.db.UnlockKey(mutex)
+
+	networks, err := c.marmot.Db.GetVirtualNetworks()
+	if err != nil {
+		return err
+	}
+
+	group := make([]api.VirtualNetwork, 0, len(networks))
+	for _, vnet := range networks {
+		if !isVxlanOverlay(vnet) {
+			continue
+		}
+		if vxlanPeerPolicy(vnet) != api.Auto {
+			continue
+		}
+		if vnet.Status != nil && vnet.Status.StatusCode == db.NETWORK_DELETING {
+			continue
+		}
+		if strings.TrimSpace(vnet.Metadata.Name) != name {
+			continue
+		}
+		group = append(group, vnet)
+	}
+
+	return c.reconcileVxlanHubFailoverForGroup(group, activeByNode)
 }
 
 func (c *controller) reconcileVxlanHubFailoverForGroup(group []api.VirtualNetwork, activeByNode map[string]api.HostStatus) error {
@@ -883,6 +922,22 @@ func parseHexHostID(raw string) (uint32, bool) {
 		return 0, false
 	}
 	return uint32(parsed), true
+}
+
+func vxlanPeerPolicy(vnet api.VirtualNetwork) api.VirtualNetworkSpecPeerPolicy {
+	if vnet.Spec.PeerPolicy == nil {
+		return api.Auto
+	}
+	return *vnet.Spec.PeerPolicy
+}
+
+func failoverLockKeyForNetworkName(name string) string {
+	sanitized := strings.TrimSpace(name)
+	if sanitized == "" {
+		sanitized = "unknown"
+	}
+	replacer := strings.NewReplacer("/", "_", " ", "_", "\t", "_")
+	return "/lock/virtualnetwork/failover/" + replacer.Replace(sanitized)
 }
 
 func vxlanHubNodeFromNetwork(vnet api.VirtualNetwork) string {
