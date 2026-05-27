@@ -1,0 +1,11 @@
+#!/bin/bash
+set -e
+
+systemctl daemon-reload || true
+
+if [ "$1" = "purge" ]; then
+    rm -rf /usr/local/marmot
+    rm -rf /etc/marmot
+fi
+
+exit 0

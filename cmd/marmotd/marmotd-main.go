@@ -59,6 +59,10 @@ func main() {
 		cfg.NodeName = hostname
 	}
 	marmotd.SetRuntimeConfig(cfg)
+	if err := marmotd.EnsureGatewayRuntimeAssets(); err != nil {
+		slog.Error("Failed to initialize gateway runtime assets", "err", err)
+		return
+	}
 	slog.Info("Config loaded",
 		"node_name", cfg.NodeName,
 		"etcd_url", cfg.EtcdURL,

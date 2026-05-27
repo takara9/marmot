@@ -1,0 +1,69 @@
+#!/bin/bash
+set -e
+
+CONFIG_FILE="/etc/marmot/marmotd.json"
+LEGACY_CONFIG_FILE="/etc/marmot.json"
+KEY_DIR="/etc/marmot/keys"
+PRIVATE_KEY="${KEY_DIR}/private.key"
+PUBLIC_KEY="${KEY_DIR}/public.key"
+PLAYBOOK_SRC_DIR="/usr/local/marmot/gateway-playbooks"
+PLAYBOOK_DST_DIR="/var/lib/marmot/ansible-playbooks"
+PLAYBOOK_TEMPLATE_DIR="${PLAYBOOK_DST_DIR}/templates"
+
+if [ -f "${LEGACY_CONFIG_FILE}" ]; then
+    CONFIG_FILE="${LEGACY_CONFIG_FILE}"
+fi
+
+if [ -f "${CONFIG_FILE}" ]; then
+    NODE_NAME="$(hostname)"
+    if [ -n "${NODE_NAME}" ]; then
+        sed -i "s/\"node_name\": \"[^\"]*\"/\"node_name\": \"${NODE_NAME}\"/" "${CONFIG_FILE}"
+    fi
+fi
+
+mkdir -p "${KEY_DIR}"
+chmod 700 "${KEY_DIR}"
+if [ ! -f "${PRIVATE_KEY}" ] || [ ! -f "${PUBLIC_KEY}" ]; then
+    rm -f "${PRIVATE_KEY}" "${PUBLIC_KEY}"
+    ssh-keygen -t rsa -b 4096 -f "${PRIVATE_KEY}" -N "" -C "marmot-gateway" >/dev/null
+fi
+chmod 600 "${PRIVATE_KEY}"
+chmod 644 "${PUBLIC_KEY}"
+
+rm -rf "${PLAYBOOK_DST_DIR}"
+mkdir -p "${PLAYBOOK_TEMPLATE_DIR}"
+if [ -d "${PLAYBOOK_SRC_DIR}" ]; then
+    cp -a "${PLAYBOOK_SRC_DIR}/." "${PLAYBOOK_TEMPLATE_DIR}/"
+fi
+
+systemctl enable libvirtd.service
+systemctl start libvirtd.service
+
+systemctl enable iscsid.service
+systemctl start iscsid.service
+
+if systemctl list-unit-files | grep -q '^openvswitch-switch\.service'; then
+    systemctl enable openvswitch-switch.service
+    systemctl start openvswitch-switch.service
+elif systemctl list-unit-files | grep -q '^ovs-vswitchd\.service'; then
+    systemctl enable ovsdb-server.service || true
+    systemctl start ovsdb-server.service || true
+    systemctl enable ovs-vswitchd.service
+    systemctl start ovs-vswitchd.service
+fi
+
+systemctl daemon-reload
+systemctl enable marmot.service
+systemctl start marmot.service
+
+echo ""
+echo "============================================================"
+echo " marmot のインストールが完了しました"
+echo "============================================================"
+echo " Gateway playbook と SSH 鍵を初期化しました"
+echo " 自動的に VM起動イメージをダウンロードしています..."
+echo " この処理は環境によって数分かかることがあります。"
+echo " mactl get images でダウンロード状況を確認できます。"
+echo "============================================================"
+
+exit 0

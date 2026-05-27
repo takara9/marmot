@@ -1,0 +1,13 @@
+#!/bin/bash
+set -e
+
+if systemctl is-active --quiet marmot.service 2>/dev/null; then
+    echo "marmot サービスを停止中..."
+    systemctl stop marmot.service
+fi
+
+if systemctl is-enabled --quiet marmot.service 2>/dev/null; then
+    systemctl disable marmot.service
+fi
+
+exit 0

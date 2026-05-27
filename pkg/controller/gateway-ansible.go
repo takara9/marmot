@@ -14,11 +14,11 @@ import (
 	"text/template"
 
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/marmotd"
 )
 
 const (
 	gatewayAnsiblePlaybookDir     = "/var/lib/marmot/ansible-playbooks"
-	gatewayAnsiblePrivateKeyPath  = "/etc/marmot/keys/private.key"
 	gatewayAnsibleMaxRetryCount   = 3
 	gatewayAnsibleDefaultUsername = "root"
 )
@@ -28,7 +28,7 @@ var gatewayPlaybookTemplate string
 
 var (
 	gatewayPlaybookDir    = gatewayAnsiblePlaybookDir
-	gatewayPrivateKeyPath = gatewayAnsiblePrivateKeyPath
+	gatewayPrivateKeyPath = marmotd.GatewayPrivateKeyPath()
 	runGatewayPlaybook    = runGatewayPlaybookCommand
 )
 
@@ -81,6 +81,12 @@ func renderGatewayPlaybook(playbookPath string, targetIP string, serverPorts []s
 	tmpl, err := template.New("gateway-playbook").Parse(gatewayPlaybookTemplate)
 	if err != nil {
 		return err
+	}
+	if override, readErr := os.ReadFile(marmotd.GatewayPlaybookTemplatePath()); readErr == nil && strings.TrimSpace(string(override)) != "" {
+		tmpl, err = template.New("gateway-playbook").Parse(string(override))
+		if err != nil {
+			return err
+		}
 	}
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, gatewayPlaybookData{TargetIP: strings.TrimSpace(targetIP), Ports: portRules}); err != nil {

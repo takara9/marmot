@@ -58,10 +58,13 @@ fi
 rm -rf "${PKG_DIR}"
 mkdir -p "${PKG_DIR}/DEBIAN"
 mkdir -p "${PKG_DIR}/usr/local/marmot"
+mkdir -p "${PKG_DIR}/usr/local/marmot/gateway-playbooks"
 mkdir -p "${PKG_DIR}/usr/local/bin"
 mkdir -p "${PKG_DIR}/lib/systemd/system"
 mkdir -p "${PKG_DIR}/etc/marmot"
+mkdir -p "${PKG_DIR}/etc/marmot/keys"
 mkdir -p "${PKG_DIR}/var/lib/marmot/images"
+mkdir -p "${PKG_DIR}/var/lib/marmot/ansible-playbooks/templates"
 mkdir -p "${PKG_DIR}/var/lib/marmot/isos"
 mkdir -p "${PKG_DIR}/var/lib/marmot/jobs"
 mkdir -p "${PKG_DIR}/var/lib/marmot/volumes"
@@ -70,6 +73,8 @@ echo "バイナリをコピー中..."
 install -m 0755 "${BINDIR}/marmotd" "${PKG_DIR}/usr/local/marmot/marmotd"
 install -m 0755 "${BINDIR}/mactl"   "${PKG_DIR}/usr/local/bin/mactl"
 install -m 0755 "${BINDIR}/maadm"   "${PKG_DIR}/usr/local/bin/maadm"
+install -m 0644 "${ROOT_DIR}/pkg/controller/gateway-playbooks/gateway-iptables.yaml.tmpl" \
+    "${PKG_DIR}/usr/local/marmot/gateway-playbooks/gateway-iptables.yaml.tmpl"
 
 echo "systemd サービスファイルをコピー中..."
 install -m 0644 "${ROOT_DIR}/cmd/marmotd/marmot.service" \
@@ -125,107 +130,13 @@ cat > "${PKG_DIR}/DEBIAN/conffiles" <<'CONFFILES'
 CONFFILES
 
 echo "DEBIAN/postinst を生成中..."
-cat > "${PKG_DIR}/DEBIAN/postinst" <<'POSTINST'
-#!/bin/bash
-set -e
-
-CONFIG_FILE="/etc/marmot/marmotd.json"
-LEGACY_CONFIG_FILE="/etc/marmot.json"
-
-# 旧配置が存在する環境では、既存の /etc/marmot.json を優先して更新する。
-if [ -f "${LEGACY_CONFIG_FILE}" ]; then
-    CONFIG_FILE="${LEGACY_CONFIG_FILE}"
-fi
-
-if [ -f "${CONFIG_FILE}" ]; then
-    NODE_NAME="$(hostname)"
-    if [ -n "${NODE_NAME}" ]; then
-        sed -i "s/\"node_name\": \"[^\"]*\"/\"node_name\": \"${NODE_NAME}\"/" "${CONFIG_FILE}"
-    fi
-fi
-
-## 以下はとうめん無効化して、変わりに libvirt を有効化する形にする。
-# LXC を有効化するために libvirtd を停止・無効化して lxcfs を起動する
-#if systemctl is-active --quiet libvirtd.service 2>/dev/null; then
-#    systemctl stop libvirtd.service
-#fi
-#if systemctl is-enabled --quiet libvirtd.service 2>/dev/null; then
-#    systemctl disable libvirtd.service
-#fi
-#systemctl enable lxcfs.service
-#systemctl start lxcfs.service
-
-# libvirt を有効化する
-systemctl enable libvirtd.service
-systemctl start libvirtd.service
-##
-
-# open-iscsi を有効化して起動する
-systemctl enable iscsid.service
-systemctl start iscsid.service
-
-# Open vSwitch を有効化して起動する
-if systemctl list-unit-files | grep -q '^openvswitch-switch\.service'; then
-    systemctl enable openvswitch-switch.service
-    systemctl start openvswitch-switch.service
-elif systemctl list-unit-files | grep -q '^ovs-vswitchd\.service'; then
-    # ディストリ差異向けのフォールバック
-    systemctl enable ovsdb-server.service || true
-    systemctl start ovsdb-server.service || true
-    systemctl enable ovs-vswitchd.service
-    systemctl start ovs-vswitchd.service
-fi
-
-systemctl daemon-reload
-systemctl enable marmot.service
-systemctl start marmot.service
-
-echo ""
-echo "============================================================"
-echo " marmot のインストールが完了しました"
-echo "============================================================"
-echo "自動的に VM起動イメージをダウンロードしています..."
-echo " この処理は環境によって数分かかることがあります。"
-echo " mactl get images でダウンロード状況を確認できます。"
-echo "============================================================"
-
-exit 0
-POSTINST
-chmod 0755 "${PKG_DIR}/DEBIAN/postinst"
+install -m 0755 "${ROOT_DIR}/tools/deb/postinst" "${PKG_DIR}/DEBIAN/postinst"
 
 echo "DEBIAN/prerm を生成中..."
-cat > "${PKG_DIR}/DEBIAN/prerm" <<'PRERM'
-#!/bin/bash
-set -e
-
-if systemctl is-active --quiet marmot.service 2>/dev/null; then
-    echo "marmot サービスを停止中..."
-    systemctl stop marmot.service
-fi
-
-if systemctl is-enabled --quiet marmot.service 2>/dev/null; then
-    systemctl disable marmot.service
-fi
-
-exit 0
-PRERM
-chmod 0755 "${PKG_DIR}/DEBIAN/prerm"
+install -m 0755 "${ROOT_DIR}/tools/deb/prerm" "${PKG_DIR}/DEBIAN/prerm"
 
 echo "DEBIAN/postrm を生成中..."
-cat > "${PKG_DIR}/DEBIAN/postrm" <<'POSTRM'
-#!/bin/bash
-set -e
-
-systemctl daemon-reload || true
-
-if [ "$1" = "purge" ]; then
-    rm -rf /usr/local/marmot
-    rm -rf /etc/marmot
-fi
-
-exit 0
-POSTRM
-chmod 0755 "${PKG_DIR}/DEBIAN/postrm"
+install -m 0755 "${ROOT_DIR}/tools/deb/postrm" "${PKG_DIR}/DEBIAN/postrm"
 
 echo "dpkgパッケージをビルド中..."
 dpkg-deb --build --root-owner-group "${PKG_DIR}" "${DIST_DIR}/${DEB_FILE}"
