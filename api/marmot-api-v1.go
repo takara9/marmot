@@ -76,6 +76,7 @@ type GatewaySpec struct {
 	BindPublicIpAddress    string   `json:"bindPublicIpAddress" yaml:"bindPublicIpAddress"`
 	InternalServerName     string   `json:"internalServerName" yaml:"internalServerName"`
 	InternalVirtualNetwork string   `json:"internalVirtualNetwork" yaml:"internalVirtualNetwork"`
+	RemoteCIDR             string   `json:"remoteCIDR,omitempty" yaml:"remoteCIDR,omitempty"`
 	ServerPorts            []string `json:"serverPorts" yaml:"serverPorts"`
 }
 

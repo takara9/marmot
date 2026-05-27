@@ -14,11 +14,108 @@
     - name: Apply sysctl configuration
       ansible.builtin.command: sysctl -p
 
+    - name: Allow established input traffic
+      ansible.builtin.iptables:
+        table: filter
+        chain: INPUT
+        ctstate:
+          - ESTABLISHED
+          - RELATED
+        jump: ACCEPT
+        comment: marmot-gateway
+
+    - name: Allow established forwarded traffic
+      ansible.builtin.iptables:
+        table: filter
+        chain: FORWARD
+        ctstate:
+          - ESTABLISHED
+          - RELATED
+        jump: ACCEPT
+        comment: marmot-gateway
+
+    - name: Allow ICMP from remoteCIDR to gateway
+      ansible.builtin.iptables:
+        table: filter
+        chain: INPUT
+        source: {{ $.RemoteCIDR }}
+        protocol: icmp
+        jump: ACCEPT
+        comment: marmot-gateway
+
+    - name: Drop ICMP from non-remoteCIDR to gateway
+      ansible.builtin.iptables:
+        table: filter
+        chain: INPUT
+        protocol: icmp
+        jump: DROP
+        comment: marmot-gateway
+
+    - name: Allow ICMP from remoteCIDR through gateway
+      ansible.builtin.iptables:
+        table: filter
+        chain: FORWARD
+        source: {{ $.RemoteCIDR }}
+        protocol: icmp
+        jump: ACCEPT
+        comment: marmot-gateway
+
+    - name: Drop ICMP from non-remoteCIDR through gateway
+      ansible.builtin.iptables:
+        table: filter
+        chain: FORWARD
+        protocol: icmp
+        jump: DROP
+        comment: marmot-gateway
+
+    - name: Allow new TCP from remoteCIDR to gateway
+      ansible.builtin.iptables:
+        table: filter
+        chain: INPUT
+        source: {{ $.RemoteCIDR }}
+        protocol: tcp
+        ctstate:
+          - NEW
+        jump: ACCEPT
+        comment: marmot-gateway
+
+    - name: Drop new TCP from non-remoteCIDR to gateway
+      ansible.builtin.iptables:
+        table: filter
+        chain: INPUT
+        protocol: tcp
+        ctstate:
+          - NEW
+        jump: DROP
+        comment: marmot-gateway
+
+    - name: Allow new TCP from remoteCIDR through gateway
+      ansible.builtin.iptables:
+        table: filter
+        chain: FORWARD
+        source: {{ $.RemoteCIDR }}
+        protocol: tcp
+        ctstate:
+          - NEW
+        jump: ACCEPT
+        comment: marmot-gateway
+
+    - name: Drop new TCP from non-remoteCIDR through gateway
+      ansible.builtin.iptables:
+        table: filter
+        chain: FORWARD
+        protocol: tcp
+        ctstate:
+          - NEW
+        jump: DROP
+        comment: marmot-gateway
+
 {{- range .Ports }}
     - name: Ensure DNAT rule for {{ .Protocol }}/{{ .Port }}
       ansible.builtin.iptables:
         table: nat
         chain: PREROUTING
+        source: {{ $.RemoteCIDR }}
         protocol: {{ .Protocol }}
         destination_port: {{ .Port }}
         jump: DNAT

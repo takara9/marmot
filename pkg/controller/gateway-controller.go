@@ -240,7 +240,7 @@ func (c *controller) reconcileGatewayConfiguring(gateway api.Gateway) {
 	}
 	configHash := desiredGatewayConfigHash(gateway, targetIP)
 	playbookPath := filepath.Join(gatewayPlaybookDir, fmt.Sprintf("gateway-%s.yaml", gatewayID))
-	if err := renderGatewayPlaybook(playbookPath, targetIP, gateway.Spec.ServerPorts); err != nil {
+	if err := renderGatewayPlaybook(playbookPath, targetIP, gateway.Spec.ServerPorts, gatewayRemoteCIDR(gateway.Spec)); err != nil {
 		c.handleGatewayConfigFailure(gatewayID, err)
 		return
 	}

@@ -867,6 +867,7 @@ func describeGatewayText(g *api.Gateway) error {
 	fmt.Printf("  BindPublicIP:  %s\n", stringOrDash(g.Spec.BindPublicIpAddress))
 	fmt.Printf("  InternalServer:%s\n", stringOrDash(g.Spec.InternalServerName))
 	fmt.Printf("  InternalVNet:  %s\n", stringOrDash(g.Spec.InternalVirtualNetwork))
+	fmt.Printf("  RemoteCIDR:    %s\n", gatewayRemoteCIDROrDefault(g.Spec.RemoteCIDR))
 	fmt.Printf("  ServerPorts:   %s\n", strings.Join(orDashSlice(g.Spec.ServerPorts), ", "))
 
 	return nil
@@ -894,6 +895,14 @@ func stringOrDash(v string) string {
 	v = strings.TrimSpace(v)
 	if v == "" {
 		return "-"
+	}
+	return v
+}
+
+func gatewayRemoteCIDROrDefault(v string) string {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return "0.0.0.0/0"
 	}
 	return v
 }

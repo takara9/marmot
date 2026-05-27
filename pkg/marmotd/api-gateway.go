@@ -82,8 +82,9 @@ func (s *Server) ApiUpdateGatewayById(ctx echo.Context, id string) error {
 		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: "immutable fields changed: spec.bindPublicIpAddress, spec.internalServerName, spec.internalVirtualNetwork"})
 	}
 
-	// 更新可能項目は spec.serverPorts のみ。
+	// 更新可能項目は spec.serverPorts, spec.remoteCIDR のみ。
 	current.Spec.ServerPorts = req.Spec.ServerPorts
+	current.Spec.RemoteCIDR = req.Spec.RemoteCIDR
 	if err := s.Ma.Db.UpdateGatewayById(id, current); err != nil {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
@@ -157,6 +158,15 @@ func normalizeGatewaySpec(spec *api.GatewaySpec) error {
 		return fmt.Errorf("spec.internalVirtualNetwork is required")
 	}
 	spec.InternalVirtualNetwork = internalVirtualNetwork
+
+	remoteCIDR := strings.TrimSpace(spec.RemoteCIDR)
+	if remoteCIDR == "" {
+		remoteCIDR = "0.0.0.0/0"
+	}
+	if _, _, err := net.ParseCIDR(remoteCIDR); err != nil {
+		return fmt.Errorf("spec.remoteCIDR must be a valid CIDR")
+	}
+	spec.RemoteCIDR = remoteCIDR
 
 	ports, err := normalizeGatewayPorts(spec.ServerPorts)
 	if err != nil {

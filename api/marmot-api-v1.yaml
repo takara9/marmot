@@ -1212,6 +1212,9 @@ components:
           type: string
         internalVirtualNetwork:
           type: string
+        remoteCIDR:
+          type: string
+          description: Source CIDR allowed to access gateway forwarding.
         serverPorts:
           type: array
           items:
