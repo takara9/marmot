@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -93,6 +94,8 @@ func (c *controller) gatewayControllerLoop() {
 			c.reconcileGatewayPending(gateway)
 		case db.GATEWAY_PROVISIONING:
 			c.reconcileGatewayProvisioning(gateway)
+		case db.GATEWAY_CONFIGURING:
+			c.reconcileGatewayConfiguring(gateway)
 		case db.GATEWAY_ACTIVE:
 			c.reconcileGatewayActive(gateway)
 		case db.GATEWAY_DELETING:
@@ -153,7 +156,7 @@ func (c *controller) reconcileGatewayProvisioning(gateway api.Gateway) {
 
 	switch server.Status.StatusCode {
 	case db.SERVER_RUNNING:
-		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_ACTIVE, "")
+		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_CONFIGURING, "gateway VM running, applying ansible")
 	case db.SERVER_ERROR:
 		msg := "gateway server entered error state"
 		if server.Status.Message != nil && strings.TrimSpace(*server.Status.Message) != "" {
@@ -161,6 +164,52 @@ func (c *controller) reconcileGatewayProvisioning(gateway api.Gateway) {
 		}
 		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_FAILED, msg)
 	}
+}
+
+func (c *controller) reconcileGatewayConfiguring(gateway api.Gateway) {
+	gatewayID := api.GatewayID(gateway)
+	serverID := gatewayManagedServerID(gateway)
+	if strings.TrimSpace(serverID) == "" {
+		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_PENDING, "gateway server reference is missing")
+		return
+	}
+
+	server, err := c.db.GetServerById(serverID)
+	if err != nil {
+		if errors.Is(err, db.ErrNotFound) {
+			_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_PENDING, "gateway server not found, recreating")
+			return
+		}
+		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_FAILED, err.Error())
+		return
+	}
+	if server.Status == nil || server.Status.StatusCode != db.SERVER_RUNNING {
+		return
+	}
+
+	targetIP, err := c.resolveGatewayInternalServerTarget(gateway)
+	if err != nil {
+		c.handleGatewayConfigFailure(gatewayID, err)
+		return
+	}
+	configHash := desiredGatewayConfigHash(gateway, targetIP)
+	playbookPath := filepath.Join(gatewayPlaybookDir, fmt.Sprintf("gateway-%s.yaml", gatewayID))
+	if err := renderGatewayPlaybook(playbookPath, targetIP, gateway.Spec.ServerPorts); err != nil {
+		c.handleGatewayConfigFailure(gatewayID, err)
+		return
+	}
+	if err := runGatewayPlaybook(playbookPath, gateway.Spec.BindPublicIpAddress, gatewayPrivateKeyPath); err != nil {
+		c.handleGatewayConfigFailure(gatewayID, err)
+		return
+	}
+	if err := c.updateGatewayLabels(gatewayID, func(labels map[string]interface{}) {
+		db.SetGatewayAnsibleRetries(labels, 0)
+		db.SetGatewayAppliedConfigHash(labels, configHash)
+	}); err != nil {
+		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_FAILED, err.Error())
+		return
+	}
+	_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_ACTIVE, "")
 }
 
 func (c *controller) reconcileGatewayActive(gateway api.Gateway) {
@@ -186,6 +235,21 @@ func (c *controller) reconcileGatewayActive(gateway api.Gateway) {
 			msg = strings.TrimSpace(*server.Status.Message)
 		}
 		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_FAILED, msg)
+		return
+	}
+	targetIP, err := c.resolveGatewayInternalServerTarget(gateway)
+	if err != nil {
+		slog.Warn("resolveGatewayInternalServerTarget() failed for active gateway", "gatewayId", gatewayID, "err", err)
+		return
+	}
+	if gatewayAppliedConfigHash(gateway) != desiredGatewayConfigHash(gateway, targetIP) {
+		if err := c.updateGatewayLabels(gatewayID, func(labels map[string]interface{}) {
+			db.SetGatewayAnsibleRetries(labels, 0)
+		}); err != nil {
+			_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_FAILED, err.Error())
+			return
+		}
+		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_CONFIGURING, "gateway configuration drift detected")
 	}
 }
 
@@ -232,6 +296,21 @@ func (c *controller) ensureGatewayManagedServerLabel(gatewayID string, serverID 
 		return nil
 	}
 	db.SetGatewayManagedServerID(labels, serverID)
+	gateway.Metadata.Labels = &labels
+	return c.db.UpdateGatewayById(gatewayID, gateway)
+}
+
+func (c *controller) updateGatewayLabels(gatewayID string, mutate func(labels map[string]interface{})) error {
+	gateway, err := c.db.GetGatewayById(gatewayID)
+	if err != nil {
+		return err
+	}
+	if gateway.Metadata.Labels == nil {
+		labels := map[string]interface{}{}
+		gateway.Metadata.Labels = &labels
+	}
+	labels := *gateway.Metadata.Labels
+	mutate(labels)
 	gateway.Metadata.Labels = &labels
 	return c.db.UpdateGatewayById(gatewayID, gateway)
 }
@@ -338,6 +417,62 @@ func (c *controller) findServerByName(name string) (api.Server, error) {
 	return api.Server{}, db.ErrNotFound
 }
 
+func (c *controller) resolveGatewayInternalServerTarget(gateway api.Gateway) (string, error) {
+	serverName := strings.TrimSpace(gateway.Spec.InternalServerName)
+	internalNetwork := strings.TrimSpace(gateway.Spec.InternalVirtualNetwork)
+	if serverName == "" {
+		return "", fmt.Errorf("spec.internalServerName is required")
+	}
+	if internalNetwork == "" {
+		return "", fmt.Errorf("spec.internalVirtualNetwork is required")
+	}
+
+	servers, err := c.db.GetServers()
+	if err != nil {
+		return "", err
+	}
+	for _, server := range servers {
+		if strings.TrimSpace(server.Metadata.Name) != serverName || server.Spec.NetworkInterface == nil {
+			continue
+		}
+		for _, nic := range *server.Spec.NetworkInterface {
+			if strings.TrimSpace(nic.Networkname) != internalNetwork || nic.Address == nil {
+				continue
+			}
+			if ip := strings.TrimSpace(*nic.Address); ip != "" {
+				return ip, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("internal server %q on network %q does not have an assigned IP address", serverName, internalNetwork)
+}
+
+func (c *controller) handleGatewayConfigFailure(gatewayID string, err error) {
+	if err == nil {
+		return
+	}
+	retries, labelErr := c.incrementGatewayConfigRetries(gatewayID)
+	if labelErr != nil {
+		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_FAILED, labelErr.Error())
+		return
+	}
+	message := fmt.Sprintf("gateway ansible apply failed (%d/%d): %v", retries, gatewayAnsibleMaxRetryCount, err)
+	if retries >= gatewayAnsibleMaxRetryCount {
+		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_FAILED, message)
+		return
+	}
+	_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_CONFIGURING, message)
+}
+
+func (c *controller) incrementGatewayConfigRetries(gatewayID string) (int, error) {
+	next := 0
+	err := c.updateGatewayLabels(gatewayID, func(labels map[string]interface{}) {
+		next = db.GetGatewayAnsibleRetries(labels) + 1
+		db.SetGatewayAnsibleRetries(labels, next)
+	})
+	return next, err
+}
+
 func validateGatewayInternalNetwork(database *db.Database, networkName string) error {
 	trimmed := strings.TrimSpace(networkName)
 	if trimmed == "" {
@@ -360,6 +495,13 @@ func gatewayManagedServerID(gateway api.Gateway) string {
 		return ""
 	}
 	return db.GetGatewayManagedServerID(*gateway.Metadata.Labels)
+}
+
+func gatewayAppliedConfigHash(gateway api.Gateway) string {
+	if gateway.Metadata.Labels == nil {
+		return ""
+	}
+	return db.GetGatewayAppliedConfigHash(*gateway.Metadata.Labels)
 }
 
 func gatewayServerName(gateway api.Gateway) string {

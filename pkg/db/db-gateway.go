@@ -26,6 +26,8 @@ const (
 	GatewayServerLabelGatewayID = "gatewayId"
 	GatewayServerLabelRole      = "role"
 	GatewayServerLabelRoleValue = "gateway"
+	GatewayLabelAnsibleRetries  = "ansibleRetries"
+	GatewayLabelAppliedConfig   = "appliedConfigHash"
 )
 
 var GatewayStatus = map[int]string{
@@ -50,6 +52,45 @@ func GetGatewayManagedServerID(labels map[string]interface{}) string {
 		return ""
 	}
 	val, ok := labels[GatewayLabelManagedServerID].(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(val)
+}
+
+func SetGatewayAnsibleRetries(labels map[string]interface{}, retries int) {
+	if labels == nil {
+		return
+	}
+	labels[GatewayLabelAnsibleRetries] = retries
+}
+
+func GetGatewayAnsibleRetries(labels map[string]interface{}) int {
+	if labels == nil {
+		return 0
+	}
+	switch val := labels[GatewayLabelAnsibleRetries].(type) {
+	case int:
+		return val
+	case float64:
+		return int(val)
+	default:
+		return 0
+	}
+}
+
+func SetGatewayAppliedConfigHash(labels map[string]interface{}, hash string) {
+	if labels == nil {
+		return
+	}
+	labels[GatewayLabelAppliedConfig] = strings.TrimSpace(hash)
+}
+
+func GetGatewayAppliedConfigHash(labels map[string]interface{}) string {
+	if labels == nil {
+		return ""
+	}
+	val, ok := labels[GatewayLabelAppliedConfig].(string)
 	if !ok {
 		return ""
 	}

@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +18,15 @@ import (
 
 func TestGatewayControllerStateTransitions(t *testing.T) {
 	database := newGatewayTestDatabase(t)
+	setupGatewayAnsibleTestHooks(t, func(playbookPath, gatewayAddress, privateKeyPath string) error {
+		if _, err := os.Stat(playbookPath); err != nil {
+			return err
+		}
+		if strings.TrimSpace(gatewayAddress) == "" || strings.TrimSpace(privateKeyPath) == "" {
+			t.Fatalf("ansible runner received empty arguments: gateway=%q key=%q", gatewayAddress, privateKeyPath)
+		}
+		return nil
+	})
 	ctrl := &controller{
 		db:            database,
 		marmot:        &marmotd.Marmot{NodeName: "hvc", Db: database},
@@ -24,6 +34,7 @@ func TestGatewayControllerStateTransitions(t *testing.T) {
 	}
 
 	_ = mustCreateVirtualNetwork(t, database, "web-servers")
+	mustCreateInternalServer(t, database, "server-10", "web-servers", "172.16.10.2")
 	createdGateway := mustCreateGateway(t, database, "igw-unit", "web-servers", "192.168.1.110")
 
 	ctrl.reconcileGatewayPending(createdGateway)
@@ -52,18 +63,33 @@ func TestGatewayControllerStateTransitions(t *testing.T) {
 		t.Fatalf("GetGatewayById() failed before provisioning reconcile: %v", err)
 	}
 	ctrl.reconcileGatewayProvisioning(gatewayBeforeProvisioning)
-
 	gatewayAfterProvisioning, err := database.GetGatewayById(gatewayID)
 	if err != nil {
 		t.Fatalf("GetGatewayById() failed after provisioning reconcile: %v", err)
 	}
-	if gatewayAfterProvisioning.Status == nil || gatewayAfterProvisioning.Status.StatusCode != db.GATEWAY_ACTIVE {
-		t.Fatalf("gateway status after provisioning reconcile = %v, want %d(ACTIVE)", gatewayAfterProvisioning.Status, db.GATEWAY_ACTIVE)
+	if gatewayAfterProvisioning.Status == nil || gatewayAfterProvisioning.Status.StatusCode != db.GATEWAY_CONFIGURING {
+		t.Fatalf("gateway status after provisioning reconcile = %v, want %d(CONFIGURING)", gatewayAfterProvisioning.Status, db.GATEWAY_CONFIGURING)
+	}
+
+	ctrl.reconcileGatewayConfiguring(gatewayAfterProvisioning)
+
+	gatewayAfterConfiguring, err := database.GetGatewayById(gatewayID)
+	if err != nil {
+		t.Fatalf("GetGatewayById() failed after configuring reconcile: %v", err)
+	}
+	if gatewayAfterConfiguring.Status == nil || gatewayAfterConfiguring.Status.StatusCode != db.GATEWAY_ACTIVE {
+		t.Fatalf("gateway status after configuring reconcile = %v, want %d(ACTIVE)", gatewayAfterConfiguring.Status, db.GATEWAY_ACTIVE)
 	}
 }
 
 func TestGatewayControllerLoopIntegration_CreateToActive(t *testing.T) {
 	database := newGatewayTestDatabase(t)
+	setupGatewayAnsibleTestHooks(t, func(playbookPath, gatewayAddress, privateKeyPath string) error {
+		if _, err := os.Stat(playbookPath); err != nil {
+			return err
+		}
+		return nil
+	})
 	ctrl := &controller{
 		db:            database,
 		marmot:        &marmotd.Marmot{NodeName: "hvc", Db: database},
@@ -71,6 +97,7 @@ func TestGatewayControllerLoopIntegration_CreateToActive(t *testing.T) {
 	}
 
 	_ = mustCreateVirtualNetwork(t, database, "web-servers")
+	mustCreateInternalServer(t, database, "server-10", "web-servers", "172.16.10.2")
 	createdGateway := mustCreateGateway(t, database, "igw-int", "web-servers", "192.168.1.111")
 	gatewayID := api.GatewayID(createdGateway)
 
@@ -96,8 +123,66 @@ func TestGatewayControllerLoopIntegration_CreateToActive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetGatewayById() failed after second loop: %v", err)
 	}
-	if gatewayAfterSecondLoop.Status == nil || gatewayAfterSecondLoop.Status.StatusCode != db.GATEWAY_ACTIVE {
-		t.Fatalf("gateway status after second loop = %v, want %d(ACTIVE)", gatewayAfterSecondLoop.Status, db.GATEWAY_ACTIVE)
+	if gatewayAfterSecondLoop.Status == nil || gatewayAfterSecondLoop.Status.StatusCode != db.GATEWAY_CONFIGURING {
+		t.Fatalf("gateway status after second loop = %v, want %d(CONFIGURING)", gatewayAfterSecondLoop.Status, db.GATEWAY_CONFIGURING)
+	}
+
+	ctrl.gatewayControllerLoop()
+
+	gatewayAfterThirdLoop, err := database.GetGatewayById(gatewayID)
+	if err != nil {
+		t.Fatalf("GetGatewayById() failed after third loop: %v", err)
+	}
+	if gatewayAfterThirdLoop.Status == nil || gatewayAfterThirdLoop.Status.StatusCode != db.GATEWAY_ACTIVE {
+		t.Fatalf("gateway status after third loop = %v, want %d(ACTIVE)", gatewayAfterThirdLoop.Status, db.GATEWAY_ACTIVE)
+	}
+}
+
+func TestGatewayControllerConfigRetryExceeded(t *testing.T) {
+	database := newGatewayTestDatabase(t)
+	setupGatewayAnsibleTestHooks(t, func(playbookPath, gatewayAddress, privateKeyPath string) error {
+		return fmt.Errorf("simulated ansible failure")
+	})
+	ctrl := &controller{
+		db:            database,
+		marmot:        &marmotd.Marmot{NodeName: "hvc", Db: database},
+		deletionDelay: 15 * time.Second,
+	}
+
+	_ = mustCreateVirtualNetwork(t, database, "web-servers")
+	mustCreateInternalServer(t, database, "server-10", "web-servers", "172.16.10.2")
+	createdGateway := mustCreateGateway(t, database, "igw-retry", "web-servers", "192.168.1.112")
+	gatewayID := api.GatewayID(createdGateway)
+
+	ctrl.reconcileGatewayPending(createdGateway)
+	gatewayAfterPending, err := database.GetGatewayById(gatewayID)
+	if err != nil {
+		t.Fatalf("GetGatewayById() failed after pending reconcile: %v", err)
+	}
+	serverID := gatewayManagedServerID(gatewayAfterPending)
+	database.UpdateServerStatus(serverID, db.SERVER_RUNNING, "")
+	ctrl.reconcileGatewayProvisioning(gatewayAfterPending)
+
+	for i := 0; i < gatewayAnsibleMaxRetryCount; i++ {
+		gateway, err := database.GetGatewayById(gatewayID)
+		if err != nil {
+			t.Fatalf("GetGatewayById() failed in retry loop: %v", err)
+		}
+		ctrl.reconcileGatewayConfiguring(gateway)
+	}
+
+	failedGateway, err := database.GetGatewayById(gatewayID)
+	if err != nil {
+		t.Fatalf("GetGatewayById() failed after retry exhaustion: %v", err)
+	}
+	if failedGateway.Status == nil || failedGateway.Status.StatusCode != db.GATEWAY_FAILED {
+		t.Fatalf("gateway status after retry exhaustion = %v, want %d(FAILED)", failedGateway.Status, db.GATEWAY_FAILED)
+	}
+	if failedGateway.Metadata.Labels == nil {
+		t.Fatalf("gateway labels missing after retry exhaustion")
+	}
+	if got := db.GetGatewayAnsibleRetries(*failedGateway.Metadata.Labels); got != gatewayAnsibleMaxRetryCount {
+		t.Fatalf("ansible retries = %d, want %d", got, gatewayAnsibleMaxRetryCount)
 	}
 }
 
@@ -140,6 +225,52 @@ func mustCreateGateway(t *testing.T, database *db.Database, name, internalNetwor
 		t.Fatalf("CreateGateway() returned empty gateway id")
 	}
 	return gateway
+}
+
+func mustCreateInternalServer(t *testing.T, database *db.Database, name, networkName, ipAddress string) api.Server {
+	t.Helper()
+	server, err := database.MakeServerEntry(api.Server{
+		ApiVersion: "v1",
+		Kind:       "Server",
+		Metadata: api.Metadata{
+			Name:     name,
+			NodeName: util.StringPtr("hvc"),
+		},
+		Spec: api.ServerSpec{
+			NetworkInterface: &[]api.NetworkInterface{{
+				Networkname: networkName,
+				Address:     util.StringPtr(ipAddress),
+			}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("MakeServerEntry() failed for internal server: %v", err)
+	}
+	database.UpdateServerStatus(api.ServerID(server), db.SERVER_RUNNING, "")
+	return server
+}
+
+func setupGatewayAnsibleTestHooks(t *testing.T, runner func(playbookPath, gatewayAddress, privateKeyPath string) error) {
+	t.Helper()
+	oldRunner := runGatewayPlaybook
+	oldDir := gatewayPlaybookDir
+	oldKey := gatewayPrivateKeyPath
+
+	tempDir := t.TempDir()
+	keyPath := filepath.Join(tempDir, "private.key")
+	if err := os.WriteFile(keyPath, []byte("dummy-private-key"), 0o600); err != nil {
+		t.Fatalf("WriteFile() failed for test private key: %v", err)
+	}
+
+	runGatewayPlaybook = runner
+	gatewayPlaybookDir = filepath.Join(tempDir, "playbooks")
+	gatewayPrivateKeyPath = keyPath
+
+	t.Cleanup(func() {
+		runGatewayPlaybook = oldRunner
+		gatewayPlaybookDir = oldDir
+		gatewayPrivateKeyPath = oldKey
+	})
 }
 
 func newGatewayTestDatabase(t *testing.T) *db.Database {
