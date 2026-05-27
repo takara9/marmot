@@ -6,6 +6,7 @@ LEGACY_CONFIG_FILE="/etc/marmot.json"
 KEY_DIR="/etc/marmot/keys"
 PRIVATE_KEY="${KEY_DIR}/private.key"
 PUBLIC_KEY="${KEY_DIR}/public.key"
+LEGACY_PUBLIC_KEY="${PRIVATE_KEY}.pub"
 PLAYBOOK_SRC_DIR="/usr/local/marmot/gateway-playbooks"
 PLAYBOOK_DST_DIR="/var/lib/marmot/ansible-playbooks"
 PLAYBOOK_TEMPLATE_DIR="${PLAYBOOK_DST_DIR}/templates"
@@ -23,9 +24,20 @@ fi
 
 mkdir -p "${KEY_DIR}"
 chmod 700 "${KEY_DIR}"
+
+# Backward compatibility: previous installer created private.key.pub.
+if [ -f "${LEGACY_PUBLIC_KEY}" ] && [ ! -f "${PUBLIC_KEY}" ]; then
+    mv "${LEGACY_PUBLIC_KEY}" "${PUBLIC_KEY}"
+fi
+
 if [ ! -f "${PRIVATE_KEY}" ] || [ ! -f "${PUBLIC_KEY}" ]; then
-    rm -f "${PRIVATE_KEY}" "${PUBLIC_KEY}"
+    rm -f "${PRIVATE_KEY}" "${PUBLIC_KEY}" "${LEGACY_PUBLIC_KEY}"
     ssh-keygen -t rsa -b 4096 -f "${PRIVATE_KEY}" -N "" -C "marmot-gateway" >/dev/null
+
+    # ssh-keygen always writes public key as ${PRIVATE_KEY}.pub.
+    if [ -f "${LEGACY_PUBLIC_KEY}" ] && [ ! -f "${PUBLIC_KEY}" ]; then
+        mv "${LEGACY_PUBLIC_KEY}" "${PUBLIC_KEY}"
+    fi
 fi
 chmod 600 "${PRIVATE_KEY}"
 chmod 644 "${PUBLIC_KEY}"

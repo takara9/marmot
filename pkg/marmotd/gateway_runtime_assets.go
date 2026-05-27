@@ -41,6 +41,14 @@ func ensureGatewayKeyPair() error {
 	}
 	privateKeyPath := filepath.Join(gatewayKeyDir, "private.key")
 	publicKeyPath := filepath.Join(gatewayKeyDir, "public.key")
+	legacyPublicKeyPath := privateKeyPath + ".pub"
+
+	// Backward compatibility: older installers created private.key.pub.
+	if !fileExists(publicKeyPath) && fileExists(legacyPublicKeyPath) {
+		if err := os.Rename(legacyPublicKeyPath, publicKeyPath); err != nil {
+			return err
+		}
+	}
 
 	privateExists := fileExists(privateKeyPath)
 	publicExists := fileExists(publicKeyPath)
@@ -50,6 +58,7 @@ func ensureGatewayKeyPair() error {
 	if privateExists || publicExists {
 		_ = os.Remove(privateKeyPath)
 		_ = os.Remove(publicKeyPath)
+		_ = os.Remove(legacyPublicKeyPath)
 	}
 
 	privateKey, err := rsa.GenerateKey(rand.Reader, 4096)

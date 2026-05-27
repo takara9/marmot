@@ -114,7 +114,8 @@ Depends: libvirt-daemon-system,
  lvm2,
  etcd-server,
  open-iscsi,
- targetcli-fb
+ targetcli-fb,
+ ansible-core
 Section: admin
 Priority: optional
 Description: marmot - VM クラスター管理サービス
