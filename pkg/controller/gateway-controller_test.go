@@ -80,6 +80,9 @@ func TestGatewayControllerStateTransitions(t *testing.T) {
 	if gatewayAfterConfiguring.Status == nil || gatewayAfterConfiguring.Status.StatusCode != db.GATEWAY_ACTIVE {
 		t.Fatalf("gateway status after configuring reconcile = %v, want %d(ACTIVE)", gatewayAfterConfiguring.Status, db.GATEWAY_ACTIVE)
 	}
+	if gatewayAfterConfiguring.Status.Message != nil && strings.TrimSpace(*gatewayAfterConfiguring.Status.Message) != "" {
+		t.Fatalf("gateway message after configuring reconcile = %q, want empty", *gatewayAfterConfiguring.Status.Message)
+	}
 }
 
 func TestGatewayControllerLoopIntegration_CreateToActive(t *testing.T) {
@@ -135,6 +138,9 @@ func TestGatewayControllerLoopIntegration_CreateToActive(t *testing.T) {
 	}
 	if gatewayAfterThirdLoop.Status == nil || gatewayAfterThirdLoop.Status.StatusCode != db.GATEWAY_ACTIVE {
 		t.Fatalf("gateway status after third loop = %v, want %d(ACTIVE)", gatewayAfterThirdLoop.Status, db.GATEWAY_ACTIVE)
+	}
+	if gatewayAfterThirdLoop.Status.Message != nil && strings.TrimSpace(*gatewayAfterThirdLoop.Status.Message) != "" {
+		t.Fatalf("gateway message after third loop = %q, want empty", *gatewayAfterThirdLoop.Status.Message)
 	}
 }
 

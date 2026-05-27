@@ -275,13 +275,21 @@ func (d *Database) UpdateGatewayStatusWithMessage(id string, status int, message
 	if gateway.Status == nil {
 		gateway.Status = &api.Status{}
 	}
+	statusChanged := gateway.Status.StatusCode != status
 	gateway.Status.StatusCode = status
 	gateway.Status.Status = util.StringPtr(GatewayStatus[status])
 	gateway.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
-	if strings.TrimSpace(message) == "" {
-		gateway.Status.Message = nil
+	trimmedMessage := strings.TrimSpace(message)
+	if statusChanged {
+		// PatchStruct skips nil pointers, so use empty string to reliably clear stale messages.
+		gateway.Status.Message = util.StringPtr("")
+	}
+	if trimmedMessage == "" {
+		if gateway.Status.Message == nil {
+			gateway.Status.Message = util.StringPtr("")
+		}
 	} else {
-		gateway.Status.Message = util.StringPtr(strings.TrimSpace(message))
+		gateway.Status.Message = util.StringPtr(trimmedMessage)
 	}
 
 	return d.UpdateGatewayById(id, gateway)
