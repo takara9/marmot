@@ -53,7 +53,7 @@ func startMockServer() (*mockServerHandle, error) {
 		marmotd.RegisterRoutes(e, server, "/api/v1")
 
 		type stopper interface{ Stop() }
-		stoppers := make([]stopper, 0, 6)
+		stoppers := make([]stopper, 0, 7)
 		stopControllers := func() {
 			for i := len(stoppers) - 1; i >= 0; i-- {
 				stoppers[i].Stop()
@@ -86,6 +86,15 @@ func startMockServer() (*mockServerHandle, error) {
 			return
 		}
 		stoppers = append(stoppers, netController)
+
+		gatewayController, err := controller.StartGatewayController(nodeName, etcdEp)
+		if err != nil {
+			slog.Error("Failed to start gateway controller", "err", err)
+			stopControllers()
+			errCh <- err
+			return
+		}
+		stoppers = append(stoppers, gatewayController)
 
 		dnsCfg := &marmotd.MarmotdConfig{
 			DNSListenAddr: "127.0.0.1:1053",

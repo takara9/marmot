@@ -19,6 +19,13 @@ const (
 	GATEWAY_ACTIVE       = 3
 	GATEWAY_FAILED       = 4
 	GATEWAY_DELETING     = 5
+
+	GatewayLabelManagedServerID = "gatewayServerId"
+	GatewayLabelManagedBy       = "managedBy"
+	GatewayLabelManagedByValue  = "gateway-controller"
+	GatewayServerLabelGatewayID = "gatewayId"
+	GatewayServerLabelRole      = "role"
+	GatewayServerLabelRoleValue = "gateway"
 )
 
 var GatewayStatus = map[int]string{
@@ -28,6 +35,25 @@ var GatewayStatus = map[int]string{
 	3: "ACTIVE",
 	4: "FAILED",
 	5: "DELETING",
+}
+
+func SetGatewayManagedServerID(labels map[string]interface{}, serverID string) {
+	if labels == nil {
+		return
+	}
+	labels[GatewayLabelManagedServerID] = strings.TrimSpace(serverID)
+	labels[GatewayLabelManagedBy] = GatewayLabelManagedByValue
+}
+
+func GetGatewayManagedServerID(labels map[string]interface{}) string {
+	if labels == nil {
+		return ""
+	}
+	val, ok := labels[GatewayLabelManagedServerID].(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(val)
 }
 
 // CreateGateway stores a gateway object in etcd with a generated ID and PENDING status.
