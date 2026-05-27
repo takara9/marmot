@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -189,6 +190,35 @@ func TestGatewayControllerConfigRetryExceeded(t *testing.T) {
 	}
 	if got := db.GetGatewayAnsibleRetries(*failedGateway.Metadata.Labels); got != gatewayAnsibleMaxRetryCount {
 		t.Fatalf("ansible retries = %d, want %d", got, gatewayAnsibleMaxRetryCount)
+	}
+}
+
+func TestGatewayControllerDeletesGatewayWhenInternalServerMissing(t *testing.T) {
+	database := newGatewayTestDatabase(t)
+	setupGatewayAnsibleTestHooks(t, func(playbookPath, gatewayAddress, privateKeyPath string) error {
+		return nil
+	})
+	ctrl := &controller{
+		db:            database,
+		marmot:        &marmotd.Marmot{NodeName: "hvc", Db: database},
+		deletionDelay: 15 * time.Second,
+	}
+
+	_ = mustCreateVirtualNetwork(t, database, "web-servers")
+	internalServer := mustCreateInternalServer(t, database, "server-10", "web-servers", "172.16.10.2")
+	createdGateway := mustCreateGateway(t, database, "igw-missing-target", "web-servers", "192.168.1.113")
+
+	ctrl.reconcileGatewayPending(createdGateway)
+
+	if err := database.DeleteServerById(api.ServerID(internalServer)); err != nil {
+		t.Fatalf("DeleteServerById() failed for internal server: %v", err)
+	}
+
+	ctrl.gatewayControllerLoop()
+
+	_, err := database.GetGatewayById(api.GatewayID(createdGateway))
+	if !errors.Is(err, db.ErrNotFound) {
+		t.Fatalf("GetGatewayById() error = %v, want ErrNotFound", err)
 	}
 }
 

@@ -74,6 +74,18 @@ func (c *controller) gatewayControllerLoop() {
 			continue
 		}
 
+		if gateway.Status == nil || gateway.Status.StatusCode != db.GATEWAY_DELETING {
+			missingInternalServer, err := c.isGatewayInternalServerMissing(gateway)
+			if err != nil {
+				slog.Warn("failed to validate gateway internal server", "gatewayId", gatewayID, "err", err)
+				continue
+			}
+			if missingInternalServer {
+				c.deleteGatewayForMissingInternalServer(gateway)
+				continue
+			}
+		}
+
 		if gateway.Status == nil {
 			if err := c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_PENDING, ""); err != nil {
 				slog.Warn("UpdateGatewayStatusWithMessage() failed", "gatewayId", gatewayID, "err", err)
@@ -106,6 +118,40 @@ func (c *controller) gatewayControllerLoop() {
 			slog.Warn("不明なゲートウェイ状態", "gatewayId", gatewayID, "statusCode", gateway.Status.StatusCode)
 		}
 	}
+}
+
+func (c *controller) isGatewayInternalServerMissing(gateway api.Gateway) (bool, error) {
+	serverName := strings.TrimSpace(gateway.Spec.InternalServerName)
+	if serverName == "" {
+		return false, nil
+	}
+
+	if _, err := c.findServerByName(serverName); err != nil {
+		if errors.Is(err, db.ErrNotFound) {
+			return true, nil
+		}
+		return false, err
+	}
+
+	return false, nil
+}
+
+func (c *controller) deleteGatewayForMissingInternalServer(gateway api.Gateway) {
+	gatewayID := api.GatewayID(gateway)
+	serverID := strings.TrimSpace(gatewayManagedServerID(gateway))
+
+	if serverID != "" {
+		if err := c.db.SetDeleteTimestamp(serverID); err != nil && !errors.Is(err, db.ErrNotFound) {
+			slog.Warn("SetDeleteTimestamp() failed while auto-deleting gateway", "gatewayId", gatewayID, "serverId", serverID, "err", err)
+		}
+	}
+
+	if err := c.db.DeleteGatewayById(gatewayID); err != nil {
+		slog.Warn("DeleteGatewayById() failed while auto-deleting gateway", "gatewayId", gatewayID, "err", err)
+		return
+	}
+
+	slog.Info("gateway deleted because spec.internalServerName target no longer exists", "gatewayId", gatewayID, "internalServerName", strings.TrimSpace(gateway.Spec.InternalServerName))
 }
 
 func (c *controller) reconcileGatewayPending(gateway api.Gateway) {

@@ -25,22 +25,34 @@ fi
 mkdir -p "${KEY_DIR}"
 chmod 700 "${KEY_DIR}"
 
+KEY_INIT_STATUS="generated"
+
 # Backward compatibility: previous installer created private.key.pub.
 if [ -f "${LEGACY_PUBLIC_KEY}" ] && [ ! -f "${PUBLIC_KEY}" ]; then
     mv "${LEGACY_PUBLIC_KEY}" "${PUBLIC_KEY}"
 fi
 
-if [ ! -f "${PRIVATE_KEY}" ] || [ ! -f "${PUBLIC_KEY}" ]; then
-    rm -f "${PRIVATE_KEY}" "${PUBLIC_KEY}" "${LEGACY_PUBLIC_KEY}"
-    ssh-keygen -t rsa -b 4096 -f "${PRIVATE_KEY}" -N "" -C "marmot-gateway" >/dev/null
+# If any key file already exists under /etc/marmot/keys, keep it as-is.
+if find "${KEY_DIR}" -mindepth 1 -maxdepth 1 -type f \( -name '*.key' -o -name '*.pub' \) | grep -q .; then
+    KEY_INIT_STATUS="skipped"
+else
+    if [ ! -f "${PRIVATE_KEY}" ] || [ ! -f "${PUBLIC_KEY}" ]; then
+        rm -f "${PRIVATE_KEY}" "${PUBLIC_KEY}" "${LEGACY_PUBLIC_KEY}"
+        ssh-keygen -t rsa -b 4096 -f "${PRIVATE_KEY}" -N "" -C "marmot-gateway" >/dev/null
 
-    # ssh-keygen always writes public key as ${PRIVATE_KEY}.pub.
-    if [ -f "${LEGACY_PUBLIC_KEY}" ] && [ ! -f "${PUBLIC_KEY}" ]; then
-        mv "${LEGACY_PUBLIC_KEY}" "${PUBLIC_KEY}"
+        # ssh-keygen always writes public key as ${PRIVATE_KEY}.pub.
+        if [ -f "${LEGACY_PUBLIC_KEY}" ] && [ ! -f "${PUBLIC_KEY}" ]; then
+            mv "${LEGACY_PUBLIC_KEY}" "${PUBLIC_KEY}"
+        fi
     fi
 fi
-chmod 600 "${PRIVATE_KEY}"
-chmod 644 "${PUBLIC_KEY}"
+
+if [ -f "${PRIVATE_KEY}" ]; then
+    chmod 600 "${PRIVATE_KEY}"
+fi
+if [ -f "${PUBLIC_KEY}" ]; then
+    chmod 644 "${PUBLIC_KEY}"
+fi
 
 rm -rf "${PLAYBOOK_DST_DIR}"
 mkdir -p "${PLAYBOOK_TEMPLATE_DIR}"
@@ -72,7 +84,11 @@ echo ""
 echo "============================================================"
 echo " marmot のインストールが完了しました"
 echo "============================================================"
-echo " Gateway playbook と SSH 鍵を初期化しました"
+if [ "${KEY_INIT_STATUS}" = "skipped" ]; then
+    echo " Gateway playbook を初期化しました (既存の SSH 鍵を検出したため鍵初期化はスキップ)"
+else
+    echo " Gateway playbook と SSH 鍵を初期化しました"
+fi
 echo " 自動的に VM起動イメージをダウンロードしています..."
 echo " この処理は環境によって数分かかることがあります。"
 echo " mactl get images でダウンロード状況を確認できます。"
