@@ -14,6 +14,8 @@ import (
 	"github.com/takara9/marmot/pkg/db"
 )
 
+var getServerShowAll bool
+
 var getCmd = &cobra.Command{
 	Use:   "get RESOURCE [NAME]",
 	Short: "Get resource(s) of a specific type",
@@ -64,6 +66,8 @@ func getServerResources(name string) error {
 			return fmt.Errorf("failed to parse servers: %w", err)
 		}
 
+		servers = filterVisibleServers(servers, getServerShowAll)
+
 		// NAME でフィルター
 		if name != "" {
 			servers = filterServersByName(servers, name)
@@ -83,6 +87,30 @@ func getServerResources(name string) error {
 	}
 
 	return runList(listFn)
+}
+
+func filterVisibleServers(servers []api.Server, showAll bool) []api.Server {
+	if showAll {
+		return servers
+	}
+
+	result := make([]api.Server, 0, len(servers))
+	for _, s := range servers {
+		if hasManagedByLabel(s.Metadata.Labels) {
+			continue
+		}
+		result = append(result, s)
+	}
+
+	return result
+}
+
+func hasManagedByLabel(labels *map[string]interface{}) bool {
+	if labels == nil {
+		return false
+	}
+	_, exists := (*labels)["managedBy"]
+	return exists
 }
 
 func getImageResources(name string) error {
@@ -437,7 +465,7 @@ func outputServers(servers []api.Server) error {
 		})
 		//fmt.Println("NAME            NODE       STATUS     CPU  RAM(MB)  IP-ADDRESS       NETWORK")
 		//fmt.Println("----            ----       ------     ---  -------  ----------       -------")
-		fmt.Printf("%-15s  %-8s  %-12s  %-3s  %-7s  %-15s  %-15s\n",
+		fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s\n",
 			"NAME",
 			"NODE",
 			"STATUS",
@@ -446,7 +474,7 @@ func outputServers(servers []api.Server) error {
 			"IP-ADDRESS",
 			"NETWORK",
 		)
-		fmt.Printf("%-15s  %-8s  %-12s  %-3s  %-7s  %-15s  %-15s\n",
+		fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s\n",
 			"----",
 			"----",
 			"------",
@@ -474,7 +502,7 @@ func outputServers(servers []api.Server) error {
 				status = *s.Status.Status
 			}
 			networkLines := serverNetworkLines(s)
-			fmt.Printf("%-15s  %-8s  %-12s  %-3s  %-7s  %-15s  %-15s\n",
+			fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s\n",
 				s.Metadata.Name,
 				node,
 				status,
@@ -484,7 +512,7 @@ func outputServers(servers []api.Server) error {
 				networkLines[0].network,
 			)
 			for _, networkLine := range networkLines[1:] {
-				fmt.Printf("%-15s  %-8s  %-12s  %-3s  %-7s  %-15s  %-15s\n",
+				fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s\n",
 					"",
 					"",
 					"",
@@ -785,4 +813,5 @@ func outputGateways(gateways []api.Gateway) error {
 func init() {
 	rootCmd.AddCommand(getCmd)
 	getCmd.Flags().StringVarP(&labelSelector, "selector", "l", "", "Label selector (e.g., key=value)")
+	getCmd.Flags().BoolVarP(&getServerShowAll, "all", "a", false, "managedBy ラベル付きの server も含めて表示する")
 }
