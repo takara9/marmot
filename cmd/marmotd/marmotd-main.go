@@ -59,6 +59,10 @@ func main() {
 		cfg.NodeName = hostname
 	}
 	marmotd.SetRuntimeConfig(cfg)
+	if err := marmotd.EnsureGatewayRuntimeAssets(); err != nil {
+		slog.Error("Failed to initialize gateway runtime assets", "err", err)
+		return
+	}
 	slog.Info("Config loaded",
 		"node_name", cfg.NodeName,
 		"etcd_url", cfg.EtcdURL,
@@ -106,6 +110,13 @@ func main() {
 	_, err = controller.StartNetController(cfg.NodeName, cfg.EtcdURL, cfg.DeletionDelaySeconds) // ネットワークコントローラーの開始
 	if err != nil {
 		slog.Error("Failed to start controller", "err", err)
+		return
+	}
+
+	// ゲートウェイコントローラー
+	_, err = controller.StartGatewayController(cfg.NodeName, cfg.EtcdURL)
+	if err != nil {
+		slog.Error("Failed to start gateway controller", "err", err)
 		return
 	}
 

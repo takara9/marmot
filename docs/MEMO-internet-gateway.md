@@ -16,7 +16,7 @@
   - mactl は、ゲートウェイ・リソースのファイル、または、URLからマニフェストを取得して、JSON形式に変換して、marmotd に送信する。
   - marmotd は、受けたゲートウェイ・リソースの作成要求を、etcd に保存して、オブジェクトの作成は、Gatewayコントローラーに任せる。
   - 内部的には、他のオブジェクト同様に、uuidから導出した id で オブジェクトは識別する。 id の重複は許さない。
-  - 同じ仮想ネットワーク上で、同一名称は許さない
+  - 同じ仮想ネットワークinternalVirtualNetwork上で、同一名称は許さない
 
 ゲートウェイ・リソースのAPI
 ```
@@ -56,7 +56,7 @@ spec:
     - deleteionTimestamp が作成されてから、15秒以上経過したオブジェクトは、削除処理を実施する。
     - 稼働サーバーを削除して、etcdのデータをクリアして削除完了となる。
   - ゲートウェイ・オブジェクトの変更
-    - 変更を禁じる対象: bindPublicIpAddress, internalServerName, web-servers
+    - 変更を禁じる対象: bindPublicIpAddress, internalServerName, internalVirtualNetwork
     - 変更を許し対象: serverPorts
 
 
@@ -76,3 +76,48 @@ iptables -t nat -A PREROUTING -p tcp --dport 80 -j DNAT --to-destination 172.16.
 # マスカレード（戻りパケットの処理）
 iptables -t nat -A POSTROUTING -j MASQUERADE
 ```
+
+## 実装方針
+
+
+1. バリデーション仕様（作成時）
+1. metadata.name は spec.internalVirtualNetwork 単位で一意にする  
+2. spec.bindPublicIpAddress はクラスタ全体で一意にする  
+3. spec.serverPorts は次の形式のみ許可する  
+4. サービス名（http, https, ssh など）は /etc/services 解決で tcp を既定にする  
+5. 数値ポートは n/tcp または n/udp 形式を許可する
+
+2. 更新仕様（apply, update）
+1. 変更禁止は spec.bindPublicIpAddress, spec.internalServerName, spec.internalVirtualNetwork  
+2. 変更許可は spec.serverPorts のみ  
+3. 禁止項目に差分があれば 400 で拒否し、どの項目が不正かを明示する  
+4. メモ内の web-servers は internalVirtualNetwork に統一して扱う
+
+3. コントローラー仕様（15秒ループ）
+1. PENDING 検知で Gateway 用 VM を作成  
+2. NIC 外側は host-bridge 固定 + bindPublicIpAddress を割当  
+3. NIC 内側は internalVirtualNetwork に接続し、IP は既存のサーバー割当ロジックを流用  
+4. VM 起動後に Ansible で DNAT と MASQUERADE を設定  
+5. Ansible 失敗は再試行し、3回超過で FAILED と message 記録  
+6. DeletionTimestamp から 15 秒超過で削除を実行
+
+4. パッケージと起動時準備
+1. deb に ansible playbook を同梱する  
+2. インストール時は既存 playbook を削除して再配置する  
+3. 起動準備で /etc/marmot/keys を確認し、無ければ public.key/private.key を生成する
+
+5. テスト観点（最低限）
+1. 同一 internalVirtualNetwork 内の同名は作成失敗  
+2. 別 internalVirtualNetwork なら同名作成成功  
+3. bindPublicIpAddress 重複はノード跨ぎでも失敗  
+4. update で禁止項目変更は失敗、serverPorts 変更は成功  
+5. service 名解決が tcp 既定で正しく変換される  
+6. Ansible 3回失敗で FAILED 遷移
+
+
+### 段階的リリース案
+
+Phase 1: API/DB/CLI まで（保存と表示だけ）
+Phase 2: Controller で VM 作成まで
+Phase 3: Ansible 適用 + retry/failure 完成
+Phase 4: deb 同梱と postinst 反映、E2E テスト追加

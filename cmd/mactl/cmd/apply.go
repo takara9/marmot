@@ -13,7 +13,7 @@ import (
 var applyCmd = &cobra.Command{
 	Use:   "apply [RESOURCE]",
 	Short: "Create or update a resource from a file or stdin",
-	Long:  `Apply a resource (server/srv, image/img, volume/vol, network/net) from a manifest file or stdin. Creates if not exists, updates if exists. If RESOURCE is omitted, it is inferred from manifest kind.`,
+	Long:  `Apply a resource (server/srv, image/img, volume/vol, network/net, gateway/gw) from a manifest file or stdin. Creates if not exists, updates if exists. If RESOURCE is omitted, it is inferred from manifest kind.`,
 	Args:  cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// マニフェストファイルが指定されていない場合はエラー
@@ -46,6 +46,8 @@ var applyCmd = &cobra.Command{
 				resourceName = "volume"
 			case ManifestTypeNetwork:
 				resourceName = "network"
+			case ManifestTypeGateway:
+				resourceName = "gateway"
 			default:
 				return fmt.Errorf("failed to infer resource type from kind %q", kind)
 			}
@@ -66,6 +68,8 @@ var applyCmd = &cobra.Command{
 			return applyVolume(manifest)
 		case "network":
 			return applyNetwork(manifest)
+		case "gateway":
+			return applyGateway(manifest)
 		default:
 			return fmt.Errorf("unknown resource type: %s", resourceName)
 		}
@@ -311,6 +315,65 @@ func applyNetwork(manifest map[string]interface{}) error {
 		byteBody, _, err = m.CreateVirtualNetwork(*network)
 		if err != nil {
 			return fmt.Errorf("failed to create network: %w", err)
+		}
+	}
+
+	return processApplyResponse(byteBody, exists)
+}
+
+func applyGateway(manifest map[string]interface{}) error {
+	m, err := getClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	gateway, err := ManifestToGateway(manifest)
+	if err != nil {
+		return fmt.Errorf("failed to convert manifest to gateway: %w", err)
+	}
+
+	if gateway.ApiVersion == "" {
+		return fmt.Errorf("apiVersion is required")
+	}
+	if gateway.Kind == "" {
+		return fmt.Errorf("kind is required")
+	}
+	if strings.TrimSpace(gateway.Metadata.Name) == "" {
+		return fmt.Errorf("metadata.name is required")
+	}
+	if strings.TrimSpace(gateway.Spec.InternalVirtualNetwork) == "" {
+		return fmt.Errorf("spec.internalVirtualNetwork is required")
+	}
+
+	exists := false
+	var existingID string
+	list, _, err := m.GetGateways()
+	if err == nil {
+		var gateways []api.Gateway
+		json.Unmarshal(list, &gateways)
+		for _, g := range gateways {
+			if g.Metadata.Name != gateway.Metadata.Name {
+				continue
+			}
+			if strings.TrimSpace(g.Spec.InternalVirtualNetwork) == strings.TrimSpace(gateway.Spec.InternalVirtualNetwork) {
+				exists = true
+				existingID = api.GatewayID(g)
+				break
+			}
+		}
+	}
+
+	var byteBody []byte
+	if exists {
+		api.SetGatewayID(gateway, existingID)
+		byteBody, _, err = m.UpdateGatewayById(existingID, *gateway)
+		if err != nil {
+			return fmt.Errorf("failed to update gateway: %w", err)
+		}
+	} else {
+		byteBody, _, err = m.CreateGateway(*gateway)
+		if err != nil {
+			return fmt.Errorf("failed to create gateway: %w", err)
 		}
 	}
 

@@ -62,6 +62,24 @@ type Error struct {
 	Message string `json:"message" yaml:"message"`
 }
 
+// Gateway defines model for Gateway.
+type Gateway struct {
+	ApiVersion string      `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string      `json:"kind" yaml:"kind"`
+	Metadata   Metadata    `json:"metadata" yaml:"metadata"`
+	Spec       GatewaySpec `json:"spec" yaml:"spec"`
+	Status     *Status     `json:"status,omitempty" yaml:"status,omitempty"`
+}
+
+// GatewaySpec defines model for GatewaySpec.
+type GatewaySpec struct {
+	BindPublicIpAddress    string   `json:"bindPublicIpAddress" yaml:"bindPublicIpAddress"`
+	InternalServerName     string   `json:"internalServerName" yaml:"internalServerName"`
+	InternalVirtualNetwork string   `json:"internalVirtualNetwork" yaml:"internalVirtualNetwork"`
+	RemoteCIDR             string   `json:"remoteCIDR,omitempty" yaml:"remoteCIDR,omitempty"`
+	ServerPorts            []string `json:"serverPorts" yaml:"serverPorts"`
+}
+
 // HostAllocation defines model for HostAllocation.
 type HostAllocation struct {
 	AllocatedCpuCores *int `json:"allocatedCpuCores,omitempty" yaml:"allocatedCpuCores,omitempty"`
@@ -323,6 +341,12 @@ type Volume struct {
 	Status     *Status  `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
+// ApiCreateGatewayJSONRequestBody defines body for ApiCreateGateway for application/json ContentType.
+type ApiCreateGatewayJSONRequestBody = Gateway
+
+// ApiUpdateGatewayByIdJSONRequestBody defines body for ApiUpdateGatewayById for application/json ContentType.
+type ApiUpdateGatewayByIdJSONRequestBody = Gateway
+
 // ApiCreateImageJSONRequestBody defines body for ApiCreateImage for application/json ContentType.
 type ApiCreateImageJSONRequestBody = Image
 
@@ -352,6 +376,21 @@ type ApiUpdateVolumeByIdJSONRequestBody = Volume
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// List Gateways
+	// (GET /gateway)
+	ApiGetGateways(ctx echo.Context) error
+	// Create Gateway
+	// (POST /gateway)
+	ApiCreateGateway(ctx echo.Context) error
+	// Delete Gateway
+	// (DELETE /gateway/{id})
+	ApiDeleteGatewayById(ctx echo.Context, id string) error
+	// Info for a specific gateway
+	// (GET /gateway/{id})
+	ApiGetGatewayById(ctx echo.Context, id string) error
+	// Update Gateway
+	// (PUT /gateway/{id})
+	ApiUpdateGatewayById(ctx echo.Context, id string) error
 	// List Images
 	// (GET /image)
 	ApiGetImages(ctx echo.Context) error
@@ -450,6 +489,72 @@ type ServerInterface interface {
 // ServerInterfaceWrapper converts echo contexts to parameters.
 type ServerInterfaceWrapper struct {
 	Handler ServerInterface
+}
+
+// ApiGetGateways converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiGetGateways(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiGetGateways(ctx)
+	return err
+}
+
+// ApiCreateGateway converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiCreateGateway(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiCreateGateway(ctx)
+	return err
+}
+
+// ApiDeleteGatewayById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiDeleteGatewayById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiDeleteGatewayById(ctx, id)
+	return err
+}
+
+// ApiGetGatewayById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiGetGatewayById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiGetGatewayById(ctx, id)
+	return err
+}
+
+// ApiUpdateGatewayById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiUpdateGatewayById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiUpdateGatewayById(ctx, id)
+	return err
 }
 
 // ApiGetImages converts echo context to params.
@@ -904,6 +1009,11 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 		Handler: si,
 	}
 
+	router.GET(options.BaseURL+"/gateway", wrapper.ApiGetGateways, options.OperationMiddlewares["apiGetGateways"]...)
+	router.POST(options.BaseURL+"/gateway", wrapper.ApiCreateGateway, options.OperationMiddlewares["apiCreateGateway"]...)
+	router.DELETE(options.BaseURL+"/gateway/:id", wrapper.ApiDeleteGatewayById, options.OperationMiddlewares["apiDeleteGatewayById"]...)
+	router.GET(options.BaseURL+"/gateway/:id", wrapper.ApiGetGatewayById, options.OperationMiddlewares["apiGetGatewayById"]...)
+	router.PUT(options.BaseURL+"/gateway/:id", wrapper.ApiUpdateGatewayById, options.OperationMiddlewares["apiUpdateGatewayById"]...)
 	router.GET(options.BaseURL+"/image", wrapper.ApiGetImages, options.OperationMiddlewares["apiGetImages"]...)
 	router.POST(options.BaseURL+"/image", wrapper.ApiCreateImage, options.OperationMiddlewares["apiCreateImage"]...)
 	router.DELETE(options.BaseURL+"/image/:id", wrapper.ApiDeleteImageById, options.OperationMiddlewares["apiDeleteImageById"]...)
