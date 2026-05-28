@@ -632,6 +632,177 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /gateway/{id}/cert:
+    get:
+      summary: "Download VPN cert profile for gateway"
+      operationId: apiGetGatewayCertById
+      tags:
+        - gateway
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the gateway to retrieve cert profile
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Gateway cert profile in ovpn format
+          content:
+            text/plain:
+              schema:
+                type: string
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /vpn-gateway:
+    post:
+      summary: "Create VpnGateway"
+      operationId: apiCreateVpnGateway
+      tags:
+        - gateway
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VpnGateway"
+      responses:
+        "201":
+          description: Created the VpnGateway
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VpnGateway"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      summary: "List VpnGateways"
+      operationId: apiGetVpnGateways
+      tags:
+        - gateway
+      responses:
+        "200":
+          description: List of VpnGateways
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VpnGateway"
+  /vpn-gateway/{id}:
+    get:
+      summary: "Info for a specific VpnGateway"
+      operationId: apiGetVpnGatewayById
+      tags:
+        - gateway
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the vpn gateway to retrieve
+          schema:
+            type: string
+      responses:
+        "200":
+          description: VpnGateway details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VpnGateway"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      summary: "Update VpnGateway"
+      operationId: apiUpdateVpnGatewayById
+      tags:
+        - gateway
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the vpn gateway to update
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VpnGateway"
+      responses:
+        "200":
+          description: Updated the VpnGateway
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Success"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: "Delete VpnGateway"
+      operationId: apiDeleteVpnGatewayById
+      tags:
+        - gateway
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the vpn gateway to delete
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Accepted the request to delete the vpn gateway
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Success"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /vpn-gateway/{id}/cert:
+    get:
+      summary: "Download VPN cert profile for vpn gateway"
+      operationId: apiGetVpnGatewayCertById
+      tags:
+        - gateway
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the vpn gateway to retrieve cert profile
+          schema:
+            type: string
+      responses:
+        "200":
+          description: VpnGateway cert profile in ovpn format
+          content:
+            text/plain:
+              schema:
+                type: string
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /image:
     post:
       summary: "Create Image"
@@ -1160,6 +1331,9 @@ components:
           type: string
         iPNetworkAddress:
           type: string
+        vpnAccess:
+          type: boolean
+          description: Enable VPN route injection for servers on this network.
         overlayMode:
           type: string
           description: "Overlay mode for multi-node networks: 'none' (default) or 'vxlan'"
@@ -1215,8 +1389,46 @@ components:
         remoteCIDR:
           type: string
           description: Source CIDR allowed to access gateway forwarding.
+        remoteCIDRs:
+          type: array
+          description: Source CIDR list allowed to access gateway forwarding. Empty means allow all.
+          items:
+            type: string
         serverPorts:
           type: array
+          items:
+            type: string
+    VpnGateway:
+      type: object
+      required:
+        - apiVersion
+        - kind
+        - metadata
+        - spec
+      properties:
+        apiVersion:
+          type: string
+        kind:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+        spec:
+          $ref: "#/components/schemas/VpnGatewaySpec"
+        status:
+          $ref: "#/components/schemas/Status"
+    VpnGatewaySpec:
+      type: object
+      required:
+        - bindPublicIpAddress
+        - internalVirtualNetwork
+      properties:
+        bindPublicIpAddress:
+          type: string
+        internalVirtualNetwork:
+          type: string
+        remoteCIDRs:
+          type: array
+          description: Source CIDR list allowed to access vpn gateway. Empty means allow all.
           items:
             type: string
     IPNetwork:

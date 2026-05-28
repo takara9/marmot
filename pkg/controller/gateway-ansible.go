@@ -38,9 +38,9 @@ type gatewayPortRule struct {
 }
 
 type gatewayPlaybookData struct {
-	TargetIP string
-	RemoteCIDR string
-	Ports    []gatewayPortRule
+	TargetIP    string
+	RemoteCIDRs []string
+	Ports       []gatewayPortRule
 }
 
 func desiredGatewayConfigHash(gateway api.Gateway, targetIP string) string {
@@ -49,12 +49,14 @@ func desiredGatewayConfigHash(gateway api.Gateway, targetIP string) string {
 		ports[i] = strings.TrimSpace(ports[i])
 	}
 	sort.Strings(ports)
+	remoteCIDRs := gatewayRemoteCIDRs(gateway.Spec)
+	sort.Strings(remoteCIDRs)
 	payload := strings.Join([]string{
 		strings.TrimSpace(api.GatewayID(gateway)),
 		strings.TrimSpace(gateway.Spec.BindPublicIpAddress),
 		strings.TrimSpace(gateway.Spec.InternalServerName),
 		strings.TrimSpace(gateway.Spec.InternalVirtualNetwork),
-		gatewayRemoteCIDR(gateway.Spec),
+		strings.Join(remoteCIDRs, ","),
 		strings.TrimSpace(targetIP),
 		strings.Join(ports, ","),
 	}, "|")
@@ -62,15 +64,15 @@ func desiredGatewayConfigHash(gateway api.Gateway, targetIP string) string {
 	return fmt.Sprintf("%x", sum)
 }
 
-func renderGatewayPlaybook(playbookPath string, targetIP string, serverPorts []string, remoteCIDR string) error {
+func renderGatewayPlaybook(playbookPath string, targetIP string, serverPorts []string, remoteCIDRs []string) error {
 	if strings.TrimSpace(playbookPath) == "" {
 		return fmt.Errorf("playbook path is empty")
 	}
 	if strings.TrimSpace(targetIP) == "" {
 		return fmt.Errorf("target ip is empty")
 	}
-	if strings.TrimSpace(remoteCIDR) == "" {
-		return fmt.Errorf("remote CIDR is empty")
+	if len(remoteCIDRs) == 0 {
+		return fmt.Errorf("remote CIDRs are empty")
 	}
 	portRules, err := buildGatewayPortRules(serverPorts)
 	if err != nil {
@@ -93,19 +95,41 @@ func renderGatewayPlaybook(playbookPath string, targetIP string, serverPorts []s
 			return err
 		}
 	}
+	cleanRemoteCIDRs := make([]string, 0, len(remoteCIDRs))
+	for _, cidr := range remoteCIDRs {
+		trimmed := strings.TrimSpace(cidr)
+		if trimmed == "" {
+			continue
+		}
+		cleanRemoteCIDRs = append(cleanRemoteCIDRs, trimmed)
+	}
+	if len(cleanRemoteCIDRs) == 0 {
+		return fmt.Errorf("remote CIDRs are empty")
+	}
+	sort.Strings(cleanRemoteCIDRs)
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, gatewayPlaybookData{TargetIP: strings.TrimSpace(targetIP), RemoteCIDR: strings.TrimSpace(remoteCIDR), Ports: portRules}); err != nil {
+	if err := tmpl.Execute(&buf, gatewayPlaybookData{TargetIP: strings.TrimSpace(targetIP), RemoteCIDRs: cleanRemoteCIDRs, Ports: portRules}); err != nil {
 		return err
 	}
 	return os.WriteFile(playbookPath, buf.Bytes(), 0o644)
 }
 
-func gatewayRemoteCIDR(spec api.GatewaySpec) string {
-	remoteCIDR := strings.TrimSpace(spec.RemoteCIDR)
-	if remoteCIDR == "" {
-		return "0.0.0.0/0"
+func gatewayRemoteCIDRs(spec api.GatewaySpec) []string {
+	remoteCIDRs := make([]string, 0, len(spec.RemoteCIDRs)+1)
+	if len(spec.RemoteCIDRs) > 0 {
+		for _, cidr := range spec.RemoteCIDRs {
+			trimmed := strings.TrimSpace(cidr)
+			if trimmed != "" {
+				remoteCIDRs = append(remoteCIDRs, trimmed)
+			}
+		}
+	} else if trimmed := strings.TrimSpace(spec.RemoteCIDR); trimmed != "" {
+		remoteCIDRs = append(remoteCIDRs, trimmed)
 	}
-	return remoteCIDR
+	if len(remoteCIDRs) == 0 {
+		return []string{"0.0.0.0/0"}
+	}
+	return remoteCIDRs
 }
 
 func buildGatewayPortRules(serverPorts []string) ([]gatewayPortRule, error) {

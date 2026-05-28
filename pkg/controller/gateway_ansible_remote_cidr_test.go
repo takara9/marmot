@@ -6,13 +6,14 @@ import (
 	"github.com/takara9/marmot/api"
 )
 
-func TestGatewayRemoteCIDR_Default(t *testing.T) {
-	if got := gatewayRemoteCIDR(api.GatewaySpec{}); got != "0.0.0.0/0" {
-		t.Fatalf("gatewayRemoteCIDR() = %q, want %q", got, "0.0.0.0/0")
+func TestGatewayRemoteCIDRs_Default(t *testing.T) {
+	got := gatewayRemoteCIDRs(api.GatewaySpec{})
+	if len(got) != 1 || got[0] != "0.0.0.0/0" {
+		t.Fatalf("gatewayRemoteCIDRs() = %v, want [0.0.0.0/0]", got)
 	}
 }
 
-func TestDesiredGatewayConfigHash_ChangesByRemoteCIDR(t *testing.T) {
+func TestDesiredGatewayConfigHash_ChangesByRemoteCIDRs(t *testing.T) {
 	base := api.Gateway{
 		Metadata: api.Metadata{Id: "gw-1"},
 		Spec: api.GatewaySpec{
@@ -23,9 +24,9 @@ func TestDesiredGatewayConfigHash_ChangesByRemoteCIDR(t *testing.T) {
 		},
 	}
 	withCIDR1 := base
-	withCIDR1.Spec.RemoteCIDR = "10.0.0.0/24"
+	withCIDR1.Spec.RemoteCIDRs = []string{"10.0.0.0/24"}
 	withCIDR2 := base
-	withCIDR2.Spec.RemoteCIDR = "192.168.0.0/16"
+	withCIDR2.Spec.RemoteCIDRs = []string{"192.168.0.0/16"}
 
 	hash1 := desiredGatewayConfigHash(withCIDR1, "172.16.10.2")
 	hash2 := desiredGatewayConfigHash(withCIDR2, "172.16.10.2")

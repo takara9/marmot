@@ -377,3 +377,21 @@ func getFreeTCPPort(t *testing.T) int {
 	}
 	return addr.Port
 }
+
+func TestFirstHostAddressFromCIDR(t *testing.T) {
+	t.Run("ipv4", func(t *testing.T) {
+		got, err := firstHostAddressFromCIDR("172.16.30.0/24")
+		if err != nil {
+			t.Fatalf("firstHostAddressFromCIDR() failed: %v", err)
+		}
+		if got != "172.16.30.1" {
+			t.Fatalf("firstHostAddressFromCIDR() = %q, want %q", got, "172.16.30.1")
+		}
+	})
+
+	t.Run("ipv6 rejected", func(t *testing.T) {
+		if _, err := firstHostAddressFromCIDR("2001:db8::/64"); err == nil {
+			t.Fatalf("firstHostAddressFromCIDR() expected error for IPv6 CIDR")
+		}
+	})
+}

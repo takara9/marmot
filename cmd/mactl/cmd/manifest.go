@@ -18,12 +18,13 @@ import (
 type ManifestType string
 
 const (
-	ManifestTypeServer  ManifestType = "Server"
-	ManifestTypeImage   ManifestType = "Image"
-	ManifestTypeVolume  ManifestType = "Volume"
-	ManifestTypeNetwork ManifestType = "VirtualNetwork"
-	ManifestTypeGateway ManifestType = "Gateway"
-	ManifestTypeUnknown ManifestType = "Unknown"
+	ManifestTypeServer     ManifestType = "Server"
+	ManifestTypeImage      ManifestType = "Image"
+	ManifestTypeVolume     ManifestType = "Volume"
+	ManifestTypeNetwork    ManifestType = "VirtualNetwork"
+	ManifestTypeGateway    ManifestType = "Gateway"
+	ManifestTypeVpnGateway ManifestType = "VpnGateway"
+	ManifestTypeUnknown    ManifestType = "Unknown"
 )
 
 // Manifest マニフェストベース構造
@@ -95,6 +96,8 @@ func normalizeResourceName(resource string) string {
 		return "network"
 	case "gw", "gateways":
 		return "gateway"
+	case "vpn-gateway", "vpn-gateways", "vpngateway", "vpngateways", "vpngw":
+		return "vpngateway"
 	default:
 		return strings.ToLower(resource)
 	}
@@ -113,6 +116,8 @@ func GetManifestType(kind string) ManifestType {
 		return ManifestTypeNetwork
 	case "gateway":
 		return ManifestTypeGateway
+	case "vpngateway":
+		return ManifestTypeVpnGateway
 	default:
 		return ManifestTypeUnknown
 	}
@@ -132,6 +137,8 @@ func GetKindFromResourceName(resource string) string {
 		return "VirtualNetwork"
 	case "gateway":
 		return "Gateway"
+	case "vpngateway":
+		return "VpnGateway"
 	default:
 		return ""
 	}
@@ -228,6 +235,21 @@ func ManifestToGateway(manifest map[string]interface{}) (*api.Gateway, error) {
 	}
 
 	return &gateway, nil
+}
+
+// ManifestToVpnGateway マニフェストを VpnGateway 構造体に変換
+func ManifestToVpnGateway(manifest map[string]interface{}) (*api.VpnGateway, error) {
+	data, err := json.Marshal(manifest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal manifest: %w", err)
+	}
+
+	var vpnGateway api.VpnGateway
+	if err := json.Unmarshal(data, &vpnGateway); err != nil {
+		return nil, fmt.Errorf("failed to parse as VpnGateway: %w", err)
+	}
+
+	return &vpnGateway, nil
 }
 
 // ExtractMetadataName マニフェストからメタデータ名を抽出

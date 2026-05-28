@@ -2,10 +2,12 @@ package marmotd
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"sort"
 	"strconv"
 	"strings"
@@ -458,6 +460,8 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 					ni.IpNetworkId = util.StringPtr(ni.Networkid)
 				}
 			}
+
+			appendVPNRouteIfEnabled(&ni, &vnet)
 			(*serverConfig.Spec.NetworkInterface)[i] = ni
 		}
 		// ループの終わり
@@ -816,6 +820,75 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	}
 
 	return id, nil
+}
+
+func appendVPNRouteIfEnabled(nic *api.NetworkInterface, vnet *api.VirtualNetwork) {
+	if nic == nil || vnet == nil || vnet.Spec.VpnAccess == nil || !*vnet.Spec.VpnAccess {
+		return
+	}
+	if vnet.Spec.IPNetworkAddress == nil || strings.TrimSpace(*vnet.Spec.IPNetworkAddress) == "" {
+		slog.Warn("vpnAccess is enabled but iPNetworkAddress is empty", "network", vnet.Metadata.Name)
+		return
+	}
+
+	vpnGW, err := firstHostAddressFromCIDR(*vnet.Spec.IPNetworkAddress)
+	if err != nil {
+		slog.Warn("failed to derive VPN gateway address from iPNetworkAddress", "network", vnet.Metadata.Name, "cidr", *vnet.Spec.IPNetworkAddress, "err", err)
+		return
+	}
+
+	to := "10.8.0.0/24"
+	if hasRoute(nic.Routes, to, vpnGW) {
+		return
+	}
+	entry := api.Route{To: util.StringPtr(to), Via: util.StringPtr(vpnGW)}
+	if nic.Routes == nil {
+		nic.Routes = &[]api.Route{entry}
+		return
+	}
+	routes := append(*nic.Routes, entry)
+	nic.Routes = &routes
+}
+
+func hasRoute(routes *[]api.Route, to string, via string) bool {
+	if routes == nil {
+		return false
+	}
+	for _, r := range *routes {
+		if r.To == nil || r.Via == nil {
+			continue
+		}
+		if strings.TrimSpace(*r.To) == strings.TrimSpace(to) && strings.TrimSpace(*r.Via) == strings.TrimSpace(via) {
+			return true
+		}
+	}
+	return false
+}
+
+func firstHostAddressFromCIDR(cidr string) (string, error) {
+	trimmed := strings.TrimSpace(cidr)
+	if trimmed == "" {
+		return "", fmt.Errorf("cidr is empty")
+	}
+	ip, ipNet, err := net.ParseCIDR(trimmed)
+	if err != nil {
+		return "", fmt.Errorf("invalid cidr %q: %w", trimmed, err)
+	}
+	ip4 := ip.To4()
+	if ip4 == nil {
+		return "", fmt.Errorf("cidr %q is not an IPv4 network", trimmed)
+	}
+	networkIP := ipNet.IP.To4()
+	if networkIP == nil {
+		return "", fmt.Errorf("cidr %q is not an IPv4 network", trimmed)
+	}
+	n := binary.BigEndian.Uint32(networkIP)
+	host := make(net.IP, net.IPv4len)
+	binary.BigEndian.PutUint32(host, n+1)
+	if !ipNet.Contains(host) {
+		return "", fmt.Errorf("cidr %q has no usable first host", trimmed)
+	}
+	return host.String(), nil
 }
 
 func isLibvirtNetworkNotFoundError(err error) bool {

@@ -120,6 +120,13 @@ func main() {
 		return
 	}
 
+	// VPNゲートウェイコントローラー
+	_, err = controller.StartVpnGatewayController(cfg.NodeName, cfg.EtcdURL)
+	if err != nil {
+		slog.Error("Failed to start vpn gateway controller", "err", err)
+		return
+	}
+
 	// DNSサーバーコントローラー
 	_, err = internaldns.StartInternalDNSServer(context.Background(), cfg.NodeName, cfg.EtcdURL, cfg) // DNSサーバーコントローラーの開始
 	if err != nil {

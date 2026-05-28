@@ -1,26 +1,29 @@
-# Open-VPNクライアントのサポート
+# OpenVPNクライアントのサポート
 
-OpenVPMクライアントで、marmot内部の仮想ネットワークへ接続するためのゲートウェイ機能
+OpenVPNクライアントで、marmot内部の仮想ネットワークへ接続するためのVPNゲートウェイ機能
 
 
 ## インストーラー
-  - インストールパッケージ (.deb ファイル) を作成する際に、このVpnGatway インスタンスを作成する際に必要な Ansible playbook を /var/lib/marmot/ansible-playbooks に配置する様に同梱する。
-  - インストール時に、既存のプレイブックは削除して、すべでコピーで作成する。
+  - インストールパッケージ (.deb ファイル) を作成する際に、このVpnGateway インスタンスを作成する際に必要な Ansible playbook を /var/lib/marmot/ansible-playbooks に配置する様に同梱する。
+  - インストール時に、既存のプレイブックは削除して、すべてコピーで作成する。
   - VpnGateway となる仮想サーバーの設定は、Ansibleのplaybookによって実施する。
 
 ## marmot起動時の準備作業
   - /etc/marmot/keys のディレクトリ下に、鍵ファイルがあれば、何もしない。
-  - ディレクトリが無ければ作成して、ssh鍵ペアを生成して、ファイル public.key と private.key に保存する。
+  - ディレクトリに鍵ファイルが無ければ、ssh鍵ペアを生成して、ファイル public.key と private.key に保存する。
 
 
 ## オブジェクトの作成
   - mactl は、VPNゲートウェイ・リソースのファイル、または、URLからマニフェストを取得して、JSON形式に変換して、marmotd に送信する。
   - marmotd は、受けたVPNゲートウェイ・リソースの作成要求を、etcd に保存して、オブジェクトの作成は、VpnGatewayコントローラーに任せる。
   - 内部的には、他のオブジェクト同様に、uuidから導出した id で オブジェクトは識別する。 id の重複は許さない。
-  - 仮想ネットワーク(internalVirtualNetwork上)で、同一名称は許さない
+  - 仮想ネットワーク(internalVirtualNetwork上)に、一つのVPNゲートウェイしか許さない。
 
 
 ## VPNゲートウェイ・リソースのAPI
+信頼できるモノが管理や開発用に使用することを想定しているため、
+VPNクライアントに対して、利用可能なプロトコルやポート番号の制限を掛けない。
+
 ```
 apiVersion: v1
 kind: VpnGateway
@@ -29,7 +32,9 @@ metadata:
 spec:
     bindPublicIpAddress: 192.168.1.100  # パブリック側のIPアドレスでアクセスを許可　ネットワークは host-bridge 固定
     internalVirtualNetwork: admin-net   # 内部側の仮想ネットワーク
-    remoteCIDR: 192.168.1.200/24        # 接続を許すリモートのIPアドレス、省略時は、0.0.0.0/0 で何処からでも受け入れる
+    remoteCIDRs:                                   # 省略時は、アクセス制限をかけない。
+      - 192.168.1.0/24                             # 接続を許すリモートのIPv4ネットワークアドレス
+      - 2400:2411:bc83:3a00:7cb2:59ff:fe92:29a3/64 # 接続を許可する IPv6のアドレス
 ```
 
 
@@ -49,23 +54,23 @@ spec:
         - オブジェクトの仮想サーバーが起動したら、次に ansible で /var/lib/marmot/ansible-playbooks に保存したansible playbook を使ってVPNゲートウェイの仮想サーバーをセットアップする。
         - ansibleで設定に必要な秘密鍵は、/etc/marmot/keys のディレクトリ下にある private.keyを使用する。
         - ansible を使った設定が失敗したら、次の制御ループで、リトライを繰り返す。もし、5回を超えて失敗したら、オブジェクトの作成を中止して、Status.statusをFAILED状態として、Status.messageに原因を記録する。
-        - Status.statusの状態が遷移した時は、Status.status.message を nil にする。
+        - Status.statusの状態が遷移した時は、Status.message を nil にする。
         - 仮想のラベルには、"managedBy": "vpn-gateway-controller" をセットして、コントローラー管理下であることを区別できるようにする。
-        - bindPublicIpAddress, remoteCIDR は、IPv4, IPv6 に対応する。 ansible playbook も 両者に対応しなければならない。
+        - bindPublicIpAddress, remoteCIDRs は、IPv4, IPv6 に対応する。 ansible playbook も 両者に対応しなければならない。
 
   - ゲートウェイ・オブジェクトの削除
-    - deleteionTimestamp が作成されてから、15秒以上経過したオブジェクトは、削除処理を実施する。
+    - deletionTimestamp が作成されてから、15秒以上経過したオブジェクトは、削除処理を実施する。
     - 稼働サーバーを削除して、etcdのデータをクリアして削除完了となる。
 
   - ゲートウェイ・オブジェクトの変更
-  　- 変更は、remoteCIDRに限定する。
+  　- 変更は、remoteCIDRsの要素に限定する。
 
 ## VpnGateway のクライアント用接続ファイルのダウンロード
-mactl get vpn-cert <vpn-gwの名前> で、ダウンロードできるようにする。
+mactl get vpngateway <vpn-gwの名前> --download で、ダウンロードできるようにする。
 
 
 ## ansible playbookで実行する仮想マシンの設定
-以下は、VpnGateway用に起動した Ubuntu 24.04 の設定です。ansibleのplaybook に書き直して、実施する予定です。
+以下は、VpnGateway用に起動した Ubuntu 24.04 の設定の手順です。ansibleのplaybook に書き直してください。
 
 1. easy-rsa で PKI（証明書環境）を構築
 
@@ -111,7 +116,7 @@ sudo cp ~/easy-rsa/pki/ta.key          /etc/openvpn/server/
 sudo vim /etc/openvpn/server/server.conf
 ```
 
-このファイルの中で３箇所置き換えを実施する。
+このファイルの中で２箇所置き換えを実施する。
 - push "route 仮想ネットワークに割当られたネットワークアドレス 255.255.255.0"
 - push "dhcp-option DNS marmotdを実行するホストのパブリック側のIPアドレス"
 
@@ -129,7 +134,7 @@ dh   /etc/openvpn/server/dh.pem
 tls-auth /etc/openvpn/server/ta.key 0
 
 # 以下のアドレスは、VPNトンネル用に固定します。
-server 10.8.0.0 255.255.0.0
+server 10.8.0.0 255.255.255.0
 
 # このアドレスは、仮想ネットワークのIPネットワークのアドレスに置き換えます。
 push "route 172.16.30.0 255.255.255.0"
@@ -180,8 +185,8 @@ sudo systemctl status openvpn-server@server
 cd ~/easy-rsa
 
 # クライアント証明書を作成（user1 の例）
-./easyrsa gen-req user1 nopass
-./easyrsa sign-req client user1
+./easyrsa gen-req ${spec.internalVirtualNetwork} nopass
+./easyrsa sign-req client ${spec.internalVirtualNetwork}
 ```
 
 7. クライアント用 .ovpn ファイルを生成
@@ -218,7 +223,7 @@ EOF
 ```
 
 この ファイル ${spec.internalVirtualNetwork}.ovpn は、/var/lib/marmot/vpn の下に保存する。
-mactl get vpn-cert <vpn-gwの名前> で、ダウンロードできるようにする。
+mactl get vpngateway <vpn-gwの名前> --download で、ダウンロードできるようにする。
 
 
 ファイアウォール設定（UFW使用の場合）
@@ -242,7 +247,7 @@ sudo cat /var/log/openvpn/status.log
 
 ## 接続対象のサーバーのルーティング設定
 
-spec.vpnAccess = true が設定された 仮想サーバーは、生成時に
+仮想サーバーが接続する仮想ネットワークに、spec.vpnAccess = true がある場合、
 iPNetworkAddressで指定したアドレスの 1 を VPNトンネルのGWとして割り当てる。
 
 ```network-6.yaml 
@@ -257,10 +262,12 @@ spec:
     vpnAccess: true
 ```
 
-上記の admin-net に接続する仮想サーバーは、以下の設定に相当するnetplanの設定をいれる。
+設定は、以下の相当の設定を netplan が使用するファイルに追加する。
 
 ```
-sudo ip route add 10.8.0.0/24 via 172.16.0.1
+      routes:
+          - to: 10.8.0.0/24
+            via: 172.16.0.1
 ```
 
 

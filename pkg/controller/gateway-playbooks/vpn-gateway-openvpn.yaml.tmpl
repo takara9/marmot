@@ -1,0 +1,217 @@
+---
+- name: Configure VPN Gateway with OpenVPN
+  hosts: all
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Ensure required packages are installed
+      ansible.builtin.apt:
+        update_cache: true
+        name:
+          - openvpn
+          - easy-rsa
+        state: present
+
+    - name: Ensure OpenVPN server directory exists
+      ansible.builtin.file:
+        path: /etc/openvpn/server
+        state: directory
+        mode: "0755"
+
+    - name: Ensure easy-rsa working directory exists
+      ansible.builtin.file:
+        path: /root/easy-rsa
+        state: directory
+        mode: "0755"
+
+    - name: Ensure VPN profile directory exists
+      ansible.builtin.file:
+        path: /var/lib/marmot/vpn
+        state: directory
+        mode: "0755"
+
+    - name: Initialize PKI
+      ansible.builtin.shell: |
+        set -eu
+        if [ ! -f /root/easy-rsa/pki/ca.crt ]; then
+          cd /root/easy-rsa
+          /usr/share/easy-rsa/easyrsa init-pki
+          /usr/share/easy-rsa/easyrsa --batch build-ca nopass
+        fi
+      args:
+        executable: /bin/bash
+
+    - name: Generate server certificate
+      ansible.builtin.shell: |
+        set -eu
+        cd /root/easy-rsa
+        if [ ! -f /root/easy-rsa/pki/issued/server.crt ]; then
+          /usr/share/easy-rsa/easyrsa --batch gen-req server nopass
+          /usr/share/easy-rsa/easyrsa --batch sign-req server server
+        fi
+      args:
+        executable: /bin/bash
+
+    - name: Generate client certificate
+      ansible.builtin.shell: |
+        set -eu
+        cd /root/easy-rsa
+        if [ ! -f /root/easy-rsa/pki/issued/{{ .ClientProfileNetwork }}.crt ]; then
+          /usr/share/easy-rsa/easyrsa --batch gen-req {{ .ClientProfileNetwork }} nopass
+          /usr/share/easy-rsa/easyrsa --batch sign-req client {{ .ClientProfileNetwork }}
+        fi
+      args:
+        executable: /bin/bash
+
+    - name: Generate dh params and tls-auth key
+      ansible.builtin.shell: |
+        set -eu
+        cd /root/easy-rsa
+        [ -f /root/easy-rsa/pki/dh.pem ] || /usr/share/easy-rsa/easyrsa --batch gen-dh
+        [ -f /root/easy-rsa/pki/ta.key ] || openvpn --genkey secret /root/easy-rsa/pki/ta.key
+      args:
+        executable: /bin/bash
+
+    - name: Copy CA certificate
+      ansible.builtin.copy:
+        src: /root/easy-rsa/pki/ca.crt
+        dest: /etc/openvpn/server/ca.crt
+        remote_src: true
+        mode: "0600"
+
+    - name: Copy server certificate
+      ansible.builtin.copy:
+        src: /root/easy-rsa/pki/issued/server.crt
+        dest: /etc/openvpn/server/server.crt
+        remote_src: true
+        mode: "0600"
+
+    - name: Copy server private key
+      ansible.builtin.copy:
+        src: /root/easy-rsa/pki/private/server.key
+        dest: /etc/openvpn/server/server.key
+        remote_src: true
+        mode: "0600"
+
+    - name: Copy dh params
+      ansible.builtin.copy:
+        src: /root/easy-rsa/pki/dh.pem
+        dest: /etc/openvpn/server/dh.pem
+        remote_src: true
+        mode: "0600"
+
+    - name: Copy tls-auth key
+      ansible.builtin.copy:
+        src: /root/easy-rsa/pki/ta.key
+        dest: /etc/openvpn/server/ta.key
+        remote_src: true
+        mode: "0600"
+
+    - name: Write OpenVPN server config
+      ansible.builtin.copy:
+        dest: /etc/openvpn/server/server.conf
+        mode: "0644"
+        content: |
+          port 1194
+          proto udp
+          dev tun
+
+          ca   /etc/openvpn/server/ca.crt
+          cert /etc/openvpn/server/server.crt
+          key  /etc/openvpn/server/server.key
+          dh   /etc/openvpn/server/dh.pem
+
+          tls-auth /etc/openvpn/server/ta.key 0
+
+          server 10.8.0.0 255.255.255.0
+          push "route {{ .InternalNetworkAddr }} {{ .InternalNetworkMask }}"
+
+          ifconfig-pool-persist /var/log/openvpn/ipp.txt
+
+          keepalive 10 120
+          cipher AES-256-GCM
+          user nobody
+          group nogroup
+          persist-key
+          persist-tun
+
+          status  /var/log/openvpn/status.log
+          log     /var/log/openvpn/openvpn.log
+          verb 3
+
+    - name: Enable IPv4 forwarding
+      ansible.builtin.copy:
+        dest: /etc/sysctl.d/99-marmot-vpn.conf
+        mode: "0644"
+        content: |
+          net.ipv4.ip_forward=1
+
+    - name: Apply sysctl settings
+      ansible.builtin.command: sysctl --system
+
+    - name: Ensure log directory exists
+      ansible.builtin.file:
+        path: /var/log/openvpn
+        state: directory
+        mode: "0755"
+
+    - name: Enable and restart OpenVPN service
+      ansible.builtin.systemd:
+        name: openvpn-server@server
+        enabled: true
+        state: restarted
+
+    - name: Render client ovpn profile
+      ansible.builtin.shell: |
+        set -eu
+        cat > "{{ .ClientProfilePath }}" <<EOF
+        client
+        dev tun
+        proto udp
+        remote {{ .PublicIP }} 1194
+        resolv-retry infinite
+        nobind
+        user nobody
+        group nogroup
+        persist-key
+        persist-tun
+        remote-cert-tls server
+        cipher AES-256-GCM
+        key-direction 1
+        verb 3
+
+        <ca>
+        $(cat /root/easy-rsa/pki/ca.crt)
+        </ca>
+        <cert>
+        $(cat /root/easy-rsa/pki/issued/{{ .ClientProfileNetwork }}.crt)
+        </cert>
+        <key>
+        $(cat /root/easy-rsa/pki/private/{{ .ClientProfileNetwork }}.key)
+        </key>
+        <tls-auth>
+        $(cat /root/easy-rsa/pki/ta.key)
+        </tls-auth>
+        EOF
+      args:
+        executable: /bin/bash
+
+    - name: Restrict ovpn file permission
+      ansible.builtin.file:
+        path: "{{ .ClientProfilePath }}"
+        mode: "0600"
+
+    - name: Ensure local vpn profile directory exists on marmot host
+      ansible.builtin.file:
+        path: /var/lib/marmot/vpn
+        state: directory
+        mode: "0755"
+      delegate_to: localhost
+      become: false
+
+    - name: Fetch client ovpn profile to marmot host
+      ansible.builtin.fetch:
+        src: "{{ .ClientProfilePath }}"
+        dest: "/var/lib/marmot/vpn/{{ .ClientProfileNetwork }}.ovpn"
+        flat: true

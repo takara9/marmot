@@ -43,6 +43,7 @@ func TestDebPackageIncludesGatewayAssets(t *testing.T) {
 	listText := string(listOut)
 	for _, want := range []string{
 		"./usr/local/marmot/gateway-playbooks/gateway-iptables.yaml.tmpl",
+		"./usr/local/marmot/gateway-playbooks/vpn-gateway-openvpn.yaml.tmpl",
 		"./var/lib/marmot/ansible-playbooks/templates/",
 		"./etc/marmot/keys/",
 	} {
