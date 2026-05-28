@@ -14,10 +14,64 @@
     - name: Apply sysctl configuration
       ansible.builtin.command: sysctl -p
 
+    - name: Ensure gateway dedicated filter chains exist
+      ansible.builtin.shell: |
+        set -euo pipefail
+        iptables -N MARMOT-GW-INPUT 2>/dev/null || true
+        iptables -N MARMOT-GW-FORWARD 2>/dev/null || true
+      args:
+        executable: /bin/bash
+
+    - name: Ensure gateway dedicated nat chain exists
+      ansible.builtin.shell: |
+        set -euo pipefail
+        iptables -t nat -N MARMOT-GW-PREROUTING 2>/dev/null || true
+      args:
+        executable: /bin/bash
+
+    - name: Flush gateway dedicated filter chains
+      ansible.builtin.command: iptables -F {{ item }}
+      loop:
+        - MARMOT-GW-INPUT
+        - MARMOT-GW-FORWARD
+
+    - name: Flush gateway dedicated nat chain
+      ansible.builtin.command: iptables -t nat -F MARMOT-GW-PREROUTING
+
+    - name: Rebind INPUT jump to gateway dedicated chain at top
+      ansible.builtin.shell: |
+        set -euo pipefail
+        while iptables -C INPUT -j MARMOT-GW-INPUT 2>/dev/null; do
+          iptables -D INPUT -j MARMOT-GW-INPUT
+        done
+        iptables -I INPUT 1 -j MARMOT-GW-INPUT
+      args:
+        executable: /bin/bash
+
+    - name: Rebind FORWARD jump to gateway dedicated chain at top
+      ansible.builtin.shell: |
+        set -euo pipefail
+        while iptables -C FORWARD -j MARMOT-GW-FORWARD 2>/dev/null; do
+          iptables -D FORWARD -j MARMOT-GW-FORWARD
+        done
+        iptables -I FORWARD 1 -j MARMOT-GW-FORWARD
+      args:
+        executable: /bin/bash
+
+    - name: Rebind PREROUTING jump to gateway dedicated nat chain at top
+      ansible.builtin.shell: |
+        set -euo pipefail
+        while iptables -t nat -C PREROUTING -j MARMOT-GW-PREROUTING 2>/dev/null; do
+          iptables -t nat -D PREROUTING -j MARMOT-GW-PREROUTING
+        done
+        iptables -t nat -I PREROUTING 1 -j MARMOT-GW-PREROUTING
+      args:
+        executable: /bin/bash
+
     - name: Allow established input traffic
       ansible.builtin.iptables:
         table: filter
-        chain: INPUT
+        chain: MARMOT-GW-INPUT
         ctstate:
           - ESTABLISHED
           - RELATED
@@ -27,7 +81,7 @@
     - name: Allow established forwarded traffic
       ansible.builtin.iptables:
         table: filter
-        chain: FORWARD
+        chain: MARMOT-GW-FORWARD
         ctstate:
           - ESTABLISHED
           - RELATED
@@ -37,7 +91,7 @@
     - name: Allow loopback input traffic
       ansible.builtin.iptables:
         table: filter
-        chain: INPUT
+        chain: MARMOT-GW-INPUT
         in_interface: lo
         jump: ACCEPT
         comment: marmot-gateway
@@ -45,7 +99,7 @@
     - name: Allow all input traffic from remoteCIDR
       ansible.builtin.iptables:
         table: filter
-        chain: INPUT
+        chain: MARMOT-GW-INPUT
         source: {{ $.RemoteCIDR }}
         jump: ACCEPT
         comment: marmot-gateway
@@ -53,14 +107,14 @@
     - name: Drop all input traffic from non-remoteCIDR
       ansible.builtin.iptables:
         table: filter
-        chain: INPUT
+        chain: MARMOT-GW-INPUT
         jump: DROP
         comment: marmot-gateway
 
     - name: Allow all forwarded traffic from remoteCIDR
       ansible.builtin.iptables:
         table: filter
-        chain: FORWARD
+        chain: MARMOT-GW-FORWARD
         source: {{ $.RemoteCIDR }}
         jump: ACCEPT
         comment: marmot-gateway
@@ -68,7 +122,7 @@
     - name: Drop all forwarded traffic from non-remoteCIDR
       ansible.builtin.iptables:
         table: filter
-        chain: FORWARD
+        chain: MARMOT-GW-FORWARD
         jump: DROP
         comment: marmot-gateway
 
@@ -76,7 +130,7 @@
     - name: Ensure DNAT rule for {{ .Protocol }}/{{ .Port }}
       ansible.builtin.iptables:
         table: nat
-        chain: PREROUTING
+        chain: MARMOT-GW-PREROUTING
         source: {{ $.RemoteCIDR }}
         protocol: {{ .Protocol }}
         destination_port: {{ .Port }}

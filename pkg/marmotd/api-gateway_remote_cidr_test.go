@@ -55,3 +55,18 @@ func TestNormalizeGatewaySpec_ValidRemoteCIDR(t *testing.T) {
 		t.Fatalf("spec.RemoteCIDR = %q, want %q", spec.RemoteCIDR, "10.0.0.0/24")
 	}
 }
+
+func TestNormalizeGatewaySpec_RejectsIPv6RemoteCIDR(t *testing.T) {
+	spec := &api.GatewaySpec{
+		BindPublicIpAddress:    "192.168.1.100",
+		InternalServerName:     "web-1",
+		InternalVirtualNetwork: "net-web",
+		RemoteCIDR:             "2001:db8::/64",
+		ServerPorts:            []string{"80/tcp"},
+	}
+
+	err := normalizeGatewaySpec(spec)
+	if err == nil {
+		t.Fatalf("normalizeGatewaySpec() expected error for IPv6 CIDR")
+	}
+}

@@ -163,8 +163,12 @@ func normalizeGatewaySpec(spec *api.GatewaySpec) error {
 	if remoteCIDR == "" {
 		remoteCIDR = "0.0.0.0/0"
 	}
-	if _, _, err := net.ParseCIDR(remoteCIDR); err != nil {
+	ip, _, err := net.ParseCIDR(remoteCIDR)
+	if err != nil {
 		return fmt.Errorf("spec.remoteCIDR must be a valid CIDR")
+	}
+	if ip == nil || ip.To4() == nil {
+		return fmt.Errorf("spec.remoteCIDR must be an IPv4 CIDR")
 	}
 	spec.RemoteCIDR = remoteCIDR
 
