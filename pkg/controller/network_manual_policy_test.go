@@ -36,7 +36,7 @@ func (m *mockNetworkFabric) GetBridgeStatus(vnet *api.VirtualNetwork) (bool, int
 	return true, 0, nil
 }
 
-func TestEnsureVxlanMeshForNetwork_ManualSkipsAutomaticTunnelOps(t *testing.T) {
+func TestEnsureOverlayMeshForNetwork_ManualSkipsAutomaticTunnelOps(t *testing.T) {
 	overlayMode := api.Vxlan
 	peerPolicy := api.Manual
 	bridgeName := "br-test"
@@ -52,7 +52,7 @@ func TestEnsureVxlanMeshForNetwork_ManualSkipsAutomaticTunnelOps(t *testing.T) {
 	fabric := &mockNetworkFabric{}
 	c := &controller{}
 
-	err := c.ensureVxlanMeshForNetwork(fabric, vnet)
+	err := c.ensureOverlayMeshForNetwork(fabric, vnet)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
