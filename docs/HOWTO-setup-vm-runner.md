@@ -36,7 +36,7 @@ edge12.g.yimg.jp.
 # apt-get update -y
 # apt-get upgrade -y
 # apt-get install git curl gcc make kpartx
-# apt-get install virt-top  virt-manager libvirt-dev libvirt-clients libvirt-daemon qemu-system-x86 openvswitch-switch openvswitch-common openvswitch-doc libguestfs-tools libvirt-daemon-driver-lxc lxcfs bridge-utils genisoimage
+# apt-get install virt-top virt-manager libvirt-dev libvirt-clients libvirt-daemon qemu-system-x86 openvswitch-switch ovn-central ovn-host libguestfs-tools libvirt-daemon-driver-lxc lxcfs bridge-utils genisoimage
 ```
 
 LXCを有効化するために
@@ -248,7 +248,7 @@ Network ovs-network defined from ovs-network.xml
   - https://github.com/takara9/marmot/blob/main/docs/network-setup-nested-vm.md#%E3%83%99%E3%82%A2%E3%83%A1%E3%82%BF%E3%83%AB%E3%81%AE%E3%83%8F%E3%82%A4%E3%83%91%E3%83%BC%E3%83%90%E3%82%A4%E3%82%B6%E3%83%BC%E5%81%B4
 
 ## ネットワークの設定（ランナー側の設定）
-  - https://github.com/takara9/marmot/blob/main/docs/network-setup-nested-vm.md#open-vswitch%E3%81%AE%E8%A8%AD%E5%AE%9A
+  - https://github.com/takara9/marmot/blob/main/docs/HOWTO-install-marmot.md#5-%E3%83%8D%E3%83%83%E3%83%88%E3%83%AF%E3%83%BC%E3%82%AF%E3%81%AE%E8%A8%AD%E5%AE%9A
   - https://github.com/takara9/marmot/blob/main/docs/network-setup-nested-vm.md#%E3%83%99%E3%82%A2%E3%83%A1%E3%82%BF%E3%83%AB%E3%81%AE%E3%83%8F%E3%82%A4%E3%83%91%E3%83%BC%E3%83%90%E3%82%A4%E3%82%B6%E3%83%BC%E5%81%B4
 
 

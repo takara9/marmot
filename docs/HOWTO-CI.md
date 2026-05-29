@@ -22,6 +22,20 @@
 
 ## 仮想サーバーの起動とセットアップ
 
+ランナー上では、各ジョブ開始時に OVN/OVS ランタイムと libvirt ネットワークを再構成できる状態にします。
+
+```bash
+sudo -E env "PATH=$PATH" ./tools/setup-libvirt-networks.sh
+virsh net-list --all
+```
+
+ジョブ終了時は、次ジョブに状態を持ち越さないよう必ずクリーンアップします。
+
+```bash
+sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
+```
+
 
 ## ランナーの起動方法
 

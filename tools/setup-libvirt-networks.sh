@@ -15,6 +15,41 @@ if ! command -v virsh >/dev/null 2>&1; then
   exit 1
 fi
 
+ensure_service_if_exists() {
+  local unit_name="$1"
+  if systemctl list-unit-files | grep -q "^${unit_name}\\.service"; then
+    sudo systemctl enable "${unit_name}.service" || true
+    sudo systemctl start "${unit_name}.service" || true
+  fi
+}
+
+ensure_ovn_ovs_runtime() {
+  ensure_service_if_exists openvswitch-switch
+  ensure_service_if_exists ovsdb-server
+  ensure_service_if_exists ovs-vswitchd
+  ensure_service_if_exists ovn-central
+  ensure_service_if_exists ovn-northd
+  ensure_service_if_exists ovn-controller
+  ensure_service_if_exists ovn-host
+}
+
+ensure_ovs_bridge() {
+  local bridge_name="$1"
+  if ! command -v ovs-vsctl >/dev/null 2>&1; then
+    echo "ovs-vsctl command not found" >&2
+    return 0
+  fi
+  if ovs-vsctl br-exists "${bridge_name}"; then
+    echo "${bridge_name} already exists"
+    return 0
+  fi
+  echo "creating ovs bridge ${bridge_name}"
+  sudo ovs-vsctl --may-exist add-br "${bridge_name}"
+}
+
+ensure_ovn_ovs_runtime
+ensure_ovs_bridge "ovsbr0"
+
 active_networks="$(virsh net-list --name)"
 
 ensure_network() {

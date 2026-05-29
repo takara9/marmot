@@ -66,15 +66,24 @@ systemctl start libvirtd.service
 systemctl enable iscsid.service
 systemctl start iscsid.service
 
-if systemctl list-unit-files | grep -q '^openvswitch-switch\.service'; then
-    systemctl enable openvswitch-switch.service
-    systemctl start openvswitch-switch.service
-elif systemctl list-unit-files | grep -q '^ovs-vswitchd\.service'; then
-    systemctl enable ovsdb-server.service || true
-    systemctl start ovsdb-server.service || true
-    systemctl enable ovs-vswitchd.service
-    systemctl start ovs-vswitchd.service
-fi
+enable_and_start_if_exists() {
+    unit_name="$1"
+    if systemctl list-unit-files | grep -q "^${unit_name}\\.service"; then
+        systemctl enable "${unit_name}.service" || true
+        systemctl start "${unit_name}.service" || true
+    fi
+}
+
+# OVS runtime
+enable_and_start_if_exists openvswitch-switch
+enable_and_start_if_exists ovsdb-server
+enable_and_start_if_exists ovs-vswitchd
+
+# OVN runtime
+enable_and_start_if_exists ovn-central
+enable_and_start_if_exists ovn-northd
+enable_and_start_if_exists ovn-controller
+enable_and_start_if_exists ovn-host
 
 systemctl daemon-reload
 systemctl enable marmot.service

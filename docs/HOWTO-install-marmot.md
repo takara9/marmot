@@ -158,30 +158,33 @@ sudo systemctl status etcd
 
 ## 5. ネットワークの設定
 
-libvirt 仮想ネットワークと OVS ブリッジの設定が必要です。  
-詳細は [docs/HOWTO-setup-vm-runner.md](HOWTO-setup-vm-runner.md) および [docs/network-setup.md](network-setup.md) を参照してください。
+OVN 運用では、OVS/OVN サービス起動と libvirt 仮想ネットワーク定義を毎回同じ手順で適用します。
+直接 `ovs-vsctl` を手で実行する運用は推奨しません。
 
-### OVS ブリッジの作成
+### OVS/OVN サービスの確認
 
 ```bash
-sudo ovs-vsctl add-br ovsbr0
-sudo ovs-vsctl add-port ovsbr0 <物理NIC名>   # 例: enp4s0f0
-sudo ovs-vsctl show
+sudo systemctl status openvswitch-switch || true
+sudo systemctl status ovn-central || true
+sudo systemctl status ovn-host || true
 ```
 
-### libvirt 仮想ネットワークの定義
+### libvirt 仮想ネットワークをセットアップ
 
 ```bash
-virsh net-define tools/ovs-network.xml
-virsh net-start ovs-network
-virsh net-autostart ovs-network
-
-virsh net-define tools/host-bridge.xml
-virsh net-start host-bridge
-virsh net-autostart host-bridge
-
+sudo -E env "PATH=$PATH" ./tools/setup-libvirt-networks.sh
 virsh net-list
 ```
+
+### テストや検証後のクリーンアップ
+
+```bash
+sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
+```
+
+### 旧手順について
+
+旧来の `ovs-vsctl add-br` など OVS 直操作の手順は移行対象です。必要な場合のみ参考として [docs/network-setup.md](network-setup.md) を参照してください。
 
 ---
 

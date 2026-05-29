@@ -40,4 +40,11 @@ done <"${tmpfile_inactive}"
 
 virsh net-list --all
 
+if command -v ovs-vsctl >/dev/null 2>&1; then
+    if ovs-vsctl br-exists ovsbr0; then
+        echo "deleting ovs bridge ovsbr0"
+        sudo ovs-vsctl --if-exists del-br ovsbr0
+    fi
+fi
+
 rm -f "${tmpfile_active}" "${tmpfile_inactive}"

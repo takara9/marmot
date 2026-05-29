@@ -22,7 +22,7 @@ YAML ファイルで仮想サーバーやネットワークの構成を定義し
 
 | コンポーネント | 説明 |
 |---|---|
-| `marmotd` | ハイパーバイザーノード上で動作するデーモン。LibVirt / LVM / OVS を操作して VM を管理する |
+| `marmotd` | ハイパーバイザーノード上で動作するデーモン。LibVirt / LVM / OVN(OVS) を操作して VM を管理する |
 | `mactl` | CLI クライアント。YAML ファイルまたは URL を指定してサーバー・ネットワーク・ボリュームを操作する |
 | `maadm` | 管理者向け補助ツール |
 
@@ -106,7 +106,7 @@ sudo rm -f /tmp/marmot_v${VERSION}_amd64.deb
 
 - [KVM / QEMU](https://www.linux-kvm.org/) — 仮想化
 - [LibVirt](https://libvirt.org/) — VM ライフサイクル管理
-- [Open vSwitch](https://www.openvswitch.org/) — 仮想ネットワーク
+- [OVN](https://www.ovn.org/) / [Open vSwitch](https://www.openvswitch.org/) — 仮想ネットワーク制御プレーン/データプレーン
 - [etcd](https://etcd.io/) — 分散 KV ストア（クラスター状態管理）
 - [LVM](https://sourceware.org/lvm2/) — 論理ボリューム管理
 - [open-iscsi / targetcli](https://github.com/open-iscsi/open-iscsi) — iSCSI ネットワークブロックストレージ
