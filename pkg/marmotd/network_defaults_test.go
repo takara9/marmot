@@ -9,17 +9,28 @@ import (
 
 var _ = Describe("VirtualNetworkDefaults", func() {
 	Describe("applyVirtualNetworkDefaults", func() {
-		It("defaults overlayMode to vxlan and peerPolicy to auto when omitted", func() {
+		It("defaults overlayMode to geneve when omitted", func() {
 			network := api.VirtualNetwork{
-				Spec: api.VirtualNetworkSpec{
-					Vni: util.IntPtrInt(100),
-				},
+				Spec: api.VirtualNetworkSpec{},
 			}
 
 			err := applyVirtualNetworkDefaults(&network, nil, nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(network.Spec.OverlayMode).NotTo(BeNil())
-			Expect(*network.Spec.OverlayMode).To(Equal(api.VirtualNetworkSpecOverlayMode(api.Vxlan)))
+			Expect(*network.Spec.OverlayMode).To(Equal(api.VirtualNetworkSpecOverlayMode(api.Geneve)))
+			Expect(network.Spec.PeerPolicy).To(BeNil())
+		})
+
+		It("defaults peerPolicy to auto for vxlan overlays", func() {
+			overlayMode := api.Vxlan
+			network := api.VirtualNetwork{
+				Spec: api.VirtualNetworkSpec{
+					OverlayMode: &overlayMode,
+				},
+			}
+
+			err := applyVirtualNetworkDefaults(&network, nil, nil)
+			Expect(err).NotTo(HaveOccurred())
 			Expect(network.Spec.PeerPolicy).NotTo(BeNil())
 			Expect(*network.Spec.PeerPolicy).To(Equal(api.VirtualNetworkSpecPeerPolicy(api.Auto)))
 		})
@@ -36,30 +47,31 @@ var _ = Describe("VirtualNetworkDefaults", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(network.Spec.PeerPolicy).To(BeNil())
 		})
-	})
 
-	Describe("nextAvailableVNI", func() {
-		It("uses the first free VNI from 100", func() {
-			networks := []api.VirtualNetwork{
-				{Spec: api.VirtualNetworkSpec{Vni: util.IntPtrInt(100)}},
-				{Spec: api.VirtualNetworkSpec{Vni: util.IntPtrInt(101)}},
-				{Spec: api.VirtualNetworkSpec{Vni: util.IntPtrInt(103)}},
+		It("does not auto-assign vni when omitted", func() {
+			overlayMode := api.Vxlan
+			network := api.VirtualNetwork{
+				Spec: api.VirtualNetworkSpec{
+					OverlayMode: &overlayMode,
+				},
 			}
 
-			vni, err := nextAvailableVNI(networks)
+			err := applyVirtualNetworkDefaults(&network, nil, nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(vni).To(Equal(102))
+			Expect(network.Spec.Vni).To(BeNil())
 		})
 
-		It("ignores invalid existing VNI values", func() {
-			networks := []api.VirtualNetwork{
-				{Spec: api.VirtualNetworkSpec{Vni: util.IntPtrInt(-1)}},
-				{Spec: api.VirtualNetworkSpec{Vni: util.IntPtrInt(0)}},
+		It("returns error for out-of-range vni", func() {
+			overlayMode := api.Vxlan
+			network := api.VirtualNetwork{
+				Spec: api.VirtualNetworkSpec{
+					OverlayMode: &overlayMode,
+					Vni:         util.IntPtrInt(maxVNI + 1),
+				},
 			}
 
-			vni, err := nextAvailableVNI(networks)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(vni).To(Equal(100))
+			err := applyVirtualNetworkDefaults(&network, nil, nil)
+			Expect(err).To(HaveOccurred())
 		})
 	})
 })
