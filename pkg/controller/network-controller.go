@@ -557,11 +557,11 @@ func (c *controller) ensureVxlanMeshForNetwork(fabric networkfabric.NetworkFabri
 		return err
 	}
 
-	if err := fabric.EnsureVxlanMesh(&vnet, peers); err != nil {
+	if err := fabric.EnsureOverlayMesh(&vnet, peers); err != nil {
 		return fmt.Errorf("ensure vxlan mesh failed: %w", err)
 	}
 
-	if err := fabric.PruneVxlanMesh(&vnet, peers); err != nil {
+	if err := fabric.PruneOverlayMesh(&vnet, peers); err != nil {
 		return fmt.Errorf("prune vxlan mesh failed: %w", err)
 	}
 
