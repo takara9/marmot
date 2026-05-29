@@ -1,9 +1,11 @@
 package controller
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -240,7 +242,7 @@ func (c *controller) reconcileGatewayConfiguring(gateway api.Gateway) {
 	}
 	configHash := desiredGatewayConfigHash(gateway, targetIP)
 	playbookPath := filepath.Join(gatewayPlaybookDir, fmt.Sprintf("gateway-%s.yaml", gatewayID))
-	if err := renderGatewayPlaybook(playbookPath, targetIP, gateway.Spec.ServerPorts, gatewayRemoteCIDR(gateway.Spec)); err != nil {
+	if err := renderGatewayPlaybook(playbookPath, targetIP, gateway.Spec.ServerPorts, gatewayRemoteCIDRs(gateway.Spec)); err != nil {
 		c.handleGatewayConfigFailure(gatewayID, err)
 		return
 	}
@@ -402,7 +404,11 @@ func (c *controller) buildGatewayServerSpec(gateway api.Gateway, serverName stri
 		publicNIC.Netmasklen = util.IntPtrInt(maskLen)
 	}
 	nics = append(nics, publicNIC)
-	nics = append(nics, api.NetworkInterface{Networkname: internalNetwork})
+	internalNIC := api.NetworkInterface{Networkname: internalNetwork}
+	if ip, err := c.deriveGatewayInternalInterfaceAddress(internalNetwork); err == nil && strings.TrimSpace(ip) != "" {
+		internalNIC.Address = util.StringPtr(ip)
+	}
+	nics = append(nics, internalNIC)
 
 	labels := map[string]interface{}{
 		db.GatewayServerLabelGatewayID: api.GatewayID(gateway),
@@ -448,6 +454,43 @@ func (c *controller) lookupNetworkMaskLen(networkName string) (int, error) {
 		return 0, fmt.Errorf("netmasklen is empty for %s", networkName)
 	}
 	return *ipnet.Netmasklen, nil
+}
+
+func (c *controller) deriveGatewayInternalInterfaceAddress(networkName string) (string, error) {
+	vnet, err := c.db.GetVirtualNetworkByName(strings.TrimSpace(networkName))
+	if err != nil {
+		return "", err
+	}
+	if vnet.Spec.IPNetworkAddress == nil || strings.TrimSpace(*vnet.Spec.IPNetworkAddress) == "" {
+		return "", fmt.Errorf("iPNetworkAddress is empty for %s", networkName)
+	}
+	return firstHostAddressFromCIDR(*vnet.Spec.IPNetworkAddress)
+}
+
+func firstHostAddressFromCIDR(cidr string) (string, error) {
+	trimmed := strings.TrimSpace(cidr)
+	if trimmed == "" {
+		return "", fmt.Errorf("cidr is empty")
+	}
+	ip, ipNet, err := net.ParseCIDR(trimmed)
+	if err != nil {
+		return "", fmt.Errorf("invalid cidr %q: %w", trimmed, err)
+	}
+	ip4 := ip.To4()
+	if ip4 == nil {
+		return "", fmt.Errorf("cidr %q is not an IPv4 network", trimmed)
+	}
+	networkIP := ipNet.IP.To4()
+	if networkIP == nil {
+		return "", fmt.Errorf("cidr %q is not an IPv4 network", trimmed)
+	}
+	n := binary.BigEndian.Uint32(networkIP)
+	host := make(net.IP, net.IPv4len)
+	binary.BigEndian.PutUint32(host, n+1)
+	if !ipNet.Contains(host) {
+		return "", fmt.Errorf("cidr %q has no usable first host", trimmed)
+	}
+	return host.String(), nil
 }
 
 func (c *controller) findServerByName(name string) (api.Server, error) {

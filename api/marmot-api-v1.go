@@ -77,7 +77,24 @@ type GatewaySpec struct {
 	InternalServerName     string   `json:"internalServerName" yaml:"internalServerName"`
 	InternalVirtualNetwork string   `json:"internalVirtualNetwork" yaml:"internalVirtualNetwork"`
 	RemoteCIDR             string   `json:"remoteCIDR,omitempty" yaml:"remoteCIDR,omitempty"`
+	RemoteCIDRs            []string `json:"remoteCIDRs,omitempty" yaml:"remoteCIDRs,omitempty"`
 	ServerPorts            []string `json:"serverPorts" yaml:"serverPorts"`
+}
+
+// VpnGateway defines model for VpnGateway.
+type VpnGateway struct {
+	ApiVersion string         `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string         `json:"kind" yaml:"kind"`
+	Metadata   Metadata       `json:"metadata" yaml:"metadata"`
+	Spec       VpnGatewaySpec `json:"spec" yaml:"spec"`
+	Status     *Status        `json:"status,omitempty" yaml:"status,omitempty"`
+}
+
+// VpnGatewaySpec defines model for VpnGatewaySpec.
+type VpnGatewaySpec struct {
+	BindPublicIpAddress    string   `json:"bindPublicIpAddress" yaml:"bindPublicIpAddress"`
+	InternalVirtualNetwork string   `json:"internalVirtualNetwork" yaml:"internalVirtualNetwork"`
+	RemoteCIDRs            []string `json:"remoteCIDRs,omitempty" yaml:"remoteCIDRs,omitempty"`
 }
 
 // HostAllocation defines model for HostAllocation.
@@ -297,6 +314,7 @@ type VirtualNetworkSpec struct {
 	MacAddress       *string `json:"macAddress,omitempty" yaml:"macAddress,omitempty"`
 	Nat              *bool   `json:"nat,omitempty" yaml:"nat,omitempty"`
 	Netmask          *string `json:"netmask,omitempty" yaml:"netmask,omitempty"`
+	VpnAccess        *bool   `json:"vpnAccess,omitempty" yaml:"vpnAccess,omitempty"`
 
 	// OverlayMode Overlay mode for multi-node networks: 'none' (default) or 'vxlan'
 	OverlayMode *VirtualNetworkSpecOverlayMode `json:"overlayMode,omitempty" yaml:"overlayMode,omitempty"`

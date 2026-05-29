@@ -13,7 +13,7 @@ import (
 var applyCmd = &cobra.Command{
 	Use:   "apply [RESOURCE]",
 	Short: "Create or update a resource from a file or stdin",
-	Long:  `Apply a resource (server/srv, image/img, volume/vol, network/net, gateway/gw) from a manifest file or stdin. Creates if not exists, updates if exists. If RESOURCE is omitted, it is inferred from manifest kind.`,
+	Long:  `Apply a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw) from a manifest file or stdin. Creates if not exists, updates if exists. If RESOURCE is omitted, it is inferred from manifest kind.`,
 	Args:  cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// マニフェストファイルが指定されていない場合はエラー
@@ -48,6 +48,8 @@ var applyCmd = &cobra.Command{
 				resourceName = "network"
 			case ManifestTypeGateway:
 				resourceName = "gateway"
+			case ManifestTypeVpnGateway:
+				resourceName = "vpngateway"
 			default:
 				return fmt.Errorf("failed to infer resource type from kind %q", kind)
 			}
@@ -70,6 +72,8 @@ var applyCmd = &cobra.Command{
 			return applyNetwork(manifest)
 		case "gateway":
 			return applyGateway(manifest)
+		case "vpngateway":
+			return applyVpnGateway(manifest)
 		default:
 			return fmt.Errorf("unknown resource type: %s", resourceName)
 		}
@@ -374,6 +378,65 @@ func applyGateway(manifest map[string]interface{}) error {
 		byteBody, _, err = m.CreateGateway(*gateway)
 		if err != nil {
 			return fmt.Errorf("failed to create gateway: %w", err)
+		}
+	}
+
+	return processApplyResponse(byteBody, exists)
+}
+
+func applyVpnGateway(manifest map[string]interface{}) error {
+	m, err := getClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	vpnGateway, err := ManifestToVpnGateway(manifest)
+	if err != nil {
+		return fmt.Errorf("failed to convert manifest to vpn gateway: %w", err)
+	}
+
+	if vpnGateway.ApiVersion == "" {
+		return fmt.Errorf("apiVersion is required")
+	}
+	if vpnGateway.Kind == "" {
+		return fmt.Errorf("kind is required")
+	}
+	if strings.TrimSpace(vpnGateway.Metadata.Name) == "" {
+		return fmt.Errorf("metadata.name is required")
+	}
+	if strings.TrimSpace(vpnGateway.Spec.InternalVirtualNetwork) == "" {
+		return fmt.Errorf("spec.internalVirtualNetwork is required")
+	}
+
+	exists := false
+	var existingID string
+	list, _, err := m.GetVpnGateways()
+	if err == nil {
+		var items []api.VpnGateway
+		json.Unmarshal(list, &items)
+		for _, g := range items {
+			if g.Metadata.Name != vpnGateway.Metadata.Name {
+				continue
+			}
+			if strings.TrimSpace(g.Spec.InternalVirtualNetwork) == strings.TrimSpace(vpnGateway.Spec.InternalVirtualNetwork) {
+				exists = true
+				existingID = api.VpnGatewayID(g)
+				break
+			}
+		}
+	}
+
+	var byteBody []byte
+	if exists {
+		api.SetVpnGatewayID(vpnGateway, existingID)
+		byteBody, _, err = m.UpdateVpnGatewayById(existingID, *vpnGateway)
+		if err != nil {
+			return fmt.Errorf("failed to update vpn gateway: %w", err)
+		}
+	} else {
+		byteBody, _, err = m.CreateVpnGateway(*vpnGateway)
+		if err != nil {
+			return fmt.Errorf("failed to create vpn gateway: %w", err)
 		}
 	}
 

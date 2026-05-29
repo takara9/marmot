@@ -96,13 +96,15 @@
         jump: ACCEPT
         comment: marmot-gateway
 
-    - name: Allow all input traffic from remoteCIDR
+{{- range .RemoteCIDRs }}
+    - name: Allow all input traffic from {{ . }}
       ansible.builtin.iptables:
         table: filter
         chain: MARMOT-GW-INPUT
-        source: {{ $.RemoteCIDR }}
+        source: {{ . }}
         jump: ACCEPT
         comment: marmot-gateway
+{{- end }}
 
     - name: Drop all input traffic from non-remoteCIDR
       ansible.builtin.iptables:
@@ -111,13 +113,15 @@
         jump: DROP
         comment: marmot-gateway
 
-    - name: Allow all forwarded traffic from remoteCIDR
+{{- range .RemoteCIDRs }}
+    - name: Allow all forwarded traffic from {{ . }}
       ansible.builtin.iptables:
         table: filter
         chain: MARMOT-GW-FORWARD
-        source: {{ $.RemoteCIDR }}
+        source: {{ . }}
         jump: ACCEPT
         comment: marmot-gateway
+{{- end }}
 
     - name: Drop all forwarded traffic from non-remoteCIDR
       ansible.builtin.iptables:
@@ -127,17 +131,20 @@
         comment: marmot-gateway
 
 {{- range .Ports }}
-    - name: Ensure DNAT rule for {{ .Protocol }}/{{ .Port }}
+{{- $port := .Port }}
+{{- $protocol := .Protocol }}
+{{- range $.RemoteCIDRs }}
+    - name: Ensure DNAT rule for {{ $protocol }}/{{ $port }} from {{ . }}
       ansible.builtin.iptables:
         table: nat
         chain: MARMOT-GW-PREROUTING
-        source: {{ $.RemoteCIDR }}
-        protocol: {{ .Protocol }}
-        destination_port: {{ .Port }}
+        source: {{ . }}
+        protocol: {{ $protocol }}
+        destination_port: {{ $port }}
         jump: DNAT
-        to_destination: {{ $.TargetIP }}:{{ .Port }}
+        to_destination: {{ $.TargetIP }}:{{ $port }}
         comment: marmot-gateway
-
+{{- end }}
 {{- end }}
     - name: Ensure masquerade rule
       ansible.builtin.iptables:

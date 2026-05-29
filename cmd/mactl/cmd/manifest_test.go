@@ -17,6 +17,7 @@ var _ = Describe("manifest", func() {
 			Expect(normalizeResourceName("volumes")).To(Equal("volume"))
 			Expect(normalizeResourceName("images")).To(Equal("image"))
 			Expect(normalizeResourceName("gateways")).To(Equal("gateway"))
+			Expect(normalizeResourceName("vpngateways")).To(Equal("vpngateway"))
 		})
 
 		It("keeps singular form unchanged", func() {
@@ -33,6 +34,7 @@ var _ = Describe("manifest", func() {
 			Expect(normalizeResourceName("vol")).To(Equal("volume"))
 			Expect(normalizeResourceName("net")).To(Equal("network"))
 			Expect(normalizeResourceName("gw")).To(Equal("gateway"))
+			Expect(normalizeResourceName("vpngw")).To(Equal("vpngateway"))
 		})
 
 		It("returns lowercase for unknown names", func() {
@@ -65,6 +67,11 @@ var _ = Describe("manifest", func() {
 		It("detects gateway kind", func() {
 			result := GetManifestType("Gateway")
 			Expect(result).To(Equal(ManifestTypeGateway))
+		})
+
+		It("detects vpn gateway kind", func() {
+			result := GetManifestType("VpnGateway")
+			Expect(result).To(Equal(ManifestTypeVpnGateway))
 		})
 
 		It("returns Unknown for missing kind", func() {

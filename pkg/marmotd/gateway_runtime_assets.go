@@ -130,6 +130,10 @@ func GatewayPlaybookTemplatePath() string {
 	return filepath.Join(gatewayPlaybookInstallDir, "gateway-iptables.yaml.tmpl")
 }
 
+func VpnGatewayPlaybookTemplatePath() string {
+	return filepath.Join(gatewayPlaybookInstallDir, "vpn-gateway-openvpn.yaml.tmpl")
+}
+
 func ValidateGatewayRuntimeAssets() error {
 	missing := make([]string, 0, 3)
 	if !fileExists(GatewayPrivateKeyPath()) {

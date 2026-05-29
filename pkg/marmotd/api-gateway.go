@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -82,9 +85,10 @@ func (s *Server) ApiUpdateGatewayById(ctx echo.Context, id string) error {
 		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: "immutable fields changed: spec.bindPublicIpAddress, spec.internalServerName, spec.internalVirtualNetwork"})
 	}
 
-	// 更新可能項目は spec.serverPorts, spec.remoteCIDR のみ。
+	// 更新可能項目は spec.serverPorts, spec.remoteCIDRs のみ。
 	current.Spec.ServerPorts = req.Spec.ServerPorts
 	current.Spec.RemoteCIDR = req.Spec.RemoteCIDR
+	current.Spec.RemoteCIDRs = req.Spec.RemoteCIDRs
 	if err := s.Ma.Db.UpdateGatewayById(id, current); err != nil {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
@@ -109,6 +113,33 @@ func (s *Server) ApiDeleteGatewayById(ctx echo.Context, id string) error {
 	}
 
 	return ctx.JSON(http.StatusOK, api.Success{Id: id, Message: util.StringPtr("Accepted the request to delete the gateway")})
+}
+
+// ApiGetGatewayCertById returns the generated OpenVPN client profile as text/plain.
+func (s *Server) ApiGetGatewayCertById(ctx echo.Context, id string) error {
+	gateway, err := s.Ma.Db.GetGatewayById(id)
+	if err != nil {
+		if errors.Is(err, db.ErrNotFound) {
+			return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "IDが存在しません"})
+		}
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	networkName := strings.TrimSpace(gateway.Spec.InternalVirtualNetwork)
+	if networkName == "" {
+		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: "spec.internalVirtualNetwork is empty"})
+	}
+
+	certPath := filepath.Join("/var/lib/marmot/vpn", filepath.Base(networkName)+".ovpn")
+	content, err := os.ReadFile(certPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "vpn cert is not found"})
+		}
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	return ctx.Blob(http.StatusOK, "text/plain; charset=utf-8", content)
 }
 
 func changedImmutableGatewayField(current api.Gateway, req api.Gateway) bool {
@@ -159,24 +190,59 @@ func normalizeGatewaySpec(spec *api.GatewaySpec) error {
 	}
 	spec.InternalVirtualNetwork = internalVirtualNetwork
 
-	remoteCIDR := strings.TrimSpace(spec.RemoteCIDR)
-	if remoteCIDR == "" {
-		remoteCIDR = "0.0.0.0/0"
+	if err := normalizeGatewayRemoteCIDRs(spec); err != nil {
+		return err
 	}
-	ip, _, err := net.ParseCIDR(remoteCIDR)
-	if err != nil {
-		return fmt.Errorf("spec.remoteCIDR must be a valid CIDR")
-	}
-	if ip == nil || ip.To4() == nil {
-		return fmt.Errorf("spec.remoteCIDR must be an IPv4 CIDR")
-	}
-	spec.RemoteCIDR = remoteCIDR
 
 	ports, err := normalizeGatewayPorts(spec.ServerPorts)
 	if err != nil {
 		return err
 	}
 	spec.ServerPorts = ports
+
+	return nil
+}
+
+func normalizeGatewayRemoteCIDRs(spec *api.GatewaySpec) error {
+	if spec == nil {
+		return fmt.Errorf("spec is required")
+	}
+
+	raw := make([]string, 0, len(spec.RemoteCIDRs)+1)
+	for _, cidr := range spec.RemoteCIDRs {
+		raw = append(raw, strings.TrimSpace(cidr))
+	}
+	if len(raw) == 0 && strings.TrimSpace(spec.RemoteCIDR) != "" {
+		raw = append(raw, strings.TrimSpace(spec.RemoteCIDR))
+	}
+
+	seen := map[string]struct{}{}
+	normalized := make([]string, 0, len(raw))
+	for _, cidr := range raw {
+		if cidr == "" {
+			continue
+		}
+		ip, _, err := net.ParseCIDR(cidr)
+		if err != nil {
+			return fmt.Errorf("spec.remoteCIDRs contains an invalid CIDR: %s", cidr)
+		}
+		if ip == nil || ip.To4() == nil {
+			return fmt.Errorf("spec.remoteCIDRs must contain only IPv4 CIDRs")
+		}
+		if _, exists := seen[cidr]; exists {
+			continue
+		}
+		seen[cidr] = struct{}{}
+		normalized = append(normalized, cidr)
+	}
+
+	sort.Strings(normalized)
+	spec.RemoteCIDRs = normalized
+	if len(normalized) > 0 {
+		spec.RemoteCIDR = normalized[0]
+	} else {
+		spec.RemoteCIDR = ""
+	}
 
 	return nil
 }

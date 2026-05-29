@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -15,11 +16,12 @@ import (
 )
 
 var getServerShowAll bool
+var getVpnGatewayDownload bool
 
 var getCmd = &cobra.Command{
 	Use:   "get RESOURCE [NAME]",
 	Short: "Get resource(s) of a specific type",
-	Long:  `Get resource(s) (server/srv, image/img, volume/vol, network/net, gateway/gw). If NAME is provided, show only that resource. Otherwise, list all resources.`,
+	Long:  `Get resource(s) (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw). If NAME is provided, show only that resource. Otherwise, list all resources.`,
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		resourceName := args[0]
@@ -43,6 +45,8 @@ var getCmd = &cobra.Command{
 			return getNetworkResources(resourceSpec)
 		case "gateway":
 			return getGatewayResources(resourceSpec)
+		case "vpngateway":
+			return getVpnGatewayResources(resourceSpec)
 		default:
 			return fmt.Errorf("unknown resource type: %s", resourceName)
 		}
@@ -260,6 +264,135 @@ func getGatewayResources(name string) error {
 	}
 
 	return runList(listFn)
+}
+
+func getVpnGatewayResources(name string) error {
+	if getVpnGatewayDownload {
+		return downloadVpnGatewayCert(name)
+	}
+
+	listFn := func() error {
+		m, err := getClientConfig()
+		if err != nil {
+			return fmt.Errorf("failed to get client config: %w", err)
+		}
+
+		list, _, err := m.GetVpnGateways()
+		if err != nil {
+			return fmt.Errorf("failed to list vpn gateways: %w", err)
+		}
+
+		var items []api.VpnGateway
+		if err := json.Unmarshal(list, &items); err != nil {
+			return fmt.Errorf("failed to parse vpn gateways: %w", err)
+		}
+
+		if name != "" {
+			filtered := make([]api.VpnGateway, 0)
+			for _, item := range items {
+				if item.Metadata.Name == name {
+					filtered = append(filtered, item)
+				}
+			}
+			items = filtered
+			if len(items) == 0 {
+				fmt.Printf("no vpn gateway found with name %q\n", name)
+				return nil
+			}
+		}
+
+		sort.SliceStable(items, func(i, j int) bool {
+			return creationTime(items[i].Status).Before(creationTime(items[j].Status))
+		})
+
+		switch outputStyle {
+		case "text":
+			fmt.Printf("%-14s  %-14s  %-16s  %-12s  %-8s\n", "NAME", "INTERNAL-NET", "PUBLIC-IP", "STATUS", "AGE")
+			fmt.Printf("%-14s  %-14s  %-16s  %-12s  %-8s\n", "----", "------------", "---------", "------", "---")
+			for _, g := range items {
+				internalNet := "-"
+				if strings.TrimSpace(g.Spec.InternalVirtualNetwork) != "" {
+					internalNet = strings.TrimSpace(g.Spec.InternalVirtualNetwork)
+				}
+				publicIP := "-"
+				if strings.TrimSpace(g.Spec.BindPublicIpAddress) != "" {
+					publicIP = strings.TrimSpace(g.Spec.BindPublicIpAddress)
+				}
+				status := "-"
+				if g.Status != nil && g.Status.Status != nil && strings.TrimSpace(*g.Status.Status) != "" {
+					status = strings.TrimSpace(*g.Status.Status)
+				}
+				fmt.Printf("%-14s  %-14s  %-16s  %-12s  %-8s\n", g.Metadata.Name, internalNet, publicIP, status, formatServerAge(g.Status))
+			}
+			return nil
+		case "json":
+			data, _ := json.MarshalIndent(items, "", "  ")
+			fmt.Println(string(data))
+			return nil
+		case "yaml":
+			data, _ := json.Marshal(items)
+			fmt.Println(string(data))
+			return nil
+		default:
+			return fmt.Errorf("output style must be text/json/yaml")
+		}
+	}
+
+	return runList(listFn)
+}
+
+func downloadVpnGatewayCert(name string) error {
+	trimmedName := strings.TrimSpace(name)
+	if trimmedName == "" {
+		return fmt.Errorf("--download requires NAME: mactl get vpngateway <name> --download")
+	}
+
+	m, err := getClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	list, _, err := m.GetVpnGateways()
+	if err != nil {
+		return fmt.Errorf("failed to list vpn gateways: %w", err)
+	}
+
+	var items []api.VpnGateway
+	if err := json.Unmarshal(list, &items); err != nil {
+		return fmt.Errorf("failed to parse vpn gateways: %w", err)
+	}
+
+	matches := make([]api.VpnGateway, 0)
+	for _, item := range items {
+		if strings.TrimSpace(item.Metadata.Name) == trimmedName {
+			matches = append(matches, item)
+		}
+	}
+
+	if len(matches) == 0 {
+		return fmt.Errorf("vpn gateway %q not found", trimmedName)
+	}
+	if len(matches) > 1 {
+		return fmt.Errorf("multiple vpn gateways found with name %q; please query by id via API", trimmedName)
+	}
+
+	body, _, err := m.GetVpnGatewayCertById(api.VpnGatewayID(matches[0]))
+	if err != nil {
+		return fmt.Errorf("failed to download vpn profile: %w", err)
+	}
+
+	filename := trimmedName + ".ovpn"
+	if err := os.WriteFile(filename, body, 0600); err != nil {
+		return fmt.Errorf("failed to write %q: %w", filename, err)
+	}
+
+	absPath, err := filepath.Abs(filename)
+	if err != nil {
+		fmt.Printf("vpn profile downloaded: %s\n", filename)
+		return nil
+	}
+	fmt.Printf("vpn profile downloaded: %s\n", absPath)
+	return nil
 }
 
 // フィルター関数
@@ -814,4 +947,5 @@ func init() {
 	rootCmd.AddCommand(getCmd)
 	getCmd.Flags().StringVarP(&labelSelector, "selector", "l", "", "Label selector (e.g., key=value)")
 	getCmd.Flags().BoolVarP(&getServerShowAll, "all", "a", false, "managedBy ラベル付きの server も含めて表示する")
+	getCmd.Flags().BoolVarP(&getVpnGatewayDownload, "download", "d", false, "vpngateway の VPN クライアント設定ファイル (.ovpn) をダウンロードする")
 }

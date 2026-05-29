@@ -14,7 +14,7 @@ import (
 var describeCmd = &cobra.Command{
 	Use:   "describe RESOURCE NAME",
 	Short: "Show detailed information about a resource",
-	Long:  `Describe a resource (server/srv, image/img, volume/vol, network/net, gateway/gw) with NAME specified. Shows formatted text output.`,
+	Long:  `Describe a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw) with NAME specified. Shows formatted text output.`,
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		resourceName := args[0]
@@ -33,6 +33,8 @@ var describeCmd = &cobra.Command{
 			return describeNetwork(objectName)
 		case "gateway":
 			return describeGateway(objectName)
+		case "vpngateway":
+			return describeVpnGateway(objectName)
 		default:
 			return fmt.Errorf("unknown resource type: %s", resourceName)
 		}
@@ -867,8 +869,110 @@ func describeGatewayText(g *api.Gateway) error {
 	fmt.Printf("  BindPublicIP:  %s\n", stringOrDash(g.Spec.BindPublicIpAddress))
 	fmt.Printf("  InternalServer:%s\n", stringOrDash(g.Spec.InternalServerName))
 	fmt.Printf("  InternalVNet:  %s\n", stringOrDash(g.Spec.InternalVirtualNetwork))
-	fmt.Printf("  RemoteCIDR:    %s\n", gatewayRemoteCIDROrDefault(g.Spec.RemoteCIDR))
+	fmt.Printf("  RemoteCIDRs:   %s\n", gatewayRemoteCIDRsOrDefault(g.Spec.RemoteCIDRs, g.Spec.RemoteCIDR))
 	fmt.Printf("  ServerPorts:   %s\n", strings.Join(orDashSlice(g.Spec.ServerPorts), ", "))
+
+	return nil
+}
+
+func describeVpnGateway(name string) error {
+	m, err := getClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	list, _, err := m.GetVpnGateways()
+	if err != nil {
+		return fmt.Errorf("failed to list vpn gateways: %w", err)
+	}
+
+	var items []api.VpnGateway
+	if err := json.Unmarshal(list, &items); err != nil {
+		return fmt.Errorf("failed to parse vpn gateways: %w", err)
+	}
+
+	matches := make([]api.VpnGateway, 0)
+	for _, g := range items {
+		if g.Metadata.Name == name {
+			matches = append(matches, g)
+		}
+	}
+
+	if len(matches) == 0 {
+		return fmt.Errorf("vpn gateway %q not found", name)
+	}
+	if len(matches) > 1 {
+		return fmt.Errorf("multiple vpn gateways found with name %q; please query by id via API", name)
+	}
+
+	found := matches[0]
+	if outputStyle == "text" {
+		return describeVpnGatewayText(&found)
+	}
+
+	return describeResource(found)
+}
+
+func describeVpnGatewayText(g *api.VpnGateway) error {
+	if g == nil {
+		return fmt.Errorf("vpn gateway is nil")
+	}
+
+	id := "-"
+	if strings.TrimSpace(g.Metadata.Id) != "" {
+		id = strings.TrimSpace(g.Metadata.Id)
+	}
+
+	nodeName := "-"
+	if g.Metadata.NodeName != nil && strings.TrimSpace(*g.Metadata.NodeName) != "" {
+		nodeName = strings.TrimSpace(*g.Metadata.NodeName)
+	}
+
+	statusText := "-"
+	statusCode := "-"
+	created := "-"
+	updated := "-"
+	deleting := "-"
+	statusMessage := "-"
+	if g.Status != nil {
+		statusCode = fmt.Sprintf("%d", g.Status.StatusCode)
+		if g.Status.Status != nil && strings.TrimSpace(*g.Status.Status) != "" {
+			statusText = strings.TrimSpace(*g.Status.Status)
+		}
+		if g.Status.LastUpdateTimeStamp != nil {
+			updated = g.Status.LastUpdateTimeStamp.Local().Format("2006-01-02 15:04:05")
+		}
+		if g.Status.DeletionTimeStamp != nil {
+			deleting = g.Status.DeletionTimeStamp.Local().Format("2006-01-02 15:04:05")
+		}
+		if g.Status.Message != nil && strings.TrimSpace(*g.Status.Message) != "" {
+			statusMessage = strings.TrimSpace(*g.Status.Message)
+		}
+	}
+	ct := creationTime(g.Status)
+	if !ct.IsZero() {
+		created = ct.Local().Format("2006-01-02 15:04:05")
+	}
+
+	fmt.Println("Metadata:")
+	fmt.Printf("  Name:          %s\n", g.Metadata.Name)
+	fmt.Printf("  Kind:          %s\n", g.Kind)
+	fmt.Printf("  ID:            %s\n", id)
+	fmt.Printf("  NodeName:      %s\n", nodeName)
+
+	fmt.Println("\nStatus:")
+	fmt.Printf("  State:         %s\n", statusText)
+	fmt.Printf("  StatusCode:    %s\n", statusCode)
+	fmt.Printf("  Age:           %s\n", formatServerAge(g.Status))
+	fmt.Printf("  Created:       %s\n", created)
+	fmt.Printf("  Updated:       %s\n", updated)
+	fmt.Printf("  DeletingAt:    %s\n", deleting)
+	fmt.Printf("  Message:       %s\n", statusMessage)
+
+	fmt.Println("\nSpec:")
+	fmt.Printf("  BindPublicIP:  %s\n", stringOrDash(g.Spec.BindPublicIpAddress))
+	fmt.Printf("  InternalVNet:  %s\n", stringOrDash(g.Spec.InternalVirtualNetwork))
+	fmt.Printf("  RemoteCIDRs:   %s\n", strings.Join(orDashSlice(g.Spec.RemoteCIDRs), ", "))
 
 	return nil
 }
@@ -899,12 +1003,23 @@ func stringOrDash(v string) string {
 	return v
 }
 
-func gatewayRemoteCIDROrDefault(v string) string {
-	v = strings.TrimSpace(v)
-	if v == "" {
+func gatewayRemoteCIDRsOrDefault(values []string, legacy string) string {
+	items := make([]string, 0, len(values)+1)
+	for _, v := range values {
+		trimmed := strings.TrimSpace(v)
+		if trimmed != "" {
+			items = append(items, trimmed)
+		}
+	}
+	if len(items) == 0 {
+		if trimmed := strings.TrimSpace(legacy); trimmed != "" {
+			items = append(items, trimmed)
+		}
+	}
+	if len(items) == 0 {
 		return "0.0.0.0/0"
 	}
-	return v
+	return strings.Join(items, ", ")
 }
 
 func describeResource(resource interface{}) error {

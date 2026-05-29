@@ -3,9 +3,11 @@ package client
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/takara9/marmot/api"
 )
@@ -93,4 +95,28 @@ func (m *MarmotEndpoint) GetGateways() ([]byte, *url.URL, error) {
 		return nil, nil, err
 	}
 	return m.httpRequest2(req)
+}
+
+// GetGatewayCertById downloads gateway cert profile as text/plain.
+func (m *MarmotEndpoint) GetGatewayCertById(id string) ([]byte, *url.URL, error) {
+	slog.Debug("===", "GetGatewayCertById is called", "===")
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/gateway/"+id+"/cert")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	req.Header.Set("Accept", "text/plain")
+
+	status, body, jobURL, err := m.httpRequest(req)
+	if err != nil {
+		return nil, nil, err
+	}
+	if status != http.StatusOK {
+		return nil, nil, fmt.Errorf("http status code = %d: %s", status, strings.TrimSpace(string(body)))
+	}
+	return body, jobURL, nil
 }
