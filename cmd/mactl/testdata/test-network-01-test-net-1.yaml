@@ -4,3 +4,4 @@ metadata:
     name: test-net-1
 spec:
     forwardMode: bridge
+    overlayMode: none
