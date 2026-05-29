@@ -4,7 +4,7 @@ import (
 	"github.com/takara9/marmot/api"
 )
 
-// NetworkFabric は OVS/VXLAN などのオーバーレイネットワーク実体操作を担当する。
+// NetworkFabric は OVS などのオーバーレイネットワーク実体操作を担当する。
 // controller 層がこのインターフェースを通じて、libvirt とは独立に overlay を管理する。
 type NetworkFabric interface {
 	// EnsureBridge はローカルノードで OVS ブリッジを作成・確認する。
@@ -13,15 +13,15 @@ type NetworkFabric interface {
 	// 戻り値: (成功時は nil、既存/失敗はエラー)
 	EnsureBridge(vnet *api.VirtualNetwork) error
 
-	// EnsureVxlanMesh はローカルノード上で、指定ピアへのトンネル群を作成・確認する。
+	// EnsureOverlayMesh はローカルノード上で、指定ピアへのトンネル群を作成・確認する。
 	// 冪等で実行される。
 	// vnet: 対象ネットワーク
 	// peers: 疎通対象のリモートノード IP リスト
-	EnsureVxlanMesh(vnet *api.VirtualNetwork, peers []string) error
+	EnsureOverlayMesh(vnet *api.VirtualNetwork, peers []string) error
 
-	// PruneVxlanMesh は不要なトンネルを削除する。
+	// PruneOverlayMesh は不要なトンネルを削除する。
 	// 例: ノード離脱時に peer リストから外れたノードへのトンネルを削除。
-	PruneVxlanMesh(vnet *api.VirtualNetwork, remainPeers []string) error
+	PruneOverlayMesh(vnet *api.VirtualNetwork, remainPeers []string) error
 
 	// DeleteBridge はブリッジとその配下のトンネルをすべて削除する。
 	// 削除前に必ず libvirt net destroy/undefine が完了していることを前提とする。

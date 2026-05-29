@@ -18,12 +18,12 @@ func (m *mockNetworkFabric) EnsureBridge(vnet *api.VirtualNetwork) error {
 	return nil
 }
 
-func (m *mockNetworkFabric) EnsureVxlanMesh(vnet *api.VirtualNetwork, peers []string) error {
+func (m *mockNetworkFabric) EnsureOverlayMesh(vnet *api.VirtualNetwork, peers []string) error {
 	m.ensureMeshCalls++
 	return nil
 }
 
-func (m *mockNetworkFabric) PruneVxlanMesh(vnet *api.VirtualNetwork, remainPeers []string) error {
+func (m *mockNetworkFabric) PruneOverlayMesh(vnet *api.VirtualNetwork, remainPeers []string) error {
 	m.pruneMeshCalls++
 	return nil
 }

@@ -147,8 +147,8 @@ func linuxBridgeDeviceExists(bridgeName string) bool {
 	return cmd.Run() == nil
 }
 
-// EnsureVxlanMesh はピアノードへの VXLAN トンネルを作成・確認する。
-func (o *OVSFabric) EnsureVxlanMesh(vnet *api.VirtualNetwork, peers []string) error {
+// EnsureOverlayMesh はピアノードへのオーバーレイトンネルを作成・確認する。
+func (o *OVSFabric) EnsureOverlayMesh(vnet *api.VirtualNetwork, peers []string) error {
 	if vnet == nil || vnet.Spec.BridgeName == nil {
 		return fmt.Errorf("invalid vnet or missing bridge name")
 	}
@@ -294,8 +294,8 @@ func resolveInterfaceIPv4(interfaceName string) (string, error) {
 	return "", fmt.Errorf("no ipv4 address found on underlay interface %s", name)
 }
 
-// PruneVxlanMesh は残すべきピア以外のトンネルを削除する。
-func (o *OVSFabric) PruneVxlanMesh(vnet *api.VirtualNetwork, remainPeers []string) error {
+// PruneOverlayMesh は残すべきピア以外のトンネルを削除する。
+func (o *OVSFabric) PruneOverlayMesh(vnet *api.VirtualNetwork, remainPeers []string) error {
 	if vnet == nil || vnet.Spec.BridgeName == nil {
 		return fmt.Errorf("invalid vnet or missing bridge name")
 	}
