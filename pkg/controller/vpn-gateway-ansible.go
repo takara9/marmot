@@ -124,7 +124,7 @@ func normalizeVpnGatewayRemoteCIDRs(values []string) []string {
 		}
 	}
 	if len(result) == 0 {
-		return []string{"0.0.0.0/0", "::/0"}
+		return []string{"0.0.0.0/0"}
 	}
 	sort.Strings(result)
 	return result

@@ -138,11 +138,11 @@
       ansible.builtin.iptables:
         table: nat
         chain: MARMOT-GW-PREROUTING
-  source: {{ . }}
-  protocol: {{ $protocol }}
-  destination_port: {{ $port }}
+        source: {{ . }}
+        protocol: {{ $protocol }}
+        destination_port: {{ $port }}
         jump: DNAT
-  to_destination: {{ $.TargetIP }}:{{ $port }}
+        to_destination: {{ $.TargetIP }}:{{ $port }}
         comment: marmot-gateway
 {{- end }}
 {{- end }}

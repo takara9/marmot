@@ -156,6 +156,41 @@
         state: directory
         mode: "0755"
 
+    - name: Ensure OpenVPN ingress ACL chain exists
+      ansible.builtin.shell: |
+        set -euo pipefail
+        iptables -N MARMOT-VPN-INPUT 2>/dev/null || true
+      args:
+        executable: /bin/bash
+
+    - name: Flush OpenVPN ingress ACL chain
+      ansible.builtin.command: iptables -F MARMOT-VPN-INPUT
+
+    - name: Rebind INPUT jump to OpenVPN ingress ACL chain at top
+      ansible.builtin.shell: |
+        set -euo pipefail
+        while iptables -C INPUT -p udp --dport 1194 -j MARMOT-VPN-INPUT 2>/dev/null; do
+          iptables -D INPUT -p udp --dport 1194 -j MARMOT-VPN-INPUT
+        done
+        iptables -I INPUT 1 -p udp --dport 1194 -j MARMOT-VPN-INPUT
+      args:
+        executable: /bin/bash
+
+{{- range .RemoteCIDRs }}
+    - name: Allow OpenVPN ingress from {{ . }}
+      ansible.builtin.iptables:
+        table: filter
+        chain: MARMOT-VPN-INPUT
+        source: {{ . }}
+        jump: ACCEPT
+{{- end }}
+
+    - name: Drop OpenVPN ingress from non-remoteCIDR
+      ansible.builtin.iptables:
+        table: filter
+        chain: MARMOT-VPN-INPUT
+        jump: DROP
+
     - name: Enable and restart OpenVPN service
       ansible.builtin.systemd:
         name: openvpn-server@server
