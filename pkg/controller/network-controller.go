@@ -51,8 +51,8 @@ func StartNetController(node string, etcdUrl string, deletionDelaySeconds int) (
 	c.stopChan = make(chan struct{})
 	c.doneChan = make(chan struct{})
 
-	// NetworkFabric の初期化（OVS/VXLAN 操作）
-	networkFabric := networkfabric.NewOVSFabric()
+	// NetworkFabric の初期化（OVN 優先、既存 VXLAN は OVS フォールバック）
+	networkFabric := networkfabric.NewOVNFabric()
 
 	// 起動時に既存の仮想ネットワークを取得して、データベースに登録する
 	if _, err := c.marmot.GetVirtualNetworksAndPutDB(); err != nil {
@@ -225,9 +225,9 @@ func (c *controller) networkControllerLoop(fabric networkfabric.NetworkFabric) {
 						c.db.UpdateVirtualNetworkStatus(vnetID, db.NETWORK_ERROR)
 					}
 				} else {
-					if err := c.ensureVxlanMeshForNetwork(fabric, vnet); err != nil {
-						slog.Error("failed to reconcile head vxlan mesh", "err", err, "networkId", vnetID, "controllerNode", c.marmot.NodeName)
-						c.db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_ERROR, "fabric:vxlan-failed:"+err.Error())
+					if err := c.ensureOverlayMeshForNetwork(fabric, vnet); err != nil {
+						slog.Error("failed to reconcile head overlay mesh", "err", err, "networkId", vnetID, "controllerNode", c.marmot.NodeName)
+						c.db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_ERROR, "fabric:overlay-failed:"+err.Error())
 					}
 				}
 
@@ -270,8 +270,8 @@ func (c *controller) reconcileHeadProvisioningNetwork(vnet api.VirtualNetwork, f
 		defer net.Free()
 	}
 
-	if err := c.ensureVxlanMeshForNetwork(fabric, vnet); err != nil {
-		return fmt.Errorf("fabric:vxlan-failed:%w", err)
+	if err := c.ensureOverlayMeshForNetwork(fabric, vnet); err != nil {
+		return fmt.Errorf("fabric:overlay-failed:%w", err)
 	}
 
 	c.db.UpdateVirtualNetworkStatus(vnetID, db.NETWORK_ACTIVE)
@@ -436,7 +436,7 @@ func (c *controller) reconcileFollowerWaitingNetwork(waitingNetwork api.VirtualN
 		if err := c.ensureVirtualNetworkPresent(headNetwork); err != nil {
 			return err
 		}
-		if err := c.ensureVxlanMeshForNetwork(fabric, waitingNetwork); err != nil {
+		if err := c.ensureOverlayMeshForNetwork(fabric, waitingNetwork); err != nil {
 			return err
 		}
 		c.db.UpdateVirtualNetworkStatus(api.VirtualNetworkID(waitingNetwork), db.NETWORK_ACTIVE)
@@ -474,7 +474,7 @@ func (c *controller) reconcileFollowerActiveNetwork(followerNetwork api.VirtualN
 		if err := c.ensureVirtualNetworkPresent(followerNetwork); err != nil {
 			return err
 		}
-		return c.ensureVxlanMeshForNetwork(fabric, followerNetwork)
+		return c.ensureOverlayMeshForNetwork(fabric, followerNetwork)
 	case db.NETWORK_DELETING:
 		c.db.UpdateVirtualNetworkStatus(api.VirtualNetworkID(followerNetwork), db.NETWORK_DELETING)
 		return nil
@@ -538,8 +538,15 @@ func isVxlanOverlay(vnet api.VirtualNetwork) bool {
 	return strings.EqualFold(string(*vnet.Spec.OverlayMode), "vxlan")
 }
 
-func (c *controller) ensureVxlanMeshForNetwork(fabric networkfabric.NetworkFabric, vnet api.VirtualNetwork) error {
-	if !isVxlanOverlay(vnet) {
+func isGeneveOverlay(vnet api.VirtualNetwork) bool {
+	if vnet.Spec.OverlayMode == nil {
+		return false
+	}
+	return strings.EqualFold(string(*vnet.Spec.OverlayMode), string(api.Geneve))
+}
+
+func (c *controller) ensureOverlayMeshForNetwork(fabric networkfabric.NetworkFabric, vnet api.VirtualNetwork) error {
+	if !isVxlanOverlay(vnet) && !isGeneveOverlay(vnet) {
 		return nil
 	}
 
@@ -547,22 +554,32 @@ func (c *controller) ensureVxlanMeshForNetwork(fabric networkfabric.NetworkFabri
 		return fmt.Errorf("ensure bridge failed: %w", err)
 	}
 
-	if vxlanPeerPolicy(vnet) == api.Manual {
+	if isVxlanOverlay(vnet) && vxlanPeerPolicy(vnet) == api.Manual {
 		slog.Debug("peerPolicy=manual: skip automatic vxlan ensure/prune", "networkId", api.VirtualNetworkID(vnet), "networkName", vnet.Metadata.Name)
 		return nil
 	}
 
-	peers, err := c.resolveVxlanPeerIPs(vnet)
-	if err != nil {
-		return err
+	peers := []string{}
+	if isVxlanOverlay(vnet) {
+		resolvedPeers, err := c.resolveVxlanPeerIPs(vnet)
+		if err != nil {
+			return err
+		}
+		peers = resolvedPeers
+	} else if isGeneveOverlay(vnet) {
+		resolvedPeers, err := c.resolveGenevePeerIPs(vnet)
+		if err != nil {
+			return err
+		}
+		peers = resolvedPeers
 	}
 
 	if err := fabric.EnsureOverlayMesh(&vnet, peers); err != nil {
-		return fmt.Errorf("ensure vxlan mesh failed: %w", err)
+		return fmt.Errorf("ensure overlay mesh failed: %w", err)
 	}
 
 	if err := fabric.PruneOverlayMesh(&vnet, peers); err != nil {
-		return fmt.Errorf("prune vxlan mesh failed: %w", err)
+		return fmt.Errorf("prune overlay mesh failed: %w", err)
 	}
 
 	return nil
@@ -642,6 +659,65 @@ func (c *controller) resolveVxlanPeerIPs(vnet api.VirtualNetwork) ([]string, err
 	}
 
 	peers := buildVxlanHubSpokePeerIPs(selfNode, hubNode, participantNodes, ipByNode)
+	sort.Strings(peers)
+	return peers, nil
+}
+
+func (c *controller) resolveGenevePeerIPs(vnet api.VirtualNetwork) ([]string, error) {
+	if strings.TrimSpace(vnet.Metadata.Name) == "" {
+		return nil, fmt.Errorf("network metadata.name is required: networkId=%s", api.VirtualNetworkID(vnet))
+	}
+
+	targetName := strings.TrimSpace(vnet.Metadata.Name)
+	statuses, err := c.marmot.Db.GetAllHostStatus()
+	if err != nil {
+		return nil, err
+	}
+	ipByNode := map[string]string{}
+	for _, st := range statuses {
+		if st.NodeName == nil || st.IpAddress == nil {
+			continue
+		}
+		node := strings.TrimSpace(*st.NodeName)
+		ip := strings.TrimSpace(*st.IpAddress)
+		if node == "" || ip == "" {
+			continue
+		}
+		ipByNode[node] = ip
+	}
+
+	networks, err := c.marmot.Db.GetVirtualNetworks()
+	if err != nil {
+		return nil, err
+	}
+
+	selfNode := strings.TrimSpace(c.marmot.NodeName)
+	peerSet := map[string]struct{}{}
+	for _, n := range networks {
+		if strings.TrimSpace(n.Metadata.Name) != targetName {
+			continue
+		}
+		if n.Metadata.NodeName == nil {
+			continue
+		}
+		if n.Status != nil && n.Status.StatusCode == db.NETWORK_DELETING {
+			continue
+		}
+		node := strings.TrimSpace(*n.Metadata.NodeName)
+		if node == "" || node == selfNode {
+			continue
+		}
+		ip, ok := ipByNode[node]
+		if !ok || strings.TrimSpace(ip) == "" {
+			continue
+		}
+		peerSet[strings.TrimSpace(ip)] = struct{}{}
+	}
+
+	peers := make([]string, 0, len(peerSet))
+	for ip := range peerSet {
+		peers = append(peers, ip)
+	}
 	sort.Strings(peers)
 	return peers, nil
 }

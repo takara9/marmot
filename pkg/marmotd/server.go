@@ -746,10 +746,10 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		}
 	}
 
-	// VM 起動直前に、VXLAN ネットワークの OVS ブリッジ存在を再確認する。
+	// VM 起動直前に、オーバーレイネットワークのブリッジ存在を再確認する。
 	// ネットワークコントローラーとのタイミング競合でブリッジがまだ見えない場合に備える。
-	if err := m.ensureVxlanBridgesForServer(serverConfig); err != nil {
-		slog.Error("ensureVxlanBridgesForServer()", "err", err)
+	if err := m.ensureOverlayBridgesForServer(serverConfig); err != nil {
+		slog.Error("ensureOverlayBridgesForServer()", "err", err)
 		return "", err
 	}
 
@@ -796,9 +796,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		}
 	}
 	if err != nil && isLibvirtBridgeDeviceMissingError(err) {
-		slog.Warn("bridge device not ready; retrying after ensuring vxlan bridges", "err", err)
-		if ensureErr := m.ensureVxlanBridgesForServer(serverConfig); ensureErr != nil {
-			slog.Error("ensureVxlanBridgesForServer() on retry", "err", ensureErr)
+		slog.Warn("bridge device not ready; retrying after ensuring overlay bridges", "err", err)
+		if ensureErr := m.ensureOverlayBridgesForServer(serverConfig); ensureErr != nil {
+			slog.Error("ensureOverlayBridgesForServer() on retry", "err", ensureErr)
 		} else {
 			consolePath, err = l.DefineAndStartVM(*dom)
 		}
@@ -907,19 +907,20 @@ func isLibvirtBridgeDeviceMissingError(err error) bool {
 	return strings.Contains(msg, "cannot get interface mtu") || strings.Contains(msg, "no such device")
 }
 
-func isVxlanOverlayNetwork(vnet api.VirtualNetwork) bool {
+func isManagedOverlayNetwork(vnet api.VirtualNetwork) bool {
 	if vnet.Spec.OverlayMode == nil {
 		return false
 	}
-	return strings.EqualFold(string(*vnet.Spec.OverlayMode), "vxlan")
+	mode := strings.TrimSpace(string(*vnet.Spec.OverlayMode))
+	return strings.EqualFold(mode, string(api.Vxlan)) || strings.EqualFold(mode, string(api.Geneve))
 }
 
-func (m *Marmot) ensureVxlanBridgesForServer(serverConfig api.Server) error {
+func (m *Marmot) ensureOverlayBridgesForServer(serverConfig api.Server) error {
 	if serverConfig.Spec.NetworkInterface == nil {
 		return nil
 	}
 
-	fabric := networkfabric.NewOVSFabric()
+	fabric := networkfabric.NewOVNFabric()
 	for _, nic := range *serverConfig.Spec.NetworkInterface {
 		networkName := strings.TrimSpace(nic.Networkname)
 		if networkName == "" {
@@ -930,11 +931,11 @@ func (m *Marmot) ensureVxlanBridgesForServer(serverConfig api.Server) error {
 		if err != nil {
 			return fmt.Errorf("failed to lookup virtual network %s: %w", networkName, err)
 		}
-		if !isVxlanOverlayNetwork(vnet) {
+		if !isManagedOverlayNetwork(vnet) {
 			continue
 		}
 		if vnet.Spec.BridgeName == nil || strings.TrimSpace(*vnet.Spec.BridgeName) == "" {
-			return fmt.Errorf("vxlan network %s has no bridgeName", networkName)
+			return fmt.Errorf("overlay network %s has no bridgeName", networkName)
 		}
 
 		if err := fabric.EnsureBridge(&vnet); err != nil {

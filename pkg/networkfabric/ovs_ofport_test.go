@@ -47,3 +47,16 @@ func TestParseInterfaceOfport_InvalidText(t *testing.T) {
 		t.Fatalf("expected error for invalid input")
 	}
 }
+
+func TestParseInterfaceOfport_TrimmedQuotedValue(t *testing.T) {
+	ofport, ready, err := parseInterfaceOfport("  \"7\"  ")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ready {
+		t.Fatalf("expected ready=true")
+	}
+	if ofport != 7 {
+		t.Fatalf("unexpected ofport: got %d, want 7", ofport)
+	}
+}

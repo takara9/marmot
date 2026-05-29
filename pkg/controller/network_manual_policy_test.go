@@ -36,7 +36,7 @@ func (m *mockNetworkFabric) GetBridgeStatus(vnet *api.VirtualNetwork) (bool, int
 	return true, 0, nil
 }
 
-func TestEnsureVxlanMeshForNetwork_ManualSkipsAutomaticTunnelOps(t *testing.T) {
+func TestEnsureOverlayMeshForNetwork_ManualSkipsAutomaticTunnelOps(t *testing.T) {
 	overlayMode := api.Vxlan
 	peerPolicy := api.Manual
 	bridgeName := "br-test"
@@ -52,7 +52,7 @@ func TestEnsureVxlanMeshForNetwork_ManualSkipsAutomaticTunnelOps(t *testing.T) {
 	fabric := &mockNetworkFabric{}
 	c := &controller{}
 
-	err := c.ensureVxlanMeshForNetwork(fabric, vnet)
+	err := c.ensureOverlayMeshForNetwork(fabric, vnet)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -60,9 +60,9 @@ func TestEnsureVxlanMeshForNetwork_ManualSkipsAutomaticTunnelOps(t *testing.T) {
 		t.Fatalf("ensureBridge call count mismatch: got %d, want 1", fabric.ensureBridgeCalls)
 	}
 	if fabric.ensureMeshCalls != 0 {
-		t.Fatalf("ensureVxlanMesh should not be called for manual policy: got %d", fabric.ensureMeshCalls)
+		t.Fatalf("ensureOverlayMesh should not be called for manual policy: got %d", fabric.ensureMeshCalls)
 	}
 	if fabric.pruneMeshCalls != 0 {
-		t.Fatalf("pruneVxlanMesh should not be called for manual policy: got %d", fabric.pruneMeshCalls)
+		t.Fatalf("pruneOverlayMesh should not be called for manual policy: got %d", fabric.pruneMeshCalls)
 	}
 }

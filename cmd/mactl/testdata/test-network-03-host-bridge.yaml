@@ -5,3 +5,4 @@ metadata:
 spec:
     #bridgeName: br3
     forwardMode: bridge
+    overlayMode: none
