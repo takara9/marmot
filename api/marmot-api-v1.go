@@ -14,16 +14,13 @@ import (
 
 // Defines values for VirtualNetworkSpecOverlayMode.
 const (
-	Geneve VirtualNetworkSpecOverlayMode = "geneve"
-	None   VirtualNetworkSpecOverlayMode = "none"
-	Vxlan  VirtualNetworkSpecOverlayMode = "vxlan"
+	None  VirtualNetworkSpecOverlayMode = "none"
+	Vxlan VirtualNetworkSpecOverlayMode = "vxlan"
 )
 
 // Valid indicates whether the value is a known member of the VirtualNetworkSpecOverlayMode enum.
 func (e VirtualNetworkSpecOverlayMode) Valid() bool {
 	switch e {
-	case Geneve:
-		return true
 	case None:
 		return true
 	case Vxlan:
@@ -319,24 +316,24 @@ type VirtualNetworkSpec struct {
 	Netmask          *string `json:"netmask,omitempty" yaml:"netmask,omitempty"`
 	VpnAccess        *bool   `json:"vpnAccess,omitempty" yaml:"vpnAccess,omitempty"`
 
-	// OverlayMode Overlay mode for multi-node networks: 'none' (default), 'geneve' (OVN-managed), or 'vxlan' (deprecated).
+	// OverlayMode Overlay mode for multi-node networks: 'none' (default) or 'vxlan'
 	OverlayMode *VirtualNetworkSpecOverlayMode `json:"overlayMode,omitempty" yaml:"overlayMode,omitempty"`
 
-	// PeerPolicy Policy for peer management: 'auto' or 'manual'. This field is ignored when OVN manages peers.
+	// PeerPolicy Policy for VXLAN peer management: 'auto' (hub-spoke) or 'manual'
 	PeerPolicy *VirtualNetworkSpecPeerPolicy `json:"peerPolicy,omitempty" yaml:"peerPolicy,omitempty"`
 	Stp        *bool                         `json:"stp,omitempty" yaml:"stp,omitempty"`
 
-	// UnderlayInterface Interface name for underlay network used by overlay tunnels.
+	// UnderlayInterface Interface name for underlay network
 	UnderlayInterface *string `json:"underlayInterface,omitempty" yaml:"underlayInterface,omitempty"`
 
-	// Vni Overlay VNI (0-16777215) used by Geneve/VXLAN.
+	// Vni VXLAN Network Identifier (0-16777215)
 	Vni *int `json:"vni,omitempty" yaml:"vni,omitempty"`
 }
 
-// VirtualNetworkSpecOverlayMode Overlay mode for multi-node networks: 'none' (default), 'geneve' (OVN-managed), or 'vxlan' (deprecated).
+// VirtualNetworkSpecOverlayMode Overlay mode for multi-node networks: 'none' (default) or 'vxlan'
 type VirtualNetworkSpecOverlayMode string
 
-// VirtualNetworkSpecPeerPolicy Policy for peer management: 'auto' or 'manual'. This field is ignored when OVN manages peers.
+// VirtualNetworkSpecPeerPolicy Policy for VXLAN peer management: 'auto' (hub-spoke) or 'manual'
 type VirtualNetworkSpecPeerPolicy string
 
 // VolSpec defines model for VolSpec.
