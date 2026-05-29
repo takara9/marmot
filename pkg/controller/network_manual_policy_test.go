@@ -60,9 +60,9 @@ func TestEnsureOverlayMeshForNetwork_ManualSkipsAutomaticTunnelOps(t *testing.T)
 		t.Fatalf("ensureBridge call count mismatch: got %d, want 1", fabric.ensureBridgeCalls)
 	}
 	if fabric.ensureMeshCalls != 0 {
-		t.Fatalf("ensureVxlanMesh should not be called for manual policy: got %d", fabric.ensureMeshCalls)
+		t.Fatalf("ensureOverlayMesh should not be called for manual policy: got %d", fabric.ensureMeshCalls)
 	}
 	if fabric.pruneMeshCalls != 0 {
-		t.Fatalf("pruneVxlanMesh should not be called for manual policy: got %d", fabric.pruneMeshCalls)
+		t.Fatalf("pruneOverlayMesh should not be called for manual policy: got %d", fabric.pruneMeshCalls)
 	}
 }

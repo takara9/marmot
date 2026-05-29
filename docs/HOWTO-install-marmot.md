@@ -76,7 +76,7 @@ sudo vi /etc/marmot/marmotd.json
 | `dns_upstream` | 上位 DNS | `8.8.8.8:53` |
 | `os_volume_group` | OS ボリューム用 LVM VG 名 | `vg1` |
 | `data_volume_group` | データボリューム用 LVM VG 名 | `vg2` |
-| `default_underlay_interface` | アンダーレイ NIC 名（VXLAN 等で使用） | `""` |
+| `default_underlay_interface` | アンダーレイ NIC 名（Geneve/VXLAN 等で使用） | `""` |
 | `iscsi_server` | iSCSI ターゲットサーバーとして動作させる場合 `true` | (未設定) |
 
 設定例:

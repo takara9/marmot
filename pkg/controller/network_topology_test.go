@@ -3,6 +3,8 @@ package controller
 import (
 	"reflect"
 	"testing"
+
+	"github.com/takara9/marmot/api"
 )
 
 func TestPickDeterministicHubNode(t *testing.T) {
@@ -78,5 +80,26 @@ func TestBuildVxlanHubSpokePeerIPs_MissingHubIP(t *testing.T) {
 	peers := buildVxlanHubSpokePeerIPs("marmot2", "marmot1", participantNodes, ipByNode)
 	if len(peers) != 0 {
 		t.Fatalf("unexpected peers: got %v, want empty", peers)
+	}
+}
+
+func TestIsGeneveOverlay(t *testing.T) {
+	mode := api.Geneve
+	vnet := api.VirtualNetwork{Spec: api.VirtualNetworkSpec{OverlayMode: &mode}}
+	if !isGeneveOverlay(vnet) {
+		t.Fatalf("expected geneve overlay to be detected")
+	}
+}
+
+func TestIsGeneveOverlay_NonGeneve(t *testing.T) {
+	vxlan := api.Vxlan
+	vnet := api.VirtualNetwork{Spec: api.VirtualNetworkSpec{OverlayMode: &vxlan}}
+	if isGeneveOverlay(vnet) {
+		t.Fatalf("vxlan overlay must not be treated as geneve")
+	}
+
+	vnet.Spec.OverlayMode = nil
+	if isGeneveOverlay(vnet) {
+		t.Fatalf("nil overlay must not be treated as geneve")
 	}
 }
