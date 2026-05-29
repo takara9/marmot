@@ -1336,21 +1336,22 @@ components:
           description: Enable VPN route injection for servers on this network.
         overlayMode:
           type: string
-          description: "Overlay mode for multi-node networks: 'none' (default) or 'vxlan'"
+          description: "Overlay mode for multi-node networks: 'none' (default), 'geneve' (OVN-managed), or 'vxlan' (deprecated)."
           enum:
             - none
+            - geneve
             - vxlan
         vni:
           type: integer
-          description: "VXLAN Network Identifier (0-16777215)"
+          description: "Overlay VNI (0-16777215) used by Geneve/VXLAN."
           minimum: 0
           maximum: 16777215
         underlayInterface:
           type: string
-          description: "Interface name for underlay network"
+          description: "Interface name for underlay network used by overlay tunnels."
         peerPolicy:
           type: string
-          description: "Policy for VXLAN peer management: 'auto' (hub-spoke) or 'manual'"
+          description: "Policy for peer management: 'auto' or 'manual'. This field is ignored when OVN manages peers."
           enum:
             - auto
             - manual
