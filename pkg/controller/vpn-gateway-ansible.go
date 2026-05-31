@@ -85,7 +85,7 @@ func renderVpnGatewayPlaybook(playbookPath string, targetIP string, vpnGateway a
 	if err != nil {
 		return err
 	}
-	if override, readErr := os.ReadFile(marmotd.VpnGatewayPlaybookTemplatePath()); readErr == nil && strings.TrimSpace(string(override)) != "" {
+	if override, readErr := os.ReadFile(marmotd.GatewayPlaybookTemplatePath()); readErr == nil && strings.TrimSpace(string(override)) != "" {
 		tmpl, err = template.New("vpn-gateway-playbook").Parse(string(override))
 		if err != nil {
 			return err
