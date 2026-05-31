@@ -32,6 +32,31 @@ type NetworkFabric interface {
 	GetBridgeStatus(vnet *api.VirtualNetwork) (exists bool, peerCount int, err error)
 }
 
+// OVNLoadBalancerSpec は OVN load_balancer 同期の最小入力。
+// VIPs は ovn-nbctl の vips マップ形式（"vip:port" -> "backend1:port,backend2:port"）を想定する。
+type OVNLoadBalancerSpec struct {
+	LoadBalancerID   string
+	LogicalSwitchName string
+	VIPs             map[string]string
+	ExternalIDs      map[string]string
+}
+
+// OVNLoadBalancerStatus は OVN 上の load_balancer 状態を表す。
+type OVNLoadBalancerStatus struct {
+	Exists                 bool
+	AttachedToLogicalSwitch bool
+	VIPCount               int
+	OVNLoadBalancerName    string
+}
+
+// LoadBalancerFabric は OVN load balancer の同期を担当する。
+// controller 層は desired state の生成までを担当し、OVN コマンド詳細は本抽象に閉じ込める。
+type LoadBalancerFabric interface {
+	EnsureLoadBalancer(spec OVNLoadBalancerSpec) (string, error)
+	DeleteLoadBalancer(loadBalancerID string, logicalSwitchName string) error
+	GetLoadBalancerStatus(loadBalancerID string, logicalSwitchName string) (OVNLoadBalancerStatus, error)
+}
+
 // PeerNode はメッシュ構成用のピア情報。
 type PeerNode struct {
 	NodeName   string // ノード名
