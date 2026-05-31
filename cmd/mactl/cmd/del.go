@@ -12,7 +12,7 @@ import (
 var delCmd = &cobra.Command{
 	Use:   "del RESOURCE NAME",
 	Short: "Delete a resource",
-	Long:  `Delete a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw) with NAME specified.`,
+	Long:  `Delete a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw, loadbalancer/lb) with NAME specified.`,
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		resourceName := normalizeResourceName(args[0])
@@ -32,6 +32,8 @@ var delCmd = &cobra.Command{
 			return deleteGateway(objectName)
 		case "vpngateway":
 			return deleteVpnGateway(objectName)
+		case "loadbalancer":
+			return deleteLoadBalancer(objectName)
 		default:
 			return fmt.Errorf("unknown resource type: %s", resourceName)
 		}
@@ -269,6 +271,45 @@ func deleteVpnGateway(name string) error {
 	}
 
 	fmt.Printf("vpn gateway %q deleted successfully\n", name)
+	return nil
+}
+
+func deleteLoadBalancer(name string) error {
+	m, err := getClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	list, _, err := m.GetLoadBalancers()
+	if err != nil {
+		return fmt.Errorf("failed to list load balancers: %w", err)
+	}
+
+	var items []api.LoadBalancer
+	if err := json.Unmarshal(list, &items); err != nil {
+		return fmt.Errorf("failed to parse load balancers: %w", err)
+	}
+
+	matches := make([]api.LoadBalancer, 0)
+	for _, item := range items {
+		if item.Metadata.Name == name {
+			matches = append(matches, item)
+		}
+	}
+
+	if len(matches) == 0 {
+		return fmt.Errorf("load balancer %q not found", name)
+	}
+	if len(matches) > 1 {
+		return fmt.Errorf("multiple load balancers found with name %q; please delete by id via API", name)
+	}
+
+	_, _, err = m.DeleteLoadBalancerById(api.LoadBalancerID(matches[0]))
+	if err != nil {
+		return fmt.Errorf("failed to delete load balancer: %w", err)
+	}
+
+	fmt.Printf("load balancer %q deleted successfully\n", name)
 	return nil
 }
 

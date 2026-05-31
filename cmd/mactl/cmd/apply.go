@@ -13,7 +13,7 @@ import (
 var applyCmd = &cobra.Command{
 	Use:   "apply [RESOURCE]",
 	Short: "Create or update a resource from a file or stdin",
-	Long:  `Apply a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw) from a manifest file or stdin. Creates if not exists, updates if exists. If RESOURCE is omitted, it is inferred from manifest kind.`,
+	Long:  `Apply a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw, loadbalancer/lb) from a manifest file or stdin. Creates if not exists, updates if exists. If RESOURCE is omitted, it is inferred from manifest kind.`,
 	Args:  cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// マニフェストファイルが指定されていない場合はエラー
@@ -50,6 +50,8 @@ var applyCmd = &cobra.Command{
 				resourceName = "gateway"
 			case ManifestTypeVpnGateway:
 				resourceName = "vpngateway"
+			case ManifestTypeLoadBalancer:
+				resourceName = "loadbalancer"
 			default:
 				return fmt.Errorf("failed to infer resource type from kind %q", kind)
 			}
@@ -74,6 +76,8 @@ var applyCmd = &cobra.Command{
 			return applyGateway(manifest)
 		case "vpngateway":
 			return applyVpnGateway(manifest)
+		case "loadbalancer":
+			return applyLoadBalancer(manifest)
 		default:
 			return fmt.Errorf("unknown resource type: %s", resourceName)
 		}
@@ -197,6 +201,59 @@ func applyImage(manifest map[string]interface{}) error {
 		byteBody, _, err = m.CreateImage(*image)
 		if err != nil {
 			return fmt.Errorf("failed to create image: %w", err)
+		}
+	}
+
+	return processApplyResponse(byteBody, exists)
+}
+
+func applyLoadBalancer(manifest map[string]interface{}) error {
+	m, err := getClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	lb, err := ManifestToLoadBalancer(manifest)
+	if err != nil {
+		return fmt.Errorf("failed to convert manifest to load balancer: %w", err)
+	}
+
+	if lb.ApiVersion == "" {
+		return fmt.Errorf("apiVersion is required")
+	}
+	if lb.Kind == "" {
+		return fmt.Errorf("kind is required")
+	}
+	if strings.TrimSpace(lb.Metadata.Name) == "" {
+		return fmt.Errorf("metadata.name is required")
+	}
+
+	exists := false
+	var existingID string
+	list, _, err := m.GetLoadBalancers()
+	if err == nil {
+		var lbs []api.LoadBalancer
+		json.Unmarshal(list, &lbs)
+		for _, item := range lbs {
+			if item.Metadata.Name == lb.Metadata.Name {
+				exists = true
+				existingID = api.LoadBalancerID(item)
+				break
+			}
+		}
+	}
+
+	var byteBody []byte
+	if exists {
+		api.SetLoadBalancerID(lb, existingID)
+		byteBody, _, err = m.UpdateLoadBalancerById(existingID, *lb)
+		if err != nil {
+			return fmt.Errorf("failed to update load balancer: %w", err)
+		}
+	} else {
+		byteBody, _, err = m.CreateLoadBalancer(*lb)
+		if err != nil {
+			return fmt.Errorf("failed to create load balancer: %w", err)
 		}
 	}
 

@@ -21,7 +21,7 @@ var getVpnGatewayDownload bool
 var getCmd = &cobra.Command{
 	Use:   "get RESOURCE [NAME]",
 	Short: "Get resource(s) of a specific type",
-	Long:  `Get resource(s) (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw). If NAME is provided, show only that resource. Otherwise, list all resources.`,
+	Long:  `Get resource(s) (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw, loadbalancer/lb). If NAME is provided, show only that resource. Otherwise, list all resources.`,
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		resourceName := args[0]
@@ -47,6 +47,8 @@ var getCmd = &cobra.Command{
 			return getGatewayResources(resourceSpec)
 		case "vpngateway":
 			return getVpnGatewayResources(resourceSpec)
+		case "loadbalancer":
+			return getLoadBalancerResources(resourceSpec)
 		default:
 			return fmt.Errorf("unknown resource type: %s", resourceName)
 		}
@@ -341,6 +343,41 @@ func getVpnGatewayResources(name string) error {
 	return runList(listFn)
 }
 
+func getLoadBalancerResources(name string) error {
+	listFn := func() error {
+		m, err := getClientConfig()
+		if err != nil {
+			return fmt.Errorf("failed to get client config: %w", err)
+		}
+
+		list, _, err := m.GetLoadBalancers()
+		if err != nil {
+			return fmt.Errorf("failed to list load balancers: %w", err)
+		}
+
+		var items []api.LoadBalancer
+		if err := json.Unmarshal(list, &items); err != nil {
+			return fmt.Errorf("failed to parse load balancers: %w", err)
+		}
+
+		if name != "" {
+			items = filterLoadBalancersByName(items, name)
+			if len(items) == 0 {
+				fmt.Printf("no load balancer found with name %q\n", name)
+				return nil
+			}
+		}
+
+		if labelSelector != "" {
+			items = filterLoadBalancersByLabel(items, labelSelector)
+		}
+
+		return outputLoadBalancers(items)
+	}
+
+	return runList(listFn)
+}
+
 func downloadVpnGatewayCert(name string) error {
 	trimmedName := strings.TrimSpace(name)
 	if trimmedName == "" {
@@ -491,6 +528,26 @@ func filterGatewaysByLabel(gateways []api.Gateway, labelFilter string) []api.Gat
 	for _, g := range gateways {
 		if MatchesLabel(convertLabels(g.Metadata.Labels), labelFilter) {
 			result = append(result, g)
+		}
+	}
+	return result
+}
+
+func filterLoadBalancersByName(items []api.LoadBalancer, name string) []api.LoadBalancer {
+	var result []api.LoadBalancer
+	for _, item := range items {
+		if item.Metadata.Name == name {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+func filterLoadBalancersByLabel(items []api.LoadBalancer, labelFilter string) []api.LoadBalancer {
+	var result []api.LoadBalancer
+	for _, item := range items {
+		if MatchesLabel(convertLabels(item.Metadata.Labels), labelFilter) {
+			result = append(result, item)
 		}
 	}
 	return result
@@ -941,6 +998,81 @@ func outputGateways(gateways []api.Gateway) error {
 	default:
 		return fmt.Errorf("output style must be text/json/yaml")
 	}
+}
+
+func outputLoadBalancers(items []api.LoadBalancer) error {
+	switch outputStyle {
+	case "text":
+		sort.SliceStable(items, func(i, j int) bool {
+			return creationTime(items[i].Status).Before(creationTime(items[j].Status))
+		})
+		fmt.Printf("%-14s  %-14s  %-15s  %-8s  %-12s  %-8s\n",
+			"NAME",
+			"INTERNAL-NET",
+			"VIP",
+			"MODE",
+			"STATUS",
+			"AGE",
+		)
+		fmt.Printf("%-14s  %-14s  %-15s  %-8s  %-12s  %-8s\n",
+			"----",
+			"------------",
+			"---",
+			"----",
+			"------",
+			"---",
+		)
+
+		for _, item := range items {
+			internalNet := "-"
+			if strings.TrimSpace(item.Spec.InternalVirtualNetwork) != "" {
+				internalNet = strings.TrimSpace(item.Spec.InternalVirtualNetwork)
+			}
+			backendMode := "auto"
+			if item.Spec.BackendMode != nil && strings.TrimSpace(*item.Spec.BackendMode) != "" {
+				backendMode = strings.TrimSpace(*item.Spec.BackendMode)
+			}
+			status := "-"
+			if item.Status != nil && item.Status.Status != nil && strings.TrimSpace(*item.Status.Status) != "" {
+				status = strings.TrimSpace(*item.Status.Status)
+			}
+
+			fmt.Printf("%-14s  %-14s  %-15s  %-8s  %-12s  %-8s\n",
+				item.Metadata.Name,
+				internalNet,
+				loadBalancerDisplayVIP(item),
+				backendMode,
+				status,
+				formatServerAge(item.Status),
+			)
+		}
+		return nil
+
+	case "json":
+		data, _ := json.MarshalIndent(items, "", "  ")
+		fmt.Println(string(data))
+		return nil
+
+	case "yaml":
+		data, _ := json.Marshal(items)
+		fmt.Println(string(data))
+		return nil
+
+	default:
+		return fmt.Errorf("output style must be text/json/yaml")
+	}
+}
+
+func loadBalancerDisplayVIP(lb api.LoadBalancer) string {
+	if lb.Spec.VirtualIpAddress != nil && strings.TrimSpace(*lb.Spec.VirtualIpAddress) != "" {
+		return strings.TrimSpace(*lb.Spec.VirtualIpAddress)
+	}
+	if lb.Metadata.Labels != nil {
+		if vip := db.GetLoadBalancerResolvedVIP(*lb.Metadata.Labels); vip != "" {
+			return vip
+		}
+	}
+	return "-"
 }
 
 func init() {

@@ -37,6 +37,7 @@ type NetworkFabric interface {
 type OVNLoadBalancerSpec struct {
 	LoadBalancerID   string
 	LogicalSwitchName string
+	Protocol         string
 	VIPs             map[string]string
 	ExternalIDs      map[string]string
 }

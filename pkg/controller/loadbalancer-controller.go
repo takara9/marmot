@@ -36,6 +36,7 @@ var (
 type loadBalancerDesiredState struct {
 	ID                string
 	LogicalSwitchName string
+	Protocol          string
 	ResolvedVIP       string
 	ResolvedBackends  []string
 	NormalizedPorts   []string
@@ -253,6 +254,11 @@ func (c *controller) resolveLoadBalancerDesiredState(lb api.LoadBalancer) loadBa
 		return loadBalancerResolveOutcome{fatalErr: fmt.Errorf("spec.serverPorts is required")}
 	}
 
+	protocol, err := resolveLoadBalancerProtocol(normalizedPorts)
+	if err != nil {
+		return loadBalancerResolveOutcome{fatalErr: err}
+	}
+
 	backendMode := resolveLoadBalancerBackendMode(lb.Spec.BackendMode)
 	if backendMode != loadBalancerBackendModeAuto && backendMode != loadBalancerBackendModeManual {
 		return loadBalancerResolveOutcome{fatalErr: fmt.Errorf("spec.backendMode must be manual or auto")}
@@ -310,6 +316,7 @@ func (c *controller) resolveLoadBalancerDesiredState(lb api.LoadBalancer) loadBa
 	desired := &loadBalancerDesiredState{
 		ID:                id,
 		LogicalSwitchName: logicalSwitchName,
+		Protocol:          protocol,
 		ResolvedVIP:       resolvedVIP,
 		ResolvedBackends:  append([]string(nil), backends...),
 		NormalizedPorts:   append([]string(nil), normalizedPorts...),
@@ -329,6 +336,7 @@ func (c *controller) applyLoadBalancerDesiredState(lb api.LoadBalancer, desired 
 	ovnName, err := fabric.EnsureLoadBalancer(networkfabric.OVNLoadBalancerSpec{
 		LoadBalancerID:    desired.ID,
 		LogicalSwitchName: desired.LogicalSwitchName,
+		Protocol:          desired.Protocol,
 		VIPs:              desired.VIPs,
 		ExternalIDs:       externalIDs,
 	})
@@ -549,6 +557,7 @@ func desiredLoadBalancerConfigHash(lb api.LoadBalancer, mode string, vip string,
 	sort.Strings(sortedBackends)
 
 	payload := strings.Join([]string{
+		"v2",
 		strings.TrimSpace(api.LoadBalancerID(lb)),
 		strings.TrimSpace(mode),
 		strings.TrimSpace(lb.Spec.InternalVirtualNetwork),
@@ -558,6 +567,31 @@ func desiredLoadBalancerConfigHash(lb api.LoadBalancer, mode string, vip string,
 	}, "|")
 	sum := sha256.Sum256([]byte(payload))
 	return fmt.Sprintf("%x", sum)
+}
+
+func resolveLoadBalancerProtocol(normalizedPorts []string) (string, error) {
+	protocol := ""
+	for _, portSpec := range normalizedPorts {
+		parts := strings.Split(portSpec, "/")
+		if len(parts) != 2 {
+			return "", fmt.Errorf("invalid normalized serverPort %q", portSpec)
+		}
+		current := strings.ToLower(strings.TrimSpace(parts[1]))
+		if current != "tcp" && current != "udp" {
+			return "", fmt.Errorf("unsupported protocol %q in spec.serverPorts", current)
+		}
+		if protocol == "" {
+			protocol = current
+			continue
+		}
+		if protocol != current {
+			return "", fmt.Errorf("mixed protocols in spec.serverPorts are not supported: %s and %s", protocol, current)
+		}
+	}
+	if protocol == "" {
+		return "", fmt.Errorf("spec.serverPorts is required")
+	}
+	return protocol, nil
 }
 
 func withPort(ips []string, port string) []string {

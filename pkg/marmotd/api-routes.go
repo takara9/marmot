@@ -17,6 +17,17 @@ func RegisterRoutes(e *echo.Echo, server *Server, baseURL string) {
 	e.GET(baseURL+"/vpn-gateway/:id", func(ctx echo.Context) error {
 		return server.ApiGetVpnGatewayById(ctx, ctx.Param("id"))
 	})
+	e.POST(baseURL+"/load-balancer", server.ApiCreateLoadBalancer)
+	e.GET(baseURL+"/load-balancer", server.ApiGetLoadBalancers)
+	e.GET(baseURL+"/load-balancer/:id", func(ctx echo.Context) error {
+		return server.ApiGetLoadBalancerById(ctx, ctx.Param("id"))
+	})
+	e.PUT(baseURL+"/load-balancer/:id", func(ctx echo.Context) error {
+		return server.ApiUpdateLoadBalancerById(ctx, ctx.Param("id"))
+	})
+	e.DELETE(baseURL+"/load-balancer/:id", func(ctx echo.Context) error {
+		return server.ApiDeleteLoadBalancerById(ctx, ctx.Param("id"))
+	})
 	e.PUT(baseURL+"/vpn-gateway/:id", func(ctx echo.Context) error {
 		return server.ApiUpdateVpnGatewayById(ctx, ctx.Param("id"))
 	})

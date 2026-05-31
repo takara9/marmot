@@ -15,7 +15,7 @@ var manifestFile string
 var createCmd = &cobra.Command{
 	Use:   "create [RESOURCE]",
 	Short: "Create a resource from a file or stdin",
-	Long:  `Create a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw) from a manifest file or stdin. If RESOURCE is omitted, it is inferred from manifest kind.`,
+	Long:  `Create a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw, loadbalancer/lb) from a manifest file or stdin. If RESOURCE is omitted, it is inferred from manifest kind.`,
 	Args:  cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// マニフェストファイルが指定されていない場合はエラー
@@ -52,6 +52,8 @@ var createCmd = &cobra.Command{
 				resourceName = "gateway"
 			case ManifestTypeVpnGateway:
 				resourceName = "vpngateway"
+			case ManifestTypeLoadBalancer:
+				resourceName = "loadbalancer"
 			default:
 				return fmt.Errorf("failed to infer resource type from kind %q", kind)
 			}
@@ -76,6 +78,8 @@ var createCmd = &cobra.Command{
 			return createGateway(manifest)
 		case "vpngateway":
 			return createVpnGateway(manifest)
+		case "loadbalancer":
+			return createLoadBalancer(manifest)
 		default:
 			return fmt.Errorf("unknown resource type: %s", resourceName)
 		}
@@ -222,6 +226,46 @@ func createVolume(manifest map[string]interface{}) error {
 	byteBody, _, err := m.CreateVolume(*volume)
 	if err != nil {
 		return fmt.Errorf("failed to create volume: %w", err)
+	}
+
+	return processCreateResponse(byteBody)
+}
+
+func createLoadBalancer(manifest map[string]interface{}) error {
+	m, err := getClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	lb, err := ManifestToLoadBalancer(manifest)
+	if err != nil {
+		return fmt.Errorf("failed to convert manifest to load balancer: %w", err)
+	}
+
+	if lb.ApiVersion == "" {
+		return fmt.Errorf("apiVersion is required")
+	}
+	if lb.Kind == "" {
+		return fmt.Errorf("kind is required")
+	}
+	if strings.TrimSpace(lb.Metadata.Name) == "" {
+		return fmt.Errorf("metadata.name is required")
+	}
+
+	list, _, err := m.GetLoadBalancers()
+	if err == nil {
+		var lbs []api.LoadBalancer
+		json.Unmarshal(list, &lbs)
+		for _, item := range lbs {
+			if item.Metadata.Name == lb.Metadata.Name {
+				return fmt.Errorf("load balancer %q already exists", lb.Metadata.Name)
+			}
+		}
+	}
+
+	byteBody, _, err := m.CreateLoadBalancer(*lb)
+	if err != nil {
+		return fmt.Errorf("failed to create load balancer: %w", err)
 	}
 
 	return processCreateResponse(byteBody)

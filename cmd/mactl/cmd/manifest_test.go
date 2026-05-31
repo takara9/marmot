@@ -35,6 +35,7 @@ var _ = Describe("manifest", func() {
 			Expect(normalizeResourceName("net")).To(Equal("network"))
 			Expect(normalizeResourceName("gw")).To(Equal("gateway"))
 			Expect(normalizeResourceName("vpngw")).To(Equal("vpngateway"))
+			Expect(normalizeResourceName("lb")).To(Equal("loadbalancer"))
 		})
 
 		It("returns lowercase for unknown names", func() {
@@ -72,6 +73,11 @@ var _ = Describe("manifest", func() {
 		It("detects vpn gateway kind", func() {
 			result := GetManifestType("VpnGateway")
 			Expect(result).To(Equal(ManifestTypeVpnGateway))
+		})
+
+		It("detects load balancer kind", func() {
+			result := GetManifestType("LoadBalancer")
+			Expect(result).To(Equal(ManifestTypeLoadBalancer))
 		})
 
 		It("returns Unknown for missing kind", func() {

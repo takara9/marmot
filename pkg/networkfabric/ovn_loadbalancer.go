@@ -22,8 +22,12 @@ func (o *OVNFabric) EnsureLoadBalancer(spec OVNLoadBalancerSpec) (string, error)
 	if lsName == "" {
 		return "", fmt.Errorf("logical switch name is required")
 	}
+	protocol := strings.ToLower(strings.TrimSpace(spec.Protocol))
+	if protocol != "tcp" && protocol != "udp" {
+		return "", fmt.Errorf("load balancer protocol must be tcp or udp")
+	}
 
-	if _, err := runOVNNBCTLCommand("--may-exist", "lb-add", lbName); err != nil {
+	if err := ensureNamedLoadBalancer(lbName); err != nil {
 		return "", fmt.Errorf("failed to ensure OVN load balancer %s: %w", lbName, err)
 	}
 
@@ -46,6 +50,10 @@ func (o *OVNFabric) EnsureLoadBalancer(spec OVNLoadBalancerSpec) (string, error)
 		}
 	}
 
+	if _, err := runOVNNBCTLCommand("set", "load_balancer", lbName, "protocol="+protocol); err != nil {
+		return "", fmt.Errorf("failed to set protocol %s on OVN load balancer %s: %w", protocol, lbName, err)
+	}
+
 	if _, err := runOVNNBCTLCommand("clear", "load_balancer", lbName, "vips"); err != nil {
 		return "", fmt.Errorf("failed to clear vips on OVN load balancer %s: %w", lbName, err)
 	}
@@ -58,6 +66,20 @@ func (o *OVNFabric) EnsureLoadBalancer(spec OVNLoadBalancerSpec) (string, error)
 	}
 
 	return lbName, nil
+}
+
+func ensureNamedLoadBalancer(lbName string) error {
+	output, err := runOVNNBCTLCommand("--columns=_uuid", "--format=csv", "--data=bare", "--no-heading", "find", "load_balancer", "name="+lbName)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(firstCSVLine(output)) != "" {
+		return nil
+	}
+	if _, err := runOVNNBCTLCommand("create", "load_balancer", "name="+lbName); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (o *OVNFabric) DeleteLoadBalancer(loadBalancerID string, logicalSwitchName string) error {

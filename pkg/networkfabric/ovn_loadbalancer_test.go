@@ -11,6 +11,9 @@ func TestEnsureLoadBalancer_ProgramsOVNCommands(t *testing.T) {
 	calls := []ovnRunnerCall{}
 	withOVNRunner(t, func(args ...string) (string, error) {
 		calls = append(calls, ovnRunnerCall{args: append([]string{}, args...)})
+		if len(args) >= 6 && reflect.DeepEqual(args[:5], []string{"--columns=_uuid", "--format=csv", "--data=bare", "--no-heading", "find"}) {
+			return "\n", nil
+		}
 		return "", nil
 	})
 
@@ -18,6 +21,7 @@ func TestEnsureLoadBalancer_ProgramsOVNCommands(t *testing.T) {
 	spec := OVNLoadBalancerSpec{
 		LoadBalancerID:    "lb-1",
 		LogicalSwitchName: "marmot-net-net1",
+		Protocol:          "tcp",
 		VIPs: map[string]string{
 			"10.0.0.10:443": "10.0.0.21:443,10.0.0.22:443",
 			"10.0.0.10:80":  "10.0.0.21:80,10.0.0.22:80",
@@ -35,16 +39,20 @@ func TestEnsureLoadBalancer_ProgramsOVNCommands(t *testing.T) {
 		t.Fatalf("EnsureLoadBalancer() name = %q, want %q", lbName, "marmot-lb-lb-1")
 	}
 
-	hasLBAdd := false
+	hasLBCreate := false
+	hasProtocolSet := false
 	hasClearVIPs := false
 	hasAttach := false
 	setVIPs := []string{}
 	for _, c := range calls {
-		if len(c.args) >= 3 && reflect.DeepEqual(c.args[:2], []string{"--may-exist", "lb-add"}) && c.args[2] == "marmot-lb-lb-1" {
-			hasLBAdd = true
+		if len(c.args) == 3 && reflect.DeepEqual(c.args[:2], []string{"create", "load_balancer"}) && c.args[2] == "name=marmot-lb-lb-1" {
+			hasLBCreate = true
 		}
 		if len(c.args) == 4 && reflect.DeepEqual(c.args[:3], []string{"clear", "load_balancer", "marmot-lb-lb-1"}) && c.args[3] == "vips" {
 			hasClearVIPs = true
+		}
+		if len(c.args) == 4 && reflect.DeepEqual(c.args[:3], []string{"set", "load_balancer", "marmot-lb-lb-1"}) && c.args[3] == "protocol=tcp" {
+			hasProtocolSet = true
 		}
 		if len(c.args) == 4 && reflect.DeepEqual(c.args[:2], []string{"--may-exist", "ls-lb-add"}) {
 			hasAttach = true
@@ -54,8 +62,11 @@ func TestEnsureLoadBalancer_ProgramsOVNCommands(t *testing.T) {
 		}
 	}
 
-	if !hasLBAdd {
-		t.Fatalf("lb-add was not called: calls=%v", calls)
+	if !hasLBCreate {
+		t.Fatalf("load_balancer create was not called: calls=%v", calls)
+	}
+	if !hasProtocolSet {
+		t.Fatalf("protocol set was not called: calls=%v", calls)
 	}
 	if !hasClearVIPs {
 		t.Fatalf("clear vips was not called: calls=%v", calls)
@@ -71,6 +82,37 @@ func TestEnsureLoadBalancer_ProgramsOVNCommands(t *testing.T) {
 	}
 	if !(strings.Contains(setVIPs[0], "10.0.0.10:80") || strings.Contains(setVIPs[1], "10.0.0.10:80")) {
 		t.Fatalf("80 vip mapping not found: calls=%v", setVIPs)
+	}
+}
+
+func TestEnsureLoadBalancer_DoesNotCreateWhenNamedLoadBalancerExists(t *testing.T) {
+	withOVNLookPath(t, true, true)
+	calls := []ovnRunnerCall{}
+	withOVNRunner(t, func(args ...string) (string, error) {
+		calls = append(calls, ovnRunnerCall{args: append([]string{}, args...)})
+		if len(args) >= 6 && reflect.DeepEqual(args[:5], []string{"--columns=_uuid", "--format=csv", "--data=bare", "--no-heading", "find"}) {
+			return "a3f5f4f9-cf12-48c4-935a-6f5f5e6f4fd8\n", nil
+		}
+		return "", nil
+	})
+
+	of := NewOVNFabric()
+	_, err := of.EnsureLoadBalancer(OVNLoadBalancerSpec{
+		LoadBalancerID:    "lb-1",
+		LogicalSwitchName: "marmot-net-net1",
+		Protocol:          "tcp",
+		VIPs: map[string]string{
+			"10.0.0.10:80": "10.0.0.21:80",
+		},
+	})
+	if err != nil {
+		t.Fatalf("EnsureLoadBalancer() failed: %v", err)
+	}
+
+	for _, c := range calls {
+		if len(c.args) >= 2 && reflect.DeepEqual(c.args[:2], []string{"create", "load_balancer"}) {
+			t.Fatalf("unexpected create command when load balancer already exists: calls=%v", calls)
+		}
 	}
 }
 

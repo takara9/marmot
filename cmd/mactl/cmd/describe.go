@@ -14,7 +14,7 @@ import (
 var describeCmd = &cobra.Command{
 	Use:   "describe RESOURCE NAME",
 	Short: "Show detailed information about a resource",
-	Long:  `Describe a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw) with NAME specified. Shows formatted text output.`,
+	Long:  `Describe a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw, loadbalancer/lb) with NAME specified. Shows formatted text output.`,
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		resourceName := args[0]
@@ -35,6 +35,8 @@ var describeCmd = &cobra.Command{
 			return describeGateway(objectName)
 		case "vpngateway":
 			return describeVpnGateway(objectName)
+		case "loadbalancer":
+			return describeLoadBalancer(objectName)
 		default:
 			return fmt.Errorf("unknown resource type: %s", resourceName)
 		}
@@ -1017,6 +1019,162 @@ func describeVpnGatewayText(g *api.VpnGateway) error {
 	fmt.Printf("  RemoteCIDRs:   %s\n", strings.Join(orDashSlice(g.Spec.RemoteCIDRs), ", "))
 
 	return nil
+}
+
+func describeLoadBalancer(name string) error {
+	m, err := getClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	list, _, err := m.GetLoadBalancers()
+	if err != nil {
+		return fmt.Errorf("failed to list load balancers: %w", err)
+	}
+
+	var items []api.LoadBalancer
+	if err := json.Unmarshal(list, &items); err != nil {
+		return fmt.Errorf("failed to parse load balancers: %w", err)
+	}
+
+	matches := make([]api.LoadBalancer, 0)
+	for _, item := range items {
+		if item.Metadata.Name == name {
+			matches = append(matches, item)
+		}
+	}
+
+	if len(matches) == 0 {
+		return fmt.Errorf("load balancer %q not found", name)
+	}
+	if len(matches) > 1 {
+		return fmt.Errorf("multiple load balancers found with name %q; please query by id via API", name)
+	}
+
+	found := matches[0]
+	if outputStyle == "text" {
+		return describeLoadBalancerText(&found)
+	}
+
+	return describeResource(found)
+}
+
+func describeLoadBalancerText(lb *api.LoadBalancer) error {
+	if lb == nil {
+		return fmt.Errorf("load balancer is nil")
+	}
+
+	id := "-"
+	if strings.TrimSpace(lb.Metadata.Id) != "" {
+		id = strings.TrimSpace(lb.Metadata.Id)
+	}
+
+	nodeName := "-"
+	if lb.Metadata.NodeName != nil && strings.TrimSpace(*lb.Metadata.NodeName) != "" {
+		nodeName = strings.TrimSpace(*lb.Metadata.NodeName)
+	}
+
+	statusText := "-"
+	statusCode := "-"
+	created := "-"
+	updated := "-"
+	deleting := "-"
+	statusMessage := "-"
+	if lb.Status != nil {
+		statusCode = fmt.Sprintf("%d", lb.Status.StatusCode)
+		if lb.Status.Status != nil && strings.TrimSpace(*lb.Status.Status) != "" {
+			statusText = strings.TrimSpace(*lb.Status.Status)
+		}
+		if lb.Status.LastUpdateTimeStamp != nil {
+			updated = lb.Status.LastUpdateTimeStamp.Local().Format("2006-01-02 15:04:05")
+		}
+		if lb.Status.DeletionTimeStamp != nil {
+			deleting = lb.Status.DeletionTimeStamp.Local().Format("2006-01-02 15:04:05")
+		}
+		if lb.Status.Message != nil && strings.TrimSpace(*lb.Status.Message) != "" {
+			statusMessage = strings.TrimSpace(*lb.Status.Message)
+		}
+	}
+	ct := creationTime(lb.Status)
+	if !ct.IsZero() {
+		created = ct.Local().Format("2006-01-02 15:04:05")
+	}
+
+	backendMode := "auto"
+	if lb.Spec.BackendMode != nil && strings.TrimSpace(*lb.Spec.BackendMode) != "" {
+		backendMode = strings.TrimSpace(*lb.Spec.BackendMode)
+	}
+	bindPublicIP := "-"
+	if lb.Spec.BindPublicIpAddress != nil && strings.TrimSpace(*lb.Spec.BindPublicIpAddress) != "" {
+		bindPublicIP = strings.TrimSpace(*lb.Spec.BindPublicIpAddress)
+	}
+	virtualIP := loadBalancerDisplayVIP(*lb)
+	resolvedBackends := loadBalancerResolvedBackends(lb)
+
+	fmt.Println("Metadata:")
+	fmt.Printf("  Name:          %s\n", lb.Metadata.Name)
+	fmt.Printf("  Kind:          %s\n", lb.Kind)
+	fmt.Printf("  ID:            %s\n", id)
+	fmt.Printf("  NodeName:      %s\n", nodeName)
+	fmt.Println("  Labels:")
+	if lb.Metadata.Labels == nil || len(*lb.Metadata.Labels) == 0 {
+		fmt.Println("    -")
+	} else {
+		keys := make([]string, 0, len(*lb.Metadata.Labels))
+		for k := range *lb.Metadata.Labels {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			fmt.Printf("    %s: %v\n", k, (*lb.Metadata.Labels)[k])
+		}
+	}
+
+	fmt.Println("\nStatus:")
+	fmt.Printf("  State:         %s\n", statusText)
+	fmt.Printf("  StatusCode:    %s\n", statusCode)
+	fmt.Printf("  Age:           %s\n", formatServerAge(lb.Status))
+	fmt.Printf("  Created:       %s\n", created)
+	fmt.Printf("  Updated:       %s\n", updated)
+	fmt.Printf("  DeletingAt:    %s\n", deleting)
+	fmt.Printf("  Message:       %s\n", statusMessage)
+
+	fmt.Println("\nSpec:")
+	fmt.Printf("  BackendMode:   %s\n", backendMode)
+	fmt.Printf("  BindPublicIP:  %s\n", bindPublicIP)
+	fmt.Printf("  InternalVNet:  %s\n", stringOrDash(lb.Spec.InternalVirtualNetwork))
+	fmt.Printf("  VirtualIP:     %s\n", virtualIP)
+	fmt.Printf("  ServerPorts:   %s\n", strings.Join(orDashSlice(lb.Spec.ServerPorts), ", "))
+	fmt.Printf("  InternalSrv:   %s\n", strings.Join(orDashSlice(lb.Spec.InternalServers), ", "))
+
+	fmt.Println("\nResolved:")
+	fmt.Printf("  VIP:           %s\n", virtualIP)
+	fmt.Printf("  Backends:      %s\n", strings.Join(resolvedBackends, ", "))
+
+	return nil
+}
+
+func loadBalancerResolvedBackends(lb *api.LoadBalancer) []string {
+	if lb == nil || lb.Metadata.Labels == nil {
+		return []string{"-"}
+	}
+	value, ok := (*lb.Metadata.Labels)["resolvedBackends"].(string)
+	if !ok || strings.TrimSpace(value) == "" {
+		return []string{"-"}
+	}
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	if len(result) == 0 {
+		return []string{"-"}
+	}
+	sort.Strings(result)
+	return result
 }
 
 func orDashSlice(v []string) []string {
