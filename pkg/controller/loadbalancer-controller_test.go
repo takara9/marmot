@@ -1,8 +1,10 @@
 package controller
 
 import (
+	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
@@ -13,14 +15,19 @@ import (
 
 type mockLoadBalancerFabric struct {
 	ensureCalls []networkfabric.OVNLoadBalancerSpec
+	ensureErr   error
 	deleteCalls []struct {
 		id  string
 		lsw string
 	}
+	deleteErr error
 }
 
 func (m *mockLoadBalancerFabric) EnsureLoadBalancer(spec networkfabric.OVNLoadBalancerSpec) (string, error) {
 	m.ensureCalls = append(m.ensureCalls, spec)
+	if m.ensureErr != nil {
+		return "", m.ensureErr
+	}
 	return "marmot-lb-" + spec.LoadBalancerID, nil
 }
 
@@ -29,6 +36,9 @@ func (m *mockLoadBalancerFabric) DeleteLoadBalancer(loadBalancerID string, logic
 		id  string
 		lsw string
 	}{id: loadBalancerID, lsw: logicalSwitchName})
+	if m.deleteErr != nil {
+		return m.deleteErr
+	}
 	return nil
 }
 
@@ -105,6 +115,199 @@ func TestLoadBalancerControllerPendingToActive(t *testing.T) {
 	}
 	if got := vipMap["172.16.10.10:443"]; strings.TrimSpace(got) != "172.16.10.2:443" {
 		t.Fatalf("vip mapping for 443 = %q, want %q", got, "172.16.10.2:443")
+	}
+}
+
+func TestLoadBalancerControllerAutoNoBackendsStaysProvisioning(t *testing.T) {
+	database := newGatewayTestDatabase(t)
+	ctrl := &controller{db: database, marmot: &marmotd.Marmot{NodeName: "hvc", Db: database}, deletionDelay: 15}
+
+	_ = mustCreateVirtualNetwork(t, database, "web-servers")
+	// lb-enabled=false 相当: auto 対象が 0 台になる。
+	mustCreateLoadBalancerBackendServer(t, database, "web-1", "web-servers", "172.16.10.2", false)
+
+	lb, err := database.CreateLoadBalancer(api.LoadBalancer{
+		ApiVersion: "v1",
+		Kind:       "LoadBalancer",
+		Metadata: api.Metadata{
+			Name:     "lb-no-backend",
+			NodeName: util.StringPtr("hvc"),
+		},
+		Spec: api.LoadBalancerSpec{
+			BackendMode:            util.StringPtr("auto"),
+			InternalVirtualNetwork: "web-servers",
+			ServerPorts:            []string{"80/tcp"},
+			VirtualIpAddress:       util.StringPtr("172.16.10.20"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateLoadBalancer() failed: %v", err)
+	}
+
+	mockFabric := &mockLoadBalancerFabric{}
+	origFactory := newLoadBalancerFabric
+	newLoadBalancerFabric = func() networkfabric.LoadBalancerFabric { return mockFabric }
+	t.Cleanup(func() {
+		newLoadBalancerFabric = origFactory
+	})
+
+	ctrl.loadBalancerControllerLoop()
+	after, err := database.GetLoadBalancerById(api.LoadBalancerID(lb))
+	if err != nil {
+		t.Fatalf("GetLoadBalancerById() failed: %v", err)
+	}
+	if after.Status == nil || after.Status.StatusCode != db.LOAD_BALANCER_PROVISIONING {
+		t.Fatalf("status = %v, want %d(PROVISIONING)", after.Status, db.LOAD_BALANCER_PROVISIONING)
+	}
+	if after.Status.Message == nil || !strings.Contains(*after.Status.Message, "no backend servers resolved") {
+		t.Fatalf("message = %v, want contains %q", after.Status.Message, "no backend servers resolved")
+	}
+	if len(mockFabric.ensureCalls) != 0 {
+		t.Fatalf("EnsureLoadBalancer() should not be called, got=%d", len(mockFabric.ensureCalls))
+	}
+}
+
+func TestLoadBalancerControllerManualMissingServerFails(t *testing.T) {
+	database := newGatewayTestDatabase(t)
+	ctrl := &controller{db: database, marmot: &marmotd.Marmot{NodeName: "hvc", Db: database}, deletionDelay: 15}
+
+	_ = mustCreateVirtualNetwork(t, database, "web-servers")
+
+	lb, err := database.CreateLoadBalancer(api.LoadBalancer{
+		ApiVersion: "v1",
+		Kind:       "LoadBalancer",
+		Metadata: api.Metadata{
+			Name:     "lb-manual-missing",
+			NodeName: util.StringPtr("hvc"),
+		},
+		Spec: api.LoadBalancerSpec{
+			BackendMode:            util.StringPtr("manual"),
+			InternalVirtualNetwork: "web-servers",
+			InternalServers:        []string{"server-not-found"},
+			ServerPorts:            []string{"80/tcp"},
+			VirtualIpAddress:       util.StringPtr("172.16.10.30"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateLoadBalancer() failed: %v", err)
+	}
+
+	ctrl.loadBalancerControllerLoop()
+	after, err := database.GetLoadBalancerById(api.LoadBalancerID(lb))
+	if err != nil {
+		t.Fatalf("GetLoadBalancerById() failed: %v", err)
+	}
+	if after.Status == nil || after.Status.StatusCode != db.LOAD_BALANCER_FAILED {
+		t.Fatalf("status = %v, want %d(FAILED)", after.Status, db.LOAD_BALANCER_FAILED)
+	}
+	if after.Status.Message == nil || !strings.Contains(*after.Status.Message, "manual backend server") {
+		t.Fatalf("message = %v, want contains %q", after.Status.Message, "manual backend server")
+	}
+}
+
+func TestLoadBalancerControllerDeletingCleansDNSAndEntry(t *testing.T) {
+	database := newGatewayTestDatabase(t)
+	ctrl := &controller{db: database, marmot: &marmotd.Marmot{NodeName: "hvc", Db: database}, deletionDelay: 15}
+
+	_ = mustCreateVirtualNetwork(t, database, "web-servers")
+
+	lb, err := database.CreateLoadBalancer(api.LoadBalancer{
+		ApiVersion: "v1",
+		Kind:       "LoadBalancer",
+		Metadata: api.Metadata{
+			Name:     "lb-delete",
+			NodeName: util.StringPtr("hvc"),
+		},
+		Spec: api.LoadBalancerSpec{
+			BackendMode:            util.StringPtr("auto"),
+			InternalVirtualNetwork: "web-servers",
+			ServerPorts:            []string{"80/tcp"},
+			VirtualIpAddress:       util.StringPtr("172.16.10.40"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateLoadBalancer() failed: %v", err)
+	}
+	lbID := api.LoadBalancerID(lb)
+
+	if err := database.PutDnsEntry("lb-delete", "web-servers", "172.16.10.40"); err != nil {
+		t.Fatalf("PutDnsEntry() failed: %v", err)
+	}
+	if err := database.UpdateLoadBalancerStatusWithMessage(lbID, db.LOAD_BALANCER_DELETING, ""); err != nil {
+		t.Fatalf("UpdateLoadBalancerStatusWithMessage() failed: %v", err)
+	}
+	if err := database.UpdateLoadBalancerById(lbID, api.LoadBalancer{
+		Metadata: api.Metadata{Labels: &map[string]interface{}{loadBalancerLabelLogicalSwitch: "marmot-net-web-servers"}},
+	}); err != nil {
+		t.Fatalf("UpdateLoadBalancerById() failed: %v", err)
+	}
+
+	mockFabric := &mockLoadBalancerFabric{}
+	origFactory := newLoadBalancerFabric
+	newLoadBalancerFabric = func() networkfabric.LoadBalancerFabric { return mockFabric }
+	t.Cleanup(func() {
+		newLoadBalancerFabric = origFactory
+	})
+
+	ctrl.loadBalancerControllerLoop()
+
+	_, err = database.GetLoadBalancerById(lbID)
+	if !errors.Is(err, db.ErrNotFound) {
+		t.Fatalf("GetLoadBalancerById() err = %v, want ErrNotFound", err)
+	}
+	if _, err := database.GetDnsEntry("lb-delete", "web-servers"); !errors.Is(err, db.ErrNotFound) {
+		t.Fatalf("GetDnsEntry() err = %v, want ErrNotFound", err)
+	}
+	if len(mockFabric.deleteCalls) != 1 {
+		t.Fatalf("DeleteLoadBalancer() call count = %d, want 1", len(mockFabric.deleteCalls))
+	}
+	if mockFabric.deleteCalls[0].id != lbID {
+		t.Fatalf("DeleteLoadBalancer() id = %q, want %q", mockFabric.deleteCalls[0].id, lbID)
+	}
+}
+
+func TestLoadBalancerControllerActiveDriftToProvisioning(t *testing.T) {
+	database := newGatewayTestDatabase(t)
+	ctrl := &controller{db: database, marmot: &marmotd.Marmot{NodeName: "hvc", Db: database}, deletionDelay: 15 * time.Second}
+
+	_ = mustCreateVirtualNetwork(t, database, "web-servers")
+	mustCreateLoadBalancerBackendServer(t, database, "web-1", "web-servers", "172.16.10.2", true)
+
+	labels := map[string]interface{}{
+		db.LoadBalancerLabelAppliedConfig: "outdated-hash",
+	}
+	lb, err := database.CreateLoadBalancer(api.LoadBalancer{
+		ApiVersion: "v1",
+		Kind:       "LoadBalancer",
+		Metadata: api.Metadata{
+			Name:     "lb-drift",
+			NodeName: util.StringPtr("hvc"),
+			Labels:   &labels,
+		},
+		Spec: api.LoadBalancerSpec{
+			BackendMode:            util.StringPtr("auto"),
+			InternalVirtualNetwork: "web-servers",
+			ServerPorts:            []string{"80/tcp"},
+			VirtualIpAddress:       util.StringPtr("172.16.10.50"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateLoadBalancer() failed: %v", err)
+	}
+	if err := database.UpdateLoadBalancerStatusWithMessage(api.LoadBalancerID(lb), db.LOAD_BALANCER_ACTIVE, ""); err != nil {
+		t.Fatalf("UpdateLoadBalancerStatusWithMessage() failed: %v", err)
+	}
+
+	ctrl.loadBalancerControllerLoop()
+	after, err := database.GetLoadBalancerById(api.LoadBalancerID(lb))
+	if err != nil {
+		t.Fatalf("GetLoadBalancerById() failed: %v", err)
+	}
+	if after.Status == nil || after.Status.StatusCode != db.LOAD_BALANCER_PROVISIONING {
+		t.Fatalf("status = %v, want %d(PROVISIONING)", after.Status, db.LOAD_BALANCER_PROVISIONING)
+	}
+	if after.Status.Message == nil || !strings.Contains(*after.Status.Message, "configuration drift detected") {
+		t.Fatalf("message = %v, want contains %q", after.Status.Message, "configuration drift detected")
 	}
 }
 
