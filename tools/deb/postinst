@@ -25,34 +25,22 @@ fi
 mkdir -p "${KEY_DIR}"
 chmod 700 "${KEY_DIR}"
 
-KEY_INIT_STATUS="generated"
-
 # Backward compatibility: previous installer created private.key.pub.
 if [ -f "${LEGACY_PUBLIC_KEY}" ] && [ ! -f "${PUBLIC_KEY}" ]; then
     mv "${LEGACY_PUBLIC_KEY}" "${PUBLIC_KEY}"
 fi
 
-# If any key file already exists under /etc/marmot/keys, keep it as-is.
-if find "${KEY_DIR}" -mindepth 1 -maxdepth 1 -type f \( -name '*.key' -o -name '*.pub' \) | grep -q .; then
-    KEY_INIT_STATUS="skipped"
-else
-    if [ ! -f "${PRIVATE_KEY}" ] || [ ! -f "${PUBLIC_KEY}" ]; then
-        rm -f "${PRIVATE_KEY}" "${PUBLIC_KEY}" "${LEGACY_PUBLIC_KEY}"
-        ssh-keygen -t rsa -b 4096 -f "${PRIVATE_KEY}" -N "" -C "marmot-gateway" >/dev/null
+if [ ! -f "${PRIVATE_KEY}" ] || [ ! -f "${PUBLIC_KEY}" ]; then
+    rm -f "${PRIVATE_KEY}" "${PUBLIC_KEY}" "${LEGACY_PUBLIC_KEY}"
+    ssh-keygen -t rsa -b 4096 -f "${PRIVATE_KEY}" -N "" -C "marmot-gateway" >/dev/null
 
-        # ssh-keygen always writes public key as ${PRIVATE_KEY}.pub.
-        if [ -f "${LEGACY_PUBLIC_KEY}" ] && [ ! -f "${PUBLIC_KEY}" ]; then
-            mv "${LEGACY_PUBLIC_KEY}" "${PUBLIC_KEY}"
-        fi
+    # ssh-keygen always writes public key as ${PRIVATE_KEY}.pub.
+    if [ -f "${LEGACY_PUBLIC_KEY}" ] && [ ! -f "${PUBLIC_KEY}" ]; then
+        mv "${LEGACY_PUBLIC_KEY}" "${PUBLIC_KEY}"
     fi
 fi
-
-if [ -f "${PRIVATE_KEY}" ]; then
-    chmod 600 "${PRIVATE_KEY}"
-fi
-if [ -f "${PUBLIC_KEY}" ]; then
-    chmod 644 "${PUBLIC_KEY}"
-fi
+chmod 600 "${PRIVATE_KEY}"
+chmod 644 "${PUBLIC_KEY}"
 
 rm -rf "${PLAYBOOK_DST_DIR}"
 mkdir -p "${PLAYBOOK_TEMPLATE_DIR}"
@@ -66,24 +54,15 @@ systemctl start libvirtd.service
 systemctl enable iscsid.service
 systemctl start iscsid.service
 
-enable_and_start_if_exists() {
-    unit_name="$1"
-    if systemctl list-unit-files | grep -q "^${unit_name}\\.service"; then
-        systemctl enable "${unit_name}.service" || true
-        systemctl start "${unit_name}.service" || true
-    fi
-}
-
-# OVS runtime
-enable_and_start_if_exists openvswitch-switch
-enable_and_start_if_exists ovsdb-server
-enable_and_start_if_exists ovs-vswitchd
-
-# OVN runtime
-enable_and_start_if_exists ovn-central
-enable_and_start_if_exists ovn-northd
-enable_and_start_if_exists ovn-controller
-enable_and_start_if_exists ovn-host
+if systemctl list-unit-files | grep -q '^openvswitch-switch\.service'; then
+    systemctl enable openvswitch-switch.service
+    systemctl start openvswitch-switch.service
+elif systemctl list-unit-files | grep -q '^ovs-vswitchd\.service'; then
+    systemctl enable ovsdb-server.service || true
+    systemctl start ovsdb-server.service || true
+    systemctl enable ovs-vswitchd.service
+    systemctl start ovs-vswitchd.service
+fi
 
 systemctl daemon-reload
 systemctl enable marmot.service
@@ -93,11 +72,7 @@ echo ""
 echo "============================================================"
 echo " marmot のインストールが完了しました"
 echo "============================================================"
-if [ "${KEY_INIT_STATUS}" = "skipped" ]; then
-    echo " Gateway playbook を初期化しました (既存の SSH 鍵を検出したため鍵初期化はスキップ)"
-else
-    echo " Gateway playbook と SSH 鍵を初期化しました"
-fi
+echo " Gateway playbook と SSH 鍵を初期化しました"
 echo " 自動的に VM起動イメージをダウンロードしています..."
 echo " この処理は環境によって数分かかることがあります。"
 echo " mactl get images でダウンロード状況を確認できます。"

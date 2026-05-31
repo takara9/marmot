@@ -30,7 +30,7 @@
         executable: /bin/bash
 
     - name: Flush gateway dedicated filter chains
-      ansible.builtin.command: iptables -F {{ item }}
+      ansible.builtin.command: iptables -F {{ "{{ item }}" }}
       loop:
         - MARMOT-GW-INPUT
         - MARMOT-GW-FORWARD

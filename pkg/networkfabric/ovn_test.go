@@ -45,6 +45,15 @@ func withOVNLookPath(t *testing.T, nbOK, sbOK bool) {
 	})
 }
 
+func withGeneveOVSTunnelMesh(t *testing.T, enabled bool) {
+	t.Helper()
+	orig := enableGeneveOVSTunnelMesh
+	enableGeneveOVSTunnelMesh = enabled
+	t.Cleanup(func() {
+		enableGeneveOVSTunnelMesh = orig
+	})
+}
+
 func testGeneveVNet() *api.VirtualNetwork {
 	overlay := api.Geneve
 	bridge := "br-test"
@@ -58,7 +67,7 @@ func testGeneveVNet() *api.VirtualNetwork {
 }
 
 func TestDesiredGenevePortNames_DedupAndSort(t *testing.T) {
-	got := desiredGenevePortNames([]string{"10.0.0.2", "10.0.0.1", "10.0.0.2", "  ", "10.0.0.3"})
+	got := desiredGenevePortNames("marmot-net-test", []string{"10.0.0.2", "10.0.0.1", "10.0.0.2", "  ", "10.0.0.3"})
 	if len(got) != 3 {
 		t.Fatalf("unexpected port count: got=%d want=3", len(got))
 	}
@@ -67,9 +76,18 @@ func TestDesiredGenevePortNames_DedupAndSort(t *testing.T) {
 	}
 }
 
+func TestGenevePortNameForPeer_ContainsSwitchEntropy(t *testing.T) {
+	p1 := genevePortNameForPeer("marmot-net-a", "10.0.0.1")
+	p2 := genevePortNameForPeer("marmot-net-b", "10.0.0.1")
+	if p1 == p2 {
+		t.Fatalf("expected different port names across switches, got same: %s", p1)
+	}
+}
+
 func TestPruneGeneveLogicalPorts_DeletesRemovedManagedPortsOnly(t *testing.T) {
-	keepName := genevePortNameForPeer("10.0.0.1")
-	deleteName := genevePortNameForPeer("10.0.0.2")
+	lsName := logicalSwitchName(testGeneveVNet())
+	keepName := genevePortNameForPeer(lsName, "10.0.0.1")
+	deleteName := genevePortNameForPeer(lsName, "10.0.0.2")
 	calls := []ovnRunnerCall{}
 	withOVNRunner(t, func(args ...string) (string, error) {
 		calls = append(calls, ovnRunnerCall{args: append([]string{}, args...)})
@@ -85,7 +103,7 @@ func TestPruneGeneveLogicalPorts_DeletesRemovedManagedPortsOnly(t *testing.T) {
 
 	vnet := testGeneveVNet()
 	remain := []string{"10.0.0.1"}
-	if err := pruneGeneveLogicalPorts(vnet, logicalSwitchName(vnet), remain); err != nil {
+	if err := pruneGeneveLogicalPorts(vnet, lsName, remain); err != nil {
 		t.Fatalf("pruneGeneveLogicalPorts returned error: %v", err)
 	}
 
@@ -118,6 +136,7 @@ func TestPruneGeneveLogicalPorts_DeletesRemovedManagedPortsOnly(t *testing.T) {
 }
 
 func TestEnsureOverlayMesh_GeneveRequiresOVNCommands(t *testing.T) {
+	withGeneveOVSTunnelMesh(t, false)
 	withOVNLookPath(t, false, false)
 	of := NewOVNFabric()
 	vnet := testGeneveVNet()
@@ -127,6 +146,7 @@ func TestEnsureOverlayMesh_GeneveRequiresOVNCommands(t *testing.T) {
 }
 
 func TestEnsureOverlayMesh_GeneveSyncsLogicalSwitchAndPorts(t *testing.T) {
+	withGeneveOVSTunnelMesh(t, false)
 	withOVNLookPath(t, true, true)
 	calls := []ovnRunnerCall{}
 	withOVNRunner(t, func(args ...string) (string, error) {
