@@ -507,33 +507,7 @@ func (c *controller) findServerByName(name string) (api.Server, error) {
 }
 
 func (c *controller) resolveGatewayInternalServerTarget(gateway api.Gateway) (string, error) {
-	serverName := strings.TrimSpace(gateway.Spec.InternalServerName)
-	internalNetwork := strings.TrimSpace(gateway.Spec.InternalVirtualNetwork)
-	if serverName == "" {
-		return "", fmt.Errorf("spec.internalServerName is required")
-	}
-	if internalNetwork == "" {
-		return "", fmt.Errorf("spec.internalVirtualNetwork is required")
-	}
-
-	servers, err := c.db.GetServers()
-	if err != nil {
-		return "", err
-	}
-	for _, server := range servers {
-		if strings.TrimSpace(server.Metadata.Name) != serverName || server.Spec.NetworkInterface == nil {
-			continue
-		}
-		for _, nic := range *server.Spec.NetworkInterface {
-			if strings.TrimSpace(nic.Networkname) != internalNetwork || nic.Address == nil {
-				continue
-			}
-			if ip := strings.TrimSpace(*nic.Address); ip != "" {
-				return ip, nil
-			}
-		}
-	}
-	return "", fmt.Errorf("internal server %q on network %q does not have an assigned IP address", serverName, internalNetwork)
+	return c.resolveSingleBackendIP(gateway.Spec.InternalServerName, gateway.Spec.InternalVirtualNetwork)
 }
 
 func (c *controller) handleGatewayConfigFailure(gatewayID string, err error) {
