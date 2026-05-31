@@ -84,6 +84,25 @@ type GatewaySpec struct {
 	ServerPorts            []string `json:"serverPorts" yaml:"serverPorts"`
 }
 
+// LoadBalancer defines model for LoadBalancer.
+type LoadBalancer struct {
+	ApiVersion string           `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string           `json:"kind" yaml:"kind"`
+	Metadata   Metadata         `json:"metadata" yaml:"metadata"`
+	Spec       LoadBalancerSpec `json:"spec" yaml:"spec"`
+	Status     *Status          `json:"status,omitempty" yaml:"status,omitempty"`
+}
+
+// LoadBalancerSpec defines model for LoadBalancerSpec.
+type LoadBalancerSpec struct {
+	BackendMode            *string  `json:"backendMode,omitempty" yaml:"backendMode,omitempty"`
+	BindPublicIpAddress    *string  `json:"bindPublicIpAddress,omitempty" yaml:"bindPublicIpAddress,omitempty"`
+	InternalServers        []string `json:"internalServers,omitempty" yaml:"internalServers,omitempty"`
+	InternalVirtualNetwork string   `json:"internalVirtualNetwork" yaml:"internalVirtualNetwork"`
+	ServerPorts            []string `json:"serverPorts" yaml:"serverPorts"`
+	VirtualIpAddress       *string  `json:"virtualIpAddress,omitempty" yaml:"virtualIpAddress,omitempty"`
+}
+
 // VpnGateway defines model for VpnGateway.
 type VpnGateway struct {
 	ApiVersion string         `json:"apiVersion" yaml:"apiVersion"`
