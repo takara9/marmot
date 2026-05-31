@@ -25,6 +25,7 @@ const ovnCommandTimeout = 15 * time.Second
 var runOVNNBCTLCommand = runOVNNBCTL
 var ovnNBCTLLookPath = exec.LookPath
 var ovnSBCTLLookPath = exec.LookPath
+var enableGeneveOVSTunnelMesh = true
 
 // NewOVNFabric は OVNFabric インスタンスを生成する。
 func NewOVNFabric() *OVNFabric {
@@ -43,21 +44,23 @@ func (o *OVNFabric) EnsureBridge(vnet *api.VirtualNetwork) error {
 
 func (o *OVNFabric) EnsureOverlayMesh(vnet *api.VirtualNetwork, peers []string) error {
 	if isGeneveOverlay(vnet) {
-		if !ovnCommandsAvailable() {
-			return fmt.Errorf("ovn-nbctl/ovn-sbctl are required for geneve overlay")
+		if ovnCommandsAvailable() {
+			lsName, err := ensureGeneveLogicalSwitch(vnet)
+			if err != nil {
+				slog.Warn("failed to ensure OVN logical switch for geneve overlay; continue with OVS tunnel mesh", "network", networkName(vnet), "err", err)
+			} else if err := syncGeneveLogicalPorts(vnet, lsName, peers); err != nil {
+				slog.Warn("failed to sync OVN logical switch ports for geneve overlay; continue with OVS tunnel mesh", "network", networkName(vnet), "logicalSwitch", lsName, "err", err)
+			} else if !enableGeneveOVSTunnelMesh {
+				return nil
+			}
+		} else {
+			slog.Warn("OVN commands are not available; using OVS tunnel mesh for geneve overlay", "network", networkName(vnet))
+			if !enableGeneveOVSTunnelMesh {
+				return fmt.Errorf("ovn-nbctl/ovn-sbctl are required for geneve overlay")
+			}
 		}
 
-		lsName, err := ensureGeneveLogicalSwitch(vnet)
-		if err != nil {
-			return err
-		}
-		if err := syncGeneveLogicalPorts(vnet, lsName, peers); err != nil {
-			return err
-		}
-
-		// OVN 管理下ではトンネルメッシュの手動構成は不要。
-		slog.Debug("geneve overlay uses OVN-managed connectivity", "network", networkName(vnet), "logicalSwitch", lsName, "peerPorts", len(peers))
-		return nil
+		return o.ovs.EnsureOverlayMesh(vnet, peers)
 	}
 
 	return o.ovs.EnsureOverlayMesh(vnet, peers)
@@ -65,18 +68,22 @@ func (o *OVNFabric) EnsureOverlayMesh(vnet *api.VirtualNetwork, peers []string) 
 
 func (o *OVNFabric) PruneOverlayMesh(vnet *api.VirtualNetwork, remainPeers []string) error {
 	if isGeneveOverlay(vnet) {
-		if !ovnCommandsAvailable() {
-			return fmt.Errorf("ovn-nbctl/ovn-sbctl are required for geneve overlay")
+		if ovnCommandsAvailable() {
+			lsName := logicalSwitchName(vnet)
+			if lsName != "" {
+				if err := pruneGeneveLogicalPorts(vnet, lsName, remainPeers); err != nil {
+					slog.Warn("failed to prune OVN logical switch ports for geneve overlay; continue with OVS tunnel prune", "network", networkName(vnet), "logicalSwitch", lsName, "err", err)
+				} else if !enableGeneveOVSTunnelMesh {
+					return nil
+				}
+			}
+		} else {
+			slog.Warn("OVN commands are not available during geneve prune; using OVS tunnel prune", "network", networkName(vnet))
+			if !enableGeneveOVSTunnelMesh {
+				return fmt.Errorf("ovn-nbctl/ovn-sbctl are required for geneve overlay")
+			}
 		}
-		lsName := logicalSwitchName(vnet)
-		if lsName == "" {
-			return nil
-		}
-		if err := pruneGeneveLogicalPorts(vnet, lsName, remainPeers); err != nil {
-			return err
-		}
-		slog.Debug("geneve overlay logical ports pruned", "network", networkName(vnet), "logicalSwitch", lsName, "remainPeers", len(remainPeers))
-		return nil
+		return o.ovs.PruneOverlayMesh(vnet, remainPeers)
 	}
 
 	return o.ovs.PruneOverlayMesh(vnet, remainPeers)
@@ -85,7 +92,7 @@ func (o *OVNFabric) PruneOverlayMesh(vnet *api.VirtualNetwork, remainPeers []str
 func (o *OVNFabric) DeleteBridge(vnet *api.VirtualNetwork) error {
 	if isGeneveOverlay(vnet) && ovnCommandsAvailable() {
 		if err := deleteGeneveLogicalSwitch(vnet); err != nil {
-			return err
+			slog.Warn("failed to delete OVN logical switch for geneve overlay; continue with OVS bridge delete", "network", networkName(vnet), "err", err)
 		}
 	}
 	return o.ovs.DeleteBridge(vnet)
@@ -150,7 +157,7 @@ func deleteGeneveLogicalSwitch(vnet *api.VirtualNetwork) error {
 }
 
 func syncGeneveLogicalPorts(vnet *api.VirtualNetwork, lsName string, peers []string) error {
-	desired := desiredGenevePortNames(peers)
+	desired := desiredGenevePortNames(lsName, peers)
 	for _, portName := range desired {
 		if _, err := runOVNNBCTLCommand("--may-exist", "lsp-add", lsName, portName); err != nil {
 			return fmt.Errorf("failed to ensure OVN logical switch port %s on %s: %w", portName, lsName, err)
@@ -178,7 +185,7 @@ func pruneGeneveLogicalPorts(vnet *api.VirtualNetwork, lsName string, remainPeer
 	}
 
 	keep := map[string]struct{}{}
-	for _, name := range desiredGenevePortNames(remainPeers) {
+	for _, name := range desiredGenevePortNames(lsName, remainPeers) {
 		keep[name] = struct{}{}
 	}
 
@@ -232,14 +239,14 @@ func listLogicalSwitchPorts(lsName string) ([]string, error) {
 	return ports, nil
 }
 
-func desiredGenevePortNames(peers []string) []string {
+func desiredGenevePortNames(lsName string, peers []string) []string {
 	unique := map[string]struct{}{}
 	for _, peer := range peers {
 		peer = strings.TrimSpace(peer)
 		if peer == "" {
 			continue
 		}
-		unique[genevePortNameForPeer(peer)] = struct{}{}
+		unique[genevePortNameForPeer(lsName, peer)] = struct{}{}
 	}
 
 	result := make([]string, 0, len(unique))
@@ -250,8 +257,10 @@ func desiredGenevePortNames(peers []string) []string {
 	return result
 }
 
-func genevePortNameForPeer(peer string) string {
+func genevePortNameForPeer(lsName, peer string) string {
 	h := fnv.New32a()
+	_, _ = h.Write([]byte(strings.TrimSpace(lsName)))
+	_, _ = h.Write([]byte("|"))
 	_, _ = h.Write([]byte(strings.TrimSpace(peer)))
 	return fmt.Sprintf("marmot-peer-%08x", h.Sum32())
 }

@@ -22,17 +22,25 @@ rm -f /usr/local/bin/${ADMIN_CMD}
 install -m 0755 ${BINDIR}/${ADMIN_CMD} /usr/local/bin
 install -m 0644 ${BINDIR}/${CLIENT_CONFIG} ${HOME}/.${CLIENT_CONFIG}
 
-# Open vSwitch を有効化して起動する
-if systemctl list-unit-files | grep -q '^openvswitch-switch\.service'; then
-	systemctl enable openvswitch-switch.service
-	systemctl start openvswitch-switch.service
-elif systemctl list-unit-files | grep -q '^ovs-vswitchd\.service'; then
-	# ディストリ差異向けのフォールバック
-	systemctl enable ovsdb-server.service || true
-	systemctl start ovsdb-server.service || true
-	systemctl enable ovs-vswitchd.service
-	systemctl start ovs-vswitchd.service
-fi
+# OVN/OVS サービスを有効化して起動する（存在するユニットのみ対象）
+enable_and_start_if_exists() {
+	unit_name="$1"
+	if systemctl list-unit-files | grep -q "^${unit_name}\\.service"; then
+		systemctl enable "${unit_name}.service" || true
+		systemctl start "${unit_name}.service" || true
+	fi
+}
+
+# OVS 基盤
+enable_and_start_if_exists openvswitch-switch
+enable_and_start_if_exists ovsdb-server
+enable_and_start_if_exists ovs-vswitchd
+
+# OVN 制御プレーン/データプレーン
+enable_and_start_if_exists ovn-central
+enable_and_start_if_exists ovn-northd
+enable_and_start_if_exists ovn-controller
+enable_and_start_if_exists ovn-host
 
 systemctl daemon-reload
 systemctl enable marmot

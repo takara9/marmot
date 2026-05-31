@@ -210,7 +210,7 @@ func (o *OVSFabric) EnsureOverlayMesh(vnet *api.VirtualNetwork, peers []string) 
 		// トンネル設定（既存トンネルも毎回再同期）
 		args := []string{
 			"set", "interface", tunnelName,
-			"type=vxlan",
+			"type=" + overlayTunnelType(vnet),
 			fmt.Sprintf("options:key=%d", vni),
 			fmt.Sprintf("options:remote_ip=%s", peerIP),
 		}
@@ -224,7 +224,7 @@ func (o *OVSFabric) EnsureOverlayMesh(vnet *api.VirtualNetwork, peers []string) 
 			return fmt.Errorf("failed to configure tunnel %s to %s: %w (output=%s)", tunnelName, peerIP, err, strings.TrimSpace(string(output)))
 		}
 
-		slog.Info("VXLAN tunnel created", "bridge", bridgeName, "tunnel", tunnelName, "peer", peerIP, "vni", vni, "underlayInterface", underlayIf, "localIP", localIP)
+		slog.Info("overlay tunnel created", "bridge", bridgeName, "tunnel", tunnelName, "peer", peerIP, "tunnelType", overlayTunnelType(vnet), "vni", vni, "underlayInterface", underlayIf, "localIP", localIP)
 	}
 
 	if err := reconcileSplitHorizonFlows(bridgeName); err != nil {
@@ -232,6 +232,13 @@ func (o *OVSFabric) EnsureOverlayMesh(vnet *api.VirtualNetwork, peers []string) 
 	}
 
 	return nil
+}
+
+func overlayTunnelType(vnet *api.VirtualNetwork) string {
+	if vnet != nil && vnet.Spec.OverlayMode != nil && strings.EqualFold(string(*vnet.Spec.OverlayMode), string(api.Geneve)) {
+		return "geneve"
+	}
+	return "vxlan"
 }
 
 func tunnelNameForPeer(bridgeName, peerIP string) string {
@@ -546,7 +553,8 @@ func listVxlanPortsOnBridge(bridgeName string) ([]string, error) {
 			return nil, fmt.Errorf("ovs-vsctl get interface %s type failed: %w (output=%s)", port, typeErr, strings.TrimSpace(string(typeOut)))
 		}
 
-		if strings.Trim(strings.TrimSpace(string(typeOut)), "\"") == "vxlan" {
+		t := strings.Trim(strings.TrimSpace(string(typeOut)), "\"")
+		if t == "vxlan" || t == "geneve" {
 			vxlanPorts = append(vxlanPorts, port)
 		}
 	}
