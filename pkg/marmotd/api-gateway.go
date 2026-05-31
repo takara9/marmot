@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/labstack/echo/v4"
@@ -194,7 +193,7 @@ func normalizeGatewaySpec(spec *api.GatewaySpec) error {
 		return err
 	}
 
-	ports, err := normalizeGatewayPorts(spec.ServerPorts)
+	ports, err := NormalizeServerPorts(spec.ServerPorts)
 	if err != nil {
 		return err
 	}
@@ -247,64 +246,3 @@ func normalizeGatewayRemoteCIDRs(spec *api.GatewaySpec) error {
 	return nil
 }
 
-func normalizeGatewayPorts(raw []string) ([]string, error) {
-	if len(raw) == 0 {
-		return nil, fmt.Errorf("spec.serverPorts is required")
-	}
-
-	normalized := make([]string, 0, len(raw))
-	seen := map[string]struct{}{}
-
-	for _, p := range raw {
-		entry := strings.TrimSpace(p)
-		if entry == "" {
-			return nil, fmt.Errorf("spec.serverPorts contains an empty entry")
-		}
-
-		portSpec, err := resolvePortSpec(entry)
-		if err != nil {
-			return nil, err
-		}
-
-		if _, ok := seen[portSpec]; ok {
-			continue
-		}
-		seen[portSpec] = struct{}{}
-		normalized = append(normalized, portSpec)
-	}
-
-	if len(normalized) == 0 {
-		return nil, fmt.Errorf("spec.serverPorts is required")
-	}
-
-	return normalized, nil
-}
-
-func resolvePortSpec(entry string) (string, error) {
-	if strings.Contains(entry, "/") {
-		parts := strings.Split(entry, "/")
-		if len(parts) != 2 {
-			return "", fmt.Errorf("invalid port format %q", entry)
-		}
-		port, err := strconv.Atoi(strings.TrimSpace(parts[0]))
-		if err != nil || port < 1 || port > 65535 {
-			return "", fmt.Errorf("invalid port number in %q", entry)
-		}
-		proto := strings.ToLower(strings.TrimSpace(parts[1]))
-		if proto != "tcp" && proto != "udp" {
-			return "", fmt.Errorf("invalid protocol in %q: must be tcp or udp", entry)
-		}
-		return fmt.Sprintf("%d/%s", port, proto), nil
-	}
-
-	if _, err := strconv.Atoi(entry); err == nil {
-		return "", fmt.Errorf("numeric port %q must include protocol suffix like /tcp or /udp", entry)
-	}
-
-	// service name lookup uses tcp as default protocol by requirement.
-	port, err := net.LookupPort("tcp", strings.ToLower(entry))
-	if err != nil {
-		return "", fmt.Errorf("failed to resolve service name %q with tcp: %w", entry, err)
-	}
-	return fmt.Sprintf("%d/tcp", port), nil
-}
