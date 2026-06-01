@@ -78,4 +78,14 @@ func (c *hostController) hostControllerLoop() {
 	if err := c.marmot.CollectAndUpdateHostStatus(); err != nil {
 		slog.Error("Failed to collect and update host status", "err", err)
 	}
+
+	statuses, err := c.marmot.Db.GetAllHostStatus()
+	if err != nil {
+		slog.Warn("failed to get host statuses; skip OVN chassis bootstrap reconciliation", "err", err)
+		return
+	}
+
+	if err := reconcileOVNClusterBootstrapFromStatuses(c.marmot.NodeName, statuses, time.Now(), reconcileOVNClusterBootstrap); err != nil {
+		slog.Warn("failed to reconcile OVN chassis bootstrap", "node", c.marmot.NodeName, "err", err)
+	}
 }

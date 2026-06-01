@@ -97,15 +97,17 @@ func (c *controller) networkControllerLoop(fabric networkfabric.NetworkFabric) {
 	statuses, err := c.marmot.Db.GetAllHostStatus()
 	if err != nil {
 		slog.Warn("failed to get host statuses; skip vxlan hub failover reconciliation", "err", err)
-	} else if marmotd.IsSchedulerLeader(c.marmot.NodeName, statuses) {
-		if err := c.reconcileVxlanHubFailovers(vnets, statuses); err != nil {
-			slog.Warn("failed to reconcile vxlan hub failovers", "err", err)
-		}
-		refreshed, refreshErr := c.marmot.GetVirtualNetwork()
-		if refreshErr != nil {
-			slog.Warn("failed to refresh virtual networks after hub failover reconciliation", "err", refreshErr)
-		} else {
-			vnets = refreshed
+	} else {
+		if marmotd.IsSchedulerLeader(c.marmot.NodeName, statuses) {
+			if err := c.reconcileVxlanHubFailovers(vnets, statuses); err != nil {
+				slog.Warn("failed to reconcile vxlan hub failovers", "err", err)
+			}
+			refreshed, refreshErr := c.marmot.GetVirtualNetwork()
+			if refreshErr != nil {
+				slog.Warn("failed to refresh virtual networks after hub failover reconciliation", "err", refreshErr)
+			} else {
+				vnets = refreshed
+			}
 		}
 	}
 

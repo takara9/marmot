@@ -321,7 +321,7 @@ func (c *controller) resolveLoadBalancerDesiredState(lb api.LoadBalancer) loadBa
 		ResolvedBackends:  append([]string(nil), backends...),
 		NormalizedPorts:   append([]string(nil), normalizedPorts...),
 		VIPs:              vipMap,
-		ConfigHash:        desiredLoadBalancerConfigHash(lb, backendMode, resolvedVIP, normalizedPorts, backends),
+		ConfigHash:        desiredLoadBalancerConfigHash(lb, backendMode, logicalSwitchName, resolvedVIP, normalizedPorts, backends),
 	}
 
 	return loadBalancerResolveOutcome{desired: desired}
@@ -540,17 +540,17 @@ func resolveLoadBalancerBackendMode(mode *string) string {
 }
 
 func loadBalancerLogicalSwitchName(vnet api.VirtualNetwork) string {
-	id := strings.TrimSpace(api.VirtualNetworkID(vnet))
-	if id == "" {
-		id = strings.TrimSpace(vnet.Metadata.Name)
+	key := strings.TrimSpace(vnet.Metadata.Name)
+	if key == "" {
+		key = strings.TrimSpace(api.VirtualNetworkID(vnet))
 	}
-	if id == "" {
+	if key == "" {
 		return ""
 	}
-	return "marmot-net-" + loadBalancerLogicalSwitchSanitizer.ReplaceAllString(id, "-")
+	return "marmot-net-" + loadBalancerLogicalSwitchSanitizer.ReplaceAllString(key, "-")
 }
 
-func desiredLoadBalancerConfigHash(lb api.LoadBalancer, mode string, vip string, ports []string, backends []string) string {
+func desiredLoadBalancerConfigHash(lb api.LoadBalancer, mode string, logicalSwitchName string, vip string, ports []string, backends []string) string {
 	sortedPorts := append([]string(nil), ports...)
 	sortedBackends := append([]string(nil), backends...)
 	sort.Strings(sortedPorts)
@@ -561,6 +561,7 @@ func desiredLoadBalancerConfigHash(lb api.LoadBalancer, mode string, vip string,
 		strings.TrimSpace(api.LoadBalancerID(lb)),
 		strings.TrimSpace(mode),
 		strings.TrimSpace(lb.Spec.InternalVirtualNetwork),
+		strings.TrimSpace(logicalSwitchName),
 		strings.TrimSpace(vip),
 		strings.Join(sortedPorts, ","),
 		strings.Join(sortedBackends, ","),

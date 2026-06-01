@@ -121,6 +121,9 @@ func TestDeleteLoadBalancer_CallsDetachAndDelete(t *testing.T) {
 	calls := []ovnRunnerCall{}
 	withOVNRunner(t, func(args ...string) (string, error) {
 		calls = append(calls, ovnRunnerCall{args: append([]string{}, args...)})
+		if len(args) == 2 && reflect.DeepEqual(args[:2], []string{"lsp-list", "marmot-net-net1"}) {
+			return "marmot-lb-vip-lb-1-aaaaaaaa\nother-port\n", nil
+		}
 		return "", nil
 	})
 
@@ -129,14 +132,26 @@ func TestDeleteLoadBalancer_CallsDetachAndDelete(t *testing.T) {
 		t.Fatalf("DeleteLoadBalancer() failed: %v", err)
 	}
 
-	if len(calls) != 2 {
-		t.Fatalf("command count = %d, want 2; calls=%v", len(calls), calls)
+	hasDetach := false
+	hasListPorts := false
+	hasDeleteVIPPort := false
+	hasDeleteLB := false
+	for _, c := range calls {
+		if reflect.DeepEqual(c.args, []string{"--if-exists", "ls-lb-del", "marmot-net-net1", "marmot-lb-lb-1"}) {
+			hasDetach = true
+		}
+		if reflect.DeepEqual(c.args, []string{"lsp-list", "marmot-net-net1"}) {
+			hasListPorts = true
+		}
+		if reflect.DeepEqual(c.args, []string{"--if-exists", "lsp-del", "marmot-lb-vip-lb-1-aaaaaaaa"}) {
+			hasDeleteVIPPort = true
+		}
+		if reflect.DeepEqual(c.args, []string{"--if-exists", "lb-del", "marmot-lb-lb-1"}) {
+			hasDeleteLB = true
+		}
 	}
-	if !reflect.DeepEqual(calls[0].args, []string{"--if-exists", "ls-lb-del", "marmot-net-net1", "marmot-lb-lb-1"}) {
-		t.Fatalf("unexpected detach command: %v", calls[0].args)
-	}
-	if !reflect.DeepEqual(calls[1].args, []string{"--if-exists", "lb-del", "marmot-lb-lb-1"}) {
-		t.Fatalf("unexpected delete command: %v", calls[1].args)
+	if !hasDetach || !hasListPorts || !hasDeleteVIPPort || !hasDeleteLB {
+		t.Fatalf("expected detach/list-vip-port/delete-vip-port/delete-lb calls, got=%v", calls)
 	}
 }
 
@@ -199,6 +214,48 @@ func TestGetLoadBalancerStatus_NotFound(t *testing.T) {
 	}
 }
 
+func TestEnsureLoadBalancer_CleansStaleVIPPortWithSameIP(t *testing.T) {
+	withOVNLookPath(t, true, true)
+	calls := []ovnRunnerCall{}
+	withOVNRunner(t, func(args ...string) (string, error) {
+		calls = append(calls, ovnRunnerCall{args: append([]string{}, args...)})
+		if len(args) >= 6 && reflect.DeepEqual(args[:5], []string{"--columns=_uuid", "--format=csv", "--data=bare", "--no-heading", "find"}) {
+			return "\n", nil
+		}
+		if len(args) == 2 && reflect.DeepEqual(args[:2], []string{"lsp-list", "marmot-net-net1"}) {
+			return "marmot-lb-vip-oldlb-aaaaaaaa\n", nil
+		}
+		if len(args) == 4 && reflect.DeepEqual(args[:3], []string{"get", "logical_switch_port", "marmot-lb-vip-oldlb-aaaaaaaa"}) && args[3] == "addresses" {
+			return "[\"02:00:aa:aa:aa:aa 10.0.0.10\"]", nil
+		}
+		return "", nil
+	})
+
+	of := NewOVNFabric()
+	_, err := of.EnsureLoadBalancer(OVNLoadBalancerSpec{
+		LoadBalancerID:    "lb-1",
+		LogicalSwitchName: "marmot-net-net1",
+		Protocol:          "tcp",
+		VIPs: map[string]string{
+			"10.0.0.10:80": "10.0.0.21:80",
+		},
+	})
+	if err != nil {
+		t.Fatalf("EnsureLoadBalancer() failed: %v", err)
+	}
+
+	hasDeleteStale := false
+	for _, c := range calls {
+		if reflect.DeepEqual(c.args, []string{"--if-exists", "lsp-del", "marmot-lb-vip-oldlb-aaaaaaaa"}) {
+			hasDeleteStale = true
+			break
+		}
+	}
+	if !hasDeleteStale {
+		t.Fatalf("stale vip port delete was not called: calls=%v", calls)
+	}
+}
+
 func TestParseOVNMap(t *testing.T) {
 	raw := "{\"10.0.0.10:80\"=\"10.0.0.21:80,10.0.0.22:80\", \"10.0.0.10:443\"=\"10.0.0.21:443\"}"
 	parsed := parseOVNMap(raw)
@@ -208,4 +265,26 @@ func TestParseOVNMap(t *testing.T) {
 	if parsed["10.0.0.10:80"] != "10.0.0.21:80,10.0.0.22:80" {
 		t.Fatalf("unexpected parsed value for 80: %v", parsed)
 	}
+}
+
+func TestDuplicateVIPConflictPortName(t *testing.T) {
+	err := 
+		"ovn-nbctl failed: args=[lsp-set-addresses p1 02:00:aa:bb:cc:dd 172.16.80.5] output=" +
+		"ovn-nbctl: Error on switch marmot-net-webs-net: duplicate IPv4 address '172.16.80.5' found on logical switch port 'marmot-lb-vip-old-12345678' err=exit status 1"
+	port := duplicateVIPConflictPortName(assertErrString(err))
+	if port != "marmot-lb-vip-old-12345678" {
+		t.Fatalf("duplicateVIPConflictPortName() = %q, want %q", port, "marmot-lb-vip-old-12345678")
+	}
+}
+
+func assertErrString(msg string) error {
+	return &staticError{msg: msg}
+}
+
+type staticError struct {
+	msg string
+}
+
+func (e *staticError) Error() string {
+	return e.msg
 }

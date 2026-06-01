@@ -7,7 +7,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 networks=(
   "default"
   "host-bridge"
-  "ovs-network"
 )
 
 if ! command -v virsh >/dev/null 2>&1; then

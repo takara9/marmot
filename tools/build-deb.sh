@@ -59,6 +59,7 @@ rm -rf "${PKG_DIR}"
 mkdir -p "${PKG_DIR}/DEBIAN"
 mkdir -p "${PKG_DIR}/usr/local/marmot"
 mkdir -p "${PKG_DIR}/usr/local/marmot/gateway-playbooks"
+mkdir -p "${PKG_DIR}/usr/local/marmot/network-setup"
 mkdir -p "${PKG_DIR}/usr/local/bin"
 mkdir -p "${PKG_DIR}/lib/systemd/system"
 mkdir -p "${PKG_DIR}/etc/marmot"
@@ -77,6 +78,14 @@ install -m 0644 "${ROOT_DIR}/pkg/controller/gateway-playbooks/gateway-iptables.y
     "${PKG_DIR}/usr/local/marmot/gateway-playbooks/gateway-iptables.yaml.tmpl"
 install -m 0644 "${ROOT_DIR}/pkg/controller/gateway-playbooks/vpn-gateway-openvpn.yaml.tmpl" \
     "${PKG_DIR}/usr/local/marmot/gateway-playbooks/vpn-gateway-openvpn.yaml.tmpl"
+install -m 0755 "${ROOT_DIR}/tools/setup-libvirt-networks.sh" \
+    "${PKG_DIR}/usr/local/marmot/network-setup/setup-libvirt-networks.sh"
+install -m 0644 "${ROOT_DIR}/tools/default.xml" \
+    "${PKG_DIR}/usr/local/marmot/network-setup/default.xml"
+install -m 0644 "${ROOT_DIR}/tools/host-bridge.xml" \
+    "${PKG_DIR}/usr/local/marmot/network-setup/host-bridge.xml"
+install -m 0644 "${ROOT_DIR}/tools/ovs-network.xml" \
+    "${PKG_DIR}/usr/local/marmot/network-setup/ovs-network.xml"
 
 echo "systemd サービスファイルをコピー中..."
 install -m 0644 "${ROOT_DIR}/cmd/marmotd/marmot.service" \

@@ -239,6 +239,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			PortID:  uuid.New().String(),
 			Bus:     1,
 		}
+		if xnet.Spec.OverlayMode != nil && strings.EqualFold(string(*xnet.Spec.OverlayMode), string(api.Geneve)) {
+			defaultNS.InterfaceID = defaultNS.PortID
+		}
 		// default ネットワークが libvirt 側に見えない環境向けのフォールバック。
 		if strings.EqualFold(xnet.Metadata.Name, "default") && xnet.Spec.BridgeName != nil && strings.TrimSpace(*xnet.Spec.BridgeName) != "" {
 			defaultNS.Bridge = strings.TrimSpace(*xnet.Spec.BridgeName)
@@ -376,6 +379,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 				Network: vnet.Metadata.Name,
 				PortID:  uuid.New().String(),
 				Bus:     busno,
+			}
+			if vnet.Spec.OverlayMode != nil && strings.EqualFold(string(*vnet.Spec.OverlayMode), string(api.Geneve)) {
+				ns.InterfaceID = ns.PortID
 			}
 			// 通常は libvirt network 名で接続する。
 			// default のみ、環境差異により network が見えないケース向けに bridge へフォールバックする。

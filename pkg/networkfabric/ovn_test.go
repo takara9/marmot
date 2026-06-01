@@ -3,7 +3,6 @@ package networkfabric
 import (
 	"fmt"
 	"os/exec"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -20,6 +19,15 @@ func withOVNRunner(t *testing.T, fn func(args ...string) (string, error)) {
 	runOVNNBCTLCommand = fn
 	t.Cleanup(func() {
 		runOVNNBCTLCommand = orig
+	})
+}
+
+func withOVSRunner(t *testing.T, fn func(args ...string) (string, error)) {
+	t.Helper()
+	orig := runOVSVSCTLCommandExec
+	runOVSVSCTLCommandExec = fn
+	t.Cleanup(func() {
+		runOVSVSCTLCommandExec = orig
 	})
 }
 
@@ -151,8 +159,11 @@ func TestEnsureOverlayMesh_GeneveSyncsLogicalSwitchAndPorts(t *testing.T) {
 	calls := []ovnRunnerCall{}
 	withOVNRunner(t, func(args ...string) (string, error) {
 		calls = append(calls, ovnRunnerCall{args: append([]string{}, args...)})
-		if len(args) >= 2 && args[0] == "lsp-list" {
-			return "", nil
+		return "", nil
+	})
+	withOVSRunner(t, func(args ...string) (string, error) {
+		if len(args) >= 2 && args[0] == "list-ports" {
+			return "vnet0\nvx-123\n", nil
 		}
 		return "", nil
 	})
@@ -166,20 +177,64 @@ func TestEnsureOverlayMesh_GeneveSyncsLogicalSwitchAndPorts(t *testing.T) {
 
 	hasLSAdd := false
 	lspAdds := []string{}
+	setCalls := 0
 	for _, c := range calls {
-		if len(c.args) >= 3 && reflect.DeepEqual(c.args[:2], []string{"--may-exist", "ls-add"}) {
+		if len(c.args) >= 3 && c.args[0] == "--may-exist" && c.args[1] == "ls-add" {
 			hasLSAdd = true
 		}
 		if len(c.args) >= 4 && c.args[0] == "--may-exist" && c.args[1] == "lsp-add" {
 			lspAdds = append(lspAdds, c.args[3])
+		}
+		if len(c.args) >= 4 && c.args[0] == "set" && c.args[1] == "logical_switch_port" {
+			setCalls++
 		}
 	}
 
 	if !hasLSAdd {
 		t.Fatalf("expected ls-add call, got calls=%v", calls)
 	}
-	if len(lspAdds) != 2 {
-		t.Fatalf("expected deduped lsp-add count=2, got=%d calls=%v", len(lspAdds), lspAdds)
+	if len(lspAdds) != 1 {
+		t.Fatalf("expected one lsp-add for vnet interface, got=%d calls=%v", len(lspAdds), lspAdds)
+	}
+	if setCalls == 0 {
+		t.Fatalf("expected logical_switch_port set calls, got calls=%v", calls)
+	}
+}
+
+func TestEnsureOverlayMesh_GeneveOVNOnlyPrunesLegacyOVSTunnels(t *testing.T) {
+	withGeneveOVSTunnelMesh(t, false)
+	withOVNLookPath(t, true, true)
+
+	ovnCalls := []ovnRunnerCall{}
+	withOVNRunner(t, func(args ...string) (string, error) {
+		ovnCalls = append(ovnCalls, ovnRunnerCall{args: append([]string{}, args...)})
+		return "", nil
+	})
+
+	ovsCalls := []ovnRunnerCall{}
+	withOVSRunner(t, func(args ...string) (string, error) {
+		ovsCalls = append(ovsCalls, ovnRunnerCall{args: append([]string{}, args...)})
+		if len(args) >= 2 && args[0] == "list-ports" {
+			return "vx-aaaa\nvx-bbbb\n", nil
+		}
+		return "", nil
+	})
+
+	of := NewOVNFabric()
+	vnet := testGeneveVNet()
+	if err := of.EnsureOverlayMesh(vnet, []string{"10.0.0.1"}); err != nil {
+		t.Fatalf("EnsureOverlayMesh returned error: %v", err)
+	}
+
+	hasPrune := false
+	for _, c := range ovsCalls {
+		if len(c.args) >= 3 && c.args[0] == "--if-exists" && c.args[1] == "del-port" && c.args[2] == "br-test" {
+			hasPrune = true
+			break
+		}
+	}
+	if !hasPrune {
+		t.Fatalf("expected legacy OVS tunnel prune call, ovsCalls=%v ovnCalls=%v", ovsCalls, ovnCalls)
 	}
 }
 

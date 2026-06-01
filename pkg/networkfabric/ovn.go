@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"hash/fnv"
 	"log/slog"
+	"os"
 	"os/exec"
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/takara9/marmot/api"
@@ -23,13 +25,64 @@ type OVNFabric struct {
 const ovnCommandTimeout = 15 * time.Second
 
 var runOVNNBCTLCommand = runOVNNBCTL
+var runOVSVSCTLCommandExec = runOVSVSCTLCommand
 var ovnNBCTLLookPath = exec.LookPath
 var ovnSBCTLLookPath = exec.LookPath
-var enableGeneveOVSTunnelMesh = true
+var enableGeneveOVSTunnelMesh = defaultEnableGeneveOVSTunnelMesh()
+var ovnDatabaseConfigMu sync.RWMutex
+var ovnNorthboundDBEndpoint string
+var ovnSouthboundDBEndpoint string
 
 // NewOVNFabric は OVNFabric インスタンスを生成する。
 func NewOVNFabric() *OVNFabric {
 	return &OVNFabric{ovs: NewOVSFabric()}
+}
+
+func ConfigureOVNCluster(leaderIP, localIP string) error {
+	leaderIP = strings.TrimSpace(leaderIP)
+	localIP = strings.TrimSpace(localIP)
+	if leaderIP == "" {
+		return fmt.Errorf("leader IP is required for OVN bootstrap")
+	}
+	if localIP == "" {
+		return fmt.Errorf("local IP is required for OVN bootstrap")
+	}
+
+	if localIP == leaderIP {
+		if err := ensureLocalOVNCentralTCPListeners(localIP); err != nil {
+			return fmt.Errorf("failed to configure OVN central listeners on leader %s: %w", localIP, err)
+		}
+	}
+
+	nbDB := fmt.Sprintf("tcp:%s:6641", leaderIP)
+	sbDB := fmt.Sprintf("tcp:%s:6642", leaderIP)
+	setOVNDatabaseEndpoints(nbDB, sbDB)
+
+	if _, err := runOVSVSCTLCommandExec(
+		"set", "Open_vSwitch", ".",
+		"external_ids:ovn-remote="+sbDB,
+		"external_ids:ovn-encap-ip="+localIP,
+		"external_ids:ovn-encap-type=geneve",
+	); err != nil {
+		return fmt.Errorf("failed to configure local OVN chassis bootstrap: %w", err)
+	}
+
+	return nil
+}
+
+func ensureLocalOVNCentralTCPListeners(bindIP string) error {
+	bindIP = strings.TrimSpace(bindIP)
+	if bindIP == "" {
+		return fmt.Errorf("bind ip is required")
+	}
+
+	if _, err := runOVNNBCTLLocal("set-connection", "ptcp:6641:"+bindIP); err != nil {
+		return fmt.Errorf("ovn-nbctl set-connection failed: %w", err)
+	}
+	if _, err := runOVNSBCTLLocal("set-connection", "ptcp:6642:"+bindIP); err != nil {
+		return fmt.Errorf("ovn-sbctl set-connection failed: %w", err)
+	}
+	return nil
 }
 
 func (o *OVNFabric) EnsureBridge(vnet *api.VirtualNetwork) error {
@@ -47,10 +100,19 @@ func (o *OVNFabric) EnsureOverlayMesh(vnet *api.VirtualNetwork, peers []string) 
 		if ovnCommandsAvailable() {
 			lsName, err := ensureGeneveLogicalSwitch(vnet)
 			if err != nil {
+				if !enableGeneveOVSTunnelMesh {
+					return err
+				}
 				slog.Warn("failed to ensure OVN logical switch for geneve overlay; continue with OVS tunnel mesh", "network", networkName(vnet), "err", err)
-			} else if err := syncGeneveLogicalPorts(vnet, lsName, peers); err != nil {
+			} else if err := syncGeneveLogicalPorts(vnet, lsName); err != nil {
+				if !enableGeneveOVSTunnelMesh {
+					return err
+				}
 				slog.Warn("failed to sync OVN logical switch ports for geneve overlay; continue with OVS tunnel mesh", "network", networkName(vnet), "logicalSwitch", lsName, "err", err)
 			} else if !enableGeneveOVSTunnelMesh {
+				if err := pruneLegacyOVSTunnels(vnet); err != nil {
+					return fmt.Errorf("failed to prune legacy OVS overlay tunnels for OVN-only geneve mode: %w", err)
+				}
 				return nil
 			}
 		} else {
@@ -69,13 +131,13 @@ func (o *OVNFabric) EnsureOverlayMesh(vnet *api.VirtualNetwork, peers []string) 
 func (o *OVNFabric) PruneOverlayMesh(vnet *api.VirtualNetwork, remainPeers []string) error {
 	if isGeneveOverlay(vnet) {
 		if ovnCommandsAvailable() {
-			lsName := logicalSwitchName(vnet)
-			if lsName != "" {
-				if err := pruneGeneveLogicalPorts(vnet, lsName, remainPeers); err != nil {
-					slog.Warn("failed to prune OVN logical switch ports for geneve overlay; continue with OVS tunnel prune", "network", networkName(vnet), "logicalSwitch", lsName, "err", err)
-				} else if !enableGeneveOVSTunnelMesh {
-					return nil
+			if !enableGeneveOVSTunnelMesh {
+				if err := pruneLegacyOVSTunnels(vnet); err != nil {
+					return fmt.Errorf("failed to prune legacy OVS overlay tunnels for OVN-only geneve mode: %w", err)
 				}
+				// OVN dataplaneではリモートノードの論理ポートを誤削除しないため、
+				// ノード単位の logical_switch_port prune は実施しない。
+				return nil
 			}
 		} else {
 			slog.Warn("OVN commands are not available during geneve prune; using OVS tunnel prune", "network", networkName(vnet))
@@ -156,9 +218,33 @@ func deleteGeneveLogicalSwitch(vnet *api.VirtualNetwork) error {
 	return nil
 }
 
-func syncGeneveLogicalPorts(vnet *api.VirtualNetwork, lsName string, peers []string) error {
-	desired := desiredGenevePortNames(lsName, peers)
-	for _, portName := range desired {
+func syncGeneveLogicalPorts(vnet *api.VirtualNetwork, lsName string) error {
+	bridge := bridgeName(vnet)
+	if bridge == "" {
+		return fmt.Errorf("bridge name is required for OVN geneve port sync")
+	}
+
+	ifaceNames, err := listOVSBridgePorts(bridge)
+	if err != nil {
+		return err
+	}
+
+	nodeName, _ := os.Hostname()
+	nodeName = sanitizeOVNToken(nodeName)
+	if nodeName == "" {
+		nodeName = "unknown-node"
+	}
+
+	for _, ifaceName := range ifaceNames {
+		if skipOVNPortSyncInterface(ifaceName, bridge) {
+			continue
+		}
+
+		portName := genevePortNameForInterface(lsName, nodeName, ifaceName)
+		if _, err := runOVSVSCTLCommandExec("set", "interface", ifaceName, "external_ids:iface-id="+portName); err != nil {
+			return fmt.Errorf("failed to set iface-id on interface %s: %w", ifaceName, err)
+		}
+
 		if _, err := runOVNNBCTLCommand("--may-exist", "lsp-add", lsName, portName); err != nil {
 			return fmt.Errorf("failed to ensure OVN logical switch port %s on %s: %w", portName, lsName, err)
 		}
@@ -173,9 +259,15 @@ func syncGeneveLogicalPorts(vnet *api.VirtualNetwork, lsName string, peers []str
 		if _, err := runOVNNBCTLCommand("set", "logical_switch_port", portName, "external_ids:marmot_managed=true"); err != nil {
 			return fmt.Errorf("failed to set managed external_id on OVN logical switch port %s: %w", portName, err)
 		}
+		if _, err := runOVNNBCTLCommand("set", "logical_switch_port", portName, "external_ids:marmot_node_name="+nodeName); err != nil {
+			return fmt.Errorf("failed to set node external_id on OVN logical switch port %s: %w", portName, err)
+		}
+		if _, err := runOVNNBCTLCommand("set", "logical_switch_port", portName, "external_ids:marmot_ovs_interface="+ifaceName); err != nil {
+			return fmt.Errorf("failed to set interface external_id on OVN logical switch port %s: %w", portName, err)
+		}
 	}
 
-	return pruneGeneveLogicalPorts(vnet, lsName, peers)
+	return nil
 }
 
 func pruneGeneveLogicalPorts(vnet *api.VirtualNetwork, lsName string, remainPeers []string) error {
@@ -257,6 +349,16 @@ func desiredGenevePortNames(lsName string, peers []string) []string {
 	return result
 }
 
+func genevePortNameForInterface(lsName, nodeName, ifaceName string) string {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(strings.TrimSpace(lsName)))
+	_, _ = h.Write([]byte("|"))
+	_, _ = h.Write([]byte(strings.TrimSpace(nodeName)))
+	_, _ = h.Write([]byte("|"))
+	_, _ = h.Write([]byte(strings.TrimSpace(ifaceName)))
+	return fmt.Sprintf("marmot-vm-%08x", h.Sum32())
+}
+
 func genevePortNameForPeer(lsName, peer string) string {
 	h := fnv.New32a()
 	_, _ = h.Write([]byte(strings.TrimSpace(lsName)))
@@ -265,7 +367,131 @@ func genevePortNameForPeer(lsName, peer string) string {
 	return fmt.Sprintf("marmot-peer-%08x", h.Sum32())
 }
 
+func listOVSBridgePorts(bridgeName string) ([]string, error) {
+	output, err := runOVSVSCTLCommandExec("list-ports", bridgeName)
+	if err != nil {
+		if strings.Contains(err.Error(), "no bridge named") {
+			return []string{}, nil
+		}
+		return nil, fmt.Errorf("failed to list OVS bridge ports on %s: %w", bridgeName, err)
+	}
+
+	ports := []string{}
+	for _, line := range strings.Split(output, "\n") {
+		name := strings.TrimSpace(line)
+		if name == "" {
+			continue
+		}
+		ports = append(ports, name)
+	}
+	return ports, nil
+}
+
+func skipOVNPortSyncInterface(ifaceName, bridgeName string) bool {
+	name := strings.TrimSpace(strings.ToLower(ifaceName))
+	if name == "" {
+		return true
+	}
+	if strings.EqualFold(ifaceName, bridgeName) {
+		return true
+	}
+	if strings.HasPrefix(name, "vx-") || strings.HasPrefix(name, "gn-") {
+		return true
+	}
+	if strings.HasPrefix(name, "patch-") || strings.HasPrefix(name, "phy-") {
+		return true
+	}
+	if strings.HasPrefix(name, "qvo") || strings.HasPrefix(name, "qvb") || strings.HasPrefix(name, "qbr") {
+		return true
+	}
+	return false
+}
+
+func pruneLegacyOVSTunnels(vnet *api.VirtualNetwork) error {
+	bridge := bridgeName(vnet)
+	if bridge == "" {
+		return nil
+	}
+
+	ports, err := listOVSBridgePorts(bridge)
+	if err != nil {
+		return err
+	}
+
+	for _, port := range ports {
+		name := strings.TrimSpace(strings.ToLower(port))
+		if !(strings.HasPrefix(name, "vx-") || strings.HasPrefix(name, "gn-")) {
+			continue
+		}
+		if _, err := runOVSVSCTLCommandExec("--if-exists", "del-port", bridge, port); err != nil {
+			return fmt.Errorf("failed to delete legacy OVS tunnel port %s on %s: %w", port, bridge, err)
+		}
+	}
+
+	return nil
+}
+
+func sanitizeOVNToken(value string) string {
+	v := strings.TrimSpace(value)
+	if v == "" {
+		return ""
+	}
+	v = ovnLogicalSwitchSanitizer.ReplaceAllString(v, "-")
+	v = strings.Trim(v, "-")
+	return v
+}
+
+func runOVSVSCTLCommand(args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), ovnCommandTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "ovs-vsctl", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("ovs-vsctl timeout: args=%v", args)
+		}
+		return "", fmt.Errorf("ovs-vsctl failed: args=%v output=%s err=%w", args, strings.TrimSpace(string(output)), err)
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+func defaultEnableGeneveOVSTunnelMesh() bool {
+	v := strings.TrimSpace(strings.ToLower(os.Getenv("MARMOT_ENABLE_GENEVE_OVS_MESH")))
+	switch v {
+	case "0", "false", "no", "off":
+		return false
+	case "1", "true", "yes", "on", "":
+		return true
+	default:
+		// Unknown values keep backward-compatible default (enabled).
+		return true
+	}
+}
+
 func runOVNNBCTL(args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), ovnCommandTimeout)
+	defer cancel()
+
+	cmdArgs, usedConfiguredDB := withOVNNBDatabase(args)
+	cmd := exec.CommandContext(ctx, "ovn-nbctl", cmdArgs...)
+	output, err := cmd.CombinedOutput()
+	if err != nil && usedConfiguredDB && isOVNDBConnectionError(string(output)) {
+		// Remote NBDB endpoint can be temporarily unavailable or not exposed via TCP.
+		// Retry once with ovn-nbctl default connection settings (typically local unix socket).
+		cmd = exec.CommandContext(ctx, "ovn-nbctl", args...)
+		output, err = cmd.CombinedOutput()
+	}
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("ovn-nbctl timeout: args=%v", args)
+		}
+		return "", fmt.Errorf("ovn-nbctl failed: args=%v output=%s err=%w", args, strings.TrimSpace(string(output)), err)
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+func runOVNNBCTLLocal(args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ovnCommandTimeout)
 	defer cancel()
 
@@ -280,18 +506,63 @@ func runOVNNBCTL(args ...string) (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
+func runOVNSBCTLLocal(args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), ovnCommandTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "ovn-sbctl", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("ovn-sbctl timeout: args=%v", args)
+		}
+		return "", fmt.Errorf("ovn-sbctl failed: args=%v output=%s err=%w", args, strings.TrimSpace(string(output)), err)
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+func setOVNDatabaseEndpoints(nbDB, sbDB string) {
+	ovnDatabaseConfigMu.Lock()
+	defer ovnDatabaseConfigMu.Unlock()
+	ovnNorthboundDBEndpoint = strings.TrimSpace(nbDB)
+	ovnSouthboundDBEndpoint = strings.TrimSpace(sbDB)
+}
+
+func withOVNNBDatabase(args []string) ([]string, bool) {
+	ovnDatabaseConfigMu.RLock()
+	nbDB := ovnNorthboundDBEndpoint
+	ovnDatabaseConfigMu.RUnlock()
+	if nbDB == "" {
+		return args, false
+	}
+	withDB := make([]string, 0, len(args)+1)
+	withDB = append(withDB, "--db="+nbDB)
+	withDB = append(withDB, args...)
+	return withDB, true
+}
+
+func isOVNDBConnectionError(output string) bool {
+	lower := strings.ToLower(strings.TrimSpace(output))
+	if lower == "" {
+		return false
+	}
+	return strings.Contains(lower, "database connection failed") ||
+		strings.Contains(lower, "connection refused") ||
+		strings.Contains(lower, "failed to connect")
+}
+
 var ovnLogicalSwitchSanitizer = regexp.MustCompile(`[^a-zA-Z0-9_-]`)
 
 func logicalSwitchName(vnet *api.VirtualNetwork) string {
-	id := networkID(vnet)
-	if id == "" {
-		id = networkName(vnet)
+	key := networkName(vnet)
+	if key == "" {
+		key = networkID(vnet)
 	}
-	id = strings.TrimSpace(id)
-	if id == "" {
+	key = strings.TrimSpace(key)
+	if key == "" {
 		return ""
 	}
-	safe := ovnLogicalSwitchSanitizer.ReplaceAllString(id, "-")
+	safe := ovnLogicalSwitchSanitizer.ReplaceAllString(key, "-")
 	return "marmot-net-" + safe
 }
 

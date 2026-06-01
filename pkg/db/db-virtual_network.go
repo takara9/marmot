@@ -144,6 +144,9 @@ func (d *Database) CreateVirtualNetwork(spec api.VirtualNetwork) (api.VirtualNet
 	// ブリッジ名の自動生成
 	if network.Spec.BridgeName == nil {
 		bridgeName := "br-" + api.VirtualNetworkID(network)
+		if network.Spec.OverlayMode != nil && strings.EqualFold(string(*network.Spec.OverlayMode), string(api.Geneve)) {
+			bridgeName = "br-int"
+		}
 		network.Spec.BridgeName = util.StringPtr(bridgeName)
 	}
 

@@ -1,5 +1,7 @@
 # LoadBalancer の最小設計案
 
+> 実運用前提の再設計は [docs/MEMO-loadbalancer-v2.md](docs/MEMO-loadbalancer-v2.md) を参照。
+
 ## 目的
 
 issue 369 の LoadBalancer を、Gateway のような専用 VM を起動せずに実装する。

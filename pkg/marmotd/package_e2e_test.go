@@ -44,6 +44,10 @@ func TestDebPackageIncludesGatewayAssets(t *testing.T) {
 	for _, want := range []string{
 		"./usr/local/marmot/gateway-playbooks/gateway-iptables.yaml.tmpl",
 		"./usr/local/marmot/gateway-playbooks/vpn-gateway-openvpn.yaml.tmpl",
+		"./usr/local/marmot/network-setup/setup-libvirt-networks.sh",
+		"./usr/local/marmot/network-setup/default.xml",
+		"./usr/local/marmot/network-setup/host-bridge.xml",
+		"./usr/local/marmot/network-setup/ovs-network.xml",
 		"./var/lib/marmot/ansible-playbooks/templates/",
 		"./etc/marmot/keys/",
 	} {
@@ -66,6 +70,8 @@ func TestDebPackageIncludesGatewayAssets(t *testing.T) {
 		"/var/lib/marmot/ansible-playbooks",
 		"ssh-keygen -t rsa -b 4096",
 		"/usr/local/marmot/gateway-playbooks",
+		"/usr/local/marmot/network-setup",
+		"setup-libvirt-networks.sh",
 	} {
 		if !strings.Contains(postinst, want) {
 			t.Fatalf("postinst missing %q\n%s", want, postinst)

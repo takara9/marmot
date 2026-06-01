@@ -154,12 +154,9 @@ func (o *OVSFabric) EnsureOverlayMesh(vnet *api.VirtualNetwork, peers []string) 
 	}
 
 	bridgeName := *vnet.Spec.BridgeName
-	vni := uint32(100)
-	if vnet.Spec.Vni != nil {
-		if *vnet.Spec.Vni < 0 || *vnet.Spec.Vni > 16777215 {
-			return fmt.Errorf("invalid vni %d", *vnet.Spec.Vni)
-		}
-		vni = uint32(*vnet.Spec.Vni)
+	vni, err := resolveOverlayVNI(vnet)
+	if err != nil {
+		return err
 	}
 
 	underlayIf := ""
@@ -232,6 +229,32 @@ func (o *OVSFabric) EnsureOverlayMesh(vnet *api.VirtualNetwork, peers []string) 
 	}
 
 	return nil
+}
+
+func resolveOverlayVNI(vnet *api.VirtualNetwork) (uint32, error) {
+	if vnet == nil {
+		return 0, fmt.Errorf("invalid vnet")
+	}
+	if vnet.Spec.Vni != nil {
+		if *vnet.Spec.Vni < 0 || *vnet.Spec.Vni > 16777215 {
+			return 0, fmt.Errorf("invalid vni %d", *vnet.Spec.Vni)
+		}
+		return uint32(*vnet.Spec.Vni), nil
+	}
+
+	seed := strings.TrimSpace(vnet.Metadata.Name)
+	if seed == "" {
+		return 0, fmt.Errorf("virtual network metadata.name is required when spec.vni is omitted")
+	}
+
+	// Derive a stable per-network VNI to avoid tunnel collisions across different networks.
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(strings.ToLower(seed)))
+	vni := (h.Sum32() % 16777215)
+	if vni == 0 {
+		vni = 1
+	}
+	return vni, nil
 }
 
 func overlayTunnelType(vnet *api.VirtualNetwork) string {

@@ -311,6 +311,36 @@ func TestLoadBalancerControllerActiveDriftToProvisioning(t *testing.T) {
 	}
 }
 
+func TestDesiredLoadBalancerConfigHash_ChangesWhenLogicalSwitchChanges(t *testing.T) {
+	lb := api.LoadBalancer{
+		Metadata: api.Metadata{Id: "lb-1"},
+		Spec: api.LoadBalancerSpec{
+			InternalVirtualNetwork: "web-servers",
+		},
+	}
+
+	h1 := desiredLoadBalancerConfigHash(
+		lb,
+		"auto",
+		"marmot-net-web-servers",
+		"172.16.10.50",
+		[]string{"80/tcp"},
+		[]string{"172.16.10.2"},
+	)
+	h2 := desiredLoadBalancerConfigHash(
+		lb,
+		"auto",
+		"marmot-net-web-servers-v2",
+		"172.16.10.50",
+		[]string{"80/tcp"},
+		[]string{"172.16.10.2"},
+	)
+
+	if h1 == h2 {
+		t.Fatalf("config hash should change when logical switch name changes: h1=%q h2=%q", h1, h2)
+	}
+}
+
 func mustCreateLoadBalancerBackendServer(t *testing.T, database *db.Database, name, networkName, ipAddress string, enabled bool) api.Server {
 	t.Helper()
 	labels := map[string]interface{}{}

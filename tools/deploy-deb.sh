@@ -56,6 +56,47 @@ echo ""
 
 REMOTE_TMP="/tmp/$(basename "${DEB_FILE}")"
 FAILED_HOSTS=()
+read -r -d '' REMOTE_POST_DEPLOY_SCRIPT <<'EOS' || true
+set -euo pipefail
+
+ensure_service_if_exists() {
+    local unit_name="$1"
+    if systemctl list-unit-files | grep -q "^${unit_name}\\.service"; then
+        systemctl enable "${unit_name}.service" || true
+        systemctl start "${unit_name}.service" || true
+    fi
+}
+
+ensure_network_if_defined() {
+    local network_name="$1"
+    if ! command -v virsh >/dev/null 2>&1; then
+        return 0
+    fi
+    if ! virsh net-info "${network_name}" >/dev/null 2>&1; then
+        return 0
+    fi
+    virsh net-start "${network_name}" >/dev/null 2>&1 || true
+    virsh net-autostart "${network_name}" >/dev/null 2>&1 || true
+}
+
+ensure_service_if_exists libvirtd
+ensure_service_if_exists openvswitch-switch
+ensure_service_if_exists ovsdb-server
+ensure_service_if_exists ovs-vswitchd
+ensure_service_if_exists ovn-central
+ensure_service_if_exists ovn-northd
+ensure_service_if_exists ovn-controller
+ensure_service_if_exists ovn-host
+
+if command -v ovs-vsctl >/dev/null 2>&1; then
+    ovs-vsctl --may-exist add-br ovsbr0 || true
+fi
+
+ensure_network_if_defined default
+ensure_network_if_defined host-bridge
+
+systemctl restart marmot.service || systemctl start marmot.service || true
+EOS
 
 for HOST in "${HOSTS[@]}"; do
     echo "---------- ${HOST} ----------"
@@ -71,7 +112,7 @@ for HOST in "${HOSTS[@]}"; do
     # dpkg -i でインストール (sudo を使用)
     echo "  インストール中: dpkg -i ${REMOTE_TMP}"
     if ! ssh -o StrictHostKeyChecking=no "${SSH_USER}@${HOST}" \
-            "sudo dpkg -i ${REMOTE_TMP} && rm -f ${REMOTE_TMP}"; then
+            "sudo dpkg -i ${REMOTE_TMP} && rm -f ${REMOTE_TMP} && sudo bash -s" <<<"${REMOTE_POST_DEPLOY_SCRIPT}"; then
         echo "  [エラー] インストール失敗: ${HOST}"
         FAILED_HOSTS+=("${HOST}")
         continue
