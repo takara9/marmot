@@ -88,6 +88,12 @@ func main() {
 	e := echo.New()
 	slog.Debug("Starting api server #2", "nodeName", cfg.NodeName, "etcdURL", cfg.EtcdURL, "apiListenAddr", cfg.APIListenAddr)
 	Server := marmotd.NewServer(cfg.NodeName, cfg.EtcdURL)
+	if err := Server.Ma.CollectAndUpdateHostStatus(); err != nil {
+		slog.Warn("Failed to collect initial host status before OVN bootstrap", "err", err)
+	}
+	if err := marmotd.EnsureOVNRuntimeBootstrap(Server.Ma, cfg); err != nil {
+		slog.Warn("Failed to ensure OVN runtime bootstrap", "err", err)
+	}
 	marmotd.RegisterRoutes(e, Server, "/api/v1")
 
 	// コントローラーの開始

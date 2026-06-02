@@ -23,6 +23,8 @@ type OVNFabric struct {
 const ovnCommandTimeout = 15 * time.Second
 
 var runOVNNBCTLCommand = runOVNNBCTL
+var runOVNSBCTLCommand = runOVNSBCTL
+var runOVSVSCTLCommand = runOVSVSCTL
 var ovnNBCTLLookPath = exec.LookPath
 var ovnSBCTLLookPath = exec.LookPath
 var enableGeneveOVSTunnelMesh = true
@@ -44,23 +46,25 @@ func (o *OVNFabric) EnsureBridge(vnet *api.VirtualNetwork) error {
 
 func (o *OVNFabric) EnsureOverlayMesh(vnet *api.VirtualNetwork, peers []string) error {
 	if isGeneveOverlay(vnet) {
-		if ovnCommandsAvailable() {
-			lsName, err := ensureGeneveLogicalSwitch(vnet)
-			if err != nil {
-				slog.Warn("failed to ensure OVN logical switch for geneve overlay; continue with OVS tunnel mesh", "network", networkName(vnet), "err", err)
-			} else if err := syncGeneveLogicalPorts(vnet, lsName, peers); err != nil {
-				slog.Warn("failed to sync OVN logical switch ports for geneve overlay; continue with OVS tunnel mesh", "network", networkName(vnet), "logicalSwitch", lsName, "err", err)
-			} else if !enableGeneveOVSTunnelMesh {
-				return nil
-			}
-		} else {
-			slog.Warn("OVN commands are not available; using OVS tunnel mesh for geneve overlay", "network", networkName(vnet))
-			if !enableGeneveOVSTunnelMesh {
-				return fmt.Errorf("ovn-nbctl/ovn-sbctl are required for geneve overlay")
-			}
+		if !ovnCommandsAvailable() {
+			return fmt.Errorf("ovn-nbctl/ovn-sbctl are required for geneve overlay")
 		}
 
-		return o.ovs.EnsureOverlayMesh(vnet, peers)
+		if err := ensureGeneveOVNReadiness(peers); err != nil {
+			return err
+		}
+
+		lsName, err := ensureGeneveLogicalSwitch(vnet)
+		if err != nil {
+			return err
+		}
+		if err := syncGeneveLogicalPorts(vnet, lsName, peers); err != nil {
+			return err
+		}
+		if enableGeneveOVSTunnelMesh {
+			return o.ovs.EnsureOverlayMesh(vnet, peers)
+		}
+		return nil
 	}
 
 	return o.ovs.EnsureOverlayMesh(vnet, peers)
@@ -68,22 +72,21 @@ func (o *OVNFabric) EnsureOverlayMesh(vnet *api.VirtualNetwork, peers []string) 
 
 func (o *OVNFabric) PruneOverlayMesh(vnet *api.VirtualNetwork, remainPeers []string) error {
 	if isGeneveOverlay(vnet) {
-		if ovnCommandsAvailable() {
-			lsName := logicalSwitchName(vnet)
-			if lsName != "" {
-				if err := pruneGeneveLogicalPorts(vnet, lsName, remainPeers); err != nil {
-					slog.Warn("failed to prune OVN logical switch ports for geneve overlay; continue with OVS tunnel prune", "network", networkName(vnet), "logicalSwitch", lsName, "err", err)
-				} else if !enableGeneveOVSTunnelMesh {
-					return nil
-				}
-			}
-		} else {
-			slog.Warn("OVN commands are not available during geneve prune; using OVS tunnel prune", "network", networkName(vnet))
-			if !enableGeneveOVSTunnelMesh {
-				return fmt.Errorf("ovn-nbctl/ovn-sbctl are required for geneve overlay")
-			}
+		if !ovnCommandsAvailable() {
+			return fmt.Errorf("ovn-nbctl/ovn-sbctl are required for geneve overlay")
 		}
-		return o.ovs.PruneOverlayMesh(vnet, remainPeers)
+
+		lsName := logicalSwitchName(vnet)
+		if lsName == "" {
+			return nil
+		}
+		if err := pruneGeneveLogicalPorts(vnet, lsName, remainPeers); err != nil {
+			return err
+		}
+		if enableGeneveOVSTunnelMesh {
+			return o.ovs.PruneOverlayMesh(vnet, remainPeers)
+		}
+		return nil
 	}
 
 	return o.ovs.PruneOverlayMesh(vnet, remainPeers)
@@ -117,6 +120,30 @@ func ovnCommandsAvailable() bool {
 		return false
 	}
 	return true
+}
+
+func ensureGeneveOVNReadiness(peers []string) error {
+	output, err := runOVNSBCTLCommand("--format=csv", "--data=bare", "--no-headings", "--columns=type", "list", "encap")
+	if err != nil {
+		return fmt.Errorf("failed to query OVN southbound encap state: %w", err)
+	}
+
+	hasGeneveEncap := false
+	for _, line := range strings.Split(output, "\n") {
+		if strings.EqualFold(strings.TrimSpace(line), "geneve") {
+			hasGeneveEncap = true
+			break
+		}
+	}
+
+	if !hasGeneveEncap {
+		if len(peers) == 0 {
+			return fmt.Errorf("OVN southbound has no geneve encap entries")
+		}
+		return fmt.Errorf("OVN southbound has no geneve encap entries; ensure ovn-controller is connected and OVS external_ids include ovn-remote/ovn-encap-ip/ovn-encap-type=geneve")
+	}
+
+	return nil
 }
 
 func ensureGeneveLogicalSwitch(vnet *api.VirtualNetwork) (string, error) {
@@ -269,13 +296,103 @@ func runOVNNBCTL(args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ovnCommandTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "ovn-nbctl", args...)
+	resolvedArgs := appendOVNDBTargetArgs(args, ovnNorthboundDBTarget())
+	cmd := exec.CommandContext(ctx, "ovn-nbctl", resolvedArgs...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return "", fmt.Errorf("ovn-nbctl timeout: args=%v", args)
+			return "", fmt.Errorf("ovn-nbctl timeout: args=%v", resolvedArgs)
 		}
-		return "", fmt.Errorf("ovn-nbctl failed: args=%v output=%s err=%w", args, strings.TrimSpace(string(output)), err)
+		return "", fmt.Errorf("ovn-nbctl failed: args=%v output=%s err=%w", resolvedArgs, strings.TrimSpace(string(output)), err)
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+func runOVNSBCTL(args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), ovnCommandTimeout)
+	defer cancel()
+
+	resolvedArgs := appendOVNDBTargetArgs(args, ovnSouthboundDBTarget())
+	cmd := exec.CommandContext(ctx, "ovn-sbctl", resolvedArgs...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("ovn-sbctl timeout: args=%v", resolvedArgs)
+		}
+		return "", fmt.Errorf("ovn-sbctl failed: args=%v output=%s err=%w", resolvedArgs, strings.TrimSpace(string(output)), err)
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+func appendOVNDBTargetArgs(args []string, dbTarget string) []string {
+	if strings.TrimSpace(dbTarget) == "" {
+		return args
+	}
+	resolved := make([]string, 0, len(args)+1)
+	resolved = append(resolved, "--db="+strings.TrimSpace(dbTarget))
+	resolved = append(resolved, args...)
+	return resolved
+}
+
+func ovnSouthboundDBTarget() string {
+	remote, ok := ovsExternalIDValue("ovn-remote")
+	if !ok {
+		return ""
+	}
+	return normalizeOVNDBTarget(remote)
+}
+
+func ovnNorthboundDBTarget() string {
+	southbound, ok := ovsExternalIDValue("ovn-remote")
+	if !ok {
+		return ""
+	}
+	target := normalizeOVNDBTarget(southbound)
+	if target == "" {
+		return ""
+	}
+	if strings.HasSuffix(target, ":6642") {
+		return strings.TrimSuffix(target, ":6642") + ":6641"
+	}
+	return target
+}
+
+func normalizeOVNDBTarget(target string) string {
+	target = strings.TrimSpace(target)
+	target = strings.Trim(target, "\"")
+	if target == "" || target == "[]" || target == "{}" {
+		return ""
+	}
+	return target
+}
+
+func ovsExternalIDValue(key string) (string, bool) {
+	k := strings.TrimSpace(key)
+	if k == "" {
+		return "", false
+	}
+	output, err := runOVSVSCTLCommand("get", "open_vswitch", ".", "external_ids:"+k)
+	if err != nil {
+		return "", false
+	}
+	value := normalizeOVNDBTarget(output)
+	if value == "" {
+		return "", false
+	}
+	return value, true
+}
+
+func runOVSVSCTL(args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), ovnCommandTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "ovs-vsctl", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("ovs-vsctl timeout: args=%v", args)
+		}
+		return "", fmt.Errorf("ovs-vsctl failed: args=%v output=%s err=%w", args, strings.TrimSpace(string(output)), err)
 	}
 	return strings.TrimSpace(string(output)), nil
 }

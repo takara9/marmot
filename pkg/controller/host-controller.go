@@ -37,6 +37,9 @@ func StartHostController(node string, etcdUrl string) (*hostController, error) {
 		slog.Error("Initial host status collection failed", "err", err)
 		// 起動時エラーはログのみで続行する
 	}
+	if err := marmotd.EnsureOVNRuntimeBootstrap(c.marmot, marmotd.CurrentConfig()); err != nil {
+		slog.Warn("Initial OVN runtime bootstrap retry failed", "err", err)
+	}
 
 	// 定期実行の開始（10秒間隔）
 	ticker := time.NewTicker(HOST_CONTROLLER_INTERVAL)
@@ -77,5 +80,9 @@ func (c *hostController) hostControllerLoop() {
 
 	if err := c.marmot.CollectAndUpdateHostStatus(); err != nil {
 		slog.Error("Failed to collect and update host status", "err", err)
+		return
+	}
+	if err := marmotd.EnsureOVNRuntimeBootstrap(c.marmot, marmotd.CurrentConfig()); err != nil {
+		slog.Warn("OVN runtime bootstrap retry failed", "err", err)
 	}
 }

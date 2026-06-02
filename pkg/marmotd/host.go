@@ -76,8 +76,14 @@ func (m *Marmot) CollectHostStatus() (api.HostStatus, error) {
 		status.HostId = util.StringPtr(hostID)
 	}
 
-	// VXLAN underlay は enp2s0 を優先する。
-	ipAddress := getHostIPAddressByInterface("enp2s0")
+	// overlay underlay は設定値を優先し、未設定時は従来通り enp2s0 を優先する。
+	ipAddress := ""
+	if ifName := strings.TrimSpace(CurrentConfig().DefaultUnderlayInterface); ifName != "" {
+		ipAddress = getHostIPAddressByInterface(ifName)
+	}
+	if ipAddress == "" {
+		ipAddress = getHostIPAddressByInterface("enp2s0")
+	}
 	if ipAddress == "" {
 		slog.Warn("enp2s0 address is unavailable; falling back to first active IPv4 address")
 		ipAddress = getHostIPAddress()

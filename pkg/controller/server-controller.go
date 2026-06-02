@@ -21,13 +21,14 @@ const (
 var controllerCounter uint64 = 0
 
 type controller struct {
-	db            *db.Database
-	Lock          sync.Mutex
-	marmot        *marmotd.Marmot
-	deletionDelay time.Duration // DeletionTimestamp 検知から削除実行までの待機時間
-	stopChan      chan struct{}
-	doneChan      chan struct{}
-	stopOnce      sync.Once
+	db                         *db.Database
+	Lock                       sync.Mutex
+	marmot                     *marmotd.Marmot
+	deletionDelay              time.Duration // DeletionTimestamp 検知から削除実行までの待機時間
+	lastNetworkMemberSignature string
+	stopChan                   chan struct{}
+	doneChan                   chan struct{}
+	stopOnce                   sync.Once
 }
 
 // VMコントローラーの開始
