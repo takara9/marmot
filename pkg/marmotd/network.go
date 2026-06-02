@@ -98,6 +98,10 @@ func (m *Marmot) GetVirtualNetworksAndPutDB() ([]api.VirtualNetwork, error) {
 		// 同じ名前のネットワークが既にETCDに登録されているか確認
 		existingNet, err := m.Db.GetVirtualNetworkByName(name)
 		if err == nil {
+			if networkDeletionRequested(existingNet) {
+				slog.Debug("Skipping libvirt network import because deletion is already requested for same-name network", "networkName", name, "existingNetworkId", api.VirtualNetworkID(existingNet))
+				continue
+			}
 			if existingNet.Metadata.Uuid != net.Metadata.Uuid {
 				err := m.Db.DeleteVirtualNetworkById(api.VirtualNetworkID(existingNet))
 				if err != nil {
@@ -240,6 +244,19 @@ func (m *Marmot) DeleteVirtualNetwork(networkId string) error {
 		return err
 	}
 
+	// 削除 API が成功しても libvirt 実態が残っているケースを検出する。
+	// 実態が残っている間は DB エントリーを消さず、次の制御ループで再試行させる。
+	if _, found, err := m.Virt.GetVirtualNetworkByName(vnet.Metadata.Name); err != nil {
+		m.Db.UpdateVirtualNetworkStatus(networkId, db.NETWORK_ERROR)
+		slog.Error("Failed to verify virtual network absence", "err", err, "networkName", vnet.Metadata.Name)
+		return err
+	} else if found {
+		verifyErr := fmt.Errorf("virtual network %s still exists after delete request", vnet.Metadata.Name)
+		m.Db.UpdateVirtualNetworkStatusWithMessage(networkId, db.NETWORK_ERROR, "libvirt:delete-verify-failed:"+verifyErr.Error())
+		slog.Warn("Virtual network still present after delete request; will retry in next loop", "networkId", networkId, "networkName", vnet.Metadata.Name)
+		return verifyErr
+	}
+
 	// 実態が消えたら、データベースからも削除する
 	// DeleteVirtualNetworkById 内で必要に応じて紐付いたIPネットワークも削除する。
 	if err := m.Db.DeleteVirtualNetworkById(api.VirtualNetworkID(vnet)); err != nil {
@@ -314,12 +331,15 @@ func (m *Marmot) CheckVirtualNetworks() error {
 		}
 
 		// 同じ名前のネットワークが既にETCDに登録されている場合は、何もしない。
-		_, err = m.Db.GetVirtualNetworkByName(vnet.Metadata.Name)
+		existingNet, err := m.Db.GetVirtualNetworkByName(vnet.Metadata.Name)
 		if err != nil {
 			if err != db.ErrNotFound {
 				slog.Error("Failed to check existing virtual network in ETCD", "err", err, "networkName", vnet.Metadata.Name)
 				continue
 			}
+		} else if networkDeletionRequested(existingNet) {
+			slog.Debug("Skipping libvirt network import because deletion is already requested for same-name network", "networkName", vnet.Metadata.Name, "existingNetworkId", api.VirtualNetworkID(existingNet))
+			continue
 		}
 
 		// 既にETCDに登録されているか確認
@@ -341,6 +361,10 @@ func (m *Marmot) CheckVirtualNetworks() error {
 	}
 
 	return nil
+}
+
+func networkDeletionRequested(network api.VirtualNetwork) bool {
+	return network.Status != nil && network.Status.DeletionTimeStamp != nil
 }
 
 // virtual.Networkをapi.VirtualNetworkに変換する関数

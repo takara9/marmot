@@ -2,6 +2,7 @@ package controller
 
 import (
 	"log/slog"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -93,6 +94,14 @@ func (c *schedulerController) schedulerControllerLoop() {
 		return
 	}
 
+	activeNodes := activeNodeNames(statuses)
+	if len(activeNodes) == 0 {
+		slog.Warn("スケジューリング対象のアクティブノードが見つかりません")
+		return
+	}
+
+	nodeLoads := buildNodeLoads(activeNodes, servers)
+
 	for _, server := range servers {
 		// PENDING 状態でない場合はスキップ
 		if server.Status == nil || server.Status.StatusCode != db.SERVER_PENDING {
@@ -114,10 +123,10 @@ func (c *schedulerController) schedulerControllerLoop() {
 			continue
 		}
 
-		// 割り当て先ノードをスコアリングで選定
-		targetNode, err := marmotd.SelectNode(statuses)
+		// 同一ループ内で均等化するため、ローカルの負荷カウントを使って選定する。
+		targetNode, err := selectLeastLoadedNode(activeNodes, nodeLoads)
 		if err != nil {
-			slog.Error("SelectNode() failed", "err", err, "serverId", api.ServerID(server))
+			slog.Error("selectLeastLoadedNode() failed", "err", err, "serverId", api.ServerID(server))
 			continue
 		}
 
@@ -126,8 +135,72 @@ func (c *schedulerController) schedulerControllerLoop() {
 			slog.Warn("AssignNodeToServer() failed", "err", err, "serverId", api.ServerID(server), "targetNode", targetNode)
 			continue
 		}
+		nodeLoads[targetNode]++
 		slog.Info("サーバーにノードを割り当てました", "serverId", api.ServerID(server), "targetNode", targetNode)
 	}
+}
+
+func activeNodeNames(statuses []api.HostStatus) []string {
+	active := make([]string, 0)
+	cutoff := time.Now().Add(-marmotd.ActiveHostThreshold)
+	for _, st := range statuses {
+		if st.LastUpdated == nil || !st.LastUpdated.After(cutoff) {
+			continue
+		}
+		if st.NodeName == nil {
+			continue
+		}
+		nodeName := strings.TrimSpace(*st.NodeName)
+		if nodeName == "" {
+			continue
+		}
+		active = append(active, nodeName)
+	}
+	return active
+}
+
+func buildNodeLoads(activeNodes []string, servers []api.Server) map[string]int {
+	loads := make(map[string]int, len(activeNodes))
+	for _, node := range activeNodes {
+		loads[node] = 0
+	}
+
+	for _, server := range servers {
+		if server.Metadata.NodeName == nil {
+			continue
+		}
+		nodeName := strings.TrimSpace(*server.Metadata.NodeName)
+		if nodeName == "" {
+			continue
+		}
+		if _, exists := loads[nodeName]; !exists {
+			continue
+		}
+		if server.Status != nil && server.Status.StatusCode == db.SERVER_DELETING {
+			continue
+		}
+		loads[nodeName]++
+	}
+
+	return loads
+}
+
+func selectLeastLoadedNode(activeNodes []string, nodeLoads map[string]int) (string, error) {
+	if len(activeNodes) == 0 {
+		return "", marmotd.ErrNoActiveHosts
+	}
+
+	candidates := append([]string(nil), activeNodes...)
+	sort.Slice(candidates, func(i, j int) bool {
+		loadI := nodeLoads[candidates[i]]
+		loadJ := nodeLoads[candidates[j]]
+		if loadI != loadJ {
+			return loadI < loadJ
+		}
+		return candidates[i] < candidates[j]
+	})
+
+	return candidates[0], nil
 }
 
 func clusterHasNode(statuses []api.HostStatus, nodeName string) bool {

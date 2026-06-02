@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -12,6 +13,29 @@ import (
 
 var _ = Describe("Output formatting", func() {
 	Describe("outputServers", func() {
+		It("outputs YAML when output style is yaml", func() {
+			original := outputStyle
+			outputStyle = "yaml"
+			DeferCleanup(func() {
+				outputStyle = original
+			})
+
+			output := captureOutput(func() {
+				err := outputServers([]api.Server{{
+					Metadata: api.Metadata{
+						Name: "server1",
+						Id:   "srv-001",
+					},
+				}})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			trimmed := strings.TrimSpace(output)
+			Expect(trimmed).To(HavePrefix("- "))
+			Expect(trimmed).To(ContainSubstring("metadata:"))
+			Expect(trimmed).NotTo(ContainSubstring("{\"apiVersion\""))
+		})
+
 		It("outputs server list without panicking", func() {
 			servers := []api.Server{
 				{

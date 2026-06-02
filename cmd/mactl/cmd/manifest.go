@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -35,8 +37,17 @@ type Manifest struct {
 	Spec       map[string]interface{} `json:"spec" yaml:"spec"`
 }
 
-// LoadManifest ファイル、URL、または stdin からマニフェストを読み込む
+// LoadManifest ファイル、URL、または stdin から最初のマニフェストを読み込む
 func LoadManifest(source string) (map[string]interface{}, error) {
+	manifests, err := LoadManifests(source)
+	if err != nil {
+		return nil, err
+	}
+	return manifests[0], nil
+}
+
+// LoadManifests ファイル、URL、または stdin から複数マニフェストを読み込む
+func LoadManifests(source string) ([]map[string]interface{}, error) {
 	var data []byte
 	var err error
 
@@ -65,16 +76,28 @@ func LoadManifest(source string) (map[string]interface{}, error) {
 		}
 	}
 
-	// YAML または JSON として解析
-	var result map[string]interface{}
-	if err := yaml.Unmarshal(data, &result); err != nil {
-		// JSON として解析を試みる
-		if err := json.Unmarshal(data, &result); err != nil {
+	decoder := yaml.NewDecoder(bytes.NewReader(data))
+	manifests := make([]map[string]interface{}, 0)
+	for {
+		var result map[string]interface{}
+		err := decoder.Decode(&result)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
 			return nil, fmt.Errorf("failed to parse manifest: %w", err)
 		}
+		if len(result) == 0 {
+			continue
+		}
+		manifests = append(manifests, result)
 	}
 
-	return result, nil
+	if len(manifests) == 0 {
+		return nil, fmt.Errorf("no manifests found")
+	}
+
+	return manifests, nil
 }
 
 // isURL URL かどうかを判定
@@ -142,6 +165,43 @@ func GetKindFromResourceName(resource string) string {
 	default:
 		return ""
 	}
+}
+
+// ResolveResourceNameForManifest は manifest とコマンド引数から処理対象の resource 名を決める。
+func ResolveResourceNameForManifest(manifest map[string]interface{}, args []string) (string, error) {
+	kind := ""
+	if k, ok := manifest["kind"].(string); ok {
+		kind = k
+	}
+
+	var resourceName string
+	if len(args) > 0 {
+		resourceName = normalizeResourceName(args[0])
+	} else {
+		switch GetManifestType(kind) {
+		case ManifestTypeServer:
+			resourceName = "server"
+		case ManifestTypeImage:
+			resourceName = "image"
+		case ManifestTypeVolume:
+			resourceName = "volume"
+		case ManifestTypeNetwork:
+			resourceName = "network"
+		case ManifestTypeGateway:
+			resourceName = "gateway"
+		case ManifestTypeVpnGateway:
+			resourceName = "vpngateway"
+		default:
+			return "", fmt.Errorf("failed to infer resource type from kind %q", kind)
+		}
+	}
+
+	expectedKind := GetKindFromResourceName(resourceName)
+	if kind != "" && kind != expectedKind {
+		return "", fmt.Errorf("manifest kind %q does not match resource type %q", kind, resourceName)
+	}
+
+	return resourceName, nil
 }
 
 // ManifestToServer マニフェストを Server 構造体に変換

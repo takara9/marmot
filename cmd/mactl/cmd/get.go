@@ -13,17 +13,52 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
+	"go.yaml.in/yaml/v3"
 )
 
 var getServerShowAll bool
 var getVpnGatewayDownload bool
+var getManifestFile string
 
 var getCmd = &cobra.Command{
-	Use:   "get RESOURCE [NAME]",
+	Use:   "get [RESOURCE [NAME]]",
 	Short: "Get resource(s) of a specific type",
-	Long:  `Get resource(s) (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw). If NAME is provided, show only that resource. Otherwise, list all resources.`,
-	Args:  cobra.MinimumNArgs(1),
+	Long:  `Get resource(s) (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw). If NAME is provided, show only that resource. Otherwise, list all resources. With -f, process manifest(s) and query by metadata.name for each document.`,
+	Args:  cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if strings.TrimSpace(getManifestFile) != "" {
+			if len(args) > 1 {
+				return fmt.Errorf("with -f, get accepts at most one optional RESOURCE argument")
+			}
+
+			manifests, err := LoadManifests(getManifestFile)
+			if err != nil {
+				return fmt.Errorf("failed to load manifest: %w", err)
+			}
+
+			for index, manifest := range manifests {
+				resourceName, err := ResolveResourceNameForManifest(manifest, args)
+				if err != nil {
+					return fmt.Errorf("manifest %d: %w", index+1, err)
+				}
+
+				name := strings.TrimSpace(ExtractMetadataName(manifest))
+				if name == "" {
+					return fmt.Errorf("manifest %d: metadata.name is required", index+1)
+				}
+
+				if err := getResourceByTypeAndName(resourceName, name); err != nil {
+					return fmt.Errorf("manifest %d: %w", index+1, err)
+				}
+			}
+
+			return nil
+		}
+
+		if len(args) < 1 {
+			return fmt.Errorf("resource is required unless -f is specified")
+		}
+
 		resourceName := args[0]
 		resourceName = normalizeResourceName(resourceName)
 
@@ -33,24 +68,28 @@ var getCmd = &cobra.Command{
 			resourceSpec = args[1]
 		}
 
-		// リソースタイプに応じて処理を分岐
-		switch strings.ToLower(resourceName) {
-		case "server", "node", "no":
-			return getServerResources(resourceSpec)
-		case "image":
-			return getImageResources(resourceSpec)
-		case "volume":
-			return getVolumeResources(resourceSpec)
-		case "network":
-			return getNetworkResources(resourceSpec)
-		case "gateway":
-			return getGatewayResources(resourceSpec)
-		case "vpngateway":
-			return getVpnGatewayResources(resourceSpec)
-		default:
-			return fmt.Errorf("unknown resource type: %s", resourceName)
-		}
+		return getResourceByTypeAndName(resourceName, resourceSpec)
 	},
+}
+
+func getResourceByTypeAndName(resourceName string, resourceSpec string) error {
+	// リソースタイプに応じて処理を分岐
+	switch strings.ToLower(resourceName) {
+	case "server", "node", "no":
+		return getServerResources(resourceSpec)
+	case "image":
+		return getImageResources(resourceSpec)
+	case "volume":
+		return getVolumeResources(resourceSpec)
+	case "network":
+		return getNetworkResources(resourceSpec)
+	case "gateway":
+		return getGatewayResources(resourceSpec)
+	case "vpngateway":
+		return getVpnGatewayResources(resourceSpec)
+	default:
+		return fmt.Errorf("unknown resource type: %s", resourceName)
+	}
 }
 
 func getServerResources(name string) error {
@@ -326,7 +365,7 @@ func getVpnGatewayResources(name string) error {
 			}
 			return nil
 		case "json":
-			data, _ := json.MarshalIndent(items, "", "  ")
+			data, _ := json.Marshal(items)
 			fmt.Println(string(data))
 			return nil
 		case "yaml":
@@ -659,16 +698,16 @@ func outputServers(servers []api.Server) error {
 		return nil
 
 	case "json":
-		data, _ := json.MarshalIndent(servers, "", "  ")
+		data, _ := json.Marshal(servers)
 		fmt.Println(string(data))
 		return nil
 
 	case "yaml":
-		data, _ := json.Marshal(servers)
-		var servers interface{}
-		json.Unmarshal(data, &servers)
-		// YAML フォーマットは describe で実装済みのものを参照
-		fmt.Println(string(data))
+		data, err := yaml.Marshal(servers)
+		if err != nil {
+			return fmt.Errorf("failed to marshal servers to YAML: %w", err)
+		}
+		fmt.Print(string(data))
 		return nil
 
 	default:
@@ -726,13 +765,16 @@ func outputImages(images []api.Image) error {
 		return nil
 
 	case "json":
-		data, _ := json.MarshalIndent(images, "", "  ")
+		data, _ := json.Marshal(images)
 		fmt.Println(string(data))
 		return nil
 
 	case "yaml":
-		data, _ := json.Marshal(images)
-		fmt.Println(string(data))
+		data, err := yaml.Marshal(images)
+		if err != nil {
+			return fmt.Errorf("failed to marshal images to YAML: %w", err)
+		}
+		fmt.Print(string(data))
 		return nil
 
 	default:
@@ -799,13 +841,16 @@ func outputVolumes(volumes []api.Volume) error {
 		return nil
 
 	case "json":
-		data, _ := json.MarshalIndent(volumes, "", "  ")
+		data, _ := json.Marshal(volumes)
 		fmt.Println(string(data))
 		return nil
 
 	case "yaml":
-		data, _ := json.Marshal(volumes)
-		fmt.Println(string(data))
+		data, err := yaml.Marshal(volumes)
+		if err != nil {
+			return fmt.Errorf("failed to marshal volumes to YAML: %w", err)
+		}
+		fmt.Print(string(data))
 		return nil
 
 	default:
@@ -869,13 +914,16 @@ func outputNetworks(networks []api.VirtualNetwork) error {
 		return nil
 
 	case "json":
-		data, _ := json.MarshalIndent(networks, "", "  ")
+		data, _ := json.Marshal(networks)
 		fmt.Println(string(data))
 		return nil
 
 	case "yaml":
-		data, _ := json.Marshal(networks)
-		fmt.Println(string(data))
+		data, err := yaml.Marshal(networks)
+		if err != nil {
+			return fmt.Errorf("failed to marshal networks to YAML: %w", err)
+		}
+		fmt.Print(string(data))
 		return nil
 
 	default:
@@ -929,13 +977,16 @@ func outputGateways(gateways []api.Gateway) error {
 		return nil
 
 	case "json":
-		data, _ := json.MarshalIndent(gateways, "", "  ")
+		data, _ := json.Marshal(gateways)
 		fmt.Println(string(data))
 		return nil
 
 	case "yaml":
-		data, _ := json.Marshal(gateways)
-		fmt.Println(string(data))
+		data, err := yaml.Marshal(gateways)
+		if err != nil {
+			return fmt.Errorf("failed to marshal gateways to YAML: %w", err)
+		}
+		fmt.Print(string(data))
 		return nil
 
 	default:
@@ -946,6 +997,7 @@ func outputGateways(gateways []api.Gateway) error {
 func init() {
 	rootCmd.AddCommand(getCmd)
 	getCmd.Flags().StringVarP(&labelSelector, "selector", "l", "", "Label selector (e.g., key=value)")
+	getCmd.Flags().StringVarP(&getManifestFile, "file", "f", "", "Manifest file, URL, or - for stdin")
 	getCmd.Flags().BoolVarP(&getServerShowAll, "all", "a", false, "managedBy ラベル付きの server も含めて表示する")
 	getCmd.Flags().BoolVarP(&getVpnGatewayDownload, "download", "d", false, "vpngateway の VPN クライアント設定ファイル (.ovpn) をダウンロードする")
 }

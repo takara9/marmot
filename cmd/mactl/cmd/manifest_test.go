@@ -118,6 +118,31 @@ spec:
 			Expect(manifest["apiVersion"]).To(Equal("v1"))
 		})
 
+		It("loads multiple YAML manifests from a single file", func() {
+			yamlFile := filepath.Join(tmpDir, "multi.yaml")
+			content := `apiVersion: v1
+kind: Server
+metadata:
+  name: test-server-1
+---
+apiVersion: v1
+kind: Volume
+metadata:
+  name: test-volume-1
+spec:
+  type: qcow2
+  kind: data
+`
+			err := os.WriteFile(yamlFile, []byte(content), 0644)
+			Expect(err).NotTo(HaveOccurred())
+
+			manifests, err := LoadManifests(yamlFile)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(manifests).To(HaveLen(2))
+			Expect(manifests[0]["kind"]).To(Equal("Server"))
+			Expect(manifests[1]["kind"]).To(Equal("Volume"))
+		})
+
 		It("loads JSON manifest from file", func() {
 			jsonFile := filepath.Join(tmpDir, "test.json")
 			content := `{
