@@ -3,8 +3,8 @@ package controller
 import (
 	"fmt"
 	"log/slog"
-	"strconv"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -51,7 +51,7 @@ func StartNetController(node string, etcdUrl string, deletionDelaySeconds int) (
 	c.stopChan = make(chan struct{})
 	c.doneChan = make(chan struct{})
 
-	// NetworkFabric の初期化（OVN 優先、既存 VXLAN は OVS フォールバック）
+	// NetworkFabric の初期化（Geneve は OVN 前提、VXLAN は OVS で処理）
 	networkFabric := networkfabric.NewOVNFabric()
 
 	// 起動時に既存の仮想ネットワークを取得して、データベースに登録する
@@ -97,15 +97,38 @@ func (c *controller) networkControllerLoop(fabric networkfabric.NetworkFabric) {
 	statuses, err := c.marmot.Db.GetAllHostStatus()
 	if err != nil {
 		slog.Warn("failed to get host statuses; skip vxlan hub failover reconciliation", "err", err)
-	} else if marmotd.IsSchedulerLeader(c.marmot.NodeName, statuses) {
-		if err := c.reconcileVxlanHubFailovers(vnets, statuses); err != nil {
-			slog.Warn("failed to reconcile vxlan hub failovers", "err", err)
+	} else {
+		isLeader := marmotd.IsSchedulerLeader(c.marmot.NodeName, statuses)
+		currentMemberSignature := clusterMemberSignature(statuses)
+		membershipChanged := currentMemberSignature != c.lastNetworkMemberSignature
+		if membershipChanged {
+			slog.Info("cluster membership changed", "controllerNode", c.marmot.NodeName, "previous", c.lastNetworkMemberSignature, "current", currentMemberSignature)
+			c.lastNetworkMemberSignature = currentMemberSignature
 		}
-		refreshed, refreshErr := c.marmot.GetVirtualNetwork()
-		if refreshErr != nil {
-			slog.Warn("failed to refresh virtual networks after hub failover reconciliation", "err", refreshErr)
-		} else {
-			vnets = refreshed
+
+		if isLeader {
+			if membershipChanged {
+				if changed, reconcileErr := c.reconcileOverlayMembershipWithCluster(vnets, statuses); reconcileErr != nil {
+					slog.Warn("failed to reconcile overlay membership after cluster change", "err", reconcileErr)
+				} else if changed {
+					refreshed, refreshErr := c.marmot.GetVirtualNetwork()
+					if refreshErr != nil {
+						slog.Warn("failed to refresh virtual networks after membership reconciliation", "err", refreshErr)
+					} else {
+						vnets = refreshed
+					}
+				}
+			}
+
+			if err := c.reconcileVxlanHubFailovers(vnets, statuses); err != nil {
+				slog.Warn("failed to reconcile vxlan hub failovers", "err", err)
+			}
+			refreshed, refreshErr := c.marmot.GetVirtualNetwork()
+			if refreshErr != nil {
+				slog.Warn("failed to refresh virtual networks after hub failover reconciliation", "err", refreshErr)
+			} else {
+				vnets = refreshed
+			}
 		}
 	}
 
@@ -214,8 +237,22 @@ func (c *controller) networkControllerLoop(fabric networkfabric.NetworkFabric) {
 					if err := c.distributeDeleteIntentToFollowerNetworks(vnet); err != nil {
 						slog.Error("failed to distribute delete intent to follower networks", "headNetworkId", vnetID, "err", err)
 					}
+					continue
 				}
-				// ERROR のまま保持する（mactl network delete 実行まで削除しない）。
+
+				if role == "follower" {
+					if err := c.recoverFollowerErrorNetwork(vnet, fabric); err != nil {
+						slog.Warn("failed to auto-recover follower network from error", "networkId", vnetID, "err", err)
+						continue
+					}
+				} else {
+					if err := c.recoverHeadErrorNetwork(vnet, fabric); err != nil {
+						slog.Warn("failed to auto-recover head network from error", "networkId", vnetID, "err", err)
+						continue
+					}
+				}
+
+				slog.Info("network recovered from error", "networkId", vnetID, "networkName", vnet.Metadata.Name, "role", role)
 
 			case db.NETWORK_ACTIVE:
 				slog.Debug("利用可能な仮想ネットワークを処理", "networkId", vnetID)
@@ -329,6 +366,94 @@ func (c *controller) ensureFollowerNetworksWaiting(headNetwork api.VirtualNetwor
 	}
 
 	return nil
+}
+
+func (c *controller) reconcileOverlayMembershipWithCluster(vnets []api.VirtualNetwork, statuses []api.HostStatus) (bool, error) {
+	memberNodes := collectClusterMemberNodes(statuses)
+	if len(memberNodes) == 0 {
+		return false, nil
+	}
+
+	memberSet := make(map[string]struct{}, len(memberNodes))
+	for _, node := range memberNodes {
+		memberSet[node] = struct{}{}
+	}
+
+	changed := false
+	for _, vnet := range vnets {
+		if networkSyncRole(&vnet.Metadata) == "follower" {
+			continue
+		}
+		if !isVxlanOverlay(vnet) && !isGeneveOverlay(vnet) {
+			continue
+		}
+		if vnet.Status != nil && vnet.Status.StatusCode == db.NETWORK_DELETING {
+			continue
+		}
+
+		headID := api.VirtualNetworkID(vnet)
+		headNode := ""
+		if vnet.Metadata.NodeName != nil {
+			headNode = strings.TrimSpace(*vnet.Metadata.NodeName)
+		}
+		if headID == "" || headNode == "" {
+			continue
+		}
+
+		desiredFollowers := map[string]struct{}{}
+		for node := range memberSet {
+			if node == headNode {
+				continue
+			}
+			desiredFollowers[node] = struct{}{}
+		}
+
+		existingFollowers := map[string]api.VirtualNetwork{}
+		for _, candidate := range vnets {
+			if candidate.Metadata.Labels == nil || candidate.Metadata.NodeName == nil {
+				continue
+			}
+			labels := *candidate.Metadata.Labels
+			if db.GetNetworkSyncRole(labels) != "follower" {
+				continue
+			}
+			if db.GetHeadNetworkID(labels) != headID {
+				continue
+			}
+			node := strings.TrimSpace(*candidate.Metadata.NodeName)
+			if node == "" {
+				continue
+			}
+			existingFollowers[node] = candidate
+		}
+
+		for node := range desiredFollowers {
+			if _, ok := existingFollowers[node]; ok {
+				continue
+			}
+			if _, createErr := c.marmot.Db.MakeFollowerVirtualNetworkEntry(vnet, node, headID); createErr != nil {
+				slog.Error("failed to create follower network entry during membership reconciliation", "headNetworkId", headID, "followerNode", node, "err", createErr)
+				continue
+			}
+			changed = true
+		}
+
+		for node, follower := range existingFollowers {
+			if _, ok := desiredFollowers[node]; ok {
+				continue
+			}
+			if follower.Status != nil && follower.Status.DeletionTimeStamp != nil {
+				continue
+			}
+			if err := c.marmot.Db.SetDeleteTimestampVirtualNetwork(api.VirtualNetworkID(follower)); err != nil {
+				slog.Error("failed to set deletion timestamp for stale follower network", "headNetworkId", headID, "followerNetworkId", api.VirtualNetworkID(follower), "followerNode", node, "err", err)
+				continue
+			}
+			changed = true
+		}
+	}
+
+	return changed, nil
 }
 
 func (c *controller) distributeDeleteIntentToFollowerNetworks(headNetwork api.VirtualNetwork) error {
@@ -480,6 +605,61 @@ func (c *controller) reconcileFollowerActiveNetwork(followerNetwork api.VirtualN
 		return nil
 	default:
 		return nil
+	}
+}
+
+func (c *controller) recoverHeadErrorNetwork(vnet api.VirtualNetwork, fabric networkfabric.NetworkFabric) error {
+	vnetID := api.VirtualNetworkID(vnet)
+	c.db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_PROVISIONING, "recovery:head-reconcile")
+	if err := c.reconcileHeadProvisioningNetwork(vnet, fabric); err != nil {
+		c.db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_ERROR, err.Error())
+		return err
+	}
+	return nil
+}
+
+func (c *controller) recoverFollowerErrorNetwork(vnet api.VirtualNetwork, fabric networkfabric.NetworkFabric) error {
+	vnetID := api.VirtualNetworkID(vnet)
+	if vnet.Metadata.Labels == nil {
+		return fmt.Errorf("labels are required for follower recovery: networkId=%s", vnetID)
+	}
+	labels := *vnet.Metadata.Labels
+	headNetworkID := db.GetHeadNetworkID(labels)
+	if headNetworkID == "" {
+		return fmt.Errorf("headNetworkId label is missing for follower recovery: networkId=%s", vnetID)
+	}
+
+	headNetwork, err := c.marmot.Db.GetVirtualNetworkById(headNetworkID)
+	if err != nil {
+		return err
+	}
+	if headNetwork.Status == nil {
+		return fmt.Errorf("head network status is nil: headNetworkId=%s", headNetworkID)
+	}
+
+	switch headNetwork.Status.StatusCode {
+	case db.NETWORK_ACTIVE:
+		c.db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_PROVISIONING, "recovery:follower-reconcile")
+		if err := c.ensureVirtualNetworkPresent(vnet); err != nil {
+			c.db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_ERROR, err.Error())
+			return err
+		}
+		if err := c.ensureOverlayMeshForNetwork(fabric, vnet); err != nil {
+			c.db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_ERROR, "fabric:overlay-failed:"+err.Error())
+			return err
+		}
+		c.db.UpdateVirtualNetworkStatus(vnetID, db.NETWORK_ACTIVE)
+		return nil
+	case db.NETWORK_DELETING:
+		c.db.UpdateVirtualNetworkStatus(vnetID, db.NETWORK_DELETING)
+		return nil
+	case db.NETWORK_PENDING, db.NETWORK_PROVISIONING, db.NETWORK_WAITING:
+		c.db.UpdateVirtualNetworkStatus(vnetID, db.NETWORK_WAITING)
+		return nil
+	case db.NETWORK_ERROR:
+		return fmt.Errorf("head network is still in error: headNetworkId=%s", headNetworkID)
+	default:
+		return fmt.Errorf("unsupported head network status for follower recovery: headNetworkId=%s status=%d", headNetworkID, headNetwork.Status.StatusCode)
 	}
 }
 
@@ -942,10 +1122,35 @@ func collectActiveHostStatusByNode(statuses []api.HostStatus, now time.Time) map
 	return active
 }
 
+func collectClusterMemberNodes(statuses []api.HostStatus) []string {
+	memberSet := map[string]struct{}{}
+	for _, st := range statuses {
+		if st.NodeName == nil {
+			continue
+		}
+		node := strings.TrimSpace(*st.NodeName)
+		if node == "" {
+			continue
+		}
+		memberSet[node] = struct{}{}
+	}
+
+	members := make([]string, 0, len(memberSet))
+	for node := range memberSet {
+		members = append(members, node)
+	}
+	sort.Strings(members)
+	return members
+}
+
+func clusterMemberSignature(statuses []api.HostStatus) string {
+	return strings.Join(collectClusterMemberNodes(statuses), ",")
+}
+
 func selectFailoverHubNode(participants map[string]struct{}, activeByNode map[string]api.HostStatus) string {
 	type candidate struct {
-		nodeName      string
-		hostID        uint32
+		nodeName       string
+		hostID         uint32
 		hasValidHostID bool
 	}
 

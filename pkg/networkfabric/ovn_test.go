@@ -23,6 +23,24 @@ func withOVNRunner(t *testing.T, fn func(args ...string) (string, error)) {
 	})
 }
 
+func withOVNSBRunner(t *testing.T, fn func(args ...string) (string, error)) {
+	t.Helper()
+	orig := runOVNSBCTLCommand
+	runOVNSBCTLCommand = fn
+	t.Cleanup(func() {
+		runOVNSBCTLCommand = orig
+	})
+}
+
+func withOVSVSRunner(t *testing.T, fn func(args ...string) (string, error)) {
+	t.Helper()
+	orig := runOVSVSCTLCommand
+	runOVSVSCTLCommand = fn
+	t.Cleanup(func() {
+		runOVSVSCTLCommand = orig
+	})
+}
+
 func withOVNLookPath(t *testing.T, nbOK, sbOK bool) {
 	t.Helper()
 	origNB := ovnNBCTLLookPath
@@ -145,10 +163,36 @@ func TestEnsureOverlayMesh_GeneveRequiresOVNCommands(t *testing.T) {
 	}
 }
 
+func TestEnsureOverlayMesh_GeneveRequiresSouthboundEncap(t *testing.T) {
+	withGeneveOVSTunnelMesh(t, false)
+	withOVNLookPath(t, true, true)
+	withOVNRunner(t, func(args ...string) (string, error) {
+		return "", nil
+	})
+	withOVNSBRunner(t, func(args ...string) (string, error) {
+		return "", nil
+	})
+
+	of := NewOVNFabric()
+	vnet := testGeneveVNet()
+	if err := of.EnsureOverlayMesh(vnet, []string{"10.0.0.2"}); err == nil {
+		t.Fatalf("expected error when OVN southbound has no geneve encap")
+	}
+}
+
 func TestEnsureOverlayMesh_GeneveSyncsLogicalSwitchAndPorts(t *testing.T) {
 	withGeneveOVSTunnelMesh(t, false)
 	withOVNLookPath(t, true, true)
+	withOVSVSRunner(t, func(args ...string) (string, error) {
+		if len(args) >= 4 && args[0] == "get" && args[3] == "external_ids:ovn-remote" {
+			return "tcp:172.16.0.201:6642", nil
+		}
+		return "", nil
+	})
 	calls := []ovnRunnerCall{}
+	withOVNSBRunner(t, func(args ...string) (string, error) {
+		return "geneve", nil
+	})
 	withOVNRunner(t, func(args ...string) (string, error) {
 		calls = append(calls, ovnRunnerCall{args: append([]string{}, args...)})
 		if len(args) >= 2 && args[0] == "lsp-list" {
@@ -180,6 +224,30 @@ func TestEnsureOverlayMesh_GeneveSyncsLogicalSwitchAndPorts(t *testing.T) {
 	}
 	if len(lspAdds) != 2 {
 		t.Fatalf("expected deduped lsp-add count=2, got=%d calls=%v", len(lspAdds), lspAdds)
+	}
+}
+
+func TestOVNDBTargetsFromOVSRemote(t *testing.T) {
+	withOVSVSRunner(t, func(args ...string) (string, error) {
+		if len(args) >= 4 && args[0] == "get" && args[3] == "external_ids:ovn-remote" {
+			return "\"tcp:172.16.0.201:6642\"", nil
+		}
+		return "", nil
+	})
+
+	if got := ovnSouthboundDBTarget(); got != "tcp:172.16.0.201:6642" {
+		t.Fatalf("unexpected southbound target: got=%q", got)
+	}
+	if got := ovnNorthboundDBTarget(); got != "tcp:172.16.0.201:6641" {
+		t.Fatalf("unexpected northbound target: got=%q", got)
+	}
+}
+
+func TestAppendOVNDBTargetArgs(t *testing.T) {
+	got := appendOVNDBTargetArgs([]string{"list", "encap"}, "tcp:172.16.0.201:6642")
+	want := []string{"--db=tcp:172.16.0.201:6642", "list", "encap"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected args: got=%v want=%v", got, want)
 	}
 }
 
