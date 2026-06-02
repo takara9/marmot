@@ -9,33 +9,73 @@ import (
 	"github.com/takara9/marmot/api"
 )
 
+var delManifestFile string
+
 var delCmd = &cobra.Command{
-	Use:   "del RESOURCE NAME",
+	Use:   "del [RESOURCE NAME]",
 	Short: "Delete a resource",
-	Long:  `Delete a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw) with NAME specified.`,
-	Args:  cobra.ExactArgs(2),
+	Long:  `Delete a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw) with NAME specified. With -f, process manifest(s) and delete by metadata.name for each document.`,
+	Args:  cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if strings.TrimSpace(delManifestFile) != "" {
+			if len(args) > 1 {
+				return fmt.Errorf("with -f, del accepts at most one optional RESOURCE argument")
+			}
+
+			manifests, err := LoadManifests(delManifestFile)
+			if err != nil {
+				return fmt.Errorf("failed to load manifest: %w", err)
+			}
+
+			for index, manifest := range manifests {
+				resourceName, err := ResolveResourceNameForManifest(manifest, args)
+				if err != nil {
+					return fmt.Errorf("manifest %d: %w", index+1, err)
+				}
+
+				objectName := strings.TrimSpace(ExtractMetadataName(manifest))
+				if objectName == "" {
+					return fmt.Errorf("manifest %d: metadata.name is required", index+1)
+				}
+
+				if err := deleteResourceByTypeAndName(resourceName, objectName); err != nil {
+					return fmt.Errorf("manifest %d: %w", index+1, err)
+				}
+			}
+
+			return nil
+		}
+
+		if len(args) != 2 {
+			return fmt.Errorf("del requires RESOURCE and NAME unless -f is specified")
+		}
+
 		resourceName := normalizeResourceName(args[0])
 		objectName := args[1]
 
-		// リソースタイプに応じて処理を分岐
-		switch strings.ToLower(resourceName) {
-		case "server":
-			return deleteServer(objectName)
-		case "image":
-			return deleteImage(objectName)
-		case "volume":
-			return deleteVolume(objectName)
-		case "network":
-			return deleteNetwork(objectName)
-		case "gateway":
-			return deleteGateway(objectName)
-		case "vpngateway":
-			return deleteVpnGateway(objectName)
-		default:
-			return fmt.Errorf("unknown resource type: %s", resourceName)
-		}
+		return deleteResourceByTypeAndName(resourceName, objectName)
 	},
+}
+
+
+func deleteResourceByTypeAndName(resourceName string, objectName string) error {
+	// リソースタイプに応じて処理を分岐
+	switch strings.ToLower(resourceName) {
+	case "server":
+		return deleteServer(objectName)
+	case "image":
+		return deleteImage(objectName)
+	case "volume":
+		return deleteVolume(objectName)
+	case "network":
+		return deleteNetwork(objectName)
+	case "gateway":
+		return deleteGateway(objectName)
+	case "vpngateway":
+		return deleteVpnGateway(objectName)
+	default:
+		return fmt.Errorf("unknown resource type: %s", resourceName)
+	}
 }
 
 func deleteServer(name string) error {
@@ -73,7 +113,7 @@ func deleteServer(name string) error {
 		return fmt.Errorf("failed to delete server: %w", err)
 	}
 
-	fmt.Printf("server %q deleted successfully\n", name)
+	fmt.Printf("server %q deletion requested (accepted)\n", name)
 	return nil
 }
 
@@ -112,7 +152,7 @@ func deleteImage(name string) error {
 		return fmt.Errorf("failed to delete image: %w", err)
 	}
 
-	fmt.Printf("image %q deleted successfully\n", name)
+	fmt.Printf("image %q deletion requested (accepted)\n", name)
 	return nil
 }
 
@@ -151,7 +191,7 @@ func deleteVolume(name string) error {
 		return fmt.Errorf("failed to delete volume: %w", err)
 	}
 
-	fmt.Printf("volume %q deleted successfully\n", name)
+	fmt.Printf("volume %q deletion requested (accepted)\n", name)
 	return nil
 }
 
@@ -171,26 +211,26 @@ func deleteNetwork(name string) error {
 		return fmt.Errorf("failed to parse networks: %w", err)
 	}
 
-	// 一致するネットワークを検索
-	var found *api.VirtualNetwork
-	for i := range networks {
-		if networks[i].Metadata.Name == name {
-			found = &networks[i]
-			break
+	// 一致するネットワークをすべて検索し、削除要求を送る。
+	// 同名の head/follower エントリーが複数ある場合に、先頭1件だけ削除要求される問題を防ぐ。
+	matches := make([]api.VirtualNetwork, 0)
+	for _, net := range networks {
+		if net.Metadata.Name == name {
+			matches = append(matches, net)
 		}
 	}
 
-	if found == nil {
+	if len(matches) == 0 {
 		return fmt.Errorf("network %q not found", name)
 	}
 
-	// ネットワークを削除
-	_, _, err = m.DeleteVirtualNetworkById(api.VirtualNetworkID(*found))
-	if err != nil {
-		return fmt.Errorf("failed to delete network: %w", err)
+	for _, net := range matches {
+		if _, _, err = m.DeleteVirtualNetworkById(api.VirtualNetworkID(net)); err != nil {
+			return fmt.Errorf("failed to delete network %q(id=%s): %w", name, api.VirtualNetworkID(net), err)
+		}
 	}
 
-	fmt.Printf("network %q deleted successfully\n", name)
+	fmt.Printf("network %q deletion requested (accepted) for %d object(s)\n", name, len(matches))
 	return nil
 }
 
@@ -229,7 +269,7 @@ func deleteGateway(name string) error {
 		return fmt.Errorf("failed to delete gateway: %w", err)
 	}
 
-	fmt.Printf("gateway %q deleted successfully\n", name)
+	fmt.Printf("gateway %q deletion requested (accepted)\n", name)
 	return nil
 }
 
@@ -268,10 +308,11 @@ func deleteVpnGateway(name string) error {
 		return fmt.Errorf("failed to delete vpn gateway: %w", err)
 	}
 
-	fmt.Printf("vpn gateway %q deleted successfully\n", name)
+	fmt.Printf("vpn gateway %q deletion requested (accepted)\n", name)
 	return nil
 }
 
 func init() {
 	rootCmd.AddCommand(delCmd)
+	delCmd.Flags().StringVarP(&delManifestFile, "file", "f", "", "Manifest file, URL, or - for stdin")
 }

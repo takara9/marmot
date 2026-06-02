@@ -22,61 +22,48 @@ var applyCmd = &cobra.Command{
 		}
 
 		// マニフェストを読み込む
-		manifest, err := LoadManifest(manifestFile)
+		manifests, err := LoadManifests(manifestFile)
 		if err != nil {
 			return fmt.Errorf("failed to load manifest: %w", err)
 		}
 
-		// マニフェストの kind を取得
-		kind := ""
-		if k, ok := manifest["kind"].(string); ok {
-			kind = k
-		}
+		for index, manifest := range manifests {
+			resourceName, err := ResolveResourceNameForManifest(manifest, args)
+			if err != nil {
+				return fmt.Errorf("manifest %d: %w", index+1, err)
+			}
 
-		var resourceName string
-		if len(args) > 0 {
-			resourceName = normalizeResourceName(args[0])
-		} else {
-			switch GetManifestType(kind) {
-			case ManifestTypeServer:
-				resourceName = "server"
-			case ManifestTypeImage:
-				resourceName = "image"
-			case ManifestTypeVolume:
-				resourceName = "volume"
-			case ManifestTypeNetwork:
-				resourceName = "network"
-			case ManifestTypeGateway:
-				resourceName = "gateway"
-			case ManifestTypeVpnGateway:
-				resourceName = "vpngateway"
+			switch strings.ToLower(resourceName) {
+			case "server":
+				if err := applyServer(manifest); err != nil {
+					return fmt.Errorf("manifest %d: %w", index+1, err)
+				}
+			case "image":
+				if err := applyImage(manifest); err != nil {
+					return fmt.Errorf("manifest %d: %w", index+1, err)
+				}
+			case "volume":
+				if err := applyVolume(manifest); err != nil {
+					return fmt.Errorf("manifest %d: %w", index+1, err)
+				}
+			case "network":
+				if err := applyNetwork(manifest); err != nil {
+					return fmt.Errorf("manifest %d: %w", index+1, err)
+				}
+			case "gateway":
+				if err := applyGateway(manifest); err != nil {
+					return fmt.Errorf("manifest %d: %w", index+1, err)
+				}
+			case "vpngateway":
+				if err := applyVpnGateway(manifest); err != nil {
+					return fmt.Errorf("manifest %d: %w", index+1, err)
+				}
 			default:
-				return fmt.Errorf("failed to infer resource type from kind %q", kind)
+				return fmt.Errorf("manifest %d: unknown resource type: %s", index+1, resourceName)
 			}
 		}
 
-		expectedKind := GetKindFromResourceName(resourceName)
-		if kind != "" && kind != expectedKind {
-			return fmt.Errorf("manifest kind %q does not match resource type %q", kind, resourceName)
-		}
-
-		// リソースタイプに応じて処理を分岐
-		switch strings.ToLower(resourceName) {
-		case "server":
-			return applyServer(manifest)
-		case "image":
-			return applyImage(manifest)
-		case "volume":
-			return applyVolume(manifest)
-		case "network":
-			return applyNetwork(manifest)
-		case "gateway":
-			return applyGateway(manifest)
-		case "vpngateway":
-			return applyVpnGateway(manifest)
-		default:
-			return fmt.Errorf("unknown resource type: %s", resourceName)
-		}
+		return nil
 	},
 }
 
