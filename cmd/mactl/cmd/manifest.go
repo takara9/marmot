@@ -25,6 +25,7 @@ const (
 	ManifestTypeVolume     ManifestType = "Volume"
 	ManifestTypeNetwork    ManifestType = "VirtualNetwork"
 	ManifestTypeGateway    ManifestType = "Gateway"
+	ManifestTypeLoadBalancer ManifestType = "LoadBalancer"
 	ManifestTypeVpnGateway ManifestType = "VpnGateway"
 	ManifestTypeUnknown    ManifestType = "Unknown"
 )
@@ -119,6 +120,8 @@ func normalizeResourceName(resource string) string {
 		return "network"
 	case "gw", "gateways":
 		return "gateway"
+	case "lb", "lbs", "load-balancer", "load-balancers", "loadbalancer", "loadbalancers":
+		return "loadbalancer"
 	case "vpn-gateway", "vpn-gateways", "vpngateway", "vpngateways", "vpngw":
 		return "vpngateway"
 	default:
@@ -139,6 +142,8 @@ func GetManifestType(kind string) ManifestType {
 		return ManifestTypeNetwork
 	case "gateway":
 		return ManifestTypeGateway
+	case "loadbalancer":
+		return ManifestTypeLoadBalancer
 	case "vpngateway":
 		return ManifestTypeVpnGateway
 	default:
@@ -160,6 +165,8 @@ func GetKindFromResourceName(resource string) string {
 		return "VirtualNetwork"
 	case "gateway":
 		return "Gateway"
+	case "loadbalancer":
+		return "LoadBalancer"
 	case "vpngateway":
 		return "VpnGateway"
 	default:
@@ -189,6 +196,8 @@ func ResolveResourceNameForManifest(manifest map[string]interface{}, args []stri
 			resourceName = "network"
 		case ManifestTypeGateway:
 			resourceName = "gateway"
+		case ManifestTypeLoadBalancer:
+			resourceName = "loadbalancer"
 		case ManifestTypeVpnGateway:
 			resourceName = "vpngateway"
 		default:
@@ -295,6 +304,21 @@ func ManifestToGateway(manifest map[string]interface{}) (*api.Gateway, error) {
 	}
 
 	return &gateway, nil
+}
+
+// ManifestToLoadBalancer マニフェストを LoadBalancer 構造体に変換
+func ManifestToLoadBalancer(manifest map[string]interface{}) (*api.LoadBalancer, error) {
+	data, err := json.Marshal(manifest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal manifest: %w", err)
+	}
+
+	var loadBalancer api.LoadBalancer
+	if err := json.Unmarshal(data, &loadBalancer); err != nil {
+		return nil, fmt.Errorf("failed to parse as LoadBalancer: %w", err)
+	}
+
+	return &loadBalancer, nil
 }
 
 // ManifestToVpnGateway マニフェストを VpnGateway 構造体に変換

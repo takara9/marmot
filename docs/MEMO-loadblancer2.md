@@ -172,13 +172,31 @@ spec:
     - 対象 LoadBalancer と listener ごとの backendSelector に一致するバックエンド情報を API から取得。
     - listeners 単位で desired な HAProxy 設定を生成。
     - 前回適用済みの設定ハッシュと比較し、差分がある場合のみ反映処理を実行。
+- marmotd 側は staged/applied を分離して管理する。
+    - stagedConfigHash: LB VM へ配備済みの desired 設定ハッシュ。
+    - appliedConfigHash: LB VM 内 agent が適用完了した設定ハッシュ。
+    - stagedConfigAt: stagedConfigHash を配備した時刻。
+- ACTIVE 遷移は hash 一致のみで確定しない。
+    - agent state の lastAppliedHash が desired と一致すること。
+    - agent state の lastAppliedAt が stagedConfigAt 以上であること。
+    - 上記を満たした場合のみ appliedConfigHash を更新し、ACTIVE とする。
 - 反映処理は安全側に倒す。
     - 一時ファイルに haproxy.cfg を生成。
     - `haproxy -c -f <tempfile>` で構文検証。
     - 検証成功時のみ本番設定へ置換し、`systemctl reload haproxy` を実行。
     - 検証失敗または reload 失敗時は旧設定を維持し、status.message に失敗理由を記録。
 - 同時反映を防ぐため、単一実行ロック（ファイルロック等）を導入する。
-- API 一時障害時は最後の有効設定を維持し、しきい値超過で status.status を DEGRADED に更新する。
+- marmotd 側は SSH で LB VM 内 state file を参照し、agent の適用結果を監視する。
+- API 一時障害/agent state 読み取り障害時は最後の有効設定を維持し、しきい値超過で status.status を DEGRADED に更新する。
+    - 現在実装のしきい値: 連続読み取り失敗 3 回で DEGRADED。
+    - 読み取り成功時は失敗カウンタをリセットする。
+- DEGRADED からの復帰時はフラップ防止のため連続成功しきい値を適用する。
+    - 現在実装のしきい値: 連続読み取り成功 2 回で ACTIVE 復帰。
+- marmotd 側のしきい値・間隔は環境変数で上書きできる。
+    - MARMOT_LB_CONTROLLER_INTERVAL_SECONDS: LB コントローラーの制御ループ間隔（秒）。
+    - MARMOT_LB_AGENT_STATE_READ_MAX_FAILURES: 読み取り失敗で DEGRADED に遷移する連続失敗回数。
+    - MARMOT_LB_AGENT_RECOVERY_SUCCESS_REQUIRED: DEGRADED から ACTIVE へ戻す連続成功回数。
+    - いずれも未設定または不正値（0 以下/非数値）は既定値を使用する。
 - healthCheck 復旧時または失敗バックエンド消滅時は status.status を ACTIVE に戻す。
 - status.status の最終責任者は段階で切り替える。
     - HAProxy コントローラー起動前: marmotd が status.status を管理する。
@@ -194,6 +212,8 @@ spec:
     - unhealthyThreshold 回連続で失敗した backend を一時除外し、status.status=DEGRADED を記録。
 - 監視 API 通信失敗
     - 一定回数までは現行設定維持、閾値超過で status.status=DEGRADED とメッセージを記録。
+    - 現在実装では agent state 読み取り失敗を 3 回まで許容し、4 回目ではなく 3 回目到達時点で DEGRADED とする。
+    - 閾値は MARMOT_LB_AGENT_STATE_READ_MAX_FAILURES で調整可能。
 
 ### 6.1 status.status の値
 
@@ -206,7 +226,8 @@ spec:
 
 - healthCheck 対象バックエンドから正常応答が返り、失敗状態が解消されたとき。
 - backendSelector でマッチしたバックエンド集合の中に、healthCheck 失敗中のバックエンドが存在しなくなったとき。
-- 上記を満たしたタイミングで status.status を ACTIVE に戻す。
+- 上記を満たし、かつ agent state 読み取りが連続成功しきい値を満たしたタイミングで status.status を ACTIVE に戻す。
+- 連続成功しきい値は MARMOT_LB_AGENT_RECOVERY_SUCCESS_REQUIRED で調整可能。
 
 ### 7. セキュリティ要件
 
@@ -246,6 +267,9 @@ spec:
 - コントローラー
     - VM 作成成功で ACTIVE 遷移
     - Ansible 3 回失敗で FAILED
+    - agent state 読み取り失敗が連続 3 回で DEGRADED
+    - DEGRADED 復帰時に連続成功しきい値（2 回）を満たすまで ACTIVE に戻さない
+    - 上記しきい値と制御間隔は環境変数で上書き可能
     - delete 時の後始末完了
 - LB 動作
     - backend 追加/削除で再設定反映
@@ -266,5 +290,6 @@ spec:
 - Phase 1: API/DB/CLI（保存・取得・表示）
 - Phase 2: marmotd コントローラー（VM 作成/削除）
 - Phase 3: LB VM 内コントローラー + HAProxy 自動反映
+- Phase 3 補足（実装済み）: staged/applied handoff、適用時刻ゲート、読み取り失敗/復帰しきい値、環境変数によるしきい値上書き
 - Phase 4: deb 同梱、postinst 反映、E2E テスト
 

@@ -1,0 +1,63 @@
+---
+- hosts: all
+  gather_facts: false
+  tasks:
+    - name: Install HAProxy
+      ansible.builtin.apt:
+        name: haproxy
+        state: present
+        update_cache: true
+
+    - name: Write HAProxy config
+      ansible.builtin.copy:
+        dest: /etc/haproxy/haproxy-desired.cfg
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+{{ .HaproxyConfig }}
+
+    - name: Install marmot-lb-agent binary
+      ansible.builtin.copy:
+        src: /usr/local/marmot/marmot-lb-agent
+        dest: /usr/local/bin/marmot-lb-agent
+        mode: "0755"
+
+    - name: Install marmot-lb-agent service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/marmot-lb-agent.service
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=marmot load balancer agent
+          After=network.target haproxy.service
+
+          [Service]
+          Type=simple
+          ExecStart=/usr/local/bin/marmot-lb-agent --interval-seconds=5 --desired-config=/etc/haproxy/haproxy-desired.cfg --active-config=/etc/haproxy/haproxy.cfg --state-file=/var/lib/marmot/lb-agent/state.json
+          Restart=always
+          RestartSec=1
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Validate HAProxy config
+      ansible.builtin.command: haproxy -c -f /etc/haproxy/haproxy.cfg
+
+    - name: Ensure HAProxy enabled
+      ansible.builtin.systemd:
+        name: haproxy
+        enabled: true
+
+    - name: Ensure marmot-lb-agent enabled
+      ansible.builtin.systemd:
+        name: marmot-lb-agent
+        enabled: true
+        daemon_reload: true
+
+    - name: Restart marmot-lb-agent
+      ansible.builtin.systemd:
+        name: marmot-lb-agent
+        state: restarted
