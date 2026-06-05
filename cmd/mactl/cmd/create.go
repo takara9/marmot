@@ -15,7 +15,7 @@ var manifestFile string
 var createCmd = &cobra.Command{
 	Use:   "create [RESOURCE]",
 	Short: "Create a resource from a file or stdin",
-	Long:  `Create a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, loadbalancer/lb, vpngateway/vpngw) from a manifest file or stdin. If RESOURCE is omitted, it is inferred from manifest kind.`,
+	Long:  `Create a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, applicationloadbalancer/alb, vpngateway/vpngw) from a manifest file or stdin. If RESOURCE is omitted, it is inferred from manifest kind.`,
 	Args:  cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// マニフェストファイルが指定されていない場合はエラー
@@ -56,7 +56,7 @@ var createCmd = &cobra.Command{
 				if err := createGateway(manifest); err != nil {
 					return fmt.Errorf("manifest %d: %w", index+1, err)
 				}
-			case "loadbalancer":
+			case "applicationloadbalancer":
 				if err := createLoadBalancer(manifest); err != nil {
 					return fmt.Errorf("manifest %d: %w", index+1, err)
 				}
@@ -377,7 +377,7 @@ func createLoadBalancer(manifest map[string]interface{}) error {
 
 	list, _, err := m.GetLoadBalancers()
 	if err == nil {
-		var items []api.LoadBalancer
+		var items []api.ApplicationLoadBalancer
 		json.Unmarshal(list, &items)
 		for _, lb := range items {
 			if lb.Metadata.Name == loadBalancer.Metadata.Name && strings.TrimSpace(lb.Spec.InternalVirtualNetwork) == strings.TrimSpace(loadBalancer.Spec.InternalVirtualNetwork) {

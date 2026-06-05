@@ -10,7 +10,7 @@ import (
 	"github.com/takara9/marmot/api"
 )
 
-func (m *MarmotEndpoint) CreateLoadBalancer(spec api.LoadBalancer) ([]byte, *url.URL, error) {
+func (m *MarmotEndpoint) CreateLoadBalancer(spec api.ApplicationLoadBalancer) ([]byte, *url.URL, error) {
 	slog.Debug("===", "CreateLoadBalancer is called", "===")
 	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/load-balancer")
 	if err != nil {
@@ -53,7 +53,7 @@ func (m *MarmotEndpoint) GetLoadBalancerById(id string) ([]byte, *url.URL, error
 	return m.httpRequest2(req)
 }
 
-func (m *MarmotEndpoint) UpdateLoadBalancerById(id string, spec api.LoadBalancer) ([]byte, *url.URL, error) {
+func (m *MarmotEndpoint) UpdateLoadBalancerById(id string, spec api.ApplicationLoadBalancer) ([]byte, *url.URL, error) {
 	slog.Debug("===", "UpdateLoadBalancerById is called", "===")
 	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/load-balancer/"+id)
 	if err != nil {

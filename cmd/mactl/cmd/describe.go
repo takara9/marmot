@@ -14,7 +14,7 @@ import (
 var describeCmd = &cobra.Command{
 	Use:   "describe RESOURCE NAME",
 	Short: "Show detailed information about a resource",
-	Long:  `Describe a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, loadbalancer/lb, vpngateway/vpngw) with NAME specified. Shows formatted text output.`,
+	Long:  `Describe a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, applicationloadbalancer/alb, vpngateway/vpngw) with NAME specified. Shows formatted text output.`,
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		resourceName := args[0]
@@ -33,7 +33,7 @@ var describeCmd = &cobra.Command{
 			return describeNetwork(objectName)
 		case "gateway":
 			return describeGateway(objectName)
-		case "loadbalancer":
+		case "applicationloadbalancer":
 			return describeLoadBalancer(objectName)
 		case "vpngateway":
 			return describeVpnGateway(objectName)
@@ -930,12 +930,12 @@ func describeLoadBalancer(name string) error {
 		return fmt.Errorf("failed to list load balancers: %w", err)
 	}
 
-	var items []api.LoadBalancer
+	var items []api.ApplicationLoadBalancer
 	if err := json.Unmarshal(list, &items); err != nil {
 		return fmt.Errorf("failed to parse load balancers: %w", err)
 	}
 
-	matches := make([]api.LoadBalancer, 0)
+	matches := make([]api.ApplicationLoadBalancer, 0)
 	for _, item := range items {
 		if item.Metadata.Name == name {
 			matches = append(matches, item)
@@ -957,7 +957,7 @@ func describeLoadBalancer(name string) error {
 	return describeResource(found)
 }
 
-func describeLoadBalancerText(lb *api.LoadBalancer) error {
+func describeLoadBalancerText(lb *api.ApplicationLoadBalancer) error {
 	if lb == nil {
 		return fmt.Errorf("load balancer is nil")
 	}

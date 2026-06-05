@@ -14,7 +14,7 @@ var delManifestFile string
 var delCmd = &cobra.Command{
 	Use:   "del [RESOURCE NAME]",
 	Short: "Delete a resource",
-	Long:  `Delete a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, loadbalancer/lb, vpngateway/vpngw) with NAME specified. With -f, process manifest(s) and delete by metadata.name for each document.`,
+	Long:  `Delete a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, applicationloadbalancer/alb, vpngateway/vpngw) with NAME specified. With -f, process manifest(s) and delete by metadata.name for each document.`,
 	Args:  cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if strings.TrimSpace(delManifestFile) != "" {
@@ -71,7 +71,7 @@ func deleteResourceByTypeAndName(resourceName string, objectName string) error {
 		return deleteNetwork(objectName)
 	case "gateway":
 		return deleteGateway(objectName)
-	case "loadbalancer":
+	case "applicationloadbalancer":
 		return deleteLoadBalancer(objectName)
 	case "vpngateway":
 		return deleteVpnGateway(objectName)
@@ -286,12 +286,12 @@ func deleteLoadBalancer(name string) error {
 		return fmt.Errorf("failed to list load balancers: %w", err)
 	}
 
-	var items []api.LoadBalancer
+	var items []api.ApplicationLoadBalancer
 	if err := json.Unmarshal(list, &items); err != nil {
 		return fmt.Errorf("failed to parse load balancers: %w", err)
 	}
 
-	matches := make([]api.LoadBalancer, 0)
+	matches := make([]api.ApplicationLoadBalancer, 0)
 	for _, item := range items {
 		if item.Metadata.Name == name {
 			matches = append(matches, item)

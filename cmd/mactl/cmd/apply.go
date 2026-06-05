@@ -13,7 +13,7 @@ import (
 var applyCmd = &cobra.Command{
 	Use:   "apply [RESOURCE]",
 	Short: "Create or update a resource from a file or stdin",
-	Long:  `Apply a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, loadbalancer/lb, vpngateway/vpngw) from a manifest file or stdin. Creates if not exists, updates if exists. If RESOURCE is omitted, it is inferred from manifest kind.`,
+	Long:  `Apply a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, applicationloadbalancer/alb, vpngateway/vpngw) from a manifest file or stdin. Creates if not exists, updates if exists. If RESOURCE is omitted, it is inferred from manifest kind.`,
 	Args:  cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// マニフェストファイルが指定されていない場合はエラー
@@ -54,7 +54,7 @@ var applyCmd = &cobra.Command{
 				if err := applyGateway(manifest); err != nil {
 					return fmt.Errorf("manifest %d: %w", index+1, err)
 				}
-			case "loadbalancer":
+			case "applicationloadbalancer":
 				if err := applyLoadBalancer(manifest); err != nil {
 					return fmt.Errorf("manifest %d: %w", index+1, err)
 				}
@@ -403,7 +403,7 @@ func applyLoadBalancer(manifest map[string]interface{}) error {
 	var existingID string
 	list, _, err := m.GetLoadBalancers()
 	if err == nil {
-		var items []api.LoadBalancer
+		var items []api.ApplicationLoadBalancer
 		json.Unmarshal(list, &items)
 		for _, item := range items {
 			if item.Metadata.Name != loadBalancer.Metadata.Name {

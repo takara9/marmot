@@ -7,10 +7,10 @@ import (
 	"github.com/takara9/marmot/api"
 )
 
-func TestBuildLoadBalancerHAProxyConfig_WithResolvedBackends(t *testing.T) {
-	loadBalancer := api.LoadBalancer{
+func TestBuildApplicationLoadBalancerHAProxyConfig_WithResolvedBackends(t *testing.T) {
+	loadBalancer := api.ApplicationLoadBalancer{
 		ApiVersion: "v1",
-		Kind:       "LoadBalancer",
+		Kind:       "ApplicationLoadBalancer",
 		Metadata: api.Metadata{
 			Name: "lb-web",
 			Id:   "lb123",
@@ -31,16 +31,16 @@ func TestBuildLoadBalancerHAProxyConfig_WithResolvedBackends(t *testing.T) {
 		},
 	}
 
-	backends := map[string][]loadBalancerBackendServer{
+	backends := map[string][]applicationLoadBalancerBackendServer{
 		"web-http": {
 			{Name: "web-a", IP: "172.16.10.11"},
 			{Name: "web-b", IP: "172.16.10.12"},
 		},
 	}
 
-	cfg, err := buildLoadBalancerHAProxyConfig(loadBalancer, backends)
+	cfg, err := buildApplicationLoadBalancerHAProxyConfig(loadBalancer, backends)
 	if err != nil {
-		t.Fatalf("buildLoadBalancerHAProxyConfig() failed: %v", err)
+		t.Fatalf("buildApplicationLoadBalancerHAProxyConfig() failed: %v", err)
 	}
 	if !strings.Contains(cfg, "server srv-1-web-a 172.16.10.11:8080 check") {
 		t.Fatalf("generated cfg does not contain backend web-a entry: %s", cfg)
@@ -50,10 +50,10 @@ func TestBuildLoadBalancerHAProxyConfig_WithResolvedBackends(t *testing.T) {
 	}
 }
 
-func TestDesiredLoadBalancerConfigHash_ChangesWhenBackendsChange(t *testing.T) {
-	loadBalancer := api.LoadBalancer{
+func TestDesiredApplicationLoadBalancerConfigHash_ChangesWhenBackendsChange(t *testing.T) {
+	loadBalancer := api.ApplicationLoadBalancer{
 		ApiVersion: "v1",
-		Kind:       "LoadBalancer",
+		Kind:       "ApplicationLoadBalancer",
 		Metadata: api.Metadata{
 			Name: "lb-web",
 			Id:   "lb123",
@@ -74,10 +74,10 @@ func TestDesiredLoadBalancerConfigHash_ChangesWhenBackendsChange(t *testing.T) {
 		},
 	}
 
-	hashA := desiredLoadBalancerConfigHash(loadBalancer, map[string][]loadBalancerBackendServer{
+	hashA := desiredApplicationLoadBalancerConfigHash(loadBalancer, map[string][]applicationLoadBalancerBackendServer{
 		"web-http": {{Name: "web-a", IP: "172.16.10.11"}},
 	})
-	hashB := desiredLoadBalancerConfigHash(loadBalancer, map[string][]loadBalancerBackendServer{
+	hashB := desiredApplicationLoadBalancerConfigHash(loadBalancer, map[string][]applicationLoadBalancerBackendServer{
 		"web-http": {{Name: "web-b", IP: "172.16.10.12"}},
 	})
 

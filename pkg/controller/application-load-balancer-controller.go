@@ -18,22 +18,22 @@ import (
 )
 
 const (
-	defaultLoadBalancerControllerIntervalSeconds          = 15
-	defaultLoadBalancerAgentStateReadMaxFailures          = 3
-	defaultLoadBalancerAgentStateRecoverySuccessRequired  = 2
+	defaultApplicationLoadBalancerControllerIntervalSeconds          = 15
+	defaultApplicationLoadBalancerAgentStateReadMaxFailures          = 3
+	defaultApplicationLoadBalancerAgentStateRecoverySuccessRequired  = 2
 )
 
 var (
-	loadBalancerControllerInterval = time.Duration(defaultLoadBalancerControllerIntervalSeconds) * time.Second
-	loadBalancerAgentStateReadMaxFailures = defaultLoadBalancerAgentStateReadMaxFailures
-	loadBalancerAgentStateRecoverySuccessRequired = defaultLoadBalancerAgentStateRecoverySuccessRequired
+	applicationLoadBalancerControllerInterval = time.Duration(defaultApplicationLoadBalancerControllerIntervalSeconds) * time.Second
+	applicationLoadBalancerAgentStateReadMaxFailures = defaultApplicationLoadBalancerAgentStateReadMaxFailures
+	applicationLoadBalancerAgentStateRecoverySuccessRequired = defaultApplicationLoadBalancerAgentStateRecoverySuccessRequired
 )
 
-// StartLoadBalancerController starts controller loop for load balancer resources.
-func StartLoadBalancerController(node string, etcdUrl string) (*controller, error) {
+// StartApplicationLoadBalancerController starts controller loop for load balancer resources.
+func StartApplicationLoadBalancerController(node string, etcdUrl string) (*controller, error) {
 	var c controller
 	var err error
-	loadBalancerControllerSettingsFromEnv()
+	applicationLoadBalancerControllerSettingsFromEnv()
 
 	c.deletionDelay = 15 * time.Second
 	c.marmot, err = marmotd.NewMarmot(node, etcdUrl)
@@ -45,14 +45,14 @@ func StartLoadBalancerController(node string, etcdUrl string) (*controller, erro
 	c.stopChan = make(chan struct{})
 	c.doneChan = make(chan struct{})
 
-	ticker := time.NewTicker(loadBalancerControllerInterval)
+	ticker := time.NewTicker(applicationLoadBalancerControllerInterval)
 	go func() {
 		defer ticker.Stop()
 		defer close(c.doneChan)
 		for {
 			select {
 			case <-ticker.C:
-				c.loadBalancerControllerLoop()
+				c.applicationLoadBalancerControllerLoop()
 			case <-c.stopChan:
 				slog.Info("ロードバランサーコントローラー停止")
 				return
@@ -63,7 +63,7 @@ func StartLoadBalancerController(node string, etcdUrl string) (*controller, erro
 	return &c, nil
 }
 
-func (c *controller) loadBalancerControllerLoop() {
+func (c *controller) applicationLoadBalancerControllerLoop() {
 	slog.Debug("ロードバランサーコントローラーの制御ループ実行", "CONTROLLER", time.Now().Format("2006-01-02 15:04:05"))
 
 	items, err := c.db.GetLoadBalancers()
@@ -80,13 +80,13 @@ func (c *controller) loadBalancerControllerLoop() {
 		}
 
 		if item.Status == nil || item.Status.StatusCode != db.LOAD_BALANCER_DELETING {
-			missingServer, err := c.isLoadBalancerManagedServerMissing(item)
+			missingServer, err := c.isApplicationLoadBalancerManagedServerMissing(item)
 			if err != nil {
 				slog.Warn("failed to validate load balancer managed server", "id", id, "err", err)
 				continue
 			}
 			if missingServer {
-				c.deleteLoadBalancerForMissingServer(item)
+				c.deleteApplicationLoadBalancerForMissingServer(item)
 				continue
 			}
 		}
@@ -105,15 +105,15 @@ func (c *controller) loadBalancerControllerLoop() {
 
 		switch item.Status.StatusCode {
 		case db.LOAD_BALANCER_PENDING:
-			c.reconcileLoadBalancerPending(item)
+			c.reconcileApplicationLoadBalancerPending(item)
 		case db.LOAD_BALANCER_PROVISIONING:
-			c.reconcileLoadBalancerProvisioning(item)
+			c.reconcileApplicationLoadBalancerProvisioning(item)
 		case db.LOAD_BALANCER_CONFIGURING:
-			c.reconcileLoadBalancerConfiguring(item)
+			c.reconcileApplicationLoadBalancerConfiguring(item)
 		case db.LOAD_BALANCER_ACTIVE, db.LOAD_BALANCER_DEGRADED:
-			c.reconcileLoadBalancerActive(item)
+			c.reconcileApplicationLoadBalancerActive(item)
 		case db.LOAD_BALANCER_DELETING:
-			c.reconcileLoadBalancerDeleting(item)
+			c.reconcileApplicationLoadBalancerDeleting(item)
 		case db.LOAD_BALANCER_FAILED:
 			slog.Debug("ロードバランサー状態を監視", "id", id, "statusCode", item.Status.StatusCode)
 		default:
@@ -122,8 +122,8 @@ func (c *controller) loadBalancerControllerLoop() {
 	}
 }
 
-func (c *controller) isLoadBalancerManagedServerMissing(loadBalancer api.LoadBalancer) (bool, error) {
-	serverID := strings.TrimSpace(loadBalancerManagedServerID(loadBalancer))
+func (c *controller) isApplicationLoadBalancerManagedServerMissing(loadBalancer api.ApplicationLoadBalancer) (bool, error) {
+	serverID := strings.TrimSpace(applicationLoadBalancerManagedServerID(loadBalancer))
 	if serverID == "" {
 		return false, nil
 	}
@@ -137,7 +137,7 @@ func (c *controller) isLoadBalancerManagedServerMissing(loadBalancer api.LoadBal
 	return false, nil
 }
 
-func (c *controller) deleteLoadBalancerForMissingServer(loadBalancer api.LoadBalancer) {
+func (c *controller) deleteApplicationLoadBalancerForMissingServer(loadBalancer api.ApplicationLoadBalancer) {
 	loadBalancerID := api.LoadBalancerID(loadBalancer)
 	if err := c.db.DeleteLoadBalancerById(loadBalancerID); err != nil {
 		slog.Warn("DeleteLoadBalancerById() failed while auto-deleting load balancer", "id", loadBalancerID, "err", err)
@@ -146,7 +146,7 @@ func (c *controller) deleteLoadBalancerForMissingServer(loadBalancer api.LoadBal
 	slog.Info("load balancer deleted because managed server no longer exists", "id", loadBalancerID)
 }
 
-func (c *controller) reconcileLoadBalancerPending(loadBalancer api.LoadBalancer) {
+func (c *controller) reconcileApplicationLoadBalancerPending(loadBalancer api.ApplicationLoadBalancer) {
 	loadBalancerID := api.LoadBalancerID(loadBalancer)
 
 	if err := validateGatewayInternalNetwork(c.db, loadBalancer.Spec.InternalVirtualNetwork); err != nil {
@@ -154,13 +154,13 @@ func (c *controller) reconcileLoadBalancerPending(loadBalancer api.LoadBalancer)
 		return
 	}
 
-	serverID, err := c.ensureLoadBalancerServerEntry(loadBalancer)
+	serverID, err := c.ensureApplicationLoadBalancerServerEntry(loadBalancer)
 	if err != nil {
 		_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_FAILED, err.Error())
 		return
 	}
 
-	if err := c.ensureLoadBalancerManagedServerLabel(loadBalancerID, serverID); err != nil {
+	if err := c.ensureApplicationLoadBalancerManagedServerLabel(loadBalancerID, serverID); err != nil {
 		_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_FAILED, err.Error())
 		return
 	}
@@ -170,9 +170,9 @@ func (c *controller) reconcileLoadBalancerPending(loadBalancer api.LoadBalancer)
 	}
 }
 
-func (c *controller) reconcileLoadBalancerProvisioning(loadBalancer api.LoadBalancer) {
+func (c *controller) reconcileApplicationLoadBalancerProvisioning(loadBalancer api.ApplicationLoadBalancer) {
 	loadBalancerID := api.LoadBalancerID(loadBalancer)
-	serverID := loadBalancerManagedServerID(loadBalancer)
+	serverID := applicationLoadBalancerManagedServerID(loadBalancer)
 	if strings.TrimSpace(serverID) == "" {
 		_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_PENDING, "load balancer server reference is missing")
 		return
@@ -204,9 +204,9 @@ func (c *controller) reconcileLoadBalancerProvisioning(loadBalancer api.LoadBala
 	}
 }
 
-func (c *controller) reconcileLoadBalancerConfiguring(loadBalancer api.LoadBalancer) {
+func (c *controller) reconcileApplicationLoadBalancerConfiguring(loadBalancer api.ApplicationLoadBalancer) {
 	loadBalancerID := api.LoadBalancerID(loadBalancer)
-	serverID := loadBalancerManagedServerID(loadBalancer)
+	serverID := applicationLoadBalancerManagedServerID(loadBalancer)
 	if strings.TrimSpace(serverID) == "" {
 		_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_PENDING, "load balancer server reference is missing")
 		return
@@ -225,33 +225,33 @@ func (c *controller) reconcileLoadBalancerConfiguring(loadBalancer api.LoadBalan
 		return
 	}
 
-	targetIP, err := c.resolveLoadBalancerTargetAddress(loadBalancer)
+		targetIP, err := c.resolveApplicationLoadBalancerTargetAddress(loadBalancer)
 	if err != nil {
-		c.handleLoadBalancerConfigFailure(loadBalancerID, err)
+			c.handleApplicationLoadBalancerConfigFailure(loadBalancerID, err)
 		return
 	}
-	listenerBackends, err := c.resolveLoadBalancerListenerBackends(loadBalancer)
+		listenerBackends, err := c.resolveApplicationLoadBalancerListenerBackends(loadBalancer)
 	if err != nil {
-		c.handleLoadBalancerConfigFailure(loadBalancerID, err)
+			c.handleApplicationLoadBalancerConfigFailure(loadBalancerID, err)
 		return
 	}
-	if msg := loadBalancerBackendAvailabilityMessage(loadBalancer, listenerBackends); msg != "" {
+		if msg := applicationLoadBalancerBackendAvailabilityMessage(loadBalancer, listenerBackends); msg != "" {
 		_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_DEGRADED, msg)
 		return
 	}
 
-	playbookPath := filepath.Join(loadBalancerPlaybookDir, fmt.Sprintf("load-balancer-%s.yaml", loadBalancerID))
-	configHash := desiredLoadBalancerConfigHash(loadBalancer, listenerBackends)
-	if loadBalancerStagedConfigHash(loadBalancer) != configHash {
-		if err := renderLoadBalancerPlaybook(playbookPath, targetIP, loadBalancer, listenerBackends); err != nil {
-			c.handleLoadBalancerConfigFailure(loadBalancerID, err)
+	playbookPath := filepath.Join(applicationLoadBalancerPlaybookDir, fmt.Sprintf("load-balancer-%s.yaml", loadBalancerID))
+		configHash := desiredApplicationLoadBalancerConfigHash(loadBalancer, listenerBackends)
+		if applicationLoadBalancerStagedConfigHash(loadBalancer) != configHash {
+			if err := renderApplicationLoadBalancerPlaybook(playbookPath, targetIP, loadBalancer, listenerBackends); err != nil {
+				c.handleApplicationLoadBalancerConfigFailure(loadBalancerID, err)
 			return
 		}
-		if err := runLoadBalancerPlaybook(playbookPath, targetIP, loadBalancerPrivateKeyPath); err != nil {
-			c.handleLoadBalancerConfigFailure(loadBalancerID, err)
+			if err := runApplicationLoadBalancerPlaybook(playbookPath, targetIP, applicationLoadBalancerPrivateKeyPath); err != nil {
+				c.handleApplicationLoadBalancerConfigFailure(loadBalancerID, err)
 			return
 		}
-		if err := c.updateLoadBalancerLabels(loadBalancerID, func(labels map[string]interface{}) {
+			if err := c.updateApplicationLoadBalancerLabels(loadBalancerID, func(labels map[string]interface{}) {
 			db.SetLoadBalancerAnsibleRetries(labels, 0)
 			db.SetLoadBalancerStagedConfigHash(labels, configHash)
 			db.SetLoadBalancerStagedConfigAt(labels, time.Now().UTC())
@@ -261,17 +261,17 @@ func (c *controller) reconcileLoadBalancerConfiguring(loadBalancer api.LoadBalan
 			_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_FAILED, err.Error())
 			return
 		}
-		refreshed, err := c.db.GetLoadBalancerById(loadBalancerID)
+			refreshed, err := c.db.GetLoadBalancerById(loadBalancerID)
 		if err == nil {
 			loadBalancer = refreshed
 		}
 	}
-	c.observeLoadBalancerAgentState(loadBalancer, targetIP, configHash, loadBalancerStagedConfigAt(loadBalancer))
+	c.observeApplicationLoadBalancerAgentState(loadBalancer, targetIP, configHash, applicationLoadBalancerStagedConfigAt(loadBalancer))
 }
 
-func (c *controller) reconcileLoadBalancerActive(loadBalancer api.LoadBalancer) {
+func (c *controller) reconcileApplicationLoadBalancerActive(loadBalancer api.ApplicationLoadBalancer) {
 	loadBalancerID := api.LoadBalancerID(loadBalancer)
-	serverID := loadBalancerManagedServerID(loadBalancer)
+	serverID := applicationLoadBalancerManagedServerID(loadBalancer)
 	if strings.TrimSpace(serverID) == "" {
 		_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_PENDING, "load balancer server reference is missing")
 		return
@@ -296,18 +296,18 @@ func (c *controller) reconcileLoadBalancerActive(loadBalancer api.LoadBalancer) 
 		return
 	}
 
-	listenerBackends, err := c.resolveLoadBalancerListenerBackends(loadBalancer)
+	listenerBackends, err := c.resolveApplicationLoadBalancerListenerBackends(loadBalancer)
 	if err != nil {
 		_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_DEGRADED, err.Error())
 		return
 	}
-	if msg := loadBalancerBackendAvailabilityMessage(loadBalancer, listenerBackends); msg != "" {
+	if msg := applicationLoadBalancerBackendAvailabilityMessage(loadBalancer, listenerBackends); msg != "" {
 		_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_DEGRADED, msg)
 		return
 	}
 
-	if loadBalancerAppliedConfigHash(loadBalancer) != desiredLoadBalancerConfigHash(loadBalancer, listenerBackends) {
-		if err := c.updateLoadBalancerLabels(loadBalancerID, func(labels map[string]interface{}) {
+	if applicationLoadBalancerAppliedConfigHash(loadBalancer) != desiredApplicationLoadBalancerConfigHash(loadBalancer, listenerBackends) {
+		if err := c.updateApplicationLoadBalancerLabels(loadBalancerID, func(labels map[string]interface{}) {
 			db.SetLoadBalancerAnsibleRetries(labels, 0)
 			db.SetLoadBalancerStagedConfigHash(labels, "")
 			db.SetLoadBalancerStagedConfigAt(labels, time.Time{})
@@ -321,9 +321,9 @@ func (c *controller) reconcileLoadBalancerActive(loadBalancer api.LoadBalancer) 
 		return
 	}
 
-	targetIP, err := c.resolveLoadBalancerTargetAddress(loadBalancer)
+	targetIP, err := c.resolveApplicationLoadBalancerTargetAddress(loadBalancer)
 	if err == nil {
-		if observed := c.observeLoadBalancerAgentState(loadBalancer, targetIP, loadBalancerAppliedConfigHash(loadBalancer), loadBalancerStagedConfigAt(loadBalancer)); observed {
+		if observed := c.observeApplicationLoadBalancerAgentState(loadBalancer, targetIP, applicationLoadBalancerAppliedConfigHash(loadBalancer), applicationLoadBalancerStagedConfigAt(loadBalancer)); observed {
 			return
 		}
 	}
@@ -333,25 +333,25 @@ func (c *controller) reconcileLoadBalancerActive(loadBalancer api.LoadBalancer) 
 	}
 }
 
-func (c *controller) resolveLoadBalancerListenerBackends(loadBalancer api.LoadBalancer) (map[string][]loadBalancerBackendServer, error) {
+func (c *controller) resolveApplicationLoadBalancerListenerBackends(loadBalancer api.ApplicationLoadBalancer) (map[string][]applicationLoadBalancerBackendServer, error) {
 	servers, err := c.db.GetServers()
 	if err != nil {
 		return nil, err
 	}
 
 	internalNetwork := strings.TrimSpace(loadBalancer.Spec.InternalVirtualNetwork)
-	result := make(map[string][]loadBalancerBackendServer, len(loadBalancer.Spec.Listeners))
+	result := make(map[string][]applicationLoadBalancerBackendServer, len(loadBalancer.Spec.Listeners))
 	for _, listener := range loadBalancer.Spec.Listeners {
 		listenerName := strings.TrimSpace(listener.Name)
 		if listenerName == "" {
 			continue
 		}
-		items := make([]loadBalancerBackendServer, 0)
+		items := make([]applicationLoadBalancerBackendServer, 0)
 		for _, server := range servers {
 			if server.Status == nil || server.Status.StatusCode != db.SERVER_RUNNING {
 				continue
 			}
-			if !serverMatchesLoadBalancerSelector(server, listener.BackendSelector.MatchLabels) {
+			if !serverMatchesApplicationLoadBalancerSelector(server, listener.BackendSelector.MatchLabels) {
 				continue
 			}
 			ip := serverAddressInNetwork(server, internalNetwork)
@@ -365,7 +365,7 @@ func (c *controller) resolveLoadBalancerListenerBackends(loadBalancer api.LoadBa
 			if name == "" {
 				continue
 			}
-			items = append(items, loadBalancerBackendServer{Name: name, IP: ip})
+			items = append(items, applicationLoadBalancerBackendServer{Name: name, IP: ip})
 		}
 		sort.SliceStable(items, func(i, j int) bool {
 			if items[i].Name == items[j].Name {
@@ -378,7 +378,7 @@ func (c *controller) resolveLoadBalancerListenerBackends(loadBalancer api.LoadBa
 	return result, nil
 }
 
-func serverMatchesLoadBalancerSelector(server api.Server, matchLabels map[string]string) bool {
+func serverMatchesApplicationLoadBalancerSelector(server api.Server, matchLabels map[string]string) bool {
 	if len(matchLabels) == 0 {
 		return false
 	}
@@ -415,7 +415,7 @@ func serverAddressInNetwork(server api.Server, networkName string) string {
 	return ""
 }
 
-func loadBalancerBackendAvailabilityMessage(loadBalancer api.LoadBalancer, listenerBackends map[string][]loadBalancerBackendServer) string {
+func applicationLoadBalancerBackendAvailabilityMessage(loadBalancer api.ApplicationLoadBalancer, listenerBackends map[string][]applicationLoadBalancerBackendServer) string {
 	missing := make([]string, 0)
 	for _, listener := range loadBalancer.Spec.Listeners {
 		name := strings.TrimSpace(listener.Name)
@@ -433,9 +433,9 @@ func loadBalancerBackendAvailabilityMessage(loadBalancer api.LoadBalancer, liste
 	return fmt.Sprintf("no backend matched for listener(s): %s", strings.Join(missing, ","))
 }
 
-func (c *controller) reconcileLoadBalancerDeleting(loadBalancer api.LoadBalancer) {
+func (c *controller) reconcileApplicationLoadBalancerDeleting(loadBalancer api.ApplicationLoadBalancer) {
 	loadBalancerID := api.LoadBalancerID(loadBalancer)
-	serverID := loadBalancerManagedServerID(loadBalancer)
+	serverID := applicationLoadBalancerManagedServerID(loadBalancer)
 	if strings.TrimSpace(serverID) == "" {
 		if err := c.db.DeleteLoadBalancerById(loadBalancerID); err != nil {
 			slog.Warn("DeleteLoadBalancerById() failed", "id", loadBalancerID, "err", err)
@@ -462,7 +462,7 @@ func (c *controller) reconcileLoadBalancerDeleting(loadBalancer api.LoadBalancer
 	}
 }
 
-func (c *controller) ensureLoadBalancerManagedServerLabel(loadBalancerID string, serverID string) error {
+func (c *controller) ensureApplicationLoadBalancerManagedServerLabel(loadBalancerID string, serverID string) error {
 	loadBalancer, err := c.db.GetLoadBalancerById(loadBalancerID)
 	if err != nil {
 		return err
@@ -480,7 +480,7 @@ func (c *controller) ensureLoadBalancerManagedServerLabel(loadBalancerID string,
 	return c.db.UpdateLoadBalancerById(loadBalancerID, loadBalancer)
 }
 
-func (c *controller) updateLoadBalancerLabels(loadBalancerID string, mutate func(labels map[string]interface{})) error {
+func (c *controller) updateApplicationLoadBalancerLabels(loadBalancerID string, mutate func(labels map[string]interface{})) error {
 	loadBalancer, err := c.db.GetLoadBalancerById(loadBalancerID)
 	if err != nil {
 		return err
@@ -495,19 +495,19 @@ func (c *controller) updateLoadBalancerLabels(loadBalancerID string, mutate func
 	return c.db.UpdateLoadBalancerById(loadBalancerID, loadBalancer)
 }
 
-func (c *controller) ensureLoadBalancerServerEntry(loadBalancer api.LoadBalancer) (string, error) {
-	if serverID := loadBalancerManagedServerID(loadBalancer); strings.TrimSpace(serverID) != "" {
+func (c *controller) ensureApplicationLoadBalancerServerEntry(loadBalancer api.ApplicationLoadBalancer) (string, error) {
+	if serverID := applicationLoadBalancerManagedServerID(loadBalancer); strings.TrimSpace(serverID) != "" {
 		if _, err := c.db.GetServerById(serverID); err == nil {
 			return serverID, nil
 		}
 	}
 
-	serverName := loadBalancerServerName(loadBalancer)
+	serverName := applicationLoadBalancerServerName(loadBalancer)
 	if existing, err := c.findServerByName(serverName); err == nil {
 		return api.ServerID(existing), nil
 	}
 
-	serverSpec, err := c.buildLoadBalancerServerSpec(loadBalancer, serverName)
+	serverSpec, err := c.buildApplicationLoadBalancerServerSpec(loadBalancer, serverName)
 	if err != nil {
 		return "", err
 	}
@@ -520,7 +520,7 @@ func (c *controller) ensureLoadBalancerServerEntry(loadBalancer api.LoadBalancer
 	return api.ServerID(created), nil
 }
 
-func (c *controller) buildLoadBalancerServerSpec(loadBalancer api.LoadBalancer, serverName string) (api.Server, error) {
+func (c *controller) buildApplicationLoadBalancerServerSpec(loadBalancer api.ApplicationLoadBalancer, serverName string) (api.Server, error) {
 	publicIP := strings.TrimSpace(loadBalancer.Spec.BindPublicIpAddress)
 	if publicIP == "" {
 		return api.Server{}, fmt.Errorf("load balancer bindPublicIpAddress is empty")
@@ -571,74 +571,74 @@ func (c *controller) buildLoadBalancerServerSpec(loadBalancer api.LoadBalancer, 
 	return api.Server{ApiVersion: "v1", Kind: "Server", Metadata: meta, Spec: spec}, nil
 }
 
-func loadBalancerManagedServerID(loadBalancer api.LoadBalancer) string {
+func applicationLoadBalancerManagedServerID(loadBalancer api.ApplicationLoadBalancer) string {
 	if loadBalancer.Metadata.Labels == nil {
 		return ""
 	}
 	return db.GetLoadBalancerManagedServerID(*loadBalancer.Metadata.Labels)
 }
 
-func loadBalancerAppliedConfigHash(loadBalancer api.LoadBalancer) string {
+func applicationLoadBalancerAppliedConfigHash(loadBalancer api.ApplicationLoadBalancer) string {
 	if loadBalancer.Metadata.Labels == nil {
 		return ""
 	}
 	return db.GetLoadBalancerAppliedConfigHash(*loadBalancer.Metadata.Labels)
 }
 
-func loadBalancerStagedConfigHash(loadBalancer api.LoadBalancer) string {
+func applicationLoadBalancerStagedConfigHash(loadBalancer api.ApplicationLoadBalancer) string {
 	if loadBalancer.Metadata.Labels == nil {
 		return ""
 	}
 	return db.GetLoadBalancerStagedConfigHash(*loadBalancer.Metadata.Labels)
 }
 
-func loadBalancerStagedConfigAt(loadBalancer api.LoadBalancer) time.Time {
+func applicationLoadBalancerStagedConfigAt(loadBalancer api.ApplicationLoadBalancer) time.Time {
 	if loadBalancer.Metadata.Labels == nil {
 		return time.Time{}
 	}
 	return db.GetLoadBalancerStagedConfigAt(*loadBalancer.Metadata.Labels)
 }
 
-func (c *controller) observeLoadBalancerAgentState(loadBalancer api.LoadBalancer, targetIP, desiredHash string, stagedAt time.Time) bool {
+func (c *controller) observeApplicationLoadBalancerAgentState(loadBalancer api.ApplicationLoadBalancer, targetIP, desiredHash string, stagedAt time.Time) bool {
 	loadBalancerID := api.LoadBalancerID(loadBalancer)
-	state, err := readLoadBalancerAgentState(targetIP, loadBalancerPrivateKeyPath)
+	state, err := readApplicationLoadBalancerAgentState(targetIP, applicationLoadBalancerPrivateKeyPath)
 	if err != nil {
-		failures, labelErr := c.recordLoadBalancerAgentStateReadFailure(loadBalancerID)
+		failures, labelErr := c.recordApplicationLoadBalancerAgentStateReadFailure(loadBalancerID)
 		if labelErr != nil {
 			_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_FAILED, labelErr.Error())
 			return true
 		}
-		message := fmt.Sprintf("load balancer agent state unavailable (%d/%d): %v", failures, loadBalancerAgentStateReadMaxFailures, err)
-		if failures >= loadBalancerAgentStateReadMaxFailures {
+		message := fmt.Sprintf("load balancer agent state unavailable (%d/%d): %v", failures, applicationLoadBalancerAgentStateReadMaxFailures, err)
+		if failures >= applicationLoadBalancerAgentStateReadMaxFailures {
 			_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_DEGRADED, message)
 			return true
 		}
 		_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_CONFIGURING, message)
 		return true
 	}
-	successes, err := c.recordLoadBalancerAgentStateReadSuccess(loadBalancerID)
+		successes, err := c.recordApplicationLoadBalancerAgentStateReadSuccess(loadBalancerID)
 	if err != nil {
 		_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_FAILED, err.Error())
 		return true
 	}
 	if strings.TrimSpace(state.LastError) != "" {
-		_ = c.resetLoadBalancerAgentStateReadSuccesses(loadBalancerID)
+		_ = c.resetApplicationLoadBalancerAgentStateReadSuccesses(loadBalancerID)
 		_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_DEGRADED, state.LastError)
 		return true
 	}
 	if strings.TrimSpace(state.LastAppliedHash) != strings.TrimSpace(desiredHash) {
-		_ = c.resetLoadBalancerAgentStateReadSuccesses(loadBalancerID)
+		_ = c.resetApplicationLoadBalancerAgentStateReadSuccesses(loadBalancerID)
 		_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_CONFIGURING, "waiting for load balancer agent to apply desired config")
 		return true
 	}
 	if !stagedAt.IsZero() {
 		if state.LastAppliedAt.IsZero() || state.LastAppliedAt.UTC().Before(stagedAt.UTC()) {
-			_ = c.resetLoadBalancerAgentStateReadSuccesses(loadBalancerID)
+			_ = c.resetApplicationLoadBalancerAgentStateReadSuccesses(loadBalancerID)
 			_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_CONFIGURING, "waiting for newer load balancer agent apply result")
 			return true
 		}
 	}
-	if err := c.updateLoadBalancerLabels(loadBalancerID, func(labels map[string]interface{}) {
+	if err := c.updateApplicationLoadBalancerLabels(loadBalancerID, func(labels map[string]interface{}) {
 		db.SetLoadBalancerAppliedConfigHash(labels, desiredHash)
 		db.SetLoadBalancerStagedConfigHash(labels, desiredHash)
 		db.SetLoadBalancerStagedConfigAt(labels, stagedAt)
@@ -646,8 +646,8 @@ func (c *controller) observeLoadBalancerAgentState(loadBalancer api.LoadBalancer
 		_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_FAILED, err.Error())
 		return true
 	}
-	if loadBalancer.Status != nil && loadBalancer.Status.StatusCode == db.LOAD_BALANCER_DEGRADED && successes < loadBalancerAgentStateRecoverySuccessRequired {
-		msg := fmt.Sprintf("waiting for consecutive successful load balancer agent checks (%d/%d)", successes, loadBalancerAgentStateRecoverySuccessRequired)
+	if loadBalancer.Status != nil && loadBalancer.Status.StatusCode == db.LOAD_BALANCER_DEGRADED && successes < applicationLoadBalancerAgentStateRecoverySuccessRequired {
+		msg := fmt.Sprintf("waiting for consecutive successful load balancer agent checks (%d/%d)", successes, applicationLoadBalancerAgentStateRecoverySuccessRequired)
 		_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_DEGRADED, msg)
 		return true
 	}
@@ -655,8 +655,8 @@ func (c *controller) observeLoadBalancerAgentState(loadBalancer api.LoadBalancer
 	return true
 }
 
-func (c *controller) resolveLoadBalancerTargetAddress(loadBalancer api.LoadBalancer) (string, error) {
-	serverID := strings.TrimSpace(loadBalancerManagedServerID(loadBalancer))
+func (c *controller) resolveApplicationLoadBalancerTargetAddress(loadBalancer api.ApplicationLoadBalancer) (string, error) {
+	serverID := strings.TrimSpace(applicationLoadBalancerManagedServerID(loadBalancer))
 	if serverID == "" {
 		return "", fmt.Errorf("load balancer server reference is missing")
 	}
@@ -686,35 +686,35 @@ func (c *controller) resolveLoadBalancerTargetAddress(loadBalancer api.LoadBalan
 	return "", fmt.Errorf("load balancer public target address is missing")
 }
 
-func (c *controller) handleLoadBalancerConfigFailure(loadBalancerID string, err error) {
+func (c *controller) handleApplicationLoadBalancerConfigFailure(loadBalancerID string, err error) {
 	if err == nil {
 		return
 	}
-	retries, labelErr := c.incrementLoadBalancerConfigRetries(loadBalancerID)
+	retries, labelErr := c.incrementApplicationLoadBalancerConfigRetries(loadBalancerID)
 	if labelErr != nil {
 		_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_FAILED, labelErr.Error())
 		return
 	}
-	message := fmt.Sprintf("load balancer ansible apply failed (%d/%d): %v", retries, loadBalancerAnsibleMaxRetryCount, err)
-	if retries >= loadBalancerAnsibleMaxRetryCount {
+	message := fmt.Sprintf("load balancer ansible apply failed (%d/%d): %v", retries, applicationLoadBalancerAnsibleMaxRetryCount, err)
+	if retries >= applicationLoadBalancerAnsibleMaxRetryCount {
 		_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_FAILED, message)
 		return
 	}
 	_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_CONFIGURING, message)
 }
 
-func (c *controller) incrementLoadBalancerConfigRetries(loadBalancerID string) (int, error) {
+func (c *controller) incrementApplicationLoadBalancerConfigRetries(loadBalancerID string) (int, error) {
 	next := 0
-	err := c.updateLoadBalancerLabels(loadBalancerID, func(labels map[string]interface{}) {
+	err := c.updateApplicationLoadBalancerLabels(loadBalancerID, func(labels map[string]interface{}) {
 		next = db.GetLoadBalancerAnsibleRetries(labels) + 1
 		db.SetLoadBalancerAnsibleRetries(labels, next)
 	})
 	return next, err
 }
 
-func (c *controller) recordLoadBalancerAgentStateReadFailure(loadBalancerID string) (int, error) {
+func (c *controller) recordApplicationLoadBalancerAgentStateReadFailure(loadBalancerID string) (int, error) {
 	next := 0
-	err := c.updateLoadBalancerLabels(loadBalancerID, func(labels map[string]interface{}) {
+	err := c.updateApplicationLoadBalancerLabels(loadBalancerID, func(labels map[string]interface{}) {
 		next = db.GetLoadBalancerAgentStateReadFailures(labels) + 1
 		db.SetLoadBalancerAgentStateReadFailures(labels, next)
 		db.SetLoadBalancerAgentStateReadSuccesses(labels, 0)
@@ -722,9 +722,9 @@ func (c *controller) recordLoadBalancerAgentStateReadFailure(loadBalancerID stri
 	return next, err
 }
 
-func (c *controller) recordLoadBalancerAgentStateReadSuccess(loadBalancerID string) (int, error) {
+func (c *controller) recordApplicationLoadBalancerAgentStateReadSuccess(loadBalancerID string) (int, error) {
 	next := 0
-	err := c.updateLoadBalancerLabels(loadBalancerID, func(labels map[string]interface{}) {
+	err := c.updateApplicationLoadBalancerLabels(loadBalancerID, func(labels map[string]interface{}) {
 		db.SetLoadBalancerAgentStateReadFailures(labels, 0)
 		next = db.GetLoadBalancerAgentStateReadSuccesses(labels) + 1
 		db.SetLoadBalancerAgentStateReadSuccesses(labels, next)
@@ -732,13 +732,13 @@ func (c *controller) recordLoadBalancerAgentStateReadSuccess(loadBalancerID stri
 	return next, err
 }
 
-func (c *controller) resetLoadBalancerAgentStateReadSuccesses(loadBalancerID string) error {
-	return c.updateLoadBalancerLabels(loadBalancerID, func(labels map[string]interface{}) {
+func (c *controller) resetApplicationLoadBalancerAgentStateReadSuccesses(loadBalancerID string) error {
+	return c.updateApplicationLoadBalancerLabels(loadBalancerID, func(labels map[string]interface{}) {
 		db.SetLoadBalancerAgentStateReadSuccesses(labels, 0)
 	})
 }
 
-func loadBalancerServerName(loadBalancer api.LoadBalancer) string {
+func applicationLoadBalancerServerName(loadBalancer api.ApplicationLoadBalancer) string {
 	id := strings.TrimSpace(api.LoadBalancerID(loadBalancer))
 	if id == "" {
 		id = strings.TrimSpace(loadBalancer.Metadata.Name)
@@ -746,11 +746,11 @@ func loadBalancerServerName(loadBalancer api.LoadBalancer) string {
 	return fmt.Sprintf("lb-%s", id)
 }
 
-func loadBalancerControllerSettingsFromEnv() {
-	intervalSeconds := readPositiveIntEnv("MARMOT_LB_CONTROLLER_INTERVAL_SECONDS", defaultLoadBalancerControllerIntervalSeconds)
-	loadBalancerControllerInterval = time.Duration(intervalSeconds) * time.Second
-	loadBalancerAgentStateReadMaxFailures = readPositiveIntEnv("MARMOT_LB_AGENT_STATE_READ_MAX_FAILURES", defaultLoadBalancerAgentStateReadMaxFailures)
-	loadBalancerAgentStateRecoverySuccessRequired = readPositiveIntEnv("MARMOT_LB_AGENT_RECOVERY_SUCCESS_REQUIRED", defaultLoadBalancerAgentStateRecoverySuccessRequired)
+func applicationLoadBalancerControllerSettingsFromEnv() {
+	intervalSeconds := readPositiveIntEnv("MARMOT_LB_CONTROLLER_INTERVAL_SECONDS", defaultApplicationLoadBalancerControllerIntervalSeconds)
+	applicationLoadBalancerControllerInterval = time.Duration(intervalSeconds) * time.Second
+	applicationLoadBalancerAgentStateReadMaxFailures = readPositiveIntEnv("MARMOT_LB_AGENT_STATE_READ_MAX_FAILURES", defaultApplicationLoadBalancerAgentStateReadMaxFailures)
+	applicationLoadBalancerAgentStateRecoverySuccessRequired = readPositiveIntEnv("MARMOT_LB_AGENT_RECOVERY_SUCCESS_REQUIRED", defaultApplicationLoadBalancerAgentStateRecoverySuccessRequired)
 }
 
 func readPositiveIntEnv(name string, fallback int) int {

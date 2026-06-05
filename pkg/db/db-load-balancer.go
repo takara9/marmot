@@ -193,16 +193,16 @@ func GetLoadBalancerAgentStateReadSuccesses(labels map[string]interface{}) int {
 	}
 }
 
-func (d *Database) CreateLoadBalancer(spec api.LoadBalancer) (api.LoadBalancer, error) {
+func (d *Database) CreateLoadBalancer(spec api.ApplicationLoadBalancer) (api.ApplicationLoadBalancer, error) {
 	mutex, err := d.LockKey("/lock/load-balancer/create")
 	if err != nil {
-		return api.LoadBalancer{}, err
+		return api.ApplicationLoadBalancer{}, err
 	}
 	defer d.UnlockKey(mutex)
 
 	current, err := d.GetLoadBalancers()
 	if err != nil && err != ErrNotFound {
-		return api.LoadBalancer{}, err
+		return api.ApplicationLoadBalancer{}, err
 	}
 
 	name := strings.TrimSpace(spec.Metadata.Name)
@@ -210,16 +210,16 @@ func (d *Database) CreateLoadBalancer(spec api.LoadBalancer) (api.LoadBalancer, 
 	publicIP := strings.TrimSpace(spec.Spec.BindPublicIpAddress)
 	for _, lb := range current {
 		if strings.TrimSpace(lb.Metadata.Name) == name && strings.TrimSpace(lb.Spec.InternalVirtualNetwork) == vnet {
-			return api.LoadBalancer{}, fmt.Errorf("load balancer with name %q already exists in internalVirtualNetwork %q", name, vnet)
+			return api.ApplicationLoadBalancer{}, fmt.Errorf("load balancer with name %q already exists in internalVirtualNetwork %q", name, vnet)
 		}
 		if publicIP != "" && strings.TrimSpace(lb.Spec.BindPublicIpAddress) == publicIP {
-			return api.LoadBalancer{}, fmt.Errorf("bindPublicIpAddress %q is already used by another load balancer", publicIP)
+			return api.ApplicationLoadBalancer{}, fmt.Errorf("bindPublicIpAddress %q is already used by another load balancer", publicIP)
 		}
 	}
 
 	rec, err := util.DeepCopy(spec)
 	if err != nil {
-		return api.LoadBalancer{}, err
+		return api.ApplicationLoadBalancer{}, err
 	}
 
 	var key string
@@ -229,13 +229,13 @@ func (d *Database) CreateLoadBalancer(spec api.LoadBalancer) (api.LoadBalancer, 
 		api.SetLoadBalancerID(&rec, id)
 		key = LoadBalancerPrefix + "/" + id
 
-		var existing api.LoadBalancer
+		var existing api.ApplicationLoadBalancer
 		_, getErr := d.GetJSON(key, &existing)
 		if getErr == ErrNotFound {
 			break
 		}
 		if getErr != nil {
-			return api.LoadBalancer{}, getErr
+			return api.ApplicationLoadBalancer{}, getErr
 		}
 	}
 
@@ -247,14 +247,14 @@ func (d *Database) CreateLoadBalancer(spec api.LoadBalancer) (api.LoadBalancer, 
 		LastUpdateTimeStamp: util.TimePtr(now),
 	}
 	if err := d.PutJSON(key, rec); err != nil {
-		return api.LoadBalancer{}, err
+		return api.ApplicationLoadBalancer{}, err
 	}
 
 	return rec, nil
 }
 
-func (d *Database) GetLoadBalancers() ([]api.LoadBalancer, error) {
-	result := make([]api.LoadBalancer, 0)
+func (d *Database) GetLoadBalancers() ([]api.ApplicationLoadBalancer, error) {
+	result := make([]api.ApplicationLoadBalancer, 0)
 	resp, err := d.GetByPrefix(LoadBalancerPrefix)
 	if err == ErrNotFound {
 		return result, nil
@@ -263,7 +263,7 @@ func (d *Database) GetLoadBalancers() ([]api.LoadBalancer, error) {
 		return result, err
 	}
 	for _, kv := range resp.Kvs {
-		var rec api.LoadBalancer
+		var rec api.ApplicationLoadBalancer
 		if err := json.Unmarshal(kv.Value, &rec); err != nil {
 			slog.Error("GetLoadBalancers() unmarshal failed", "err", err, "key", string(kv.Key))
 			continue
@@ -273,17 +273,17 @@ func (d *Database) GetLoadBalancers() ([]api.LoadBalancer, error) {
 	return result, nil
 }
 
-func (d *Database) GetLoadBalancerById(id string) (api.LoadBalancer, error) {
+func (d *Database) GetLoadBalancerById(id string) (api.ApplicationLoadBalancer, error) {
 	key := LoadBalancerPrefix + "/" + id
-	var rec api.LoadBalancer
+	var rec api.ApplicationLoadBalancer
 	_, err := d.GetJSON(key, &rec)
 	if err != nil {
-		return api.LoadBalancer{}, err
+		return api.ApplicationLoadBalancer{}, err
 	}
 	return rec, nil
 }
 
-func (d *Database) UpdateLoadBalancerById(id string, spec api.LoadBalancer) error {
+func (d *Database) UpdateLoadBalancerById(id string, spec api.ApplicationLoadBalancer) error {
 	for {
 		err := d.updateLoadBalancer(id, spec)
 		if err == ErrUpdateConflict {
@@ -293,7 +293,7 @@ func (d *Database) UpdateLoadBalancerById(id string, spec api.LoadBalancer) erro
 	}
 }
 
-func (d *Database) updateLoadBalancer(id string, spec api.LoadBalancer) error {
+func (d *Database) updateLoadBalancer(id string, spec api.ApplicationLoadBalancer) error {
 	lockKey := "/lock/load-balancer/" + id
 	mutex, err := d.LockKey(lockKey)
 	if err != nil {
@@ -302,7 +302,7 @@ func (d *Database) updateLoadBalancer(id string, spec api.LoadBalancer) error {
 	defer d.UnlockKey(mutex)
 
 	key := LoadBalancerPrefix + "/" + id
-	var rec api.LoadBalancer
+	var rec api.ApplicationLoadBalancer
 	resp, err := d.GetJSON(key, &rec)
 	if err != nil {
 		return err

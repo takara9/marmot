@@ -14,7 +14,7 @@ import (
 )
 
 func (s *Server) ApiCreateLoadBalancer(ctx echo.Context) error {
-	var rec api.LoadBalancer
+	var rec api.ApplicationLoadBalancer
 	if err := ctx.Bind(&rec); err != nil {
 		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: "invalid request body"})
 	}
@@ -63,7 +63,7 @@ func (s *Server) ApiUpdateLoadBalancerById(ctx echo.Context, id string) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	var req api.LoadBalancer
+	var req api.ApplicationLoadBalancer
 	if err := ctx.Bind(&req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: "invalid request body"})
 	}
@@ -99,12 +99,12 @@ func (s *Server) ApiDeleteLoadBalancerById(ctx echo.Context, id string) error {
 	return ctx.JSON(http.StatusOK, api.Success{Id: id, Message: util.StringPtr("Accepted the request to delete the load balancer")})
 }
 
-func changedImmutableLoadBalancerField(current api.LoadBalancer, req api.LoadBalancer) bool {
+func changedImmutableLoadBalancerField(current api.ApplicationLoadBalancer, req api.ApplicationLoadBalancer) bool {
 	return strings.TrimSpace(current.Spec.BindPublicIpAddress) != strings.TrimSpace(req.Spec.BindPublicIpAddress) ||
 		strings.TrimSpace(current.Spec.InternalVirtualNetwork) != strings.TrimSpace(req.Spec.InternalVirtualNetwork)
 }
 
-func normalizeLoadBalancerResource(rec *api.LoadBalancer) error {
+func normalizeLoadBalancerResource(rec *api.ApplicationLoadBalancer) error {
 	if rec == nil {
 		return fmt.Errorf("load balancer is nil")
 	}

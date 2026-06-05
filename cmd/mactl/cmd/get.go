@@ -23,7 +23,7 @@ var getManifestFile string
 var getCmd = &cobra.Command{
 	Use:   "get [RESOURCE [NAME]]",
 	Short: "Get resource(s) of a specific type",
-	Long:  `Get resource(s) (server/srv, image/img, volume/vol, network/net, gateway/gw, loadbalancer/lb, vpngateway/vpngw). If NAME is provided, show only that resource. Otherwise, list all resources. With -f, process manifest(s) and query by metadata.name for each document.`,
+	Long:  `Get resource(s) (server/srv, image/img, volume/vol, network/net, gateway/gw, applicationloadbalancer/alb, vpngateway/vpngw). If NAME is provided, show only that resource. Otherwise, list all resources. With -f, process manifest(s) and query by metadata.name for each document.`,
 	Args:  cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if strings.TrimSpace(getManifestFile) != "" {
@@ -85,7 +85,7 @@ func getResourceByTypeAndName(resourceName string, resourceSpec string) error {
 		return getNetworkResources(resourceSpec)
 	case "gateway":
 		return getGatewayResources(resourceSpec)
-	case "loadbalancer":
+	case "applicationloadbalancer":
 		return getLoadBalancerResources(resourceSpec)
 	case "vpngateway":
 		return getVpnGatewayResources(resourceSpec)
@@ -319,7 +319,7 @@ func getLoadBalancerResources(name string) error {
 			return fmt.Errorf("failed to list load balancers: %w", err)
 		}
 
-		var items []api.LoadBalancer
+		var items []api.ApplicationLoadBalancer
 		if err := json.Unmarshal(list, &items); err != nil {
 			return fmt.Errorf("failed to parse load balancers: %w", err)
 		}
@@ -572,8 +572,8 @@ func filterGatewaysByLabel(gateways []api.Gateway, labelFilter string) []api.Gat
 	return result
 }
 
-func filterLoadBalancersByName(items []api.LoadBalancer, name string) []api.LoadBalancer {
-	var result []api.LoadBalancer
+func filterLoadBalancersByName(items []api.ApplicationLoadBalancer, name string) []api.ApplicationLoadBalancer {
+	var result []api.ApplicationLoadBalancer
 	for _, item := range items {
 		if item.Metadata.Name == name {
 			result = append(result, item)
@@ -582,8 +582,8 @@ func filterLoadBalancersByName(items []api.LoadBalancer, name string) []api.Load
 	return result
 }
 
-func filterLoadBalancersByLabel(items []api.LoadBalancer, labelFilter string) []api.LoadBalancer {
-	var result []api.LoadBalancer
+func filterLoadBalancersByLabel(items []api.ApplicationLoadBalancer, labelFilter string) []api.ApplicationLoadBalancer {
+	var result []api.ApplicationLoadBalancer
 	for _, item := range items {
 		if MatchesLabel(convertLabels(item.Metadata.Labels), labelFilter) {
 			result = append(result, item)
@@ -1051,7 +1051,7 @@ func outputGateways(gateways []api.Gateway) error {
 	}
 }
 
-func outputLoadBalancers(items []api.LoadBalancer) error {
+func outputLoadBalancers(items []api.ApplicationLoadBalancer) error {
 	switch outputStyle {
 	case "text":
 		sort.SliceStable(items, func(i, j int) bool {

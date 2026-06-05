@@ -4,7 +4,7 @@
 
 ### 1. 現状確認（2026-06-03 時点）
 
-- OpenAPI v1 には kind: Gateway / kind: VpnGateway は定義済みだが、kind: LoadBalancer は未定義なので、今回 kind: LoadBalancer を新設する。
+- OpenAPI v1 には kind: Gateway / kind: VpnGateway は定義済みだが、kind: ApplicationLoadBalancer は未定義なので、今回 kind: ApplicationLoadBalancer を新設する。
 - そのため本メモは「新規 API 追加前提の設計案」であり、実装着手時は API 定義追加と CLI 対応を同一フェーズで行う。
 - 用語は既存資産と合わせる。
     - 外側ネットワーク: host-bridge（固定）
@@ -34,7 +34,7 @@
 
 ```yaml
 apiVersion: v1
-kind: LoadBalancer
+kind: ApplicationLoadBalancer
 metadata:
     name: lb-1
 spec:
@@ -126,7 +126,7 @@ spec:
 
 ### 4. データプレーン構成
 
-- 1 LoadBalancer オブジェクトにつき 1 VM を作成。
+- 1 ApplicationLoadBalancer オブジェクトにつき 1 VM を作成。
 - LB VM の配置先ノード選択は初期リリースでは仮想マシンのスケジューラーへ委任し、LB コントローラーの責務外とする。
 - 初期実装では、LB VM の配置候補ホストはすべて同一のネットワーク/実行環境を持つ前提とする。
 - NIC は 2 本。
@@ -155,7 +155,7 @@ spec:
 - healthCheck は HTTP プロトコルを使用するバックエンドサーバーに対してのみ listener 単位で実施する。
 - 健全性判定
     - /healthz の HTTP 応答が unhealthyThreshold 回連続で失敗した backend は一時除外する。
-    - healthCheck 失敗が発生した場合、LoadBalancer の status.status は DEGRADED とする。
+    - healthCheck 失敗が発生した場合、ApplicationLoadBalancer の status.status は DEGRADED とする。
 - sessionPersistence は HTTP プロトコルを使用するバックエンドサーバーに対してのみ listener 単位で有効化できる。enabled=true かつ cookieName 未指定の場合は metadata.name 由来の安定した cookie 名を使う。更新時も同一オブジェクトでは cookie 名を維持する。
 - バックエンド VM の再起動は LB コントローラーの責務外（分離原則）。必要なら上位 controller に event 通知。
 
@@ -169,7 +169,7 @@ spec:
     - 発展型: 制御通信は専用制御プレーン（管理ネットワーク）へ移行し、host-bridge はデータプレーン用途を優先する。
     - 発展型: TLS と認証を導入し、制御通信を強化する。
 - 5 秒ごとに以下を実行する。
-    - 対象 LoadBalancer と listener ごとの backendSelector に一致するバックエンド情報を API から取得。
+    - 対象 ApplicationLoadBalancer と listener ごとの backendSelector に一致するバックエンド情報を API から取得。
     - listeners 単位で desired な HAProxy 設定を生成。
     - 前回適用済みの設定ハッシュと比較し、差分がある場合のみ反映処理を実行。
 - marmotd 側は staged/applied を分離して管理する。

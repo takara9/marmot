@@ -17,7 +17,7 @@ import (
 func TestLoadBalancerControllerStateTransitions(t *testing.T) {
 	database := newGatewayTestDatabase(t)
 	var desiredHash string
-	setupLoadBalancerAnsibleTestHooks(t, func(playbookPath, targetAddress, privateKeyPath string) error {
+	setupApplicationLoadBalancerAnsibleTestHooks(t, func(playbookPath, targetAddress, privateKeyPath string) error {
 		if _, err := os.Stat(playbookPath); err != nil {
 			return err
 		}
@@ -25,8 +25,8 @@ func TestLoadBalancerControllerStateTransitions(t *testing.T) {
 			t.Fatalf("ansible runner received empty arguments: target=%q key=%q", targetAddress, privateKeyPath)
 		}
 		return nil
-	}, func(targetAddress, privateKeyPath string) (loadBalancerAgentState, error) {
-		return loadBalancerAgentState{LastAppliedHash: desiredHash, LastAppliedAt: time.Now().UTC().Add(time.Hour)}, nil
+	}, func(targetAddress, privateKeyPath string) (applicationLoadBalancerAgentState, error) {
+		return applicationLoadBalancerAgentState{LastAppliedHash: desiredHash, LastAppliedAt: time.Now().UTC().Add(time.Hour)}, nil
 	})
 	ctrl := &controller{
 		db:            database,
@@ -38,7 +38,7 @@ func TestLoadBalancerControllerStateTransitions(t *testing.T) {
 	mustCreateLoadBalancerBackendServer(t, database, "web-a", "web-servers", "172.16.10.11")
 	created := mustCreateLoadBalancer(t, database, "lb-unit", "web-servers", "192.168.1.120")
 
-	ctrl.reconcileLoadBalancerPending(created)
+	ctrl.reconcileApplicationLoadBalancerPending(created)
 
 	lbID := api.LoadBalancerID(created)
 	afterPending, err := database.GetLoadBalancerById(lbID)
@@ -49,7 +49,7 @@ func TestLoadBalancerControllerStateTransitions(t *testing.T) {
 		t.Fatalf("load balancer status after pending reconcile = %v, want %d(PROVISIONING)", afterPending.Status, db.LOAD_BALANCER_PROVISIONING)
 	}
 
-	serverID := loadBalancerManagedServerID(afterPending)
+	serverID := applicationLoadBalancerManagedServerID(afterPending)
 	if serverID == "" {
 		t.Fatalf("load balancer managed server id is empty")
 	}
@@ -63,7 +63,7 @@ func TestLoadBalancerControllerStateTransitions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetLoadBalancerById() failed before provisioning reconcile: %v", err)
 	}
-	ctrl.reconcileLoadBalancerProvisioning(beforeProvisioning)
+	ctrl.reconcileApplicationLoadBalancerProvisioning(beforeProvisioning)
 
 	afterProvisioning, err := database.GetLoadBalancerById(lbID)
 	if err != nil {
@@ -73,13 +73,13 @@ func TestLoadBalancerControllerStateTransitions(t *testing.T) {
 		t.Fatalf("load balancer status after provisioning reconcile = %v, want %d(CONFIGURING)", afterProvisioning.Status, db.LOAD_BALANCER_CONFIGURING)
 	}
 
-	listenerBackends, err := ctrl.resolveLoadBalancerListenerBackends(afterProvisioning)
+	listenerBackends, err := ctrl.resolveApplicationLoadBalancerListenerBackends(afterProvisioning)
 	if err != nil {
-		t.Fatalf("resolveLoadBalancerListenerBackends() failed: %v", err)
+		t.Fatalf("resolveApplicationLoadBalancerListenerBackends() failed: %v", err)
 	}
-	desiredHash = desiredLoadBalancerConfigHash(afterProvisioning, listenerBackends)
+	desiredHash = desiredApplicationLoadBalancerConfigHash(afterProvisioning, listenerBackends)
 
-	ctrl.reconcileLoadBalancerConfiguring(afterProvisioning)
+	ctrl.reconcileApplicationLoadBalancerConfiguring(afterProvisioning)
 
 	afterConfiguring, err := database.GetLoadBalancerById(lbID)
 	if err != nil {
@@ -92,10 +92,10 @@ func TestLoadBalancerControllerStateTransitions(t *testing.T) {
 
 func TestLoadBalancerControllerWaitsForAgentApply(t *testing.T) {
 	database := newGatewayTestDatabase(t)
-	setupLoadBalancerAnsibleTestHooks(t, func(playbookPath, targetAddress, privateKeyPath string) error {
+	setupApplicationLoadBalancerAnsibleTestHooks(t, func(playbookPath, targetAddress, privateKeyPath string) error {
 		return nil
-	}, func(targetAddress, privateKeyPath string) (loadBalancerAgentState, error) {
-		return loadBalancerAgentState{}, nil
+	}, func(targetAddress, privateKeyPath string) (applicationLoadBalancerAgentState, error) {
+		return applicationLoadBalancerAgentState{}, nil
 	})
 	ctrl := &controller{
 		db:            database,
@@ -107,21 +107,21 @@ func TestLoadBalancerControllerWaitsForAgentApply(t *testing.T) {
 	mustCreateLoadBalancerBackendServer(t, database, "web-a", "web-servers", "172.16.10.11")
 	created := mustCreateLoadBalancer(t, database, "lb-wait", "web-servers", "192.168.1.124")
 
-	ctrl.reconcileLoadBalancerPending(created)
+	ctrl.reconcileApplicationLoadBalancerPending(created)
 	lbID := api.LoadBalancerID(created)
 	afterPending, err := database.GetLoadBalancerById(lbID)
 	if err != nil {
 		t.Fatalf("GetLoadBalancerById() failed after pending reconcile: %v", err)
 	}
-	serverID := loadBalancerManagedServerID(afterPending)
+	serverID := applicationLoadBalancerManagedServerID(afterPending)
 	database.UpdateServerStatus(serverID, db.SERVER_RUNNING, "")
-	ctrl.reconcileLoadBalancerProvisioning(afterPending)
+	ctrl.reconcileApplicationLoadBalancerProvisioning(afterPending)
 
 	configuring, err := database.GetLoadBalancerById(lbID)
 	if err != nil {
 		t.Fatalf("GetLoadBalancerById() failed after provisioning reconcile: %v", err)
 	}
-	ctrl.reconcileLoadBalancerConfiguring(configuring)
+	ctrl.reconcileApplicationLoadBalancerConfiguring(configuring)
 
 	afterConfiguring, err := database.GetLoadBalancerById(lbID)
 	if err != nil {
@@ -130,10 +130,10 @@ func TestLoadBalancerControllerWaitsForAgentApply(t *testing.T) {
 	if afterConfiguring.Status == nil || afterConfiguring.Status.StatusCode != db.LOAD_BALANCER_CONFIGURING {
 		t.Fatalf("load balancer status after waiting for agent = %v, want %d(CONFIGURING)", afterConfiguring.Status, db.LOAD_BALANCER_CONFIGURING)
 	}
-	if got := loadBalancerAppliedConfigHash(afterConfiguring); got != "" {
+	if got := applicationLoadBalancerAppliedConfigHash(afterConfiguring); got != "" {
 		t.Fatalf("applied hash should stay empty until agent confirms apply, got %q", got)
 	}
-	if got := loadBalancerStagedConfigHash(afterConfiguring); got == "" {
+	if got := applicationLoadBalancerStagedConfigHash(afterConfiguring); got == "" {
 		t.Fatalf("staged hash should be set after playbook deployment")
 	}
 }
@@ -141,10 +141,10 @@ func TestLoadBalancerControllerWaitsForAgentApply(t *testing.T) {
 func TestLoadBalancerControllerWaitsForNewerAgentApplyResult(t *testing.T) {
 	database := newGatewayTestDatabase(t)
 	var desiredHash string
-	setupLoadBalancerAnsibleTestHooks(t, func(playbookPath, targetAddress, privateKeyPath string) error {
+	setupApplicationLoadBalancerAnsibleTestHooks(t, func(playbookPath, targetAddress, privateKeyPath string) error {
 		return nil
-	}, func(targetAddress, privateKeyPath string) (loadBalancerAgentState, error) {
-		return loadBalancerAgentState{LastAppliedHash: desiredHash, LastAppliedAt: time.Time{}}, nil
+	}, func(targetAddress, privateKeyPath string) (applicationLoadBalancerAgentState, error) {
+		return applicationLoadBalancerAgentState{LastAppliedHash: desiredHash, LastAppliedAt: time.Time{}}, nil
 	})
 	ctrl := &controller{
 		db:            database,
@@ -156,27 +156,27 @@ func TestLoadBalancerControllerWaitsForNewerAgentApplyResult(t *testing.T) {
 	mustCreateLoadBalancerBackendServer(t, database, "web-a", "web-servers", "172.16.10.11")
 	created := mustCreateLoadBalancer(t, database, "lb-stale", "web-servers", "192.168.1.125")
 
-	ctrl.reconcileLoadBalancerPending(created)
+	ctrl.reconcileApplicationLoadBalancerPending(created)
 	lbID := api.LoadBalancerID(created)
 	afterPending, err := database.GetLoadBalancerById(lbID)
 	if err != nil {
 		t.Fatalf("GetLoadBalancerById() failed after pending reconcile: %v", err)
 	}
-	serverID := loadBalancerManagedServerID(afterPending)
+	serverID := applicationLoadBalancerManagedServerID(afterPending)
 	database.UpdateServerStatus(serverID, db.SERVER_RUNNING, "")
-	ctrl.reconcileLoadBalancerProvisioning(afterPending)
+	ctrl.reconcileApplicationLoadBalancerProvisioning(afterPending)
 
 	configuring, err := database.GetLoadBalancerById(lbID)
 	if err != nil {
 		t.Fatalf("GetLoadBalancerById() failed after provisioning reconcile: %v", err)
 	}
-	listenerBackends, err := ctrl.resolveLoadBalancerListenerBackends(configuring)
+	listenerBackends, err := ctrl.resolveApplicationLoadBalancerListenerBackends(configuring)
 	if err != nil {
-		t.Fatalf("resolveLoadBalancerListenerBackends() failed: %v", err)
+		t.Fatalf("resolveApplicationLoadBalancerListenerBackends() failed: %v", err)
 	}
-	desiredHash = desiredLoadBalancerConfigHash(configuring, listenerBackends)
+	desiredHash = desiredApplicationLoadBalancerConfigHash(configuring, listenerBackends)
 
-	ctrl.reconcileLoadBalancerConfiguring(configuring)
+	ctrl.reconcileApplicationLoadBalancerConfiguring(configuring)
 
 	afterConfiguring, err := database.GetLoadBalancerById(lbID)
 	if err != nil {
@@ -189,10 +189,10 @@ func TestLoadBalancerControllerWaitsForNewerAgentApplyResult(t *testing.T) {
 
 func TestLoadBalancerControllerAgentStateReadFailureThreshold(t *testing.T) {
 	database := newGatewayTestDatabase(t)
-	setupLoadBalancerAnsibleTestHooks(t, func(playbookPath, targetAddress, privateKeyPath string) error {
+	setupApplicationLoadBalancerAnsibleTestHooks(t, func(playbookPath, targetAddress, privateKeyPath string) error {
 		return nil
-	}, func(targetAddress, privateKeyPath string) (loadBalancerAgentState, error) {
-		return loadBalancerAgentState{}, errors.New("agent state read failed")
+	}, func(targetAddress, privateKeyPath string) (applicationLoadBalancerAgentState, error) {
+		return applicationLoadBalancerAgentState{}, errors.New("agent state read failed")
 	})
 	ctrl := &controller{
 		db:            database,
@@ -204,22 +204,22 @@ func TestLoadBalancerControllerAgentStateReadFailureThreshold(t *testing.T) {
 	mustCreateLoadBalancerBackendServer(t, database, "web-a", "web-servers", "172.16.10.11")
 	created := mustCreateLoadBalancer(t, database, "lb-agent-failure", "web-servers", "192.168.1.126")
 
-	ctrl.reconcileLoadBalancerPending(created)
+	ctrl.reconcileApplicationLoadBalancerPending(created)
 	lbID := api.LoadBalancerID(created)
 	afterPending, err := database.GetLoadBalancerById(lbID)
 	if err != nil {
 		t.Fatalf("GetLoadBalancerById() failed after pending reconcile: %v", err)
 	}
-	serverID := loadBalancerManagedServerID(afterPending)
+	serverID := applicationLoadBalancerManagedServerID(afterPending)
 	database.UpdateServerStatus(serverID, db.SERVER_RUNNING, "")
-	ctrl.reconcileLoadBalancerProvisioning(afterPending)
+	ctrl.reconcileApplicationLoadBalancerProvisioning(afterPending)
 
-	for i := 0; i < loadBalancerAgentStateReadMaxFailures; i++ {
+	for i := 0; i < applicationLoadBalancerAgentStateReadMaxFailures; i++ {
 		configuring, err := database.GetLoadBalancerById(lbID)
 		if err != nil {
 			t.Fatalf("GetLoadBalancerById() failed before configuring reconcile: %v", err)
 		}
-		ctrl.reconcileLoadBalancerConfiguring(configuring)
+		ctrl.reconcileApplicationLoadBalancerConfiguring(configuring)
 	}
 
 	after, err := database.GetLoadBalancerById(lbID)
@@ -232,8 +232,8 @@ func TestLoadBalancerControllerAgentStateReadFailureThreshold(t *testing.T) {
 	if after.Metadata.Labels == nil {
 		t.Fatalf("labels should be present")
 	}
-	if got := db.GetLoadBalancerAgentStateReadFailures(*after.Metadata.Labels); got != loadBalancerAgentStateReadMaxFailures {
-		t.Fatalf("agent state read failures = %d, want %d", got, loadBalancerAgentStateReadMaxFailures)
+	if got := db.GetLoadBalancerAgentStateReadFailures(*after.Metadata.Labels); got != applicationLoadBalancerAgentStateReadMaxFailures {
+		t.Fatalf("agent state read failures = %d, want %d", got, applicationLoadBalancerAgentStateReadMaxFailures)
 	}
 }
 
@@ -241,13 +241,13 @@ func TestLoadBalancerControllerRecoversAfterConsecutiveAgentReadSuccesses(t *tes
 	database := newGatewayTestDatabase(t)
 	var failReads bool
 	var desiredHash string
-	setupLoadBalancerAnsibleTestHooks(t, func(playbookPath, targetAddress, privateKeyPath string) error {
+	setupApplicationLoadBalancerAnsibleTestHooks(t, func(playbookPath, targetAddress, privateKeyPath string) error {
 		return nil
-	}, func(targetAddress, privateKeyPath string) (loadBalancerAgentState, error) {
+	}, func(targetAddress, privateKeyPath string) (applicationLoadBalancerAgentState, error) {
 		if failReads {
-			return loadBalancerAgentState{}, errors.New("agent state read failed")
+			return applicationLoadBalancerAgentState{}, errors.New("agent state read failed")
 		}
-		return loadBalancerAgentState{LastAppliedHash: desiredHash, LastAppliedAt: time.Now().UTC().Add(time.Hour)}, nil
+		return applicationLoadBalancerAgentState{LastAppliedHash: desiredHash, LastAppliedAt: time.Now().UTC().Add(time.Hour)}, nil
 	})
 	ctrl := &controller{
 		db:            database,
@@ -259,26 +259,26 @@ func TestLoadBalancerControllerRecoversAfterConsecutiveAgentReadSuccesses(t *tes
 	mustCreateLoadBalancerBackendServer(t, database, "web-a", "web-servers", "172.16.10.11")
 	created := mustCreateLoadBalancer(t, database, "lb-recover", "web-servers", "192.168.1.127")
 
-	ctrl.reconcileLoadBalancerPending(created)
+	ctrl.reconcileApplicationLoadBalancerPending(created)
 	lbID := api.LoadBalancerID(created)
 	afterPending, err := database.GetLoadBalancerById(lbID)
 	if err != nil {
 		t.Fatalf("GetLoadBalancerById() failed after pending reconcile: %v", err)
 	}
-	serverID := loadBalancerManagedServerID(afterPending)
+	serverID := applicationLoadBalancerManagedServerID(afterPending)
 	database.UpdateServerStatus(serverID, db.SERVER_RUNNING, "")
-	ctrl.reconcileLoadBalancerProvisioning(afterPending)
+	ctrl.reconcileApplicationLoadBalancerProvisioning(afterPending)
 
 	configuring, err := database.GetLoadBalancerById(lbID)
 	if err != nil {
 		t.Fatalf("GetLoadBalancerById() failed after provisioning reconcile: %v", err)
 	}
-	listenerBackends, err := ctrl.resolveLoadBalancerListenerBackends(configuring)
+	listenerBackends, err := ctrl.resolveApplicationLoadBalancerListenerBackends(configuring)
 	if err != nil {
-		t.Fatalf("resolveLoadBalancerListenerBackends() failed: %v", err)
+		t.Fatalf("resolveApplicationLoadBalancerListenerBackends() failed: %v", err)
 	}
-	desiredHash = desiredLoadBalancerConfigHash(configuring, listenerBackends)
-	ctrl.reconcileLoadBalancerConfiguring(configuring)
+	desiredHash = desiredApplicationLoadBalancerConfigHash(configuring, listenerBackends)
+	ctrl.reconcileApplicationLoadBalancerConfiguring(configuring)
 
 	active, err := database.GetLoadBalancerById(lbID)
 	if err != nil {
@@ -289,12 +289,12 @@ func TestLoadBalancerControllerRecoversAfterConsecutiveAgentReadSuccesses(t *tes
 	}
 
 	failReads = true
-	for i := 0; i < loadBalancerAgentStateReadMaxFailures; i++ {
+	for i := 0; i < applicationLoadBalancerAgentStateReadMaxFailures; i++ {
 		current, err := database.GetLoadBalancerById(lbID)
 		if err != nil {
 			t.Fatalf("GetLoadBalancerById() failed while forcing degraded: %v", err)
 		}
-		ctrl.reconcileLoadBalancerActive(current)
+		ctrl.reconcileApplicationLoadBalancerActive(current)
 	}
 
 	degraded, err := database.GetLoadBalancerById(lbID)
@@ -310,7 +310,7 @@ func TestLoadBalancerControllerRecoversAfterConsecutiveAgentReadSuccesses(t *tes
 	if err != nil {
 		t.Fatalf("GetLoadBalancerById() failed before first recovery reconcile: %v", err)
 	}
-	ctrl.reconcileLoadBalancerActive(firstRecovery)
+	ctrl.reconcileApplicationLoadBalancerActive(firstRecovery)
 
 	afterFirstRecovery, err := database.GetLoadBalancerById(lbID)
 	if err != nil {
@@ -324,7 +324,7 @@ func TestLoadBalancerControllerRecoversAfterConsecutiveAgentReadSuccesses(t *tes
 	if err != nil {
 		t.Fatalf("GetLoadBalancerById() failed before second recovery reconcile: %v", err)
 	}
-	ctrl.reconcileLoadBalancerActive(secondRecovery)
+	ctrl.reconcileApplicationLoadBalancerActive(secondRecovery)
 
 	afterSecondRecovery, err := database.GetLoadBalancerById(lbID)
 	if err != nil {
@@ -346,14 +346,14 @@ func TestLoadBalancerControllerDeletingRemovesObject(t *testing.T) {
 	_ = mustCreateVirtualNetwork(t, database, "web-servers")
 	mustCreateLoadBalancerBackendServer(t, database, "web-a", "web-servers", "172.16.10.11")
 	created := mustCreateLoadBalancer(t, database, "lb-del", "web-servers", "192.168.1.121")
-	ctrl.reconcileLoadBalancerPending(created)
+	ctrl.reconcileApplicationLoadBalancerPending(created)
 
 	lbID := api.LoadBalancerID(created)
 	afterPending, err := database.GetLoadBalancerById(lbID)
 	if err != nil {
 		t.Fatalf("GetLoadBalancerById() failed: %v", err)
 	}
-	serverID := loadBalancerManagedServerID(afterPending)
+	serverID := applicationLoadBalancerManagedServerID(afterPending)
 	if serverID == "" {
 		t.Fatalf("load balancer managed server id is empty")
 	}
@@ -366,7 +366,7 @@ func TestLoadBalancerControllerDeletingRemovesObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetLoadBalancerById() failed in deleting phase: %v", err)
 	}
-	ctrl.reconcileLoadBalancerDeleting(deleting)
+	ctrl.reconcileApplicationLoadBalancerDeleting(deleting)
 
 	if err := database.DeleteServerById(serverID); err != nil {
 		t.Fatalf("DeleteServerById() failed: %v", err)
@@ -376,7 +376,7 @@ func TestLoadBalancerControllerDeletingRemovesObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetLoadBalancerById() failed before final delete reconcile: %v", err)
 	}
-	ctrl.reconcileLoadBalancerDeleting(deleting)
+	ctrl.reconcileApplicationLoadBalancerDeleting(deleting)
 
 	_, err = database.GetLoadBalancerById(lbID)
 	if !errors.Is(err, db.ErrNotFound) {
@@ -386,10 +386,10 @@ func TestLoadBalancerControllerDeletingRemovesObject(t *testing.T) {
 
 func TestLoadBalancerControllerDegradedRecoveryByBackendMatch(t *testing.T) {
 	database := newGatewayTestDatabase(t)
-	setupLoadBalancerAnsibleTestHooks(t, func(playbookPath, targetAddress, privateKeyPath string) error {
+	setupApplicationLoadBalancerAnsibleTestHooks(t, func(playbookPath, targetAddress, privateKeyPath string) error {
 		return nil
-	}, func(targetAddress, privateKeyPath string) (loadBalancerAgentState, error) {
-		return loadBalancerAgentState{}, nil
+	}, func(targetAddress, privateKeyPath string) (applicationLoadBalancerAgentState, error) {
+		return applicationLoadBalancerAgentState{}, nil
 	})
 	ctrl := &controller{
 		db:            database,
@@ -400,21 +400,21 @@ func TestLoadBalancerControllerDegradedRecoveryByBackendMatch(t *testing.T) {
 	_ = mustCreateVirtualNetwork(t, database, "web-servers")
 	created := mustCreateLoadBalancer(t, database, "lb-degraded", "web-servers", "192.168.1.122")
 
-	ctrl.reconcileLoadBalancerPending(created)
+	ctrl.reconcileApplicationLoadBalancerPending(created)
 	lbID := api.LoadBalancerID(created)
 	afterPending, err := database.GetLoadBalancerById(lbID)
 	if err != nil {
 		t.Fatalf("GetLoadBalancerById() failed after pending reconcile: %v", err)
 	}
-	serverID := loadBalancerManagedServerID(afterPending)
+	serverID := applicationLoadBalancerManagedServerID(afterPending)
 	database.UpdateServerStatus(serverID, db.SERVER_RUNNING, "")
 
-	ctrl.reconcileLoadBalancerProvisioning(afterPending)
+	ctrl.reconcileApplicationLoadBalancerProvisioning(afterPending)
 	configuring, err := database.GetLoadBalancerById(lbID)
 	if err != nil {
 		t.Fatalf("GetLoadBalancerById() failed after provisioning reconcile: %v", err)
 	}
-	ctrl.reconcileLoadBalancerConfiguring(configuring)
+	ctrl.reconcileApplicationLoadBalancerConfiguring(configuring)
 
 	degraded, err := database.GetLoadBalancerById(lbID)
 	if err != nil {
@@ -425,7 +425,7 @@ func TestLoadBalancerControllerDegradedRecoveryByBackendMatch(t *testing.T) {
 	}
 
 	mustCreateLoadBalancerBackendServer(t, database, "web-a", "web-servers", "172.16.10.11")
-	ctrl.reconcileLoadBalancerActive(degraded)
+	ctrl.reconcileApplicationLoadBalancerActive(degraded)
 
 	afterRecoveryCheck, err := database.GetLoadBalancerById(lbID)
 	if err != nil {
@@ -436,11 +436,11 @@ func TestLoadBalancerControllerDegradedRecoveryByBackendMatch(t *testing.T) {
 	}
 }
 
-func mustCreateLoadBalancer(t *testing.T, database *db.Database, name, internalNetwork, publicIP string) api.LoadBalancer {
+func mustCreateLoadBalancer(t *testing.T, database *db.Database, name, internalNetwork, publicIP string) api.ApplicationLoadBalancer {
 	t.Helper()
-	item, err := database.CreateLoadBalancer(api.LoadBalancer{
+	item, err := database.CreateLoadBalancer(api.ApplicationLoadBalancer{
 		ApiVersion: "v1",
-		Kind:       "LoadBalancer",
+		Kind:       "ApplicationLoadBalancer",
 		Metadata: api.Metadata{
 			Name:     name,
 			NodeName: util.StringPtr("hvc"),
@@ -495,12 +495,12 @@ func mustCreateLoadBalancerBackendServer(t *testing.T, database *db.Database, na
 	return server
 }
 
-func setupLoadBalancerAnsibleTestHooks(t *testing.T, runner func(playbookPath, targetAddress, privateKeyPath string) error, stateReader func(targetAddress, privateKeyPath string) (loadBalancerAgentState, error)) {
+func setupApplicationLoadBalancerAnsibleTestHooks(t *testing.T, runner func(playbookPath, targetAddress, privateKeyPath string) error, stateReader func(targetAddress, privateKeyPath string) (applicationLoadBalancerAgentState, error)) {
 	t.Helper()
-	oldRunner := runLoadBalancerPlaybook
-	oldDir := loadBalancerPlaybookDir
-	oldKey := loadBalancerPrivateKeyPath
-	oldStateReader := readLoadBalancerAgentState
+	oldRunner := runApplicationLoadBalancerPlaybook
+	oldDir := applicationLoadBalancerPlaybookDir
+	oldKey := applicationLoadBalancerPrivateKeyPath
+	oldStateReader := readApplicationLoadBalancerAgentState
 
 	tempDir := t.TempDir()
 	keyPath := filepath.Join(tempDir, "private.key")
@@ -508,42 +508,42 @@ func setupLoadBalancerAnsibleTestHooks(t *testing.T, runner func(playbookPath, t
 		t.Fatalf("WriteFile() failed for test private key: %v", err)
 	}
 
-	runLoadBalancerPlaybook = runner
-	loadBalancerPlaybookDir = filepath.Join(tempDir, "playbooks")
-	loadBalancerPrivateKeyPath = keyPath
-	readLoadBalancerAgentState = stateReader
+	runApplicationLoadBalancerPlaybook = runner
+	applicationLoadBalancerPlaybookDir = filepath.Join(tempDir, "playbooks")
+	applicationLoadBalancerPrivateKeyPath = keyPath
+	readApplicationLoadBalancerAgentState = stateReader
 
 	t.Cleanup(func() {
-		runLoadBalancerPlaybook = oldRunner
-		loadBalancerPlaybookDir = oldDir
-		loadBalancerPrivateKeyPath = oldKey
-		readLoadBalancerAgentState = oldStateReader
+		runApplicationLoadBalancerPlaybook = oldRunner
+		applicationLoadBalancerPlaybookDir = oldDir
+		applicationLoadBalancerPrivateKeyPath = oldKey
+		readApplicationLoadBalancerAgentState = oldStateReader
 	})
 }
 
 func TestLoadBalancerControllerSettingsFromEnv(t *testing.T) {
-	oldInterval := loadBalancerControllerInterval
-	oldMaxFailures := loadBalancerAgentStateReadMaxFailures
-	oldRecovery := loadBalancerAgentStateRecoverySuccessRequired
+	oldInterval := applicationLoadBalancerControllerInterval
+	oldMaxFailures := applicationLoadBalancerAgentStateReadMaxFailures
+	oldRecovery := applicationLoadBalancerAgentStateRecoverySuccessRequired
 	t.Cleanup(func() {
-		loadBalancerControllerInterval = oldInterval
-		loadBalancerAgentStateReadMaxFailures = oldMaxFailures
-		loadBalancerAgentStateRecoverySuccessRequired = oldRecovery
+		applicationLoadBalancerControllerInterval = oldInterval
+		applicationLoadBalancerAgentStateReadMaxFailures = oldMaxFailures
+		applicationLoadBalancerAgentStateRecoverySuccessRequired = oldRecovery
 	})
 
 	t.Setenv("MARMOT_LB_CONTROLLER_INTERVAL_SECONDS", "9")
 	t.Setenv("MARMOT_LB_AGENT_STATE_READ_MAX_FAILURES", "5")
 	t.Setenv("MARMOT_LB_AGENT_RECOVERY_SUCCESS_REQUIRED", "4")
 
-	loadBalancerControllerSettingsFromEnv()
+	applicationLoadBalancerControllerSettingsFromEnv()
 
-	if loadBalancerControllerInterval != 9*time.Second {
-		t.Fatalf("loadBalancerControllerInterval = %v, want %v", loadBalancerControllerInterval, 9*time.Second)
+	if applicationLoadBalancerControllerInterval != 9*time.Second {
+		t.Fatalf("applicationLoadBalancerControllerInterval = %v, want %v", applicationLoadBalancerControllerInterval, 9*time.Second)
 	}
-	if loadBalancerAgentStateReadMaxFailures != 5 {
-		t.Fatalf("loadBalancerAgentStateReadMaxFailures = %d, want 5", loadBalancerAgentStateReadMaxFailures)
+	if applicationLoadBalancerAgentStateReadMaxFailures != 5 {
+		t.Fatalf("applicationLoadBalancerAgentStateReadMaxFailures = %d, want 5", applicationLoadBalancerAgentStateReadMaxFailures)
 	}
-	if loadBalancerAgentStateRecoverySuccessRequired != 4 {
-		t.Fatalf("loadBalancerAgentStateRecoverySuccessRequired = %d, want 4", loadBalancerAgentStateRecoverySuccessRequired)
+	if applicationLoadBalancerAgentStateRecoverySuccessRequired != 4 {
+		t.Fatalf("applicationLoadBalancerAgentStateRecoverySuccessRequired = %d, want 4", applicationLoadBalancerAgentStateRecoverySuccessRequired)
 	}
 }

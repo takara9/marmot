@@ -1,7 +1,7 @@
 package api
 
-// LoadBalancer defines model for LoadBalancer.
-type LoadBalancer struct {
+// ApplicationLoadBalancer defines model for ApplicationLoadBalancer.
+type ApplicationLoadBalancer struct {
 	ApiVersion string           `json:"apiVersion" yaml:"apiVersion"`
 	Kind       string           `json:"kind" yaml:"kind"`
 	Metadata   Metadata         `json:"metadata" yaml:"metadata"`

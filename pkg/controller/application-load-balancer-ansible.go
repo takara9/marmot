@@ -19,40 +19,40 @@ import (
 )
 
 const (
-	loadBalancerAnsiblePlaybookDir     = "/var/lib/marmot/ansible-playbooks"
-	loadBalancerAnsibleMaxRetryCount   = 5
-	loadBalancerAnsibleDefaultUsername = "root"
+	applicationLoadBalancerAnsiblePlaybookDir     = "/var/lib/marmot/ansible-playbooks"
+	applicationLoadBalancerAnsibleMaxRetryCount   = 5
+	applicationLoadBalancerAnsibleDefaultUsername = "root"
 )
 
 //go:embed gateway-playbooks/load-balancer-haproxy.yaml.tmpl
-var loadBalancerPlaybookTemplate string
+var applicationLoadBalancerPlaybookTemplate string
 
 var (
-	loadBalancerPlaybookDir    = loadBalancerAnsiblePlaybookDir
-	loadBalancerPrivateKeyPath = marmotd.GatewayPrivateKeyPath()
-	runLoadBalancerPlaybook    = runLoadBalancerPlaybookCommand
-	readLoadBalancerAgentState = readLoadBalancerAgentStateCommand
+	applicationLoadBalancerPlaybookDir    = applicationLoadBalancerAnsiblePlaybookDir
+	applicationLoadBalancerPrivateKeyPath = marmotd.GatewayPrivateKeyPath()
+	runApplicationLoadBalancerPlaybook    = runApplicationLoadBalancerPlaybookCommand
+	readApplicationLoadBalancerAgentState = readApplicationLoadBalancerAgentStateCommand
 )
 
-const loadBalancerAgentStatePath = "/var/lib/marmot/lb-agent/state.json"
+const applicationLoadBalancerAgentStatePath = "/var/lib/marmot/lb-agent/state.json"
 
-type loadBalancerPlaybookData struct {
+type applicationLoadBalancerPlaybookData struct {
 	TargetIP      string
 	HaproxyConfig string
 }
 
-type loadBalancerBackendServer struct {
+type applicationLoadBalancerBackendServer struct {
 	Name string
 	IP   string
 }
 
-type loadBalancerAgentState struct {
+type applicationLoadBalancerAgentState struct {
 	LastAppliedHash string `json:"lastAppliedHash"`
 	LastAppliedAt   time.Time `json:"lastAppliedAt"`
 	LastError       string `json:"lastError,omitempty"`
 }
 
-func desiredLoadBalancerConfigHash(loadBalancer api.LoadBalancer, listenerBackends map[string][]loadBalancerBackendServer) string {
+func desiredApplicationLoadBalancerConfigHash(loadBalancer api.ApplicationLoadBalancer, listenerBackends map[string][]applicationLoadBalancerBackendServer) string {
 	listenerPayloads := make([]string, 0, len(loadBalancer.Spec.Listeners))
 	for _, listener := range loadBalancer.Spec.Listeners {
 		labelPairs := make([]string, 0, len(listener.BackendSelector.MatchLabels))
@@ -90,7 +90,7 @@ func desiredLoadBalancerConfigHash(loadBalancer api.LoadBalancer, listenerBacken
 	return fmt.Sprintf("%x", sum)
 }
 
-func renderLoadBalancerPlaybook(playbookPath string, targetIP string, loadBalancer api.LoadBalancer, listenerBackends map[string][]loadBalancerBackendServer) error {
+func renderApplicationLoadBalancerPlaybook(playbookPath string, targetIP string, loadBalancer api.ApplicationLoadBalancer, listenerBackends map[string][]applicationLoadBalancerBackendServer) error {
 	if strings.TrimSpace(playbookPath) == "" {
 		return fmt.Errorf("playbook path is empty")
 	}
@@ -101,19 +101,19 @@ func renderLoadBalancerPlaybook(playbookPath string, targetIP string, loadBalanc
 		return err
 	}
 
-	haproxyCfg, err := buildLoadBalancerHAProxyConfig(loadBalancer, listenerBackends)
+	haproxyCfg, err := buildApplicationLoadBalancerHAProxyConfig(loadBalancer, listenerBackends)
 	if err != nil {
 		return err
 	}
 	haproxyCfg = indentMultiline(haproxyCfg, 10)
 
-	tmpl, err := template.New("load-balancer-playbook").Parse(loadBalancerPlaybookTemplate)
+	tmpl, err := template.New("load-balancer-playbook").Parse(applicationLoadBalancerPlaybookTemplate)
 	if err != nil {
 		return err
 	}
 
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, loadBalancerPlaybookData{TargetIP: strings.TrimSpace(targetIP), HaproxyConfig: haproxyCfg}); err != nil {
+	if err := tmpl.Execute(&buf, applicationLoadBalancerPlaybookData{TargetIP: strings.TrimSpace(targetIP), HaproxyConfig: haproxyCfg}); err != nil {
 		return err
 	}
 	return os.WriteFile(playbookPath, buf.Bytes(), 0o644)
@@ -135,7 +135,7 @@ func indentMultiline(input string, spaces int) string {
 	return strings.Join(lines, "\n") + "\n"
 }
 
-func runLoadBalancerPlaybookCommand(playbookPath, targetAddress, privateKeyPath string) error {
+func runApplicationLoadBalancerPlaybookCommand(playbookPath, targetAddress, privateKeyPath string) error {
 	address := strings.TrimSpace(targetAddress)
 	if address == "" {
 		return fmt.Errorf("target address is empty")
@@ -152,7 +152,7 @@ func runLoadBalancerPlaybookCommand(playbookPath, targetAddress, privateKeyPath 
 		"-i", address + ",",
 		playbookPath,
 		"--private-key", key,
-		"-u", loadBalancerAnsibleDefaultUsername,
+		"-u", applicationLoadBalancerAnsibleDefaultUsername,
 		"--ssh-common-args", "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
 	}
 	cmd := exec.Command("ansible-playbook", args...)
@@ -167,44 +167,44 @@ func runLoadBalancerPlaybookCommand(playbookPath, targetAddress, privateKeyPath 
 	return nil
 }
 
-func readLoadBalancerAgentStateCommand(targetAddress, privateKeyPath string) (loadBalancerAgentState, error) {
+func readApplicationLoadBalancerAgentStateCommand(targetAddress, privateKeyPath string) (applicationLoadBalancerAgentState, error) {
 	address := strings.TrimSpace(targetAddress)
 	if address == "" {
-		return loadBalancerAgentState{}, fmt.Errorf("target address is empty")
+		return applicationLoadBalancerAgentState{}, fmt.Errorf("target address is empty")
 	}
 	key := strings.TrimSpace(privateKeyPath)
 	if key == "" {
-		return loadBalancerAgentState{}, fmt.Errorf("private key path is empty")
+		return applicationLoadBalancerAgentState{}, fmt.Errorf("private key path is empty")
 	}
 	if _, err := os.Stat(key); err != nil {
-		return loadBalancerAgentState{}, fmt.Errorf("private key is not available: %w", err)
+		return applicationLoadBalancerAgentState{}, fmt.Errorf("private key is not available: %w", err)
 	}
 
 	args := []string{
 		"-i", key,
 		"-o", "StrictHostKeyChecking=no",
 		"-o", "UserKnownHostsFile=/dev/null",
-		loadBalancerAnsibleDefaultUsername + "@" + address,
-		"cat", loadBalancerAgentStatePath,
+		applicationLoadBalancerAnsibleDefaultUsername + "@" + address,
+		"cat", applicationLoadBalancerAgentStatePath,
 	}
 	cmd := exec.Command("ssh", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		trimmed := strings.TrimSpace(string(output))
 		if trimmed == "" {
-			return loadBalancerAgentState{}, fmt.Errorf("ssh state read failed: %w", err)
+			return applicationLoadBalancerAgentState{}, fmt.Errorf("ssh state read failed: %w", err)
 		}
-		return loadBalancerAgentState{}, fmt.Errorf("ssh state read failed: %w: %s", err, trimmed)
+		return applicationLoadBalancerAgentState{}, fmt.Errorf("ssh state read failed: %w: %s", err, trimmed)
 	}
 
-	var state loadBalancerAgentState
+	var state applicationLoadBalancerAgentState
 	if err := json.Unmarshal(output, &state); err != nil {
-		return loadBalancerAgentState{}, fmt.Errorf("failed to decode lb agent state: %w", err)
+		return applicationLoadBalancerAgentState{}, fmt.Errorf("failed to decode lb agent state: %w", err)
 	}
 	return state, nil
 }
 
-func buildLoadBalancerHAProxyConfig(loadBalancer api.LoadBalancer, listenerBackends map[string][]loadBalancerBackendServer) (string, error) {
+func buildApplicationLoadBalancerHAProxyConfig(loadBalancer api.ApplicationLoadBalancer, listenerBackends map[string][]applicationLoadBalancerBackendServer) (string, error) {
 	id := strings.TrimSpace(api.LoadBalancerID(loadBalancer))
 	if id == "" {
 		id = strings.TrimSpace(loadBalancer.Metadata.Name)
