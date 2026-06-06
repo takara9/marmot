@@ -87,6 +87,33 @@ var _ = Describe("Servers", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 
+			It("UpdateServerStatus が SERVER_PENDING(0) を保持できる", func() {
+				localDB, err := db.NewDatabase(url)
+				Expect(err).NotTo(HaveOccurred())
+
+				created, err := localDB.MakeServerEntry(api.Server{
+					Metadata: api.Metadata{Name: "server-status-regression"},
+				})
+				Expect(err).NotTo(HaveOccurred())
+				targetID := api.ServerID(created)
+
+				localDB.UpdateServerStatus(targetID, db.SERVER_PROVISIONING, "provisioning")
+				srv1, err := localDB.GetServerById(targetID)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(srv1.Status).NotTo(BeNil())
+				Expect(srv1.Status.StatusCode).To(Equal(db.SERVER_PROVISIONING))
+				Expect(*srv1.Status.Status).To(Equal(db.ServerStatus[db.SERVER_PROVISIONING]))
+
+				localDB.UpdateServerStatus(targetID, db.SERVER_PENDING, "retry")
+				srv2, err := localDB.GetServerById(targetID)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(srv2.Status).NotTo(BeNil())
+				Expect(srv2.Status.StatusCode).To(Equal(db.SERVER_PENDING))
+				Expect(*srv2.Status.Status).To(Equal(db.ServerStatus[db.SERVER_PENDING]))
+				Expect(srv2.Status.Message).NotTo(BeNil())
+				Expect(*srv2.Status.Message).To(Equal("retry"))
+			})
+
 			It("Keyからサーバー情報を取得", func() {
 				srv, err := v.GetServerById(api.ServerID(serverSpec))
 				Expect(err).NotTo(HaveOccurred())
@@ -128,7 +155,7 @@ var _ = Describe("Servers", Ordered, func() {
 			It("サーバーの一覧取得", func() {
 				servers, err := v.GetServers()
 				Expect(err).NotTo(HaveOccurred())
-				Expect(len(servers)).To(Equal(3))
+				Expect(len(servers)).To(Equal(4))
 				fmt.Println("サーバー一覧:")
 				for _, srv := range servers {
 					jsonData, err := json.MarshalIndent(srv, "", "  ")
@@ -140,7 +167,7 @@ var _ = Describe("Servers", Ordered, func() {
 			It("サーバーの削除", func() {
 				servers, err := v.GetServers()
 				Expect(err).NotTo(HaveOccurred())
-				Expect(len(servers)).To(Equal(3))
+				Expect(len(servers)).To(Equal(4))
 				err = v.DeleteServerById(api.ServerID(servers[0]))
 				Expect(err).NotTo(HaveOccurred())
 			})
@@ -148,7 +175,7 @@ var _ = Describe("Servers", Ordered, func() {
 			It("サーバーの一覧取得", func() {
 				servers, err := v.GetServers()
 				Expect(err).NotTo(HaveOccurred())
-				Expect(len(servers)).To(Equal(2))
+				Expect(len(servers)).To(Equal(3))
 				fmt.Println("サーバー一覧:")
 				for _, srv := range servers {
 					jsonData, err := json.MarshalIndent(srv, "", "  ")

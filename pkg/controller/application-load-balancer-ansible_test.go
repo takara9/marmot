@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -110,5 +111,53 @@ func TestDecodeApplicationLoadBalancerAgentState_RejectsWarningPayload(t *testin
 	_, err := decodeApplicationLoadBalancerAgentState([]byte("Warning: Permanently added '10.0.0.10' (ED25519) to the list of known hosts."))
 	if err == nil {
 		t.Fatalf("decodeApplicationLoadBalancerAgentState() expected error for non-JSON payload")
+	}
+}
+
+func TestIsRetryableApplicationLoadBalancerPendingError(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  string
+		want bool
+	}{
+		{
+			name: "internalVirtualNetwork not found is retryable",
+			msg:  `internalVirtualNetwork "app-net" is not found`,
+			want: true,
+		},
+		{
+			name: "uppercase variant is retryable",
+			msg:  `internalVirtualNetwork "WebServers" is not found`,
+			want: true,
+		},
+		{
+			name: "unrelated error is not retryable",
+			msg:  "spec.internalVirtualNetwork is required",
+			want: false,
+		},
+		{
+			name: "reserved network error is not retryable",
+			msg:  `spec.internalVirtualNetwork "default" is reserved`,
+			want: false,
+		},
+		{
+			name: "nil error is not retryable",
+			msg:  "",
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			var err error
+			if tt.msg != "" {
+				err = errors.New(tt.msg)
+			}
+			got := isRetryableApplicationLoadBalancerPendingError(err)
+			if got != tt.want {
+				t.Fatalf("isRetryableApplicationLoadBalancerPendingError() = %v, want %v, msg=%q", got, tt.want, tt.msg)
+			}
+		})
 	}
 }
