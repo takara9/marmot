@@ -3,8 +3,8 @@ package controller
 import (
 	"bytes"
 	"crypto/sha256"
-	"encoding/json"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -28,11 +28,11 @@ const (
 var applicationLoadBalancerPlaybookTemplate string
 
 var (
-	applicationLoadBalancerPlaybookDir    = applicationLoadBalancerAnsiblePlaybookDir
-	applicationLoadBalancerDesiredDir     = applicationLoadBalancerDesiredConfigDir
-	applicationLoadBalancerPrivateKeyPath = marmotd.GatewayPrivateKeyPath()
-	runApplicationLoadBalancerPlaybook    = runApplicationLoadBalancerPlaybookCommand
-	readApplicationLoadBalancerAgentState = readApplicationLoadBalancerAgentStateCommand
+	applicationLoadBalancerPlaybookDir           = applicationLoadBalancerAnsiblePlaybookDir
+	applicationLoadBalancerDesiredDir            = applicationLoadBalancerDesiredConfigDir
+	applicationLoadBalancerPrivateKeyPath        = marmotd.GatewayPrivateKeyPath()
+	runApplicationLoadBalancerPlaybook           = runApplicationLoadBalancerPlaybookCommand
+	readApplicationLoadBalancerAgentState        = readApplicationLoadBalancerAgentStateCommand
 	readApplicationLoadBalancerDesiredConfigHash = readApplicationLoadBalancerDesiredConfigHashCommand
 )
 
@@ -50,9 +50,9 @@ type applicationLoadBalancerBackendServer struct {
 }
 
 type applicationLoadBalancerAgentState struct {
-	LastAppliedHash string `json:"lastAppliedHash"`
+	LastAppliedHash string    `json:"lastAppliedHash"`
 	LastAppliedAt   time.Time `json:"lastAppliedAt"`
-	LastError       string `json:"lastError,omitempty"`
+	LastError       string    `json:"lastError,omitempty"`
 }
 
 func desiredApplicationLoadBalancerConfigHash(loadBalancer api.ApplicationLoadBalancer, listenerBackends map[string][]applicationLoadBalancerBackendServer) string {

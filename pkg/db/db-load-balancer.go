@@ -21,17 +21,17 @@ const (
 	LOAD_BALANCER_PROVISIONING = 5
 	LOAD_BALANCER_CONFIGURING  = 6
 
-	LoadBalancerLabelManagedServerID = "loadBalancerServerId"
-	LoadBalancerLabelManagedBy       = "managedBy"
-	LoadBalancerLabelManagedByValue  = "load-balancer-controller"
-	LoadBalancerServerLabelID        = "loadBalancerId"
-	LoadBalancerServerLabelRole      = "role"
-	LoadBalancerServerLabelRoleValue = "load-balancer"
-	LoadBalancerLabelAnsibleRetries  = "ansibleRetries"
-	LoadBalancerLabelAppliedConfig   = "appliedConfigHash"
-	LoadBalancerLabelStagedConfig    = "stagedConfigHash"
-	LoadBalancerLabelStagedConfigAt  = "stagedConfigAt"
-	LoadBalancerLabelAgentStateReadFailures = "agentStateReadFailures"
+	LoadBalancerLabelManagedServerID         = "loadBalancerServerId"
+	LoadBalancerLabelManagedBy               = "managedBy"
+	LoadBalancerLabelManagedByValue          = "load-balancer-controller"
+	LoadBalancerServerLabelID                = "loadBalancerId"
+	LoadBalancerServerLabelRole              = "role"
+	LoadBalancerServerLabelRoleValue         = "load-balancer"
+	LoadBalancerLabelAnsibleRetries          = "ansibleRetries"
+	LoadBalancerLabelAppliedConfig           = "appliedConfigHash"
+	LoadBalancerLabelStagedConfig            = "stagedConfigHash"
+	LoadBalancerLabelStagedConfigAt          = "stagedConfigAt"
+	LoadBalancerLabelAgentStateReadFailures  = "agentStateReadFailures"
 	LoadBalancerLabelAgentStateReadSuccesses = "agentStateReadSuccesses"
 )
 

@@ -465,9 +465,9 @@ func mustCreateLoadBalancer(t *testing.T, database *db.Database, name, internalN
 			InternalVirtualNetwork: internalNetwork,
 			RemoteCIDR:             "0.0.0.0/0",
 			Listeners: []api.LoadBalancerListener{{
-				Name:       "http",
-				Protocol:   "HTTP",
-				VipPort:    80,
+				Name:        "http",
+				Protocol:    "HTTP",
+				VipPort:     80,
 				BackendPort: 8080,
 				BackendSelector: api.LoadBalancerLabelSelector{
 					MatchLabels: map[string]string{"app": "web"},

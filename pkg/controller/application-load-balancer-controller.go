@@ -18,14 +18,14 @@ import (
 )
 
 const (
-	defaultApplicationLoadBalancerControllerIntervalSeconds          = 15
-	defaultApplicationLoadBalancerAgentStateReadMaxFailures          = 3
-	defaultApplicationLoadBalancerAgentStateRecoverySuccessRequired  = 2
+	defaultApplicationLoadBalancerControllerIntervalSeconds         = 15
+	defaultApplicationLoadBalancerAgentStateReadMaxFailures         = 3
+	defaultApplicationLoadBalancerAgentStateRecoverySuccessRequired = 2
 )
 
 var (
-	applicationLoadBalancerControllerInterval = time.Duration(defaultApplicationLoadBalancerControllerIntervalSeconds) * time.Second
-	applicationLoadBalancerAgentStateReadMaxFailures = defaultApplicationLoadBalancerAgentStateReadMaxFailures
+	applicationLoadBalancerControllerInterval                = time.Duration(defaultApplicationLoadBalancerControllerIntervalSeconds) * time.Second
+	applicationLoadBalancerAgentStateReadMaxFailures         = defaultApplicationLoadBalancerAgentStateReadMaxFailures
 	applicationLoadBalancerAgentStateRecoverySuccessRequired = defaultApplicationLoadBalancerAgentStateRecoverySuccessRequired
 )
 
@@ -226,17 +226,17 @@ func (c *controller) reconcileApplicationLoadBalancerConfiguring(loadBalancer ap
 		return
 	}
 
-		targetIP, err := c.resolveApplicationLoadBalancerTargetAddress(loadBalancer)
+	targetIP, err := c.resolveApplicationLoadBalancerTargetAddress(loadBalancer)
 	if err != nil {
-			c.handleApplicationLoadBalancerConfigFailure(loadBalancerID, err)
+		c.handleApplicationLoadBalancerConfigFailure(loadBalancerID, err)
 		return
 	}
-		listenerBackends, err := c.resolveApplicationLoadBalancerListenerBackends(loadBalancer)
+	listenerBackends, err := c.resolveApplicationLoadBalancerListenerBackends(loadBalancer)
 	if err != nil {
-			c.handleApplicationLoadBalancerConfigFailure(loadBalancerID, err)
+		c.handleApplicationLoadBalancerConfigFailure(loadBalancerID, err)
 		return
 	}
-		if msg := applicationLoadBalancerBackendAvailabilityMessage(loadBalancer, listenerBackends); msg != "" {
+	if msg := applicationLoadBalancerBackendAvailabilityMessage(loadBalancer, listenerBackends); msg != "" {
 		_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_DEGRADED, msg)
 		return
 	}
@@ -248,16 +248,16 @@ func (c *controller) reconcileApplicationLoadBalancerConfiguring(loadBalancer ap
 		c.handleApplicationLoadBalancerConfigFailure(loadBalancerID, err)
 		return
 	}
-		if applicationLoadBalancerStagedConfigHash(loadBalancer) != configHash {
-			if err := renderApplicationLoadBalancerPlaybook(playbookPath, targetIP, desiredConfigPath, desiredConfigPath); err != nil {
-				c.handleApplicationLoadBalancerConfigFailure(loadBalancerID, err)
+	if applicationLoadBalancerStagedConfigHash(loadBalancer) != configHash {
+		if err := renderApplicationLoadBalancerPlaybook(playbookPath, targetIP, desiredConfigPath, desiredConfigPath); err != nil {
+			c.handleApplicationLoadBalancerConfigFailure(loadBalancerID, err)
 			return
 		}
-			if err := runApplicationLoadBalancerPlaybook(playbookPath, targetIP, applicationLoadBalancerPrivateKeyPath); err != nil {
-				c.handleApplicationLoadBalancerConfigFailure(loadBalancerID, err)
+		if err := runApplicationLoadBalancerPlaybook(playbookPath, targetIP, applicationLoadBalancerPrivateKeyPath); err != nil {
+			c.handleApplicationLoadBalancerConfigFailure(loadBalancerID, err)
 			return
 		}
-			if err := c.updateApplicationLoadBalancerLabels(loadBalancerID, func(labels map[string]interface{}) {
+		if err := c.updateApplicationLoadBalancerLabels(loadBalancerID, func(labels map[string]interface{}) {
 			db.SetLoadBalancerAnsibleRetries(labels, 0)
 			db.SetLoadBalancerStagedConfigHash(labels, configHash)
 			db.SetLoadBalancerStagedConfigAt(labels, time.Now().UTC())
@@ -267,7 +267,7 @@ func (c *controller) reconcileApplicationLoadBalancerConfiguring(loadBalancer ap
 			_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_FAILED, err.Error())
 			return
 		}
-			refreshed, err := c.db.GetLoadBalancerById(loadBalancerID)
+		refreshed, err := c.db.GetLoadBalancerById(loadBalancerID)
 		if err == nil {
 			loadBalancer = refreshed
 		}
@@ -651,7 +651,7 @@ func (c *controller) observeApplicationLoadBalancerAgentState(loadBalancer api.A
 		_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_CONFIGURING, message)
 		return true
 	}
-		successes, err := c.recordApplicationLoadBalancerAgentStateReadSuccess(loadBalancerID)
+	successes, err := c.recordApplicationLoadBalancerAgentStateReadSuccess(loadBalancerID)
 	if err != nil {
 		_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_FAILED, err.Error())
 		return true
