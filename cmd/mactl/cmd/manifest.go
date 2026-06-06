@@ -20,14 +20,14 @@ import (
 type ManifestType string
 
 const (
-	ManifestTypeServer     ManifestType = "Server"
-	ManifestTypeImage      ManifestType = "Image"
-	ManifestTypeVolume     ManifestType = "Volume"
-	ManifestTypeNetwork    ManifestType = "VirtualNetwork"
-	ManifestTypeGateway    ManifestType = "Gateway"
+	ManifestTypeServer                  ManifestType = "Server"
+	ManifestTypeImage                   ManifestType = "Image"
+	ManifestTypeVolume                  ManifestType = "Volume"
+	ManifestTypeNetwork                 ManifestType = "VirtualNetwork"
+	ManifestTypeGateway                 ManifestType = "Gateway"
 	ManifestTypeApplicationLoadBalancer ManifestType = "ApplicationLoadBalancer"
-	ManifestTypeVpnGateway ManifestType = "VpnGateway"
-	ManifestTypeUnknown    ManifestType = "Unknown"
+	ManifestTypeVpnGateway              ManifestType = "VpnGateway"
+	ManifestTypeUnknown                 ManifestType = "Unknown"
 )
 
 // Manifest マニフェストベース構造

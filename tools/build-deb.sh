@@ -78,6 +78,8 @@ install -m 0644 "${ROOT_DIR}/pkg/controller/gateway-playbooks/gateway-iptables.y
     "${PKG_DIR}/usr/local/marmot/gateway-playbooks/gateway-iptables.yaml.tmpl"
 install -m 0644 "${ROOT_DIR}/pkg/controller/gateway-playbooks/vpn-gateway-openvpn.yaml.tmpl" \
     "${PKG_DIR}/usr/local/marmot/gateway-playbooks/vpn-gateway-openvpn.yaml.tmpl"
+install -m 0644 "${ROOT_DIR}/pkg/controller/gateway-playbooks/load-balancer-haproxy.yaml.tmpl" \
+    "${PKG_DIR}/usr/local/marmot/gateway-playbooks/load-balancer-haproxy.yaml.tmpl"
 
 echo "systemd サービスファイルをコピー中..."
 install -m 0644 "${ROOT_DIR}/cmd/marmotd/marmot.service" \

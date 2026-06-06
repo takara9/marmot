@@ -3,6 +3,7 @@ package controller
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/takara9/marmot/api"
 )
@@ -83,5 +84,25 @@ func TestDesiredApplicationLoadBalancerConfigHash_ChangesWhenBackendsChange(t *t
 
 	if hashA == hashB {
 		t.Fatalf("hash must differ when backend set changes")
+	}
+}
+
+func TestDecodeApplicationLoadBalancerAgentState_ValidJSON(t *testing.T) {
+	state, err := decodeApplicationLoadBalancerAgentState([]byte(`{"lastAppliedHash":"abc","lastAppliedAt":"2026-06-06T00:00:00Z"}`))
+	if err != nil {
+		t.Fatalf("decodeApplicationLoadBalancerAgentState() failed: %v", err)
+	}
+	if state.LastAppliedHash != "abc" {
+		t.Fatalf("LastAppliedHash = %q, want %q", state.LastAppliedHash, "abc")
+	}
+	if !state.LastAppliedAt.Equal(time.Date(2026, 6, 6, 0, 0, 0, 0, time.UTC)) {
+		t.Fatalf("LastAppliedAt = %v, want 2026-06-06T00:00:00Z", state.LastAppliedAt)
+	}
+}
+
+func TestDecodeApplicationLoadBalancerAgentState_RejectsWarningPayload(t *testing.T) {
+	_, err := decodeApplicationLoadBalancerAgentState([]byte("Warning: Permanently added '10.0.0.10' (ED25519) to the list of known hosts."))
+	if err == nil {
+		t.Fatalf("decodeApplicationLoadBalancerAgentState() expected error for non-JSON payload")
 	}
 }

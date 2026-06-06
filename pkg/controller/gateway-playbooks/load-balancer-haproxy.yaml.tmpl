@@ -2,20 +2,36 @@
 - hosts: all
   gather_facts: false
   tasks:
+    - name: Ensure desired config directory exists
+      ansible.builtin.file:
+        path: /var/lib/marmot/ansible-playbooks/desire-configs
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
     - name: Install HAProxy
       ansible.builtin.apt:
         name: haproxy
         state: present
         update_cache: true
 
-    - name: Write HAProxy config
+    - name: Upload desired HAProxy config
       ansible.builtin.copy:
-        dest: /etc/haproxy/haproxy-desired.cfg
+        src: {{ .DesiredConfigSourcePath }}
+        dest: {{ .DesiredConfigPath }}
         owner: root
         group: root
         mode: "0644"
-        content: |
-{{ .HaproxyConfig }}
+
+    - name: Apply desired HAProxy config
+      ansible.builtin.copy:
+        src: {{ .DesiredConfigPath }}
+        dest: /etc/haproxy/haproxy-desired.cfg
+        remote_src: true
+        owner: root
+        group: root
+        mode: "0644"
 
     - name: Install marmot-lb-agent binary
       ansible.builtin.copy:

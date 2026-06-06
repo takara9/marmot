@@ -139,6 +139,7 @@ func (c *controller) isApplicationLoadBalancerManagedServerMissing(loadBalancer 
 
 func (c *controller) deleteApplicationLoadBalancerForMissingServer(loadBalancer api.ApplicationLoadBalancer) {
 	loadBalancerID := api.LoadBalancerID(loadBalancer)
+	c.cleanupApplicationLoadBalancerDesiredConfig(loadBalancerID)
 	if err := c.db.DeleteLoadBalancerById(loadBalancerID); err != nil {
 		slog.Warn("DeleteLoadBalancerById() failed while auto-deleting load balancer", "id", loadBalancerID, "err", err)
 		return
@@ -241,9 +242,14 @@ func (c *controller) reconcileApplicationLoadBalancerConfiguring(loadBalancer ap
 	}
 
 	playbookPath := filepath.Join(applicationLoadBalancerPlaybookDir, fmt.Sprintf("load-balancer-%s.yaml", loadBalancerID))
-		configHash := desiredApplicationLoadBalancerConfigHash(loadBalancer, listenerBackends)
+	desiredConfigPath := applicationLoadBalancerDesiredConfigPath(loadBalancerID)
+	configHash, err := writeApplicationLoadBalancerDesiredConfig(desiredConfigPath, loadBalancer, listenerBackends)
+	if err != nil {
+		c.handleApplicationLoadBalancerConfigFailure(loadBalancerID, err)
+		return
+	}
 		if applicationLoadBalancerStagedConfigHash(loadBalancer) != configHash {
-			if err := renderApplicationLoadBalancerPlaybook(playbookPath, targetIP, loadBalancer, listenerBackends); err != nil {
+			if err := renderApplicationLoadBalancerPlaybook(playbookPath, targetIP, desiredConfigPath, desiredConfigPath); err != nil {
 				c.handleApplicationLoadBalancerConfigFailure(loadBalancerID, err)
 			return
 		}
@@ -266,7 +272,7 @@ func (c *controller) reconcileApplicationLoadBalancerConfiguring(loadBalancer ap
 			loadBalancer = refreshed
 		}
 	}
-	c.observeApplicationLoadBalancerAgentState(loadBalancer, targetIP, configHash, applicationLoadBalancerStagedConfigAt(loadBalancer))
+	c.observeApplicationLoadBalancerAgentState(loadBalancer, targetIP, configHash, applicationLoadBalancerStagedConfigAt(loadBalancer), desiredConfigPath)
 }
 
 func (c *controller) reconcileApplicationLoadBalancerActive(loadBalancer api.ApplicationLoadBalancer) {
@@ -323,7 +329,7 @@ func (c *controller) reconcileApplicationLoadBalancerActive(loadBalancer api.App
 
 	targetIP, err := c.resolveApplicationLoadBalancerTargetAddress(loadBalancer)
 	if err == nil {
-		if observed := c.observeApplicationLoadBalancerAgentState(loadBalancer, targetIP, applicationLoadBalancerAppliedConfigHash(loadBalancer), applicationLoadBalancerStagedConfigAt(loadBalancer)); observed {
+		if observed := c.observeApplicationLoadBalancerAgentState(loadBalancer, targetIP, applicationLoadBalancerAppliedConfigHash(loadBalancer), applicationLoadBalancerStagedConfigAt(loadBalancer), ""); observed {
 			return
 		}
 	}
@@ -435,6 +441,7 @@ func applicationLoadBalancerBackendAvailabilityMessage(loadBalancer api.Applicat
 
 func (c *controller) reconcileApplicationLoadBalancerDeleting(loadBalancer api.ApplicationLoadBalancer) {
 	loadBalancerID := api.LoadBalancerID(loadBalancer)
+	c.cleanupApplicationLoadBalancerDesiredConfig(loadBalancerID)
 	serverID := applicationLoadBalancerManagedServerID(loadBalancer)
 	if strings.TrimSpace(serverID) == "" {
 		if err := c.db.DeleteLoadBalancerById(loadBalancerID); err != nil {
@@ -459,6 +466,16 @@ func (c *controller) reconcileApplicationLoadBalancerDeleting(loadBalancer api.A
 		if err := c.db.SetDeleteTimestamp(serverID); err != nil {
 			slog.Warn("SetDeleteTimestamp() failed", "id", loadBalancerID, "serverId", serverID, "err", err)
 		}
+	}
+}
+
+func (c *controller) cleanupApplicationLoadBalancerDesiredConfig(loadBalancerID string) {
+	path := applicationLoadBalancerDesiredConfigPath(loadBalancerID)
+	if strings.TrimSpace(path) == "" {
+		return
+	}
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		slog.Warn("failed to remove load balancer desired config file", "id", loadBalancerID, "path", path, "err", err)
 	}
 }
 
@@ -599,8 +616,26 @@ func applicationLoadBalancerStagedConfigAt(loadBalancer api.ApplicationLoadBalan
 	return db.GetLoadBalancerStagedConfigAt(*loadBalancer.Metadata.Labels)
 }
 
-func (c *controller) observeApplicationLoadBalancerAgentState(loadBalancer api.ApplicationLoadBalancer, targetIP, desiredHash string, stagedAt time.Time) bool {
+func (c *controller) observeApplicationLoadBalancerAgentState(loadBalancer api.ApplicationLoadBalancer, targetIP, desiredHash string, stagedAt time.Time, desiredConfigPath string) bool {
 	loadBalancerID := api.LoadBalancerID(loadBalancer)
+	if strings.TrimSpace(desiredConfigPath) != "" {
+		localHash, err := fileSHA256Hex(desiredConfigPath)
+		if err != nil {
+			_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_CONFIGURING, fmt.Sprintf("failed to read local desired config hash: %v", err))
+			return true
+		}
+		remoteHash, err := readApplicationLoadBalancerDesiredConfigHash(targetIP, applicationLoadBalancerPrivateKeyPath, desiredConfigPath)
+		if err != nil {
+			_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_CONFIGURING, fmt.Sprintf("waiting for desired config hash from load balancer VM: %v", err))
+			return true
+		}
+		if strings.TrimSpace(localHash) != strings.TrimSpace(remoteHash) {
+			_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_CONFIGURING, "waiting for desired config sync between marmotd and load balancer VM")
+			return true
+		}
+		desiredHash = localHash
+	}
+
 	state, err := readApplicationLoadBalancerAgentState(targetIP, applicationLoadBalancerPrivateKeyPath)
 	if err != nil {
 		failures, labelErr := c.recordApplicationLoadBalancerAgentStateReadFailure(loadBalancerID)

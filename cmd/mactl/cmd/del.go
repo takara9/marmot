@@ -57,7 +57,6 @@ var delCmd = &cobra.Command{
 	},
 }
 
-
 func deleteResourceByTypeAndName(resourceName string, objectName string) error {
 	// リソースタイプに応じて処理を分岐
 	switch strings.ToLower(resourceName) {

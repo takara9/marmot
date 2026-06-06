@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 	"text/template"
 	"time"
@@ -22,6 +21,7 @@ const (
 	applicationLoadBalancerAnsiblePlaybookDir     = "/var/lib/marmot/ansible-playbooks"
 	applicationLoadBalancerAnsibleMaxRetryCount   = 5
 	applicationLoadBalancerAnsibleDefaultUsername = "root"
+	applicationLoadBalancerDesiredConfigDir       = "/var/lib/marmot/ansible-playbooks/desire-configs"
 )
 
 //go:embed gateway-playbooks/load-balancer-haproxy.yaml.tmpl
@@ -29,16 +29,19 @@ var applicationLoadBalancerPlaybookTemplate string
 
 var (
 	applicationLoadBalancerPlaybookDir    = applicationLoadBalancerAnsiblePlaybookDir
+	applicationLoadBalancerDesiredDir     = applicationLoadBalancerDesiredConfigDir
 	applicationLoadBalancerPrivateKeyPath = marmotd.GatewayPrivateKeyPath()
 	runApplicationLoadBalancerPlaybook    = runApplicationLoadBalancerPlaybookCommand
 	readApplicationLoadBalancerAgentState = readApplicationLoadBalancerAgentStateCommand
+	readApplicationLoadBalancerDesiredConfigHash = readApplicationLoadBalancerDesiredConfigHashCommand
 )
 
 const applicationLoadBalancerAgentStatePath = "/var/lib/marmot/lb-agent/state.json"
 
 type applicationLoadBalancerPlaybookData struct {
-	TargetIP      string
-	HaproxyConfig string
+	TargetIP                string
+	DesiredConfigSourcePath string
+	DesiredConfigPath       string
 }
 
 type applicationLoadBalancerBackendServer struct {
@@ -53,86 +56,83 @@ type applicationLoadBalancerAgentState struct {
 }
 
 func desiredApplicationLoadBalancerConfigHash(loadBalancer api.ApplicationLoadBalancer, listenerBackends map[string][]applicationLoadBalancerBackendServer) string {
-	listenerPayloads := make([]string, 0, len(loadBalancer.Spec.Listeners))
-	for _, listener := range loadBalancer.Spec.Listeners {
-		labelPairs := make([]string, 0, len(listener.BackendSelector.MatchLabels))
-		for key, value := range listener.BackendSelector.MatchLabels {
-			labelPairs = append(labelPairs, strings.TrimSpace(key)+"="+strings.TrimSpace(value))
-		}
-		sort.Strings(labelPairs)
-		backendPairs := make([]string, 0)
-		if backends, ok := listenerBackends[strings.TrimSpace(listener.Name)]; ok {
-			backendPairs = make([]string, 0, len(backends))
-			for _, backend := range backends {
-				backendPairs = append(backendPairs, strings.TrimSpace(backend.Name)+"@"+strings.TrimSpace(backend.IP))
-			}
-			sort.Strings(backendPairs)
-		}
-		listenerPayloads = append(listenerPayloads, strings.Join([]string{
-			strings.TrimSpace(listener.Name),
-			strings.ToUpper(strings.TrimSpace(listener.Protocol)),
-			fmt.Sprintf("%d", listener.VipPort),
-			fmt.Sprintf("%d", listener.BackendPort),
-			strings.ToLower(strings.TrimSpace(listener.LoadBalancingAlgorithm)),
-			strings.Join(labelPairs, ","),
-			strings.Join(backendPairs, ","),
-		}, "|"))
-	}
-	sort.Strings(listenerPayloads)
-	payload := strings.Join([]string{
-		strings.TrimSpace(api.LoadBalancerID(loadBalancer)),
-		strings.TrimSpace(loadBalancer.Spec.BindPublicIpAddress),
-		strings.TrimSpace(loadBalancer.Spec.InternalVirtualNetwork),
-		strings.TrimSpace(loadBalancer.Spec.RemoteCIDR),
-		strings.Join(listenerPayloads, "||"),
-	}, "###")
-	sum := sha256.Sum256([]byte(payload))
+	haproxyCfg, _ := buildApplicationLoadBalancerHAProxyConfig(loadBalancer, listenerBackends)
+	sum := sha256.Sum256([]byte(haproxyCfg))
 	return fmt.Sprintf("%x", sum)
 }
 
-func renderApplicationLoadBalancerPlaybook(playbookPath string, targetIP string, loadBalancer api.ApplicationLoadBalancer, listenerBackends map[string][]applicationLoadBalancerBackendServer) error {
+func applicationLoadBalancerDesiredConfigPath(loadBalancerID string) string {
+	id := strings.TrimSpace(loadBalancerID)
+	if id == "" {
+		id = "lb"
+	}
+	return filepath.Join(applicationLoadBalancerDesiredDir, fmt.Sprintf("haproxy-desired-%s.cfg", id))
+}
+
+func writeApplicationLoadBalancerDesiredConfig(desiredConfigPath string, loadBalancer api.ApplicationLoadBalancer, listenerBackends map[string][]applicationLoadBalancerBackendServer) (string, error) {
+	if strings.TrimSpace(desiredConfigPath) == "" {
+		return "", fmt.Errorf("desired config path is empty")
+	}
+	haproxyCfg, err := buildApplicationLoadBalancerHAProxyConfig(loadBalancer, listenerBackends)
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(filepath.Dir(desiredConfigPath), 0o755); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(desiredConfigPath, []byte(haproxyCfg), 0o644); err != nil {
+		return "", err
+	}
+	return fileSHA256Hex(desiredConfigPath)
+}
+
+func fileSHA256Hex(path string) (string, error) {
+	content, err := os.ReadFile(strings.TrimSpace(path))
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(content)
+	return fmt.Sprintf("%x", sum), nil
+}
+
+func renderApplicationLoadBalancerPlaybook(playbookPath string, targetIP string, desiredConfigSourcePath string, desiredConfigPath string) error {
 	if strings.TrimSpace(playbookPath) == "" {
 		return fmt.Errorf("playbook path is empty")
 	}
 	if strings.TrimSpace(targetIP) == "" {
 		return fmt.Errorf("target ip is empty")
 	}
+	if strings.TrimSpace(desiredConfigSourcePath) == "" {
+		return fmt.Errorf("desired config source path is empty")
+	}
+	if strings.TrimSpace(desiredConfigPath) == "" {
+		return fmt.Errorf("desired config path is empty")
+	}
 	if err := os.MkdirAll(filepath.Dir(playbookPath), 0o755); err != nil {
 		return err
 	}
-
-	haproxyCfg, err := buildApplicationLoadBalancerHAProxyConfig(loadBalancer, listenerBackends)
-	if err != nil {
-		return err
-	}
-	haproxyCfg = indentMultiline(haproxyCfg, 10)
 
 	tmpl, err := template.New("load-balancer-playbook").Parse(applicationLoadBalancerPlaybookTemplate)
 	if err != nil {
 		return err
 	}
+	if override, readErr := os.ReadFile(marmotd.LoadBalancerPlaybookTemplatePath()); readErr == nil && strings.TrimSpace(string(override)) != "" {
+		tmpl, err = template.New("load-balancer-playbook").Parse(string(override))
+		if err != nil {
+			return err
+		}
+	}
 
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, applicationLoadBalancerPlaybookData{TargetIP: strings.TrimSpace(targetIP), HaproxyConfig: haproxyCfg}); err != nil {
+	data := applicationLoadBalancerPlaybookData{
+		TargetIP:                strings.TrimSpace(targetIP),
+		DesiredConfigSourcePath: strings.TrimSpace(desiredConfigSourcePath),
+		DesiredConfigPath:       strings.TrimSpace(desiredConfigPath),
+	}
+	if err := tmpl.Execute(&buf, data); err != nil {
 		return err
 	}
 	return os.WriteFile(playbookPath, buf.Bytes(), 0o644)
-}
-
-func indentMultiline(input string, spaces int) string {
-	if spaces <= 0 {
-		return input
-	}
-	prefix := strings.Repeat(" ", spaces)
-	lines := strings.Split(strings.TrimRight(input, "\n"), "\n")
-	for i := range lines {
-		if lines[i] == "" {
-			lines[i] = prefix
-			continue
-		}
-		lines[i] = prefix + lines[i]
-	}
-	return strings.Join(lines, "\n") + "\n"
 }
 
 func runApplicationLoadBalancerPlaybookCommand(playbookPath, targetAddress, privateKeyPath string) error {
@@ -188,20 +188,77 @@ func readApplicationLoadBalancerAgentStateCommand(targetAddress, privateKeyPath 
 		"cat", applicationLoadBalancerAgentStatePath,
 	}
 	cmd := exec.Command("ssh", args...)
-	output, err := cmd.CombinedOutput()
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	output, err := cmd.Output()
 	if err != nil {
-		trimmed := strings.TrimSpace(string(output))
+		trimmed := strings.TrimSpace(stderr.String())
 		if trimmed == "" {
 			return applicationLoadBalancerAgentState{}, fmt.Errorf("ssh state read failed: %w", err)
 		}
 		return applicationLoadBalancerAgentState{}, fmt.Errorf("ssh state read failed: %w: %s", err, trimmed)
 	}
 
-	var state applicationLoadBalancerAgentState
-	if err := json.Unmarshal(output, &state); err != nil {
+	state, err := decodeApplicationLoadBalancerAgentState(output)
+	if err != nil {
 		return applicationLoadBalancerAgentState{}, fmt.Errorf("failed to decode lb agent state: %w", err)
 	}
 	return state, nil
+}
+
+func decodeApplicationLoadBalancerAgentState(output []byte) (applicationLoadBalancerAgentState, error) {
+	trimmed := bytes.TrimSpace(output)
+	if len(trimmed) == 0 {
+		return applicationLoadBalancerAgentState{}, fmt.Errorf("empty payload")
+	}
+
+	var state applicationLoadBalancerAgentState
+	if err := json.Unmarshal(trimmed, &state); err != nil {
+		return applicationLoadBalancerAgentState{}, err
+	}
+	return state, nil
+}
+
+func readApplicationLoadBalancerDesiredConfigHashCommand(targetAddress, privateKeyPath, desiredConfigPath string) (string, error) {
+	address := strings.TrimSpace(targetAddress)
+	if address == "" {
+		return "", fmt.Errorf("target address is empty")
+	}
+	key := strings.TrimSpace(privateKeyPath)
+	if key == "" {
+		return "", fmt.Errorf("private key path is empty")
+	}
+	if _, err := os.Stat(key); err != nil {
+		return "", fmt.Errorf("private key is not available: %w", err)
+	}
+	path := strings.TrimSpace(desiredConfigPath)
+	if path == "" {
+		return "", fmt.Errorf("desired config path is empty")
+	}
+
+	args := []string{
+		"-i", key,
+		"-o", "StrictHostKeyChecking=no",
+		"-o", "UserKnownHostsFile=/dev/null",
+		applicationLoadBalancerAnsibleDefaultUsername + "@" + address,
+		"sha256sum", path,
+	}
+	cmd := exec.Command("ssh", args...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	output, err := cmd.Output()
+	if err != nil {
+		trimmed := strings.TrimSpace(stderr.String())
+		if trimmed == "" {
+			return "", fmt.Errorf("ssh desired config hash read failed: %w", err)
+		}
+		return "", fmt.Errorf("ssh desired config hash read failed: %w: %s", err, trimmed)
+	}
+	fields := strings.Fields(strings.TrimSpace(string(output)))
+	if len(fields) < 1 {
+		return "", fmt.Errorf("failed to parse sha256sum output")
+	}
+	return strings.TrimSpace(fields[0]), nil
 }
 
 func buildApplicationLoadBalancerHAProxyConfig(loadBalancer api.ApplicationLoadBalancer, listenerBackends map[string][]applicationLoadBalancerBackendServer) (string, error) {

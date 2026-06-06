@@ -323,37 +323,57 @@ func (d *Database) DeleteLoadBalancerById(id string) error {
 }
 
 func (d *Database) SetDeleteTimestampLoadBalancer(id string) error {
-	rec, err := d.GetLoadBalancerById(id)
-	if err != nil {
-		return err
-	}
-	now := time.Now()
-	if rec.Status == nil {
-		rec.Status = &api.Status{}
-	}
-	rec.Status.DeletionTimeStamp = util.TimePtr(now)
-	rec.Status.LastUpdateTimeStamp = util.TimePtr(now)
-	rec.Status.StatusCode = LOAD_BALANCER_DELETING
-	rec.Status.Status = util.StringPtr(LoadBalancerStatus[LOAD_BALANCER_DELETING])
-	return d.UpdateLoadBalancerById(id, rec)
+	return d.UpdateLoadBalancerStatusWithMessage(id, LOAD_BALANCER_DELETING, "")
 }
 
 func (d *Database) UpdateLoadBalancerStatusWithMessage(id string, status int, message string) error {
-	rec, err := d.GetLoadBalancerById(id)
+	for {
+		rec, err := d.GetLoadBalancerById(id)
+		if err != nil {
+			return err
+		}
+		if rec.Status == nil {
+			rec.Status = &api.Status{}
+		}
+		statusChanged := rec.Status.StatusCode != status
+		rec.Status.StatusCode = status
+		rec.Status.Status = util.StringPtr(LoadBalancerStatus[status])
+		rec.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+		trimmed := strings.TrimSpace(message)
+		if statusChanged {
+			rec.Status.Message = nil
+		}
+		if trimmed != "" {
+			rec.Status.Message = util.StringPtr(trimmed)
+		}
+
+		err = d.putLoadBalancerById(rec)
+		if err == ErrUpdateConflict {
+			continue
+		}
+		return err
+	}
+}
+
+func (d *Database) putLoadBalancerById(rec api.ApplicationLoadBalancer) error {
+	id := api.LoadBalancerID(rec)
+	if strings.TrimSpace(id) == "" {
+		return ErrNotFound
+	}
+
+	lockKey := "/lock/load-balancer/" + id
+	mutex, err := d.LockKey(lockKey)
 	if err != nil {
 		return err
 	}
-	if rec.Status == nil {
-		rec.Status = &api.Status{}
+	defer d.UnlockKey(mutex)
+
+	key := LoadBalancerPrefix + "/" + id
+	var current api.ApplicationLoadBalancer
+	resp, err := d.GetJSON(key, &current)
+	if err != nil {
+		return err
 	}
-	rec.Status.StatusCode = status
-	rec.Status.Status = util.StringPtr(LoadBalancerStatus[status])
-	rec.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
-	trimmed := strings.TrimSpace(message)
-	if trimmed == "" {
-		rec.Status.Message = nil
-	} else {
-		rec.Status.Message = util.StringPtr(trimmed)
-	}
-	return d.UpdateLoadBalancerById(id, rec)
+	api.SetLoadBalancerID(&rec, id)
+	return d.PutJSONCAS(key, resp.Kvs[0].ModRevision, &rec)
 }

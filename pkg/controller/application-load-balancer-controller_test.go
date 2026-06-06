@@ -337,6 +337,11 @@ func TestLoadBalancerControllerRecoversAfterConsecutiveAgentReadSuccesses(t *tes
 
 func TestLoadBalancerControllerDeletingRemovesObject(t *testing.T) {
 	database := newGatewayTestDatabase(t)
+	setupApplicationLoadBalancerAnsibleTestHooks(t, func(playbookPath, targetAddress, privateKeyPath string) error {
+		return nil
+	}, func(targetAddress, privateKeyPath string) (applicationLoadBalancerAgentState, error) {
+		return applicationLoadBalancerAgentState{}, nil
+	})
 	ctrl := &controller{
 		db:            database,
 		marmot:        &marmotd.Marmot{NodeName: "hvc", Db: database},
@@ -356,6 +361,13 @@ func TestLoadBalancerControllerDeletingRemovesObject(t *testing.T) {
 	serverID := applicationLoadBalancerManagedServerID(afterPending)
 	if serverID == "" {
 		t.Fatalf("load balancer managed server id is empty")
+	}
+	desiredConfigPath := applicationLoadBalancerDesiredConfigPath(lbID)
+	if err := os.MkdirAll(filepath.Dir(desiredConfigPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll() failed for desired config directory: %v", err)
+	}
+	if err := os.WriteFile(desiredConfigPath, []byte("dummy"), 0o644); err != nil {
+		t.Fatalf("WriteFile() failed for desired config: %v", err)
 	}
 
 	if err := database.SetDeleteTimestampLoadBalancer(lbID); err != nil {
@@ -381,6 +393,9 @@ func TestLoadBalancerControllerDeletingRemovesObject(t *testing.T) {
 	_, err = database.GetLoadBalancerById(lbID)
 	if !errors.Is(err, db.ErrNotFound) {
 		t.Fatalf("GetLoadBalancerById() error = %v, want ErrNotFound", err)
+	}
+	if _, err := os.Stat(desiredConfigPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("desired config file still exists after delete reconcile: %v", err)
 	}
 }
 
@@ -499,8 +514,10 @@ func setupApplicationLoadBalancerAnsibleTestHooks(t *testing.T, runner func(play
 	t.Helper()
 	oldRunner := runApplicationLoadBalancerPlaybook
 	oldDir := applicationLoadBalancerPlaybookDir
+	oldDesiredDir := applicationLoadBalancerDesiredDir
 	oldKey := applicationLoadBalancerPrivateKeyPath
 	oldStateReader := readApplicationLoadBalancerAgentState
+	oldDesiredHashReader := readApplicationLoadBalancerDesiredConfigHash
 
 	tempDir := t.TempDir()
 	keyPath := filepath.Join(tempDir, "private.key")
@@ -510,14 +527,20 @@ func setupApplicationLoadBalancerAnsibleTestHooks(t *testing.T, runner func(play
 
 	runApplicationLoadBalancerPlaybook = runner
 	applicationLoadBalancerPlaybookDir = filepath.Join(tempDir, "playbooks")
+	applicationLoadBalancerDesiredDir = filepath.Join(tempDir, "desired-configs")
 	applicationLoadBalancerPrivateKeyPath = keyPath
 	readApplicationLoadBalancerAgentState = stateReader
+	readApplicationLoadBalancerDesiredConfigHash = func(targetAddress, privateKeyPath, desiredConfigPath string) (string, error) {
+		return fileSHA256Hex(desiredConfigPath)
+	}
 
 	t.Cleanup(func() {
 		runApplicationLoadBalancerPlaybook = oldRunner
 		applicationLoadBalancerPlaybookDir = oldDir
+		applicationLoadBalancerDesiredDir = oldDesiredDir
 		applicationLoadBalancerPrivateKeyPath = oldKey
 		readApplicationLoadBalancerAgentState = oldStateReader
+		readApplicationLoadBalancerDesiredConfigHash = oldDesiredHashReader
 	})
 }
 

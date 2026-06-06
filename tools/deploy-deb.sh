@@ -68,10 +68,10 @@ for HOST in "${HOSTS[@]}"; do
         continue
     fi
 
-    # dpkg -i でインストール (sudo を使用)
+    # dpkg -i でインストール後、marmot を再起動 (sudo を使用)
     echo "  インストール中: dpkg -i ${REMOTE_TMP}"
     if ! ssh -o StrictHostKeyChecking=no "${SSH_USER}@${HOST}" \
-            "sudo dpkg -i ${REMOTE_TMP} && rm -f ${REMOTE_TMP}"; then
+            "sudo dpkg -i ${REMOTE_TMP} && rm -f ${REMOTE_TMP} && sudo systemctl restart marmot"; then
         echo "  [エラー] インストール失敗: ${HOST}"
         FAILED_HOSTS+=("${HOST}")
         continue
