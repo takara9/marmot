@@ -151,6 +151,12 @@ func (c *controller) reconcileApplicationLoadBalancerPending(loadBalancer api.Ap
 	loadBalancerID := api.LoadBalancerID(loadBalancer)
 
 	if err := validateGatewayInternalNetwork(c.db, loadBalancer.Spec.InternalVirtualNetwork); err != nil {
+		if isRetryableApplicationLoadBalancerPendingError(err) {
+			slog.Warn("validateGatewayInternalNetwork() failed with retryable error; keep load balancer pending", "id", loadBalancerID, "err", err)
+			retryMsg := fmt.Sprintf("ロードバランサーのプロビジョニング待機中（依存関係の準備待ち）: %v", err)
+			_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_PENDING, retryMsg)
+			return
+		}
 		_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_FAILED, err.Error())
 		return
 	}
@@ -804,4 +810,19 @@ func readPositiveIntEnv(name string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+// isRetryableApplicationLoadBalancerPendingError は、PENDING フェーズの ALB が
+// 再試行すべき一時的な依存エラーかどうかを判定する。
+// 仮想ネットワークが未作成（ACTIVEでない）の場合は再試行対象とする。
+func isRetryableApplicationLoadBalancerPendingError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(strings.TrimSpace(err.Error()))
+	if msg == "" {
+		return false
+	}
+	// validateGatewayInternalNetwork が返す "internalVirtualNetwork \"X\" is not found"
+	return strings.Contains(msg, "internalvirtualnetwork") && strings.Contains(msg, "is not found")
 }

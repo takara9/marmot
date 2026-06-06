@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/takara9/marmot/api"
@@ -105,6 +106,54 @@ func TestShouldBypassNodeGateForDeletingServer(t *testing.T) {
 			gotBypass, gotReason := shouldBypassNodeGateForDeletingServer(tt.spec, tt.statuses)
 			if gotBypass != tt.wantBypass || gotReason != tt.wantReason {
 				t.Fatalf("shouldBypassNodeGateForDeletingServer() = (%v, %q), want (%v, %q)", gotBypass, gotReason, tt.wantBypass, tt.wantReason)
+			}
+		})
+	}
+}
+
+func TestIsRetryableServerProvisionError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "network missing is retryable",
+			err:  errors.New("network 'webservers-net' is not found"),
+			want: true,
+		},
+		{
+			name: "ssh key fetch transport error is retryable",
+			err:  errors.New("failed to fetch keys from https://github.com/foo.keys: Get \"https://github.com/foo.keys\": dial tcp: i/o timeout"),
+			want: true,
+		},
+		{
+			name: "ssh key fetch http status error is retryable",
+			err:  errors.New("unexpected HTTP status 503 from https://github.com/foo.keys"),
+			want: true,
+		},
+		{
+			name: "ssh key empty response is retryable",
+			err:  errors.New("no public keys found at https://github.com/foo.keys"),
+			want: true,
+		},
+		{
+			name: "other provisioning error is not retryable",
+			err:  errors.New("boot volume path is required for qcow2"),
+			want: false,
+		},
+		{
+			name: "nil error is not retryable",
+			err:  nil,
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isRetryableServerProvisionError(tt.err)
+			if got != tt.want {
+				t.Fatalf("isRetryableServerProvisionError() = %v, want %v, err=%v", got, tt.want, tt.err)
 			}
 		})
 	}

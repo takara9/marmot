@@ -155,6 +155,12 @@ func (c *controller) serverControllerLoop() {
 			if _, err := c.marmot.CreateServerManage(api.ServerID(spec)); err != nil {
 				slog.Error("CreateServerManage()", "err", err)
 				msg := fmt.Sprintf("サーバーのプロビジョニングに失敗した。原因エラー: %v", err)
+				if isRetryableServerProvisionError(err) {
+					retryMsg := fmt.Sprintf("サーバーのプロビジョニング待機中（依存関係の準備待ち）: %v", err)
+					slog.Warn("CreateServerManage() failed with retryable error; keep server pending", "server", api.ServerID(spec), "err", err)
+					c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_PENDING, retryMsg)
+					continue
+				}
 				c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_ERROR, msg)
 				continue
 			}
@@ -291,4 +297,33 @@ func shouldBypassNodeGateForDeletingServer(spec api.Server, statuses []api.HostS
 	}
 
 	return false, ""
+}
+
+func isRetryableServerProvisionError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	msg := strings.ToLower(strings.TrimSpace(err.Error()))
+	if msg == "" {
+		return false
+	}
+
+	// 依存リソース未作成時は待機して再試行する。
+	if strings.Contains(msg, "network '") && strings.Contains(msg, "is not found") {
+		return true
+	}
+
+	// GitHub 等からの公開鍵取得失敗は一時的障害の可能性があるため再試行する。
+	if strings.Contains(msg, "failed to fetch keys from") {
+		return true
+	}
+	if strings.Contains(msg, "unexpected http status") {
+		return true
+	}
+	if strings.Contains(msg, "no public keys found at") {
+		return true
+	}
+
+	return false
 }

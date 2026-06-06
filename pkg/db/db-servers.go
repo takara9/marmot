@@ -196,23 +196,57 @@ func (d *Database) updateServer(id string, spec api.Server) error {
 
 // サーバーオブジェクトのステータスを更新
 func (d *Database) UpdateServerStatus(id string, status int, message string) {
-	server, err := d.GetServerById(id)
+	for {
+		err := d.updateServerStatus(id, status, message)
+		if err == ErrUpdateConflict {
+			slog.Warn("UpdateServerStatus() retrying due to update conflict", "serverId", id)
+			continue
+		} else if err != nil {
+			slog.Error("UpdateServerStatus() failed", "err", err, "serverId", id)
+			panic(err)
+		}
+		break
+	}
+}
+
+func (d *Database) updateServerStatus(id string, status int, message string) error {
+	lockKey := "/lock/server/" + id
+	mutex, err := d.LockKey(lockKey)
 	if err != nil {
-		slog.Error("UpdateServerStatus() GetServerById() failed", "err", err, "serverId", id)
-		panic(err)
+		slog.Error("failed to lock", "err", err, "lockKey", lockKey)
+		return err
 	}
-	server.Status.StatusCode = status
-	server.Status.Status = util.StringPtr(ServerStatus[status])
+	defer d.UnlockKey(mutex)
+
+	var rec api.Server
+	key := ServerPrefix + "/" + id
+	resp, err := d.GetJSON(key, &rec)
+	if err != nil {
+		slog.Error("GetJSON() failed", "err", err, "key", key)
+		return err
+	}
+
+	if rec.Status == nil {
+		rec.Status = &api.Status{}
+	}
+	rec.Status.StatusCode = status
+	rec.Status.Status = util.StringPtr(ServerStatus[status])
 	if len(message) > 0 {
-		server.Status.Message = util.StringPtr(message)
+		rec.Status.Message = util.StringPtr(message)
 	} else {
-		server.Status.Message = nil
+		rec.Status.Message = nil
 	}
-	server.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
-	if err := d.UpdateServer(id, server); err != nil {
-		slog.Error("UpdateServerStatus() UpdateServer() failed", "err", err, "serverId", id)
-		panic(err)
+	rec.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+
+	api.SetServerID(&rec, id)
+	expected := resp.Kvs[0].ModRevision
+	err = d.PutJSONCAS(key, expected, &rec)
+	if err != nil {
+		slog.Error("PutJSONCAS() failed", "err", err, "key", key, "expected", expected)
+		return err
 	}
+
+	return nil
 }
 
 // AssignNodeToServer は NodeName 未設定のサーバーに対して nodeName を割り当てる。
