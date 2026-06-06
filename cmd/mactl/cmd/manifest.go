@@ -20,13 +20,14 @@ import (
 type ManifestType string
 
 const (
-	ManifestTypeServer     ManifestType = "Server"
-	ManifestTypeImage      ManifestType = "Image"
-	ManifestTypeVolume     ManifestType = "Volume"
-	ManifestTypeNetwork    ManifestType = "VirtualNetwork"
-	ManifestTypeGateway    ManifestType = "Gateway"
-	ManifestTypeVpnGateway ManifestType = "VpnGateway"
-	ManifestTypeUnknown    ManifestType = "Unknown"
+	ManifestTypeServer                  ManifestType = "Server"
+	ManifestTypeImage                   ManifestType = "Image"
+	ManifestTypeVolume                  ManifestType = "Volume"
+	ManifestTypeNetwork                 ManifestType = "VirtualNetwork"
+	ManifestTypeGateway                 ManifestType = "Gateway"
+	ManifestTypeApplicationLoadBalancer ManifestType = "ApplicationLoadBalancer"
+	ManifestTypeVpnGateway              ManifestType = "VpnGateway"
+	ManifestTypeUnknown                 ManifestType = "Unknown"
 )
 
 // Manifest マニフェストベース構造
@@ -119,6 +120,8 @@ func normalizeResourceName(resource string) string {
 		return "network"
 	case "gw", "gateways":
 		return "gateway"
+	case "application-load-balancer", "application-load-balancers", "applicationloadbalancer", "applicationloadbalancers", "alb":
+		return "applicationloadbalancer"
 	case "vpn-gateway", "vpn-gateways", "vpngateway", "vpngateways", "vpngw":
 		return "vpngateway"
 	default:
@@ -139,6 +142,8 @@ func GetManifestType(kind string) ManifestType {
 		return ManifestTypeNetwork
 	case "gateway":
 		return ManifestTypeGateway
+	case "applicationloadbalancer":
+		return ManifestTypeApplicationLoadBalancer
 	case "vpngateway":
 		return ManifestTypeVpnGateway
 	default:
@@ -160,6 +165,8 @@ func GetKindFromResourceName(resource string) string {
 		return "VirtualNetwork"
 	case "gateway":
 		return "Gateway"
+	case "applicationloadbalancer":
+		return "ApplicationLoadBalancer"
 	case "vpngateway":
 		return "VpnGateway"
 	default:
@@ -189,6 +196,8 @@ func ResolveResourceNameForManifest(manifest map[string]interface{}, args []stri
 			resourceName = "network"
 		case ManifestTypeGateway:
 			resourceName = "gateway"
+		case ManifestTypeApplicationLoadBalancer:
+			resourceName = "applicationloadbalancer"
 		case ManifestTypeVpnGateway:
 			resourceName = "vpngateway"
 		default:
@@ -295,6 +304,21 @@ func ManifestToGateway(manifest map[string]interface{}) (*api.Gateway, error) {
 	}
 
 	return &gateway, nil
+}
+
+// ManifestToLoadBalancer マニフェストを ApplicationLoadBalancer 構造体に変換
+func ManifestToLoadBalancer(manifest map[string]interface{}) (*api.ApplicationLoadBalancer, error) {
+	data, err := json.Marshal(manifest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal manifest: %w", err)
+	}
+
+	var loadBalancer api.ApplicationLoadBalancer
+	if err := json.Unmarshal(data, &loadBalancer); err != nil {
+		return nil, fmt.Errorf("failed to parse as ApplicationLoadBalancer: %w", err)
+	}
+
+	return &loadBalancer, nil
 }
 
 // ManifestToVpnGateway マニフェストを VpnGateway 構造体に変換

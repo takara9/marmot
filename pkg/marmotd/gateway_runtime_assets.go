@@ -130,6 +130,10 @@ func GatewayPlaybookTemplatePath() string {
 	return filepath.Join(gatewayPlaybookInstallDir, "gateway-iptables.yaml.tmpl")
 }
 
+func LoadBalancerPlaybookTemplatePath() string {
+	return filepath.Join(gatewayPlaybookInstallDir, "load-balancer-haproxy.yaml.tmpl")
+}
+
 func ValidateGatewayRuntimeAssets() error {
 	missing := make([]string, 0, 3)
 	if !fileExists(GatewayPrivateKeyPath()) {

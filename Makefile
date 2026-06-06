@@ -1,4 +1,4 @@
-PROGRAMS = mactl marmotd maadm
+PROGRAMS = mactl marmotd maadm marmot-lb-agent
 .PHONY: all $(PROGRAMS)
 all:	$(PROGRAMS)
 
@@ -58,6 +58,7 @@ install:
 	rm -fr $(DISTDIR)
 	mkdir $(DISTDIR)
 	install -m 0755 $(BINDIR)/$(SERVER_EXE) $(DISTDIR)
+	install -m 0755 $(BINDIR)/marmot-lb-agent $(DISTDIR)
 	rm -f /etc/systemd/system/marmot.service
 	install -m 0644 $(BINDIR)/marmot.service /lib/systemd/system
 	rm -f /usr/local/bin/$(CLIENT_CMD)

@@ -30,6 +30,7 @@ var _ = Describe("kubectl-like commands", Ordered, func() {
 				"vol": "volume",
 				"net": "network",
 				"gw":  "gateway",
+				"alb": "applicationloadbalancer",
 			}
 
 			for input, expected := range testCases {
@@ -54,11 +55,13 @@ var _ = Describe("kubectl-like commands", Ordered, func() {
 			Expect(GetKindFromResourceName("network")).To(Equal("VirtualNetwork"))
 			Expect(GetKindFromResourceName("volume")).To(Equal("Volume"))
 			Expect(GetKindFromResourceName("gateway")).To(Equal("Gateway"))
+			Expect(GetKindFromResourceName("applicationloadbalancer")).To(Equal("ApplicationLoadBalancer"))
 		})
 
 		It("handles aliases", func() {
 			Expect(GetKindFromResourceName("srv")).To(Equal("Server"))
 			Expect(GetKindFromResourceName("img")).To(Equal("Image"))
+			Expect(GetKindFromResourceName("alb")).To(Equal("ApplicationLoadBalancer"))
 		})
 
 		It("handles plural forms", func() {

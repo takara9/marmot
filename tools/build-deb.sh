@@ -36,7 +36,7 @@ echo "=== marmot v${TAG} dpkgパッケージビルド ==="
 echo ""
 
 # バイナリの存在確認
-for bin in marmotd mactl maadm; do
+for bin in marmotd mactl maadm marmot-lb-agent; do
     if [ ! -f "${BINDIR}/${bin}" ]; then
         echo "エラー: ${BINDIR}/${bin} が見つかりません。"
         echo "先に各コマンドをビルドしてください:"
@@ -71,12 +71,15 @@ mkdir -p "${PKG_DIR}/var/lib/marmot/volumes"
 
 echo "バイナリをコピー中..."
 install -m 0755 "${BINDIR}/marmotd" "${PKG_DIR}/usr/local/marmot/marmotd"
+install -m 0755 "${BINDIR}/marmot-lb-agent" "${PKG_DIR}/usr/local/marmot/marmot-lb-agent"
 install -m 0755 "${BINDIR}/mactl"   "${PKG_DIR}/usr/local/bin/mactl"
 install -m 0755 "${BINDIR}/maadm"   "${PKG_DIR}/usr/local/bin/maadm"
 install -m 0644 "${ROOT_DIR}/pkg/controller/gateway-playbooks/gateway-iptables.yaml.tmpl" \
     "${PKG_DIR}/usr/local/marmot/gateway-playbooks/gateway-iptables.yaml.tmpl"
 install -m 0644 "${ROOT_DIR}/pkg/controller/gateway-playbooks/vpn-gateway-openvpn.yaml.tmpl" \
     "${PKG_DIR}/usr/local/marmot/gateway-playbooks/vpn-gateway-openvpn.yaml.tmpl"
+install -m 0644 "${ROOT_DIR}/pkg/controller/gateway-playbooks/load-balancer-haproxy.yaml.tmpl" \
+    "${PKG_DIR}/usr/local/marmot/gateway-playbooks/load-balancer-haproxy.yaml.tmpl"
 
 echo "systemd サービスファイルをコピー中..."
 install -m 0644 "${ROOT_DIR}/cmd/marmotd/marmot.service" \

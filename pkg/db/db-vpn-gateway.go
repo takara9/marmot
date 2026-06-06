@@ -229,43 +229,78 @@ func (d *Database) DeleteVpnGatewayById(id string) error {
 }
 
 func (d *Database) SetDeleteTimestampVpnGateway(id string) error {
-	rec, err := d.GetVpnGatewayById(id)
-	if err != nil {
+	for {
+		rec, err := d.GetVpnGatewayById(id)
+		if err != nil {
+			return err
+		}
+		if rec.Status == nil {
+			rec.Status = &api.Status{}
+		}
+		rec.Status.StatusCode = VPN_GATEWAY_DELETING
+		rec.Status.Status = util.StringPtr(VpnGatewayStatus[VPN_GATEWAY_DELETING])
+		rec.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+		if rec.Status.DeletionTimeStamp == nil {
+			rec.Status.DeletionTimeStamp = util.TimePtr(time.Now())
+		}
+		rec.Status.Message = nil
+
+		err = d.putVpnGatewayById(rec)
+		if err == ErrUpdateConflict {
+			continue
+		}
 		return err
 	}
-	now := time.Now()
-	if rec.Status == nil {
-		rec.Status = &api.Status{}
-	}
-	rec.Status.DeletionTimeStamp = util.TimePtr(now)
-	rec.Status.LastUpdateTimeStamp = util.TimePtr(now)
-	rec.Status.StatusCode = VPN_GATEWAY_DELETING
-	rec.Status.Status = util.StringPtr(VpnGatewayStatus[VPN_GATEWAY_DELETING])
-	return d.UpdateVpnGatewayById(id, rec)
 }
 
 func (d *Database) UpdateVpnGatewayStatusWithMessage(id string, status int, message string) error {
-	rec, err := d.GetVpnGatewayById(id)
+	for {
+		rec, err := d.GetVpnGatewayById(id)
+		if err != nil {
+			return err
+		}
+		if rec.Status == nil {
+			rec.Status = &api.Status{}
+		}
+		statusChanged := rec.Status.StatusCode != status
+		rec.Status.StatusCode = status
+		rec.Status.Status = util.StringPtr(VpnGatewayStatus[status])
+		rec.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+		trimmed := strings.TrimSpace(message)
+		if statusChanged {
+			rec.Status.Message = nil
+		}
+		if trimmed != "" {
+			rec.Status.Message = util.StringPtr(trimmed)
+		}
+
+		err = d.putVpnGatewayById(rec)
+		if err == ErrUpdateConflict {
+			continue
+		}
+		return err
+	}
+}
+
+func (d *Database) putVpnGatewayById(rec api.VpnGateway) error {
+	id := api.VpnGatewayID(rec)
+	if strings.TrimSpace(id) == "" {
+		return ErrNotFound
+	}
+
+	lockKey := "/lock/vpn-gateway/" + id
+	mutex, err := d.LockKey(lockKey)
 	if err != nil {
 		return err
 	}
-	if rec.Status == nil {
-		rec.Status = &api.Status{}
+	defer d.UnlockKey(mutex)
+
+	key := VpnGatewayPrefix + "/" + id
+	var current api.VpnGateway
+	resp, err := d.GetJSON(key, &current)
+	if err != nil {
+		return err
 	}
-	statusChanged := rec.Status.StatusCode != status
-	rec.Status.StatusCode = status
-	rec.Status.Status = util.StringPtr(VpnGatewayStatus[status])
-	rec.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
-	trimmed := strings.TrimSpace(message)
-	if statusChanged {
-		rec.Status.Message = util.StringPtr("")
-	}
-	if trimmed == "" {
-		if rec.Status.Message == nil {
-			rec.Status.Message = util.StringPtr("")
-		}
-	} else {
-		rec.Status.Message = util.StringPtr(trimmed)
-	}
-	return d.UpdateVpnGatewayById(id, rec)
+	api.SetVpnGatewayID(&rec, id)
+	return d.PutJSONCAS(key, resp.Kvs[0].ModRevision, &rec)
 }
