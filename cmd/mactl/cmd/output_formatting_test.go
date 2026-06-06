@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -59,6 +60,75 @@ var _ = Describe("Output formatting", func() {
 					outputServers([]api.Server{})
 				})
 			}).NotTo(Panic())
+		})
+
+		It("includes AGE column in text output", func() {
+			createdAt := time.Now().Add(-2 * time.Hour)
+
+			output := captureOutput(func() {
+				err := outputServers([]api.Server{{
+					Metadata: api.Metadata{Name: "server-age"},
+					Status:   &api.Status{CreationTimeStamp: &createdAt},
+				}})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			lines := strings.Split(strings.TrimSpace(output), "\n")
+			Expect(lines).To(HaveLen(3), output)
+			Expect(lines[0]).To(ContainSubstring("AGE"), output)
+			Expect(lines[2]).To(ContainSubstring("2h"), output)
+		})
+
+		It("omits continuation lines with N/A IP by default", func() {
+			originalShowAll := getServerShowAll
+			getServerShowAll = false
+			DeferCleanup(func() {
+				getServerShowAll = originalShowAll
+			})
+
+			addrPrimary := "172.16.8.3"
+			addrSecondary := "192.168.1.64"
+			output := captureOutput(func() {
+				err := outputServers([]api.Server{{
+					Metadata: api.Metadata{Name: "server-na-trim"},
+					Spec: api.ServerSpec{NetworkInterface: &[]api.NetworkInterface{
+						{Address: &addrPrimary, Networkname: "app-net"},
+						{Networkname: "default"},
+						{Address: &addrSecondary, Networkname: "host-bridge"},
+					}},
+				}})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			Expect(output).To(ContainSubstring("app-net"), output)
+			Expect(output).To(ContainSubstring("host-bridge"), output)
+			Expect(output).NotTo(ContainSubstring("default"), output)
+		})
+
+		It("keeps all continuation lines including N/A IP when --all is enabled", func() {
+			originalShowAll := getServerShowAll
+			getServerShowAll = true
+			DeferCleanup(func() {
+				getServerShowAll = originalShowAll
+			})
+
+			addrPrimary := "172.16.8.3"
+			addrSecondary := "192.168.1.64"
+			output := captureOutput(func() {
+				err := outputServers([]api.Server{{
+					Metadata: api.Metadata{Name: "server-na-all"},
+					Spec: api.ServerSpec{NetworkInterface: &[]api.NetworkInterface{
+						{Address: &addrPrimary, Networkname: "app-net"},
+						{Networkname: "default"},
+						{Address: &addrSecondary, Networkname: "host-bridge"},
+					}},
+				}})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			Expect(output).To(ContainSubstring("app-net"), output)
+			Expect(output).To(ContainSubstring("default"), output)
+			Expect(output).To(ContainSubstring("host-bridge"), output)
 		})
 	})
 

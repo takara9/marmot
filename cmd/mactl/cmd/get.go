@@ -694,7 +694,7 @@ func outputServers(servers []api.Server) error {
 		})
 		//fmt.Println("NAME            NODE       STATUS     CPU  RAM(MB)  IP-ADDRESS       NETWORK")
 		//fmt.Println("----            ----       ------     ---  -------  ----------       -------")
-		fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s\n",
+		fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s  %-6s\n",
 			"NAME",
 			"NODE",
 			"STATUS",
@@ -702,8 +702,9 @@ func outputServers(servers []api.Server) error {
 			"RAM(MB)",
 			"IP-ADDRESS",
 			"NETWORK",
+			"AGE",
 		)
-		fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s\n",
+		fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s  %-6s\n",
 			"----",
 			"----",
 			"------",
@@ -711,6 +712,7 @@ func outputServers(servers []api.Server) error {
 			"-------",
 			"----------",
 			"-------",
+			"---",
 		)
 
 		for _, s := range servers {
@@ -730,8 +732,9 @@ func outputServers(servers []api.Server) error {
 			if s.Status != nil && s.Status.Status != nil && *s.Status.Status != "" {
 				status = *s.Status.Status
 			}
-			networkLines := serverNetworkLines(s)
-			fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s\n",
+			age := formatServerAge(s.Status)
+			networkLines := serverNetworkLinesForGet(s, getServerShowAll)
+			fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s  %-6s\n",
 				s.Metadata.Name,
 				node,
 				status,
@@ -739,9 +742,10 @@ func outputServers(servers []api.Server) error {
 				ram,
 				networkLines[0].address,
 				networkLines[0].network,
+				age,
 			)
 			for _, networkLine := range networkLines[1:] {
-				fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s\n",
+				fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s  %-6s\n",
 					"",
 					"",
 					"",
@@ -749,6 +753,7 @@ func outputServers(servers []api.Server) error {
 					"",
 					networkLine.address,
 					networkLine.network,
+					"",
 				)
 			}
 		}
@@ -770,6 +775,24 @@ func outputServers(servers []api.Server) error {
 	default:
 		return fmt.Errorf("output style must be text/json/yaml")
 	}
+}
+
+func serverNetworkLinesForGet(server api.Server, showAll bool) []serverNetworkLine {
+	lines := serverNetworkLines(server)
+	if showAll || len(lines) <= 1 {
+		return lines
+	}
+
+	result := make([]serverNetworkLine, 0, len(lines))
+	result = append(result, lines[0])
+	for _, line := range lines[1:] {
+		if line.address == "N/A" {
+			continue
+		}
+		result = append(result, line)
+	}
+
+	return result
 }
 
 func outputImages(images []api.Image) error {
