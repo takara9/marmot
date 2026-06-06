@@ -323,7 +323,28 @@ func (d *Database) DeleteLoadBalancerById(id string) error {
 }
 
 func (d *Database) SetDeleteTimestampLoadBalancer(id string) error {
-	return d.UpdateLoadBalancerStatusWithMessage(id, LOAD_BALANCER_DELETING, "")
+	for {
+		rec, err := d.GetLoadBalancerById(id)
+		if err != nil {
+			return err
+		}
+		if rec.Status == nil {
+			rec.Status = &api.Status{}
+		}
+		rec.Status.StatusCode = LOAD_BALANCER_DELETING
+		rec.Status.Status = util.StringPtr(LoadBalancerStatus[LOAD_BALANCER_DELETING])
+		rec.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+		if rec.Status.DeletionTimeStamp == nil {
+			rec.Status.DeletionTimeStamp = util.TimePtr(time.Now())
+		}
+		rec.Status.Message = nil
+
+		err = d.putLoadBalancerById(rec)
+		if err == ErrUpdateConflict {
+			continue
+		}
+		return err
+	}
 }
 
 func (d *Database) UpdateLoadBalancerStatusWithMessage(id string, status int, message string) error {

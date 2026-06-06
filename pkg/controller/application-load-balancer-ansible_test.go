@@ -75,12 +75,18 @@ func TestDesiredApplicationLoadBalancerConfigHash_ChangesWhenBackendsChange(t *t
 		},
 	}
 
-	hashA := desiredApplicationLoadBalancerConfigHash(loadBalancer, map[string][]applicationLoadBalancerBackendServer{
+	hashA, err := desiredApplicationLoadBalancerConfigHash(loadBalancer, map[string][]applicationLoadBalancerBackendServer{
 		"web-http": {{Name: "web-a", IP: "172.16.10.11"}},
 	})
-	hashB := desiredApplicationLoadBalancerConfigHash(loadBalancer, map[string][]applicationLoadBalancerBackendServer{
+	if err != nil {
+		t.Fatalf("desiredApplicationLoadBalancerConfigHash() failed: %v", err)
+	}
+	hashB, err := desiredApplicationLoadBalancerConfigHash(loadBalancer, map[string][]applicationLoadBalancerBackendServer{
 		"web-http": {{Name: "web-b", IP: "172.16.10.12"}},
 	})
+	if err != nil {
+		t.Fatalf("desiredApplicationLoadBalancerConfigHash() failed: %v", err)
+	}
 
 	if hashA == hashB {
 		t.Fatalf("hash must differ when backend set changes")

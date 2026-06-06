@@ -77,7 +77,10 @@ func TestLoadBalancerControllerStateTransitions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolveApplicationLoadBalancerListenerBackends() failed: %v", err)
 	}
-	desiredHash = desiredApplicationLoadBalancerConfigHash(afterProvisioning, listenerBackends)
+	desiredHash, err = desiredApplicationLoadBalancerConfigHash(afterProvisioning, listenerBackends)
+	if err != nil {
+		t.Fatalf("desiredApplicationLoadBalancerConfigHash() failed: %v", err)
+	}
 
 	ctrl.reconcileApplicationLoadBalancerConfiguring(afterProvisioning)
 
@@ -174,7 +177,10 @@ func TestLoadBalancerControllerWaitsForNewerAgentApplyResult(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolveApplicationLoadBalancerListenerBackends() failed: %v", err)
 	}
-	desiredHash = desiredApplicationLoadBalancerConfigHash(configuring, listenerBackends)
+	desiredHash, err = desiredApplicationLoadBalancerConfigHash(configuring, listenerBackends)
+	if err != nil {
+		t.Fatalf("desiredApplicationLoadBalancerConfigHash() failed: %v", err)
+	}
 
 	ctrl.reconcileApplicationLoadBalancerConfiguring(configuring)
 
@@ -277,7 +283,10 @@ func TestLoadBalancerControllerRecoversAfterConsecutiveAgentReadSuccesses(t *tes
 	if err != nil {
 		t.Fatalf("resolveApplicationLoadBalancerListenerBackends() failed: %v", err)
 	}
-	desiredHash = desiredApplicationLoadBalancerConfigHash(configuring, listenerBackends)
+	desiredHash, err = desiredApplicationLoadBalancerConfigHash(configuring, listenerBackends)
+	if err != nil {
+		t.Fatalf("desiredApplicationLoadBalancerConfigHash() failed: %v", err)
+	}
 	ctrl.reconcileApplicationLoadBalancerConfiguring(configuring)
 
 	active, err := database.GetLoadBalancerById(lbID)

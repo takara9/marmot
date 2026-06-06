@@ -249,7 +249,28 @@ func (d *Database) DeleteGatewayById(id string) error {
 
 // SetDeleteTimestampGateway sets deletion timestamp for async controller processing.
 func (d *Database) SetDeleteTimestampGateway(id string) error {
-	return d.UpdateGatewayStatusWithMessage(id, GATEWAY_DELETING, "")
+	for {
+		gateway, err := d.GetGatewayById(id)
+		if err != nil {
+			return err
+		}
+		if gateway.Status == nil {
+			gateway.Status = &api.Status{}
+		}
+		gateway.Status.StatusCode = GATEWAY_DELETING
+		gateway.Status.Status = util.StringPtr(GatewayStatus[GATEWAY_DELETING])
+		gateway.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+		if gateway.Status.DeletionTimeStamp == nil {
+			gateway.Status.DeletionTimeStamp = util.TimePtr(time.Now())
+		}
+		gateway.Status.Message = nil
+
+		err = d.putGatewayById(gateway)
+		if err == ErrUpdateConflict {
+			continue
+		}
+		return err
+	}
 }
 
 // UpdateGatewayStatusWithMessage updates status and optional message for gateway objects.

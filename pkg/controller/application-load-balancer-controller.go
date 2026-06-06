@@ -312,7 +312,13 @@ func (c *controller) reconcileApplicationLoadBalancerActive(loadBalancer api.App
 		return
 	}
 
-	if applicationLoadBalancerAppliedConfigHash(loadBalancer) != desiredApplicationLoadBalancerConfigHash(loadBalancer, listenerBackends) {
+	desiredHash, err := desiredApplicationLoadBalancerConfigHash(loadBalancer, listenerBackends)
+	if err != nil {
+		_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_FAILED, err.Error())
+		return
+	}
+
+	if applicationLoadBalancerAppliedConfigHash(loadBalancer) != desiredHash {
 		if err := c.updateApplicationLoadBalancerLabels(loadBalancerID, func(labels map[string]interface{}) {
 			db.SetLoadBalancerAnsibleRetries(labels, 0)
 			db.SetLoadBalancerStagedConfigHash(labels, "")

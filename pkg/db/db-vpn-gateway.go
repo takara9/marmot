@@ -229,7 +229,28 @@ func (d *Database) DeleteVpnGatewayById(id string) error {
 }
 
 func (d *Database) SetDeleteTimestampVpnGateway(id string) error {
-	return d.UpdateVpnGatewayStatusWithMessage(id, VPN_GATEWAY_DELETING, "")
+	for {
+		rec, err := d.GetVpnGatewayById(id)
+		if err != nil {
+			return err
+		}
+		if rec.Status == nil {
+			rec.Status = &api.Status{}
+		}
+		rec.Status.StatusCode = VPN_GATEWAY_DELETING
+		rec.Status.Status = util.StringPtr(VpnGatewayStatus[VPN_GATEWAY_DELETING])
+		rec.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+		if rec.Status.DeletionTimeStamp == nil {
+			rec.Status.DeletionTimeStamp = util.TimePtr(time.Now())
+		}
+		rec.Status.Message = nil
+
+		err = d.putVpnGatewayById(rec)
+		if err == ErrUpdateConflict {
+			continue
+		}
+		return err
+	}
 }
 
 func (d *Database) UpdateVpnGatewayStatusWithMessage(id string, status int, message string) error {

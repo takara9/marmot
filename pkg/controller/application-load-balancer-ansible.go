@@ -55,10 +55,13 @@ type applicationLoadBalancerAgentState struct {
 	LastError       string    `json:"lastError,omitempty"`
 }
 
-func desiredApplicationLoadBalancerConfigHash(loadBalancer api.ApplicationLoadBalancer, listenerBackends map[string][]applicationLoadBalancerBackendServer) string {
-	haproxyCfg, _ := buildApplicationLoadBalancerHAProxyConfig(loadBalancer, listenerBackends)
+func desiredApplicationLoadBalancerConfigHash(loadBalancer api.ApplicationLoadBalancer, listenerBackends map[string][]applicationLoadBalancerBackendServer) (string, error) {
+	haproxyCfg, err := buildApplicationLoadBalancerHAProxyConfig(loadBalancer, listenerBackends)
+	if err != nil {
+		return "", err
+	}
 	sum := sha256.Sum256([]byte(haproxyCfg))
-	return fmt.Sprintf("%x", sum)
+	return fmt.Sprintf("%x", sum), nil
 }
 
 func applicationLoadBalancerDesiredConfigPath(loadBalancerID string) string {
