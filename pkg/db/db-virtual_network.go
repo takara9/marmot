@@ -21,6 +21,7 @@ const (
 	NETWORK_ERROR        = 4 // エラー状態
 	NETWORK_DELETING     = 5 // 削除中
 	NETWORK_WAITING      = 6 // ヘッドノードの作成完了待ち
+	NETWORK_DEL_PENDING  = 7 // 依存リソース削除待ち
 
 	// Network label keys for distributed sync
 	NetworkLabelSyncRole      = "syncRole"
@@ -36,6 +37,7 @@ var NetworkStatus = map[int]string{
 	4: "ERROR",
 	5: "DELETING",
 	6: "WAITING",
+	7: "DEL-PENDING",
 }
 
 // SetNetworkSyncLabels sets distributed sync metadata labels for networks.
@@ -398,6 +400,8 @@ func defaultMessageForStatus(status int) string {
 		return "error:unknown"
 	case NETWORK_DELETING:
 		return "deletion:in-progress"
+	case NETWORK_DEL_PENDING:
+		return "deletion:blocked-by-dependents"
 	case NETWORK_INACTIVE:
 		return "inactive"
 	default:

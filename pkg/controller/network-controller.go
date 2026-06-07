@@ -142,7 +142,8 @@ func (c *controller) networkControllerLoop(fabric networkfabric.NetworkFabric) {
 
 		role := networkSyncRole(&vnet.Metadata)
 
-		// 削除タイムスタンプが設定されて一定時間経過した仮想ネットワークのステータスを DELETING に更新する。
+		// 削除タイムスタンプが設定されて一定時間経過した仮想ネットワークを削除処理へ進める。
+		// 依存リソースが残っている場合は DEL-PENDING で待機し、依存解消後に DELETING へ遷移する。
 		// ERROR 状態でも削除要求を優先し、削除フローへ進める。
 		if vnet.Status != nil && vnet.Status.DeletionTimeStamp != nil {
 			if err := c.distributeDeleteIntentToSameNameNetworks(vnet); err != nil {
@@ -150,9 +151,18 @@ func (c *controller) networkControllerLoop(fabric networkfabric.NetworkFabric) {
 			}
 			deletionTime := *vnet.Status.DeletionTimeStamp
 			if time.Since(deletionTime) > c.deletionDelay {
-				slog.Debug("削除のタイムスタンプが一定時間以上経過している仮想ネットワーク検出", "networkId", vnetID)
-				c.marmot.Db.UpdateVirtualNetworkStatus(vnetID, db.NETWORK_DELETING)
-				vnet.Status.StatusCode = db.NETWORK_DELETING
+				deps, depErr := c.collectDeleteBlockingDependencies(vnet)
+				if depErr != nil {
+					slog.Warn("依存リソース判定に失敗したためネットワーク削除を保留", "networkId", vnetID, "err", depErr)
+				} else if deps.hasAny() {
+					c.marmot.Db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_DEL_PENDING, deps.statusMessage())
+					vnet.Status.StatusCode = db.NETWORK_DEL_PENDING
+					slog.Debug("依存リソースが残っているためネットワーク削除を待機", "networkId", vnetID, "dependents", deps.statusMessage())
+				} else {
+					slog.Debug("削除のタイムスタンプが一定時間以上経過し依存リソースも存在しないため削除を開始", "networkId", vnetID)
+					c.marmot.Db.UpdateVirtualNetworkStatus(vnetID, db.NETWORK_DELETING)
+					vnet.Status.StatusCode = db.NETWORK_DELETING
+				}
 			}
 		}
 		//fmt.Println("======================================================")
@@ -230,6 +240,8 @@ func (c *controller) networkControllerLoop(fabric networkfabric.NetworkFabric) {
 					slog.Warn("failed to delete bridge on head, continuing", "networkId", vnetID, "err", err)
 				}
 				slog.Debug("仮想ネットワークの削除成功", "networkId", vnetID)
+			case db.NETWORK_DEL_PENDING:
+				slog.Debug("依存リソースの削除待ち状態の仮想ネットワークを処理", "networkId", vnetID)
 			case db.NETWORK_ERROR:
 				slog.Debug("エラー状態の仮想ネットワークを処理", "networkId", vnetID)
 				// ERROR 状態は保持する。削除要求（DeletionTimeStamp）が入った場合のみ削除意図を伝播する。
@@ -709,6 +721,121 @@ func (c *controller) ensureVirtualNetworkAbsent(vnet api.VirtualNetwork) error {
 
 	slog.Debug("フォロワーノードで仮想ネットワーク実体を削除", "networkId", api.VirtualNetworkID(vnet), "networkName", vnet.Metadata.Name, "controllerNode", c.marmot.NodeName)
 	return nil
+}
+
+type networkDeleteDependencies struct {
+	servers       []string
+	loadBalancers []string
+	gateways      []string
+	vpnGateways   []string
+}
+
+func (d networkDeleteDependencies) hasAny() bool {
+	return len(d.servers)+len(d.loadBalancers)+len(d.gateways)+len(d.vpnGateways) > 0
+}
+
+func (d networkDeleteDependencies) statusMessage() string {
+	return fmt.Sprintf(
+		"deletion:blocked-by-dependents servers=%d loadBalancers=%d gateways=%d vpnGateways=%d",
+		len(d.servers),
+		len(d.loadBalancers),
+		len(d.gateways),
+		len(d.vpnGateways),
+	)
+}
+
+func (c *controller) collectDeleteBlockingDependencies(vnet api.VirtualNetwork) (networkDeleteDependencies, error) {
+	networkName := strings.TrimSpace(vnet.Metadata.Name)
+	networkID := strings.TrimSpace(api.VirtualNetworkID(vnet))
+
+	servers, err := c.db.GetServers()
+	if err != nil {
+		return networkDeleteDependencies{}, err
+	}
+	loadBalancers, err := c.db.GetLoadBalancers()
+	if err != nil {
+		return networkDeleteDependencies{}, err
+	}
+	gateways, err := c.db.GetGateways()
+	if err != nil {
+		return networkDeleteDependencies{}, err
+	}
+	vpnGateways, err := c.db.GetVpnGateways()
+	if err != nil {
+		return networkDeleteDependencies{}, err
+	}
+
+	return collectNetworkDeleteDependencies(networkName, networkID, servers, loadBalancers, gateways, vpnGateways), nil
+}
+
+func collectNetworkDeleteDependencies(
+	networkName string,
+	networkID string,
+	servers []api.Server,
+	loadBalancers []api.ApplicationLoadBalancer,
+	gateways []api.Gateway,
+	vpnGateways []api.VpnGateway,
+) networkDeleteDependencies {
+	deps := networkDeleteDependencies{}
+	trimmedName := strings.TrimSpace(networkName)
+	trimmedID := strings.TrimSpace(networkID)
+
+	for _, server := range servers {
+		if server.Spec.NetworkInterface == nil {
+			continue
+		}
+		for _, nic := range *server.Spec.NetworkInterface {
+			if !matchesNetworkRef(trimmedName, trimmedID, nic.Networkname, nic.Networkid) {
+				continue
+			}
+			serverName := strings.TrimSpace(server.Metadata.Name)
+			if serverName == "" {
+				serverName = api.ServerID(server)
+			}
+			deps.servers = append(deps.servers, serverName)
+			break
+		}
+	}
+
+	for _, loadBalancer := range loadBalancers {
+		if !matchesNetworkName(trimmedName, loadBalancer.Spec.InternalVirtualNetwork) {
+			continue
+		}
+		deps.loadBalancers = append(deps.loadBalancers, strings.TrimSpace(loadBalancer.Metadata.Name))
+	}
+
+	for _, gateway := range gateways {
+		if !matchesNetworkName(trimmedName, gateway.Spec.InternalVirtualNetwork) {
+			continue
+		}
+		deps.gateways = append(deps.gateways, strings.TrimSpace(gateway.Metadata.Name))
+	}
+
+	for _, vpnGateway := range vpnGateways {
+		if !matchesNetworkName(trimmedName, vpnGateway.Spec.InternalVirtualNetwork) {
+			continue
+		}
+		deps.vpnGateways = append(deps.vpnGateways, strings.TrimSpace(vpnGateway.Metadata.Name))
+	}
+
+	return deps
+}
+
+func matchesNetworkRef(targetName string, targetID string, candidateName string, candidateID string) bool {
+	if targetID != "" && strings.TrimSpace(candidateID) == targetID {
+		return true
+	}
+	if targetName != "" && strings.TrimSpace(candidateName) == targetName {
+		return true
+	}
+	return false
+}
+
+func matchesNetworkName(targetName string, candidateName string) bool {
+	if targetName == "" {
+		return false
+	}
+	return strings.TrimSpace(candidateName) == targetName
 }
 
 func isVxlanOverlay(vnet api.VirtualNetwork) bool {
