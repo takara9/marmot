@@ -421,6 +421,12 @@ type VpnGatewaySpec struct {
 	RemoteCIDRs []string `json:"remoteCIDRs,omitempty" yaml:"remoteCIDRs,omitempty"`
 }
 
+// ApiCreateLoadBalancerJSONRequestBody defines body for ApiCreateLoadBalancer for application/json ContentType.
+type ApiCreateLoadBalancerJSONRequestBody = ApplicationLoadBalancer
+
+// ApiUpdateLoadBalancerByIdJSONRequestBody defines body for ApiUpdateLoadBalancerById for application/json ContentType.
+type ApiUpdateLoadBalancerByIdJSONRequestBody = ApplicationLoadBalancer
+
 // ApiCreateGatewayJSONRequestBody defines body for ApiCreateGateway for application/json ContentType.
 type ApiCreateGatewayJSONRequestBody = Gateway
 
@@ -432,12 +438,6 @@ type ApiCreateImageJSONRequestBody = Image
 
 // ApiUpdateImageByIdJSONRequestBody defines body for ApiUpdateImageById for application/json ContentType.
 type ApiUpdateImageByIdJSONRequestBody = Image
-
-// ApiCreateLoadBalancerJSONRequestBody defines body for ApiCreateLoadBalancer for application/json ContentType.
-type ApiCreateLoadBalancerJSONRequestBody = ApplicationLoadBalancer
-
-// ApiUpdateLoadBalancerByIdJSONRequestBody defines body for ApiUpdateLoadBalancerById for application/json ContentType.
-type ApiUpdateLoadBalancerByIdJSONRequestBody = ApplicationLoadBalancer
 
 // ApiCreateNetworkJSONRequestBody defines body for ApiCreateNetwork for application/json ContentType.
 type ApiCreateNetworkJSONRequestBody = VirtualNetwork
@@ -468,6 +468,21 @@ type ApiUpdateVpnGatewayByIdJSONRequestBody = VpnGateway
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// List LoadBalancers
+	// (GET /application-load-balancer)
+	ApiGetLoadBalancers(ctx echo.Context) error
+	// Create LoadBalancer
+	// (POST /application-load-balancer)
+	ApiCreateLoadBalancer(ctx echo.Context) error
+	// Delete LoadBalancer
+	// (DELETE /application-load-balancer/{id})
+	ApiDeleteLoadBalancerById(ctx echo.Context, id string) error
+	// Info for a specific LoadBalancer
+	// (GET /application-load-balancer/{id})
+	ApiGetLoadBalancerById(ctx echo.Context, id string) error
+	// Update LoadBalancer
+	// (PUT /application-load-balancer/{id})
+	ApiUpdateLoadBalancerById(ctx echo.Context, id string) error
 	// List Gateways
 	// (GET /gateway)
 	ApiGetGateways(ctx echo.Context) error
@@ -507,21 +522,6 @@ type ServerInterface interface {
 	// Get assigned IP addresses for a specific IP network
 	// (GET /ipnetwork/{id}/addresses)
 	ApiGetIpAddressesByNetwork(ctx echo.Context, id string) error
-	// List LoadBalancers
-	// (GET /load-balancer)
-	ApiGetLoadBalancers(ctx echo.Context) error
-	// Create LoadBalancer
-	// (POST /load-balancer)
-	ApiCreateLoadBalancer(ctx echo.Context) error
-	// Delete LoadBalancer
-	// (DELETE /load-balancer/{id})
-	ApiDeleteLoadBalancerById(ctx echo.Context, id string) error
-	// Info for a specific LoadBalancer
-	// (GET /load-balancer/{id})
-	ApiGetLoadBalancerById(ctx echo.Context, id string) error
-	// Update LoadBalancer
-	// (PUT /load-balancer/{id})
-	ApiUpdateLoadBalancerById(ctx echo.Context, id string) error
 	// Get Marmot Cluster Status
 	// (GET /marmot/cluster)
 	ApiGetMarmotCluster(ctx echo.Context) error
@@ -617,6 +617,72 @@ type ServerInterface interface {
 // ServerInterfaceWrapper converts echo contexts to parameters.
 type ServerInterfaceWrapper struct {
 	Handler ServerInterface
+}
+
+// ApiGetLoadBalancers converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiGetLoadBalancers(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiGetLoadBalancers(ctx)
+	return err
+}
+
+// ApiCreateLoadBalancer converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiCreateLoadBalancer(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiCreateLoadBalancer(ctx)
+	return err
+}
+
+// ApiDeleteLoadBalancerById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiDeleteLoadBalancerById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiDeleteLoadBalancerById(ctx, id)
+	return err
+}
+
+// ApiGetLoadBalancerById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiGetLoadBalancerById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiGetLoadBalancerById(ctx, id)
+	return err
+}
+
+// ApiUpdateLoadBalancerById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiUpdateLoadBalancerById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiUpdateLoadBalancerById(ctx, id)
+	return err
 }
 
 // ApiGetGateways converts echo context to params.
@@ -789,72 +855,6 @@ func (w *ServerInterfaceWrapper) ApiGetIpAddressesByNetwork(ctx echo.Context) er
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.ApiGetIpAddressesByNetwork(ctx, id)
-	return err
-}
-
-// ApiGetLoadBalancers converts echo context to params.
-func (w *ServerInterfaceWrapper) ApiGetLoadBalancers(ctx echo.Context) error {
-	var err error
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.ApiGetLoadBalancers(ctx)
-	return err
-}
-
-// ApiCreateLoadBalancer converts echo context to params.
-func (w *ServerInterfaceWrapper) ApiCreateLoadBalancer(ctx echo.Context) error {
-	var err error
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.ApiCreateLoadBalancer(ctx)
-	return err
-}
-
-// ApiDeleteLoadBalancerById converts echo context to params.
-func (w *ServerInterfaceWrapper) ApiDeleteLoadBalancerById(ctx echo.Context) error {
-	var err error
-	// ------------- Path parameter "id" -------------
-	var id string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
-	}
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.ApiDeleteLoadBalancerById(ctx, id)
-	return err
-}
-
-// ApiGetLoadBalancerById converts echo context to params.
-func (w *ServerInterfaceWrapper) ApiGetLoadBalancerById(ctx echo.Context) error {
-	var err error
-	// ------------- Path parameter "id" -------------
-	var id string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
-	}
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.ApiGetLoadBalancerById(ctx, id)
-	return err
-}
-
-// ApiUpdateLoadBalancerById converts echo context to params.
-func (w *ServerInterfaceWrapper) ApiUpdateLoadBalancerById(ctx echo.Context) error {
-	var err error
-	// ------------- Path parameter "id" -------------
-	var id string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
-	}
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.ApiUpdateLoadBalancerById(ctx, id)
 	return err
 }
 
@@ -1301,6 +1301,11 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 		Handler: si,
 	}
 
+	router.GET(options.BaseURL+"/application-load-balancer", wrapper.ApiGetLoadBalancers, options.OperationMiddlewares["apiGetLoadBalancers"]...)
+	router.POST(options.BaseURL+"/application-load-balancer", wrapper.ApiCreateLoadBalancer, options.OperationMiddlewares["apiCreateLoadBalancer"]...)
+	router.DELETE(options.BaseURL+"/application-load-balancer/:id", wrapper.ApiDeleteLoadBalancerById, options.OperationMiddlewares["apiDeleteLoadBalancerById"]...)
+	router.GET(options.BaseURL+"/application-load-balancer/:id", wrapper.ApiGetLoadBalancerById, options.OperationMiddlewares["apiGetLoadBalancerById"]...)
+	router.PUT(options.BaseURL+"/application-load-balancer/:id", wrapper.ApiUpdateLoadBalancerById, options.OperationMiddlewares["apiUpdateLoadBalancerById"]...)
 	router.GET(options.BaseURL+"/gateway", wrapper.ApiGetGateways, options.OperationMiddlewares["apiGetGateways"]...)
 	router.POST(options.BaseURL+"/gateway", wrapper.ApiCreateGateway, options.OperationMiddlewares["apiCreateGateway"]...)
 	router.DELETE(options.BaseURL+"/gateway/:id", wrapper.ApiDeleteGatewayById, options.OperationMiddlewares["apiDeleteGatewayById"]...)
@@ -1314,11 +1319,6 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.PUT(options.BaseURL+"/image/:id", wrapper.ApiUpdateImageById, options.OperationMiddlewares["apiUpdateImageById"]...)
 	router.GET(options.BaseURL+"/ipnetwork", wrapper.ApiListIpNetworks, options.OperationMiddlewares["apiListIpNetworks"]...)
 	router.GET(options.BaseURL+"/ipnetwork/:id/addresses", wrapper.ApiGetIpAddressesByNetwork, options.OperationMiddlewares["apiGetIpAddressesByNetwork"]...)
-	router.GET(options.BaseURL+"/load-balancer", wrapper.ApiGetLoadBalancers, options.OperationMiddlewares["apiGetLoadBalancers"]...)
-	router.POST(options.BaseURL+"/load-balancer", wrapper.ApiCreateLoadBalancer, options.OperationMiddlewares["apiCreateLoadBalancer"]...)
-	router.DELETE(options.BaseURL+"/load-balancer/:id", wrapper.ApiDeleteLoadBalancerById, options.OperationMiddlewares["apiDeleteLoadBalancerById"]...)
-	router.GET(options.BaseURL+"/load-balancer/:id", wrapper.ApiGetLoadBalancerById, options.OperationMiddlewares["apiGetLoadBalancerById"]...)
-	router.PUT(options.BaseURL+"/load-balancer/:id", wrapper.ApiUpdateLoadBalancerById, options.OperationMiddlewares["apiUpdateLoadBalancerById"]...)
 	router.GET(options.BaseURL+"/marmot/cluster", wrapper.ApiGetMarmotCluster, options.OperationMiddlewares["apiGetMarmotCluster"]...)
 	router.GET(options.BaseURL+"/marmot/status", wrapper.ApiGetMarmotStatus, options.OperationMiddlewares["apiGetMarmotStatus"]...)
 	router.GET(options.BaseURL+"/network", wrapper.ApiGetNetworks, options.OperationMiddlewares["apiGetNetworks"]...)

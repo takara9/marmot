@@ -658,7 +658,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-  /load-balancer:
+  /application-load-balancer:
     post:
       summary: "Create LoadBalancer"
       operationId: apiCreateLoadBalancer
@@ -696,7 +696,7 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/LoadBalancer"
-  /load-balancer/{id}:
+  /application-load-balancer/{id}:
     get:
       summary: "Info for a specific LoadBalancer"
       operationId: apiGetLoadBalancerById
