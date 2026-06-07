@@ -13,7 +13,7 @@ import (
 var applyCmd = &cobra.Command{
 	Use:   "apply [RESOURCE]",
 	Short: "Create or update a resource from a file or stdin",
-	Long:  `Apply a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, applicationloadbalancer/alb, vpngateway/vpngw) from a manifest file or stdin. Creates if not exists, updates if exists. If RESOURCE is omitted, it is inferred from manifest kind.`,
+	Long:  `Apply a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, applicationloadbalancer/alb, networkloadbalancer/nlb, vpngateway/vpngw) from a manifest file or stdin. Creates if not exists, updates if exists. If RESOURCE is omitted, it is inferred from manifest kind.`,
 	Args:  cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// マニフェストファイルが指定されていない場合はエラー
@@ -56,6 +56,10 @@ var applyCmd = &cobra.Command{
 				}
 			case "applicationloadbalancer":
 				if err := applyLoadBalancer(manifest); err != nil {
+					return fmt.Errorf("manifest %d: %w", index+1, err)
+				}
+			case "networkloadbalancer":
+				if err := applyNetworkLoadBalancer(manifest); err != nil {
 					return fmt.Errorf("manifest %d: %w", index+1, err)
 				}
 			case "vpngateway":
@@ -428,6 +432,65 @@ func applyLoadBalancer(manifest map[string]interface{}) error {
 		byteBody, _, err = m.CreateLoadBalancer(*loadBalancer)
 		if err != nil {
 			return fmt.Errorf("failed to create load balancer: %w", err)
+		}
+	}
+
+	return processApplyResponse(byteBody, exists)
+}
+
+func applyNetworkLoadBalancer(manifest map[string]interface{}) error {
+	m, err := getClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	loadBalancer, err := ManifestToNetworkLoadBalancer(manifest)
+	if err != nil {
+		return fmt.Errorf("failed to convert manifest to network load balancer: %w", err)
+	}
+
+	if loadBalancer.ApiVersion == "" {
+		return fmt.Errorf("apiVersion is required")
+	}
+	if loadBalancer.Kind == "" {
+		return fmt.Errorf("kind is required")
+	}
+	if strings.TrimSpace(loadBalancer.Metadata.Name) == "" {
+		return fmt.Errorf("metadata.name is required")
+	}
+	if strings.TrimSpace(loadBalancer.Spec.InternalVirtualNetwork) == "" {
+		return fmt.Errorf("spec.internalVirtualNetwork is required")
+	}
+
+	exists := false
+	var existingID string
+	list, _, err := m.GetNetworkLoadBalancers()
+	if err == nil {
+		var items []api.NetworkLoadBalancer
+		json.Unmarshal(list, &items)
+		for _, item := range items {
+			if item.Metadata.Name != loadBalancer.Metadata.Name {
+				continue
+			}
+			if strings.TrimSpace(item.Spec.InternalVirtualNetwork) == strings.TrimSpace(loadBalancer.Spec.InternalVirtualNetwork) {
+				exists = true
+				existingID = api.NetworkLoadBalancerID(item)
+				break
+			}
+		}
+	}
+
+	var byteBody []byte
+	if exists {
+		api.SetNetworkLoadBalancerID(loadBalancer, existingID)
+		byteBody, _, err = m.UpdateNetworkLoadBalancerById(existingID, *loadBalancer)
+		if err != nil {
+			return fmt.Errorf("failed to update network load balancer: %w", err)
+		}
+	} else {
+		byteBody, _, err = m.CreateNetworkLoadBalancer(*loadBalancer)
+		if err != nil {
+			return fmt.Errorf("failed to create network load balancer: %w", err)
 		}
 	}
 

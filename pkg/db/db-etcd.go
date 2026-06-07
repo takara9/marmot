@@ -23,6 +23,7 @@ const (
 	NetworkPrefix         = "/marmot/network"
 	GatewayPrefix         = "/marmot/gateway"
 	LoadBalancerPrefix    = "/marmot/load-balancer"
+	NetworkLoadBalancerPrefix = "/marmot/network-load-balancer"
 	VpnGatewayPrefix      = "/marmot/vpn-gateway"
 	SeqPrefix             = "/marmot/sequence"
 	VersionKey            = "/marmot/version"

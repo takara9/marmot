@@ -777,6 +777,125 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /network-load-balancer:
+    post:
+      summary: "Create NetworkLoadBalancer"
+      operationId: apiCreateNetworkLoadBalancer
+      tags:
+        - gateway
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NetworkLoadBalancer"
+      responses:
+        "201":
+          description: Created the NetworkLoadBalancer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkLoadBalancer"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      summary: "List NetworkLoadBalancers"
+      operationId: apiGetNetworkLoadBalancers
+      tags:
+        - gateway
+      responses:
+        "200":
+          description: List of NetworkLoadBalancers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NetworkLoadBalancer"
+  /network-load-balancer/{id}:
+    get:
+      summary: "Info for a specific NetworkLoadBalancer"
+      operationId: apiGetNetworkLoadBalancerById
+      tags:
+        - gateway
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the network load balancer to retrieve
+          schema:
+            type: string
+      responses:
+        "200":
+          description: NetworkLoadBalancer details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkLoadBalancer"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      summary: "Update NetworkLoadBalancer"
+      operationId: apiUpdateNetworkLoadBalancerById
+      tags:
+        - gateway
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the network load balancer to update
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NetworkLoadBalancer"
+      responses:
+        "200":
+          description: Updated the NetworkLoadBalancer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Success"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: "Delete NetworkLoadBalancer"
+      operationId: apiDeleteNetworkLoadBalancerById
+      tags:
+        - gateway
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the network load balancer to delete
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Accepted the request to delete the network load balancer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Success"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /vpn-gateway:
     post:
       summary: "Create VpnGateway"
@@ -1625,6 +1744,81 @@ components:
         cookieName:
           x-go-type-skip-optional-pointer: true
           type: string
+    NetworkLoadBalancer:
+      type: object
+      required:
+        - apiVersion
+        - kind
+        - metadata
+        - spec
+      properties:
+        apiVersion:
+          type: string
+        kind:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+        spec:
+          $ref: "#/components/schemas/NetworkLoadBalancerSpec"
+        status:
+          $ref: "#/components/schemas/Status"
+    NetworkLoadBalancerSpec:
+      type: object
+      required:
+        - bindPublicIpAddress
+        - internalVirtualNetwork
+        - listeners
+      properties:
+        bindPublicIpAddress:
+          type: string
+        internalVirtualNetwork:
+          type: string
+        remoteCIDR:
+          x-go-type-skip-optional-pointer: true
+          type: string
+          description: Source CIDR allowed to access the network load balancer. Empty means allow all.
+        listeners:
+          type: array
+          items:
+            $ref: "#/components/schemas/NetworkLoadBalancerListener"
+    NetworkLoadBalancerListener:
+      type: object
+      required:
+        - name
+        - protocol
+        - vipPort
+        - backendPort
+        - backendSelector
+      properties:
+        name:
+          type: string
+        protocol:
+          type: string
+        vipPort:
+          type: integer
+          format: int
+        backendPort:
+          type: integer
+          format: int
+        backendSelector:
+          $ref: "#/components/schemas/NetworkLoadBalancerLabelSelector"
+        sessionPersistence:
+          $ref: "#/components/schemas/NetworkLoadBalancerPersistence"
+    NetworkLoadBalancerLabelSelector:
+      type: object
+      properties:
+        matchLabels:
+          x-go-type-skip-optional-pointer: true
+          type: object
+          additionalProperties:
+            type: string
+    NetworkLoadBalancerPersistence:
+      type: object
+      required:
+        - enabled
+      properties:
+        enabled:
+          type: boolean
     VpnGateway:
       type: object
       required:

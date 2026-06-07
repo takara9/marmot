@@ -134,8 +134,12 @@ func LoadBalancerPlaybookTemplatePath() string {
 	return filepath.Join(gatewayPlaybookInstallDir, "load-balancer-haproxy.yaml.tmpl")
 }
 
+func NetworkLoadBalancerPlaybookTemplatePath() string {
+	return filepath.Join(gatewayPlaybookInstallDir, "network-load-balancer-iptables.yaml.tmpl")
+}
+
 func ValidateGatewayRuntimeAssets() error {
-	missing := make([]string, 0, 3)
+	missing := make([]string, 0, 4)
 	if !fileExists(GatewayPrivateKeyPath()) {
 		missing = append(missing, GatewayPrivateKeyPath())
 	}
@@ -144,6 +148,9 @@ func ValidateGatewayRuntimeAssets() error {
 	}
 	if !fileExists(GatewayPlaybookTemplatePath()) {
 		missing = append(missing, GatewayPlaybookTemplatePath())
+	}
+	if !fileExists(NetworkLoadBalancerPlaybookTemplatePath()) {
+		missing = append(missing, NetworkLoadBalancerPlaybookTemplatePath())
 	}
 	if len(missing) > 0 {
 		return fmt.Errorf("gateway runtime assets are missing: %s", strings.Join(missing, ", "))

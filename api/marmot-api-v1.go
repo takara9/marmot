@@ -270,6 +270,45 @@ type NetworkInterface struct {
 	Vlans       *[]uint      `json:"vlans,omitempty" yaml:"vlans,omitempty"`
 }
 
+// NetworkLoadBalancer defines model for NetworkLoadBalancer.
+type NetworkLoadBalancer struct {
+	ApiVersion string                  `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string                  `json:"kind" yaml:"kind"`
+	Metadata   Metadata                `json:"metadata" yaml:"metadata"`
+	Spec       NetworkLoadBalancerSpec `json:"spec" yaml:"spec"`
+	Status     *Status                 `json:"status,omitempty" yaml:"status,omitempty"`
+}
+
+// NetworkLoadBalancerLabelSelector defines model for NetworkLoadBalancerLabelSelector.
+type NetworkLoadBalancerLabelSelector struct {
+	MatchLabels map[string]string `json:"matchLabels,omitempty" yaml:"matchLabels,omitempty"`
+}
+
+// NetworkLoadBalancerListener defines model for NetworkLoadBalancerListener.
+type NetworkLoadBalancerListener struct {
+	BackendPort        int                              `json:"backendPort" yaml:"backendPort"`
+	BackendSelector    NetworkLoadBalancerLabelSelector `json:"backendSelector" yaml:"backendSelector"`
+	Name               string                           `json:"name" yaml:"name"`
+	Protocol           string                           `json:"protocol" yaml:"protocol"`
+	SessionPersistence *NetworkLoadBalancerPersistence  `json:"sessionPersistence,omitempty" yaml:"sessionPersistence,omitempty"`
+	VipPort            int                              `json:"vipPort" yaml:"vipPort"`
+}
+
+// NetworkLoadBalancerPersistence defines model for NetworkLoadBalancerPersistence.
+type NetworkLoadBalancerPersistence struct {
+	Enabled bool `json:"enabled" yaml:"enabled"`
+}
+
+// NetworkLoadBalancerSpec defines model for NetworkLoadBalancerSpec.
+type NetworkLoadBalancerSpec struct {
+	BindPublicIpAddress    string                        `json:"bindPublicIpAddress" yaml:"bindPublicIpAddress"`
+	InternalVirtualNetwork string                        `json:"internalVirtualNetwork" yaml:"internalVirtualNetwork"`
+	Listeners              []NetworkLoadBalancerListener `json:"listeners" yaml:"listeners"`
+
+	// RemoteCIDR Source CIDR allowed to access the network load balancer. Empty means allow all.
+	RemoteCIDR string `json:"remoteCIDR,omitempty" yaml:"remoteCIDR,omitempty"`
+}
+
 // Pong defines model for Pong.
 type Pong struct {
 	Ping string `json:"ping" yaml:"ping"`
@@ -442,6 +481,12 @@ type ApiUpdateImageByIdJSONRequestBody = Image
 // ApiCreateNetworkJSONRequestBody defines body for ApiCreateNetwork for application/json ContentType.
 type ApiCreateNetworkJSONRequestBody = VirtualNetwork
 
+// ApiCreateNetworkLoadBalancerJSONRequestBody defines body for ApiCreateNetworkLoadBalancer for application/json ContentType.
+type ApiCreateNetworkLoadBalancerJSONRequestBody = NetworkLoadBalancer
+
+// ApiUpdateNetworkLoadBalancerByIdJSONRequestBody defines body for ApiUpdateNetworkLoadBalancerById for application/json ContentType.
+type ApiUpdateNetworkLoadBalancerByIdJSONRequestBody = NetworkLoadBalancer
+
 // ApiUpdateNetworkByIdJSONRequestBody defines body for ApiUpdateNetworkById for application/json ContentType.
 type ApiUpdateNetworkByIdJSONRequestBody = VirtualNetwork
 
@@ -534,6 +579,21 @@ type ServerInterface interface {
 	// Create Virtual Network
 	// (POST /network)
 	ApiCreateNetwork(ctx echo.Context) error
+	// List NetworkLoadBalancers
+	// (GET /network-load-balancer)
+	ApiGetNetworkLoadBalancers(ctx echo.Context) error
+	// Create NetworkLoadBalancer
+	// (POST /network-load-balancer)
+	ApiCreateNetworkLoadBalancer(ctx echo.Context) error
+	// Delete NetworkLoadBalancer
+	// (DELETE /network-load-balancer/{id})
+	ApiDeleteNetworkLoadBalancerById(ctx echo.Context, id string) error
+	// Info for a specific NetworkLoadBalancer
+	// (GET /network-load-balancer/{id})
+	ApiGetNetworkLoadBalancerById(ctx echo.Context, id string) error
+	// Update NetworkLoadBalancer
+	// (PUT /network-load-balancer/{id})
+	ApiUpdateNetworkLoadBalancerById(ctx echo.Context, id string) error
 	// Delete Virtual Network
 	// (DELETE /network/{id})
 	ApiDeleteNetworkById(ctx echo.Context, id string) error
@@ -891,6 +951,72 @@ func (w *ServerInterfaceWrapper) ApiCreateNetwork(ctx echo.Context) error {
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.ApiCreateNetwork(ctx)
+	return err
+}
+
+// ApiGetNetworkLoadBalancers converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiGetNetworkLoadBalancers(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiGetNetworkLoadBalancers(ctx)
+	return err
+}
+
+// ApiCreateNetworkLoadBalancer converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiCreateNetworkLoadBalancer(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiCreateNetworkLoadBalancer(ctx)
+	return err
+}
+
+// ApiDeleteNetworkLoadBalancerById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiDeleteNetworkLoadBalancerById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiDeleteNetworkLoadBalancerById(ctx, id)
+	return err
+}
+
+// ApiGetNetworkLoadBalancerById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiGetNetworkLoadBalancerById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiGetNetworkLoadBalancerById(ctx, id)
+	return err
+}
+
+// ApiUpdateNetworkLoadBalancerById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiUpdateNetworkLoadBalancerById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiUpdateNetworkLoadBalancerById(ctx, id)
 	return err
 }
 
@@ -1323,6 +1449,11 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.GET(options.BaseURL+"/marmot/status", wrapper.ApiGetMarmotStatus, options.OperationMiddlewares["apiGetMarmotStatus"]...)
 	router.GET(options.BaseURL+"/network", wrapper.ApiGetNetworks, options.OperationMiddlewares["apiGetNetworks"]...)
 	router.POST(options.BaseURL+"/network", wrapper.ApiCreateNetwork, options.OperationMiddlewares["apiCreateNetwork"]...)
+	router.GET(options.BaseURL+"/network-load-balancer", wrapper.ApiGetNetworkLoadBalancers, options.OperationMiddlewares["apiGetNetworkLoadBalancers"]...)
+	router.POST(options.BaseURL+"/network-load-balancer", wrapper.ApiCreateNetworkLoadBalancer, options.OperationMiddlewares["apiCreateNetworkLoadBalancer"]...)
+	router.DELETE(options.BaseURL+"/network-load-balancer/:id", wrapper.ApiDeleteNetworkLoadBalancerById, options.OperationMiddlewares["apiDeleteNetworkLoadBalancerById"]...)
+	router.GET(options.BaseURL+"/network-load-balancer/:id", wrapper.ApiGetNetworkLoadBalancerById, options.OperationMiddlewares["apiGetNetworkLoadBalancerById"]...)
+	router.PUT(options.BaseURL+"/network-load-balancer/:id", wrapper.ApiUpdateNetworkLoadBalancerById, options.OperationMiddlewares["apiUpdateNetworkLoadBalancerById"]...)
 	router.DELETE(options.BaseURL+"/network/:id", wrapper.ApiDeleteNetworkById, options.OperationMiddlewares["apiDeleteNetworkById"]...)
 	router.GET(options.BaseURL+"/network/:id", wrapper.ApiGetNetworkById, options.OperationMiddlewares["apiGetNetworkById"]...)
 	router.PUT(options.BaseURL+"/network/:id", wrapper.ApiUpdateNetworkById, options.OperationMiddlewares["apiUpdateNetworkById"]...)
