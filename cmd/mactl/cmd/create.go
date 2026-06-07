@@ -15,7 +15,7 @@ var manifestFile string
 var createCmd = &cobra.Command{
 	Use:   "create [RESOURCE]",
 	Short: "Create a resource from a file or stdin",
-	Long:  `Create a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, applicationloadbalancer/alb, vpngateway/vpngw) from a manifest file or stdin. If RESOURCE is omitted, it is inferred from manifest kind.`,
+	Long:  `Create a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, applicationloadbalancer/alb, networkloadbalancer/nlb, vpngateway/vpngw) from a manifest file or stdin. If RESOURCE is omitted, it is inferred from manifest kind.`,
 	Args:  cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// マニフェストファイルが指定されていない場合はエラー
@@ -58,6 +58,10 @@ var createCmd = &cobra.Command{
 				}
 			case "applicationloadbalancer":
 				if err := createLoadBalancer(manifest); err != nil {
+					return fmt.Errorf("manifest %d: %w", index+1, err)
+				}
+			case "networkloadbalancer":
+				if err := createNetworkLoadBalancer(manifest); err != nil {
 					return fmt.Errorf("manifest %d: %w", index+1, err)
 				}
 			case "vpngateway":
@@ -394,6 +398,49 @@ func createLoadBalancer(manifest map[string]interface{}) error {
 	return processCreateResponse(byteBody)
 }
 
+func createNetworkLoadBalancer(manifest map[string]interface{}) error {
+	m, err := getClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	networkLoadBalancer, err := ManifestToNetworkLoadBalancer(manifest)
+	if err != nil {
+		return fmt.Errorf("failed to convert manifest to network load balancer: %w", err)
+	}
+
+	if networkLoadBalancer.ApiVersion == "" {
+		return fmt.Errorf("apiVersion is required")
+	}
+	if networkLoadBalancer.Kind == "" {
+		return fmt.Errorf("kind is required")
+	}
+	if strings.TrimSpace(networkLoadBalancer.Metadata.Name) == "" {
+		return fmt.Errorf("metadata.name is required")
+	}
+	if strings.TrimSpace(networkLoadBalancer.Spec.InternalVirtualNetwork) == "" {
+		return fmt.Errorf("spec.internalVirtualNetwork is required")
+	}
+
+	list, _, err := m.GetNetworkLoadBalancers()
+	if err == nil {
+		var items []api.NetworkLoadBalancer
+		json.Unmarshal(list, &items)
+		for _, nlb := range items {
+			if nlb.Metadata.Name == networkLoadBalancer.Metadata.Name && strings.TrimSpace(nlb.Spec.InternalVirtualNetwork) == strings.TrimSpace(networkLoadBalancer.Spec.InternalVirtualNetwork) {
+				return fmt.Errorf("network load balancer %q already exists in internalVirtualNetwork %q", networkLoadBalancer.Metadata.Name, networkLoadBalancer.Spec.InternalVirtualNetwork)
+			}
+		}
+	}
+
+	byteBody, _, err := m.CreateNetworkLoadBalancer(*networkLoadBalancer)
+	if err != nil {
+		return fmt.Errorf("failed to create network load balancer: %w", err)
+	}
+
+	return processCreateResponse(byteBody)
+}
+
 func processCreateResponse(byteBody []byte) error {
 	switch outputStyle {
 	case "text":
@@ -401,8 +448,11 @@ func processCreateResponse(byteBody []byte) error {
 		if err := json.Unmarshal(byteBody, &data); err != nil {
 			return fmt.Errorf("failed to parse response: %w", err)
 		}
-		serveMap := data.(map[string]any)
-		fmt.Printf("リソースの作成要求が受け入れられました。ID: %v\n", serveMap["id"])
+		serveMap, ok := data.(map[string]any)
+		if !ok {
+			return fmt.Errorf("failed to parse response object")
+		}
+		fmt.Printf("リソースの作成要求が受け入れられました。ID: %s\n", extractResponseID(serveMap))
 		return nil
 
 	case "json":
@@ -424,6 +474,25 @@ func processCreateResponse(byteBody []byte) error {
 	default:
 		return fmt.Errorf("output style must be text/json/yaml")
 	}
+}
+
+func extractResponseID(serveMap map[string]any) string {
+	if serveMap == nil {
+		return "-"
+	}
+	if id, ok := serveMap["id"]; ok {
+		if s := strings.TrimSpace(fmt.Sprintf("%v", id)); s != "" && s != "<nil>" {
+			return s
+		}
+	}
+	if metadata, ok := serveMap["metadata"].(map[string]any); ok {
+		if id, ok := metadata["id"]; ok {
+			if s := strings.TrimSpace(fmt.Sprintf("%v", id)); s != "" && s != "<nil>" {
+				return s
+			}
+		}
+	}
+	return "-"
 }
 
 func init() {

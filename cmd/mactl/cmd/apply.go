@@ -13,7 +13,7 @@ import (
 var applyCmd = &cobra.Command{
 	Use:   "apply [RESOURCE]",
 	Short: "Create or update a resource from a file or stdin",
-	Long:  `Apply a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, applicationloadbalancer/alb, vpngateway/vpngw) from a manifest file or stdin. Creates if not exists, updates if exists. If RESOURCE is omitted, it is inferred from manifest kind.`,
+	Long:  `Apply a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, applicationloadbalancer/alb, networkloadbalancer/nlb, vpngateway/vpngw) from a manifest file or stdin. Creates if not exists, updates if exists. If RESOURCE is omitted, it is inferred from manifest kind.`,
 	Args:  cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// マニフェストファイルが指定されていない場合はエラー
@@ -56,6 +56,10 @@ var applyCmd = &cobra.Command{
 				}
 			case "applicationloadbalancer":
 				if err := applyLoadBalancer(manifest); err != nil {
+					return fmt.Errorf("manifest %d: %w", index+1, err)
+				}
+			case "networkloadbalancer":
+				if err := applyNetworkLoadBalancer(manifest); err != nil {
 					return fmt.Errorf("manifest %d: %w", index+1, err)
 				}
 			case "vpngateway":
@@ -493,6 +497,65 @@ func applyVpnGateway(manifest map[string]interface{}) error {
 	return processApplyResponse(byteBody, exists)
 }
 
+func applyNetworkLoadBalancer(manifest map[string]interface{}) error {
+	m, err := getClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	networkLoadBalancer, err := ManifestToNetworkLoadBalancer(manifest)
+	if err != nil {
+		return fmt.Errorf("failed to convert manifest to network load balancer: %w", err)
+	}
+
+	if networkLoadBalancer.ApiVersion == "" {
+		return fmt.Errorf("apiVersion is required")
+	}
+	if networkLoadBalancer.Kind == "" {
+		return fmt.Errorf("kind is required")
+	}
+	if strings.TrimSpace(networkLoadBalancer.Metadata.Name) == "" {
+		return fmt.Errorf("metadata.name is required")
+	}
+	if strings.TrimSpace(networkLoadBalancer.Spec.InternalVirtualNetwork) == "" {
+		return fmt.Errorf("spec.internalVirtualNetwork is required")
+	}
+
+	exists := false
+	var existingID string
+	list, _, err := m.GetNetworkLoadBalancers()
+	if err == nil {
+		var items []api.NetworkLoadBalancer
+		json.Unmarshal(list, &items)
+		for _, item := range items {
+			if item.Metadata.Name != networkLoadBalancer.Metadata.Name {
+				continue
+			}
+			if strings.TrimSpace(item.Spec.InternalVirtualNetwork) == strings.TrimSpace(networkLoadBalancer.Spec.InternalVirtualNetwork) {
+				exists = true
+				existingID = api.NetworkLoadBalancerID(item)
+				break
+			}
+		}
+	}
+
+	var byteBody []byte
+	if exists {
+		api.SetNetworkLoadBalancerID(networkLoadBalancer, existingID)
+		byteBody, _, err = m.UpdateNetworkLoadBalancerById(existingID, *networkLoadBalancer)
+		if err != nil {
+			return fmt.Errorf("failed to update network load balancer: %w", err)
+		}
+	} else {
+		byteBody, _, err = m.CreateNetworkLoadBalancer(*networkLoadBalancer)
+		if err != nil {
+			return fmt.Errorf("failed to create network load balancer: %w", err)
+		}
+	}
+
+	return processApplyResponse(byteBody, exists)
+}
+
 func processApplyResponse(byteBody []byte, updated bool) error {
 	switch outputStyle {
 	case "text":
@@ -500,11 +563,15 @@ func processApplyResponse(byteBody []byte, updated bool) error {
 		if err := json.Unmarshal(byteBody, &data); err != nil {
 			return fmt.Errorf("failed to parse response: %w", err)
 		}
-		serveMap := data.(map[string]any)
+		serveMap, ok := data.(map[string]any)
+		if !ok {
+			return fmt.Errorf("failed to parse response object")
+		}
+		id := extractResponseID(serveMap)
 		if updated {
-			fmt.Printf("リソースが更新されました。ID: %v\n", serveMap["id"])
+			fmt.Printf("リソースが更新されました。ID: %s\n", id)
 		} else {
-			fmt.Printf("リソースが作成されました。ID: %v\n", serveMap["id"])
+			fmt.Printf("リソースが作成されました。ID: %s\n", id)
 		}
 		return nil
 

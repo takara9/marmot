@@ -96,6 +96,15 @@ func startMockServer() (*mockServerHandle, error) {
 		}
 		stoppers = append(stoppers, gatewayController)
 
+		networkLoadBalancerController, err := controller.StartNetworkLoadBalancerController(nodeName, etcdEp)
+		if err != nil {
+			slog.Error("Failed to start network load balancer controller", "err", err)
+			stopControllers()
+			errCh <- err
+			return
+		}
+		stoppers = append(stoppers, networkLoadBalancerController)
+
 		dnsCfg := &marmotd.MarmotdConfig{
 			DNSListenAddr: "127.0.0.1:1053",
 			DNSUpstream:   "8.8.8.8:53",

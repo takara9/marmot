@@ -140,6 +140,13 @@ func main() {
 		return
 	}
 
+	// ネットワークロードバランサーコントローラー
+	_, err = controller.StartNetworkLoadBalancerController(cfg.NodeName, cfg.EtcdURL)
+	if err != nil {
+		slog.Error("Failed to start network load balancer controller", "err", err)
+		return
+	}
+
 	// DNSサーバーコントローラー
 	_, err = internaldns.StartInternalDNSServer(context.Background(), cfg.NodeName, cfg.EtcdURL, cfg) // DNSサーバーコントローラーの開始
 	if err != nil {
