@@ -1519,6 +1519,7 @@ components:
           items:
             type: string
     LoadBalancer:
+      x-go-name: ApplicationLoadBalancer
       type: object
       required:
         - apiVersion
@@ -1548,6 +1549,7 @@ components:
         internalVirtualNetwork:
           type: string
         remoteCIDR:
+          x-go-type-skip-optional-pointer: true
           type: string
           description: Source CIDR allowed to access the load balancer. Empty means allow all.
         listeners:
@@ -1567,10 +1569,6 @@ components:
           type: string
         protocol:
           type: string
-          enum:
-            - HTTP
-            - TCP
-            - UDP
         vipPort:
           type: integer
           format: int
@@ -1580,10 +1578,8 @@ components:
         backendSelector:
           $ref: "#/components/schemas/LoadBalancerLabelSelector"
         loadBalancingAlgorithm:
+          x-go-type-skip-optional-pointer: true
           type: string
-          enum:
-            - roundrobin
-            - random
         healthCheck:
           $ref: "#/components/schemas/LoadBalancerHealthCheck"
         sessionPersistence:
@@ -1592,6 +1588,7 @@ components:
       type: object
       properties:
         matchLabels:
+          x-go-type-skip-optional-pointer: true
           type: object
           additionalProperties:
             type: string
@@ -1603,14 +1600,18 @@ components:
         enabled:
           type: boolean
         path:
+          x-go-type-skip-optional-pointer: true
           type: string
         intervalSeconds:
+          x-go-type-skip-optional-pointer: true
           type: integer
           format: int
         timeoutSeconds:
+          x-go-type-skip-optional-pointer: true
           type: integer
           format: int
         unhealthyThreshold:
+          x-go-type-skip-optional-pointer: true
           type: integer
           format: int
     LoadBalancerPersistence:
@@ -1621,6 +1622,7 @@ components:
         enabled:
           type: boolean
         cookieName:
+          x-go-type-skip-optional-pointer: true
           type: string
     VpnGateway:
       type: object
