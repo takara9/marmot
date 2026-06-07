@@ -469,16 +469,16 @@ func mustCreateLoadBalancer(t *testing.T, database *db.Database, name, internalN
 			Name:     name,
 			NodeName: util.StringPtr("hvc"),
 		},
-		Spec: api.LoadBalancerSpec{
+		Spec: api.ApplicationLoadBalancerSpec{
 			BindPublicIpAddress:    publicIP,
 			InternalVirtualNetwork: internalNetwork,
 			RemoteCIDR:             "0.0.0.0/0",
-			Listeners: []api.LoadBalancerListener{{
+			Listeners: []api.ApplicationLoadBalancerListener{{
 				Name:        "http",
 				Protocol:    "HTTP",
 				VipPort:     80,
 				BackendPort: 8080,
-				BackendSelector: api.LoadBalancerLabelSelector{
+				BackendSelector: api.ApplicationLoadBalancerLabelSelector{
 					MatchLabels: map[string]string{"app": "web"},
 				},
 				LoadBalancingAlgorithm: "roundrobin",

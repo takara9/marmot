@@ -20,6 +20,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/takara9/lvm v0.0.0-20260321023221-187aa1e599b9
 	go.yaml.in/yaml/v3 v3.0.4
+	golang.org/x/crypto v0.51.0
 	golang.org/x/term v0.43.0
 	libvirt.org/go/libvirtxml v1.12002.0
 )
@@ -47,7 +48,6 @@ require (
 	go.etcd.io/etcd/client/pkg/v3 v3.6.11 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.28.0 // indirect
-	golang.org/x/crypto v0.51.0 // indirect
 	golang.org/x/mod v0.36.0 // indirect
 	golang.org/x/net v0.54.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect

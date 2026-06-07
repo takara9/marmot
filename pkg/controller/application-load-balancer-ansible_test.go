@@ -17,16 +17,16 @@ func TestBuildApplicationLoadBalancerHAProxyConfig_WithResolvedBackends(t *testi
 			Name: "lb-web",
 			Id:   "lb123",
 		},
-		Spec: api.LoadBalancerSpec{
+		Spec: api.ApplicationLoadBalancerSpec{
 			BindPublicIpAddress:    "192.168.1.120",
 			InternalVirtualNetwork: "web-servers",
-			Listeners: []api.LoadBalancerListener{{
+			Listeners: []api.ApplicationLoadBalancerListener{{
 				Name:                   "web-http",
 				Protocol:               "HTTP",
 				VipPort:                80,
 				BackendPort:            8080,
 				LoadBalancingAlgorithm: "roundrobin",
-				BackendSelector: api.LoadBalancerLabelSelector{
+				BackendSelector: api.ApplicationLoadBalancerLabelSelector{
 					MatchLabels: map[string]string{"app": "web"},
 				},
 			}},
@@ -60,16 +60,16 @@ func TestDesiredApplicationLoadBalancerConfigHash_ChangesWhenBackendsChange(t *t
 			Name: "lb-web",
 			Id:   "lb123",
 		},
-		Spec: api.LoadBalancerSpec{
+		Spec: api.ApplicationLoadBalancerSpec{
 			BindPublicIpAddress:    "192.168.1.120",
 			InternalVirtualNetwork: "web-servers",
-			Listeners: []api.LoadBalancerListener{{
+			Listeners: []api.ApplicationLoadBalancerListener{{
 				Name:                   "web-http",
 				Protocol:               "HTTP",
 				VipPort:                80,
 				BackendPort:            8080,
 				LoadBalancingAlgorithm: "roundrobin",
-				BackendSelector: api.LoadBalancerLabelSelector{
+				BackendSelector: api.ApplicationLoadBalancerLabelSelector{
 					MatchLabels: map[string]string{"app": "web"},
 				},
 			}},

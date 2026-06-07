@@ -658,7 +658,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-  /load-balancer:
+  /application-load-balancer:
     post:
       summary: "Create LoadBalancer"
       operationId: apiCreateLoadBalancer
@@ -668,14 +668,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/LoadBalancer"
+              $ref: "#/components/schemas/ApplicationLoadBalancer"
       responses:
         "201":
           description: Created the LoadBalancer
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LoadBalancer"
+                $ref: "#/components/schemas/ApplicationLoadBalancer"
         default:
           description: unexpected error
           content:
@@ -695,8 +695,8 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/LoadBalancer"
-  /load-balancer/{id}:
+                  $ref: "#/components/schemas/ApplicationLoadBalancer"
+  /application-load-balancer/{id}:
     get:
       summary: "Info for a specific LoadBalancer"
       operationId: apiGetLoadBalancerById
@@ -715,7 +715,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LoadBalancer"
+                $ref: "#/components/schemas/ApplicationLoadBalancer"
         default:
           description: unexpected error
           content:
@@ -738,7 +738,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/LoadBalancer"
+              $ref: "#/components/schemas/ApplicationLoadBalancer"
       responses:
         "200":
           description: Updated the LoadBalancer
@@ -1507,9 +1507,11 @@ components:
         internalVirtualNetwork:
           type: string
         remoteCIDR:
+          x-go-type-skip-optional-pointer: true
           type: string
           description: Source CIDR allowed to access gateway forwarding.
         remoteCIDRs:
+          x-go-type-skip-optional-pointer: true
           type: array
           description: Source CIDR list allowed to access gateway forwarding. Empty means allow all.
           items:
@@ -1518,7 +1520,7 @@ components:
           type: array
           items:
             type: string
-    LoadBalancer:
+    ApplicationLoadBalancer:
       type: object
       required:
         - apiVersion
@@ -1533,10 +1535,10 @@ components:
         metadata:
           $ref: "#/components/schemas/Metadata"
         spec:
-          $ref: "#/components/schemas/LoadBalancerSpec"
+          $ref: "#/components/schemas/ApplicationLoadBalancerSpec"
         status:
           $ref: "#/components/schemas/Status"
-    LoadBalancerSpec:
+    ApplicationLoadBalancerSpec:
       type: object
       required:
         - bindPublicIpAddress
@@ -1548,13 +1550,14 @@ components:
         internalVirtualNetwork:
           type: string
         remoteCIDR:
+          x-go-type-skip-optional-pointer: true
           type: string
           description: Source CIDR allowed to access the load balancer. Empty means allow all.
         listeners:
           type: array
           items:
-            $ref: "#/components/schemas/LoadBalancerListener"
-    LoadBalancerListener:
+            $ref: "#/components/schemas/ApplicationLoadBalancerListener"
+    ApplicationLoadBalancerListener:
       type: object
       required:
         - name
@@ -1567,10 +1570,6 @@ components:
           type: string
         protocol:
           type: string
-          enum:
-            - HTTP
-            - TCP
-            - UDP
         vipPort:
           type: integer
           format: int
@@ -1578,24 +1577,23 @@ components:
           type: integer
           format: int
         backendSelector:
-          $ref: "#/components/schemas/LoadBalancerLabelSelector"
+          $ref: "#/components/schemas/ApplicationLoadBalancerLabelSelector"
         loadBalancingAlgorithm:
+          x-go-type-skip-optional-pointer: true
           type: string
-          enum:
-            - roundrobin
-            - random
         healthCheck:
-          $ref: "#/components/schemas/LoadBalancerHealthCheck"
+          $ref: "#/components/schemas/ApplicationLoadBalancerHealthCheck"
         sessionPersistence:
-          $ref: "#/components/schemas/LoadBalancerPersistence"
-    LoadBalancerLabelSelector:
+          $ref: "#/components/schemas/ApplicationLoadBalancerPersistence"
+    ApplicationLoadBalancerLabelSelector:
       type: object
       properties:
         matchLabels:
+          x-go-type-skip-optional-pointer: true
           type: object
           additionalProperties:
             type: string
-    LoadBalancerHealthCheck:
+    ApplicationLoadBalancerHealthCheck:
       type: object
       required:
         - enabled
@@ -1603,17 +1601,21 @@ components:
         enabled:
           type: boolean
         path:
+          x-go-type-skip-optional-pointer: true
           type: string
         intervalSeconds:
+          x-go-type-skip-optional-pointer: true
           type: integer
           format: int
         timeoutSeconds:
+          x-go-type-skip-optional-pointer: true
           type: integer
           format: int
         unhealthyThreshold:
+          x-go-type-skip-optional-pointer: true
           type: integer
           format: int
-    LoadBalancerPersistence:
+    ApplicationLoadBalancerPersistence:
       type: object
       required:
         - enabled
@@ -1621,6 +1623,7 @@ components:
         enabled:
           type: boolean
         cookieName:
+          x-go-type-skip-optional-pointer: true
           type: string
     VpnGateway:
       type: object
@@ -1651,6 +1654,7 @@ components:
         internalVirtualNetwork:
           type: string
         remoteCIDRs:
+          x-go-type-skip-optional-pointer: true
           type: array
           description: Source CIDR list allowed to access vpn gateway. Empty means allow all.
           items:

@@ -28,8 +28,8 @@ func TestCollectNetworkDeleteDependencies_MatchesByNameAndID(t *testing.T) {
 	}
 
 	loadBalancers := []api.ApplicationLoadBalancer{
-		{Metadata: api.Metadata{Name: "alb-app"}, Spec: api.LoadBalancerSpec{InternalVirtualNetwork: "app-net"}},
-		{Metadata: api.Metadata{Name: "alb-other"}, Spec: api.LoadBalancerSpec{InternalVirtualNetwork: "other-net"}},
+		{Metadata: api.Metadata{Name: "alb-app"}, Spec: api.ApplicationLoadBalancerSpec{InternalVirtualNetwork: "app-net"}},
+		{Metadata: api.Metadata{Name: "alb-other"}, Spec: api.ApplicationLoadBalancerSpec{InternalVirtualNetwork: "other-net"}},
 	}
 	gateways := []api.Gateway{
 		{Metadata: api.Metadata{Name: "gw-app"}, Spec: api.GatewaySpec{InternalVirtualNetwork: "app-net"}},

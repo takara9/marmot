@@ -1207,7 +1207,7 @@ func formatLoadBalancerMatchLabels(labels map[string]string) string {
 	return strings.Join(parts, ", ")
 }
 
-func formatLoadBalancerHealthCheck(healthCheck *api.LoadBalancerHealthCheck) string {
+func formatLoadBalancerHealthCheck(healthCheck *api.ApplicationLoadBalancerHealthCheck) string {
 	if healthCheck == nil {
 		return "-"
 	}
@@ -1230,7 +1230,7 @@ func formatLoadBalancerHealthCheck(healthCheck *api.LoadBalancerHealthCheck) str
 	return strings.Join(parts, ", ")
 }
 
-func formatLoadBalancerPersistence(persistence *api.LoadBalancerPersistence) string {
+func formatLoadBalancerPersistence(persistence *api.ApplicationLoadBalancerPersistence) string {
 	if persistence == nil {
 		return "-"
 	}

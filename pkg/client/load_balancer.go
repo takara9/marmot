@@ -12,7 +12,7 @@ import (
 
 func (m *MarmotEndpoint) CreateLoadBalancer(spec api.ApplicationLoadBalancer) ([]byte, *url.URL, error) {
 	slog.Debug("===", "CreateLoadBalancer is called", "===")
-	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/load-balancer")
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/application-load-balancer")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -29,7 +29,7 @@ func (m *MarmotEndpoint) CreateLoadBalancer(spec api.ApplicationLoadBalancer) ([
 
 func (m *MarmotEndpoint) GetLoadBalancers() ([]byte, *url.URL, error) {
 	slog.Debug("===", "GetLoadBalancers is called", "===")
-	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/load-balancer")
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/application-load-balancer")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -42,7 +42,7 @@ func (m *MarmotEndpoint) GetLoadBalancers() ([]byte, *url.URL, error) {
 
 func (m *MarmotEndpoint) GetLoadBalancerById(id string) ([]byte, *url.URL, error) {
 	slog.Debug("===", "GetLoadBalancerById is called", "===")
-	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/load-balancer/"+id)
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/application-load-balancer/"+id)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -55,7 +55,7 @@ func (m *MarmotEndpoint) GetLoadBalancerById(id string) ([]byte, *url.URL, error
 
 func (m *MarmotEndpoint) UpdateLoadBalancerById(id string, spec api.ApplicationLoadBalancer) ([]byte, *url.URL, error) {
 	slog.Debug("===", "UpdateLoadBalancerById is called", "===")
-	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/load-balancer/"+id)
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/application-load-balancer/"+id)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -72,7 +72,7 @@ func (m *MarmotEndpoint) UpdateLoadBalancerById(id string, spec api.ApplicationL
 
 func (m *MarmotEndpoint) DeleteLoadBalancerById(id string) ([]byte, *url.URL, error) {
 	slog.Debug("===", "DeleteLoadBalancerById is called", "===")
-	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/load-balancer/"+id)
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/application-load-balancer/"+id)
 	if err != nil {
 		return nil, nil, err
 	}
