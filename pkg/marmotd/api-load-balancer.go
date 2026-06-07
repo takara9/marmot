@@ -120,7 +120,7 @@ func normalizeLoadBalancerResource(rec *api.ApplicationLoadBalancer) error {
 	return normalizeLoadBalancerSpec(&rec.Spec)
 }
 
-func normalizeLoadBalancerSpec(spec *api.LoadBalancerSpec) error {
+func normalizeLoadBalancerSpec(spec *api.ApplicationLoadBalancerSpec) error {
 	if spec == nil {
 		return fmt.Errorf("spec is required")
 	}

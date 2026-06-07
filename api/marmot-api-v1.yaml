@@ -668,14 +668,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/LoadBalancer"
+              $ref: "#/components/schemas/ApplicationLoadBalancer"
       responses:
         "201":
           description: Created the LoadBalancer
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LoadBalancer"
+                $ref: "#/components/schemas/ApplicationLoadBalancer"
         default:
           description: unexpected error
           content:
@@ -695,7 +695,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/LoadBalancer"
+                  $ref: "#/components/schemas/ApplicationLoadBalancer"
   /application-load-balancer/{id}:
     get:
       summary: "Info for a specific LoadBalancer"
@@ -715,7 +715,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LoadBalancer"
+                $ref: "#/components/schemas/ApplicationLoadBalancer"
         default:
           description: unexpected error
           content:
@@ -738,7 +738,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/LoadBalancer"
+              $ref: "#/components/schemas/ApplicationLoadBalancer"
       responses:
         "200":
           description: Updated the LoadBalancer
@@ -1507,9 +1507,11 @@ components:
         internalVirtualNetwork:
           type: string
         remoteCIDR:
+          x-go-type-skip-optional-pointer: true
           type: string
           description: Source CIDR allowed to access gateway forwarding.
         remoteCIDRs:
+          x-go-type-skip-optional-pointer: true
           type: array
           description: Source CIDR list allowed to access gateway forwarding. Empty means allow all.
           items:
@@ -1518,8 +1520,7 @@ components:
           type: array
           items:
             type: string
-    LoadBalancer:
-      x-go-name: ApplicationLoadBalancer
+    ApplicationLoadBalancer:
       type: object
       required:
         - apiVersion
@@ -1534,10 +1535,10 @@ components:
         metadata:
           $ref: "#/components/schemas/Metadata"
         spec:
-          $ref: "#/components/schemas/LoadBalancerSpec"
+          $ref: "#/components/schemas/ApplicationLoadBalancerSpec"
         status:
           $ref: "#/components/schemas/Status"
-    LoadBalancerSpec:
+    ApplicationLoadBalancerSpec:
       type: object
       required:
         - bindPublicIpAddress
@@ -1555,8 +1556,8 @@ components:
         listeners:
           type: array
           items:
-            $ref: "#/components/schemas/LoadBalancerListener"
-    LoadBalancerListener:
+            $ref: "#/components/schemas/ApplicationLoadBalancerListener"
+    ApplicationLoadBalancerListener:
       type: object
       required:
         - name
@@ -1576,15 +1577,15 @@ components:
           type: integer
           format: int
         backendSelector:
-          $ref: "#/components/schemas/LoadBalancerLabelSelector"
+          $ref: "#/components/schemas/ApplicationLoadBalancerLabelSelector"
         loadBalancingAlgorithm:
           x-go-type-skip-optional-pointer: true
           type: string
         healthCheck:
-          $ref: "#/components/schemas/LoadBalancerHealthCheck"
+          $ref: "#/components/schemas/ApplicationLoadBalancerHealthCheck"
         sessionPersistence:
-          $ref: "#/components/schemas/LoadBalancerPersistence"
-    LoadBalancerLabelSelector:
+          $ref: "#/components/schemas/ApplicationLoadBalancerPersistence"
+    ApplicationLoadBalancerLabelSelector:
       type: object
       properties:
         matchLabels:
@@ -1592,7 +1593,7 @@ components:
           type: object
           additionalProperties:
             type: string
-    LoadBalancerHealthCheck:
+    ApplicationLoadBalancerHealthCheck:
       type: object
       required:
         - enabled
@@ -1614,7 +1615,7 @@ components:
           x-go-type-skip-optional-pointer: true
           type: integer
           format: int
-    LoadBalancerPersistence:
+    ApplicationLoadBalancerPersistence:
       type: object
       required:
         - enabled
@@ -1653,6 +1654,7 @@ components:
         internalVirtualNetwork:
           type: string
         remoteCIDRs:
+          x-go-type-skip-optional-pointer: true
           type: array
           description: Source CIDR list allowed to access vpn gateway. Empty means allow all.
           items:

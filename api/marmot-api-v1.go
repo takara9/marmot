@@ -51,6 +51,57 @@ func (e VirtualNetworkSpecPeerPolicy) Valid() bool {
 	}
 }
 
+// ApplicationLoadBalancer defines model for ApplicationLoadBalancer.
+type ApplicationLoadBalancer struct {
+	ApiVersion string                      `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string                      `json:"kind" yaml:"kind"`
+	Metadata   Metadata                    `json:"metadata" yaml:"metadata"`
+	Spec       ApplicationLoadBalancerSpec `json:"spec" yaml:"spec"`
+	Status     *Status                     `json:"status,omitempty" yaml:"status,omitempty"`
+}
+
+// ApplicationLoadBalancerHealthCheck defines model for ApplicationLoadBalancerHealthCheck.
+type ApplicationLoadBalancerHealthCheck struct {
+	Enabled            bool   `json:"enabled" yaml:"enabled"`
+	IntervalSeconds    int    `json:"intervalSeconds,omitempty" yaml:"intervalSeconds,omitempty"`
+	Path               string `json:"path,omitempty" yaml:"path,omitempty"`
+	TimeoutSeconds     int    `json:"timeoutSeconds,omitempty" yaml:"timeoutSeconds,omitempty"`
+	UnhealthyThreshold int    `json:"unhealthyThreshold,omitempty" yaml:"unhealthyThreshold,omitempty"`
+}
+
+// ApplicationLoadBalancerLabelSelector defines model for ApplicationLoadBalancerLabelSelector.
+type ApplicationLoadBalancerLabelSelector struct {
+	MatchLabels map[string]string `json:"matchLabels,omitempty" yaml:"matchLabels,omitempty"`
+}
+
+// ApplicationLoadBalancerListener defines model for ApplicationLoadBalancerListener.
+type ApplicationLoadBalancerListener struct {
+	BackendPort            int                                  `json:"backendPort" yaml:"backendPort"`
+	BackendSelector        ApplicationLoadBalancerLabelSelector `json:"backendSelector" yaml:"backendSelector"`
+	HealthCheck            *ApplicationLoadBalancerHealthCheck  `json:"healthCheck,omitempty" yaml:"healthCheck,omitempty"`
+	LoadBalancingAlgorithm string                               `json:"loadBalancingAlgorithm,omitempty" yaml:"loadBalancingAlgorithm,omitempty"`
+	Name                   string                               `json:"name" yaml:"name"`
+	Protocol               string                               `json:"protocol" yaml:"protocol"`
+	SessionPersistence     *ApplicationLoadBalancerPersistence  `json:"sessionPersistence,omitempty" yaml:"sessionPersistence,omitempty"`
+	VipPort                int                                  `json:"vipPort" yaml:"vipPort"`
+}
+
+// ApplicationLoadBalancerPersistence defines model for ApplicationLoadBalancerPersistence.
+type ApplicationLoadBalancerPersistence struct {
+	CookieName string `json:"cookieName,omitempty" yaml:"cookieName,omitempty"`
+	Enabled    bool   `json:"enabled" yaml:"enabled"`
+}
+
+// ApplicationLoadBalancerSpec defines model for ApplicationLoadBalancerSpec.
+type ApplicationLoadBalancerSpec struct {
+	BindPublicIpAddress    string                            `json:"bindPublicIpAddress" yaml:"bindPublicIpAddress"`
+	InternalVirtualNetwork string                            `json:"internalVirtualNetwork" yaml:"internalVirtualNetwork"`
+	Listeners              []ApplicationLoadBalancerListener `json:"listeners" yaml:"listeners"`
+
+	// RemoteCIDR Source CIDR allowed to access the load balancer. Empty means allow all.
+	RemoteCIDR string `json:"remoteCIDR,omitempty" yaml:"remoteCIDR,omitempty"`
+}
+
 // Auth defines model for Auth.
 type Auth struct {
 	PublicKey    *string `json:"publicKey,omitempty" yaml:"publicKey,omitempty"`
@@ -179,57 +230,6 @@ type JobSpec struct {
 	MaxTime     *time.Time `json:"maxTime,omitempty" yaml:"maxTime,omitempty"`
 	RequestTime *time.Time `json:"requestTime,omitempty" yaml:"requestTime,omitempty"`
 	StartTime   *time.Time `json:"startTime,omitempty" yaml:"startTime,omitempty"`
-}
-
-// ApplicationLoadBalancer defines model for LoadBalancer.
-type ApplicationLoadBalancer struct {
-	ApiVersion string           `json:"apiVersion" yaml:"apiVersion"`
-	Kind       string           `json:"kind" yaml:"kind"`
-	Metadata   Metadata         `json:"metadata" yaml:"metadata"`
-	Spec       LoadBalancerSpec `json:"spec" yaml:"spec"`
-	Status     *Status          `json:"status,omitempty" yaml:"status,omitempty"`
-}
-
-// LoadBalancerHealthCheck defines model for LoadBalancerHealthCheck.
-type LoadBalancerHealthCheck struct {
-	Enabled            bool   `json:"enabled" yaml:"enabled"`
-	IntervalSeconds    int    `json:"intervalSeconds,omitempty" yaml:"intervalSeconds,omitempty"`
-	Path               string `json:"path,omitempty" yaml:"path,omitempty"`
-	TimeoutSeconds     int    `json:"timeoutSeconds,omitempty" yaml:"timeoutSeconds,omitempty"`
-	UnhealthyThreshold int    `json:"unhealthyThreshold,omitempty" yaml:"unhealthyThreshold,omitempty"`
-}
-
-// LoadBalancerLabelSelector defines model for LoadBalancerLabelSelector.
-type LoadBalancerLabelSelector struct {
-	MatchLabels map[string]string `json:"matchLabels,omitempty" yaml:"matchLabels,omitempty"`
-}
-
-// LoadBalancerListener defines model for LoadBalancerListener.
-type LoadBalancerListener struct {
-	BackendPort            int                       `json:"backendPort" yaml:"backendPort"`
-	BackendSelector        LoadBalancerLabelSelector `json:"backendSelector" yaml:"backendSelector"`
-	HealthCheck            *LoadBalancerHealthCheck  `json:"healthCheck,omitempty" yaml:"healthCheck,omitempty"`
-	LoadBalancingAlgorithm string                    `json:"loadBalancingAlgorithm,omitempty" yaml:"loadBalancingAlgorithm,omitempty"`
-	Name                   string                    `json:"name" yaml:"name"`
-	Protocol               string                    `json:"protocol" yaml:"protocol"`
-	SessionPersistence     *LoadBalancerPersistence  `json:"sessionPersistence,omitempty" yaml:"sessionPersistence,omitempty"`
-	VipPort                int                       `json:"vipPort" yaml:"vipPort"`
-}
-
-// LoadBalancerPersistence defines model for LoadBalancerPersistence.
-type LoadBalancerPersistence struct {
-	CookieName string `json:"cookieName,omitempty" yaml:"cookieName,omitempty"`
-	Enabled    bool   `json:"enabled" yaml:"enabled"`
-}
-
-// LoadBalancerSpec defines model for LoadBalancerSpec.
-type LoadBalancerSpec struct {
-	BindPublicIpAddress    string                 `json:"bindPublicIpAddress" yaml:"bindPublicIpAddress"`
-	InternalVirtualNetwork string                 `json:"internalVirtualNetwork" yaml:"internalVirtualNetwork"`
-	Listeners              []LoadBalancerListener `json:"listeners" yaml:"listeners"`
-
-	// RemoteCIDR Source CIDR allowed to access the load balancer. Empty means allow all.
-	RemoteCIDR string `json:"remoteCIDR,omitempty" yaml:"remoteCIDR,omitempty"`
 }
 
 // Metadata defines model for Metadata.
