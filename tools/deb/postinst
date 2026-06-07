@@ -54,14 +54,6 @@ systemctl start libvirtd.service
 systemctl enable iscsid.service
 systemctl start iscsid.service
 
-if systemctl list-unit-files | grep -q '^etcd-server\.service'; then
-    systemctl enable etcd-server.service
-    systemctl start etcd-server.service
-elif systemctl list-unit-files | grep -q '^etcd\.service'; then
-    systemctl enable etcd.service
-    systemctl start etcd.service
-fi
-
 if systemctl list-unit-files | grep -q '^openvswitch-switch\.service'; then
     systemctl enable openvswitch-switch.service
     systemctl start openvswitch-switch.service

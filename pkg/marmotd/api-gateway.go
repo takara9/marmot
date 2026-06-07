@@ -208,12 +208,15 @@ func normalizeGatewayRemoteCIDRs(spec *api.GatewaySpec) error {
 		return fmt.Errorf("spec is required")
 	}
 
-	raw := make([]string, 0, len(spec.RemoteCIDRs)+1)
-	for _, cidr := range spec.RemoteCIDRs {
-		raw = append(raw, strings.TrimSpace(cidr))
+	raw := make([]string, 0)
+	if spec.RemoteCIDRs != nil {
+		raw = make([]string, 0, len(*spec.RemoteCIDRs)+1)
+		for _, cidr := range *spec.RemoteCIDRs {
+			raw = append(raw, strings.TrimSpace(cidr))
+		}
 	}
-	if len(raw) == 0 && strings.TrimSpace(spec.RemoteCIDR) != "" {
-		raw = append(raw, strings.TrimSpace(spec.RemoteCIDR))
+	if len(raw) == 0 && spec.RemoteCIDR != nil && strings.TrimSpace(*spec.RemoteCIDR) != "" {
+		raw = append(raw, strings.TrimSpace(*spec.RemoteCIDR))
 	}
 
 	seen := map[string]struct{}{}
@@ -237,11 +240,13 @@ func normalizeGatewayRemoteCIDRs(spec *api.GatewaySpec) error {
 	}
 
 	sort.Strings(normalized)
-	spec.RemoteCIDRs = normalized
+	normalizedCIDRs := append([]string(nil), normalized...)
+	spec.RemoteCIDRs = &normalizedCIDRs
 	if len(normalized) > 0 {
-		spec.RemoteCIDR = normalized[0]
+		first := normalized[0]
+		spec.RemoteCIDR = &first
 	} else {
-		spec.RemoteCIDR = ""
+		spec.RemoteCIDR = nil
 	}
 
 	return nil

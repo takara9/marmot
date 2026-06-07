@@ -14,7 +14,7 @@ var delManifestFile string
 var delCmd = &cobra.Command{
 	Use:   "del [RESOURCE NAME]",
 	Short: "Delete a resource",
-	Long:  `Delete a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, applicationloadbalancer/alb, networkloadbalancer/nlb, vpngateway/vpngw) with NAME specified. With -f, process manifest(s) and delete by metadata.name for each document.`,
+	Long:  `Delete a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw, applicationloadbalancer/alb, networkloadbalancer/nlb) with NAME specified. With -f, process manifest(s) and delete by metadata.name for each document.`,
 	Args:  cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if strings.TrimSpace(delManifestFile) != "" {
@@ -57,6 +57,7 @@ var delCmd = &cobra.Command{
 	},
 }
 
+
 func deleteResourceByTypeAndName(resourceName string, objectName string) error {
 	// リソースタイプに応じて処理を分岐
 	switch strings.ToLower(resourceName) {
@@ -70,12 +71,12 @@ func deleteResourceByTypeAndName(resourceName string, objectName string) error {
 		return deleteNetwork(objectName)
 	case "gateway":
 		return deleteGateway(objectName)
+	case "vpngateway":
+		return deleteVpnGateway(objectName)
 	case "applicationloadbalancer":
 		return deleteLoadBalancer(objectName)
 	case "networkloadbalancer":
 		return deleteNetworkLoadBalancer(objectName)
-	case "vpngateway":
-		return deleteVpnGateway(objectName)
 	default:
 		return fmt.Errorf("unknown resource type: %s", resourceName)
 	}
@@ -276,6 +277,45 @@ func deleteGateway(name string) error {
 	return nil
 }
 
+func deleteVpnGateway(name string) error {
+	m, err := getClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	list, _, err := m.GetVpnGateways()
+	if err != nil {
+		return fmt.Errorf("failed to list vpn gateways: %w", err)
+	}
+
+	var items []api.VpnGateway
+	if err := json.Unmarshal(list, &items); err != nil {
+		return fmt.Errorf("failed to parse vpn gateways: %w", err)
+	}
+
+	matches := make([]api.VpnGateway, 0)
+	for _, g := range items {
+		if g.Metadata.Name == name {
+			matches = append(matches, g)
+		}
+	}
+
+	if len(matches) == 0 {
+		return fmt.Errorf("vpn gateway %q not found", name)
+	}
+	if len(matches) > 1 {
+		return fmt.Errorf("multiple vpn gateways found with name %q; please delete by id via API", name)
+	}
+
+	_, _, err = m.DeleteVpnGatewayById(api.VpnGatewayID(matches[0]))
+	if err != nil {
+		return fmt.Errorf("failed to delete vpn gateway: %w", err)
+	}
+
+	fmt.Printf("vpn gateway %q deletion requested (accepted)\n", name)
+	return nil
+}
+
 func deleteLoadBalancer(name string) error {
 	m, err := getClientConfig()
 	if err != nil {
@@ -284,12 +324,12 @@ func deleteLoadBalancer(name string) error {
 
 	list, _, err := m.GetLoadBalancers()
 	if err != nil {
-		return fmt.Errorf("failed to list load balancers: %w", err)
+		return fmt.Errorf("failed to list application load balancers: %w", err)
 	}
 
 	var items []api.ApplicationLoadBalancer
 	if err := json.Unmarshal(list, &items); err != nil {
-		return fmt.Errorf("failed to parse load balancers: %w", err)
+		return fmt.Errorf("failed to parse application load balancers: %w", err)
 	}
 
 	matches := make([]api.ApplicationLoadBalancer, 0)
@@ -300,18 +340,18 @@ func deleteLoadBalancer(name string) error {
 	}
 
 	if len(matches) == 0 {
-		return fmt.Errorf("load balancer %q not found", name)
+		return fmt.Errorf("application load balancer %q not found", name)
 	}
 	if len(matches) > 1 {
-		return fmt.Errorf("multiple load balancers found with name %q; please delete by id via API", name)
+		return fmt.Errorf("multiple application load balancers found with name %q; please delete by id via API", name)
 	}
 
 	_, _, err = m.DeleteLoadBalancerById(api.LoadBalancerID(matches[0]))
 	if err != nil {
-		return fmt.Errorf("failed to delete load balancer: %w", err)
+		return fmt.Errorf("failed to delete application load balancer: %w", err)
 	}
 
-	fmt.Printf("load balancer %q deletion requested (accepted)\n", name)
+	fmt.Printf("application load balancer %q deletion requested (accepted)\n", name)
 	return nil
 }
 
@@ -351,45 +391,6 @@ func deleteNetworkLoadBalancer(name string) error {
 	}
 
 	fmt.Printf("network load balancer %q deletion requested (accepted)\n", name)
-	return nil
-}
-
-func deleteVpnGateway(name string) error {
-	m, err := getClientConfig()
-	if err != nil {
-		return fmt.Errorf("failed to get client config: %w", err)
-	}
-
-	list, _, err := m.GetVpnGateways()
-	if err != nil {
-		return fmt.Errorf("failed to list vpn gateways: %w", err)
-	}
-
-	var items []api.VpnGateway
-	if err := json.Unmarshal(list, &items); err != nil {
-		return fmt.Errorf("failed to parse vpn gateways: %w", err)
-	}
-
-	matches := make([]api.VpnGateway, 0)
-	for _, g := range items {
-		if g.Metadata.Name == name {
-			matches = append(matches, g)
-		}
-	}
-
-	if len(matches) == 0 {
-		return fmt.Errorf("vpn gateway %q not found", name)
-	}
-	if len(matches) > 1 {
-		return fmt.Errorf("multiple vpn gateways found with name %q; please delete by id via API", name)
-	}
-
-	_, _, err = m.DeleteVpnGatewayById(api.VpnGatewayID(matches[0]))
-	if err != nil {
-		return fmt.Errorf("failed to delete vpn gateway: %w", err)
-	}
-
-	fmt.Printf("vpn gateway %q deletion requested (accepted)\n", name)
 	return nil
 }
 

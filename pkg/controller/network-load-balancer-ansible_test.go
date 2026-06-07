@@ -48,6 +48,12 @@ func TestNetworkLoadBalancerPlaybookTemplate_RendersBackendRules(t *testing.T) {
 	if !strings.Contains(out, "iptables -t nat -A MARMOT-NLB-POSTROUTING -p tcp -d 172.16.8.11 --dport 8080 -j MASQUERADE") {
 		t.Fatalf("rendered playbook missing postrouting masquerade rule: %s", out)
 	}
+	if !strings.Contains(out, "marmot-nlb-iptables-restore.service") {
+		t.Fatalf("rendered playbook missing systemd restore unit for persisted iptables rules: %s", out)
+	}
+	if !strings.Contains(out, "iptables-save > /etc/marmot/iptables/nlb-rules.v4") {
+		t.Fatalf("rendered playbook missing iptables-save persistence command: %s", out)
+	}
 	if !strings.Contains(out, "\n        iptables -t nat -A MARMOT-NLB-NLB1-TCP-80 -p tcp -m statistic --mode random --probability 0.500000 -j DNAT --to-destination 172.16.8.11:8080") {
 		t.Fatalf("rendered playbook DNAT rule must stay indented inside shell block: %s", out)
 	}

@@ -20,15 +20,15 @@ import (
 type ManifestType string
 
 const (
-	ManifestTypeServer                  ManifestType = "Server"
-	ManifestTypeImage                   ManifestType = "Image"
-	ManifestTypeVolume                  ManifestType = "Volume"
-	ManifestTypeNetwork                 ManifestType = "VirtualNetwork"
-	ManifestTypeGateway                 ManifestType = "Gateway"
-	ManifestTypeApplicationLoadBalancer ManifestType = "ApplicationLoadBalancer"
-	ManifestTypeNetworkLoadBalancer     ManifestType = "NetworkLoadBalancer"
-	ManifestTypeVpnGateway              ManifestType = "VpnGateway"
-	ManifestTypeUnknown                 ManifestType = "Unknown"
+	ManifestTypeServer     ManifestType = "Server"
+	ManifestTypeImage      ManifestType = "Image"
+	ManifestTypeVolume     ManifestType = "Volume"
+	ManifestTypeNetwork    ManifestType = "VirtualNetwork"
+	ManifestTypeGateway    ManifestType = "Gateway"
+	ManifestTypeVpnGateway ManifestType = "VpnGateway"
+	ManifestTypeLoadBalancer ManifestType = "ApplicationLoadBalancer"
+	ManifestTypeNetworkLoadBalancer ManifestType = "NetworkLoadBalancer"
+	ManifestTypeUnknown    ManifestType = "Unknown"
 )
 
 // Manifest マニフェストベース構造
@@ -121,12 +121,12 @@ func normalizeResourceName(resource string) string {
 		return "network"
 	case "gw", "gateways":
 		return "gateway"
+	case "vpn-gateway", "vpn-gateways", "vpngateway", "vpngateways", "vpngw":
+		return "vpngateway"
 	case "application-load-balancer", "application-load-balancers", "applicationloadbalancer", "applicationloadbalancers", "alb":
 		return "applicationloadbalancer"
 	case "network-load-balancer", "network-load-balancers", "networkloadbalancer", "networkloadbalancers", "nlb":
 		return "networkloadbalancer"
-	case "vpn-gateway", "vpn-gateways", "vpngateway", "vpngateways", "vpngw":
-		return "vpngateway"
 	default:
 		return strings.ToLower(resource)
 	}
@@ -145,12 +145,12 @@ func GetManifestType(kind string) ManifestType {
 		return ManifestTypeNetwork
 	case "gateway":
 		return ManifestTypeGateway
-	case "applicationloadbalancer":
-		return ManifestTypeApplicationLoadBalancer
-	case "networkloadbalancer":
-		return ManifestTypeNetworkLoadBalancer
 	case "vpngateway":
 		return ManifestTypeVpnGateway
+	case "applicationloadbalancer":
+		return ManifestTypeLoadBalancer
+	case "networkloadbalancer":
+		return ManifestTypeNetworkLoadBalancer
 	default:
 		return ManifestTypeUnknown
 	}
@@ -170,12 +170,12 @@ func GetKindFromResourceName(resource string) string {
 		return "VirtualNetwork"
 	case "gateway":
 		return "Gateway"
+	case "vpngateway":
+		return "VpnGateway"
 	case "applicationloadbalancer":
 		return "ApplicationLoadBalancer"
 	case "networkloadbalancer":
 		return "NetworkLoadBalancer"
-	case "vpngateway":
-		return "VpnGateway"
 	default:
 		return ""
 	}
@@ -203,12 +203,12 @@ func ResolveResourceNameForManifest(manifest map[string]interface{}, args []stri
 			resourceName = "network"
 		case ManifestTypeGateway:
 			resourceName = "gateway"
-		case ManifestTypeApplicationLoadBalancer:
+		case ManifestTypeVpnGateway:
+			resourceName = "vpngateway"
+		case ManifestTypeLoadBalancer:
 			resourceName = "applicationloadbalancer"
 		case ManifestTypeNetworkLoadBalancer:
 			resourceName = "networkloadbalancer"
-		case ManifestTypeVpnGateway:
-			resourceName = "vpngateway"
 		default:
 			return "", fmt.Errorf("failed to infer resource type from kind %q", kind)
 		}
@@ -315,8 +315,23 @@ func ManifestToGateway(manifest map[string]interface{}) (*api.Gateway, error) {
 	return &gateway, nil
 }
 
-// ManifestToLoadBalancer マニフェストを ApplicationLoadBalancer 構造体に変換
-func ManifestToLoadBalancer(manifest map[string]interface{}) (*api.ApplicationLoadBalancer, error) {
+// ManifestToVpnGateway マニフェストを VpnGateway 構造体に変換
+func ManifestToVpnGateway(manifest map[string]interface{}) (*api.VpnGateway, error) {
+	data, err := json.Marshal(manifest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal manifest: %w", err)
+	}
+
+	var vpnGateway api.VpnGateway
+	if err := json.Unmarshal(data, &vpnGateway); err != nil {
+		return nil, fmt.Errorf("failed to parse as VpnGateway: %w", err)
+	}
+
+	return &vpnGateway, nil
+}
+
+// ManifestToApplicationLoadBalancer マニフェストを ApplicationLoadBalancer 構造体に変換
+func ManifestToApplicationLoadBalancer(manifest map[string]interface{}) (*api.ApplicationLoadBalancer, error) {
 	data, err := json.Marshal(manifest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal manifest: %w", err)
@@ -343,21 +358,6 @@ func ManifestToNetworkLoadBalancer(manifest map[string]interface{}) (*api.Networ
 	}
 
 	return &loadBalancer, nil
-}
-
-// ManifestToVpnGateway マニフェストを VpnGateway 構造体に変換
-func ManifestToVpnGateway(manifest map[string]interface{}) (*api.VpnGateway, error) {
-	data, err := json.Marshal(manifest)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal manifest: %w", err)
-	}
-
-	var vpnGateway api.VpnGateway
-	if err := json.Unmarshal(data, &vpnGateway); err != nil {
-		return nil, fmt.Errorf("failed to parse as VpnGateway: %w", err)
-	}
-
-	return &vpnGateway, nil
 }
 
 // ExtractMetadataName マニフェストからメタデータ名を抽出

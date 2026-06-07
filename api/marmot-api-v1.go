@@ -53,298 +53,299 @@ func (e VirtualNetworkSpecPeerPolicy) Valid() bool {
 
 // ApplicationLoadBalancer defines model for ApplicationLoadBalancer.
 type ApplicationLoadBalancer struct {
-	ApiVersion string                      `json:"apiVersion" yaml:"apiVersion"`
-	Kind       string                      `json:"kind" yaml:"kind"`
-	Metadata   Metadata                    `json:"metadata" yaml:"metadata"`
-	Spec       ApplicationLoadBalancerSpec `json:"spec" yaml:"spec"`
-	Status     *Status                     `json:"status,omitempty" yaml:"status,omitempty"`
+	ApiVersion string                      `json:"apiVersion"`
+	Kind       string                      `json:"kind"`
+	Metadata   Metadata                    `json:"metadata"`
+	Spec       ApplicationLoadBalancerSpec `json:"spec"`
+	Status     *Status                     `json:"status,omitempty"`
 }
 
 // ApplicationLoadBalancerHealthCheck defines model for ApplicationLoadBalancerHealthCheck.
 type ApplicationLoadBalancerHealthCheck struct {
-	Enabled            bool   `json:"enabled" yaml:"enabled"`
-	IntervalSeconds    int    `json:"intervalSeconds,omitempty" yaml:"intervalSeconds,omitempty"`
-	Path               string `json:"path,omitempty" yaml:"path,omitempty"`
-	TimeoutSeconds     int    `json:"timeoutSeconds,omitempty" yaml:"timeoutSeconds,omitempty"`
-	UnhealthyThreshold int    `json:"unhealthyThreshold,omitempty" yaml:"unhealthyThreshold,omitempty"`
+	Enabled            bool    `json:"enabled"`
+	HealthyThreshold   *int    `json:"healthyThreshold,omitempty"`
+	IntervalSeconds    *int    `json:"intervalSeconds,omitempty"`
+	Path               *string `json:"path,omitempty"`
+	TimeoutSeconds     *int    `json:"timeoutSeconds,omitempty"`
+	UnhealthyThreshold *int    `json:"unhealthyThreshold,omitempty"`
 }
 
 // ApplicationLoadBalancerLabelSelector defines model for ApplicationLoadBalancerLabelSelector.
 type ApplicationLoadBalancerLabelSelector struct {
-	MatchLabels map[string]string `json:"matchLabels,omitempty" yaml:"matchLabels,omitempty"`
+	MatchLabels map[string]string `json:"matchLabels"`
 }
 
 // ApplicationLoadBalancerListener defines model for ApplicationLoadBalancerListener.
 type ApplicationLoadBalancerListener struct {
-	BackendPort            int                                  `json:"backendPort" yaml:"backendPort"`
-	BackendSelector        ApplicationLoadBalancerLabelSelector `json:"backendSelector" yaml:"backendSelector"`
-	HealthCheck            *ApplicationLoadBalancerHealthCheck  `json:"healthCheck,omitempty" yaml:"healthCheck,omitempty"`
-	LoadBalancingAlgorithm string                               `json:"loadBalancingAlgorithm,omitempty" yaml:"loadBalancingAlgorithm,omitempty"`
-	Name                   string                               `json:"name" yaml:"name"`
-	Protocol               string                               `json:"protocol" yaml:"protocol"`
-	SessionPersistence     *ApplicationLoadBalancerPersistence  `json:"sessionPersistence,omitempty" yaml:"sessionPersistence,omitempty"`
-	VipPort                int                                  `json:"vipPort" yaml:"vipPort"`
+	BackendPort            int                                  `json:"backendPort"`
+	BackendSelector        ApplicationLoadBalancerLabelSelector `json:"backendSelector"`
+	HealthCheck            *ApplicationLoadBalancerHealthCheck  `json:"healthCheck,omitempty"`
+	LoadBalancingAlgorithm string                               `json:"loadBalancingAlgorithm"`
+	Name                   string                               `json:"name"`
+	Protocol               string                               `json:"protocol"`
+	SessionPersistence     *ApplicationLoadBalancerPersistence  `json:"sessionPersistence,omitempty"`
+	VipPort                int                                  `json:"vipPort"`
 }
 
 // ApplicationLoadBalancerPersistence defines model for ApplicationLoadBalancerPersistence.
 type ApplicationLoadBalancerPersistence struct {
-	CookieName string `json:"cookieName,omitempty" yaml:"cookieName,omitempty"`
-	Enabled    bool   `json:"enabled" yaml:"enabled"`
+	CookieName *string `json:"cookieName,omitempty"`
+	Enabled    bool    `json:"enabled"`
 }
 
 // ApplicationLoadBalancerSpec defines model for ApplicationLoadBalancerSpec.
 type ApplicationLoadBalancerSpec struct {
-	BindPublicIpAddress    string                            `json:"bindPublicIpAddress" yaml:"bindPublicIpAddress"`
-	InternalVirtualNetwork string                            `json:"internalVirtualNetwork" yaml:"internalVirtualNetwork"`
-	Listeners              []ApplicationLoadBalancerListener `json:"listeners" yaml:"listeners"`
+	BindPublicIpAddress    string                            `json:"bindPublicIpAddress"`
+	InternalVirtualNetwork string                            `json:"internalVirtualNetwork"`
+	Listeners              []ApplicationLoadBalancerListener `json:"listeners"`
 
-	// RemoteCIDR Source CIDR allowed to access the load balancer. Empty means allow all.
-	RemoteCIDR string `json:"remoteCIDR,omitempty" yaml:"remoteCIDR,omitempty"`
+	// RemoteCIDR Source CIDR allowed to access load balancer forwarding. Empty means allow all.
+	RemoteCIDR string `json:"remoteCIDR"`
 }
 
 // Auth defines model for Auth.
 type Auth struct {
-	PublicKey    *string `json:"publicKey,omitempty" yaml:"publicKey,omitempty"`
-	RootPassword *string `json:"rootPassword,omitempty" yaml:"rootPassword,omitempty"`
-	Url          *string `json:"url,omitempty" yaml:"url,omitempty"`
-	User         *string `json:"user,omitempty" yaml:"user,omitempty"`
+	PublicKey    *string `json:"publicKey,omitempty"`
+	RootPassword *string `json:"rootPassword,omitempty"`
+	Url          *string `json:"url,omitempty"`
+	User         *string `json:"user,omitempty"`
 }
 
 // Error defines model for Error.
 type Error struct {
-	Code    int32  `json:"code" yaml:"code"`
-	Message string `json:"message" yaml:"message"`
+	Code    int32  `json:"code"`
+	Message string `json:"message"`
 }
 
 // Gateway defines model for Gateway.
 type Gateway struct {
-	ApiVersion string      `json:"apiVersion" yaml:"apiVersion"`
-	Kind       string      `json:"kind" yaml:"kind"`
-	Metadata   Metadata    `json:"metadata" yaml:"metadata"`
-	Spec       GatewaySpec `json:"spec" yaml:"spec"`
-	Status     *Status     `json:"status,omitempty" yaml:"status,omitempty"`
+	ApiVersion string      `json:"apiVersion"`
+	Kind       string      `json:"kind"`
+	Metadata   Metadata    `json:"metadata"`
+	Spec       GatewaySpec `json:"spec"`
+	Status     *Status     `json:"status,omitempty"`
 }
 
 // GatewaySpec defines model for GatewaySpec.
 type GatewaySpec struct {
-	BindPublicIpAddress    string `json:"bindPublicIpAddress" yaml:"bindPublicIpAddress"`
-	InternalServerName     string `json:"internalServerName" yaml:"internalServerName"`
-	InternalVirtualNetwork string `json:"internalVirtualNetwork" yaml:"internalVirtualNetwork"`
+	BindPublicIpAddress    string `json:"bindPublicIpAddress"`
+	InternalServerName     string `json:"internalServerName"`
+	InternalVirtualNetwork string `json:"internalVirtualNetwork"`
 
 	// RemoteCIDR Source CIDR allowed to access gateway forwarding.
-	RemoteCIDR string `json:"remoteCIDR,omitempty" yaml:"remoteCIDR,omitempty"`
+	RemoteCIDR *string `json:"remoteCIDR,omitempty"`
 
 	// RemoteCIDRs Source CIDR list allowed to access gateway forwarding. Empty means allow all.
-	RemoteCIDRs []string `json:"remoteCIDRs,omitempty" yaml:"remoteCIDRs,omitempty"`
-	ServerPorts []string `json:"serverPorts" yaml:"serverPorts"`
+	RemoteCIDRs *[]string `json:"remoteCIDRs,omitempty"`
+	ServerPorts []string  `json:"serverPorts"`
 }
 
 // HostAllocation defines model for HostAllocation.
 type HostAllocation struct {
-	AllocatedCpuCores *int `json:"allocatedCpuCores,omitempty" yaml:"allocatedCpuCores,omitempty"`
-	AllocatedMemoryMB *int `json:"allocatedMemoryMB,omitempty" yaml:"allocatedMemoryMB,omitempty"`
-	RunningVMs        *int `json:"runningVMs,omitempty" yaml:"runningVMs,omitempty"`
-	StoppedVMs        *int `json:"stoppedVMs,omitempty" yaml:"stoppedVMs,omitempty"`
-	TotalVMs          *int `json:"totalVMs,omitempty" yaml:"totalVMs,omitempty"`
-	VirtualNetworks   *int `json:"virtualNetworks,omitempty" yaml:"virtualNetworks,omitempty"`
+	AllocatedCpuCores *int `json:"allocatedCpuCores,omitempty"`
+	AllocatedMemoryMB *int `json:"allocatedMemoryMB,omitempty"`
+	RunningVMs        *int `json:"runningVMs,omitempty"`
+	StoppedVMs        *int `json:"stoppedVMs,omitempty"`
+	TotalVMs          *int `json:"totalVMs,omitempty"`
+	VirtualNetworks   *int `json:"virtualNetworks,omitempty"`
 }
 
 // HostCapacity defines model for HostCapacity.
 type HostCapacity struct {
-	CpuCores          *int      `json:"cpuCores,omitempty" yaml:"cpuCores,omitempty"`
-	DiskCapacityGB    *int      `json:"diskCapacityGB,omitempty" yaml:"diskCapacityGB,omitempty"`
-	DiskCount         *int      `json:"diskCount,omitempty" yaml:"diskCount,omitempty"`
-	MemoryMB          *int      `json:"memoryMB,omitempty" yaml:"memoryMB,omitempty"`
-	NetworkInterfaces *[]string `json:"networkInterfaces,omitempty" yaml:"networkInterfaces,omitempty"`
+	CpuCores          *int      `json:"cpuCores,omitempty"`
+	DiskCapacityGB    *int      `json:"diskCapacityGB,omitempty"`
+	DiskCount         *int      `json:"diskCount,omitempty"`
+	MemoryMB          *int      `json:"memoryMB,omitempty"`
+	NetworkInterfaces *[]string `json:"networkInterfaces,omitempty"`
 }
 
 // HostStatus defines model for HostStatus.
 type HostStatus struct {
-	Allocation  *HostAllocation `json:"allocation,omitempty" yaml:"allocation,omitempty"`
-	Capacity    *HostCapacity   `json:"capacity,omitempty" yaml:"capacity,omitempty"`
-	HostId      *string         `json:"hostId,omitempty" yaml:"hostId,omitempty"`
-	InitiatorId *string         `json:"initiatorId,omitempty" yaml:"initiatorId,omitempty"`
-	IpAddress   *string         `json:"ipAddress,omitempty" yaml:"ipAddress,omitempty"`
-	IscsiServer *bool           `json:"iscsiServer,omitempty" yaml:"iscsiServer,omitempty"`
-	LastUpdated *time.Time      `json:"lastUpdated,omitempty" yaml:"lastUpdated,omitempty"`
-	NodeName    *string         `json:"nodeName,omitempty" yaml:"nodeName,omitempty"`
+	Allocation  *HostAllocation `json:"allocation,omitempty"`
+	Capacity    *HostCapacity   `json:"capacity,omitempty"`
+	HostId      *string         `json:"hostId,omitempty"`
+	InitiatorId *string         `json:"initiatorId,omitempty"`
+	IpAddress   *string         `json:"ipAddress,omitempty"`
+	IscsiServer *bool           `json:"iscsiServer,omitempty"`
+	LastUpdated *time.Time      `json:"lastUpdated,omitempty"`
+	NodeName    *string         `json:"nodeName,omitempty"`
 }
 
 // IPAddress defines model for IPAddress.
 type IPAddress struct {
-	HostId    *string `json:"hostId,omitempty" yaml:"hostId,omitempty"`
-	IpAddress string  `json:"ipAddress" yaml:"ipAddress"`
-	Netmask   *string `json:"netmask,omitempty" yaml:"netmask,omitempty"`
-	NetworkId *string `json:"networkId,omitempty" yaml:"networkId,omitempty"`
+	HostId    *string `json:"hostId,omitempty"`
+	IpAddress string  `json:"ipAddress"`
+	Netmask   *string `json:"netmask,omitempty"`
+	NetworkId *string `json:"networkId,omitempty"`
 }
 
 // IPNetwork defines model for IPNetwork.
 type IPNetwork struct {
-	AddressMaskLen   *string `json:"addressMaskLen,omitempty" yaml:"addressMaskLen,omitempty"`
-	EndAddress       *string `json:"endAddress,omitempty" yaml:"endAddress,omitempty"`
-	Gateway          *string `json:"gateway,omitempty" yaml:"gateway,omitempty"`
-	Id               string  `json:"id" yaml:"id"`
-	Netmask          *string `json:"netmask,omitempty" yaml:"netmask,omitempty"`
-	Netmasklen       *int    `json:"netmasklen,omitempty" yaml:"netmasklen,omitempty"`
-	NetworkAddress   *string `json:"networkAddress,omitempty" yaml:"networkAddress,omitempty"`
-	StartAddress     *string `json:"startAddress,omitempty" yaml:"startAddress,omitempty"`
-	VirtualNetworkId *string `json:"virtualNetworkId,omitempty" yaml:"virtualNetworkId,omitempty"`
+	AddressMaskLen   *string `json:"addressMaskLen,omitempty"`
+	EndAddress       *string `json:"endAddress,omitempty"`
+	Gateway          *string `json:"gateway,omitempty"`
+	Id               string  `json:"id"`
+	Netmask          *string `json:"netmask,omitempty"`
+	Netmasklen       *int    `json:"netmasklen,omitempty"`
+	NetworkAddress   *string `json:"networkAddress,omitempty"`
+	StartAddress     *string `json:"startAddress,omitempty"`
+	VirtualNetworkId *string `json:"virtualNetworkId,omitempty"`
 }
 
 // Image defines model for Image.
 type Image struct {
-	ApiVersion string    `json:"apiVersion" yaml:"apiVersion"`
-	Kind       string    `json:"kind" yaml:"kind"`
-	Metadata   Metadata  `json:"metadata" yaml:"metadata"`
-	Spec       ImageSpec `json:"spec" yaml:"spec"`
-	Status     *Status   `json:"status,omitempty" yaml:"status,omitempty"`
+	ApiVersion string    `json:"apiVersion"`
+	Kind       string    `json:"kind"`
+	Metadata   Metadata  `json:"metadata"`
+	Spec       ImageSpec `json:"spec"`
+	Status     *Status   `json:"status,omitempty"`
 }
 
 // ImageSpec defines model for ImageSpec.
 type ImageSpec struct {
-	Kind          *string `json:"kind,omitempty" yaml:"kind,omitempty"`
-	LogicalVolume *string `json:"logicalVolume,omitempty" yaml:"logicalVolume,omitempty"`
-	LvPath        *string `json:"lvPath,omitempty" yaml:"lvPath,omitempty"`
-	OsName        *string `json:"osName,omitempty" yaml:"osName,omitempty"`
-	OsVersion     *string `json:"osVersion,omitempty" yaml:"osVersion,omitempty"`
-	Qcow2Path     *string `json:"qcow2Path,omitempty" yaml:"qcow2Path,omitempty"`
-	Size          *int    `json:"size,omitempty" yaml:"size,omitempty"`
-	SourceUrl     *string `json:"sourceUrl,omitempty" yaml:"sourceUrl,omitempty"`
-	Type          *string `json:"type,omitempty" yaml:"type,omitempty"`
-	VolumeGroup   *string `json:"volumeGroup,omitempty" yaml:"volumeGroup,omitempty"`
+	Kind          *string `json:"kind,omitempty"`
+	LogicalVolume *string `json:"logicalVolume,omitempty"`
+	LvPath        *string `json:"lvPath,omitempty"`
+	OsName        *string `json:"osName,omitempty"`
+	OsVersion     *string `json:"osVersion,omitempty"`
+	Qcow2Path     *string `json:"qcow2Path,omitempty"`
+	Size          *int    `json:"size,omitempty"`
+	SourceUrl     *string `json:"sourceUrl,omitempty"`
+	Type          *string `json:"type,omitempty"`
+	VolumeGroup   *string `json:"volumeGroup,omitempty"`
 }
 
 // Job defines model for Job.
 type Job struct {
-	Id       string    `json:"id" yaml:"id"`
-	Metadata *Metadata `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-	Spec     *JobSpec  `json:"spec,omitempty" yaml:"spec,omitempty"`
-	Status   *Status   `json:"status,omitempty" yaml:"status,omitempty"`
+	Id       string    `json:"id"`
+	Metadata *Metadata `json:"metadata,omitempty"`
+	Spec     *JobSpec  `json:"spec,omitempty"`
+	Status   *Status   `json:"status,omitempty"`
 }
 
 // JobSpec defines model for JobSpec.
 type JobSpec struct {
-	Command     *[]string  `json:"command,omitempty" yaml:"command,omitempty"`
-	ExitCode    *int       `json:"exitCode,omitempty" yaml:"exitCode,omitempty"`
-	FinishTime  *time.Time `json:"finishTime,omitempty" yaml:"finishTime,omitempty"`
-	MaxTime     *time.Time `json:"maxTime,omitempty" yaml:"maxTime,omitempty"`
-	RequestTime *time.Time `json:"requestTime,omitempty" yaml:"requestTime,omitempty"`
-	StartTime   *time.Time `json:"startTime,omitempty" yaml:"startTime,omitempty"`
+	Command     *[]string  `json:"command,omitempty"`
+	ExitCode    *int       `json:"exitCode,omitempty"`
+	FinishTime  *time.Time `json:"finishTime,omitempty"`
+	MaxTime     *time.Time `json:"maxTime,omitempty"`
+	RequestTime *time.Time `json:"requestTime,omitempty"`
+	StartTime   *time.Time `json:"startTime,omitempty"`
 }
 
 // Metadata defines model for Metadata.
 type Metadata struct {
-	Comment      *string                 `json:"comment,omitempty" yaml:"comment,omitempty"`
-	Id           string                  `json:"id" yaml:"id"`
-	InstanceName *string                 `json:"instanceName,omitempty" yaml:"instanceName,omitempty"`
-	Key          *string                 `json:"key,omitempty" yaml:"key,omitempty"`
-	Labels       *map[string]interface{} `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Name         string                  `json:"name" yaml:"name"`
-	NodeName     *string                 `json:"nodeName,omitempty" yaml:"nodeName,omitempty"`
-	Uuid         *string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Comment      *string                 `json:"comment,omitempty"`
+	Id           string                  `json:"id"`
+	InstanceName *string                 `json:"instanceName,omitempty"`
+	Key          *string                 `json:"key,omitempty"`
+	Labels       *map[string]interface{} `json:"labels,omitempty"`
+	Name         string                  `json:"name"`
+	NodeName     *string                 `json:"nodeName,omitempty"`
+	Uuid         *string                 `json:"uuid,omitempty"`
 }
 
 // Nameservers defines model for Nameservers.
 type Nameservers struct {
-	Addresses *[]string `json:"addresses,omitempty" yaml:"addresses,omitempty"`
-	Search    *[]string `json:"search,omitempty" yaml:"search,omitempty"`
+	Addresses *[]string `json:"addresses,omitempty"`
+	Search    *[]string `json:"search,omitempty"`
 }
 
 // NetworkInterface defines model for NetworkInterface.
 type NetworkInterface struct {
-	Address     *string      `json:"address,omitempty" yaml:"address,omitempty"`
-	Dhcp4       *bool        `json:"dhcp4,omitempty" yaml:"dhcp4,omitempty"`
-	Dhcp6       *bool        `json:"dhcp6,omitempty" yaml:"dhcp6,omitempty"`
-	Ethernet    *string      `json:"ethernet,omitempty" yaml:"ethernet,omitempty"`
-	IpGateway   *string      `json:"ipGateway,omitempty" yaml:"ipGateway,omitempty"`
-	IpNetworkId *string      `json:"ipNetworkId,omitempty" yaml:"ipNetworkId,omitempty"`
-	Mac         *string      `json:"mac,omitempty" yaml:"mac,omitempty"`
-	Nameservers *Nameservers `json:"nameservers,omitempty" yaml:"nameservers,omitempty"`
-	Netmask     *string      `json:"netmask,omitempty" yaml:"netmask,omitempty"`
-	Netmasklen  *int         `json:"netmasklen,omitempty" yaml:"netmasklen,omitempty"`
-	Networkid   string       `json:"networkid" yaml:"networkid"`
-	Networkname string       `json:"networkname" yaml:"networkname"`
-	Portgroup   *string      `json:"portgroup,omitempty" yaml:"portgroup,omitempty"`
-	Routes      *[]Route     `json:"routes,omitempty" yaml:"routes,omitempty"`
-	Uuid        *string      `json:"uuid,omitempty" yaml:"uuid,omitempty"`
-	Vlans       *[]uint      `json:"vlans,omitempty" yaml:"vlans,omitempty"`
+	Address     *string      `json:"address,omitempty"`
+	Dhcp4       *bool        `json:"dhcp4,omitempty"`
+	Dhcp6       *bool        `json:"dhcp6,omitempty"`
+	Ethernet    *string      `json:"ethernet,omitempty"`
+	IpGateway   *string      `json:"ipGateway,omitempty"`
+	IpNetworkId *string      `json:"ipNetworkId,omitempty"`
+	Mac         *string      `json:"mac,omitempty"`
+	Nameservers *Nameservers `json:"nameservers,omitempty"`
+	Netmask     *string      `json:"netmask,omitempty"`
+	Netmasklen  *int         `json:"netmasklen,omitempty"`
+	Networkid   string       `json:"networkid"`
+	Networkname string       `json:"networkname"`
+	Portgroup   *string      `json:"portgroup,omitempty"`
+	Routes      *[]Route     `json:"routes,omitempty"`
+	Uuid        *string      `json:"uuid,omitempty"`
+	Vlans       *[]uint      `json:"vlans,omitempty"`
 }
 
 // NetworkLoadBalancer defines model for NetworkLoadBalancer.
 type NetworkLoadBalancer struct {
-	ApiVersion string                  `json:"apiVersion" yaml:"apiVersion"`
-	Kind       string                  `json:"kind" yaml:"kind"`
-	Metadata   Metadata                `json:"metadata" yaml:"metadata"`
-	Spec       NetworkLoadBalancerSpec `json:"spec" yaml:"spec"`
-	Status     *Status                 `json:"status,omitempty" yaml:"status,omitempty"`
+	ApiVersion string                  `json:"apiVersion"`
+	Kind       string                  `json:"kind"`
+	Metadata   Metadata                `json:"metadata"`
+	Spec       NetworkLoadBalancerSpec `json:"spec"`
+	Status     *Status                 `json:"status,omitempty"`
 }
 
 // NetworkLoadBalancerLabelSelector defines model for NetworkLoadBalancerLabelSelector.
 type NetworkLoadBalancerLabelSelector struct {
-	MatchLabels map[string]string `json:"matchLabels,omitempty" yaml:"matchLabels,omitempty"`
+	MatchLabels map[string]string `json:"matchLabels"`
 }
 
 // NetworkLoadBalancerListener defines model for NetworkLoadBalancerListener.
 type NetworkLoadBalancerListener struct {
-	BackendPort        int                              `json:"backendPort" yaml:"backendPort"`
-	BackendSelector    NetworkLoadBalancerLabelSelector `json:"backendSelector" yaml:"backendSelector"`
-	Name               string                           `json:"name" yaml:"name"`
-	Protocol           string                           `json:"protocol" yaml:"protocol"`
-	SessionPersistence *NetworkLoadBalancerPersistence  `json:"sessionPersistence,omitempty" yaml:"sessionPersistence,omitempty"`
-	VipPort            int                              `json:"vipPort" yaml:"vipPort"`
+	BackendPort        int                              `json:"backendPort"`
+	BackendSelector    NetworkLoadBalancerLabelSelector `json:"backendSelector"`
+	Name               string                           `json:"name"`
+	Protocol           string                           `json:"protocol"`
+	SessionPersistence *NetworkLoadBalancerPersistence  `json:"sessionPersistence,omitempty"`
+	VipPort            int                              `json:"vipPort"`
 }
 
 // NetworkLoadBalancerPersistence defines model for NetworkLoadBalancerPersistence.
 type NetworkLoadBalancerPersistence struct {
-	Enabled bool `json:"enabled" yaml:"enabled"`
+	Enabled bool `json:"enabled"`
 }
 
 // NetworkLoadBalancerSpec defines model for NetworkLoadBalancerSpec.
 type NetworkLoadBalancerSpec struct {
-	BindPublicIpAddress    string                        `json:"bindPublicIpAddress" yaml:"bindPublicIpAddress"`
-	InternalVirtualNetwork string                        `json:"internalVirtualNetwork" yaml:"internalVirtualNetwork"`
-	Listeners              []NetworkLoadBalancerListener `json:"listeners" yaml:"listeners"`
+	BindPublicIpAddress    string                        `json:"bindPublicIpAddress"`
+	InternalVirtualNetwork string                        `json:"internalVirtualNetwork"`
+	Listeners              []NetworkLoadBalancerListener `json:"listeners"`
 
-	// RemoteCIDR Source CIDR allowed to access the network load balancer. Empty means allow all.
-	RemoteCIDR string `json:"remoteCIDR,omitempty" yaml:"remoteCIDR,omitempty"`
+	// RemoteCIDR Source CIDR allowed to access network load balancer forwarding. Empty means allow all.
+	RemoteCIDR string `json:"remoteCIDR"`
 }
 
 // Pong defines model for Pong.
 type Pong struct {
-	Ping string `json:"ping" yaml:"ping"`
+	Ping string `json:"ping"`
 }
 
 // ReplyMessage defines model for ReplyMessage.
 type ReplyMessage struct {
-	Message string `json:"message" yaml:"message"`
+	Message string `json:"message"`
 }
 
 // Route defines model for Route.
 type Route struct {
-	To  *string `json:"to,omitempty" yaml:"to,omitempty"`
-	Via *string `json:"via,omitempty" yaml:"via,omitempty"`
+	To  *string `json:"to,omitempty"`
+	Via *string `json:"via,omitempty"`
 }
 
 // Server defines model for Server.
 type Server struct {
-	ApiVersion string     `json:"apiVersion" yaml:"apiVersion"`
-	Kind       string     `json:"kind" yaml:"kind"`
-	Metadata   Metadata   `json:"metadata" yaml:"metadata"`
-	Spec       ServerSpec `json:"spec" yaml:"spec"`
-	Status     *Status    `json:"status,omitempty" yaml:"status,omitempty"`
+	ApiVersion string     `json:"apiVersion"`
+	Kind       string     `json:"kind"`
+	Metadata   Metadata   `json:"metadata"`
+	Spec       ServerSpec `json:"spec"`
+	Status     *Status    `json:"status,omitempty"`
 }
 
 // ServerSpec defines model for ServerSpec.
 type ServerSpec struct {
-	Auth             *Auth               `json:"auth,omitempty" yaml:"auth,omitempty"`
-	BootVolume       *Volume             `json:"bootVolume,omitempty" yaml:"bootVolume,omitempty"`
-	Cpu              *int                `json:"cpu,omitempty" yaml:"cpu,omitempty"`
-	Memory           *int                `json:"memory,omitempty" yaml:"memory,omitempty"`
-	NetworkInterface *[]NetworkInterface `json:"networkInterface,omitempty" yaml:"networkInterface,omitempty"`
-	OsLv             *string             `json:"osLv,omitempty" yaml:"osLv,omitempty"`
-	OsVariant        *string             `json:"osVariant,omitempty" yaml:"osVariant,omitempty"`
-	OsVg             *string             `json:"osVg,omitempty" yaml:"osVg,omitempty"`
-	Storage          *[]Volume           `json:"storage,omitempty" yaml:"storage,omitempty"`
+	Auth             *Auth               `json:"auth,omitempty"`
+	BootVolume       *Volume             `json:"bootVolume,omitempty"`
+	Cpu              *int                `json:"cpu,omitempty"`
+	Memory           *int                `json:"memory,omitempty"`
+	NetworkInterface *[]NetworkInterface `json:"networkInterface,omitempty"`
+	OsLv             *string             `json:"osLv,omitempty"`
+	OsVariant        *string             `json:"osVariant,omitempty"`
+	OsVg             *string             `json:"osVg,omitempty"`
+	Storage          *[]Volume           `json:"storage,omitempty"`
 }
 
 // Servers defines model for Servers.
@@ -352,65 +353,65 @@ type Servers = []Server
 
 // Status defines model for Status.
 type Status struct {
-	Console             *string    `json:"console,omitempty" yaml:"console,omitempty"`
-	CreationTimeStamp   *time.Time `json:"creationTimeStamp,omitempty" yaml:"creationTimeStamp,omitempty"`
-	DeletionTimeStamp   *time.Time `json:"deletionTimeStamp,omitempty" yaml:"deletionTimeStamp,omitempty"`
-	LastUpdateTimeStamp *time.Time `json:"lastUpdateTimeStamp,omitempty" yaml:"lastUpdateTimeStamp,omitempty"`
-	Message             *string    `json:"message,omitempty" yaml:"message,omitempty"`
-	Status              *string    `json:"status,omitempty" yaml:"status,omitempty"`
-	StatusCode          int        `json:"statusCode" yaml:"statusCode"`
+	Console             *string    `json:"console,omitempty"`
+	CreationTimeStamp   *time.Time `json:"creationTimeStamp,omitempty"`
+	DeletionTimeStamp   *time.Time `json:"deletionTimeStamp,omitempty"`
+	LastUpdateTimeStamp *time.Time `json:"lastUpdateTimeStamp,omitempty"`
+	Message             *string    `json:"message,omitempty"`
+	Status              *string    `json:"status,omitempty"`
+	StatusCode          int        `json:"statusCode"`
 }
 
 // Success defines model for Success.
 type Success struct {
-	Id      string  `json:"id" yaml:"id"`
-	Message *string `json:"message,omitempty" yaml:"message,omitempty"`
+	Id      string  `json:"id"`
+	Message *string `json:"message,omitempty"`
 }
 
 // Version defines model for Version.
 type Version struct {
-	ClientVersion string  `json:"clientVersion" yaml:"clientVersion"`
-	ServerVersion *string `json:"serverVersion,omitempty" yaml:"serverVersion,omitempty"`
+	ClientVersion string  `json:"clientVersion"`
+	ServerVersion *string `json:"serverVersion,omitempty"`
 }
 
 // VirtualNetwork defines model for VirtualNetwork.
 type VirtualNetwork struct {
-	ApiVersion string             `json:"apiVersion" yaml:"apiVersion"`
-	Kind       string             `json:"kind" yaml:"kind"`
-	Metadata   Metadata           `json:"metadata" yaml:"metadata"`
-	Spec       VirtualNetworkSpec `json:"spec" yaml:"spec"`
-	Status     *Status            `json:"status,omitempty" yaml:"status,omitempty"`
+	ApiVersion string             `json:"apiVersion"`
+	Kind       string             `json:"kind"`
+	Metadata   Metadata           `json:"metadata"`
+	Spec       VirtualNetworkSpec `json:"spec"`
+	Status     *Status            `json:"status,omitempty"`
 }
 
 // VirtualNetworkSpec defines model for VirtualNetworkSpec.
 type VirtualNetworkSpec struct {
-	BridgeName       *string `json:"bridgeName,omitempty" yaml:"bridgeName,omitempty"`
-	Dhcp             *bool   `json:"dhcp,omitempty" yaml:"dhcp,omitempty"`
-	DhcpEndAddress   *string `json:"dhcpEndAddress,omitempty" yaml:"dhcpEndAddress,omitempty"`
-	DhcpStartAddress *string `json:"dhcpStartAddress,omitempty" yaml:"dhcpStartAddress,omitempty"`
-	ForwardMode      *string `json:"forwardMode,omitempty" yaml:"forwardMode,omitempty"`
-	IPNetworkAddress *string `json:"iPNetworkAddress,omitempty" yaml:"iPNetworkAddress,omitempty"`
-	IpAddress        *string `json:"ipAddress,omitempty" yaml:"ipAddress,omitempty"`
-	IpNetworkId      *string `json:"ipNetworkId,omitempty" yaml:"ipNetworkId,omitempty"`
-	MacAddress       *string `json:"macAddress,omitempty" yaml:"macAddress,omitempty"`
-	Nat              *bool   `json:"nat,omitempty" yaml:"nat,omitempty"`
-	Netmask          *string `json:"netmask,omitempty" yaml:"netmask,omitempty"`
+	BridgeName       *string `json:"bridgeName,omitempty"`
+	Dhcp             *bool   `json:"dhcp,omitempty"`
+	DhcpEndAddress   *string `json:"dhcpEndAddress,omitempty"`
+	DhcpStartAddress *string `json:"dhcpStartAddress,omitempty"`
+	ForwardMode      *string `json:"forwardMode,omitempty"`
+	IPNetworkAddress *string `json:"iPNetworkAddress,omitempty"`
+	IpAddress        *string `json:"ipAddress,omitempty"`
+	IpNetworkId      *string `json:"ipNetworkId,omitempty"`
+	MacAddress       *string `json:"macAddress,omitempty"`
+	Nat              *bool   `json:"nat,omitempty"`
+	Netmask          *string `json:"netmask,omitempty"`
 
 	// OverlayMode Overlay mode for multi-node networks: 'none' (default), 'geneve' (OVN-managed), or 'vxlan' (deprecated).
-	OverlayMode *VirtualNetworkSpecOverlayMode `json:"overlayMode,omitempty" yaml:"overlayMode,omitempty"`
+	OverlayMode *VirtualNetworkSpecOverlayMode `json:"overlayMode,omitempty"`
 
 	// PeerPolicy Policy for peer management: 'auto' or 'manual'. This field is ignored when OVN manages peers.
-	PeerPolicy *VirtualNetworkSpecPeerPolicy `json:"peerPolicy,omitempty" yaml:"peerPolicy,omitempty"`
-	Stp        *bool                         `json:"stp,omitempty" yaml:"stp,omitempty"`
+	PeerPolicy *VirtualNetworkSpecPeerPolicy `json:"peerPolicy,omitempty"`
+	Stp        *bool                         `json:"stp,omitempty"`
 
 	// UnderlayInterface Interface name for underlay network used by overlay tunnels.
-	UnderlayInterface *string `json:"underlayInterface,omitempty" yaml:"underlayInterface,omitempty"`
+	UnderlayInterface *string `json:"underlayInterface,omitempty"`
 
 	// Vni Overlay VNI (0-16777215) used by Geneve/VXLAN.
-	Vni *int `json:"vni,omitempty" yaml:"vni,omitempty"`
+	Vni *int `json:"vni,omitempty"`
 
 	// VpnAccess Enable VPN route injection for servers on this network.
-	VpnAccess *bool `json:"vpnAccess,omitempty" yaml:"vpnAccess,omitempty"`
+	VpnAccess *bool `json:"vpnAccess,omitempty"`
 }
 
 // VirtualNetworkSpecOverlayMode Overlay mode for multi-node networks: 'none' (default), 'geneve' (OVN-managed), or 'vxlan' (deprecated).
@@ -421,43 +422,43 @@ type VirtualNetworkSpecPeerPolicy string
 
 // VolSpec defines model for VolSpec.
 type VolSpec struct {
-	Iscsi          *bool   `json:"iscsi,omitempty" yaml:"iscsi,omitempty"`
-	IscsiTargetIqn *string `json:"iscsiTargetIqn,omitempty" yaml:"iscsiTargetIqn,omitempty"`
-	Kind           *string `json:"kind,omitempty" yaml:"kind,omitempty"`
-	LogicalVolume  *string `json:"logicalVolume,omitempty" yaml:"logicalVolume,omitempty"`
-	OsVariant      *string `json:"osVariant,omitempty" yaml:"osVariant,omitempty"`
-	Path           *string `json:"path,omitempty" yaml:"path,omitempty"`
-	Persistent     *bool   `json:"persistent,omitempty" yaml:"persistent,omitempty"`
-	Size           *int    `json:"size,omitempty" yaml:"size,omitempty"`
-	Type           *string `json:"type,omitempty" yaml:"type,omitempty"`
-	VolumeGroup    *string `json:"volumeGroup,omitempty" yaml:"volumeGroup,omitempty"`
+	Iscsi          *bool   `json:"iscsi,omitempty"`
+	IscsiTargetIqn *string `json:"iscsiTargetIqn,omitempty"`
+	Kind           *string `json:"kind,omitempty"`
+	LogicalVolume  *string `json:"logicalVolume,omitempty"`
+	OsVariant      *string `json:"osVariant,omitempty"`
+	Path           *string `json:"path,omitempty"`
+	Persistent     *bool   `json:"persistent,omitempty"`
+	Size           *int    `json:"size,omitempty"`
+	Type           *string `json:"type,omitempty"`
+	VolumeGroup    *string `json:"volumeGroup,omitempty"`
 }
 
 // Volume defines model for Volume.
 type Volume struct {
-	ApiVersion string   `json:"apiVersion" yaml:"apiVersion"`
-	Kind       string   `json:"kind" yaml:"kind"`
-	Metadata   Metadata `json:"metadata" yaml:"metadata"`
-	Spec       VolSpec  `json:"spec" yaml:"spec"`
-	Status     *Status  `json:"status,omitempty" yaml:"status,omitempty"`
+	ApiVersion string   `json:"apiVersion"`
+	Kind       string   `json:"kind"`
+	Metadata   Metadata `json:"metadata"`
+	Spec       VolSpec  `json:"spec"`
+	Status     *Status  `json:"status,omitempty"`
 }
 
 // VpnGateway defines model for VpnGateway.
 type VpnGateway struct {
-	ApiVersion string         `json:"apiVersion" yaml:"apiVersion"`
-	Kind       string         `json:"kind" yaml:"kind"`
-	Metadata   Metadata       `json:"metadata" yaml:"metadata"`
-	Spec       VpnGatewaySpec `json:"spec" yaml:"spec"`
-	Status     *Status        `json:"status,omitempty" yaml:"status,omitempty"`
+	ApiVersion string         `json:"apiVersion"`
+	Kind       string         `json:"kind"`
+	Metadata   Metadata       `json:"metadata"`
+	Spec       VpnGatewaySpec `json:"spec"`
+	Status     *Status        `json:"status,omitempty"`
 }
 
 // VpnGatewaySpec defines model for VpnGatewaySpec.
 type VpnGatewaySpec struct {
-	BindPublicIpAddress    string `json:"bindPublicIpAddress" yaml:"bindPublicIpAddress"`
-	InternalVirtualNetwork string `json:"internalVirtualNetwork" yaml:"internalVirtualNetwork"`
+	BindPublicIpAddress    string `json:"bindPublicIpAddress"`
+	InternalVirtualNetwork string `json:"internalVirtualNetwork"`
 
 	// RemoteCIDRs Source CIDR list allowed to access vpn gateway. Empty means allow all.
-	RemoteCIDRs []string `json:"remoteCIDRs,omitempty" yaml:"remoteCIDRs,omitempty"`
+	RemoteCIDRs *[]string `json:"remoteCIDRs,omitempty"`
 }
 
 // ApiCreateLoadBalancerJSONRequestBody defines body for ApiCreateLoadBalancer for application/json ContentType.
@@ -513,19 +514,19 @@ type ApiUpdateVpnGatewayByIdJSONRequestBody = VpnGateway
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// List LoadBalancers
+	// List ApplicationLoadBalancers
 	// (GET /application-load-balancer)
 	ApiGetLoadBalancers(ctx echo.Context) error
-	// Create LoadBalancer
+	// Create ApplicationLoadBalancer
 	// (POST /application-load-balancer)
 	ApiCreateLoadBalancer(ctx echo.Context) error
-	// Delete LoadBalancer
+	// Delete ApplicationLoadBalancer
 	// (DELETE /application-load-balancer/{id})
 	ApiDeleteLoadBalancerById(ctx echo.Context, id string) error
-	// Info for a specific LoadBalancer
+	// Info for a specific application load balancer
 	// (GET /application-load-balancer/{id})
 	ApiGetLoadBalancerById(ctx echo.Context, id string) error
-	// Update LoadBalancer
+	// Update ApplicationLoadBalancer
 	// (PUT /application-load-balancer/{id})
 	ApiUpdateLoadBalancerById(ctx echo.Context, id string) error
 	// List Gateways
@@ -588,7 +589,7 @@ type ServerInterface interface {
 	// Delete NetworkLoadBalancer
 	// (DELETE /network-load-balancer/{id})
 	ApiDeleteNetworkLoadBalancerById(ctx echo.Context, id string) error
-	// Info for a specific NetworkLoadBalancer
+	// Info for a specific network load balancer
 	// (GET /network-load-balancer/{id})
 	ApiGetNetworkLoadBalancerById(ctx echo.Context, id string) error
 	// Update NetworkLoadBalancer

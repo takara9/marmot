@@ -197,13 +197,19 @@ func normalizeLoadBalancerSpec(spec *api.ApplicationLoadBalancerSpec) error {
 		}
 
 		if listener.HealthCheck != nil {
-			listener.HealthCheck.Path = strings.TrimSpace(listener.HealthCheck.Path)
+			if listener.HealthCheck.Path != nil {
+				trimmedPath := strings.TrimSpace(*listener.HealthCheck.Path)
+				listener.HealthCheck.Path = &trimmedPath
+			}
 			if listener.HealthCheck.Enabled && listener.Protocol != "HTTP" {
 				return fmt.Errorf("spec.listeners[%d].healthCheck can be enabled only for HTTP listeners", index)
 			}
 		}
 		if listener.SessionPersistence != nil {
-			listener.SessionPersistence.CookieName = strings.TrimSpace(listener.SessionPersistence.CookieName)
+			if listener.SessionPersistence.CookieName != nil {
+				trimmedCookieName := strings.TrimSpace(*listener.SessionPersistence.CookieName)
+				listener.SessionPersistence.CookieName = &trimmedCookieName
+			}
 			if listener.SessionPersistence.Enabled && listener.Protocol != "HTTP" {
 				return fmt.Errorf("spec.listeners[%d].sessionPersistence can be enabled only for HTTP listeners", index)
 			}

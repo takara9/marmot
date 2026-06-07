@@ -12,6 +12,67 @@
     - name: Apply sysctl configuration
       ansible.builtin.command: sysctl -p
 
+    - name: Ensure directory for persisted iptables rules exists
+      ansible.builtin.file:
+        path: /etc/marmot/iptables
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Install NLB iptables restore script
+      ansible.builtin.copy:
+        dest: /usr/local/sbin/marmot-nlb-iptables-restore.sh
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          RULES_FILE="/etc/marmot/iptables/nlb-rules.v4"
+          if [[ ! -s "${RULES_FILE}" ]]; then
+            exit 0
+          fi
+
+          IPTABLES_RESTORE="$(command -v iptables-restore || true)"
+          if [[ -z "${IPTABLES_RESTORE}" ]]; then
+            IPTABLES_RESTORE="/sbin/iptables-restore"
+          fi
+
+          "${IPTABLES_RESTORE}" < "${RULES_FILE}"
+
+    - name: Install NLB iptables restore service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/marmot-nlb-iptables-restore.service
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Marmot NLB iptables restore
+          DefaultDependencies=no
+          Wants=network-pre.target
+          After=network-pre.target local-fs.target
+          Before=network.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/sbin/marmot-nlb-iptables-restore.sh
+          RemainAfterExit=yes
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Reload systemd manager configuration
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Enable NLB iptables restore service
+      ansible.builtin.systemd:
+        name: marmot-nlb-iptables-restore.service
+        enabled: true
+
     - name: Ensure NLB dedicated filter chains exist
       ansible.builtin.shell: |
         set -euo pipefail
@@ -172,3 +233,10 @@
       args:
         executable: /bin/bash
 {{- end }}
+
+    - name: Persist iptables rules for reboot
+      ansible.builtin.shell: |
+        set -euo pipefail
+        iptables-save > /etc/marmot/iptables/nlb-rules.v4
+      args:
+        executable: /bin/bash
