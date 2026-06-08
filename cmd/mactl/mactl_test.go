@@ -452,14 +452,18 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 		var imageID string
 		It("OSイメージの登録", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "image", "create", "--configfile", "testdata/test-image-01-ubuntu22.yaml", "--output", "json")
-			stdoutStderr, err := cmd.CombinedOutput()
-			Expect(err).NotTo(HaveOccurred())
-			fmt.Println(string(stdoutStderr))
-			var image api.Success
-			err = json.Unmarshal(stdoutStderr, &image)
-			Expect(err).NotTo(HaveOccurred())
-			imageID = image.Id
+			Eventually(func(g Gomega) {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "image", "create", "--configfile", "testdata/test-image-01-ubuntu22.yaml", "--output", "json")
+				stdoutStderr, err := cmd.CombinedOutput()
+				GinkgoWriter.Println(string(stdoutStderr))
+				g.Expect(err).NotTo(HaveOccurred(), string(stdoutStderr))
+
+				var image api.Success
+				err = json.Unmarshal(stdoutStderr, &image)
+				g.Expect(err).NotTo(HaveOccurred(), string(stdoutStderr))
+				g.Expect(strings.TrimSpace(image.Id)).NotTo(BeEmpty(), string(stdoutStderr))
+				imageID = image.Id
+			}, 60*time.Second, 3*time.Second).Should(Succeed())
 		})
 
 		It("OSイメージの個別詳細取得", func() {
