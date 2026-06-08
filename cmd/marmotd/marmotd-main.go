@@ -133,10 +133,17 @@ func main() {
 		return
 	}
 
-	// ロードバランサーコントローラー
+	// アプリケーションロードバランサーコントローラー
 	_, err = controller.StartApplicationLoadBalancerController(cfg.NodeName, cfg.EtcdURL)
 	if err != nil {
-		slog.Error("Failed to start load balancer controller", "err", err)
+		slog.Error("Failed to start application load balancer controller", "err", err)
+		return
+	}
+
+	// ネットワークロードバランサーコントローラー
+	_, err = controller.StartNetworkLoadBalancerController(cfg.NodeName, cfg.EtcdURL)
+	if err != nil {
+		slog.Error("Failed to start network load balancer controller", "err", err)
 		return
 	}
 

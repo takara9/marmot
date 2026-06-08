@@ -13,18 +13,18 @@ import (
 	"github.com/takara9/marmot/pkg/util"
 )
 
-func (s *Server) ApiCreateLoadBalancer(ctx echo.Context) error {
-	var rec api.ApplicationLoadBalancer
+func (s *Server) ApiCreateNetworkLoadBalancer(ctx echo.Context) error {
+	var rec api.NetworkLoadBalancer
 	if err := ctx.Bind(&rec); err != nil {
 		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: "invalid request body"})
 	}
 
 	assignNodeNameIfUnset(&rec.Metadata, s.Ma.NodeName)
-	if err := normalizeLoadBalancerResource(&rec); err != nil {
+	if err := normalizeNetworkLoadBalancerResource(&rec); err != nil {
 		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	created, err := s.Ma.Db.CreateLoadBalancer(rec)
+	created, err := s.Ma.Db.CreateNetworkLoadBalancer(rec)
 	if err != nil {
 		if errors.Is(err, db.ErrFound) {
 			return ctx.JSON(http.StatusConflict, api.Error{Code: 1, Message: err.Error()})
@@ -35,16 +35,16 @@ func (s *Server) ApiCreateLoadBalancer(ctx echo.Context) error {
 	return ctx.JSON(http.StatusCreated, created)
 }
 
-func (s *Server) ApiGetLoadBalancers(ctx echo.Context) error {
-	items, err := s.Ma.Db.GetLoadBalancers()
+func (s *Server) ApiGetNetworkLoadBalancers(ctx echo.Context) error {
+	items, err := s.Ma.Db.GetNetworkLoadBalancers()
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 	return ctx.JSON(http.StatusOK, items)
 }
 
-func (s *Server) ApiGetLoadBalancerById(ctx echo.Context, id string) error {
-	rec, err := s.Ma.Db.GetLoadBalancerById(id)
+func (s *Server) ApiGetNetworkLoadBalancerById(ctx echo.Context, id string) error {
+	rec, err := s.Ma.Db.GetNetworkLoadBalancerById(id)
 	if err != nil {
 		if errors.Is(err, db.ErrNotFound) {
 			return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "IDが存在しません"})
@@ -54,8 +54,8 @@ func (s *Server) ApiGetLoadBalancerById(ctx echo.Context, id string) error {
 	return ctx.JSON(http.StatusOK, rec)
 }
 
-func (s *Server) ApiUpdateLoadBalancerById(ctx echo.Context, id string) error {
-	current, err := s.Ma.Db.GetLoadBalancerById(id)
+func (s *Server) ApiUpdateNetworkLoadBalancerById(ctx echo.Context, id string) error {
+	current, err := s.Ma.Db.GetNetworkLoadBalancerById(id)
 	if err != nil {
 		if errors.Is(err, db.ErrNotFound) {
 			return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "IDが存在しません"})
@@ -63,50 +63,50 @@ func (s *Server) ApiUpdateLoadBalancerById(ctx echo.Context, id string) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	var req api.ApplicationLoadBalancer
+	var req api.NetworkLoadBalancer
 	if err := ctx.Bind(&req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: "invalid request body"})
 	}
-	if err := normalizeLoadBalancerSpec(&req.Spec); err != nil {
+	if err := normalizeNetworkLoadBalancerSpec(&req.Spec); err != nil {
 		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: err.Error()})
 	}
-	if changedImmutableLoadBalancerField(current, req) {
+	if changedImmutableNetworkLoadBalancerField(current, req) {
 		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: "immutable fields changed: spec.bindPublicIpAddress, spec.internalVirtualNetwork"})
 	}
 
 	current.Spec.Listeners = req.Spec.Listeners
 	current.Spec.RemoteCIDR = req.Spec.RemoteCIDR
-	if err := s.Ma.Db.UpdateLoadBalancerById(id, current); err != nil {
+	if err := s.Ma.Db.UpdateNetworkLoadBalancerById(id, current); err != nil {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	return ctx.JSON(http.StatusOK, api.Success{Id: id, Message: util.StringPtr("Accepted the request to update the load balancer")})
+	return ctx.JSON(http.StatusOK, api.Success{Id: id, Message: util.StringPtr("Accepted the request to update the network load balancer")})
 }
 
-func (s *Server) ApiDeleteLoadBalancerById(ctx echo.Context, id string) error {
-	if _, err := s.Ma.Db.GetLoadBalancerById(id); err != nil {
+func (s *Server) ApiDeleteNetworkLoadBalancerById(ctx echo.Context, id string) error {
+	if _, err := s.Ma.Db.GetNetworkLoadBalancerById(id); err != nil {
 		if errors.Is(err, db.ErrNotFound) {
 			return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "IDが存在しません"})
 		}
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-	if err := s.Ma.Db.SetDeleteTimestampLoadBalancer(id); err != nil {
+	if err := s.Ma.Db.SetDeleteTimestampNetworkLoadBalancer(id); err != nil {
 		if errors.Is(err, db.ErrNotFound) {
 			return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "IDが存在しません"})
 		}
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-	return ctx.JSON(http.StatusOK, api.Success{Id: id, Message: util.StringPtr("Accepted the request to delete the load balancer")})
+	return ctx.JSON(http.StatusOK, api.Success{Id: id, Message: util.StringPtr("Accepted the request to delete the network load balancer")})
 }
 
-func changedImmutableLoadBalancerField(current api.ApplicationLoadBalancer, req api.ApplicationLoadBalancer) bool {
+func changedImmutableNetworkLoadBalancerField(current api.NetworkLoadBalancer, req api.NetworkLoadBalancer) bool {
 	return strings.TrimSpace(current.Spec.BindPublicIpAddress) != strings.TrimSpace(req.Spec.BindPublicIpAddress) ||
 		strings.TrimSpace(current.Spec.InternalVirtualNetwork) != strings.TrimSpace(req.Spec.InternalVirtualNetwork)
 }
 
-func normalizeLoadBalancerResource(rec *api.ApplicationLoadBalancer) error {
+func normalizeNetworkLoadBalancerResource(rec *api.NetworkLoadBalancer) error {
 	if rec == nil {
-		return fmt.Errorf("load balancer is nil")
+		return fmt.Errorf("network load balancer is nil")
 	}
 	if strings.TrimSpace(rec.ApiVersion) == "" {
 		return fmt.Errorf("apiVersion is required")
@@ -117,10 +117,10 @@ func normalizeLoadBalancerResource(rec *api.ApplicationLoadBalancer) error {
 	if strings.TrimSpace(rec.Metadata.Name) == "" {
 		return fmt.Errorf("metadata.name is required")
 	}
-	return normalizeLoadBalancerSpec(&rec.Spec)
+	return normalizeNetworkLoadBalancerSpec(&rec.Spec)
 }
 
-func normalizeLoadBalancerSpec(spec *api.ApplicationLoadBalancerSpec) error {
+func normalizeNetworkLoadBalancerSpec(spec *api.NetworkLoadBalancerSpec) error {
 	if spec == nil {
 		return fmt.Errorf("spec is required")
 	}
@@ -166,9 +166,9 @@ func normalizeLoadBalancerSpec(spec *api.ApplicationLoadBalancerSpec) error {
 		}
 		seenNames[listener.Name] = struct{}{}
 
-		listener.Protocol = strings.ToUpper(strings.TrimSpace(listener.Protocol))
-		if listener.Protocol != "HTTP" && listener.Protocol != "TCP" && listener.Protocol != "UDP" {
-			return fmt.Errorf("spec.listeners[%d].protocol must be one of HTTP/TCP/UDP", index)
+		listener.Protocol = strings.ToLower(strings.TrimSpace(listener.Protocol))
+		if listener.Protocol != "tcp" && listener.Protocol != "udp" {
+			return fmt.Errorf("spec.listeners[%d].protocol must be tcp or udp", index)
 		}
 		if listener.VipPort < 1 || listener.VipPort > 65535 {
 			return fmt.Errorf("spec.listeners[%d].vipPort must be between 1 and 65535", index)
@@ -187,31 +187,9 @@ func normalizeLoadBalancerSpec(spec *api.ApplicationLoadBalancerSpec) error {
 			delete(listener.BackendSelector.MatchLabels, key)
 			listener.BackendSelector.MatchLabels[strings.TrimSpace(key)] = strings.TrimSpace(value)
 		}
-
-		listener.LoadBalancingAlgorithm = strings.ToLower(strings.TrimSpace(listener.LoadBalancingAlgorithm))
-		if listener.LoadBalancingAlgorithm == "" {
-			listener.LoadBalancingAlgorithm = "roundrobin"
-		}
-		if listener.LoadBalancingAlgorithm != "roundrobin" && listener.LoadBalancingAlgorithm != "random" {
-			return fmt.Errorf("spec.listeners[%d].loadBalancingAlgorithm must be random or roundrobin", index)
-		}
-
-		if listener.HealthCheck != nil {
-			if listener.HealthCheck.Path != nil {
-				trimmedPath := strings.TrimSpace(*listener.HealthCheck.Path)
-				listener.HealthCheck.Path = &trimmedPath
-			}
-			if listener.HealthCheck.Enabled && listener.Protocol != "HTTP" {
-				return fmt.Errorf("spec.listeners[%d].healthCheck can be enabled only for HTTP listeners", index)
-			}
-		}
 		if listener.SessionPersistence != nil {
-			if listener.SessionPersistence.CookieName != nil {
-				trimmedCookieName := strings.TrimSpace(*listener.SessionPersistence.CookieName)
-				listener.SessionPersistence.CookieName = &trimmedCookieName
-			}
-			if listener.SessionPersistence.Enabled && listener.Protocol != "HTTP" {
-				return fmt.Errorf("spec.listeners[%d].sessionPersistence can be enabled only for HTTP listeners", index)
+			if listener.SessionPersistence.Enabled {
+				listener.SessionPersistence.Enabled = true
 			}
 		}
 	}

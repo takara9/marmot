@@ -162,26 +162,30 @@ func normalizeVpnGatewaySpec(spec *api.VpnGatewaySpec) error {
 	spec.InternalVirtualNetwork = vnet
 
 	seen := map[string]struct{}{}
-	normalized := make([]string, 0, len(spec.RemoteCIDRs))
-	for _, cidr := range spec.RemoteCIDRs {
-		trimmed := strings.TrimSpace(cidr)
-		if trimmed == "" {
-			continue
+	normalized := make([]string, 0)
+	if spec.RemoteCIDRs != nil {
+		normalized = make([]string, 0, len(*spec.RemoteCIDRs))
+		for _, cidr := range *spec.RemoteCIDRs {
+			trimmed := strings.TrimSpace(cidr)
+			if trimmed == "" {
+				continue
+			}
+			ip, _, err := net.ParseCIDR(trimmed)
+			if err != nil {
+				return fmt.Errorf("spec.remoteCIDRs contains an invalid CIDR: %s", trimmed)
+			}
+			if ip == nil || ip.To4() == nil {
+				return fmt.Errorf("spec.remoteCIDRs must contain only IPv4 CIDRs")
+			}
+			if _, ok := seen[trimmed]; ok {
+				continue
+			}
+			seen[trimmed] = struct{}{}
+			normalized = append(normalized, trimmed)
 		}
-		ip, _, err := net.ParseCIDR(trimmed)
-		if err != nil {
-			return fmt.Errorf("spec.remoteCIDRs contains an invalid CIDR: %s", trimmed)
-		}
-		if ip == nil || ip.To4() == nil {
-			return fmt.Errorf("spec.remoteCIDRs must contain only IPv4 CIDRs")
-		}
-		if _, ok := seen[trimmed]; ok {
-			continue
-		}
-		seen[trimmed] = struct{}{}
-		normalized = append(normalized, trimmed)
 	}
 	sort.Strings(normalized)
-	spec.RemoteCIDRs = normalized
+	normalizedCIDRs := append([]string(nil), normalized...)
+	spec.RemoteCIDRs = &normalizedCIDRs
 	return nil
 }

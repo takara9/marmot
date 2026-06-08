@@ -13,6 +13,24 @@ import (
 )
 
 var _ = Describe("ReadYamlConfig", func() {
+	It("decodes lowerCamel keys like apiVersion and sourceUrl", func() {
+		tmpDir := GinkgoT().TempDir()
+		configPath := filepath.Join(tmpDir, "image.yaml")
+		content := "apiVersion: v1\nkind: Image\nmetadata:\n  name: ubuntu22.04\nspec:\n  sourceUrl: http://hmc/ubuntu-22.04-server-cloudimg-amd64.img\n"
+
+		err := os.WriteFile(configPath, []byte(content), 0o600)
+		Expect(err).NotTo(HaveOccurred())
+
+		var conf api.Image
+		err = config.ReadYamlConfig(configPath, &conf)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(conf.ApiVersion).To(Equal("v1"))
+		Expect(conf.Kind).To(Equal("Image"))
+		Expect(conf.Metadata.Name).To(Equal("ubuntu22.04"))
+		Expect(conf.Spec.SourceUrl).NotTo(BeNil())
+		Expect(*conf.Spec.SourceUrl).To(Equal("http://hmc/ubuntu-22.04-server-cloudimg-amd64.img"))
+	})
+
 	It("reads a YAML config from a file", func() {
 		tmpDir := GinkgoT().TempDir()
 		configPath := filepath.Join(tmpDir, "server.yaml")

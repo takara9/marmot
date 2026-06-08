@@ -115,16 +115,19 @@ func renderGatewayPlaybook(playbookPath string, targetIP string, serverPorts []s
 }
 
 func gatewayRemoteCIDRs(spec api.GatewaySpec) []string {
-	remoteCIDRs := make([]string, 0, len(spec.RemoteCIDRs)+1)
-	if len(spec.RemoteCIDRs) > 0 {
-		for _, cidr := range spec.RemoteCIDRs {
+	remoteCIDRs := make([]string, 0)
+	if spec.RemoteCIDRs != nil {
+		remoteCIDRs = make([]string, 0, len(*spec.RemoteCIDRs)+1)
+		for _, cidr := range *spec.RemoteCIDRs {
 			trimmed := strings.TrimSpace(cidr)
 			if trimmed != "" {
 				remoteCIDRs = append(remoteCIDRs, trimmed)
 			}
 		}
-	} else if trimmed := strings.TrimSpace(spec.RemoteCIDR); trimmed != "" {
+	} else if spec.RemoteCIDR != nil {
+		if trimmed := strings.TrimSpace(*spec.RemoteCIDR); trimmed != "" {
 		remoteCIDRs = append(remoteCIDRs, trimmed)
+		}
 	}
 	if len(remoteCIDRs) == 0 {
 		return []string{"0.0.0.0/0"}

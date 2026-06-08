@@ -1,0 +1,242 @@
+---
+- hosts: all
+  gather_facts: false
+  tasks:
+    - name: Ensure IPv4 forwarding is enabled
+      ansible.builtin.lineinfile:
+        path: /etc/sysctl.conf
+        regexp: '^net.ipv4.ip_forward='
+        line: net.ipv4.ip_forward=1
+        create: true
+
+    - name: Apply sysctl configuration
+      ansible.builtin.command: sysctl -p
+
+    - name: Ensure directory for persisted iptables rules exists
+      ansible.builtin.file:
+        path: /etc/marmot/iptables
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Install NLB iptables restore script
+      ansible.builtin.copy:
+        dest: /usr/local/sbin/marmot-nlb-iptables-restore.sh
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          RULES_FILE="/etc/marmot/iptables/nlb-rules.v4"
+          if [[ ! -s "${RULES_FILE}" ]]; then
+            exit 0
+          fi
+
+          IPTABLES_RESTORE="$(command -v iptables-restore || true)"
+          if [[ -z "${IPTABLES_RESTORE}" ]]; then
+            IPTABLES_RESTORE="/sbin/iptables-restore"
+          fi
+
+          "${IPTABLES_RESTORE}" < "${RULES_FILE}"
+
+    - name: Install NLB iptables restore service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/marmot-nlb-iptables-restore.service
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Marmot NLB iptables restore
+          DefaultDependencies=no
+          Wants=network-pre.target
+          After=network-pre.target local-fs.target
+          Before=network.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/sbin/marmot-nlb-iptables-restore.sh
+          RemainAfterExit=yes
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Reload systemd manager configuration
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Enable NLB iptables restore service
+      ansible.builtin.systemd:
+        name: marmot-nlb-iptables-restore.service
+        enabled: true
+
+    - name: Ensure NLB dedicated filter chains exist
+      ansible.builtin.shell: |
+        set -euo pipefail
+        iptables -N MARMOT-NLB-INPUT 2>/dev/null || true
+        iptables -N MARMOT-NLB-FORWARD 2>/dev/null || true
+      args:
+        executable: /bin/bash
+
+    - name: Ensure NLB dedicated nat chain exists
+      ansible.builtin.shell: |
+        set -euo pipefail
+        iptables -t nat -N MARMOT-NLB-PREROUTING 2>/dev/null || true
+        iptables -t nat -N MARMOT-NLB-POSTROUTING 2>/dev/null || true
+      args:
+        executable: /bin/bash
+
+    - name: Flush NLB dedicated filter chains
+      ansible.builtin.command: iptables -F {{ "{{ item }}" }}
+      loop:
+        - MARMOT-NLB-INPUT
+        - MARMOT-NLB-FORWARD
+
+    - name: Flush NLB dedicated nat chains
+      ansible.builtin.command: iptables -t nat -F {{ "{{ item }}" }}
+      loop:
+        - MARMOT-NLB-PREROUTING
+        - MARMOT-NLB-POSTROUTING
+
+    - name: Rebind INPUT jump to NLB dedicated chain at top
+      ansible.builtin.shell: |
+        set -euo pipefail
+        while iptables -C INPUT -j MARMOT-NLB-INPUT 2>/dev/null; do
+          iptables -D INPUT -j MARMOT-NLB-INPUT
+        done
+        iptables -I INPUT 1 -j MARMOT-NLB-INPUT
+      args:
+        executable: /bin/bash
+
+    - name: Rebind FORWARD jump to NLB dedicated chain at top
+      ansible.builtin.shell: |
+        set -euo pipefail
+        while iptables -C FORWARD -j MARMOT-NLB-FORWARD 2>/dev/null; do
+          iptables -D FORWARD -j MARMOT-NLB-FORWARD
+        done
+        iptables -I FORWARD 1 -j MARMOT-NLB-FORWARD
+      args:
+        executable: /bin/bash
+
+    - name: Rebind PREROUTING jump to NLB dedicated nat chain at top
+      ansible.builtin.shell: |
+        set -euo pipefail
+        while iptables -t nat -C PREROUTING -j MARMOT-NLB-PREROUTING 2>/dev/null; do
+          iptables -t nat -D PREROUTING -j MARMOT-NLB-PREROUTING
+        done
+        iptables -t nat -I PREROUTING 1 -j MARMOT-NLB-PREROUTING
+      args:
+        executable: /bin/bash
+
+    - name: Rebind POSTROUTING jump to NLB dedicated nat chain at top
+      ansible.builtin.shell: |
+        set -euo pipefail
+        while iptables -t nat -C POSTROUTING -j MARMOT-NLB-POSTROUTING 2>/dev/null; do
+          iptables -t nat -D POSTROUTING -j MARMOT-NLB-POSTROUTING
+        done
+        iptables -t nat -I POSTROUTING 1 -j MARMOT-NLB-POSTROUTING
+      args:
+        executable: /bin/bash
+
+    - name: Allow established input traffic
+      ansible.builtin.iptables:
+        table: filter
+        chain: MARMOT-NLB-INPUT
+        ctstate:
+          - ESTABLISHED
+          - RELATED
+        jump: ACCEPT
+        comment: marmot-network-load-balancer
+
+    - name: Allow established forwarded traffic
+      ansible.builtin.iptables:
+        table: filter
+        chain: MARMOT-NLB-FORWARD
+        ctstate:
+          - ESTABLISHED
+          - RELATED
+        jump: ACCEPT
+        comment: marmot-network-load-balancer
+
+    - name: Allow loopback input traffic
+      ansible.builtin.iptables:
+        table: filter
+        chain: MARMOT-NLB-INPUT
+        in_interface: lo
+        jump: ACCEPT
+        comment: marmot-network-load-balancer
+
+{{- if .RemoteCIDR }}
+    - name: Allow input traffic from {{ .RemoteCIDR }}
+      ansible.builtin.iptables:
+        table: filter
+        chain: MARMOT-NLB-INPUT
+        source: {{ .RemoteCIDR }}
+        jump: ACCEPT
+        comment: marmot-network-load-balancer
+
+    - name: Allow forwarded traffic from {{ .RemoteCIDR }}
+      ansible.builtin.iptables:
+        table: filter
+        chain: MARMOT-NLB-FORWARD
+        source: {{ .RemoteCIDR }}
+        jump: ACCEPT
+        comment: marmot-network-load-balancer
+{{- end }}
+
+    - name: Drop all remaining input traffic
+      ansible.builtin.iptables:
+        table: filter
+        chain: MARMOT-NLB-INPUT
+        jump: DROP
+        comment: marmot-network-load-balancer
+
+    - name: Drop all remaining forwarded traffic
+      ansible.builtin.iptables:
+        table: filter
+        chain: MARMOT-NLB-FORWARD
+        jump: DROP
+        comment: marmot-network-load-balancer
+
+{{- range .Listeners }}
+{{- $listener := . }}
+    - name: Configure listener {{ .Name }}
+      ansible.builtin.shell: |
+        set -euo pipefail
+        iptables -t nat -N {{ .ChainName }} 2>/dev/null || true
+        iptables -t nat -F {{ .ChainName }}
+        while iptables -t nat -C MARMOT-NLB-PREROUTING -p {{ .Protocol }} --dport {{ .VipPort }} -j {{ .ChainName }} 2>/dev/null; do
+          iptables -t nat -D MARMOT-NLB-PREROUTING -p {{ .Protocol }} --dport {{ .VipPort }} -j {{ .ChainName }}
+        done
+        iptables -t nat -I MARMOT-NLB-PREROUTING 1 -p {{ .Protocol }} --dport {{ .VipPort }} -j {{ .ChainName }}
+{{ if $.RemoteCIDR }}
+        while iptables -t filter -C MARMOT-NLB-FORWARD -s {{ $.RemoteCIDR }} -p {{ .Protocol }} --dport {{ .BackendPort }} -j ACCEPT 2>/dev/null; do
+          iptables -t filter -D MARMOT-NLB-FORWARD -s {{ $.RemoteCIDR }} -p {{ .Protocol }} --dport {{ .BackendPort }} -j ACCEPT
+        done
+        iptables -t filter -I MARMOT-NLB-FORWARD 1 -s {{ $.RemoteCIDR }} -p {{ .Protocol }} --dport {{ .BackendPort }} -j ACCEPT
+{{ else }}
+        while iptables -t filter -C MARMOT-NLB-FORWARD -p {{ .Protocol }} --dport {{ .BackendPort }} -j ACCEPT 2>/dev/null; do
+          iptables -t filter -D MARMOT-NLB-FORWARD -p {{ .Protocol }} --dport {{ .BackendPort }} -j ACCEPT
+        done
+        iptables -t filter -I MARMOT-NLB-FORWARD 1 -p {{ .Protocol }} --dport {{ .BackendPort }} -j ACCEPT
+{{ end }}
+{{ range .BackendRules }}
+        while iptables -t nat -C MARMOT-NLB-POSTROUTING -p {{ $listener.Protocol }} -d {{ .IP }} --dport {{ $listener.BackendPort }} -j MASQUERADE 2>/dev/null; do
+          iptables -t nat -D MARMOT-NLB-POSTROUTING -p {{ $listener.Protocol }} -d {{ .IP }} --dport {{ $listener.BackendPort }} -j MASQUERADE
+        done
+        iptables -t nat -A MARMOT-NLB-POSTROUTING -p {{ $listener.Protocol }} -d {{ .IP }} --dport {{ $listener.BackendPort }} -j MASQUERADE
+        iptables -t nat -A {{ $listener.ChainName }} -p {{ $listener.Protocol }}{{ if .Probability }} -m statistic --mode random --probability {{ .Probability }}{{ end }} -j DNAT --to-destination {{ .IP }}:{{ $listener.BackendPort }}
+{{ end }}
+      args:
+        executable: /bin/bash
+{{- end }}
+
+    - name: Persist iptables rules for reboot
+      ansible.builtin.shell: |
+        set -euo pipefail
+        iptables-save > /etc/marmot/iptables/nlb-rules.v4
+      args:
+        executable: /bin/bash

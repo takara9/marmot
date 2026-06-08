@@ -308,14 +308,20 @@ func buildApplicationLoadBalancerHAProxyConfig(loadBalancer api.ApplicationLoadB
 		b.WriteString("  mode " + mode + "\n")
 		b.WriteString("  balance " + algorithm + "\n")
 		if listener.HealthCheck != nil && listener.HealthCheck.Enabled && mode == "http" {
-			path := strings.TrimSpace(listener.HealthCheck.Path)
+			path := ""
+			if listener.HealthCheck.Path != nil {
+				path = strings.TrimSpace(*listener.HealthCheck.Path)
+			}
 			if path == "" {
 				path = "/healthz"
 			}
 			b.WriteString("  option httpchk GET " + path + "\n")
 		}
 		if listener.SessionPersistence != nil && listener.SessionPersistence.Enabled && mode == "http" {
-			cookieName := strings.TrimSpace(listener.SessionPersistence.CookieName)
+			cookieName := ""
+			if listener.SessionPersistence.CookieName != nil {
+				cookieName = strings.TrimSpace(*listener.SessionPersistence.CookieName)
+			}
 			if cookieName == "" {
 				cookieName = sanitizeCookieName(loadBalancer.Metadata.Name)
 			}

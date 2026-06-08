@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -300,6 +301,13 @@ func (c *controller) networkControllerLoop(fabric networkfabric.NetworkFabric) {
 
 func (c *controller) reconcileHeadProvisioningNetwork(vnet api.VirtualNetwork, fabric networkfabric.NetworkFabric) error {
 	vnetID := api.VirtualNetworkID(vnet)
+	if _, err := c.db.GetVirtualNetworkById(vnetID); err != nil {
+		if errors.Is(err, db.ErrNotFound) {
+			slog.Info("skip reconcile for deleted head network", "networkId", vnetID)
+			return nil
+		}
+		return fmt.Errorf("db:lookup-failed:%w", err)
+	}
 
 	c.db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_PROVISIONING, "fabric:ensure-bridge")
 	if err := fabric.EnsureBridge(&vnet); err != nil {

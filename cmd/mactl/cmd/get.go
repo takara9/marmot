@@ -23,7 +23,7 @@ var getManifestFile string
 var getCmd = &cobra.Command{
 	Use:   "get [RESOURCE [NAME]]",
 	Short: "Get resource(s) of a specific type",
-	Long:  `Get resource(s) (server/srv, image/img, volume/vol, network/net, gateway/gw, applicationloadbalancer/alb, vpngateway/vpngw). If NAME is provided, show only that resource. Otherwise, list all resources. With -f, process manifest(s) and query by metadata.name for each document.`,
+	Long:  `Get resource(s) (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw, applicationloadbalancer/alb, networkloadbalancer/nlb). If NAME is provided, show only that resource. Otherwise, list all resources. With -f, process manifest(s) and query by metadata.name for each document.`,
 	Args:  cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if strings.TrimSpace(getManifestFile) != "" {
@@ -85,13 +85,163 @@ func getResourceByTypeAndName(resourceName string, resourceSpec string) error {
 		return getNetworkResources(resourceSpec)
 	case "gateway":
 		return getGatewayResources(resourceSpec)
-	case "applicationloadbalancer":
-		return getLoadBalancerResources(resourceSpec)
 	case "vpngateway":
 		return getVpnGatewayResources(resourceSpec)
+	case "applicationloadbalancer":
+		return getLoadBalancerResources(resourceSpec)
+	case "networkloadbalancer":
+		return getNetworkLoadBalancerResources(resourceSpec)
 	default:
 		return fmt.Errorf("unknown resource type: %s", resourceName)
 	}
+}
+
+func getLoadBalancerResources(name string) error {
+	listFn := func() error {
+		m, err := getClientConfig()
+		if err != nil {
+			return fmt.Errorf("failed to get client config: %w", err)
+		}
+
+		list, _, err := m.GetLoadBalancers()
+		if err != nil {
+			return fmt.Errorf("failed to list application load balancers: %w", err)
+		}
+
+		var items []api.ApplicationLoadBalancer
+		if err := json.Unmarshal(list, &items); err != nil {
+			return fmt.Errorf("failed to parse application load balancers: %w", err)
+		}
+
+		if name != "" {
+			filtered := make([]api.ApplicationLoadBalancer, 0)
+			for _, item := range items {
+				if item.Metadata.Name == name {
+					filtered = append(filtered, item)
+				}
+			}
+			items = filtered
+			if len(items) == 0 {
+				fmt.Printf("no application load balancer found with name %q\n", name)
+				return nil
+			}
+		}
+
+		sort.SliceStable(items, func(i, j int) bool {
+			return creationTime(items[i].Status).Before(creationTime(items[j].Status))
+		})
+
+		switch outputStyle {
+		case "text":
+			fmt.Printf("%-16s  %-14s  %-16s  %-12s  %-9s  %-8s\n", "NAME", "INTERNAL-NET", "PUBLIC-IP", "STATUS", "LISTENERS", "AGE")
+			fmt.Printf("%-16s  %-14s  %-16s  %-12s  %-9s  %-8s\n", "----", "------------", "---------", "------", "---------", "---")
+			for _, item := range items {
+				internalNet := "-"
+				if strings.TrimSpace(item.Spec.InternalVirtualNetwork) != "" {
+					internalNet = strings.TrimSpace(item.Spec.InternalVirtualNetwork)
+				}
+				publicIP := "-"
+				if strings.TrimSpace(item.Spec.BindPublicIpAddress) != "" {
+					publicIP = strings.TrimSpace(item.Spec.BindPublicIpAddress)
+				}
+				status := "-"
+				if item.Status != nil && item.Status.Status != nil && strings.TrimSpace(*item.Status.Status) != "" {
+					status = strings.TrimSpace(*item.Status.Status)
+				}
+				fmt.Printf("%-16s  %-14s  %-16s  %-12s  %-9d  %-8s\n", item.Metadata.Name, internalNet, publicIP, status, len(item.Spec.Listeners), formatServerAge(item.Status))
+			}
+			return nil
+		case "json":
+			data, _ := json.Marshal(items)
+			fmt.Println(string(data))
+			return nil
+		case "yaml":
+			data, err := yaml.Marshal(items)
+			if err != nil {
+				return fmt.Errorf("failed to marshal application load balancers to YAML: %w", err)
+			}
+			fmt.Print(string(data))
+			return nil
+		default:
+			return fmt.Errorf("output style must be text/json/yaml")
+		}
+	}
+
+	return runList(listFn)
+}
+
+func getNetworkLoadBalancerResources(name string) error {
+	listFn := func() error {
+		m, err := getClientConfig()
+		if err != nil {
+			return fmt.Errorf("failed to get client config: %w", err)
+		}
+
+		list, _, err := m.GetNetworkLoadBalancers()
+		if err != nil {
+			return fmt.Errorf("failed to list network load balancers: %w", err)
+		}
+
+		var items []api.NetworkLoadBalancer
+		if err := json.Unmarshal(list, &items); err != nil {
+			return fmt.Errorf("failed to parse network load balancers: %w", err)
+		}
+
+		if name != "" {
+			filtered := make([]api.NetworkLoadBalancer, 0)
+			for _, item := range items {
+				if item.Metadata.Name == name {
+					filtered = append(filtered, item)
+				}
+			}
+			items = filtered
+			if len(items) == 0 {
+				fmt.Printf("no network load balancer found with name %q\n", name)
+				return nil
+			}
+		}
+
+		sort.SliceStable(items, func(i, j int) bool {
+			return creationTime(items[i].Status).Before(creationTime(items[j].Status))
+		})
+
+		switch outputStyle {
+		case "text":
+			fmt.Printf("%-16s  %-14s  %-16s  %-12s  %-9s  %-8s\n", "NAME", "INTERNAL-NET", "PUBLIC-IP", "STATUS", "LISTENERS", "AGE")
+			fmt.Printf("%-16s  %-14s  %-16s  %-12s  %-9s  %-8s\n", "----", "------------", "---------", "------", "---------", "---")
+			for _, item := range items {
+				internalNet := "-"
+				if strings.TrimSpace(item.Spec.InternalVirtualNetwork) != "" {
+					internalNet = strings.TrimSpace(item.Spec.InternalVirtualNetwork)
+				}
+				publicIP := "-"
+				if strings.TrimSpace(item.Spec.BindPublicIpAddress) != "" {
+					publicIP = strings.TrimSpace(item.Spec.BindPublicIpAddress)
+				}
+				status := "-"
+				if item.Status != nil && item.Status.Status != nil && strings.TrimSpace(*item.Status.Status) != "" {
+					status = strings.TrimSpace(*item.Status.Status)
+				}
+				fmt.Printf("%-16s  %-14s  %-16s  %-12s  %-9d  %-8s\n", item.Metadata.Name, internalNet, publicIP, status, len(item.Spec.Listeners), formatServerAge(item.Status))
+			}
+			return nil
+		case "json":
+			data, _ := json.Marshal(items)
+			fmt.Println(string(data))
+			return nil
+		case "yaml":
+			data, err := yaml.Marshal(items)
+			if err != nil {
+				return fmt.Errorf("failed to marshal network load balancers to YAML: %w", err)
+			}
+			fmt.Print(string(data))
+			return nil
+		default:
+			return fmt.Errorf("output style must be text/json/yaml")
+		}
+	}
+
+	return runList(listFn)
 }
 
 func getServerResources(name string) error {
@@ -302,41 +452,6 @@ func getGatewayResources(name string) error {
 		}
 
 		return outputGateways(gateways)
-	}
-
-	return runList(listFn)
-}
-
-func getLoadBalancerResources(name string) error {
-	listFn := func() error {
-		m, err := getClientConfig()
-		if err != nil {
-			return fmt.Errorf("failed to get client config: %w", err)
-		}
-
-		list, _, err := m.GetLoadBalancers()
-		if err != nil {
-			return fmt.Errorf("failed to list load balancers: %w", err)
-		}
-
-		var items []api.ApplicationLoadBalancer
-		if err := json.Unmarshal(list, &items); err != nil {
-			return fmt.Errorf("failed to parse load balancers: %w", err)
-		}
-
-		if name != "" {
-			items = filterLoadBalancersByName(items, name)
-			if len(items) == 0 {
-				fmt.Printf("no load balancer found with name %q\n", name)
-				return nil
-			}
-		}
-
-		if labelSelector != "" {
-			items = filterLoadBalancersByLabel(items, labelSelector)
-		}
-
-		return outputLoadBalancers(items)
 	}
 
 	return runList(listFn)
@@ -572,26 +687,6 @@ func filterGatewaysByLabel(gateways []api.Gateway, labelFilter string) []api.Gat
 	return result
 }
 
-func filterLoadBalancersByName(items []api.ApplicationLoadBalancer, name string) []api.ApplicationLoadBalancer {
-	var result []api.ApplicationLoadBalancer
-	for _, item := range items {
-		if item.Metadata.Name == name {
-			result = append(result, item)
-		}
-	}
-	return result
-}
-
-func filterLoadBalancersByLabel(items []api.ApplicationLoadBalancer, labelFilter string) []api.ApplicationLoadBalancer {
-	var result []api.ApplicationLoadBalancer
-	for _, item := range items {
-		if MatchesLabel(convertLabels(item.Metadata.Labels), labelFilter) {
-			result = append(result, item)
-		}
-	}
-	return result
-}
-
 // ヘルパー関数
 func convertLabels(labels *map[string]interface{}) map[string]interface{} {
 	if labels == nil {
@@ -692,9 +787,9 @@ func outputServers(servers []api.Server) error {
 		sort.SliceStable(servers, func(i, j int) bool {
 			return creationTime(servers[i].Status).Before(creationTime(servers[j].Status))
 		})
-		//fmt.Println("NAME            NODE       STATUS     CPU  RAM(MB)  IP-ADDRESS       NETWORK")
-		//fmt.Println("----            ----       ------     ---  -------  ----------       -------")
-		fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s  %-6s\n",
+		//fmt.Println("NAME            NODE       STATUS     CPU  RAM(MB)  IP-ADDRESS       NETWORK        AGE")
+		//fmt.Println("----            ----       ------     ---  -------  ----------       -------        ---")
+		fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s  %s\n",
 			"NAME",
 			"NODE",
 			"STATUS",
@@ -704,7 +799,7 @@ func outputServers(servers []api.Server) error {
 			"NETWORK",
 			"AGE",
 		)
-		fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s  %-6s\n",
+		fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s  %s\n",
 			"----",
 			"----",
 			"------",
@@ -733,19 +828,35 @@ func outputServers(servers []api.Server) error {
 				status = *s.Status.Status
 			}
 			age := formatServerAge(s.Status)
-			networkLines := serverNetworkLinesForGet(s, getServerShowAll)
-			fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s  %-6s\n",
+			networkLines := serverNetworkLines(s)
+
+			// Filter out N/A network lines when getServerShowAll is false
+			filteredLines := networkLines
+			if !getServerShowAll {
+				filteredLines = make([]serverNetworkLine, 0, len(networkLines))
+				for _, line := range networkLines {
+					if line.address != "N/A" {
+						filteredLines = append(filteredLines, line)
+					}
+				}
+				// Ensure we have at least one line to display
+				if len(filteredLines) == 0 {
+					filteredLines = []serverNetworkLine{{address: "N/A", network: "N/A"}}
+				}
+			}
+
+			fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s  %s\n",
 				s.Metadata.Name,
 				node,
 				status,
 				cpu,
 				ram,
-				networkLines[0].address,
-				networkLines[0].network,
+				filteredLines[0].address,
+				filteredLines[0].network,
 				age,
 			)
-			for _, networkLine := range networkLines[1:] {
-				fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s  %-6s\n",
+			for _, networkLine := range filteredLines[1:] {
+				fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s  %s\n",
 					"",
 					"",
 					"",
@@ -775,24 +886,6 @@ func outputServers(servers []api.Server) error {
 	default:
 		return fmt.Errorf("output style must be text/json/yaml")
 	}
-}
-
-func serverNetworkLinesForGet(server api.Server, showAll bool) []serverNetworkLine {
-	lines := serverNetworkLines(server)
-	if showAll || len(lines) <= 1 {
-		return lines
-	}
-
-	result := make([]serverNetworkLine, 0, len(lines))
-	result = append(result, lines[0])
-	for _, line := range lines[1:] {
-		if line.address == "N/A" {
-			continue
-		}
-		result = append(result, line)
-	}
-
-	return result
 }
 
 func outputImages(images []api.Image) error {
@@ -1065,72 +1158,6 @@ func outputGateways(gateways []api.Gateway) error {
 		data, err := yaml.Marshal(gateways)
 		if err != nil {
 			return fmt.Errorf("failed to marshal gateways to YAML: %w", err)
-		}
-		fmt.Print(string(data))
-		return nil
-
-	default:
-		return fmt.Errorf("output style must be text/json/yaml")
-	}
-}
-
-func outputLoadBalancers(items []api.ApplicationLoadBalancer) error {
-	switch outputStyle {
-	case "text":
-		sort.SliceStable(items, func(i, j int) bool {
-			return creationTime(items[i].Status).Before(creationTime(items[j].Status))
-		})
-		fmt.Printf("%-14s  %-14s  %-16s  %-9s  %-12s  %-8s\n",
-			"NAME",
-			"INTERNAL-NET",
-			"PUBLIC-IP",
-			"LISTENERS",
-			"STATUS",
-			"AGE",
-		)
-		fmt.Printf("%-14s  %-14s  %-16s  %-9s  %-12s  %-8s\n",
-			"----",
-			"------------",
-			"---------",
-			"---------",
-			"------",
-			"---",
-		)
-
-		for _, item := range items {
-			internalNet := "-"
-			if strings.TrimSpace(item.Spec.InternalVirtualNetwork) != "" {
-				internalNet = strings.TrimSpace(item.Spec.InternalVirtualNetwork)
-			}
-			publicIP := "-"
-			if strings.TrimSpace(item.Spec.BindPublicIpAddress) != "" {
-				publicIP = strings.TrimSpace(item.Spec.BindPublicIpAddress)
-			}
-			status := "-"
-			if item.Status != nil && item.Status.Status != nil && strings.TrimSpace(*item.Status.Status) != "" {
-				status = strings.TrimSpace(*item.Status.Status)
-			}
-
-			fmt.Printf("%-14s  %-14s  %-16s  %-9d  %-12s  %-8s\n",
-				item.Metadata.Name,
-				internalNet,
-				publicIP,
-				len(item.Spec.Listeners),
-				status,
-				formatServerAge(item.Status),
-			)
-		}
-		return nil
-
-	case "json":
-		data, _ := json.Marshal(items)
-		fmt.Println(string(data))
-		return nil
-
-	case "yaml":
-		data, err := yaml.Marshal(items)
-		if err != nil {
-			return fmt.Errorf("failed to marshal load balancers to YAML: %w", err)
 		}
 		fmt.Print(string(data))
 		return nil

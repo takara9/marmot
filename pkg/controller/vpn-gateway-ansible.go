@@ -45,11 +45,14 @@ type vpnGatewayPlaybookData struct {
 }
 
 func desiredVpnGatewayConfigHash(vpnGateway api.VpnGateway) string {
-	remoteCIDRs := make([]string, 0, len(vpnGateway.Spec.RemoteCIDRs))
-	for _, cidr := range vpnGateway.Spec.RemoteCIDRs {
-		trimmed := strings.TrimSpace(cidr)
-		if trimmed != "" {
-			remoteCIDRs = append(remoteCIDRs, trimmed)
+	remoteCIDRs := make([]string, 0)
+	if vpnGateway.Spec.RemoteCIDRs != nil {
+		remoteCIDRs = make([]string, 0, len(*vpnGateway.Spec.RemoteCIDRs))
+		for _, cidr := range *vpnGateway.Spec.RemoteCIDRs {
+			trimmed := strings.TrimSpace(cidr)
+			if trimmed != "" {
+				remoteCIDRs = append(remoteCIDRs, trimmed)
+			}
 		}
 	}
 	sort.Strings(remoteCIDRs)
@@ -115,12 +118,15 @@ func renderVpnGatewayPlaybook(playbookPath string, targetIP string, vpnGateway a
 	return os.WriteFile(playbookPath, buf.Bytes(), 0o644)
 }
 
-func normalizeVpnGatewayRemoteCIDRs(values []string) []string {
-	result := make([]string, 0, len(values))
-	for _, cidr := range values {
-		trimmed := strings.TrimSpace(cidr)
-		if trimmed != "" {
-			result = append(result, trimmed)
+func normalizeVpnGatewayRemoteCIDRs(values *[]string) []string {
+	result := make([]string, 0)
+	if values != nil {
+		result = make([]string, 0, len(*values))
+		for _, cidr := range *values {
+			trimmed := strings.TrimSpace(cidr)
+			if trimmed != "" {
+				result = append(result, trimmed)
+			}
 		}
 	}
 	if len(result) == 0 {

@@ -212,3 +212,71 @@ link_state          : up
 name                : vx-ccee6303
 type                : geneve
 ```
+
+### VNIが衝突した時の対応方法
+
+次で削除できます。まずは br-81636 があるノードで実行してください。
+
+1. OVS からブリッジ削除
+ovs-vsctl --if-exists del-br br-81636
+
+2. 残骸インターフェース掃除
+ip link del br-81636 2>/dev/null || true
+ip link del vx-27cabbe6 2>/dev/null || true
+ip link del vx-28cabd79 2>/dev/null || true
+
+3. 削除確認
+ovs-vsctl show | grep -n br-81636 || echo "br-81636 not found in OVS"
+ip link show br-81636 2>/dev/null || echo "br-81636 netdev not found"
+ovs-vsctl list interface | grep -E "br-81636|vx-27cabbe6|vx-28cabd79" || echo "stale interfaces not found"
+
+補足:
+- 同じ残骸が他ノードにもある場合は、そのノードでも同じ手順を実施してください。
+- 自動再作成される場合はコントローラー側がまだそのネットワークを desired state として持っているので、対象ネットワーク定義の削除も必要です。
+
+
+
+
+
+root@nlb-nlb1:~# iptables -L
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination         
+MARMOT-NLB-INPUT  all  --  anywhere             anywhere            
+
+Chain FORWARD (policy ACCEPT)
+target     prot opt source               destination         
+MARMOT-NLB-FORWARD  all  --  anywhere             anywhere            
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination         
+
+Chain MARMOT-NLB-FORWARD (1 references)
+target     prot opt source               destination         
+ACCEPT     tcp  --  192.168.1.0/24       anywhere             tcp dpt:http
+ACCEPT     all  --  anywhere             anywhere             ctstate RELATED,ESTABLISHED /* marmot-network-load-balancer */
+ACCEPT     all  --  192.168.1.0/24       anywhere             /* marmot-network-load-balancer */
+DROP       all  --  anywhere             anywhere             /* marmot-network-load-balancer */
+
+Chain MARMOT-NLB-INPUT (1 references)
+target     prot opt source               destination         
+ACCEPT     all  --  anywhere             anywhere             ctstate RELATED,ESTABLISHED /* marmot-network-load-balancer */
+ACCEPT     all  --  anywhere             anywhere             /* marmot-network-load-balancer */
+ACCEPT     all  --  192.168.1.0/24       anywhere             /* marmot-network-load-balancer */
+DROP       all  --  anywhere             anywhere             /* marmot-network-load-balancer */
+root@nlb-nlb1:~# iptables -t nat -S
+-P PREROUTING ACCEPT
+-P INPUT ACCEPT
+-P OUTPUT ACCEPT
+-P POSTROUTING ACCEPT
+-N MARMOT-NLB-NLB1-HTTP
+-N MARMOT-NLB-POSTROUTING
+-N MARMOT-NLB-PREROUTING
+-A PREROUTING -j MARMOT-NLB-PREROUTING
+-A POSTROUTING -j MARMOT-NLB-POSTROUTING
+-A MARMOT-NLB-NLB1-HTTP -p tcp -m statistic --mode random --probability 0.33333300008 -j DNAT --to-destination 172.16.8.3:80
+-A MARMOT-NLB-NLB1-HTTP -p tcp -m statistic --mode random --probability 0.50000000000 -j DNAT --to-destination 172.16.8.4:80
+-A MARMOT-NLB-NLB1-HTTP -p tcp -j DNAT --to-destination 172.16.8.2:80
+-A MARMOT-NLB-POSTROUTING -d 172.16.8.3/32 -p tcp -m tcp --dport 80 -j MASQUERADE
+-A MARMOT-NLB-POSTROUTING -d 172.16.8.4/32 -p tcp -m tcp --dport 80 -j MASQUERADE
+-A MARMOT-NLB-POSTROUTING -d 172.16.8.2/32 -p tcp -m tcp --dport 80 -j MASQUERADE
+-A MARMOT-NLB-PREROUTING -p tcp -m tcp --dport 80 -j MARMOT-NLB-NLB1-HTTP

@@ -17,7 +17,6 @@ var _ = Describe("manifest", func() {
 			Expect(normalizeResourceName("volumes")).To(Equal("volume"))
 			Expect(normalizeResourceName("images")).To(Equal("image"))
 			Expect(normalizeResourceName("gateways")).To(Equal("gateway"))
-			Expect(normalizeResourceName("applicationloadbalancers")).To(Equal("applicationloadbalancer"))
 			Expect(normalizeResourceName("vpngateways")).To(Equal("vpngateway"))
 		})
 
@@ -27,7 +26,6 @@ var _ = Describe("manifest", func() {
 			Expect(normalizeResourceName("volume")).To(Equal("volume"))
 			Expect(normalizeResourceName("image")).To(Equal("image"))
 			Expect(normalizeResourceName("gateway")).To(Equal("gateway"))
-			Expect(normalizeResourceName("applicationloadbalancer")).To(Equal("applicationloadbalancer"))
 		})
 
 		It("handles aliases", func() {
@@ -36,8 +34,9 @@ var _ = Describe("manifest", func() {
 			Expect(normalizeResourceName("vol")).To(Equal("volume"))
 			Expect(normalizeResourceName("net")).To(Equal("network"))
 			Expect(normalizeResourceName("gw")).To(Equal("gateway"))
-			Expect(normalizeResourceName("alb")).To(Equal("applicationloadbalancer"))
 			Expect(normalizeResourceName("vpngw")).To(Equal("vpngateway"))
+			Expect(normalizeResourceName("alb")).To(Equal("applicationloadbalancer"))
+			Expect(normalizeResourceName("nlb")).To(Equal("networkloadbalancer"))
 		})
 
 		It("returns lowercase for unknown names", func() {
@@ -72,14 +71,19 @@ var _ = Describe("manifest", func() {
 			Expect(result).To(Equal(ManifestTypeGateway))
 		})
 
-		It("detects application load balancer kind", func() {
-			result := GetManifestType("ApplicationLoadBalancer")
-			Expect(result).To(Equal(ManifestTypeApplicationLoadBalancer))
-		})
-
 		It("detects vpn gateway kind", func() {
 			result := GetManifestType("VpnGateway")
 			Expect(result).To(Equal(ManifestTypeVpnGateway))
+		})
+
+		It("detects application load balancer kind", func() {
+			result := GetManifestType("ApplicationLoadBalancer")
+			Expect(result).To(Equal(ManifestTypeLoadBalancer))
+		})
+
+		It("detects network load balancer kind", func() {
+			result := GetManifestType("NetworkLoadBalancer")
+			Expect(result).To(Equal(ManifestTypeNetworkLoadBalancer))
 		})
 
 		It("returns Unknown for missing kind", func() {

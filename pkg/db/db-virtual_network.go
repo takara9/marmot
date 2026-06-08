@@ -170,14 +170,15 @@ func (d *Database) GetVirtualNetworks() ([]api.VirtualNetwork, error) {
 	var networks []api.VirtualNetwork
 	var err error
 	var resp *etcd.GetResponse
+	networkObjectPrefix := NetworkPrefix + "/"
 
-	slog.Debug("GetVirtualNetworks()", "key-prefix", NetworkPrefix)
-	resp, err = d.GetByPrefix(NetworkPrefix)
+	slog.Debug("GetVirtualNetworks()", "key-prefix", networkObjectPrefix)
+	resp, err = d.GetByPrefix(networkObjectPrefix)
 	if err == ErrNotFound {
-		slog.Debug("no networks found", "key-prefix", NetworkPrefix)
+		slog.Debug("no networks found", "key-prefix", networkObjectPrefix)
 		return networks, nil
 	} else if err != nil {
-		slog.Error("GetByPrefix() failed", "err", err, "key-prefix", NetworkPrefix)
+		slog.Error("GetByPrefix() failed", "err", err, "key-prefix", networkObjectPrefix)
 		return networks, err
 	}
 
@@ -216,14 +217,15 @@ func (d *Database) GetVirtualNetworkById(id string) (api.VirtualNetwork, error) 
 func (d *Database) GetVirtualNetworkByName(name string) (api.VirtualNetwork, error) {
 	var err error
 	var resp *etcd.GetResponse
+	networkObjectPrefix := NetworkPrefix + "/"
 
-	slog.Debug("仮想ネットワークを名前で検索 GetVirtualNetworkByName()", "key-prefix", NetworkPrefix, "name", name)
-	resp, err = d.GetByPrefix(NetworkPrefix)
+	slog.Debug("仮想ネットワークを名前で検索 GetVirtualNetworkByName()", "key-prefix", networkObjectPrefix, "name", name)
+	resp, err = d.GetByPrefix(networkObjectPrefix)
 	if err == ErrNotFound {
-		slog.Debug("no networks found", "key-prefix", NetworkPrefix)
+		slog.Debug("no networks found", "key-prefix", networkObjectPrefix)
 		return api.VirtualNetwork{}, ErrNotFound
 	} else if err != nil {
-		slog.Error("GetByPrefix() failed", "err", err, "key-prefix", NetworkPrefix)
+		slog.Error("GetByPrefix() failed", "err", err, "key-prefix", networkObjectPrefix)
 		return api.VirtualNetwork{}, err
 	}
 
@@ -364,8 +366,12 @@ func (d *Database) UpdateVirtualNetworkStatus(id string, status int) {
 func (d *Database) UpdateVirtualNetworkStatusWithMessage(id string, status int, message string) {
 	network, err := d.GetVirtualNetworkById(id)
 	if err != nil {
+		if err == ErrNotFound {
+			slog.Warn("UpdateVirtualNetworkStatusWithMessage() skip missing network", "networkId", id, "status", status)
+			return
+		}
 		slog.Error("UpdateVirtualNetworkStatusWithMessage() GetVirtualNetworkById() failed", "err", err, "networkId", id)
-		panic(err)
+		return
 	}
 	network.Status.StatusCode = status
 	network.Status.Status = util.StringPtr(NetworkStatus[network.Status.StatusCode])
@@ -382,8 +388,12 @@ func (d *Database) UpdateVirtualNetworkStatusWithMessage(id string, status int, 
 	}
 
 	if err := d.UpdateVirtualNetworkById(id, network); err != nil {
+		if err == ErrNotFound {
+			slog.Warn("UpdateVirtualNetworkStatusWithMessage() update skipped; network disappeared", "networkId", id, "status", status)
+			return
+		}
 		slog.Error("UpdateVirtualNetworkStatusWithMessage() UpdateVirtualNetwork() failed", "err", err, "networkId", id)
-		panic(err)
+		return
 	}
 }
 

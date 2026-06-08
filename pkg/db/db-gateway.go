@@ -249,81 +249,50 @@ func (d *Database) DeleteGatewayById(id string) error {
 
 // SetDeleteTimestampGateway sets deletion timestamp for async controller processing.
 func (d *Database) SetDeleteTimestampGateway(id string) error {
-	for {
-		gateway, err := d.GetGatewayById(id)
-		if err != nil {
-			return err
-		}
-		if gateway.Status == nil {
-			gateway.Status = &api.Status{}
-		}
-		gateway.Status.StatusCode = GATEWAY_DELETING
-		gateway.Status.Status = util.StringPtr(GatewayStatus[GATEWAY_DELETING])
-		gateway.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
-		if gateway.Status.DeletionTimeStamp == nil {
-			gateway.Status.DeletionTimeStamp = util.TimePtr(time.Now())
-		}
-		gateway.Status.Message = nil
-
-		err = d.putGatewayById(gateway)
-		if err == ErrUpdateConflict {
-			continue
-		}
+	gateway, err := d.GetGatewayById(id)
+	if err != nil {
 		return err
 	}
+
+	now := time.Now()
+	if gateway.Status == nil {
+		gateway.Status = &api.Status{}
+	}
+	gateway.Status.DeletionTimeStamp = util.TimePtr(now)
+	gateway.Status.LastUpdateTimeStamp = util.TimePtr(now)
+	gateway.Status.StatusCode = GATEWAY_DELETING
+	gateway.Status.Status = util.StringPtr(GatewayStatus[GATEWAY_DELETING])
+
+	return d.UpdateGatewayById(id, gateway)
 }
 
 // UpdateGatewayStatusWithMessage updates status and optional message for gateway objects.
 func (d *Database) UpdateGatewayStatusWithMessage(id string, status int, message string) error {
-	for {
-		gateway, err := d.GetGatewayById(id)
-		if err != nil {
-			return err
-		}
-		if gateway.Status == nil {
-			gateway.Status = &api.Status{}
-		}
-		statusChanged := gateway.Status.StatusCode != status
-		gateway.Status.StatusCode = status
-		gateway.Status.Status = util.StringPtr(GatewayStatus[status])
-		gateway.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
-		trimmedMessage := strings.TrimSpace(message)
-		if statusChanged {
-			gateway.Status.Message = nil
-		}
-		if trimmedMessage != "" {
-			gateway.Status.Message = util.StringPtr(trimmedMessage)
-		}
-
-		err = d.putGatewayById(gateway)
-		if err == ErrUpdateConflict {
-			continue
-		}
-		return err
-	}
-}
-
-func (d *Database) putGatewayById(gateway api.Gateway) error {
-	id := api.GatewayID(gateway)
-	if strings.TrimSpace(id) == "" {
-		return ErrNotFound
-	}
-
-	lockKey := "/lock/gateway/" + id
-	mutex, err := d.LockKey(lockKey)
+	gateway, err := d.GetGatewayById(id)
 	if err != nil {
 		return err
 	}
-	defer d.UnlockKey(mutex)
-
-	key := GatewayPrefix + "/" + id
-	var current api.Gateway
-	resp, err := d.GetJSON(key, &current)
-	if err != nil {
-		return err
+	if gateway.Status == nil {
+		gateway.Status = &api.Status{}
 	}
-	api.SetGatewayID(&gateway, id)
-	return d.PutJSONCAS(key, resp.Kvs[0].ModRevision, &gateway)
+	statusChanged := gateway.Status.StatusCode != status
+	gateway.Status.StatusCode = status
+	gateway.Status.Status = util.StringPtr(GatewayStatus[status])
+	gateway.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+	trimmedMessage := strings.TrimSpace(message)
+	if statusChanged {
+		// PatchStruct skips nil pointers, so use empty string to reliably clear stale messages.
+		gateway.Status.Message = util.StringPtr("")
+	}
+	if trimmedMessage == "" {
+		if gateway.Status.Message == nil {
+			gateway.Status.Message = util.StringPtr("")
+		}
+	} else {
+		gateway.Status.Message = util.StringPtr(trimmedMessage)
+	}
+
+	return d.UpdateGatewayById(id, gateway)
 }
 
 // GetGatewayByName returns gateways matching the given name.
