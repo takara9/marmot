@@ -24,9 +24,11 @@ func TestDesiredGatewayConfigHash_ChangesByRemoteCIDRs(t *testing.T) {
 		},
 	}
 	withCIDR1 := base
-	withCIDR1.Spec.RemoteCIDRs = []string{"10.0.0.0/24"}
+	cidrs1 := []string{"10.0.0.0/24"}
+	withCIDR1.Spec.RemoteCIDRs = &cidrs1
 	withCIDR2 := base
-	withCIDR2.Spec.RemoteCIDRs = []string{"192.168.0.0/16"}
+	cidrs2 := []string{"192.168.0.0/16"}
+	withCIDR2.Spec.RemoteCIDRs = &cidrs2
 
 	hash1 := desiredGatewayConfigHash(withCIDR1, "172.16.10.2")
 	hash2 := desiredGatewayConfigHash(withCIDR2, "172.16.10.2")

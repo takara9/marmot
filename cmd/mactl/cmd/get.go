@@ -787,9 +787,9 @@ func outputServers(servers []api.Server) error {
 		sort.SliceStable(servers, func(i, j int) bool {
 			return creationTime(servers[i].Status).Before(creationTime(servers[j].Status))
 		})
-		//fmt.Println("NAME            NODE       STATUS     CPU  RAM(MB)  IP-ADDRESS       NETWORK")
-		//fmt.Println("----            ----       ------     ---  -------  ----------       -------")
-		fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s\n",
+		//fmt.Println("NAME            NODE       STATUS     CPU  RAM(MB)  IP-ADDRESS       NETWORK        AGE")
+		//fmt.Println("----            ----       ------     ---  -------  ----------       -------        ---")
+		fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s  %s\n",
 			"NAME",
 			"NODE",
 			"STATUS",
@@ -797,8 +797,9 @@ func outputServers(servers []api.Server) error {
 			"RAM(MB)",
 			"IP-ADDRESS",
 			"NETWORK",
+			"AGE",
 		)
-		fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s\n",
+		fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s  %s\n",
 			"----",
 			"----",
 			"------",
@@ -806,6 +807,7 @@ func outputServers(servers []api.Server) error {
 			"-------",
 			"----------",
 			"-------",
+			"---",
 		)
 
 		for _, s := range servers {
@@ -825,18 +827,36 @@ func outputServers(servers []api.Server) error {
 			if s.Status != nil && s.Status.Status != nil && *s.Status.Status != "" {
 				status = *s.Status.Status
 			}
+			age := formatServerAge(s.Status)
 			networkLines := serverNetworkLines(s)
-			fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s\n",
+
+			// Filter out N/A network lines when getServerShowAll is false
+			filteredLines := networkLines
+			if !getServerShowAll {
+				filteredLines = make([]serverNetworkLine, 0, len(networkLines))
+				for _, line := range networkLines {
+					if line.address != "N/A" {
+						filteredLines = append(filteredLines, line)
+					}
+				}
+				// Ensure we have at least one line to display
+				if len(filteredLines) == 0 {
+					filteredLines = []serverNetworkLine{{address: "N/A", network: "N/A"}}
+				}
+			}
+
+			fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s  %s\n",
 				s.Metadata.Name,
 				node,
 				status,
 				cpu,
 				ram,
-				networkLines[0].address,
-				networkLines[0].network,
+				filteredLines[0].address,
+				filteredLines[0].network,
+				age,
 			)
-			for _, networkLine := range networkLines[1:] {
-				fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s\n",
+			for _, networkLine := range filteredLines[1:] {
+				fmt.Printf("%-15s  %-12s  %-12s  %-3s  %-7s  %-15s  %-15s  %s\n",
 					"",
 					"",
 					"",
@@ -844,6 +864,7 @@ func outputServers(servers []api.Server) error {
 					"",
 					networkLine.address,
 					networkLine.network,
+					"",
 				)
 			}
 		}
