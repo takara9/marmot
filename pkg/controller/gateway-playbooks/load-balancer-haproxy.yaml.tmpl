@@ -37,7 +37,6 @@
       ansible.builtin.copy:
         src: /usr/local/marmot/marmot-lb-agent
         dest: /usr/local/bin/marmot-lb-agent
-        remote_src: true
         mode: "0755"
 
     - name: Install marmot-lb-agent service
