@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,11 +26,52 @@ func ReadYamlConfig(fn string, yamlConfig interface{}) error {
 		return err
 	}
 
-	err = yaml.Unmarshal(byteData, yamlConfig)
-	if err != nil {
+	if err := unmarshalYAMLUsingJSONTags(byteData, yamlConfig); err != nil {
 		return err
 	}
 	return nil
+}
+
+func unmarshalYAMLUsingJSONTags(byteData []byte, out interface{}) error {
+	var raw interface{}
+	if err := yaml.Unmarshal(byteData, &raw); err != nil {
+		return err
+	}
+
+	normalized := normalizeYAMLValue(raw)
+	jsonData, err := json.Marshal(normalized)
+	if err != nil {
+		return err
+	}
+
+	if err := json.Unmarshal(jsonData, out); err != nil {
+		return err
+	}
+	return nil
+}
+
+func normalizeYAMLValue(v interface{}) interface{} {
+	switch val := v.(type) {
+	case map[string]interface{}:
+		m := make(map[string]interface{}, len(val))
+		for k, child := range val {
+			m[k] = normalizeYAMLValue(child)
+		}
+		return m
+	case map[interface{}]interface{}:
+		m := make(map[string]interface{}, len(val))
+		for k, child := range val {
+			m[fmt.Sprint(k)] = normalizeYAMLValue(child)
+		}
+		return m
+	case []interface{}:
+		for i := range val {
+			val[i] = normalizeYAMLValue(val[i])
+		}
+		return val
+	default:
+		return v
+	}
 }
 
 func readYAMLSource(source string) ([]byte, error) {
