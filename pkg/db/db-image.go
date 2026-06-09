@@ -241,7 +241,7 @@ func (d *Database) makeImageEntryFromURLWithNodeAndMeta(name, url, nodeName, api
 		Kind:       kind,
 		Metadata: api.Metadata{
 			Name: name,
-			Id: id,
+			Id:   id,
 			Uuid: util.StringPtr(uuidString),
 		},
 		Spec: api.ImageSpec{
@@ -265,6 +265,57 @@ func (d *Database) makeImageEntryFromURLWithNodeAndMeta(name, url, nodeName, api
 	}
 
 	return id, nil
+}
+
+// MakeImportedImageEntry は既存のqcow2ファイルを参照する利用可能なイメージを登録する。
+func (d *Database) MakeImportedImageEntry(name, nodeName, qcow2Path string) (api.Image, error) {
+	trimmedName := strings.TrimSpace(name)
+	if trimmedName == "" {
+		return api.Image{}, fmt.Errorf("name is required")
+	}
+	trimmedPath := strings.TrimSpace(qcow2Path)
+	if trimmedPath == "" {
+		return api.Image{}, fmt.Errorf("qcow2Path is required")
+	}
+
+	id, uuidString, err := d.getUniqueImageID()
+	if err != nil {
+		return api.Image{}, err
+	}
+
+	now := time.Now()
+	img := api.Image{
+		ApiVersion: "v1",
+		Kind:       "Image",
+		Metadata: api.Metadata{
+			Name: trimmedName,
+			Id:   id,
+			Uuid: util.StringPtr(uuidString),
+		},
+		Spec: api.ImageSpec{
+			Kind:      util.StringPtr("os"),
+			Type:      util.StringPtr("qcow2"),
+			Qcow2Path: util.StringPtr(trimmedPath),
+		},
+		Status: &api.Status{
+			StatusCode:          IMAGE_PENDING,
+			Status:              util.StringPtr(ImageStatus[IMAGE_PENDING]),
+			CreationTimeStamp:   util.TimePtr(now),
+			LastUpdateTimeStamp: util.TimePtr(now),
+			Message:             util.StringPtr("インポート済みイメージの同期準備中"),
+		},
+	}
+
+	if node := strings.TrimSpace(nodeName); node != "" {
+		img.Metadata.NodeName = util.StringPtr(node)
+	}
+
+	key := ImagePrefix + "/" + id
+	if err := d.PutJSON(key, img); err != nil {
+		return api.Image{}, err
+	}
+
+	return img, nil
 }
 
 // ブートボリュームからイメージを作成する
@@ -332,7 +383,7 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 				Name:     name,
 				Labels:   &labels,
 				NodeName: serverNodeName,
-				Id: id,
+				Id:       id,
 				Uuid:     util.StringPtr(uuidString),
 			},
 			Spec: api.ImageSpec{
@@ -363,7 +414,7 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 				Name:     name,
 				Labels:   &labels,
 				NodeName: serverNodeName,
-				Id: id,
+				Id:       id,
 				Uuid:     util.StringPtr(uuidString),
 			},
 			Spec: api.ImageSpec{
@@ -561,13 +612,16 @@ func (d *Database) updateImage(id string, spec api.Image) error {
 
 // イメージの削除予定日時をセットする
 func (d *Database) SetDeleteTimestampImage(id string) error {
-	image, err := d.GetImage(id)
+	key := ImagePrefix + "/" + id
+	var image api.Image
+	resp, err := d.GetJSON(key, &image)
 	if err != nil {
 		slog.Error("SetDeleteTimestamp() GetImage() failed", "err", err, "imageId", id)
 		return err
 	}
 	image.Status.DeletionTimeStamp = util.TimePtr(time.Now())
-	if err := d.UpdateImage(id, image); err != nil {
+	image.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+	if err := d.PutJSONCAS(key, resp.Kvs[0].ModRevision, image); err != nil {
 		slog.Error("SetDeleteTimestamp() UpdateImage() failed", "err", err, "imageId", id)
 		return err
 	}
@@ -698,7 +752,7 @@ func (d *Database) MakeFollowerImageEntry(headImage api.Image, followerNodeName 
 			Name:     headImage.Metadata.Name,
 			NodeName: util.StringPtr(followerNodeName),
 			Labels:   &labels,
-			Id: id,
+			Id:       id,
 			Uuid:     util.StringPtr(uuidString),
 		},
 		Spec: api.ImageSpec{

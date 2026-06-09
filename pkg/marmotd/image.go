@@ -192,6 +192,67 @@ func (m *Marmot) GetImageManage(id string) (api.Image, error) {
 	return m.Db.GetImage(id)
 }
 
+// ImportImageArchiveWithNode はtgzアーカイブからqcow2を取り出してイメージ登録する。
+func (m *Marmot) ImportImageArchiveWithNode(src io.Reader, imageName, nodeName string) (api.Image, error) {
+	if src == nil {
+		return api.Image{}, fmt.Errorf("archive stream is nil")
+	}
+	name := strings.TrimSpace(imageName)
+	if name == "" {
+		return api.Image{}, fmt.Errorf("image name is required")
+	}
+
+	if err := os.MkdirAll(IMAGE_POOL, 0755); err != nil {
+		return api.Image{}, err
+	}
+
+	importDir, err := os.MkdirTemp(IMAGE_POOL, "import-")
+	if err != nil {
+		return api.Image{}, err
+	}
+	defer func() {
+		_ = os.RemoveAll(importDir)
+	}()
+
+	importedQcow2, err := extractSingleQcow2FromTGZ(src, importDir)
+	if err != nil {
+		return api.Image{}, err
+	}
+	if err := validateQcowV2Image(importedQcow2); err != nil {
+		return api.Image{}, err
+	}
+
+	image, err := m.Db.MakeImportedImageEntry(name, nodeName, importedQcow2)
+	if err != nil {
+		return api.Image{}, err
+	}
+	cleanupEntry := func() {
+		if err := m.Db.DeleteImage(image.Metadata.Id); err != nil {
+			slog.Warn("ImportImageArchiveWithNode() failed to rollback imported image entry", "imageId", image.Metadata.Id, "err", err)
+		}
+	}
+
+	finalDir := filepath.Join(IMAGE_POOL, image.Metadata.Id)
+	if err := os.MkdirAll(finalDir, 0755); err != nil {
+		cleanupEntry()
+		return api.Image{}, err
+	}
+	finalQcow2Path := filepath.Join(finalDir, fmt.Sprintf("osimage-%s.qcow2", image.Metadata.Id))
+	if err := os.Rename(importedQcow2, finalQcow2Path); err != nil {
+		cleanupEntry()
+		return api.Image{}, err
+	}
+
+	image.Spec.Qcow2Path = util.StringPtr(finalQcow2Path)
+	if err := m.Db.UpdateImage(image.Metadata.Id, image); err != nil {
+		_ = os.Remove(finalQcow2Path)
+		cleanupEntry()
+		return api.Image{}, err
+	}
+
+	return image, nil
+}
+
 // 指定したIDのイメージを削除する関数 （ラップ関数） コントローラーで使用
 func (m *Marmot) DeleteImageManage(id string) error {
 	slog.Debug("Deleting image", "imgId", id)
