@@ -70,7 +70,9 @@ func (m *MarmotEndpoint) httpRequest(req *http.Request) (int, []byte, *url.URL, 
 
 func (m *MarmotEndpoint) httpRequest2(req *http.Request) ([]byte, *url.URL, error) {
 	req.Header.Set("User-Agent", "MarmotdClient/1.0")
-	req.Header.Set("Content-Type", "application/json")
+	if strings.TrimSpace(req.Header.Get("Content-Type")) == "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
 
 	resp, err := m.Client.Do(req)
 	if err != nil {

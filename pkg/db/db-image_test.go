@@ -167,6 +167,30 @@ var _ = Describe("Image", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 
+			It("イメージの削除予定日時を設定できる", func() {
+				localDB, err := db.NewDatabase(url)
+				Expect(err).NotTo(HaveOccurred())
+				defer func() {
+					Expect(localDB.Close()).NotTo(HaveOccurred())
+				}()
+
+				createdID, err := localDB.MakeImageEntryFromURLWithNode("test-image-delete-ts", "http://hmc/delete-ts.qcow2", "hv-test-01")
+				Expect(err).NotTo(HaveOccurred())
+
+				img, err := localDB.GetImage(createdID)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(img.Status).NotTo(BeNil())
+				Expect(img.Status.DeletionTimeStamp).To(BeNil())
+
+				err = localDB.SetDeleteTimestampImage(createdID)
+				Expect(err).NotTo(HaveOccurred())
+
+				updated, err := localDB.GetImage(createdID)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(updated.Status).NotTo(BeNil())
+				Expect(updated.Status.DeletionTimeStamp).NotTo(BeNil())
+			})
+
 			It("すべてのイメージ情報を取得", func() {
 				imgs, err := v.GetImages()
 				Expect(err).NotTo(HaveOccurred())

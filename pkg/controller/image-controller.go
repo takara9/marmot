@@ -104,6 +104,11 @@ func (c *controller) imageControllerLoop() {
 			if err := c.ensureFollowerImagesWaiting(image); err != nil {
 				slog.Error("フォロワー用イメージエントリーの作成に失敗", "headImageId", image.Metadata.Id, "err", err)
 			}
+			if image.Spec.SourceUrl == nil && strings.TrimSpace(util.OrDefault(image.Spec.Qcow2Path, "")) != "" {
+				slog.Debug("インポート済みQCOW2イメージを利用可能に遷移", "image", image.Metadata.Name, "imageId", image.Metadata.Id)
+				c.marmot.Db.UpdateImageStatusMessage(image.Metadata.Id, db.IMAGE_AVAILABLE, "")
+				continue
+			}
 			c.marmot.Db.UpdateImageStatus(image.Metadata.Id, db.IMAGE_CREATING)
 			// ラベルの存在をチェック
 			if image.Metadata.Labels != nil {

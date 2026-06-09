@@ -9,6 +9,7 @@ import (
 func RegisterRoutes(e *echo.Echo, server *Server, baseURL string) {
 	api.RegisterHandlersWithBaseURL(e, server, baseURL)
 	e.GET(baseURL+"/image/:id/qcow2", server.ApiDownloadImageQcow2ById)
+	e.POST(baseURL+"/image/import", server.ApiImportImageArchive)
 	e.GET(baseURL+"/gateway/:id/cert", func(ctx echo.Context) error {
 		return server.ApiGetGatewayCertById(ctx, ctx.Param("id"))
 	})
