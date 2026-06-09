@@ -1510,6 +1510,8 @@ components:
     ServerSpec:
       type: object
       properties:
+        ansible-playbook:
+          type: string
         cpu:
           type: integer
           format: int

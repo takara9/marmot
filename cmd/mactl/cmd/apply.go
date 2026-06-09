@@ -131,6 +131,9 @@ func applyServer(manifest map[string]interface{}) error {
 		if err != nil {
 			return fmt.Errorf("failed to create server: %w", err)
 		}
+		if err := maybeApplyServerAnsiblePlaybook(m, *server, byteBody); err != nil {
+			return err
+		}
 	}
 
 	// レスポンス処理

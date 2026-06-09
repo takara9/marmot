@@ -140,6 +140,9 @@ var serverCreateCmd = &cobra.Command{
 			fmt.Println("CreateServer", "err", err)
 			return err
 		}
+		if err := maybeApplyServerAnsiblePlaybook(m, virtualServer, byteBody); err != nil {
+			return err
+		}
 
 		switch outputStyle {
 		case "text":

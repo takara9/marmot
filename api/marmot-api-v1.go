@@ -337,6 +337,7 @@ type Server struct {
 
 // ServerSpec defines model for ServerSpec.
 type ServerSpec struct {
+	AnsiblePlaybook  *string             `json:"ansible-playbook,omitempty"`
 	Auth             *Auth               `json:"auth,omitempty"`
 	BootVolume       *Volume             `json:"bootVolume,omitempty"`
 	Cpu              *int                `json:"cpu,omitempty"`
