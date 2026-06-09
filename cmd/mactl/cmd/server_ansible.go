@@ -40,6 +40,7 @@ func maybeApplyServerAnsiblePlaybook(m *client.MarmotEndpoint, server api.Server
 		return fmt.Errorf("failed to parse create response id for ansible apply: %w", err)
 	}
 
+	fmt.Fprintln(os.Stderr, "OS起動待機中.....")
 	if err := waitServerRunning(m, serverID, serverAnsibleWaitTimeout, serverAnsibleWaitPollInterval); err != nil {
 		return err
 	}
@@ -57,11 +58,10 @@ func maybeApplyServerAnsiblePlaybook(m *client.MarmotEndpoint, server api.Server
 		return err
 	}
 
+	fmt.Fprintln(os.Stderr, "playbook 適用開始.....")
 	if err := runServerAnsiblePlaybook(playbookPath, targetAddress, privateKeyPath); err != nil {
 		return err
 	}
-
-	fmt.Fprintf(os.Stderr, "ansible-playbook applied successfully: server=%s address=%s playbook=%s\n", serverID, targetAddress, playbookPath)
 	return nil
 }
 
@@ -182,9 +182,6 @@ func waitServerAnsiblePingReady(targetAddress, privateKeyPath string, timeout, i
 			lastErr = err
 		}
 		if time.Now().After(deadline) {
-			if lastErr == nil {
-				lastErr = fmt.Errorf("ansible ping failed")
-			}
 			return fmt.Errorf("timeout waiting for ansible ping to %s: %w", targetAddress, lastErr)
 		}
 		time.Sleep(interval)
@@ -221,13 +218,10 @@ func runServerAnsiblePlaybook(playbookPath, targetAddress, privateKeyPath string
 	}
 	cmd := serverAnsibleExecCommand("ansible-playbook", args...)
 	cmd.Env = serverAnsibleCommandEnv()
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		trimmed := strings.TrimSpace(string(output))
-		if trimmed == "" {
-			return fmt.Errorf("ansible-playbook failed: %w", err)
-		}
-		return fmt.Errorf("ansible-playbook failed: %w: %s", err, trimmed)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("ansible-playbook failed: %w", err)
 	}
 	return nil
 }
