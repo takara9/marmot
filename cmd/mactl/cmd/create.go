@@ -121,8 +121,14 @@ func createServer(manifest map[string]interface{}) error {
 		return fmt.Errorf("failed to create server: %w", err)
 	}
 
-	// レスポンス処理
-	return processCreateResponse(byteBody)
+	// まず API の受理レスポンスを表示し、その後に ansible の実行ログを流す
+	if err := processCreateResponse(byteBody); err != nil {
+		return err
+	}
+	if err := maybeApplyServerAnsiblePlaybook(m, *server, byteBody); err != nil {
+		return err
+	}
+	return nil
 }
 
 func createImage(manifest map[string]interface{}) error {

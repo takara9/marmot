@@ -133,8 +133,16 @@ func applyServer(manifest map[string]interface{}) error {
 		}
 	}
 
-	// レスポンス処理
-	return processApplyResponse(byteBody, exists)
+	// まず API の結果を表示し、その後に必要なら ansible を実行する
+	if err := processApplyResponse(byteBody, exists); err != nil {
+		return err
+	}
+	if !exists {
+		if err := maybeApplyServerAnsiblePlaybook(m, *server, byteBody); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func applyImage(manifest map[string]interface{}) error {

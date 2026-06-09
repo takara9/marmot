@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Server
+metadata:
+    name: test-server-38
+    comment: "Issue #421 sample: apply ansible-playbook after server boot"
+spec:
+    cpu: 1
+    memory: 1024
+    osVariant: ubuntu24.04
+    auth:
+        url: https://github.com/takara9.keys
+    ansible-playbook: playbook/setup.yaml
+    networkInterface:
+        - networkname: "host-bridge"
+          address: "192.168.1.64"
+          netmasklen: 24
+          routes:
+            - to: "default"
+              via: "192.168.1.1"
+          nameservers:
+            addresses:
+                - 192.168.1.9
+                - 8.8.8.8
+                - 8.8.4.4
+            search:
+                - labo.local
+                - lab.local

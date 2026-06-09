@@ -150,10 +150,16 @@ var serverCreateCmd = &cobra.Command{
 			}
 			serverMap := data.(map[string]interface{})
 			fmt.Printf("サーバーの作成要求が受け入れられました。ID: %v\n", serverMap["id"])
+			if err := maybeApplyServerAnsiblePlaybook(m, virtualServer, byteBody); err != nil {
+				return err
+			}
 			return nil
 
 		case "json":
 			fmt.Println(string(byteBody))
+			if err := maybeApplyServerAnsiblePlaybook(m, virtualServer, byteBody); err != nil {
+				return err
+			}
 			return nil
 
 		case "yaml":
@@ -168,6 +174,9 @@ var serverCreateCmd = &cobra.Command{
 				return err
 			}
 			fmt.Println(string(yamlBytes))
+			if err := maybeApplyServerAnsiblePlaybook(m, virtualServer, byteBody); err != nil {
+				return err
+			}
 			return nil
 
 		default:

@@ -67,6 +67,35 @@ mactl server create -f https://raw.githubusercontent.com/takara9/marmot/refs/hea
 mactl network create -f https://raw.githubusercontent.com/takara9/marmot/refs/heads/main/cmd/mactl/testdata/test-network-02-test-net-2.yaml
 ```
 
+### Issue #421 サンプル: Server 作成後に ansible-playbook を自動適用
+
+`spec.ansible-playbook` を指定した Server マニフェストのサンプルは以下です。
+
+- `cmd/mactl/testdata/test-server-38-ansible-playbook.yaml`
+
+実行手順:
+
+1. playbook ファイルを `mactl` 実行ディレクトリ配下に配置する（サンプルでは `playbook/setup.yaml`）。
+2. 必要なら秘密鍵パスを環境変数 `MARMOT_ANSIBLE_PRIVATE_KEY` で指定する。
+3. Server を作成する。
+
+```sh
+mkdir -p playbook
+# 例: playbook を配置
+# cp /path/to/setup.yaml playbook/setup.yaml
+
+export MARMOT_ANSIBLE_PRIVATE_KEY="$HOME/.ssh/id_ed25519"
+mactl server create -f cmd/mactl/testdata/test-server-38-ansible-playbook.yaml
+```
+
+補足:
+
+- `spec.ansible-playbook` は `host-bridge` の固定 IP (`spec.networkInterface[].address`) がある場合のみ有効です。
+- `ansible.cfg` がカレントディレクトリに無い場合、`mactl` は次の環境変数を付与して `ansible` / `ansible-playbook` を実行します。
+  - `ANSIBLE_HOST_KEY_CHECKING=False`
+  - `ANSIBLE_DEPRECATION_WARNINGS=False`
+  - `ANSIBLE_SSH_ARGS="-o ControlMaster=auto -o ControlPersist=60s -o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes"`
+
 ### 主な `mactl` サブコマンド
 
 ```
