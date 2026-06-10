@@ -457,7 +457,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 				err = json.Unmarshal(stdoutStderr, &image)
 				Expect(err).NotTo(HaveOccurred())
 				g.Expect(image.Status.StatusCode).To(Equal(db.IMAGE_AVAILABLE))
-			}, 10*60*time.Second, 3*time.Second).Should(Succeed())
+			}, 5*60*time.Second, 3*time.Second).Should(Succeed())
 		})
 
 		It("OSイメージのリスト取得", func() {
