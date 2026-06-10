@@ -891,16 +891,40 @@ func defaultNameserversFromConfig() *api.Nameservers {
 	cfg := CurrentConfig()
 	var addrs []string
 
-	if primary := util.NameserverForDNSListenAddr(cfg.DNSListenAddr); primary != "" {
-		addrs = append(addrs, primary)
+	if shouldUsePublicFallbackNameserver(cfg.DNSListenAddr) {
+		addrs = appendUniqueAddress(addrs, "8.8.8.8")
+	} else if primary := util.NameserverForDNSListenAddr(cfg.DNSListenAddr); primary != "" {
+		addrs = appendUniqueAddress(addrs, primary)
 	}
 	if upstream := util.NameserverForDNSListenAddr(cfg.DNSUpstream); upstream != "" {
-		addrs = append(addrs, upstream)
+		addrs = appendUniqueAddress(addrs, upstream)
 	}
 	if len(addrs) == 0 {
 		return nil
 	}
 	return &api.Nameservers{Addresses: &addrs}
+}
+
+func shouldUsePublicFallbackNameserver(dnsListenAddr string) bool {
+	host, _, err := net.SplitHostPort(strings.TrimSpace(dnsListenAddr))
+	if err != nil {
+		return false
+	}
+	host = strings.TrimSpace(strings.Trim(host, "[]"))
+	return host == "0.0.0.0" || host == "127.0.0.1"
+}
+
+func appendUniqueAddress(addrs []string, addr string) []string {
+	trimmed := strings.TrimSpace(addr)
+	if trimmed == "" {
+		return addrs
+	}
+	for _, existing := range addrs {
+		if existing == trimmed {
+			return addrs
+		}
+	}
+	return append(addrs, trimmed)
 }
 
 func isLibvirtNetworkNotFoundError(err error) bool {
