@@ -7,6 +7,20 @@ import (
 	"testing"
 )
 
+func TestVpnGatewayPlaybookTemplatePath(t *testing.T) {
+	oldInstallDir := gatewayPlaybookInstallDir
+	t.Cleanup(func() {
+		gatewayPlaybookInstallDir = oldInstallDir
+	})
+
+	gatewayPlaybookInstallDir = "/tmp/marmot-playbooks"
+	got := VpnGatewayPlaybookTemplatePath()
+	want := filepath.Join("/tmp/marmot-playbooks", "vpn-gateway-openvpn.yaml.tmpl")
+	if got != want {
+		t.Fatalf("VpnGatewayPlaybookTemplatePath() = %q, want %q", got, want)
+	}
+}
+
 func TestEnsureGatewayRuntimeAssets_CreatesKeysAndSyncsPlaybooks(t *testing.T) {
 	oldKeyDir := gatewayKeyDir
 	oldSourceDir := gatewayPlaybookSourceDir
