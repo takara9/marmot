@@ -62,6 +62,12 @@ func parseNameserverFromResolvConf(content string) (string, error) {
 	return "", fmt.Errorf("no nameserver entry found in /etc/resolv.conf")
 }
 
+// NameserverForDNSListenAddr extracts the nameserver IP from a dns_listen_addr string (host:port).
+// "0.0.0.0" and "" are normalized to "127.0.0.1".
+func NameserverForDNSListenAddr(dnsListenAddr string) string {
+	return nameserverForDNSListenAddr(dnsListenAddr)
+}
+
 func nameserverForDNSListenAddr(dnsListenAddr string) string {
 	host, _, err := net.SplitHostPort(strings.TrimSpace(dnsListenAddr))
 	if err != nil {
