@@ -239,16 +239,12 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			PortID:  uuid.New().String(),
 			Bus:     1,
 		}
-		// default ネットワークが libvirt 側に見えない環境向けのフォールバック。
-		if strings.EqualFold(xnet.Metadata.Name, "default") && xnet.Spec.BridgeName != nil && strings.TrimSpace(*xnet.Spec.BridgeName) != "" {
-			defaultNS.Bridge = strings.TrimSpace(*xnet.Spec.BridgeName)
-			defaultNS.Network = ""
-		}
 		virtSpec.NetSpecs = []virt.NetSpec{defaultNS}
 
 		net.Networkid = api.VirtualNetworkID(xnet)
 		net.Networkname = xnet.Metadata.Name
 		net.Mac = &virtSpec.NetSpecs[0].MAC
+		net.Nameservers = defaultNameserversFromConfig()
 		serverConfig.Spec.NetworkInterface = &[]api.NetworkInterface{net}
 	} else {
 		slog.Debug("ネットワーク指定あり、指定されたネットワークを使用")
@@ -377,12 +373,6 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 				PortID:  uuid.New().String(),
 				Bus:     busno,
 			}
-			// 通常は libvirt network 名で接続する。
-			// default のみ、環境差異により network が見えないケース向けに bridge へフォールバックする。
-			if strings.EqualFold(vnet.Metadata.Name, "default") && vnet.Spec.BridgeName != nil && strings.TrimSpace(*vnet.Spec.BridgeName) != "" {
-				ns.Bridge = strings.TrimSpace(*vnet.Spec.BridgeName)
-				ns.Network = ""
-			}
 
 			// VLAN対応
 			if reqNic.Portgroup != nil {
@@ -415,6 +405,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 
 			ni.Routes = reqNic.Routes
 			ni.Nameservers = reqNic.Nameservers
+			if ni.Nameservers == nil {
+				ni.Nameservers = defaultNameserversFromConfig()
+			}
 
 			fmt.Println("=== ネットワークインターフェースの情報確認 ===", "network interface", "ipaddr", ipaddr, "bitmask", bitmask)
 
@@ -889,6 +882,49 @@ func firstHostAddressFromCIDR(cidr string) (string, error) {
 		return "", fmt.Errorf("cidr %q has no usable first host", trimmed)
 	}
 	return host.String(), nil
+}
+
+// defaultNameserversFromConfig は marmotd 設定から DNS アドレスを構築する。
+// 第一 nameserver に dns_listen_addr の IP、第二 nameserver に dns_upstream の IP を使用する。
+// どちらも未設定・到達不能のときは nil を返す（netplan への書き出しをスキップさせる）。
+func defaultNameserversFromConfig() *api.Nameservers {
+	cfg := CurrentConfig()
+	var addrs []string
+
+	if shouldUsePublicFallbackNameserver(cfg.DNSListenAddr) {
+		addrs = appendUniqueAddress(addrs, "8.8.8.8")
+	} else if primary := util.NameserverForDNSListenAddr(cfg.DNSListenAddr); primary != "" {
+		addrs = appendUniqueAddress(addrs, primary)
+	}
+	if upstream := util.NameserverForDNSListenAddr(cfg.DNSUpstream); upstream != "" {
+		addrs = appendUniqueAddress(addrs, upstream)
+	}
+	if len(addrs) == 0 {
+		return nil
+	}
+	return &api.Nameservers{Addresses: &addrs}
+}
+
+func shouldUsePublicFallbackNameserver(dnsListenAddr string) bool {
+	host, _, err := net.SplitHostPort(strings.TrimSpace(dnsListenAddr))
+	if err != nil {
+		return false
+	}
+	host = strings.TrimSpace(strings.Trim(host, "[]"))
+	return host == "0.0.0.0" || host == "127.0.0.1"
+}
+
+func appendUniqueAddress(addrs []string, addr string) []string {
+	trimmed := strings.TrimSpace(addr)
+	if trimmed == "" {
+		return addrs
+	}
+	for _, existing := range addrs {
+		if existing == trimmed {
+			return addrs
+		}
+	}
+	return append(addrs, trimmed)
 }
 
 func isLibvirtNetworkNotFoundError(err error) bool {
