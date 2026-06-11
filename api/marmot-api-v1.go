@@ -105,10 +105,11 @@ type ApplicationLoadBalancerSpec struct {
 
 // Auth defines model for Auth.
 type Auth struct {
-	PublicKey    *string `json:"publicKey,omitempty"`
-	RootPassword *string `json:"rootPassword,omitempty"`
-	Url          *string `json:"url,omitempty"`
-	User         *string `json:"user,omitempty"`
+	PublicKey    *string   `json:"publicKey,omitempty"`
+	RootPassword *string   `json:"rootPassword,omitempty"`
+	Url          *string   `json:"url,omitempty"`
+	User         *string   `json:"user,omitempty"`
+	Users        *[]string `json:"users,omitempty"`
 }
 
 // Error defines model for Error.
