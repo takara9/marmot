@@ -891,48 +891,68 @@ func outputServers(servers []api.Server) error {
 func outputImages(images []api.Image) error {
 	switch outputStyle {
 	case "text":
-		sort.SliceStable(images, func(i, j int) bool {
-			return creationTime(images[i].Status).Before(creationTime(images[j].Status))
-		})
-		fmt.Println("NAME            NODE-NAME  STATUS     ROLE   LV   QCOW2  AGE")
-		fmt.Println("----            ---------  ------     ----   --   -----  ---")
-		for _, img := range images {
-			nodeName := "-"
-			if img.Metadata.NodeName != nil && strings.TrimSpace(*img.Metadata.NodeName) != "" {
-				nodeName = strings.TrimSpace(*img.Metadata.NodeName)
-			}
-
-			status := "-"
-			if img.Status != nil && img.Status.Status != nil && strings.TrimSpace(*img.Status.Status) != "" {
-				status = strings.TrimSpace(*img.Status.Status)
-			}
-
-			role := "master"
-			if img.Metadata.Labels != nil {
-				if db.GetFollowerSyncRole(*img.Metadata.Labels) == "follower" {
-					role = "replica"
+		if getServerShowAll {
+			sort.SliceStable(images, func(i, j int) bool {
+				return creationTime(images[i].Status).Before(creationTime(images[j].Status))
+			})
+			fmt.Println("NAME            NODE-NAME  STATUS     ROLE     LV   QCOW2  AGE")
+			fmt.Println("----            ---------  ------     ------   --   -----  ---")
+			for _, img := range images {
+				nodeName := "-"
+				if img.Metadata.NodeName != nil && strings.TrimSpace(*img.Metadata.NodeName) != "" {
+					nodeName = strings.TrimSpace(*img.Metadata.NodeName)
 				}
-			}
 
-			hasLV := "no"
-			if (img.Spec.LvPath != nil && strings.TrimSpace(*img.Spec.LvPath) != "") ||
-				(img.Spec.LogicalVolume != nil && strings.TrimSpace(*img.Spec.LogicalVolume) != "") {
-				hasLV = "yes"
-			}
+				status := "-"
+				if img.Status != nil && img.Status.Status != nil && strings.TrimSpace(*img.Status.Status) != "" {
+					status = strings.TrimSpace(*img.Status.Status)
+				}
 
-			hasQcow2 := "no"
-			if img.Spec.Qcow2Path != nil && strings.TrimSpace(*img.Spec.Qcow2Path) != "" {
-				hasQcow2 = "yes"
-			}
+				role := "master"
+				if img.Metadata.Labels != nil {
+					if db.GetFollowerSyncRole(*img.Metadata.Labels) == "follower" {
+						role = "replica"
+					}
+				}
 
-			fmt.Printf("%-14s  %-9s  %-9s  %-5s  %-3s  %-5s  %s\n",
-				img.Metadata.Name,
-				nodeName,
-				status,
-				role,
-				hasLV,
-				hasQcow2,
-				formatServerAge(img.Status),
+				hasLV := "no"
+				if (img.Spec.LvPath != nil && strings.TrimSpace(*img.Spec.LvPath) != "") ||
+					(img.Spec.LogicalVolume != nil && strings.TrimSpace(*img.Spec.LogicalVolume) != "") {
+					hasLV = "yes"
+				}
+
+				hasQcow2 := "no"
+				if img.Spec.Qcow2Path != nil && strings.TrimSpace(*img.Spec.Qcow2Path) != "" {
+					hasQcow2 = "yes"
+				}
+
+				fmt.Printf("%-14s  %-9s  %-9s  %-7s  %-3s  %-5s  %s\n",
+					img.Metadata.Name,
+					nodeName,
+					status,
+					role,
+					hasLV,
+					hasQcow2,
+					formatServerAge(img.Status),
+				)
+			}
+			return nil
+		}
+
+		aggregated := summarizeImages(images)
+		sort.SliceStable(aggregated, func(i, j int) bool {
+			return creationTime(aggregated[i].ageStatus).Before(creationTime(aggregated[j].ageStatus))
+		})
+		fmt.Println("NAME            STATUS     SYNCED    LV   QCOW2  AGE")
+		fmt.Println("----            ------     ------    --   -----  ---")
+		for _, row := range aggregated {
+			fmt.Printf("%-14s  %-9s  %-8s  %-3s  %-5s  %s\n",
+				row.name,
+				row.status,
+				row.synced,
+				row.hasLV,
+				row.hasQcow2,
+				formatServerAge(row.ageStatus),
 			)
 		}
 		return nil
@@ -953,6 +973,140 @@ func outputImages(images []api.Image) error {
 	default:
 		return fmt.Errorf("output style must be text/json/yaml")
 	}
+}
+
+type imageSummary struct {
+	name      string
+	status    string
+	synced    string
+	hasLV     string
+	hasQcow2  string
+	ageStatus *api.Status
+}
+
+func summarizeImages(images []api.Image) []imageSummary {
+	totalNodes := collectUniqueNodeCount(images)
+	byName := map[string][]api.Image{}
+	for _, img := range images {
+		name := strings.TrimSpace(img.Metadata.Name)
+		if name == "" {
+			continue
+		}
+		byName[name] = append(byName[name], img)
+	}
+
+	result := make([]imageSummary, 0, len(byName))
+	for name, group := range byName {
+		result = append(result, summarizeImageGroup(name, group, totalNodes))
+	}
+
+	return result
+}
+
+func summarizeImageGroup(name string, images []api.Image, totalNodes int) imageSummary {
+	nodeSet := map[string]struct{}{}
+	statusSet := map[string]struct{}{}
+	lvSet := map[string]struct{}{}
+	qcow2Set := map[string]struct{}{}
+
+	var ageStatus *api.Status
+	for _, img := range images {
+		nodeName := ""
+		if img.Metadata.NodeName != nil {
+			nodeName = strings.TrimSpace(*img.Metadata.NodeName)
+		}
+		if nodeName != "" {
+			nodeSet[nodeName] = struct{}{}
+		}
+
+		statusSet[normalizeImageStatus(img)] = struct{}{}
+		lvSet[normalizeImageLV(img)] = struct{}{}
+		qcow2Set[normalizeImageQcow2(img)] = struct{}{}
+
+		if ageStatus == nil || creationTime(img.Status).Before(creationTime(ageStatus)) {
+			ageStatus = img.Status
+		}
+	}
+
+	status := firstMapKey(statusSet)
+	if len(statusSet) > 1 {
+		status = "MIXED"
+	}
+
+	lv := firstMapKey(lvSet)
+	if len(lvSet) > 1 {
+		lv = "mixed"
+	}
+
+	qcow2 := firstMapKey(qcow2Set)
+	if len(qcow2Set) > 1 {
+		qcow2 = "mixed"
+	}
+
+	expectedNodes := totalNodes
+	if expectedNodes <= 0 {
+		expectedNodes = len(nodeSet)
+	}
+	uniform := len(statusSet) == 1 && len(lvSet) == 1 && len(qcow2Set) == 1
+	complete := uniform && len(nodeSet) == expectedNodes
+
+	synced := "DEGRADE"
+	if complete {
+		synced = "COMPLETE"
+	}
+
+	return imageSummary{
+		name:      name,
+		status:    status,
+		synced:    synced,
+		hasLV:     lv,
+		hasQcow2:  qcow2,
+		ageStatus: ageStatus,
+	}
+}
+
+func collectUniqueNodeCount(images []api.Image) int {
+	nodes := map[string]struct{}{}
+	for _, img := range images {
+		if img.Metadata.NodeName == nil {
+			continue
+		}
+		nodeName := strings.TrimSpace(*img.Metadata.NodeName)
+		if nodeName == "" {
+			continue
+		}
+		nodes[nodeName] = struct{}{}
+	}
+	return len(nodes)
+}
+
+func normalizeImageStatus(img api.Image) string {
+	if img.Status == nil || img.Status.Status == nil || strings.TrimSpace(*img.Status.Status) == "" {
+		return "-"
+	}
+	return strings.TrimSpace(*img.Status.Status)
+}
+
+func normalizeImageLV(img api.Image) string {
+	if (img.Spec.LvPath != nil && strings.TrimSpace(*img.Spec.LvPath) != "") ||
+		(img.Spec.LogicalVolume != nil && strings.TrimSpace(*img.Spec.LogicalVolume) != "") {
+		return "yes"
+	}
+	return "no"
+}
+
+func normalizeImageQcow2(img api.Image) string {
+	if img.Spec.Qcow2Path != nil && strings.TrimSpace(*img.Spec.Qcow2Path) != "" {
+		return "yes"
+	}
+	return "no"
+}
+
+func firstMapKey(m map[string]struct{}) string {
+	for k := range m {
+		return k
+	}
+	return "-"
 }
 
 func outputVolumes(volumes []api.Volume) error {
@@ -1171,6 +1325,6 @@ func init() {
 	rootCmd.AddCommand(getCmd)
 	getCmd.Flags().StringVarP(&labelSelector, "selector", "l", "", "Label selector (e.g., key=value)")
 	getCmd.Flags().StringVarP(&getManifestFile, "file", "f", "", "Manifest file, URL, or - for stdin")
-	getCmd.Flags().BoolVarP(&getServerShowAll, "all", "a", false, "managedBy ラベル付きの server も含めて表示する")
+	getCmd.Flags().BoolVarP(&getServerShowAll, "all", "a", false, "server は managedBy を含め、image はノード別一覧を表示する")
 	getCmd.Flags().BoolVarP(&getVpnGatewayDownload, "download", "d", false, "vpngateway の VPN クライアント設定ファイル (.ovpn) をダウンロードする")
 }
