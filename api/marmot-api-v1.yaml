@@ -1980,6 +1980,10 @@ components:
           type: string
         user:
           type: string
+        users:
+          type: array
+          items:
+            type: string
         rootPassword:
           type: string
     HostStatus:

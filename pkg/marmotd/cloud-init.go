@@ -10,8 +10,8 @@ import (
 )
 
 // GenerateCloudInitISO generates a cloud-init ISO with password and SSH key settings.
-// username が空の場合はデフォルトユーザーに設定し、指定がある場合は新規ユーザーを作成します。
-func GenerateCloudInitISO(path, password, sshKey, username string) (string, error) {
+// usernames が空の場合はデフォルトユーザーに設定し、指定がある場合は各ユーザーを作成します。
+func GenerateCloudInitISO(path, password, sshKey string, usernames []string) (string, error) {
 	// Create temporary directory for cloud-init files
 	tempDir, err := os.MkdirTemp("", "cloud-init-")
 	if err != nil {
@@ -20,28 +20,7 @@ func GenerateCloudInitISO(path, password, sshKey, username string) (string, erro
 	defer os.RemoveAll(tempDir)
 
 	// Generate user-data
-	var userData string
-	if username != "" {
-		userData = fmt.Sprintf(`#cloud-config
-users:
-  - name: %s
-    shell: /bin/bash
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    ssh_authorized_keys:
-%s
-chpasswd:
-  list:
-    - %s:%s
-  expire: False
-`, username, formatSSHKeys(sshKey, "      "), username, password)
-	} else {
-		userData = fmt.Sprintf(`#cloud-config
-password: %s
-chpasswd: { expire: False }
-ssh_authorized_keys:
-%s
-`, password, formatSSHKeys(sshKey, "  "))
-	}
+	userData := buildCloudInitUserData(password, sshKey, usernames)
 
 	userDataPath := filepath.Join(tempDir, "user-data")
 	if err := os.WriteFile(userDataPath, []byte(userData), 0644); err != nil {
@@ -96,4 +75,47 @@ func formatSSHKeys(sshKey, indent string) string {
 		}
 	}
 	return strings.Join(result, "\n")
+}
+
+func buildCloudInitUserData(password, sshKey string, usernames []string) string {
+	users := normalizeUsernames(usernames)
+	if len(users) == 0 {
+		return fmt.Sprintf(`#cloud-config
+password: %s
+chpasswd: { expire: False }
+ssh_authorized_keys:
+%s
+`, password, formatSSHKeys(sshKey, "  "))
+	}
+
+	var builder strings.Builder
+	builder.WriteString("#cloud-config\n")
+	builder.WriteString("users:\n")
+	for _, username := range users {
+		builder.WriteString(fmt.Sprintf("  - name: %s\n", username))
+		builder.WriteString("    shell: /bin/bash\n")
+		builder.WriteString("    sudo: ALL=(ALL) NOPASSWD:ALL\n")
+		builder.WriteString("    ssh_authorized_keys:\n")
+		builder.WriteString(formatSSHKeys(sshKey, "      "))
+		builder.WriteString("\n")
+	}
+	if password != "" {
+		builder.WriteString("chpasswd:\n")
+		builder.WriteString("  list:\n")
+		for _, username := range users {
+			builder.WriteString(fmt.Sprintf("    - %s:%s\n", username, password))
+		}
+		builder.WriteString("  expire: False\n")
+	}
+	return builder.String()
+}
+
+func normalizeUsernames(usernames []string) []string {
+	normalized := make([]string, 0, len(usernames))
+	for _, username := range usernames {
+		if trimmed := strings.TrimSpace(username); trimmed != "" {
+			normalized = append(normalized, trimmed)
+		}
+	}
+	return normalized
 }

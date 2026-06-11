@@ -157,6 +157,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		slog.Error("GetServerById()", "err", err)
 		return "", err
 	}
+	if err := validateServerAuthSpec(serverConfig.Spec.Auth); err != nil {
+		return "", err
+	}
 
 	assignedNodeName := strings.TrimSpace(m.NodeName)
 	if serverConfig.Metadata.NodeName != nil {
@@ -593,14 +596,17 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 
 	var password string
 	var sshKey string
-	var username string
+	var usernames []string
 
 	if serverConfig.Spec.Auth != nil {
 		if serverConfig.Spec.Auth.RootPassword != nil {
 			password = *serverConfig.Spec.Auth.RootPassword
 		}
 		if serverConfig.Spec.Auth.User != nil {
-			username = *serverConfig.Spec.Auth.User
+			usernames = append(usernames, *serverConfig.Spec.Auth.User)
+		}
+		if serverConfig.Spec.Auth.Users != nil {
+			usernames = append(usernames, (*serverConfig.Spec.Auth.Users)...)
 		}
 		if serverConfig.Spec.Auth.Url != nil {
 			keys, err := FetchPublicKeys(*serverConfig.Spec.Auth.Url)
@@ -614,7 +620,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		}
 	}
 
-	isoPath, err := GenerateCloudInitISO(path, password, sshKey, username)
+	isoPath, err := GenerateCloudInitISO(path, password, sshKey, usernames)
 	if err != nil {
 		slog.Error("GenerateCloudInitISO()", "err", err)
 		return "", err
@@ -813,6 +819,26 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	}
 
 	return id, nil
+}
+
+func validateServerAuthSpec(auth *api.Auth) error {
+	if auth == nil {
+		return nil
+	}
+	if auth.User != nil && auth.Users != nil && len(*auth.Users) > 0 {
+		return fmt.Errorf("spec.auth.user and spec.auth.users cannot be used together")
+	}
+	if auth.User != nil && strings.TrimSpace(*auth.User) == "" {
+		return fmt.Errorf("spec.auth.user must not be empty")
+	}
+	if auth.Users != nil {
+		for _, username := range *auth.Users {
+			if strings.TrimSpace(username) == "" {
+				return fmt.Errorf("spec.auth.users must not contain empty values")
+			}
+		}
+	}
+	return nil
 }
 
 func appendVPNRouteIfEnabled(nic *api.NetworkInterface, vnet *api.VirtualNetwork) {

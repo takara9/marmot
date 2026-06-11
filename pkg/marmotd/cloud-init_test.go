@@ -26,7 +26,7 @@ var _ = Describe("Cloud-InitISO作成テスト", Ordered, func() {
 		path := "/var/lib/marmot/isos/test-server"
 
 		It("モックサーバー用etcdの起動", func() {
-			isoFile, err = marmotd.GenerateCloudInitISO(path, password, sshKey, "")
+			isoFile, err = marmotd.GenerateCloudInitISO(path, password, sshKey, nil)
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println("ISO FILE=", isoFile)
 		})
