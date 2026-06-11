@@ -382,7 +382,7 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 			Metadata: api.Metadata{
 				Name:     name,
 				Labels:   &labels,
-				NodeName: serverNodeName,
+				NodeName: util.StringPtr("marmot1"),
 				Id:       id,
 				Uuid:     util.StringPtr(uuidString),
 			},
@@ -413,7 +413,7 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 			Metadata: api.Metadata{
 				Name:     name,
 				Labels:   &labels,
-				NodeName: serverNodeName,
+				NodeName: util.StringPtr("marmot1"),
 				Id:       id,
 				Uuid:     util.StringPtr(uuidString),
 			},
