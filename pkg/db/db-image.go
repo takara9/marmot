@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"os"
 	"strings"
 	"time"
 
@@ -368,13 +367,9 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 	}
 	var img api.Image
 	if bootVol.Spec.Type != nil && *bootVol.Spec.Type == "qcow2" {
-		// イメージを書き込むディレクトリの作成
-		imageDir := fmt.Sprintf("/var/lib/marmot/images/%s", id)
-		if err := os.MkdirAll(imageDir, 0755); err != nil {
-			slog.Error("CreateImageFromVolume() failed to create image directory", "err", err, "imageDir", imageDir)
-			return api.Image{}, err
-		}
 		// イメージのqcow2ボリューム名を設定
+		// 実体ディレクトリの作成は、割り当てノードで実行されるコントローラー側で行う。
+		imageDir := fmt.Sprintf("/var/lib/marmot/images/%s", id)
 		imagePath := fmt.Sprintf("%s/osimage-%s.qcow2", imageDir, id)
 		img = api.Image{
 			ApiVersion: "v1",
@@ -382,7 +377,7 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 			Metadata: api.Metadata{
 				Name:     name,
 				Labels:   &labels,
-				NodeName: util.StringPtr("marmot1"),
+				NodeName: serverNodeName,
 				Id:       id,
 				Uuid:     util.StringPtr(uuidString),
 			},
@@ -413,7 +408,7 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 			Metadata: api.Metadata{
 				Name:     name,
 				Labels:   &labels,
-				NodeName: util.StringPtr("marmot1"),
+				NodeName: serverNodeName,
 				Id:       id,
 				Uuid:     util.StringPtr(uuidString),
 			},
