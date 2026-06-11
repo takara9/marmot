@@ -104,7 +104,13 @@ func (c *controller) imageControllerLoop() {
 			if err := c.ensureFollowerImagesWaiting(image); err != nil {
 				slog.Error("フォロワー用イメージエントリーの作成に失敗", "headImageId", image.Metadata.Id, "err", err)
 			}
-			if image.Spec.SourceUrl == nil && strings.TrimSpace(util.OrDefault(image.Spec.Qcow2Path, "")) != "" {
+			source := ""
+			if image.Metadata.Labels != nil {
+				source = db.GetImageSource(*image.Metadata.Labels)
+			}
+
+			// bootVolume 由来のイメージは、インポート済み扱いにせず必ずVMコピー処理へ進める。
+			if source != "bootVolume" && image.Spec.SourceUrl == nil && strings.TrimSpace(util.OrDefault(image.Spec.Qcow2Path, "")) != "" {
 				slog.Debug("インポート済みQCOW2イメージを利用可能に遷移", "image", image.Metadata.Name, "imageId", image.Metadata.Id)
 				c.marmot.Db.UpdateImageStatusMessage(image.Metadata.Id, db.IMAGE_AVAILABLE, "")
 				continue
@@ -112,7 +118,6 @@ func (c *controller) imageControllerLoop() {
 			c.marmot.Db.UpdateImageStatus(image.Metadata.Id, db.IMAGE_CREATING)
 			// ラベルの存在をチェック
 			if image.Metadata.Labels != nil {
-				source := db.GetImageSource(*image.Metadata.Labels)
 				if source == "bootVolume" {
 					slog.Debug("実行中VMからイメージの作成", "image", image.Metadata.Name, "source", "bootVolume")
 					serverId := db.GetImageServerID(*image.Metadata.Labels)

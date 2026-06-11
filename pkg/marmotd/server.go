@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -1291,6 +1293,19 @@ func (m *Marmot) MakeImageEntryFromRunningVMWithContext(ctx context.Context, ser
 	}
 
 	if bootVol.Spec.Type != nil && *bootVol.Spec.Type == "qcow2" {
+		if image.Spec.Qcow2Path == nil || strings.TrimSpace(*image.Spec.Qcow2Path) == "" {
+			err := fmt.Errorf("image qcow2 path is empty")
+			slog.Error("MakeImageEntryFromRunningVMWithContext()", "err", err, "serverId", serverId, "imageName", name)
+			return "", markFailed(err)
+		}
+
+		// イメージを作成するノード上で出力先ディレクトリを作成する。
+		imageDir := filepath.Dir(*image.Spec.Qcow2Path)
+		if err := os.MkdirAll(imageDir, 0755); err != nil {
+			slog.Error("os.MkdirAll()", "err", err, "imageDir", imageDir, "serverId", serverId, "imageName", name)
+			return "", markFailed(err)
+		}
+
 		// qcow2ファイルのコピー
 		slog.Debug("qcow2ファイルのコピー", "source path", *bootVol.Spec.Path, "destination path", *image.Spec.Qcow2Path)
 		if bootVol.Spec.Path != nil {
