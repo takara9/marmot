@@ -52,6 +52,131 @@ func normalizeISCSITargetName(targetIQN string) string {
 	return t + "/0"
 }
 
+func volumeKindOrDefault(spec api.VolSpec) string {
+	if spec.Kind != nil {
+		if kind := strings.TrimSpace(*spec.Kind); kind != "" {
+			return kind
+		}
+	}
+	return "data"
+}
+
+func chooseAssignedNodeName(defaultNode string, requestedNode *string, storageNode string) (string, error) {
+	defaultAssigned := strings.TrimSpace(defaultNode)
+	assigned := defaultAssigned
+	requested := ""
+	if requestedNode != nil {
+		requested = strings.TrimSpace(*requestedNode)
+		if requested != "" {
+			assigned = requested
+		}
+	}
+
+	storage := strings.TrimSpace(storageNode)
+	if storage == "" {
+		return assigned, nil
+	}
+	if requested != "" && requested != storage && requested != defaultAssigned {
+		return "", fmt.Errorf("metadata.nodeName %q conflicts with pre-created storage volume node %q", requested, storage)
+	}
+	return storage, nil
+}
+
+func (m *Marmot) findPreCreatedStorageVolume(disk api.Volume) (*api.Volume, error) {
+	if diskID := strings.TrimSpace(api.VolumeID(disk)); diskID != "" {
+		vol, err := m.GetVolumeById(diskID)
+		if err != nil {
+			return nil, err
+		}
+		return vol, nil
+	}
+
+	name := strings.TrimSpace(disk.Metadata.Name)
+	if name == "" {
+		return nil, nil
+	}
+
+	kind := volumeKindOrDefault(disk.Spec)
+	volumes, err := m.Db.FindVolumeByName(name, kind)
+	if err != nil {
+		return nil, err
+	}
+	return selectReusableVolume(volumes)
+}
+
+func (m *Marmot) resolveStorageBoundNodeName(storage *[]api.Volume) (string, error) {
+	if storage == nil {
+		return "", nil
+	}
+
+	boundNode := ""
+	for i, disk := range *storage {
+		vol, err := m.findPreCreatedStorageVolume(disk)
+		if err != nil {
+			return "", fmt.Errorf("storage[%d] volume lookup failed: %w", i, err)
+		}
+		if vol == nil || vol.Metadata.NodeName == nil {
+			continue
+		}
+
+		node := strings.TrimSpace(*vol.Metadata.NodeName)
+		if node == "" {
+			continue
+		}
+		if boundNode == "" {
+			boundNode = node
+			continue
+		}
+		if boundNode != node {
+			return "", fmt.Errorf("storage volumes are distributed across nodes: %q and %q", boundNode, node)
+		}
+	}
+
+	return boundNode, nil
+}
+
+
+// ResolveAndAssignServerNodeByStorage inspects pre-created storage volumes and
+// updates server metadata.nodeName when storage constrains placement.
+func (m *Marmot) ResolveAndAssignServerNodeByStorage(serverID string) (string, error) {
+	serverID = strings.TrimSpace(serverID)
+	if serverID == "" {
+		return "", errors.New("server id is required")
+	}
+
+	serverConfig, err := m.Db.GetServerById(serverID)
+	if err != nil {
+		return "", err
+	}
+
+	storageNodeName, err := m.resolveStorageBoundNodeName(serverConfig.Spec.Storage)
+	if err != nil {
+		return "", err
+	}
+
+	assignedNodeName, err := chooseAssignedNodeName(m.NodeName, serverConfig.Metadata.NodeName, storageNodeName)
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(assignedNodeName) == "" {
+		return "", nil
+	}
+
+	currentNode := ""
+	if serverConfig.Metadata.NodeName != nil {
+		currentNode = strings.TrimSpace(*serverConfig.Metadata.NodeName)
+	}
+	if currentNode == assignedNodeName {
+		return assignedNodeName, nil
+	}
+
+	patch := api.Server{Metadata: api.Metadata{NodeName: util.StringPtr(assignedNodeName)}}
+	if err := m.Db.UpdateServer(serverID, patch); err != nil {
+		return "", err
+	}
+
+	return assignedNodeName, nil
+}
 func resolveISCSIServerNode(statuses []api.HostStatus) string {
 	active := filterActiveHosts(statuses)
 	if len(active) == 0 {
@@ -163,11 +288,16 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		return "", err
 	}
 
-	assignedNodeName := strings.TrimSpace(m.NodeName)
-	if serverConfig.Metadata.NodeName != nil {
-		if node := strings.TrimSpace(*serverConfig.Metadata.NodeName); node != "" {
-			assignedNodeName = node
-		}
+	storageNodeName, err := m.resolveStorageBoundNodeName(serverConfig.Spec.Storage)
+	if err != nil {
+		slog.Error("resolveStorageBoundNodeName()", "err", err)
+		return "", err
+	}
+
+	assignedNodeName, err := chooseAssignedNodeName(m.NodeName, serverConfig.Metadata.NodeName, storageNodeName)
+	if err != nil {
+		slog.Error("chooseAssignedNodeName()", "err", err)
+		return "", err
 	}
 	assignNodeNameIfUnset(&serverConfig.Metadata, assignedNodeName)
 
@@ -501,18 +631,17 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			disk.ApiVersion = "v1"
 			disk.Kind = "Volume"
 
-			diskID := api.VolumeID(disk)
-			if len(diskID) > 0 {
-				slog.Debug("既存ボリュームを使用", "disk index", i, "volume id", diskID)
-				diskVol, err := m.GetVolumeById(diskID)
-				if err != nil {
-					slog.Error("GetVolumeById()", "err", err)
-					return "", err
-				}
+			diskVol, err := m.findPreCreatedStorageVolume(disk)
+			if err != nil {
+				slog.Error("findPreCreatedStorageVolume()", "err", err, "disk index", i)
+				return "", err
+			}
+			if diskVol != nil {
+				slog.Debug("既存ボリュームを使用", "disk index", i, "volume id", api.VolumeID(*diskVol))
 
 				// 永続フラグを立てる
-				var peersistent bool = true
-				diskVol.Spec.Persistent = &peersistent
+				var persistent bool = true
+				diskVol.Spec.Persistent = &persistent
 
 				slog.Debug("既存ボリュームの情報取得成功", "disk index", i, "volume id", api.VolumeID(*diskVol), "path", diskVol.Spec.Path, "status", diskVol.Status.Status)
 				(*serverConfig.Spec.Storage)[i] = *diskVol

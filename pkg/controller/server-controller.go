@@ -108,6 +108,19 @@ func (c *controller) serverControllerLoop() {
 	}
 
 	for _, spec := range serverSpec {
+		if spec.Status != nil && spec.Status.StatusCode == db.SERVER_PENDING {
+			assignedNode, assignErr := c.marmot.ResolveAndAssignServerNodeByStorage(api.ServerID(spec))
+			if assignErr != nil {
+				slog.Error("ResolveAndAssignServerNodeByStorage()", "serverId", api.ServerID(spec), "err", assignErr)
+				msg := fmt.Sprintf("サーバーのノード割当解決に失敗した。原因エラー: %v", assignErr)
+				c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_ERROR, msg)
+				continue
+			}
+			if strings.TrimSpace(assignedNode) != "" {
+				spec.Metadata.NodeName = util.StringPtr(assignedNode)
+			}
+		}
+
 		// 削除のタイムスタンプが一定時間以上経過しているかをチェックして、削除処理を実行する
 		if spec.Status != nil && spec.Status.DeletionTimeStamp != nil {
 			deletionTime := *spec.Status.DeletionTimeStamp
@@ -323,6 +336,13 @@ func isRetryableServerProvisionError(err error) bool {
 	}
 	if strings.Contains(msg, "no public keys found at") {
 		return true
+	}
+
+	// ノード間レプリケーション中に OS イメージ実体が未到達な場合は再試行する。
+	if strings.Contains(msg, "failed to copy qcow2 volume") {
+		if strings.Contains(msg, "no such file") || strings.Contains(msg, "not found") || strings.Contains(msg, "does not exist") {
+			return true
+		}
 	}
 
 	return false

@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 )
 
 // QCOW2ボリュームの存在チェック
@@ -52,12 +55,20 @@ func CopyQcow(srcPath string, destPath string) error {
 // QCOW2 ボリュームのコピー
 func CopyQcowWithContext(ctx context.Context, srcPath string, destPath string) error {
 	slog.Debug("Copying QCOW2 volume", "srcPath", srcPath, "destPath", destPath)
+	destDir := filepath.Dir(destPath)
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return fmt.Errorf("failed to ensure destination directory for QCOW2 copy: %s: %w", destDir, err)
+	}
 	//cmd := exec.Command("qemu-img", "convert", "-f", "qcow2", "-O", "qcow2", srcPath, destPath)
 	cmd := exec.CommandContext(ctx, "cp", srcPath, destPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		slog.Error("qemu-img copy failed", "output", string(output))
-		return fmt.Errorf("Failed to copy QCOW2 volume from %s to %s, error: %v", srcPath, destPath, err)
+		trimmed := strings.TrimSpace(string(output))
+		slog.Error("cp qcow2 failed", "output", trimmed)
+		if trimmed == "" {
+			return fmt.Errorf("failed to copy QCOW2 volume from %s to %s: %w", srcPath, destPath, err)
+		}
+		return fmt.Errorf("failed to copy QCOW2 volume from %s to %s: %w (output: %s)", srcPath, destPath, err, trimmed)
 	}
 	return nil
 }
