@@ -324,6 +324,9 @@ func (d *Database) FindVolumeByName(name, kind string) ([]api.Volume, error) {
 	prefix := VolumePrefix + "/"
 	resp, err := d.GetByPrefix(prefix)
 	if err != nil {
+		if err == ErrNotFound {
+			return volumes, nil
+		}
 		slog.Error("GetEtcdByPrefix() failed", "err", err, "key-prefix", prefix)
 		return volumes, err
 	}
