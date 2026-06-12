@@ -450,12 +450,15 @@ func createNetworkLoadBalancer(manifest map[string]interface{}) error {
 func processCreateResponse(byteBody []byte) error {
 	switch outputStyle {
 	case "text":
-		var data any
-		if err := json.Unmarshal(byteBody, &data); err != nil {
+		id, err := extractResponseID(byteBody)
+		if err != nil {
 			return fmt.Errorf("failed to parse response: %w", err)
 		}
-		serveMap := data.(map[string]any)
-		fmt.Printf("リソースの作成要求が受け入れられました。ID: %v\n", serveMap["id"])
+		if id == "" {
+			fmt.Printf("リソースの作成要求が受け入れられました。ID: <nil>\n")
+			return nil
+		}
+		fmt.Printf("リソースの作成要求が受け入れられました。ID: %s\n", id)
 		return nil
 
 	case "json":
