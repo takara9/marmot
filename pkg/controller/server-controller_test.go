@@ -138,6 +138,11 @@ func TestIsRetryableServerProvisionError(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "missing qcow2 source file copy is retryable",
+			err:  errors.New("failed to copy QCOW2 volume from /var/lib/marmot/images/x/osimage-x.qcow2 to /var/lib/marmot/volumes/boot-y.qcow2: exit status 1 (output: cp: cannot stat '/var/lib/marmot/images/x/osimage-x.qcow2': No such file or directory)"),
+			want: true,
+		},
+		{
 			name: "other provisioning error is not retryable",
 			err:  errors.New("boot volume path is required for qcow2"),
 			want: false,
