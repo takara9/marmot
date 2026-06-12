@@ -596,30 +596,10 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 
 	path := "/var/lib/marmot/isos/" + api.ServerID(serverConfig)
 
-	var password string
-	var sshKey string
-	var usernames []string
-
-	if serverConfig.Spec.Auth != nil {
-		if serverConfig.Spec.Auth.RootPassword != nil {
-			password = *serverConfig.Spec.Auth.RootPassword
-		}
-		if serverConfig.Spec.Auth.User != nil {
-			usernames = append(usernames, *serverConfig.Spec.Auth.User)
-		}
-		if serverConfig.Spec.Auth.Users != nil {
-			usernames = append(usernames, (*serverConfig.Spec.Auth.Users)...)
-		}
-		if serverConfig.Spec.Auth.Url != nil {
-			keys, err := FetchPublicKeys(*serverConfig.Spec.Auth.Url)
-			if err != nil {
-				slog.Error("公開鍵の取得に失敗", "url", *serverConfig.Spec.Auth.Url, "err", err)
-				return "", err
-			}
-			sshKey = strings.Join(keys, "\n")
-		} else if serverConfig.Spec.Auth.PublicKey != nil {
-			sshKey = *serverConfig.Spec.Auth.PublicKey
-		}
+	password, sshKey, usernames, err := cloudInitAuthInputs(serverConfig.Spec.Auth)
+	if err != nil {
+		slog.Error("公開鍵の取得に失敗", "err", err)
+		return "", err
 	}
 
 	isoPath, err := GenerateCloudInitISO(path, password, sshKey, usernames)
@@ -841,6 +821,50 @@ func validateServerAuthSpec(auth *api.Auth) error {
 		}
 	}
 	return nil
+}
+
+func cloudInitAuthInputs(auth *api.Auth) (string, string, []string, error) {
+	if auth == nil {
+		return "", "", nil, nil
+	}
+
+	var password string
+	var sshKey string
+	var usernames []string
+
+	if auth.RootPassword != nil {
+		password = *auth.RootPassword
+	}
+	if auth.User != nil {
+		usernames = append(usernames, *auth.User)
+	}
+	if auth.Users != nil {
+		usernames = append(usernames, (*auth.Users)...)
+	}
+	if auth.Url != nil {
+		keys, err := FetchPublicKeys(*auth.Url)
+		if err != nil {
+			return "", "", nil, err
+		}
+		sshKey = strings.Join(keys, "\n")
+	} else if auth.PublicKey != nil {
+		sshKey = *auth.PublicKey
+	}
+
+	if auth.RootPassword != nil && !containsUsername(usernames, "root") {
+		usernames = append(usernames, "root")
+	}
+
+	return password, sshKey, usernames, nil
+}
+
+func containsUsername(usernames []string, expected string) bool {
+	for _, username := range usernames {
+		if strings.TrimSpace(username) == expected {
+			return true
+		}
+	}
+	return false
 }
 
 func appendVPNRouteIfEnabled(nic *api.NetworkInterface, vnet *api.VirtualNetwork) {
