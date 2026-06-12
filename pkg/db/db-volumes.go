@@ -93,13 +93,13 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 		volume.Metadata.Name = name
 	}
 	// OSかDATAかの種別で、サイズのデフォルト値を変える
-	if volume.Spec.Kind == nil {
+	if volume.Spec.Kind == nil || strings.TrimSpace(*volume.Spec.Kind) == "" {
 		volume.Spec.Kind = util.StringPtr("data") // デフォルトはdata
 		// サイズのデフォルト値を設定
 		if volume.Spec.Size == nil {
 			volume.Spec.Size = util.IntPtrInt(1) // 1GB
 		}
-	} else if *volume.Spec.Kind == "os" {
+	} else if strings.TrimSpace(*volume.Spec.Kind) == "os" {
 		// OSボリュームはサイズ未指定(または0以下)時のみデフォルト値を設定
 		if volume.Spec.Size == nil || *volume.Spec.Size <= 0 {
 			volume.Spec.Size = util.IntPtrInt(16) // 16GB
@@ -107,13 +107,13 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 	}
 
 	// ボリュームタイプのデフォルト値を設定し、パスを決定する
-	if volume.Spec.Type == nil {
+	if volume.Spec.Type == nil || strings.TrimSpace(*volume.Spec.Type) == "" {
 		volume.Spec.Type = util.StringPtr("qcow2")
 	}
 
 	// QCOW2ボリュームの場合、パスを決定する。OSとDATAでパスを分ける。OSはboot-<id>.qcow2、DATAはdata-<id>.qcow2
-	if *volume.Spec.Type == "qcow2" {
-		if *volume.Spec.Kind == "os" {
+	if strings.TrimSpace(*volume.Spec.Type) == "qcow2" {
+		if strings.TrimSpace(*volume.Spec.Kind) == "os" {
 			volume.Spec.Path = util.StringPtr(fmt.Sprintf("/var/lib/marmot/volumes/boot-%s.qcow2", api.VolumeID(volume)))
 		} else {
 			volume.Spec.Path = util.StringPtr(fmt.Sprintf("/var/lib/marmot/volumes/data-%s.qcow2", api.VolumeID(volume)))
@@ -121,12 +121,12 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 	}
 
 	// LVMボリュームの場合、パスを決定する
-	if *volume.Spec.Type == "lvm" {
+	if strings.TrimSpace(*volume.Spec.Type) == "lvm" {
 		configureLVMVolumeSpec(&volume.Spec, api.VolumeID(volume))
 	}
 
 	// OSボリュームの場合、OsVariantのデフォルト値を設定する  必要か？
-	if *volume.Spec.Kind == "os" {
+	if strings.TrimSpace(*volume.Spec.Kind) == "os" {
 		if volume.Spec.OsVariant == nil {
 			volume.Spec.OsVariant = util.StringPtr("ubuntu22.04")
 		}

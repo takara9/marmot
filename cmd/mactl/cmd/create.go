@@ -200,12 +200,9 @@ func createVolume(manifest map[string]interface{}) error {
 	if strings.TrimSpace(volume.Metadata.Name) == "" {
 		return fmt.Errorf("metadata.name is required")
 	}
-	if volume.Spec.Type == nil || strings.TrimSpace(*volume.Spec.Type) == "" {
-		return fmt.Errorf("spec.type is required")
-	}
-	if volume.Spec.Kind == nil || strings.TrimSpace(*volume.Spec.Kind) == "" {
-		return fmt.Errorf("spec.kind is required")
-	}
+
+	// spec.type/spec.kind の既定値を補完
+	ApplyVolumeDefaults(volume)
 
 	// ボリュームが既に存在するかチェック
 	list, _, err := m.ListVolumes()

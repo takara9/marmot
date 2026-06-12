@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -68,6 +69,12 @@ func StartVolController(node string, etcdUrl string, deletionDelaySeconds int) (
 func (c *controller) volumeControllerLoop() {
 	slog.Debug("ボリュームコントローラーの制御ループ実行", "CONTROLLER", time.Now().Format("2006-01-02 15:04:05"))
 
+	statuses, err := c.marmot.Db.GetAllHostStatus()
+	if err != nil {
+		slog.Warn("GetAllHostStatus() failed; ボリュームの nodeName 存在確認をスキップ", "err", err)
+		statuses = nil
+	}
+
 	vols, err := c.marmot.GetVolumes()
 	if err != nil {
 		slog.Error("failed to get volumes", "err", err)
@@ -76,6 +83,28 @@ func (c *controller) volumeControllerLoop() {
 	slog.Debug("取得したボリュームの数", "numVolumes", len(vols))
 	for _, vol := range vols {
 		volID := api.VolumeID(vol)
+		if shouldFail, message := shouldFailVolumeForMissingAssignedNode(vol, statuses); shouldFail {
+			assignedNode := ""
+			if vol.Metadata.NodeName != nil {
+				assignedNode = strings.TrimSpace(*vol.Metadata.NodeName)
+			}
+			slog.Warn("存在しない nodeName 指定のためボリュームを ERROR に更新", "volId", volID, "assignedNode", assignedNode, "message", message)
+			c.db.UpdateVolumeStatusMessage(volID, db.VOLUME_ERROR, message)
+			continue
+		}
+
+		if shouldDelete, reason := shouldDeleteVolumeForMissingAssignedNode(vol, statuses); shouldDelete {
+			assignedNode := ""
+			if vol.Metadata.NodeName != nil {
+				assignedNode = strings.TrimSpace(*vol.Metadata.NodeName)
+			}
+			slog.Warn("存在しない nodeName 指定のためボリューム定義を削除", "volId", volID, "assignedNode", assignedNode, "reason", reason)
+			if err := c.db.DeleteVolume(volID); err != nil {
+				slog.Error("DeleteVolume()", "err", err, "volId", volID)
+			}
+			continue
+		}
+
 		if ok, assignedNode, reason := evaluateNodeAssignment(&vol.Metadata, c.marmot.NodeName); !ok {
 			objectName := vol.Metadata.Name
 			slog.Debug("別ノード割当のボリュームをスキップ", "volumeId", volID, "volumeName", objectName, "controllerNode", c.marmot.NodeName, "assignedNode", assignedNode, "reason", reason)
@@ -189,4 +218,58 @@ func (c *controller) volumeControllerLoop() {
 		}
 	}
 	// ワークキューから処理を取り出して、処理を実行する
+}
+
+func shouldDeleteVolumeForMissingAssignedNode(vol api.Volume, statuses []api.HostStatus) (bool, string) {
+	if vol.Status == nil || vol.Status.StatusCode != db.VOLUME_DELETING {
+		return false, ""
+	}
+
+	if vol.Metadata.NodeName == nil {
+		return false, ""
+	}
+
+	assignedNode := strings.TrimSpace(*vol.Metadata.NodeName)
+	if assignedNode == "" {
+		return false, ""
+	}
+
+	if !clusterHasAnyNode(statuses) {
+		return false, ""
+	}
+
+	if clusterHasNode(statuses, assignedNode) {
+		return false, ""
+	}
+
+	return true, "assigned_node_not_found"
+}
+
+func shouldFailVolumeForMissingAssignedNode(vol api.Volume, statuses []api.HostStatus) (bool, string) {
+	if vol.Status == nil {
+		return false, ""
+	}
+
+	if vol.Status.StatusCode != db.VOLUME_PENDING && vol.Status.StatusCode != db.VOLUME_PROVISIONING {
+		return false, ""
+	}
+
+	if vol.Metadata.NodeName == nil {
+		return false, ""
+	}
+
+	assignedNode := strings.TrimSpace(*vol.Metadata.NodeName)
+	if assignedNode == "" {
+		return false, ""
+	}
+
+	if !clusterHasAnyNode(statuses) {
+		return false, ""
+	}
+
+	if clusterHasNode(statuses, assignedNode) {
+		return false, ""
+	}
+
+	return true, fmt.Sprintf("metadata.nodeName %q is not found in cluster", assignedNode)
 }

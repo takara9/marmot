@@ -255,6 +255,21 @@ func ApplyServerDefaults(server *api.Server) {
 	}
 }
 
+// ApplyVolumeDefaults は volume.spec の既定値を補完する。
+// spec.type が未指定なら qcow2、spec.kind が未指定なら data を設定する。
+func ApplyVolumeDefaults(volume *api.Volume) {
+	if volume == nil {
+		return
+	}
+
+	if volume.Spec.Type == nil || strings.TrimSpace(*volume.Spec.Type) == "" {
+		volume.Spec.Type = util.StringPtr("qcow2")
+	}
+	if volume.Spec.Kind == nil || strings.TrimSpace(*volume.Spec.Kind) == "" {
+		volume.Spec.Kind = util.StringPtr("data")
+	}
+}
+
 // ManifestToImage マニフェストを Image 構造体に変換
 func ManifestToImage(manifest map[string]interface{}) (*api.Image, error) {
 	data, err := json.Marshal(manifest)
