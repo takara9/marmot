@@ -275,11 +275,49 @@ func requestedOSVolumeSizeGB(volSpec api.Volume, img api.Image) (int, error) {
 	return requestedSize, nil
 }
 
+func selectReusableVolume(volumes []api.Volume) (*api.Volume, error) {
+	switch len(volumes) {
+	case 0:
+		return nil, nil
+	case 1:
+		volume := volumes[0]
+		return &volume, nil
+	default:
+		return nil, fmt.Errorf("multiple volumes found with the same name")
+	}
+}
+
+func (m *Marmot) waitForVolumeAvailable(volumeID string) (api.Volume, error) {
+	for {
+		vol, err := m.GetVolumeById(volumeID)
+		if err != nil {
+			slog.Error("GetVolumeById()", "err", err)
+			return api.Volume{}, err
+		}
+		slog.Debug("ブートボリュームのステータス確認ループ", "volume id", volumeID, "status", vol.Status.Status)
+		if vol.Status.StatusCode == db.VOLUME_AVAILABLE {
+			slog.Debug("ブートボリュームのステータスがAVAILABLEになった", "volume id", volumeID)
+			return *vol, nil
+		}
+		if vol.Status.StatusCode == db.VOLUME_ERROR {
+			msg := "volume provisioning failed"
+			if vol.Status.Message != nil && len(*vol.Status.Message) > 0 {
+				msg = *vol.Status.Message
+			}
+			return api.Volume{}, fmt.Errorf("volume provisioning failed: %s", msg)
+		}
+		time.Sleep(1 * time.Second)
+	}
+}
+
 func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 	volSpec, err := m.Db.GetVolumeById(id)
 	if err != nil {
 		slog.Error("failed to get volume by id after creation", "err", err, "volId", id)
 		return nil, err
+	}
+	if volSpec.Status == nil {
+		volSpec.Status = &api.Status{}
 	}
 	volumeID := api.VolumeID(volSpec)
 
@@ -572,6 +610,63 @@ func CheckVolumeBackingStore(volume api.Volume) error {
 
 	return nil
 }
+
+/*
+func getVolumeBackingStore(spec *api.VolSpec) (string, string) {
+	if spec == nil {
+		return "", ""
+				requestedName := strings.TrimSpace(volReq.Metadata.Name)
+				requestedKind := "data"
+				if volReq.Spec.Kind != nil && strings.TrimSpace(*volReq.Spec.Kind) != "" {
+					requestedKind = strings.TrimSpace(*volReq.Spec.Kind)
+				}
+
+				if requestedName != "" {
+					existingVolumes, err := m.Db.FindVolumeByName(requestedName, requestedKind)
+					if err != nil {
+						slog.Error("FindVolumeByName()", "err", err, "name", requestedName, "kind", requestedKind)
+						return api.Volume{}, err
+					}
+					existingVolume, err := selectReusableVolume(existingVolumes)
+					if err != nil {
+						slog.Error("selectReusableVolume()", "err", err, "name", requestedName, "kind", requestedKind)
+						return api.Volume{}, err
+					}
+					if existingVolume != nil {
+						slog.Info("existing volume found; reusing it", "name", requestedName, "kind", requestedKind, "volume id", api.VolumeID(*existingVolume))
+						return m.waitForVolumeAvailable(api.VolumeID(*existingVolume))
+					}
+	}
+
+				vol, err := m.Db.CreateVolumeOnDB2(volReq)
+	switch volType {
+					slog.Error("CreateVolumeOnDB2()", "err", err)
+		if path == "" {
+			return "", ""
+		}
+				if _, err = m.CreateNewVolume(api.VolumeID(*vol)); err != nil {
+					slog.Error("CreateNewVolume()", "err", err)
+					return api.Volume{}, err
+
+// ボリュームの拡張,API, ExpandVolume(volId, newSize)
+				return m.waitForVolumeAvailable(api.VolumeID(*vol))
+	return errors.New("not implemented")
+}
+
+// ボリュームの仮想マシンへのアタッチとデタッチ,API, AttachVol(vmId, volId), DetachVol(vmId, volId)
+func AttachVol(vmId string, volId string) error {
+	return errors.New("not implemented")
+}
+
+func DetachVol(vmId string, volId string) error {
+	return errors.New("not implemented")
+}
+
+// ボリュームの複製,API, CopyVolume(volId)
+func CopyVolume(volId string) error {
+	return errors.New("not implemented")
+}
+*/
 
 func getVolumeBackingStore(spec *api.VolSpec) (string, string) {
 	if spec == nil {
