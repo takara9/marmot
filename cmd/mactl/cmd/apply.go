@@ -567,15 +567,18 @@ func applyNetworkLoadBalancer(manifest map[string]interface{}) error {
 func processApplyResponse(byteBody []byte, updated bool) error {
 	switch outputStyle {
 	case "text":
-		var data any
-		if err := json.Unmarshal(byteBody, &data); err != nil {
+		id, err := extractResponseID(byteBody)
+		if err != nil {
 			return fmt.Errorf("failed to parse response: %w", err)
 		}
-		serveMap := data.(map[string]any)
+		displayID := id
+		if displayID == "" {
+			displayID = "<nil>"
+		}
 		if updated {
-			fmt.Printf("リソースが更新されました。ID: %v\n", serveMap["id"])
+			fmt.Printf("リソースが更新されました。ID: %s\n", displayID)
 		} else {
-			fmt.Printf("リソースが作成されました。ID: %v\n", serveMap["id"])
+			fmt.Printf("リソースが作成されました。ID: %s\n", displayID)
 		}
 		return nil
 

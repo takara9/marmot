@@ -97,6 +97,14 @@ func TestExtractSuccessID(t *testing.T) {
 		t.Fatalf("extractSuccessID() = %q, want s1234", id)
 	}
 
+	id, err = extractSuccessID([]byte(`{"id":null,"metadata":{"id":"s5678"},"message":"ok"}`))
+	if err != nil {
+		t.Fatalf("extractSuccessID() unexpected err: %v", err)
+	}
+	if id != "s5678" {
+		t.Fatalf("extractSuccessID() = %q, want s5678", id)
+	}
+
 	if _, err := extractSuccessID([]byte(`{"message":"ok"}`)); err == nil {
 		t.Fatalf("extractSuccessID() expected error for missing id")
 	}

@@ -85,12 +85,11 @@ func validateServerAnsiblePlaybookSpec(server api.Server) (string, error) {
 }
 
 func extractSuccessID(body []byte) (string, error) {
-	var data map[string]any
-	if err := json.Unmarshal(body, &data); err != nil {
+	id, err := extractResponseID(body)
+	if err != nil {
 		return "", err
 	}
-	id := strings.TrimSpace(fmt.Sprint(data["id"]))
-	if id == "" || id == "<nil>" {
+	if id == "" {
 		return "", fmt.Errorf("id is empty")
 	}
 	return id, nil
