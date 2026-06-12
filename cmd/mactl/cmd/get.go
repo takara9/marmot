@@ -363,6 +363,9 @@ func getVolumeResources(name string) error {
 			return fmt.Errorf("failed to parse volumes: %w", err)
 		}
 
+		// volume 一覧は通常 data kind のみ。-a のときは全件表示。
+		volumes = filterDataKindVolumes(volumes, getServerShowAll)
+
 		// NAME でフィルター
 		if name != "" {
 			volumes = filterVolumesByName(volumes, name)
@@ -641,6 +644,23 @@ func filterVolumesByLabel(volumes []api.Volume, labelFilter string) []api.Volume
 	var result []api.Volume
 	for _, v := range volumes {
 		if MatchesLabel(convertLabels(v.Metadata.Labels), labelFilter) {
+			result = append(result, v)
+		}
+	}
+	return result
+}
+
+func filterDataKindVolumes(volumes []api.Volume, showAll bool) []api.Volume {
+	if showAll {
+		return volumes
+	}
+
+	var result []api.Volume
+	for _, v := range volumes {
+		if v.Spec.Kind == nil {
+			continue
+		}
+		if strings.TrimSpace(*v.Spec.Kind) == "data" {
 			result = append(result, v)
 		}
 	}
@@ -1115,8 +1135,8 @@ func outputVolumes(volumes []api.Volume) error {
 		sort.SliceStable(volumes, func(i, j int) bool {
 			return creationTime(volumes[i].Status).Before(creationTime(volumes[j].Status))
 		})
-		fmt.Println("NAME          NODE  KIND  TYPE   iSCSI  SIZE(GB)  STATUS     PATH                  AGE")
-		fmt.Println("----          ----  ----  ----   -----  --------  ------     ----                  ---")
+		fmt.Println("NAME          NODE        KIND  TYPE   iSCSI  SIZE(GB)  STATUS     PATH                  AGE")
+		fmt.Println("----          ----        ----  ----   -----  --------  ------     ----                  ---")
 		for _, v := range volumes {
 			size := 0
 			if v.Spec.Size != nil {
@@ -1153,7 +1173,7 @@ func outputVolumes(volumes []api.Volume) error {
 				path = truncatePath(strings.TrimSpace(*v.Spec.Path), 22)
 			}
 
-			fmt.Printf("%-12s  %-4s  %-4s  %-5s  %-5s  %-8d  %-9s  %-20s  %s\n",
+			fmt.Printf("%-12s  %-10s  %-4s  %-5s  %-5s  %-8d  %-9s  %-20s  %s\n",
 				v.Metadata.Name,
 				node,
 				volKind,
@@ -1325,6 +1345,6 @@ func init() {
 	rootCmd.AddCommand(getCmd)
 	getCmd.Flags().StringVarP(&labelSelector, "selector", "l", "", "Label selector (e.g., key=value)")
 	getCmd.Flags().StringVarP(&getManifestFile, "file", "f", "", "Manifest file, URL, or - for stdin")
-	getCmd.Flags().BoolVarP(&getServerShowAll, "all", "a", false, "server は managedBy を含め、image はノード別一覧を表示する")
+	getCmd.Flags().BoolVarP(&getServerShowAll, "all", "a", false, "server は managedBy を含め、image はノード別一覧、volume は kind フィルターなしで全件表示する")
 	getCmd.Flags().BoolVarP(&getVpnGatewayDownload, "download", "d", false, "vpngateway の VPN クライアント設定ファイル (.ovpn) をダウンロードする")
 }
