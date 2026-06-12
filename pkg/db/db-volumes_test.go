@@ -51,6 +51,16 @@ var _ = Describe("Volumes", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 
+			It("ボリューム未作成時の名前検索", func() {
+				if v == nil {
+					v, err = db.NewDatabase(url)
+					Expect(err).NotTo(HaveOccurred())
+				}
+				vols, err := v.FindVolumeByName("missing-volume", "data")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(vols).To(BeEmpty())
+			})
+
 			It("ボリュームの作成 #1", func() {
 				vol := &api.Volume{
 					Metadata: api.Metadata{

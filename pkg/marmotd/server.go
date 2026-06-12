@@ -1222,6 +1222,29 @@ func (m *Marmot) UpdateServerById(id string, serverSpec api.Server) error {
 func (m *Marmot) CreateNewVolumeWithWait(volReq api.Volume) (api.Volume, error) {
 	slog.Debug("===CreateNewVolume is called===", "volume request", volReq)
 
+	requestedName := strings.TrimSpace(volReq.Metadata.Name)
+	requestedKind := "data"
+	if volReq.Spec.Kind != nil && strings.TrimSpace(*volReq.Spec.Kind) != "" {
+		requestedKind = strings.TrimSpace(*volReq.Spec.Kind)
+	}
+
+	if requestedName != "" {
+		existingVolumes, err := m.Db.FindVolumeByName(requestedName, requestedKind)
+		if err != nil {
+			slog.Error("FindVolumeByName()", "err", err, "name", requestedName, "kind", requestedKind)
+			return api.Volume{}, err
+		}
+		existingVolume, err := selectReusableVolume(existingVolumes)
+		if err != nil {
+			slog.Error("selectReusableVolume()", "err", err, "name", requestedName, "kind", requestedKind)
+			return api.Volume{}, err
+		}
+		if existingVolume != nil {
+			slog.Info("existing volume found; reusing it", "name", requestedName, "kind", requestedKind, "volume id", api.VolumeID(*existingVolume))
+			return m.waitForVolumeAvailable(api.VolumeID(*existingVolume))
+		}
+	}
+
 	vol, err := m.Db.CreateVolumeOnDB2(volReq)
 	if err != nil {
 		slog.Error("CreateVolumeOnDB2()", "err", err)
@@ -1230,36 +1253,12 @@ func (m *Marmot) CreateNewVolumeWithWait(volReq api.Volume) (api.Volume, error) 
 		return api.Volume{}, err
 	}
 
-	volDefined, err := m.CreateNewVolume(api.VolumeID(*vol))
-	if err != nil {
+	if _, err = m.CreateNewVolume(api.VolumeID(*vol)); err != nil {
 		slog.Error("CreateNewVolume()", "err", err)
-		//
 		return api.Volume{}, err
 	}
 
-	for {
-		vol, err := m.GetVolumeById(api.VolumeID(*vol))
-		if err != nil {
-			slog.Error("GetVolumeById()", "err", err)
-			// サーバーとボリュームのステータスをエラーに更新する処理を追加するべき
-			return api.Volume{}, err
-		}
-		slog.Debug("ブートボリュームのステータス確認ループ", "volume id", api.VolumeID(*vol), "status", vol.Status.Status)
-		if vol.Status.StatusCode == db.VOLUME_AVAILABLE {
-			slog.Debug("ブートボリュームのステータスがAVAILABLEになった", "volume id", api.VolumeID(*vol))
-			break
-		}
-		if vol.Status.StatusCode == db.VOLUME_ERROR {
-			msg := "volume provisioning failed"
-			if vol.Status.Message != nil && len(*vol.Status.Message) > 0 {
-				msg = *vol.Status.Message
-			}
-			return api.Volume{}, fmt.Errorf("volume %s is in error state: %s", api.VolumeID(*vol), msg)
-		}
-		time.Sleep(1 * time.Second)
-	}
-
-	return *volDefined, nil
+	return m.waitForVolumeAvailable(api.VolumeID(*vol))
 }
 
 // サーバーから起動イメージの作成
