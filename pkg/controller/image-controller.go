@@ -54,7 +54,7 @@ func StartImageController(node string, etcdUrl string, deletionDelaySeconds int)
 			case <-ticker.C:
 				c.imageControllerLoop()
 			case <-c.stopChan:
-				slog.Info("イメージコントローラー停止")
+				slog.Debug("イメージコントローラー停止")
 				return
 			}
 		}
@@ -308,35 +308,9 @@ func (c *controller) syncFollowerImageFromHead(followerImage api.Image, headImag
 		return err
 	}
 
-	followerLatest.Spec.Kind = util.StringPtr("os")
-	followerLatest.Spec.Type = util.StringPtr("qcow2")
-	followerLatest.Spec.SourceUrl = nil
-	if headImage.Spec.Kind != nil {
-		followerLatest.Spec.Kind = util.StringPtr(*headImage.Spec.Kind)
-	}
-	if headImage.Spec.Type != nil {
-		followerLatest.Spec.Type = util.StringPtr(*headImage.Spec.Type)
-	}
-	if headImage.Spec.SourceUrl != nil {
-		sourceURL := strings.TrimSpace(*headImage.Spec.SourceUrl)
-		if sourceURL != "" {
-			followerLatest.Spec.SourceUrl = util.StringPtr(sourceURL)
-		}
-	}
-	if headImage.Spec.OsName != nil {
-		osName := strings.TrimSpace(*headImage.Spec.OsName)
-		if osName != "" {
-			followerLatest.Spec.OsName = util.StringPtr(osName)
-		}
-	}
-	if headImage.Spec.OsVersion != nil {
-		osVersion := strings.TrimSpace(*headImage.Spec.OsVersion)
-		if osVersion != "" {
-			followerLatest.Spec.OsVersion = util.StringPtr(osVersion)
-		}
-	}
-	if headImage.Spec.Size != nil {
-		followerLatest.Spec.Size = util.IntPtrInt(*headImage.Spec.Size)
+	moduleKey, err := marmotd.ApplyFollowerImageSpecByOS(&followerLatest, headImage)
+	if err != nil {
+		return fmt.Errorf("failed to resolve image module for follower sync: %w", err)
 	}
 	if followerLatest.Metadata.Labels != nil {
 		labels := *followerLatest.Metadata.Labels
@@ -352,6 +326,13 @@ func (c *controller) syncFollowerImageFromHead(followerImage api.Image, headImag
 	if err := c.marmot.Db.UpdateImage(followerLatest.Metadata.Id, followerLatest); err != nil {
 		return err
 	}
+	slog.Debug("Sync image from head to follower",
+		"head", headImage.Metadata.Name,
+		"follower", followerLatest.Metadata.Name,
+		"headNode", headImage.Metadata.NodeName,
+		"followerNode", followerLatest.Metadata.NodeName,
+		"module", moduleKey,
+	)
 	c.marmot.Db.UpdateImageStatus(followerLatest.Metadata.Id, db.IMAGE_AVAILABLE)
 
 	return nil
@@ -375,17 +356,34 @@ func (c *controller) reconcileFollowerImageSpec(followerImage api.Image) error {
 		return err
 	}
 
+	desired := followerImage
+	moduleKey, err := marmotd.ApplyFollowerImageSpecByOS(&desired, headImage)
+	if err != nil {
+		slog.Error("failed to resolve image module while reconciling follower spec",
+			"head", headImage.Metadata.Name,
+			"follower", followerImage.Metadata.Name,
+			"err", err,
+		)
+		return nil
+	}
+
 	changed := false
-	changed = setStringPtrFromHead(&followerImage.Spec.Kind, headImage.Spec.Kind) || changed
-	changed = setStringPtrFromHead(&followerImage.Spec.Type, headImage.Spec.Type) || changed
-	changed = setStringPtrFromHead(&followerImage.Spec.SourceUrl, headImage.Spec.SourceUrl) || changed
-	changed = setStringPtrFromHead(&followerImage.Spec.OsName, headImage.Spec.OsName) || changed
-	changed = setStringPtrFromHead(&followerImage.Spec.OsVersion, headImage.Spec.OsVersion) || changed
-	changed = setIntPtrFromHead(&followerImage.Spec.Size, headImage.Spec.Size) || changed
+	changed = setStringPtrFromHead(&followerImage.Spec.Kind, desired.Spec.Kind) || changed
+	changed = setStringPtrFromHead(&followerImage.Spec.Type, desired.Spec.Type) || changed
+	changed = setStringPtrFromHead(&followerImage.Spec.SourceUrl, desired.Spec.SourceUrl) || changed
+	changed = setStringPtrFromHead(&followerImage.Spec.OsName, desired.Spec.OsName) || changed
+	changed = setStringPtrFromHead(&followerImage.Spec.OsVersion, desired.Spec.OsVersion) || changed
+	changed = setIntPtrFromHead(&followerImage.Spec.Size, desired.Spec.Size) || changed
 
 	if !changed {
 		return nil
 	}
+
+	slog.Debug("Reconciled follower image spec by module",
+		"head", headImage.Metadata.Name,
+		"follower", followerImage.Metadata.Name,
+		"module", moduleKey,
+	)
 
 	return c.marmot.Db.UpdateImage(followerImage.Metadata.Id, followerImage)
 }

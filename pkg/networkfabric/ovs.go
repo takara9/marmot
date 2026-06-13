@@ -23,7 +23,7 @@ type OVSFabric struct {
 
 const (
 	splitHorizonCookie = "0x6d61726d6f740001"
-	ovsCommandTimeout = 30 * time.Second
+	ovsCommandTimeout  = 30 * time.Second
 )
 
 const bridgeDeviceWaitTimeout = 10 * time.Second
@@ -57,7 +57,7 @@ func (o *OVSFabric) EnsureBridge(vnet *api.VirtualNetwork) error {
 			return err
 		}
 		if waitLinuxBridgeDeviceReady(bridgeName, bridgeDeviceWaitTimeout) {
-			slog.Info("OVS bridge recreated and Linux device became ready", "bridge", bridgeName)
+			slog.Debug("OVS bridge recreated and Linux device became ready", "bridge", bridgeName)
 			return nil
 		}
 		return fmt.Errorf("bridge %s exists in OVSDB but Linux device is not ready", bridgeName)
@@ -99,7 +99,7 @@ func (o *OVSFabric) EnsureBridge(vnet *api.VirtualNetwork) error {
 		return fmt.Errorf("bridge %s created in OVSDB but Linux device is not ready", bridgeName)
 	}
 
-	slog.Info("OVS bridge created", "bridge", bridgeName)
+	slog.Debug("OVS bridge created", "bridge", bridgeName)
 	return nil
 }
 
@@ -224,7 +224,7 @@ func (o *OVSFabric) EnsureOverlayMesh(vnet *api.VirtualNetwork, peers []string) 
 			return fmt.Errorf("failed to configure tunnel %s to %s: %w (output=%s)", tunnelName, peerIP, err, strings.TrimSpace(string(output)))
 		}
 
-		slog.Info("overlay tunnel created", "bridge", bridgeName, "tunnel", tunnelName, "peer", peerIP, "tunnelType", overlayTunnelType(vnet), "vni", vni, "underlayInterface", underlayIf, "localIP", localIP)
+		slog.Debug("overlay tunnel created", "bridge", bridgeName, "tunnel", tunnelName, "peer", peerIP, "tunnelType", overlayTunnelType(vnet), "vni", vni, "underlayInterface", underlayIf, "localIP", localIP)
 	}
 
 	if err := reconcileSplitHorizonFlows(bridgeName); err != nil {
@@ -338,7 +338,7 @@ func (o *OVSFabric) PruneOverlayMesh(vnet *api.VirtualNetwork, remainPeers []str
 			if output, err := delCmd.CombinedOutput(); err != nil {
 				slog.Warn("failed to delete VXLAN tunnel", "bridge", bridgeName, "tunnel", port, "err", err, "output", string(output))
 			} else {
-				slog.Info("VXLAN tunnel deleted", "bridge", bridgeName, "tunnel", port)
+				slog.Debug("VXLAN tunnel deleted", "bridge", bridgeName, "tunnel", port)
 			}
 		}
 	}
@@ -422,7 +422,7 @@ func reconcileSplitHorizonFlows(bridgeName string) error {
 		return err
 	}
 
-	slog.Info("split-horizon flows reconciled", "bridge", bridgeName, "vxlanPorts", readyVxlanPorts, "accessPorts", len(accessPorts))
+	slog.Debug("split-horizon flows reconciled", "bridge", bridgeName, "vxlanPorts", readyVxlanPorts, "accessPorts", len(accessPorts))
 	return nil
 }
 
@@ -642,7 +642,7 @@ func (o *OVSFabric) DeleteBridge(vnet *api.VirtualNetwork) error {
 		return fmt.Errorf("failed to delete bridge %s: %w", bridgeName, err)
 	}
 
-	slog.Info("OVS bridge deleted", "bridge", bridgeName)
+	slog.Debug("OVS bridge deleted", "bridge", bridgeName)
 	return nil
 }
 

@@ -18,7 +18,7 @@ func SetupLocalResolver(dnsListenAddr string) error {
 	nameserver := nameserverForDNSListenAddr(dnsListenAddr)
 
 	if current, err := currentNameserverInResolvConf(); err == nil && current == nameserver {
-		slog.Info("resolv.conf nameserver already matches dns_listen_addr; skipping rewrite", "nameserver", nameserver)
+		slog.Debug("resolv.conf nameserver already matches dns_listen_addr; skipping rewrite", "nameserver", nameserver)
 		return nil
 	}
 

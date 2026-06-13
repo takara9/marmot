@@ -78,7 +78,7 @@ func EnsureOVNRuntimeBootstrap(ma *Marmot, cfg *MarmotdConfig) error {
 		return nil
 	}
 
-	slog.Info("OVN runtime bootstrap updated OVS external_ids; restarting ovn-controller")
+	slog.Debug("OVN runtime bootstrap updated OVS external_ids; restarting ovn-controller")
 	restartCmd := exec.Command("systemctl", "restart", "ovn-controller")
 	if output, err := restartCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to restart ovn-controller: %w (output=%s)", err, strings.TrimSpace(string(output)))
@@ -227,7 +227,7 @@ func ensureOVNDBConnection(command string, target string) (bool, error) {
 	if _, err := runOVNDBControl(command, "set-connection", target); err != nil {
 		return false, err
 	}
-	slog.Info("OVN bootstrap set DB listener", "command", command, "target", target)
+	slog.Debug("OVN bootstrap set DB listener", "command", command, "target", target)
 	return true, nil
 }
 
@@ -337,6 +337,6 @@ func setOVSExternalID(key, value string) error {
 		return fmt.Errorf("failed to set OVS external_id %s: %w (output=%s)", k, err, strings.TrimSpace(string(output)))
 	}
 
-	slog.Info("OVN bootstrap set OVS external_id", "key", k, "value", v)
+	slog.Debug("OVN bootstrap set OVS external_id", "key", k, "value", v)
 	return nil
 }

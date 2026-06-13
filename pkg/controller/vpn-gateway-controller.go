@@ -42,7 +42,7 @@ func StartVpnGatewayController(node string, etcdUrl string) (*controller, error)
 			case <-ticker.C:
 				c.vpnGatewayControllerLoop()
 			case <-c.stopChan:
-				slog.Info("VPNゲートウェイコントローラー停止")
+				slog.Debug("VPNゲートウェイコントローラー停止")
 				return
 			}
 		}
@@ -131,7 +131,7 @@ func (c *controller) deleteVpnGatewayForMissingServer(vpnGateway api.VpnGateway)
 		slog.Warn("DeleteVpnGatewayById() failed while auto-deleting vpn gateway", "id", vpnGatewayID, "err", err)
 		return
 	}
-	slog.Info("vpn gateway deleted because managed server no longer exists", "id", vpnGatewayID)
+	slog.Debug("vpn gateway deleted because managed server no longer exists", "id", vpnGatewayID)
 }
 
 func (c *controller) reconcileVpnGatewayPending(vpnGateway api.VpnGateway) {

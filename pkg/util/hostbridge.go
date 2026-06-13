@@ -15,11 +15,11 @@ import (
 // SetupHostBridge checks and configures host bridge for marmot
 // Returns true if bridge was successfully set up, false otherwise
 func SetupHostBridge() bool {
-	slog.Info("Starting host-bridge setup")
+	slog.Debug("Starting host-bridge setup")
 
 	// Check if bridge br0 already exists
 	if bridgeExists("br0") {
-		slog.Info("Bridge br0 already exists, skipping setup")
+		slog.Debug("Bridge br0 already exists, skipping setup")
 		return configureVirshBridge()
 	}
 
@@ -30,7 +30,7 @@ func SetupHostBridge() bool {
 		return false
 	}
 
-	slog.Info("Found primary NIC", "nic", primaryNIC)
+	slog.Debug("Found primary NIC", "nic", primaryNIC)
 
 	// Get DHCP information from current interface
 	bridgeConfig := getBridgeConfig(primaryNIC)
@@ -77,7 +77,7 @@ func SetupHostBridge() bool {
 		return true // Bridge might still work without virsh configuration
 	}
 
-	slog.Info("Host-bridge setup completed successfully")
+	slog.Debug("Host-bridge setup completed successfully")
 	return true
 }
 
@@ -232,13 +232,13 @@ func backupNetplanFiles() error {
 			continue
 		}
 
-		slog.Info("Backed up netplan file", "original", originalPath, "backup", backupPath)
+		slog.Debug("Backed up netplan file", "original", originalPath, "backup", backupPath)
 
 		// Remove original file after successful backup
 		if err := os.Remove(originalPath); err != nil {
 			slog.Warn("Failed to remove original netplan file", "file", originalPath, "err", err)
 		} else {
-			slog.Info("Removed original netplan file", "file", originalPath)
+			slog.Debug("Removed original netplan file", "file", originalPath)
 		}
 	}
 
@@ -300,7 +300,7 @@ func createNetplanConfig(filePath string, nicName string, config bridgeConfigInf
 		return err
 	}
 
-	slog.Info("Created netplan config", "file", filePath)
+	slog.Debug("Created netplan config", "file", filePath)
 	return nil
 }
 
@@ -313,7 +313,7 @@ func applyNetplan() error {
 		return err
 	}
 
-	slog.Info("netplan applied successfully")
+	slog.Debug("netplan applied successfully")
 	return nil
 }
 
@@ -329,7 +329,7 @@ func configureVirshBridge() bool {
 	// Check if host-bridge network already defined
 	cmd = exec.Command("virsh", "net-info", "host-bridge")
 	if err := cmd.Run(); err == nil {
-		slog.Info("host-bridge network already defined in virsh")
+		slog.Debug("host-bridge network already defined in virsh")
 		// Try to start it if not running
 		startVirshBridge()
 		return true
@@ -366,7 +366,7 @@ func configureVirshBridge() bool {
 		return false
 	}
 
-	slog.Info("Defined host-bridge network in virsh")
+	slog.Debug("Defined host-bridge network in virsh")
 
 	// Start and autostart the network
 	if !startVirshBridge() {
@@ -396,6 +396,6 @@ func startVirshBridge() bool {
 		return false
 	}
 
-	slog.Info("Started and autostated host-bridge network in virsh")
+	slog.Debug("Started and autostated host-bridge network in virsh")
 	return true
 }

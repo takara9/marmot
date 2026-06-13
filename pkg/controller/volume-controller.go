@@ -57,7 +57,7 @@ func StartVolController(node string, etcdUrl string, deletionDelaySeconds int) (
 			case <-ticker.C:
 				c.volumeControllerLoop()
 			case <-c.stopChan:
-				slog.Info("ボリュームコントローラー停止")
+				slog.Debug("ボリュームコントローラー停止")
 				return
 			}
 		}
@@ -137,7 +137,7 @@ func (c *controller) volumeControllerLoop() {
 				slog.Warn("最終更新から10分以上放置されたボリュームを削除キューへ登録", "volId", volID, "status", vol.Status.StatusCode, "lastUpdate", vol.Status.LastUpdateTimeStamp)
 				if vol.Status.DeletionTimeStamp == nil {
 					c.db.SetVolumeDeletionTimestamp(volID)
-					slog.Info("放置ボリュームにDeletionTimeStampを設定", "volId", volID)
+					slog.Debug("放置ボリュームにDeletionTimeStampを設定", "volId", volID)
 				}
 				continue
 			}

@@ -64,7 +64,7 @@ func StartVmController(node string, etcdUrl string, deletionDelaySeconds int) (*
 			case <-ticker.C:
 				c.serverControllerLoop()
 			case <-c.stopChan:
-				slog.Info("サーバーコントローラー停止")
+				slog.Debug("サーバーコントローラー停止")
 				return
 			}
 		}

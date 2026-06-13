@@ -122,6 +122,12 @@ func (m *Marmot) CreateNewImageManageWithContext(ctx context.Context, id string)
 		return nil, err
 	}
 
+	imageModule, err := resolveImageOSModuleFromImage(image)
+	if err != nil {
+		slog.Error("resolveImageOSModuleFromImage()", "imgId", id, "err", err)
+		return markFailed(err)
+	}
+
 	// イメージがQCOW2であることを確認する
 	if err := validateQcowV2Image(downloadPath); err != nil {
 		_ = os.Remove(downloadPath)
@@ -130,7 +136,7 @@ func (m *Marmot) CreateNewImageManageWithContext(ctx context.Context, id string)
 	}
 
 	// QCOW2イメージをカスタマイズする（SSH有効化、ネットワーク設定など）
-	if err := customizeQcowImageWithContext(ctx, downloadPath); err != nil {
+	if err := imageModule.customizeDownloadedImage(ctx, downloadPath); err != nil {
 		slog.Error("Failed to customize QCOW2 image", "imgId", id, "path", downloadPath, "err", err)
 		return markFailed(err)
 	}
@@ -480,7 +486,7 @@ func customizeQcowImageWithContext(ctx context.Context, imagePath string) error 
 		"--root-password", "password:ubuntu",
 		"--edit", "/etc/ssh/sshd_config: s/^#?PermitRootLogin.*/PermitRootLogin yes/",
 		"--edit", "/etc/ssh/sshd_config: s/^#?PasswordAuthentication.*/PasswordAuthentication yes/",
-		"--run-command", "rm /etc/ssh/sshd_config.d/60-cloudimg-settings.conf",
+		"--run-command", "rm -f /etc/ssh/sshd_config.d/60-cloudimg-settings.conf",
 		"--run-command", "ssh-keygen -A",
 		"--run-command", "systemctl enable ssh",
 		"--run-command", "systemctl restart ssh",

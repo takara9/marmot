@@ -46,7 +46,7 @@ func StartSchedulerController(node string, etcdUrl string) (*schedulerController
 			case <-ticker.C:
 				c.schedulerControllerLoop()
 			case <-c.stopChan:
-				slog.Info("スケジューラーコントローラー停止")
+				slog.Debug("スケジューラーコントローラー停止")
 				return
 			}
 		}
@@ -136,7 +136,7 @@ func (c *schedulerController) schedulerControllerLoop() {
 			continue
 		}
 		nodeLoads[targetNode]++
-		slog.Info("サーバーにノードを割り当てました", "serverId", api.ServerID(server), "targetNode", targetNode)
+		slog.Debug("サーバーにノードを割り当てました", "serverId", api.ServerID(server), "targetNode", targetNode)
 	}
 }
 

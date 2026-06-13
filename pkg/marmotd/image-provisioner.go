@@ -13,11 +13,11 @@ import (
 // Called at marmotd startup to automatically download and register configured images
 func ProvisionOSImages(m *Marmot, osImages []OSImage) error {
 	if len(osImages) == 0 {
-		slog.Info("No OS images configured for provisioning")
+		slog.Debug("No OS images configured for provisioning")
 		return nil
 	}
 
-	slog.Info("Starting OS image provisioning", "count", len(osImages))
+	slog.Debug("Starting OS image provisioning", "count", len(osImages))
 
 	// Get list of existing images
 	existingImages, err := m.GetImagesManage()
@@ -41,7 +41,7 @@ func ProvisionOSImages(m *Marmot, osImages []OSImage) error {
 
 		// Check if image already exists
 		if existingImageNames[imageName] {
-			slog.Info("OS image already exists, skipping", "name", imageName)
+			slog.Debug("OS image already exists, skipping", "name", imageName)
 			continue
 		}
 
@@ -56,7 +56,7 @@ func ProvisionOSImages(m *Marmot, osImages []OSImage) error {
 		time.Sleep(500 * time.Millisecond)
 	}
 
-	slog.Info("OS image provisioning completed")
+	slog.Debug("OS image provisioning completed")
 	return nil
 }
 
@@ -74,7 +74,7 @@ func registerOSImage(m *Marmot, osImage OSImage) error {
 		return nil
 	}
 
-	slog.Info("Registering OS image", "name", imageName, "url", imageURL)
+	slog.Debug("Registering OS image", "name", imageName, "url", imageURL)
 
 	// Build API spec similar to ApiCreateImage
 	imageSpec := api.Image{
@@ -106,6 +106,6 @@ func registerOSImage(m *Marmot, osImage OSImage) error {
 		return err
 	}
 
-	slog.Info("OS image registered successfully", "name", imageName, "id", id)
+	slog.Debug("OS image registered successfully", "name", imageName, "id", id)
 	return nil
 }

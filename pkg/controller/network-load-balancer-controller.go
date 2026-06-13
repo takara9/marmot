@@ -53,7 +53,7 @@ func StartNetworkLoadBalancerController(node string, etcdUrl string) (*controlle
 			case <-ticker.C:
 				c.networkLoadBalancerControllerLoop()
 			case <-c.stopChan:
-				slog.Info("ネットワークロードバランサーコントローラー停止")
+				slog.Debug("ネットワークロードバランサーコントローラー停止")
 				return
 			}
 		}
@@ -155,7 +155,7 @@ func (c *controller) deleteNetworkLoadBalancerForMissingServer(loadBalancer api.
 		slog.Warn("DeleteNetworkLoadBalancerById() failed while auto-deleting network load balancer", "id", loadBalancerID, "err", err)
 		return
 	}
-	slog.Info("network load balancer deleted because managed server no longer exists", "id", loadBalancerID)
+	slog.Debug("network load balancer deleted because managed server no longer exists", "id", loadBalancerID)
 }
 
 func (c *controller) reconcileNetworkLoadBalancerPending(loadBalancer api.NetworkLoadBalancer) {

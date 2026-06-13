@@ -481,7 +481,7 @@ func cleanupStaleOVSPorts() {
 			slog.Warn("failed to remove stale ovs port", "port", name, "err", delErr, "output", strings.TrimSpace(string(delOut)))
 			continue
 		}
-		slog.Info("removed stale ovs port", "port", name, "reason", errText)
+		slog.Debug("removed stale ovs port", "port", name, "reason", errText)
 	}
 }
 
