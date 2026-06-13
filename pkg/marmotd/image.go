@@ -464,6 +464,10 @@ func customizeQcowImage(imagePath string) error {
 }
 
 func customizeQcowImageWithContext(ctx context.Context, imagePath string) error {
+	return customizeUbuntuQcowImageWithContext(ctx, imagePath)
+}
+
+func customizeUbuntuQcowImageWithContext(ctx context.Context, imagePath string) error {
 	timeout := contextTimeoutHint(ctx)
 	netplanConfig := "network:\n" +
 		"  version: 2\n" +
@@ -500,6 +504,30 @@ func customizeQcowImageWithContext(ctx context.Context, imagePath string) error 
 	}
 
 	slog.Debug("virt-customize completed", "imagePath", imagePath, "output", strings.TrimSpace(string(output)))
+	return nil
+}
+
+func customizeAlpineQcowImageWithContext(ctx context.Context, imagePath string) error {
+	timeout := contextTimeoutHint(ctx)
+	args := []string{
+		"-a", imagePath,
+		"--root-password", "password:alpine",
+		"--edit", "/etc/ssh/sshd_config: s/^#?PermitRootLogin.*/PermitRootLogin yes/",
+		"--edit", "/etc/ssh/sshd_config: s/^#?PasswordAuthentication.*/PasswordAuthentication yes/",
+		"--run-command", "if [ -f /etc/ssh/sshd_config.d/60-cloudimg-settings.conf ]; then rm -f /etc/ssh/sshd_config.d/60-cloudimg-settings.conf; fi",
+		"--run-command", "if ! id -u alpine >/dev/null 2>&1; then adduser -D alpine; fi",
+		"--run-command", "echo 'alpine:alpine' | chpasswd",
+		"--run-command", "if command -v ssh-keygen >/dev/null 2>&1; then ssh-keygen -A; fi",
+		"--run-command", "if command -v rc-update >/dev/null 2>&1; then rc-update add sshd default || true; fi",
+	}
+
+	cmd := exec.CommandContext(ctx, "virt-customize", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return wrapDeadlineExceeded(fmt.Errorf("virt-customize failed: %w, output: %s", err, strings.TrimSpace(string(output))), "QCOW2 イメージ設定", timeout)
+	}
+
+	slog.Debug("virt-customize completed for alpine", "imagePath", imagePath, "output", strings.TrimSpace(string(output)))
 	return nil
 }
 
@@ -555,18 +583,26 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 		return fmt.Errorf("qemu-nbd attach failed: %s", strings.Join(attachErrs, " | "))
 	}
 
-	time.Sleep(3 * time.Second)
+	_ = runCmd(ctx, "partprobe", nbdDev)
+	resizeTarget := nbdDev
+	if err := waitForBlockDevice(ctx, partDev, 5*time.Second); err == nil {
+		if err := runCmd(ctx, "parted", nbdDev, "--fix", "--script", "resizepart", "1", "100%"); err != nil {
+			return err
+		}
 
-	if err := runCmd(ctx, "parted", nbdDev, "--fix", "--script", "resizepart", "1", "100%"); err != nil {
-		return err
+		_ = runCmd(ctx, "partprobe", nbdDev)
+		if err := waitForBlockDevice(ctx, partDev, 20*time.Second); err != nil {
+			return err
+		}
+		resizeTarget = partDev
+	} else {
+		slog.Warn("Partition device was not detected; fallback to whole-disk filesystem resize", "nbdDevice", nbdDev, "partition", partDev, "err", err)
 	}
 
-	time.Sleep(3 * time.Second)
-
-	if err := runCmd(ctx, "e2fsck", "-f", partDev, "-y"); err != nil {
+	if err := runCmd(ctx, "e2fsck", "-f", resizeTarget, "-y"); err != nil {
 		return err
 	}
-	if err := runCmd(ctx, "resize2fs", partDev); err != nil {
+	if err := runCmd(ctx, "resize2fs", resizeTarget); err != nil {
 		return err
 	}
 
@@ -574,8 +610,6 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 		return err
 	}
 	connected = false
-
-	time.Sleep(3 * time.Second)
 
 	if err := runCmd(ctx, "qemu-img", "info", imageTemplatePath); err != nil {
 		return err
@@ -595,6 +629,22 @@ func findFreeNbdDeviceByIndex(i int) (string, error) {
 		return devicePath, nil
 	}
 	return "", fmt.Errorf("device %s is busy", devicePath)
+}
+
+func waitForBlockDevice(ctx context.Context, devicePath string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		if _, err := os.Stat(devicePath); err == nil {
+			return nil
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("device %s did not appear within %s", devicePath, timeout)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
 }
 
 // runCmd はコマンド実行とエラー出力整形を行うヘルパー。

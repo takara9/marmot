@@ -16,7 +16,8 @@ type imageOSModule interface {
 }
 
 type commonImageOSModule struct {
-	moduleKey string
+	moduleKey        string
+	customizeHandler func(ctx context.Context, qcowPath string) error
 }
 
 func (m commonImageOSModule) key() string {
@@ -24,6 +25,9 @@ func (m commonImageOSModule) key() string {
 }
 
 func (m commonImageOSModule) customizeDownloadedImage(ctx context.Context, qcowPath string) error {
+	if m.customizeHandler != nil {
+		return m.customizeHandler(ctx, qcowPath)
+	}
 	return customizeQcowImageWithContext(ctx, qcowPath)
 }
 
@@ -68,7 +72,7 @@ var (
 	imageOSModuleUbuntu2204 = commonImageOSModule{moduleKey: "ubuntu22.04"}
 	imageOSModuleUbuntu2404 = commonImageOSModule{moduleKey: "ubuntu24.04"}
 	imageOSModuleUbuntu     = commonImageOSModule{moduleKey: "ubuntu"}
-	imageOSModuleAlpine323  = commonImageOSModule{moduleKey: "alpine3.23"}
+	imageOSModuleAlpine323  = commonImageOSModule{moduleKey: "alpine3.23", customizeHandler: customizeAlpineQcowImageWithContext}
 )
 
 func resolveImageOSModuleFromImage(img api.Image) (imageOSModule, error) {

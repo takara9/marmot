@@ -99,3 +99,49 @@ func TestImageModuleCustomizeDelegatesToCommonCustomizer(t *testing.T) {
 		t.Fatalf("expected customizeDownloadedImage to return error for empty path")
 	}
 }
+
+func TestCommonImageOSModuleUsesCustomCustomizeHandler(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	mod := commonImageOSModule{
+		moduleKey: "alpine3.23",
+		customizeHandler: func(ctx context.Context, qcowPath string) error {
+			called = true
+			if qcowPath != "/tmp/test.qcow2" {
+				t.Fatalf("qcowPath = %q, want %q", qcowPath, "/tmp/test.qcow2")
+			}
+			return nil
+		},
+	}
+
+	if err := mod.customizeDownloadedImage(context.Background(), "/tmp/test.qcow2"); err != nil {
+		t.Fatalf("customizeDownloadedImage() error = %v", err)
+	}
+	if !called {
+		t.Fatalf("expected customizeHandler to be called")
+	}
+}
+
+func TestCommonServerImageModuleUsesCustomSetupBootVolume(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	mod := commonServerImageModule{
+		key: "alpine3.23",
+		setupBootVolumeFn: func(spec api.Server) error {
+			called = true
+			if spec.Metadata.Name != "server-51" {
+				t.Fatalf("server name = %q, want %q", spec.Metadata.Name, "server-51")
+			}
+			return nil
+		},
+	}
+
+	if err := mod.SetupBootVolume(api.Server{Metadata: api.Metadata{Name: "server-51"}}); err != nil {
+		t.Fatalf("SetupBootVolume() error = %v", err)
+	}
+	if !called {
+		t.Fatalf("expected setupBootVolumeFn to be called")
+	}
+}

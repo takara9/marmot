@@ -15,7 +15,8 @@ type serverImageModule interface {
 }
 
 type commonServerImageModule struct {
-	key string
+	key               string
+	setupBootVolumeFn func(spec api.Server) error
 }
 
 func (m commonServerImageModule) Key() string {
@@ -23,6 +24,9 @@ func (m commonServerImageModule) Key() string {
 }
 
 func (m commonServerImageModule) SetupBootVolume(spec api.Server) error {
+	if m.setupBootVolumeFn != nil {
+		return m.setupBootVolumeFn(spec)
+	}
 	return util.SetupLinux(spec)
 }
 
@@ -34,7 +38,7 @@ var (
 	serverImageModuleUbuntu2204 = commonServerImageModule{key: "ubuntu22.04"}
 	serverImageModuleUbuntu2404 = commonServerImageModule{key: "ubuntu24.04"}
 	serverImageModuleUbuntu     = commonServerImageModule{key: "ubuntu"}
-	serverImageModuleAlpine323  = commonServerImageModule{key: "alpine3.23"}
+	serverImageModuleAlpine323  = commonServerImageModule{key: "alpine3.23", setupBootVolumeFn: util.SetupAlpineLinux}
 )
 
 func resolveServerImageModule(m *Marmot, bootVol api.Volume) (serverImageModule, error) {
