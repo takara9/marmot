@@ -167,6 +167,10 @@ func (c *controller) imageControllerLoop() {
 			if err := marmotd.CheckImageBackingStore(image); err != nil {
 				slog.Warn("AVAILABLE イメージの実体が見つからないため DELETED に更新", "imageId", image.Metadata.Id, "err", err)
 				c.marmot.Db.UpdateImageStatusMessage(image.Metadata.Id, db.IMAGE_DELETED, err.Error())
+				continue
+			}
+			if err := c.reconcileFollowerImageSpec(image); err != nil {
+				slog.Warn("フォロワーIMAGEのspec同期に失敗", "imageId", image.Metadata.Id, "err", err)
 			}
 		case db.IMAGE_DELETING:
 			slog.Debug("イメージの削除処理を実行", "image", image.Metadata.Name)
@@ -307,6 +311,30 @@ func (c *controller) syncFollowerImageFromHead(followerImage api.Image, headImag
 	followerLatest.Spec.Kind = util.StringPtr("os")
 	followerLatest.Spec.Type = util.StringPtr("qcow2")
 	followerLatest.Spec.SourceUrl = nil
+	if headImage.Spec.Kind != nil {
+		followerLatest.Spec.Kind = util.StringPtr(*headImage.Spec.Kind)
+	}
+	if headImage.Spec.Type != nil {
+		followerLatest.Spec.Type = util.StringPtr(*headImage.Spec.Type)
+	}
+	if headImage.Spec.SourceUrl != nil {
+		sourceURL := strings.TrimSpace(*headImage.Spec.SourceUrl)
+		if sourceURL != "" {
+			followerLatest.Spec.SourceUrl = util.StringPtr(sourceURL)
+		}
+	}
+	if headImage.Spec.OsName != nil {
+		osName := strings.TrimSpace(*headImage.Spec.OsName)
+		if osName != "" {
+			followerLatest.Spec.OsName = util.StringPtr(osName)
+		}
+	}
+	if headImage.Spec.OsVersion != nil {
+		osVersion := strings.TrimSpace(*headImage.Spec.OsVersion)
+		if osVersion != "" {
+			followerLatest.Spec.OsVersion = util.StringPtr(osVersion)
+		}
+	}
 	if headImage.Spec.Size != nil {
 		followerLatest.Spec.Size = util.IntPtrInt(*headImage.Spec.Size)
 	}
@@ -324,8 +352,80 @@ func (c *controller) syncFollowerImageFromHead(followerImage api.Image, headImag
 	if err := c.marmot.Db.UpdateImage(followerLatest.Metadata.Id, followerLatest); err != nil {
 		return err
 	}
+	c.marmot.Db.UpdateImageStatus(followerLatest.Metadata.Id, db.IMAGE_AVAILABLE)
 
 	return nil
+}
+
+func (c *controller) reconcileFollowerImageSpec(followerImage api.Image) error {
+	if followerImage.Metadata.Labels == nil {
+		return nil
+	}
+	labels := *followerImage.Metadata.Labels
+	if db.GetFollowerSyncRole(labels) != "follower" {
+		return nil
+	}
+	headImageID := db.GetHeadImageID(labels)
+	if headImageID == "" {
+		return nil
+	}
+
+	headImage, err := c.marmot.Db.GetImage(headImageID)
+	if err != nil {
+		return err
+	}
+
+	changed := false
+	changed = setStringPtrFromHead(&followerImage.Spec.Kind, headImage.Spec.Kind) || changed
+	changed = setStringPtrFromHead(&followerImage.Spec.Type, headImage.Spec.Type) || changed
+	changed = setStringPtrFromHead(&followerImage.Spec.SourceUrl, headImage.Spec.SourceUrl) || changed
+	changed = setStringPtrFromHead(&followerImage.Spec.OsName, headImage.Spec.OsName) || changed
+	changed = setStringPtrFromHead(&followerImage.Spec.OsVersion, headImage.Spec.OsVersion) || changed
+	changed = setIntPtrFromHead(&followerImage.Spec.Size, headImage.Spec.Size) || changed
+
+	if !changed {
+		return nil
+	}
+
+	return c.marmot.Db.UpdateImage(followerImage.Metadata.Id, followerImage)
+}
+
+func setStringPtrFromHead(dst **string, src *string) bool {
+	if src == nil {
+		if *dst != nil {
+			*dst = nil
+			return true
+		}
+		return false
+	}
+	trimmed := strings.TrimSpace(*src)
+	if trimmed == "" {
+		if *dst != nil {
+			*dst = nil
+			return true
+		}
+		return false
+	}
+	if *dst != nil && strings.TrimSpace(**dst) == trimmed {
+		return false
+	}
+	*dst = util.StringPtr(trimmed)
+	return true
+}
+
+func setIntPtrFromHead(dst **int, src *int) bool {
+	if src == nil {
+		if *dst != nil {
+			*dst = nil
+			return true
+		}
+		return false
+	}
+	if *dst != nil && **dst == *src {
+		return false
+	}
+	*dst = util.IntPtrInt(*src)
+	return true
 }
 
 func buildHeadImageDownloadURL(headIP, imageID string) string {

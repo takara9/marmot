@@ -16,6 +16,10 @@ func stringPtr(v string) *string {
 	return &v
 }
 
+func intPtr(v int) *int {
+	return &v
+}
+
 var _ = Describe("Image", Ordered, func() {
 	var port int = 11379
 	var url string = "http://127.0.0.1:" + fmt.Sprintf("%d", port)
@@ -142,6 +146,69 @@ var _ = Describe("Image", Ordered, func() {
 				Expect(*img.Spec.OsName).To(Equal("ubuntu"))
 				Expect(img.Spec.OsVersion).NotTo(BeNil())
 				Expect(*img.Spec.OsVersion).To(Equal("24.04"))
+			})
+
+			It("MakeFollowerImageEntry が osName/osVersion/sourceUrl を引き継ぐ", func() {
+				if v == nil {
+					var connErr error
+					v, connErr = db.NewDatabase(url)
+					Expect(connErr).NotTo(HaveOccurred())
+				}
+
+				head := api.Image{
+					ApiVersion: "v1",
+					Kind:       "Image",
+					Metadata: api.Metadata{
+						Id:       "head-image-id",
+						Name:     "ubuntu26.04",
+						NodeName: stringPtr("marmot1"),
+					},
+					Spec: api.ImageSpec{
+						Kind:      stringPtr("os"),
+						Type:      stringPtr("qcow2"),
+						SourceUrl: stringPtr("https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img"),
+						OsName:    stringPtr("ubuntu"),
+						OsVersion: stringPtr("26.04"),
+						Size:      intPtr(16),
+					},
+				}
+
+				followerID, err := v.MakeFollowerImageEntry(head, "marmot2", "head-image-id")
+				Expect(err).NotTo(HaveOccurred())
+
+				follower, err := v.GetImage(followerID)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(follower.Spec.OsName).NotTo(BeNil())
+				Expect(*follower.Spec.OsName).To(Equal("ubuntu"))
+				Expect(follower.Spec.OsVersion).NotTo(BeNil())
+				Expect(*follower.Spec.OsVersion).To(Equal("26.04"))
+				Expect(follower.Spec.SourceUrl).NotTo(BeNil())
+				Expect(*follower.Spec.SourceUrl).To(Equal("https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img"))
+			})
+
+			It("UpdateImageStatus は status.message を nil にクリアする", func() {
+				if v == nil {
+					var connErr error
+					v, connErr = db.NewDatabase(url)
+					Expect(connErr).NotTo(HaveOccurred())
+				}
+
+				createdID, err := v.MakeImageEntryFromURLWithNode("test-image-status-message", "http://hmc/status-message.qcow2", "marmot1")
+				Expect(err).NotTo(HaveOccurred())
+
+				v.UpdateImageStatusMessage(createdID, db.IMAGE_CREATING, "ヘッドノードからQCOW2イメージを取得中")
+				creating, err := v.GetImage(createdID)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(creating.Status).NotTo(BeNil())
+				Expect(creating.Status.Message).NotTo(BeNil())
+				Expect(*creating.Status.Message).To(Equal("ヘッドノードからQCOW2イメージを取得中"))
+
+				v.UpdateImageStatus(createdID, db.IMAGE_AVAILABLE)
+				available, err := v.GetImage(createdID)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(available.Status).NotTo(BeNil())
+				Expect(available.Status.StatusCode).To(Equal(db.IMAGE_AVAILABLE))
+				Expect(available.Status.Message).To(BeNil())
 			})
 
 			It("Keyからイメージ情報を取得 #2", func() {

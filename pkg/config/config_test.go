@@ -16,7 +16,7 @@ var _ = Describe("ReadYamlConfig", func() {
 	It("decodes lowerCamel keys like apiVersion and sourceUrl", func() {
 		tmpDir := GinkgoT().TempDir()
 		configPath := filepath.Join(tmpDir, "image.yaml")
-		content := "apiVersion: v1\nkind: Image\nmetadata:\n  name: ubuntu22.04\nspec:\n  sourceUrl: http://hmc/ubuntu-22.04-server-cloudimg-amd64.img\n"
+		content := "apiVersion: v1\nkind: Image\nmetadata:\n  name: ubuntu22.04\nspec:\n  sourceUrl: http://hmc/ubuntu-22.04-server-cloudimg-amd64.img\n  osName: ubuntu\n  osVersion: \"24.04\"\n"
 
 		err := os.WriteFile(configPath, []byte(content), 0o600)
 		Expect(err).NotTo(HaveOccurred())
@@ -29,6 +29,10 @@ var _ = Describe("ReadYamlConfig", func() {
 		Expect(conf.Metadata.Name).To(Equal("ubuntu22.04"))
 		Expect(conf.Spec.SourceUrl).NotTo(BeNil())
 		Expect(*conf.Spec.SourceUrl).To(Equal("http://hmc/ubuntu-22.04-server-cloudimg-amd64.img"))
+		Expect(conf.Spec.OsName).NotTo(BeNil())
+		Expect(*conf.Spec.OsName).To(Equal("ubuntu"))
+		Expect(conf.Spec.OsVersion).NotTo(BeNil())
+		Expect(*conf.Spec.OsVersion).To(Equal("24.04"))
 	})
 
 	It("reads a YAML config from a file", func() {

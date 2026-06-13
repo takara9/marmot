@@ -207,5 +207,31 @@ spec:
 				ApplyServerDefaults(server)
 			}).NotTo(Panic())
 		})
+
+		Describe("ManifestToImage", func() {
+			It("maps spec.osName and spec.osVersion", func() {
+				manifest := map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Image",
+					"metadata": map[string]interface{}{
+						"name": "ubuntu26.04",
+					},
+					"spec": map[string]interface{}{
+						"sourceUrl": "https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img",
+						"osName":    "ubuntu",
+						"osVersion": "26.04",
+					},
+				}
+
+				image, err := ManifestToImage(manifest)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(image.Spec.SourceUrl).NotTo(BeNil())
+				Expect(*image.Spec.SourceUrl).To(Equal("https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img"))
+				Expect(image.Spec.OsName).NotTo(BeNil())
+				Expect(*image.Spec.OsName).To(Equal("ubuntu"))
+				Expect(image.Spec.OsVersion).NotTo(BeNil())
+				Expect(*image.Spec.OsVersion).To(Equal("26.04"))
+			})
+		})
 	})
 })
