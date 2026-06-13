@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/config"
-	"github.com/takara9/marmot/pkg/util"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -35,12 +34,8 @@ var volumeCreateCmd = &cobra.Command{
 		if strings.TrimSpace(conf.Metadata.Name) == "" {
 			return fmt.Errorf("Metadata.name is required in the configuration")
 		}
-		if conf.Spec.Type == nil || strings.TrimSpace(*conf.Spec.Type) == "" {
-			conf.Spec.Type = util.StringPtr("qcow2")
-		}
-		if conf.Spec.Kind == nil || strings.TrimSpace(*conf.Spec.Kind) == "" {
-			conf.Spec.Kind = util.StringPtr("data")
-		}
+
+		ApplyVolumeDefaults(&conf)
 
 		byteBody, _, err := m.CreateVolume(conf)
 		if err != nil {
