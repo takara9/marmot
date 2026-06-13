@@ -104,18 +104,18 @@ func (m *Marmot) findPreCreatedStorageVolume(disk api.Volume) (*api.Volume, erro
 	return selectReusableVolume(volumes)
 }
 
-func (m *Marmot) resolveStorageBoundNodeName(storage *[]api.Volume) (string, error) {
-	if storage == nil {
-		return "", nil
-	}
-
+// nodeNameFromResolvedVolumes は解決済みのボリューム一覧からサーバーのノード制約を導出する。
+// spec.iscsiTargetIqn がセットされているボリュームはネットワーク越しにどのノードからも
+// アクセス可能なため、ノード配置制約の対象外とする。
+func nodeNameFromResolvedVolumes(vols []*api.Volume) (string, error) {
 	boundNode := ""
-	for i, disk := range *storage {
-		vol, err := m.findPreCreatedStorageVolume(disk)
-		if err != nil {
-			return "", fmt.Errorf("storage[%d] volume lookup failed: %w", i, err)
-		}
+	for _, vol := range vols {
 		if vol == nil || vol.Metadata.NodeName == nil {
+			continue
+		}
+
+		// iSCSI ターゲット IQN がセットされているボリュームは配置制約の対象外。
+		if vol.Spec.IscsiTargetIqn != nil && strings.TrimSpace(*vol.Spec.IscsiTargetIqn) != "" {
 			continue
 		}
 
@@ -131,8 +131,24 @@ func (m *Marmot) resolveStorageBoundNodeName(storage *[]api.Volume) (string, err
 			return "", fmt.Errorf("storage volumes are distributed across nodes: %q and %q", boundNode, node)
 		}
 	}
-
 	return boundNode, nil
+}
+
+func (m *Marmot) resolveStorageBoundNodeName(storage *[]api.Volume) (string, error) {
+	if storage == nil {
+		return "", nil
+	}
+
+	vols := make([]*api.Volume, 0, len(*storage))
+	for i, disk := range *storage {
+		vol, err := m.findPreCreatedStorageVolume(disk)
+		if err != nil {
+			return "", fmt.Errorf("storage[%d] volume lookup failed: %w", i, err)
+		}
+		vols = append(vols, vol)
+	}
+
+	return nodeNameFromResolvedVolumes(vols)
 }
 
 
