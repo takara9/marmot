@@ -176,6 +176,7 @@ func (m *Marmot) CreateNewImageManageWithContext(ctx context.Context, id string)
 		slog.Error("Failed to update image data in DB", "imgId", id, "err", err)
 		return markFailed(err)
 	}
+	m.Db.UpdateImageStatus(id, db.IMAGE_AVAILABLE)
 
 	return &image, nil
 }

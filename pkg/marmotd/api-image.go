@@ -43,6 +43,10 @@ func (s *Server) ApiCreateImage(ctx echo.Context) error {
 		slog.Error("ApiCreateImage()", "err", "Name is required")
 		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: "Name is required"})
 	}
+	if err := validateImageOSSpec(&imageSpec.Spec); err != nil {
+		slog.Error("ApiCreateImage()", "err", err)
+		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: err.Error()})
+	}
 	assignNodeNameIfUnset(&imageSpec.Metadata, s.Ma.NodeName)
 	assignedNodeName := ""
 	if imageSpec.Metadata.NodeName != nil {
@@ -149,6 +153,10 @@ func (s *Server) ApiUpdateImageById(ctx echo.Context, id string) error {
 	if err := ctx.Bind(&imageSpec); err != nil {
 		slog.Error("ApiUpdateImageById()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+	if err := validateImageOSSpec(&imageSpec.Spec); err != nil {
+		slog.Error("ApiUpdateImageById()", "err", err)
+		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: err.Error()})
 	}
 
 	err := s.Ma.UpdateImageManage(id, imageSpec)

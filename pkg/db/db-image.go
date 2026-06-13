@@ -528,25 +528,47 @@ func (d *Database) UpdateImageStatus(id string, status int) {
 
 // ステータスとメッセージの変更
 func (d *Database) UpdateImageStatusMessage(id string, status int, message string) {
-	slog.Debug("SetImageStatus() called", "id", id, "status", status)
-	image, err := d.GetImage(id)
+	for {
+		err := d.updateImageStatusMessage(id, status, message)
+		if err == ErrUpdateConflict {
+			slog.Warn("UpdateImageStatusMessage() retrying due to update conflict", "imageId", id)
+			continue
+		}
+		if err != nil {
+			slog.Error("UpdateImageStatusMessage() failed", "err", err, "imageId", id)
+			panic(err)
+		}
+		return
+	}
+}
+
+func (d *Database) updateImageStatusMessage(id string, status int, message string) error {
+	lockKey := "/lock/image/" + id
+	mutex, err := d.LockKey(lockKey)
 	if err != nil {
-		slog.Error("SetDeleteTimestamp() GetImage() failed", "err", err, "imageId", id)
-		panic(err)
+		return err
 	}
-	image.Status.StatusCode = status
-	image.Status.Status = util.StringPtr(ImageStatus[status])
-	// 状態が変わるたびにメッセージを消す（ポインタをnilにする）
-	image.Status.Message = nil
-	// 必要なら新しいメッセージをセット
-	if len(message) > 0 {
-		image.Status.Message = util.StringPtr(message)
+	defer d.UnlockKey(mutex)
+
+	var rec api.Image
+	key := ImagePrefix + "/" + id
+	resp, err := d.GetJSON(key, &rec)
+	if err != nil {
+		return err
 	}
-	image.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
-	if err := d.UpdateImage(id, image); err != nil {
-		slog.Error("SetDeleteTimestamp() UpdateImage() failed", "err", err, "imageId", id)
-		panic(err)
+
+	if rec.Status == nil {
+		rec.Status = &api.Status{}
 	}
+	rec.Status.StatusCode = status
+	rec.Status.Status = util.StringPtr(ImageStatus[status])
+	rec.Status.Message = nil
+	if trimmed := strings.TrimSpace(message); trimmed != "" {
+		rec.Status.Message = util.StringPtr(trimmed)
+	}
+	rec.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+
+	return d.PutJSONCAS(key, resp.Kvs[0].ModRevision, rec)
 }
 
 // イメージのオブジェクトを部分更新
@@ -740,6 +762,40 @@ func (d *Database) MakeFollowerImageEntry(headImage api.Image, followerNodeName 
 	imageDir := fmt.Sprintf("/var/lib/marmot/images/%s", id)
 	imagePath := fmt.Sprintf("%s/osimage-%s.qcow2", imageDir, id)
 
+	followerSpec := api.ImageSpec{
+		Kind:      util.StringPtr("os"),
+		Type:      util.StringPtr("qcow2"),
+		Qcow2Path: util.StringPtr(imagePath),
+		SourceUrl: nil,
+	}
+	if headImage.Spec.Kind != nil {
+		followerSpec.Kind = util.StringPtr(*headImage.Spec.Kind)
+	}
+	if headImage.Spec.Type != nil {
+		followerSpec.Type = util.StringPtr(*headImage.Spec.Type)
+	}
+	if headImage.Spec.Size != nil {
+		followerSpec.Size = util.IntPtrInt(*headImage.Spec.Size)
+	}
+	if headImage.Spec.SourceUrl != nil {
+		sourceURL := strings.TrimSpace(*headImage.Spec.SourceUrl)
+		if sourceURL != "" {
+			followerSpec.SourceUrl = util.StringPtr(sourceURL)
+		}
+	}
+	if headImage.Spec.OsName != nil {
+		osName := strings.TrimSpace(*headImage.Spec.OsName)
+		if osName != "" {
+			followerSpec.OsName = util.StringPtr(osName)
+		}
+	}
+	if headImage.Spec.OsVersion != nil {
+		osVersion := strings.TrimSpace(*headImage.Spec.OsVersion)
+		if osVersion != "" {
+			followerSpec.OsVersion = util.StringPtr(osVersion)
+		}
+	}
+
 	follower := api.Image{
 		ApiVersion: "v1",
 		Kind:       "Image",
@@ -750,12 +806,7 @@ func (d *Database) MakeFollowerImageEntry(headImage api.Image, followerNodeName 
 			Id:       id,
 			Uuid:     util.StringPtr(uuidString),
 		},
-		Spec: api.ImageSpec{
-			Kind:      util.StringPtr("os"),
-			Type:      util.StringPtr("qcow2"),
-			Qcow2Path: util.StringPtr(imagePath),
-			SourceUrl: nil,
-		},
+		Spec: followerSpec,
 		Status: &api.Status{
 			StatusCode:          IMAGE_WAITING,
 			Status:              util.StringPtr(ImageStatus[IMAGE_WAITING]),
