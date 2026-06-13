@@ -34,12 +34,8 @@ var volumeCreateCmd = &cobra.Command{
 		if strings.TrimSpace(conf.Metadata.Name) == "" {
 			return fmt.Errorf("Metadata.name is required in the configuration")
 		}
-		if conf.Spec.Type == nil || strings.TrimSpace(*conf.Spec.Type) == "" {
-			return fmt.Errorf("Spec.type is required in the configuration")
-		}
-		if conf.Spec.Kind == nil || strings.TrimSpace(*conf.Spec.Kind) == "" {
-			return fmt.Errorf("Spec.kind is required in the configuration")
-		}
+
+		ApplyVolumeDefaults(&conf)
 
 		byteBody, _, err := m.CreateVolume(conf)
 		if err != nil {
