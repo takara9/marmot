@@ -142,7 +142,7 @@ sudo rm -f ./marmot_v${VERSION}_amd64.deb
 - [LVM](https://sourceware.org/lvm2/) — 論理ボリューム管理
 - [open-iscsi / targetcli](https://github.com/open-iscsi/open-iscsi) — iSCSI ネットワークブロックストレージ
 
-## 応用例
+## 活用例
 
 - [marmotマニフェスト集](https://github.com/takara9/marmot-manifests)
 
@@ -160,11 +160,11 @@ GNU General Public License v3.0 — 詳細は [LICENSE](LICENSE) を参照して
 
 貢献を歓迎します。ガイドラインは [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
 
-## About the Author
+## 開発者の経歴について
 
 Marmotは、30年以上にわたりエンタープライズシステム、仮想化基盤、クラウド技術に携わってきたインフラエンジニアによって開発されています。
 
-長年にわたり、大規模システムの構築・運用を経験する中で、クラウド基盤は便利になる一方で、導入や運用が複雑化し、多くの利用者にとって扱いにくいものになっていると感じてきました。
+長年にわたり、大規模システムの構築・運用を経験した後、クラウド基盤を利用した開発とテクニカルセールスに従事する中で、Kuberntesとコンテナは画期的な技術革新である反面、導入や運用が複雑化し、多くの利用者にとって扱いにくいものになっていると感じてきました。
 
 Marmotは、その課題に対する一つの答えとして生まれました。
 
