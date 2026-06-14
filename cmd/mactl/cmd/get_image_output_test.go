@@ -53,6 +53,24 @@ var _ = Describe("summarizeImages", func() {
 		Expect(result["other"].synced).To(Equal("COMPLETE"))
 	})
 
+	It("keeps COMPLETE when LV differs but QCOW2 is uniform across nodes", func() {
+		node1 := "marmot1"
+		node2 := "marmot2"
+		node3 := "marmot3"
+		lvPath := "/dev/vg1/boot-ubuntu"
+		images := []api.Image{
+			{Metadata: api.Metadata{Name: "ubuntu", NodeName: &node1}, Status: &api.Status{Status: &statusAvailable}, Spec: api.ImageSpec{Qcow2Path: &qcow2Path, LvPath: &lvPath}},
+			{Metadata: api.Metadata{Name: "ubuntu", NodeName: &node2}, Status: &api.Status{Status: &statusAvailable}, Spec: api.ImageSpec{Qcow2Path: &qcow2Path}},
+			{Metadata: api.Metadata{Name: "ubuntu", NodeName: &node3}, Status: &api.Status{Status: &statusAvailable}, Spec: api.ImageSpec{Qcow2Path: &qcow2Path}},
+		}
+
+		summaries := summarizeImages(images)
+		Expect(summaries).To(HaveLen(1))
+		Expect(summaries[0].synced).To(Equal("COMPLETE"))
+		Expect(summaries[0].hasLV).To(Equal("mixed"))
+		Expect(summaries[0].hasQcow2).To(Equal("yes"))
+	})
+
 	It("marks image DEGRADE and status MIXED when per-node status differs", func() {
 		node1 := "marmot1"
 		node2 := "marmot2"
@@ -65,5 +83,17 @@ var _ = Describe("summarizeImages", func() {
 		Expect(summaries).To(HaveLen(1))
 		Expect(summaries[0].synced).To(Equal("DEGRADE"))
 		Expect(summaries[0].status).To(Equal("MIXED"))
+	})
+
+	It("renders WAITING images as QCOW2 no", func() {
+		node1 := "marmot1"
+		statusWaiting := "WAITING"
+		images := []api.Image{
+			{Metadata: api.Metadata{Name: "ubuntu", NodeName: &node1}, Status: &api.Status{Status: &statusWaiting}, Spec: api.ImageSpec{Qcow2Path: &qcow2Path}},
+		}
+
+		summaries := summarizeImages(images)
+		Expect(summaries).To(HaveLen(1))
+		Expect(summaries[0].hasQcow2).To(Equal("no"))
 	})
 })

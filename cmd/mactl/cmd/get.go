@@ -941,12 +941,9 @@ func outputImages(images []api.Image) error {
 					hasLV = "yes"
 				}
 
-				hasQcow2 := "no"
-				if img.Spec.Qcow2Path != nil && strings.TrimSpace(*img.Spec.Qcow2Path) != "" {
-					hasQcow2 = "yes"
-				}
+				hasQcow2 := normalizeImageQcow2(img)
 
-				fmt.Printf("%-14s  %-9s  %-9s  %-7s  %-3s  %-5s  %s\n",
+				fmt.Printf("%-14s  %-9s  %-9s  %-7s  %-6s  %-5s  %s\n",
 					img.Metadata.Name,
 					nodeName,
 					status,
@@ -963,10 +960,10 @@ func outputImages(images []api.Image) error {
 		sort.SliceStable(aggregated, func(i, j int) bool {
 			return creationTime(aggregated[i].ageStatus).Before(creationTime(aggregated[j].ageStatus))
 		})
-		fmt.Println("NAME            STATUS     SYNCED    LV   QCOW2  AGE")
-		fmt.Println("----            ------     ------    --   -----  ---")
+		fmt.Println("NAME            STATUS     SYNCED    LV     QCOW2  AGE")
+		fmt.Println("----            ------     ------    ------  -----  ---")
 		for _, row := range aggregated {
-			fmt.Printf("%-14s  %-9s  %-8s  %-3s  %-5s  %s\n",
+			fmt.Printf("%-14s  %-9s  %-8s  %-6s  %-5s  %s\n",
 				row.name,
 				row.status,
 				row.synced,
@@ -1067,7 +1064,7 @@ func summarizeImageGroup(name string, images []api.Image, totalNodes int) imageS
 	if expectedNodes <= 0 {
 		expectedNodes = len(nodeSet)
 	}
-	uniform := len(statusSet) == 1 && len(lvSet) == 1 && len(qcow2Set) == 1
+	uniform := len(statusSet) == 1 && len(qcow2Set) == 1
 	complete := uniform && len(nodeSet) == expectedNodes
 
 	synced := "DEGRADE"
@@ -1116,6 +1113,9 @@ func normalizeImageLV(img api.Image) string {
 }
 
 func normalizeImageQcow2(img api.Image) string {
+	if normalizeImageStatus(img) == "WAITING" {
+		return "no"
+	}
 	if img.Spec.Qcow2Path != nil && strings.TrimSpace(*img.Spec.Qcow2Path) != "" {
 		return "yes"
 	}
