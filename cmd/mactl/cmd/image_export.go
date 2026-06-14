@@ -54,37 +54,14 @@ var imageExportCmd = &cobra.Command{
 			return err
 		}
 
-		clusterStatuses, err := getClusterStatuses(m)
+		image := candidates[0]
+		qcowBytes, err := m.DownloadImageQcow2ById(image.Metadata.Id)
 		if err != nil {
-			slog.Warn("failed to resolve cluster statuses; falling back to current endpoint", "err", err)
-		}
-
-		var image *api.Image
-		var qcowBytes []byte
-		var downloadErr error
-		for _, candidate := range candidates {
-			endpoint := m
-			if targetNode := imageNodeName(candidate); targetNode != "" && len(clusterStatuses) > 0 {
-				if targetHostPort, hpErr := hostPortForNode(clusterStatuses, targetNode, m.HostPort); hpErr == nil && strings.TrimSpace(targetHostPort) != "" {
-					endpoint = cloneEndpointForHostPort(m, targetHostPort)
-				}
-			}
-
-			qcowBytes, downloadErr = endpoint.DownloadImageQcow2ById(candidate.Metadata.Id)
-			if downloadErr == nil {
-				image = &candidate
-				break
-			}
-			if !strings.Contains(downloadErr.Error(), "qcow2 file does not exist") && !strings.Contains(downloadErr.Error(), "qcow2 path is not set") {
-				return fmt.Errorf("failed to download qcow2 for image %q: %w", candidate.Metadata.Id, downloadErr)
-			}
-		}
-		if image == nil {
-			return fmt.Errorf("failed to download qcow2 for image %q: %w", name, downloadErr)
+			return fmt.Errorf("failed to download qcow2 for image %q: %w", image.Metadata.Id, err)
 		}
 
 		outPath := filepath.Join(".", fmt.Sprintf("marmot-machine-image-%s.tgz", sanitizeArchiveName(name)))
-		if err := writeImageArchive(outPath, *image, qcowBytes); err != nil {
+		if err := writeImageArchive(outPath, image, qcowBytes); err != nil {
 			return fmt.Errorf("failed to write archive: %w", err)
 		}
 
@@ -112,41 +89,11 @@ func getLocalNodeName(m *client.MarmotEndpoint) (string, error) {
 	return strings.TrimSpace(*status.NodeName), nil
 }
 
-func getClusterStatuses(m *client.MarmotEndpoint) ([]api.HostStatus, error) {
-	body, _, err := m.GetMarmotCluster()
-	if err != nil {
-		return nil, err
-	}
-	var statuses []api.HostStatus
-	if err := json.Unmarshal(body, &statuses); err != nil {
-		return nil, err
-	}
-	return statuses, nil
-}
-
-func imageNodeName(image api.Image) string {
-	if image.Metadata.NodeName == nil {
-		return ""
-	}
-	return strings.TrimSpace(*image.Metadata.NodeName)
-}
-
-func cloneEndpointForHostPort(src *client.MarmotEndpoint, hostPort string) *client.MarmotEndpoint {
-	if src == nil {
-		return nil
-	}
-	clone := *src
-	clone.HostPort = strings.TrimSpace(hostPort)
-	return &clone
-}
-
 func pickExportableImagesByName(images []api.Image, name, preferredNode string) ([]api.Image, error) {
 	matched := make([]api.Image, 0)
+	localMatched := make([]api.Image, 0)
 	for _, image := range images {
 		if strings.TrimSpace(image.Metadata.Name) != name {
-			continue
-		}
-		if image.Metadata.Labels != nil && db.GetFollowerSyncRole(*image.Metadata.Labels) == "follower" {
 			continue
 		}
 		if image.Status == nil || image.Status.StatusCode != db.IMAGE_AVAILABLE {
@@ -155,23 +102,31 @@ func pickExportableImagesByName(images []api.Image, name, preferredNode string) 
 		if image.Spec.Qcow2Path == nil || strings.TrimSpace(*image.Spec.Qcow2Path) == "" {
 			continue
 		}
+
+		if preferredNode != "" {
+			if image.Metadata.NodeName != nil && strings.TrimSpace(*image.Metadata.NodeName) == preferredNode {
+				localMatched = append(localMatched, image)
+			}
+		}
+
+		if image.Metadata.Labels != nil && db.GetFollowerSyncRole(*image.Metadata.Labels) == "follower" {
+			continue
+		}
 		matched = append(matched, image)
+	}
+
+	if preferredNode != "" {
+		if len(localMatched) == 0 {
+			return nil, fmt.Errorf("exportable image not found on current endpoint node (%s): %s", preferredNode, name)
+		}
+		sort.SliceStable(localMatched, func(i, j int) bool {
+			return creationTime(localMatched[i].Status).After(creationTime(localMatched[j].Status))
+		})
+		return localMatched, nil
 	}
 
 	if len(matched) == 0 {
 		return nil, fmt.Errorf("exportable image not found: %s", name)
-	}
-
-	if preferredNode != "" {
-		sort.SliceStable(matched, func(i, j int) bool {
-			imatch := matched[i].Metadata.NodeName != nil && strings.TrimSpace(*matched[i].Metadata.NodeName) == preferredNode
-			jmatch := matched[j].Metadata.NodeName != nil && strings.TrimSpace(*matched[j].Metadata.NodeName) == preferredNode
-			if imatch != jmatch {
-				return imatch
-			}
-			return creationTime(matched[i].Status).After(creationTime(matched[j].Status))
-		})
-		return matched, nil
 	}
 
 	sort.SliceStable(matched, func(i, j int) bool {

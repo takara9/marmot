@@ -56,7 +56,8 @@ var _ = Describe("pickExportableImageByName", func() {
 
 	It("prefers the local node when the same image exists on multiple nodes", func() {
 		now := time.Now()
-		earier := now.Add(-1 * time.Hour)
+		earlier := now.Add(-1 * time.Hour)
+		followerLabels := map[string]interface{}{db.ImageLabelSyncRole: "follower"}
 
 		images := []api.Image{
 			{
@@ -65,9 +66,9 @@ var _ = Describe("pickExportableImageByName", func() {
 				Status:   &api.Status{StatusCode: db.IMAGE_AVAILABLE, CreationTimeStamp: &now},
 			},
 			{
-				Metadata: api.Metadata{Name: "server110", Id: "img-local", NodeName: util.StringPtr("marmot1")},
+				Metadata: api.Metadata{Name: "server110", Id: "img-local", NodeName: util.StringPtr("marmot1"), Labels: &followerLabels},
 				Spec:     api.ImageSpec{Qcow2Path: util.StringPtr("/tmp/local.qcow2")},
-				Status:   &api.Status{StatusCode: db.IMAGE_AVAILABLE, CreationTimeStamp: &earier},
+				Status:   &api.Status{StatusCode: db.IMAGE_AVAILABLE, CreationTimeStamp: &earlier},
 			},
 		}
 
@@ -75,6 +76,21 @@ var _ = Describe("pickExportableImageByName", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(picked).NotTo(BeEmpty())
 		Expect(picked[0].Metadata.Id).To(Equal("img-local"))
+	})
+
+	It("returns error when current endpoint node has no matching image", func() {
+		now := time.Now()
+		images := []api.Image{
+			{
+				Metadata: api.Metadata{Name: "docker", Id: "img-remote", NodeName: util.StringPtr("marmot2")},
+				Spec:     api.ImageSpec{Qcow2Path: util.StringPtr("/tmp/remote.qcow2")},
+				Status:   &api.Status{StatusCode: db.IMAGE_AVAILABLE, CreationTimeStamp: &now},
+			},
+		}
+
+		_, err := pickExportableImagesByName(images, "docker", "marmot1")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("current endpoint node"))
 	})
 })
 
