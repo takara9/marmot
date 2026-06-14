@@ -584,6 +584,8 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 	}
 
 	_ = runCmd(ctx, "partprobe", nbdDev)
+	_ = runCmd(ctx, "partx", "-u", nbdDev)
+	_ = runCmd(ctx, "udevadm", "settle")
 	resizeTarget := nbdDev
 	usingPartitionTarget := false
 	if err := waitForBlockDevice(ctx, partDev, 5*time.Second); err == nil {
@@ -592,6 +594,8 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 		}
 
 		_ = runCmd(ctx, "partprobe", nbdDev)
+		_ = runCmd(ctx, "partx", "-u", nbdDev)
+		_ = runCmd(ctx, "udevadm", "settle")
 		if err := waitForBlockDevice(ctx, partDev, 20*time.Second); err != nil {
 			return err
 		}
@@ -617,7 +621,7 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 				return retryErr
 			}
 		} else {
-		return err
+			return err
 		}
 	}
 	if err := runCmd(ctx, "resize2fs", resizeTarget); err != nil {
