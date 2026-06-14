@@ -93,19 +93,47 @@ ubuntu@server-20:~$
 
 ## インストール
 
-### 1. deb パッケージのインストール
+### 必要最小条件
+- Ubuntu Linux 24.06 がインストールされていること。
+- ルート`/`ファイルシステムが、3G程度空いていること。 marmotが依存モジュール 1.2GBほどが、インストールされます。
+- `/var/lib/marmot` が、100GB程度の空きがあること。（OSイメージ取得で約2GB、１台の仮想マシン起動で16GBを消費します。
+
+
+### deb パッケージのインストール
 
 [Releases](https://github.com/takara9/marmot/releases) から最新の `.deb` ファイルをダウンロードしてインストールします。
 
 ```console
+cd /tmp
+apt-get update
 VERSION=0.23.0
 curl -OL https://github.com/takara9/marmot/releases/download/v${VERSION}/marmot_v${VERSION}_amd64.deb
-sudo install -m 0644 ./marmot_v${VERSION}_amd64.deb /tmp/
-sudo apt install /tmp/marmot_v${VERSION}_amd64.deb
-sudo rm -f /tmp/marmot_v${VERSION}_amd64.deb
+sudo apt install -y ./marmot_v${VERSION}_amd64.deb
+```
+インストール完了後に、`/etc/marmot/marmotd.json`を編集して、`systemctl restart mamort` を実行します。
+シングル構成時は、以下の２箇所に注意してください。
+
+```json
+# cat marmotd.json 
+{
+  "node_name": "marmot0",
+  "etcd_url": "http://127.0.0.1:2379",
+  "api_listen_addr": "0.0.0.0:8750",
+  "dns_listen_addr": "127.0.0.1:53", # 仮想マシンのDNS名を参照する時に、hostのIPアドレスに変更
+  "dns_upstream": "8.8.8.8:53",      # 内部DNSで解決できない時の上位 DNSサーバー
+  "dns_upstream_allow_cidrs": [
+    "192.168.1.0/24"
+  ],
+  "default_underlay_interface": "",
+以下省略
 ```
 
-## 主な依存技術
+
+```console
+sudo rm -f ./marmot_v${VERSION}_amd64.deb
+```
+
+## 主な利用技術
 
 - [KVM / QEMU](https://www.linux-kvm.org/) — 仮想化
 - [LibVirt](https://libvirt.org/) — VM ライフサイクル管理
@@ -117,6 +145,12 @@ sudo rm -f /tmp/marmot_v${VERSION}_amd64.deb
 ## 応用例
 
 - [marmotマニフェスト集](https://github.com/takara9/marmot-manifests)
+
+## チュートリアル
+準備中
+
+## リファレンスマニュアル
+準備中
 
 ## ライセンス
 
