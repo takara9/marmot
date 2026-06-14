@@ -680,7 +680,7 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 	}
 	connected = false
 
-	if err := runCmd(ctx, "qemu-img", "info", imageTemplatePath); err != nil {
+	if err := runQemuImgInfoWithRetry(ctx, imageTemplatePath, 10, 300*time.Millisecond); err != nil {
 		return err
 	}
 
@@ -742,6 +742,41 @@ func hasPartitionTableType(partitionTableType string) bool {
 	return strings.TrimSpace(partitionTableType) != ""
 }
 
+func runQemuImgInfoWithRetry(ctx context.Context, imagePath string, attempts int, delay time.Duration) error {
+	if attempts < 1 {
+		attempts = 1
+	}
+	if delay < 0 {
+		delay = 0
+	}
+
+	var lastErr error
+	for i := 0; i < attempts; i++ {
+		err := runCmd(ctx, "qemu-img", "info", imagePath)
+		if err == nil {
+			return nil
+		}
+		lastErr = err
+		if !isQemuImgWriteLockError(err) || i == attempts-1 {
+			return err
+		}
+
+		slog.Warn("qemu-img info lock contention; retrying", "imagePath", imagePath, "attempt", i+1, "maxAttempts", attempts, "err", err)
+		if delay > 0 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+	}
+
+	if lastErr != nil {
+		return lastErr
+	}
+	return fmt.Errorf("qemu-img info failed without detailed error")
+}
+
 func isMissingBlockDeviceError(err error) bool {
 	if err == nil {
 		return false
@@ -750,6 +785,15 @@ func isMissingBlockDeviceError(err error) bool {
 	return strings.Contains(msg, "no such file or directory") ||
 		strings.Contains(msg, "possibly non-existent device") ||
 		strings.Contains(msg, "does not exist")
+}
+
+func isQemuImgWriteLockError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "failed to get shared \"write\" lock") ||
+		(strings.Contains(msg, "is another process using the image") && strings.Contains(msg, "qemu-img info"))
 }
 
 // runCmd はコマンド実行とエラー出力整形を行うヘルパー。
