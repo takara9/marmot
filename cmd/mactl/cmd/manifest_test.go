@@ -219,7 +219,7 @@ spec:
 					"spec": map[string]interface{}{
 						"sourceUrl": "https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img",
 						"osName":    "ubuntu",
-						"osVersion": "26.04",
+						"osVersion": "24.04",
 					},
 				}
 
@@ -230,7 +230,7 @@ spec:
 				Expect(image.Spec.OsName).NotTo(BeNil())
 				Expect(*image.Spec.OsName).To(Equal("ubuntu"))
 				Expect(image.Spec.OsVersion).NotTo(BeNil())
-				Expect(*image.Spec.OsVersion).To(Equal("26.04"))
+				Expect(*image.Spec.OsVersion).To(Equal("24.04"))
 			})
 		})
 	})
