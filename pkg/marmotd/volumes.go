@@ -633,7 +633,7 @@ func getVolumeBackingStore(spec *api.VolSpec) (string, string) {
 						return api.Volume{}, err
 					}
 					if existingVolume != nil {
-						slog.Info("existing volume found; reusing it", "name", requestedName, "kind", requestedKind, "volume id", api.VolumeID(*existingVolume))
+						slog.Debug("existing volume found; reusing it", "name", requestedName, "kind", requestedKind, "volume id", api.VolumeID(*existingVolume))
 						return m.waitForVolumeAvailable(api.VolumeID(*existingVolume))
 					}
 	}

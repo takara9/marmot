@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"hash/crc32"
-	"log"
 	"log/slog"
 	"net/netip"
 	"os"
@@ -35,32 +34,44 @@ func SetupLinux(spec api.Server) error {
 	}
 	defer UnMountVolume(*spec.Spec.BootVolume, mountPoint, nbdDev)
 
-	// ホスト名設定
-	hostnameFile := filepath.Join(mountPoint, "etc/hostname")
-	hostname := hostnameForServer(spec)
-	slog.Debug("Setting hostname", "file", hostnameFile, "hostname", hostname)
+	return setupLinuxMountedVolume(spec, mountPoint)
+}
 
-	err = os.WriteFile(hostnameFile, []byte(hostname), 0644)
+func SetupAlpineLinux(spec api.Server) error {
+	if spec.Spec.BootVolume == nil {
+		return fmt.Errorf("BootVolume is nil")
+	}
+
+	mountPoint, nbdDev, err := MountVolume(*spec.Spec.BootVolume)
 	if err != nil {
-		slog.Error("WriteFile hostname failed", "error", err)
+		slog.Error("MountVolume failed", "error", err)
+		return err
+	}
+	defer UnMountVolume(*spec.Spec.BootVolume, mountPoint, nbdDev)
+
+	if err := setupMountedIdentity(spec, mountPoint); err != nil {
 		return err
 	}
 
-	machineID := machineIDForServer(spec)
+	if spec.Spec.NetworkInterface == nil {
+		defaultNic := api.NetworkInterface{
+			Networkname: "default",
+			Dhcp4:       BoolPtr(true),
+			Dhcp6:       BoolPtr(false),
+		}
+		spec.Spec.NetworkInterface = &[]api.NetworkInterface{defaultNic}
+	}
 
-	// machine-id は systemd 系の一意識別子として利用する
-	machineIDFile := filepath.Join(mountPoint, "etc/machine-id")
-	err = os.WriteFile(machineIDFile, []byte(machineID), 0644)
-	if err != nil {
-		slog.Error("WriteFile /etc/machine-id failed", "error", err)
+	if err := CreateAlpineInterfaces(*spec.Spec.NetworkInterface, mountPoint); err != nil {
+		slog.Error("CreateAlpineInterfaces failed", "error", err)
 		return err
 	}
 
-	// hostid コマンドは /etc/hostid の 4 バイト値を参照する
-	hostidFile := filepath.Join(mountPoint, "etc/hostid")
-	err = os.WriteFile(hostidFile, hostIDBytes(machineID), 0644)
-	if err != nil {
-		slog.Error("WriteFile /etc/hostid failed", "error", err)
+	return nil
+}
+
+func setupLinuxMountedVolume(spec api.Server, mountPoint string) error {
+	if err := setupMountedIdentity(spec, mountPoint); err != nil {
 		return err
 	}
 
@@ -78,6 +89,115 @@ func SetupLinux(spec api.Server) error {
 	if err := CreateNetplanInterfaces(*spec.Spec.NetworkInterface, mountPoint); err != nil {
 		slog.Error("CreateNetplanInterfaces failed", "error", err)
 		return err
+	}
+
+	return nil
+}
+
+func setupMountedIdentity(spec api.Server, mountPoint string) error {
+	hostnameFile := filepath.Join(mountPoint, "etc/hostname")
+	hostname := hostnameForServer(spec)
+	slog.Debug("Setting hostname", "file", hostnameFile, "hostname", hostname)
+
+	if err := os.WriteFile(hostnameFile, []byte(hostname), 0644); err != nil {
+		slog.Error("WriteFile hostname failed", "error", err)
+		return err
+	}
+
+	machineID := machineIDForServer(spec)
+	machineIDFile := filepath.Join(mountPoint, "etc/machine-id")
+	if err := os.WriteFile(machineIDFile, []byte(machineID), 0644); err != nil {
+		slog.Error("WriteFile /etc/machine-id failed", "error", err)
+		return err
+	}
+
+	hostidFile := filepath.Join(mountPoint, "etc/hostid")
+	if err := os.WriteFile(hostidFile, hostIDBytes(machineID), 0644); err != nil {
+		slog.Error("WriteFile /etc/hostid failed", "error", err)
+		return err
+	}
+
+	return nil
+}
+
+func CreateAlpineInterfaces(requestConfig []api.NetworkInterface, mountPoint string) error {
+	nicNames := []string{"eth0", "eth1", "eth2", "eth3", "eth4", "eth5"}
+	var builder strings.Builder
+	builder.WriteString("auto lo\n")
+	builder.WriteString("iface lo inet loopback\n\n")
+
+	resolvLines := make([]string, 0)
+	searchDomains := make([]string, 0)
+
+	if len(requestConfig) == 0 {
+		builder.WriteString("auto eth0\n")
+		builder.WriteString("iface eth0 inet dhcp\n")
+	} else {
+		for idx, nic := range requestConfig {
+			ifaceName := nicNames[idx]
+			builder.WriteString(fmt.Sprintf("auto %s\n", ifaceName))
+
+			if nic.Address != nil && nic.Netmasklen != nil {
+				builder.WriteString(fmt.Sprintf("iface %s inet static\n", ifaceName))
+				builder.WriteString(fmt.Sprintf("    address %s/%d\n", *nic.Address, *nic.Netmasklen))
+				if nic.Routes != nil {
+					for _, route := range *nic.Routes {
+						if route.To == nil || route.Via == nil {
+							continue
+						}
+						if strings.TrimSpace(*route.To) == "default" {
+							builder.WriteString(fmt.Sprintf("    gateway %s\n", strings.TrimSpace(*route.Via)))
+							continue
+						}
+						builder.WriteString(fmt.Sprintf("    up ip route add %s via %s dev %s\n", strings.TrimSpace(*route.To), strings.TrimSpace(*route.Via), ifaceName))
+					}
+				}
+			} else {
+				builder.WriteString(fmt.Sprintf("iface %s inet dhcp\n", ifaceName))
+			}
+			builder.WriteString("\n")
+
+			if nic.Nameservers != nil {
+				if nic.Nameservers.Addresses != nil {
+					for _, addr := range *nic.Nameservers.Addresses {
+						addr = strings.TrimSpace(addr)
+						if addr != "" {
+							resolvLines = append(resolvLines, "nameserver "+addr)
+						}
+					}
+				}
+				if nic.Nameservers.Search != nil {
+					for _, search := range *nic.Nameservers.Search {
+						search = strings.TrimSpace(search)
+						if search != "" {
+							searchDomains = append(searchDomains, search)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	interfacesPath := filepath.Join(mountPoint, "etc", "network", "interfaces")
+	if err := os.MkdirAll(filepath.Dir(interfacesPath), 0755); err != nil {
+		return fmt.Errorf("failed to create alpine network directory: %w", err)
+	}
+	if err := os.WriteFile(interfacesPath, []byte(builder.String()), 0644); err != nil {
+		return fmt.Errorf("failed to write alpine interfaces: %w", err)
+	}
+
+	if len(resolvLines) > 0 || len(searchDomains) > 0 {
+		var resolvBuilder strings.Builder
+		if len(searchDomains) > 0 {
+			resolvBuilder.WriteString("search " + strings.Join(searchDomains, " ") + "\n")
+		}
+		for _, line := range resolvLines {
+			resolvBuilder.WriteString(line + "\n")
+		}
+		resolvPath := filepath.Join(mountPoint, "etc", "resolv.conf")
+		if err := os.WriteFile(resolvPath, []byte(resolvBuilder.String()), 0644); err != nil {
+			return fmt.Errorf("failed to write alpine resolv.conf: %w", err)
+		}
 	}
 
 	return nil
@@ -197,14 +317,32 @@ func MountVolume(v api.Volume) (string, string, error) {
 			err := errors.New("qemu-nbd failed to setup OS-Disk")
 			return "", "", err
 		}
-		time.Sleep(3 * time.Second) // 少し待つ
+		time.Sleep(1 * time.Second) // デバイス作成を待機
 
-		// ループバックデバイスの2番パーティションをマウント
-		fmt.Println("Mounting", "mount", "-t", "ext4", fmt.Sprintf("%sp1", nbdDevice), mountPoint)
-		cmd = exec.Command("mount", "-t", "ext4", fmt.Sprintf("%sp1", nbdDevice), mountPoint)
-		err = cmd.Run()
-		if err != nil {
-			slog.Error("mount command failed", "error", err, "device", fmt.Sprintf("%sp1", nbdDevice), "mountPoint", mountPoint)
+		mountCandidates := []string{fmt.Sprintf("%sp1", nbdDevice), nbdDevice}
+		mounted := false
+		for _, dev := range mountCandidates {
+			fmt.Println("Mounting", "mount", "-t", "ext4", dev, mountPoint)
+			cmd = exec.Command("mount", "-t", "ext4", dev, mountPoint)
+			err = cmd.Run()
+			if err == nil {
+				mounted = true
+				break
+			}
+
+			// filesystem type を固定しない再試行（alpine cloud image 互換）
+			cmd = exec.Command("mount", dev, mountPoint)
+			err = cmd.Run()
+			if err == nil {
+				mounted = true
+				break
+			}
+
+			slog.Warn("mount attempt failed", "device", dev, "mountPoint", mountPoint, "error", err)
+		}
+		if !mounted {
+			_ = exec.Command("qemu-nbd", "--disconnect", nbdDevice).Run()
+			_ = os.RemoveAll(mountPoint)
 			err := errors.New("mount failed to setup OS-Disk")
 			return "", "", err
 		}
@@ -417,7 +555,7 @@ func CreateNetplanInterfaces(requestConfig []api.NetworkInterface, mountPoint st
 	// YAML への変換
 	data, err := yaml.Marshal(&config)
 	if err != nil {
-		log.Fatalf("Marshal error: %v", err)
+		return fmt.Errorf("marshal netplan config failed: %w", err)
 	}
 
 	// YAMLファイルへの書き出し
@@ -426,7 +564,7 @@ func CreateNetplanInterfaces(requestConfig []api.NetworkInterface, mountPoint st
 	filePath := filepath.Join(mountPoint, "etc", "netplan", "00-nic.yaml")
 	err = os.WriteFile(filePath, data, 0600)
 	if err != nil {
-		log.Fatalf("Write file error: %v", err)
+		return fmt.Errorf("write netplan config failed: %w", err)
 	}
 
 	fmt.Printf("Generated %s successfully:\n\n%s", filePath, string(data))

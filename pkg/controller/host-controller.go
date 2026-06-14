@@ -51,7 +51,7 @@ func StartHostController(node string, etcdUrl string) (*hostController, error) {
 			case <-ticker.C:
 				c.hostControllerLoop()
 			case <-c.stopChan:
-				slog.Info("ホストコントローラー停止")
+				slog.Debug("ホストコントローラー停止")
 				return
 			}
 		}

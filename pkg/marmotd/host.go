@@ -282,7 +282,7 @@ func ensureISCSIInitiatorID(nodeName string) error {
 	if err := systemctlRestartIscsid(); err != nil {
 		return fmt.Errorf("failed to restart iscsid: %w", err)
 	}
-	slog.Info("iSCSI initiator name configured and iscsid restarted", "iqn", newIQN)
+	slog.Debug("iSCSI initiator name configured and iscsid restarted", "iqn", newIQN)
 	return nil
 }
 

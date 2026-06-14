@@ -151,7 +151,6 @@ func (m *Marmot) resolveStorageBoundNodeName(storage *[]api.Volume) (string, err
 	return nodeNameFromResolvedVolumes(vols)
 }
 
-
 // ResolveAndAssignServerNodeByStorage inspects pre-created storage volumes and
 // updates server metadata.nodeName when storage constrains placement.
 func (m *Marmot) ResolveAndAssignServerNodeByStorage(serverID string) (string, error) {
@@ -635,8 +634,13 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 
 	// ブートボリュームをマウントして、ホスト名、netplanを設定する
 	slog.Debug("ブートボリュームをマウントして、ホスト名、netplanを設定する")
-	if err := util.SetupLinux(serverConfig); err != nil {
-		slog.Error("SetupLinux()", "err", err)
+	imageModule, err := resolveServerImageModule(m, bootVol)
+	if err != nil {
+		slog.Error("resolveServerImageModule()", "err", err)
+		return "", err
+	}
+	if err := imageModule.SetupBootVolume(serverConfig); err != nil {
+		slog.Error("SetupBootVolume()", "module", imageModule.Key(), "err", err)
 		return "", err
 	}
 
@@ -747,9 +751,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		return "", err
 	}
 
-	isoPath, err := GenerateCloudInitISO(path, password, sshKey, usernames)
+	isoPath, err := imageModule.GenerateCloudInitISO(path, password, sshKey, usernames)
 	if err != nil {
-		slog.Error("GenerateCloudInitISO()", "err", err)
+		slog.Error("GenerateCloudInitISO()", "module", imageModule.Key(), "err", err)
 		return "", err
 	}
 
@@ -1385,7 +1389,7 @@ func (m *Marmot) CreateNewVolumeWithWait(volReq api.Volume) (api.Volume, error) 
 			return api.Volume{}, err
 		}
 		if existingVolume != nil {
-			slog.Info("existing volume found; reusing it", "name", requestedName, "kind", requestedKind, "volume id", api.VolumeID(*existingVolume))
+			slog.Debug("existing volume found; reusing it", "name", requestedName, "kind", requestedKind, "volume id", api.VolumeID(*existingVolume))
 			return m.waitForVolumeAvailable(api.VolumeID(*existingVolume))
 		}
 	}

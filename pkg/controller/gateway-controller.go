@@ -51,7 +51,7 @@ func StartGatewayController(node string, etcdUrl string) (*controller, error) {
 			case <-ticker.C:
 				c.gatewayControllerLoop()
 			case <-c.stopChan:
-				slog.Info("ゲートウェイコントローラー停止")
+				slog.Debug("ゲートウェイコントローラー停止")
 				return
 			}
 		}
@@ -153,7 +153,7 @@ func (c *controller) deleteGatewayForMissingInternalServer(gateway api.Gateway) 
 		return
 	}
 
-	slog.Info("gateway deleted because spec.internalServerName target no longer exists", "gatewayId", gatewayID, "internalServerName", strings.TrimSpace(gateway.Spec.InternalServerName))
+	slog.Debug("gateway deleted because spec.internalServerName target no longer exists", "gatewayId", gatewayID, "internalServerName", strings.TrimSpace(gateway.Spec.InternalServerName))
 }
 
 func (c *controller) reconcileGatewayPending(gateway api.Gateway) {

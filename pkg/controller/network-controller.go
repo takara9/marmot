@@ -71,7 +71,7 @@ func StartNetController(node string, etcdUrl string, deletionDelaySeconds int) (
 			case <-ticker.C:
 				c.networkControllerLoop(networkFabric)
 			case <-c.stopChan:
-				slog.Info("ネットワークコントローラー停止")
+				slog.Debug("ネットワークコントローラー停止")
 				return
 			}
 		}
@@ -103,7 +103,7 @@ func (c *controller) networkControllerLoop(fabric networkfabric.NetworkFabric) {
 		currentMemberSignature := clusterMemberSignature(statuses)
 		membershipChanged := currentMemberSignature != c.lastNetworkMemberSignature
 		if membershipChanged {
-			slog.Info("cluster membership changed", "controllerNode", c.marmot.NodeName, "previous", c.lastNetworkMemberSignature, "current", currentMemberSignature)
+			slog.Debug("cluster membership changed", "controllerNode", c.marmot.NodeName, "previous", c.lastNetworkMemberSignature, "current", currentMemberSignature)
 			c.lastNetworkMemberSignature = currentMemberSignature
 		}
 
@@ -265,7 +265,7 @@ func (c *controller) networkControllerLoop(fabric networkfabric.NetworkFabric) {
 					}
 				}
 
-				slog.Info("network recovered from error", "networkId", vnetID, "networkName", vnet.Metadata.Name, "role", role)
+				slog.Debug("network recovered from error", "networkId", vnetID, "networkName", vnet.Metadata.Name, "role", role)
 
 			case db.NETWORK_ACTIVE:
 				slog.Debug("利用可能な仮想ネットワークを処理", "networkId", vnetID)
@@ -303,7 +303,7 @@ func (c *controller) reconcileHeadProvisioningNetwork(vnet api.VirtualNetwork, f
 	vnetID := api.VirtualNetworkID(vnet)
 	if _, err := c.db.GetVirtualNetworkById(vnetID); err != nil {
 		if errors.Is(err, db.ErrNotFound) {
-			slog.Info("skip reconcile for deleted head network", "networkId", vnetID)
+			slog.Debug("skip reconcile for deleted head network", "networkId", vnetID)
 			return nil
 		}
 		return fmt.Errorf("db:lookup-failed:%w", err)

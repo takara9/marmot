@@ -54,7 +54,7 @@ func GenerateCloudInitISO(path, password, sshKey string, usernames []string) (st
 		return "", err
 	}
 	isoPath := filepath.Join(path, "cloud-init.iso")
-	slog.Info("Cloud-init ISOの生成を開始", "isoPath", isoPath)
+	slog.Debug("Cloud-init ISOの生成を開始", "isoPath", isoPath)
 	cmd := exec.Command("genisoimage", "-output", isoPath, "-volid", "cidata", "-joliet", "-rock", tempDir)
 	if err := cmd.Run(); err != nil {
 		err := fmt.Errorf("failed to generate ISO: %v", err)

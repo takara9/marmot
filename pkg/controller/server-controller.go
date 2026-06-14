@@ -64,7 +64,7 @@ func StartVmController(node string, etcdUrl string, deletionDelaySeconds int) (*
 			case <-ticker.C:
 				c.serverControllerLoop()
 			case <-c.stopChan:
-				slog.Info("サーバーコントローラー停止")
+				slog.Debug("サーバーコントローラー停止")
 				return
 			}
 		}
@@ -264,6 +264,11 @@ func (c *controller) serverControllerLoop() {
 
 		case db.SERVER_PROVISIONING:
 			slog.Debug("プロビジョニング中のサーバー検出", "SERVER", api.ServerID(spec))
+			msg := "サーバーのプロビジョニングが中断されました。marmot サービス再起動後も自動再開されないため、サーバーを再作成してください"
+			if spec.Status != nil && spec.Status.Message != nil && strings.TrimSpace(*spec.Status.Message) != "" {
+				msg = *spec.Status.Message
+			}
+			c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_ERROR, msg)
 
 		default:
 			slog.Warn("不明な状態のサーバー検出", "SERVER", api.ServerID(spec), "STATUS", *spec.Status.Status)

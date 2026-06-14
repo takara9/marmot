@@ -54,7 +54,7 @@ func StartApplicationLoadBalancerController(node string, etcdUrl string) (*contr
 			case <-ticker.C:
 				c.applicationLoadBalancerControllerLoop()
 			case <-c.stopChan:
-				slog.Info("ロードバランサーコントローラー停止")
+				slog.Debug("ロードバランサーコントローラー停止")
 				return
 			}
 		}
@@ -144,7 +144,7 @@ func (c *controller) deleteApplicationLoadBalancerForMissingServer(loadBalancer 
 		slog.Warn("DeleteLoadBalancerById() failed while auto-deleting load balancer", "id", loadBalancerID, "err", err)
 		return
 	}
-	slog.Info("load balancer deleted because managed server no longer exists", "id", loadBalancerID)
+	slog.Debug("load balancer deleted because managed server no longer exists", "id", loadBalancerID)
 }
 
 func (c *controller) reconcileApplicationLoadBalancerPending(loadBalancer api.ApplicationLoadBalancer) {

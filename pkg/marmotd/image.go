@@ -122,6 +122,12 @@ func (m *Marmot) CreateNewImageManageWithContext(ctx context.Context, id string)
 		return nil, err
 	}
 
+	imageModule, err := resolveImageOSModuleFromImage(image)
+	if err != nil {
+		slog.Error("resolveImageOSModuleFromImage()", "imgId", id, "err", err)
+		return markFailed(err)
+	}
+
 	// イメージがQCOW2であることを確認する
 	if err := validateQcowV2Image(downloadPath); err != nil {
 		_ = os.Remove(downloadPath)
@@ -130,7 +136,7 @@ func (m *Marmot) CreateNewImageManageWithContext(ctx context.Context, id string)
 	}
 
 	// QCOW2イメージをカスタマイズする（SSH有効化、ネットワーク設定など）
-	if err := customizeQcowImageWithContext(ctx, downloadPath); err != nil {
+	if err := imageModule.customizeDownloadedImage(ctx, downloadPath); err != nil {
 		slog.Error("Failed to customize QCOW2 image", "imgId", id, "path", downloadPath, "err", err)
 		return markFailed(err)
 	}
@@ -458,6 +464,10 @@ func customizeQcowImage(imagePath string) error {
 }
 
 func customizeQcowImageWithContext(ctx context.Context, imagePath string) error {
+	return customizeUbuntuQcowImageWithContext(ctx, imagePath)
+}
+
+func customizeUbuntuQcowImageWithContext(ctx context.Context, imagePath string) error {
 	timeout := contextTimeoutHint(ctx)
 	netplanConfig := "network:\n" +
 		"  version: 2\n" +
@@ -480,7 +490,7 @@ func customizeQcowImageWithContext(ctx context.Context, imagePath string) error 
 		"--root-password", "password:ubuntu",
 		"--edit", "/etc/ssh/sshd_config: s/^#?PermitRootLogin.*/PermitRootLogin yes/",
 		"--edit", "/etc/ssh/sshd_config: s/^#?PasswordAuthentication.*/PasswordAuthentication yes/",
-		"--run-command", "rm /etc/ssh/sshd_config.d/60-cloudimg-settings.conf",
+		"--run-command", "rm -f /etc/ssh/sshd_config.d/60-cloudimg-settings.conf",
 		"--run-command", "ssh-keygen -A",
 		"--run-command", "systemctl enable ssh",
 		"--run-command", "systemctl restart ssh",
@@ -494,6 +504,30 @@ func customizeQcowImageWithContext(ctx context.Context, imagePath string) error 
 	}
 
 	slog.Debug("virt-customize completed", "imagePath", imagePath, "output", strings.TrimSpace(string(output)))
+	return nil
+}
+
+func customizeAlpineQcowImageWithContext(ctx context.Context, imagePath string) error {
+	timeout := contextTimeoutHint(ctx)
+	args := []string{
+		"-a", imagePath,
+		"--root-password", "password:alpine",
+		"--edit", "/etc/ssh/sshd_config: s/^#?PermitRootLogin.*/PermitRootLogin yes/",
+		"--edit", "/etc/ssh/sshd_config: s/^#?PasswordAuthentication.*/PasswordAuthentication yes/",
+		"--run-command", "if [ -f /etc/ssh/sshd_config.d/60-cloudimg-settings.conf ]; then rm -f /etc/ssh/sshd_config.d/60-cloudimg-settings.conf; fi",
+		"--run-command", "if ! id -u alpine >/dev/null 2>&1; then adduser -D alpine; fi",
+		"--run-command", "echo 'alpine:alpine' | chpasswd",
+		"--run-command", "if command -v ssh-keygen >/dev/null 2>&1; then ssh-keygen -A; fi",
+		"--run-command", "if command -v rc-update >/dev/null 2>&1; then rc-update add sshd default || true; fi",
+	}
+
+	cmd := exec.CommandContext(ctx, "virt-customize", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return wrapDeadlineExceeded(fmt.Errorf("virt-customize failed: %w, output: %s", err, strings.TrimSpace(string(output))), "QCOW2 イメージ設定", timeout)
+	}
+
+	slog.Debug("virt-customize completed for alpine", "imagePath", imagePath, "output", strings.TrimSpace(string(output)))
 	return nil
 }
 
@@ -549,18 +583,95 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 		return fmt.Errorf("qemu-nbd attach failed: %s", strings.Join(attachErrs, " | "))
 	}
 
-	time.Sleep(3 * time.Second)
-
-	if err := runCmd(ctx, "parted", nbdDev, "--fix", "--script", "resizepart", "1", "100%"); err != nil {
+	if err := refreshPartitionDevices(ctx, nbdDev); err != nil {
 		return err
 	}
 
-	time.Sleep(3 * time.Second)
-
-	if err := runCmd(ctx, "e2fsck", "-f", partDev, "-y"); err != nil {
-		return err
+	partitionTableType, err := detectPartitionTableType(ctx, nbdDev)
+	if err != nil {
+		slog.Warn("Failed to detect partition table type; treat as unknown", "nbdDevice", nbdDev, "err", err)
 	}
-	if err := runCmd(ctx, "resize2fs", partDev); err != nil {
+	hasPartitionTable := hasPartitionTableType(partitionTableType)
+	if hasPartitionTable {
+		slog.Debug("Detected partition table on NBD device", "nbdDevice", nbdDev, "ptType", partitionTableType)
+	}
+
+	resizeTarget := nbdDev
+	usingPartitionTarget := false
+	if err := waitForBlockDevice(ctx, partDev, 5*time.Second); err == nil {
+		if err := runCmd(ctx, "parted", nbdDev, "--fix", "--script", "resizepart", "1", "100%"); err != nil {
+			return err
+		}
+
+		if err := refreshPartitionDevices(ctx, nbdDev); err != nil {
+			return err
+		}
+		if err := waitForBlockDevice(ctx, partDev, 20*time.Second); err != nil {
+			return err
+		}
+		resizeTarget = partDev
+		usingPartitionTarget = true
+	} else {
+		if hasPartitionTable {
+			slog.Warn("Partition table detected; extend wait for partition device instead of falling back to whole disk", "nbdDevice", nbdDev, "partition", partDev, "ptType", partitionTableType, "err", err)
+			if err := refreshPartitionDevices(ctx, nbdDev); err != nil {
+				return err
+			}
+			if err := waitForBlockDevice(ctx, partDev, 30*time.Second); err != nil {
+				return err
+			}
+			resizeTarget = partDev
+			usingPartitionTarget = true
+		} else {
+			slog.Warn("Partition table was not detected; fallback to whole-disk filesystem resize", "nbdDevice", nbdDev, "partition", partDev, "err", err)
+		}
+	}
+
+	if usingPartitionTarget {
+		if _, err := os.Stat(partDev); err != nil {
+			if hasPartitionTable {
+				slog.Warn("Partition device disappeared before filesystem resize; retry partition detection", "nbdDevice", nbdDev, "partition", partDev, "ptType", partitionTableType, "err", err)
+				if err := refreshPartitionDevices(ctx, nbdDev); err != nil {
+					return err
+				}
+				if err := waitForBlockDevice(ctx, partDev, 30*time.Second); err != nil {
+					return err
+				}
+				resizeTarget = partDev
+			} else {
+				slog.Warn("Partition device disappeared before filesystem resize; fallback to whole disk", "nbdDevice", nbdDev, "partition", partDev, "err", err)
+				resizeTarget = nbdDev
+				usingPartitionTarget = false
+			}
+		}
+	}
+
+	if err := runCmd(ctx, "e2fsck", "-f", resizeTarget, "-y"); err != nil {
+		if usingPartitionTarget && isMissingBlockDeviceError(err) {
+			if hasPartitionTable {
+				slog.Warn("Partition device became unavailable during e2fsck; retry on partition", "nbdDevice", nbdDev, "partition", partDev, "ptType", partitionTableType, "err", err)
+				if refreshErr := refreshPartitionDevices(ctx, nbdDev); refreshErr != nil {
+					return refreshErr
+				}
+				if waitErr := waitForBlockDevice(ctx, partDev, 30*time.Second); waitErr != nil {
+					return waitErr
+				}
+				resizeTarget = partDev
+				if retryErr := runCmd(ctx, "e2fsck", "-f", resizeTarget, "-y"); retryErr != nil {
+					return retryErr
+				}
+			} else {
+				slog.Warn("Partition device became unavailable during e2fsck; retry on whole disk", "nbdDevice", nbdDev, "partition", partDev, "err", err)
+				resizeTarget = nbdDev
+				if retryErr := runCmd(ctx, "e2fsck", "-f", resizeTarget, "-y"); retryErr != nil {
+					return retryErr
+				}
+			}
+		} else {
+			return err
+		}
+	}
+	if err := runCmd(ctx, "resize2fs", resizeTarget); err != nil {
 		return err
 	}
 
@@ -569,9 +680,7 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 	}
 	connected = false
 
-	time.Sleep(3 * time.Second)
-
-	if err := runCmd(ctx, "qemu-img", "info", imageTemplatePath); err != nil {
+	if err := runQemuImgInfoWithRetry(ctx, imageTemplatePath, 10, 300*time.Millisecond); err != nil {
 		return err
 	}
 
@@ -589,6 +698,102 @@ func findFreeNbdDeviceByIndex(i int) (string, error) {
 		return devicePath, nil
 	}
 	return "", fmt.Errorf("device %s is busy", devicePath)
+}
+
+func waitForBlockDevice(ctx context.Context, devicePath string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		if _, err := os.Stat(devicePath); err == nil {
+			return nil
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("device %s did not appear within %s", devicePath, timeout)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func refreshPartitionDevices(ctx context.Context, nbdDev string) error {
+	if err := runCmd(ctx, "partprobe", nbdDev); err != nil {
+		return err
+	}
+	if err := runCmd(ctx, "partx", "-u", nbdDev); err != nil {
+		slog.Warn("partx refresh failed", "nbdDevice", nbdDev, "err", err)
+	}
+	if err := runCmd(ctx, "udevadm", "settle"); err != nil {
+		slog.Warn("udevadm settle failed", "nbdDevice", nbdDev, "err", err)
+	}
+	return nil
+}
+
+func detectPartitionTableType(ctx context.Context, devicePath string) (string, error) {
+	cmd := exec.CommandContext(ctx, "lsblk", "-n", "-o", "PTTYPE", devicePath)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("lsblk -n -o PTTYPE %s failed: %w, output=%s", devicePath, err, strings.TrimSpace(string(out)))
+	}
+	return strings.ToLower(strings.TrimSpace(string(out))), nil
+}
+
+func hasPartitionTableType(partitionTableType string) bool {
+	return strings.TrimSpace(partitionTableType) != ""
+}
+
+func runQemuImgInfoWithRetry(ctx context.Context, imagePath string, attempts int, delay time.Duration) error {
+	if attempts < 1 {
+		attempts = 1
+	}
+	if delay < 0 {
+		delay = 0
+	}
+
+	var lastErr error
+	for i := 0; i < attempts; i++ {
+		err := runCmd(ctx, "qemu-img", "info", imagePath)
+		if err == nil {
+			return nil
+		}
+		lastErr = err
+		if !isQemuImgWriteLockError(err) || i == attempts-1 {
+			return err
+		}
+
+		slog.Warn("qemu-img info lock contention; retrying", "imagePath", imagePath, "attempt", i+1, "maxAttempts", attempts, "err", err)
+		if delay > 0 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+	}
+
+	if lastErr != nil {
+		return lastErr
+	}
+	return fmt.Errorf("qemu-img info failed without detailed error")
+}
+
+func isMissingBlockDeviceError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "no such file or directory") ||
+		strings.Contains(msg, "possibly non-existent device") ||
+		strings.Contains(msg, "does not exist")
+}
+
+func isQemuImgWriteLockError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "failed to get shared \"write\" lock") ||
+		(strings.Contains(msg, "is another process using the image") && strings.Contains(msg, "qemu-img info"))
 }
 
 // runCmd はコマンド実行とエラー出力整形を行うヘルパー。

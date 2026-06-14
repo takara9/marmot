@@ -63,7 +63,7 @@ func main() {
 		slog.Error("Failed to initialize gateway runtime assets", "err", err)
 		return
 	}
-	slog.Info("Config loaded",
+	slog.Debug("Config loaded",
 		"node_name", cfg.NodeName,
 		"etcd_url", cfg.EtcdURL,
 		"api_listen_addr", cfg.APIListenAddr,
@@ -83,7 +83,7 @@ func main() {
 	util.SetupHostBridge()
 
 	// REST-APIサーバーの処理
-	slog.Info("Starting api server", "nodeName", cfg.NodeName, "etcdURL", cfg.EtcdURL, "apiListenAddr", cfg.APIListenAddr)
+	slog.Debug("Starting api server", "nodeName", cfg.NodeName, "etcdURL", cfg.EtcdURL, "apiListenAddr", cfg.APIListenAddr)
 
 	e := echo.New()
 	slog.Debug("Starting api server #2", "nodeName", cfg.NodeName, "etcdURL", cfg.EtcdURL, "apiListenAddr", cfg.APIListenAddr)
@@ -97,7 +97,7 @@ func main() {
 	marmotd.RegisterRoutes(e, Server, "/api/v1")
 
 	// コントローラーの開始
-	slog.Info("Starting controllers", "nodeName", cfg.NodeName, "etcdURL", cfg.EtcdURL, "deletionDelaySeconds", cfg.DeletionDelaySeconds)
+	slog.Debug("Starting controllers", "nodeName", cfg.NodeName, "etcdURL", cfg.EtcdURL, "deletionDelaySeconds", cfg.DeletionDelaySeconds)
 
 	// 仮想マシンコントローラー
 	_, err = controller.StartVmController(cfg.NodeName, cfg.EtcdURL, cfg.DeletionDelaySeconds) // VMコントローラーの開始
@@ -189,7 +189,7 @@ func main() {
 
 	//startDispatcher()
 	// And we serve HTTP until the world ends.
-	slog.Info("Starting API server", "addr", cfg.APIListenAddr)
+	slog.Debug("Starting API server", "addr", cfg.APIListenAddr)
 
 	if err := e.Start(cfg.APIListenAddr); err != nil {
 		slog.Error("API server stopped", "err", err)

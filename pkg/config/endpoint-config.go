@@ -25,7 +25,7 @@ func EnsureMarmotConfig() error {
 	if err := os.WriteFile(dest, data, 0600); err != nil {
 		return fmt.Errorf("設定ファイルの作成に失敗しました (%s): %w", dest, err)
 	}
-	slog.Info("設定ファイルを作成しました", "path", dest, "from", exampleConfigPath)
+	slog.Debug("設定ファイルを作成しました", "path", dest, "from", exampleConfigPath)
 	return nil
 }
 

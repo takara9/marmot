@@ -168,7 +168,7 @@ var _ = Describe("Image", Ordered, func() {
 						Type:      stringPtr("qcow2"),
 						SourceUrl: stringPtr("https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img"),
 						OsName:    stringPtr("ubuntu"),
-						OsVersion: stringPtr("26.04"),
+						OsVersion: stringPtr("24.04"),
 						Size:      intPtr(16),
 					},
 				}
@@ -181,7 +181,7 @@ var _ = Describe("Image", Ordered, func() {
 				Expect(follower.Spec.OsName).NotTo(BeNil())
 				Expect(*follower.Spec.OsName).To(Equal("ubuntu"))
 				Expect(follower.Spec.OsVersion).NotTo(BeNil())
-				Expect(*follower.Spec.OsVersion).To(Equal("26.04"))
+				Expect(*follower.Spec.OsVersion).To(Equal("24.04"))
 				Expect(follower.Spec.SourceUrl).NotTo(BeNil())
 				Expect(*follower.Spec.SourceUrl).To(Equal("https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img"))
 			})
