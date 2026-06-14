@@ -583,9 +583,19 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 		return fmt.Errorf("qemu-nbd attach failed: %s", strings.Join(attachErrs, " | "))
 	}
 
-	_ = runCmd(ctx, "partprobe", nbdDev)
-	_ = runCmd(ctx, "partx", "-u", nbdDev)
-	_ = runCmd(ctx, "udevadm", "settle")
+	if err := refreshPartitionDevices(ctx, nbdDev); err != nil {
+		return err
+	}
+
+	partitionTableType, err := detectPartitionTableType(ctx, nbdDev)
+	if err != nil {
+		slog.Warn("Failed to detect partition table type; treat as unknown", "nbdDevice", nbdDev, "err", err)
+	}
+	hasPartitionTable := hasPartitionTableType(partitionTableType)
+	if hasPartitionTable {
+		slog.Debug("Detected partition table on NBD device", "nbdDevice", nbdDev, "ptType", partitionTableType)
+	}
+
 	resizeTarget := nbdDev
 	usingPartitionTarget := false
 	if err := waitForBlockDevice(ctx, partDev, 5*time.Second); err == nil {
@@ -593,32 +603,69 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 			return err
 		}
 
-		_ = runCmd(ctx, "partprobe", nbdDev)
-		_ = runCmd(ctx, "partx", "-u", nbdDev)
-		_ = runCmd(ctx, "udevadm", "settle")
+		if err := refreshPartitionDevices(ctx, nbdDev); err != nil {
+			return err
+		}
 		if err := waitForBlockDevice(ctx, partDev, 20*time.Second); err != nil {
 			return err
 		}
 		resizeTarget = partDev
 		usingPartitionTarget = true
 	} else {
-		slog.Warn("Partition device was not detected; fallback to whole-disk filesystem resize", "nbdDevice", nbdDev, "partition", partDev, "err", err)
+		if hasPartitionTable {
+			slog.Warn("Partition table detected; extend wait for partition device instead of falling back to whole disk", "nbdDevice", nbdDev, "partition", partDev, "ptType", partitionTableType, "err", err)
+			if err := refreshPartitionDevices(ctx, nbdDev); err != nil {
+				return err
+			}
+			if err := waitForBlockDevice(ctx, partDev, 30*time.Second); err != nil {
+				return err
+			}
+			resizeTarget = partDev
+			usingPartitionTarget = true
+		} else {
+			slog.Warn("Partition table was not detected; fallback to whole-disk filesystem resize", "nbdDevice", nbdDev, "partition", partDev, "err", err)
+		}
 	}
 
 	if usingPartitionTarget {
 		if _, err := os.Stat(partDev); err != nil {
-			slog.Warn("Partition device disappeared before filesystem resize; fallback to whole disk", "nbdDevice", nbdDev, "partition", partDev, "err", err)
-			resizeTarget = nbdDev
-			usingPartitionTarget = false
+			if hasPartitionTable {
+				slog.Warn("Partition device disappeared before filesystem resize; retry partition detection", "nbdDevice", nbdDev, "partition", partDev, "ptType", partitionTableType, "err", err)
+				if err := refreshPartitionDevices(ctx, nbdDev); err != nil {
+					return err
+				}
+				if err := waitForBlockDevice(ctx, partDev, 30*time.Second); err != nil {
+					return err
+				}
+				resizeTarget = partDev
+			} else {
+				slog.Warn("Partition device disappeared before filesystem resize; fallback to whole disk", "nbdDevice", nbdDev, "partition", partDev, "err", err)
+				resizeTarget = nbdDev
+				usingPartitionTarget = false
+			}
 		}
 	}
 
 	if err := runCmd(ctx, "e2fsck", "-f", resizeTarget, "-y"); err != nil {
 		if usingPartitionTarget && isMissingBlockDeviceError(err) {
-			slog.Warn("Partition device became unavailable during e2fsck; retry on whole disk", "nbdDevice", nbdDev, "partition", partDev, "err", err)
-			resizeTarget = nbdDev
-			if retryErr := runCmd(ctx, "e2fsck", "-f", resizeTarget, "-y"); retryErr != nil {
-				return retryErr
+			if hasPartitionTable {
+				slog.Warn("Partition device became unavailable during e2fsck; retry on partition", "nbdDevice", nbdDev, "partition", partDev, "ptType", partitionTableType, "err", err)
+				if refreshErr := refreshPartitionDevices(ctx, nbdDev); refreshErr != nil {
+					return refreshErr
+				}
+				if waitErr := waitForBlockDevice(ctx, partDev, 30*time.Second); waitErr != nil {
+					return waitErr
+				}
+				resizeTarget = partDev
+				if retryErr := runCmd(ctx, "e2fsck", "-f", resizeTarget, "-y"); retryErr != nil {
+					return retryErr
+				}
+			} else {
+				slog.Warn("Partition device became unavailable during e2fsck; retry on whole disk", "nbdDevice", nbdDev, "partition", partDev, "err", err)
+				resizeTarget = nbdDev
+				if retryErr := runCmd(ctx, "e2fsck", "-f", resizeTarget, "-y"); retryErr != nil {
+					return retryErr
+				}
 			}
 		} else {
 			return err
@@ -667,6 +714,32 @@ func waitForBlockDevice(ctx context.Context, devicePath string, timeout time.Dur
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
+}
+
+func refreshPartitionDevices(ctx context.Context, nbdDev string) error {
+	if err := runCmd(ctx, "partprobe", nbdDev); err != nil {
+		return err
+	}
+	if err := runCmd(ctx, "partx", "-u", nbdDev); err != nil {
+		slog.Warn("partx refresh failed", "nbdDevice", nbdDev, "err", err)
+	}
+	if err := runCmd(ctx, "udevadm", "settle"); err != nil {
+		slog.Warn("udevadm settle failed", "nbdDevice", nbdDev, "err", err)
+	}
+	return nil
+}
+
+func detectPartitionTableType(ctx context.Context, devicePath string) (string, error) {
+	cmd := exec.CommandContext(ctx, "lsblk", "-n", "-o", "PTTYPE", devicePath)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("lsblk -n -o PTTYPE %s failed: %w, output=%s", devicePath, err, strings.TrimSpace(string(out)))
+	}
+	return strings.ToLower(strings.TrimSpace(string(out))), nil
+}
+
+func hasPartitionTableType(partitionTableType string) bool {
+	return strings.TrimSpace(partitionTableType) != ""
 }
 
 func isMissingBlockDeviceError(err error) bool {
