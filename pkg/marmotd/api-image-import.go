@@ -3,6 +3,7 @@ package marmotd
 import (
 	"archive/tar"
 	"compress/gzip"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -49,6 +50,16 @@ func (s *Server) ApiImportImageArchive(ctx echo.Context) error {
 }
 
 func extractSingleQcow2FromTGZ(src io.Reader, destDir string) (string, error) {
+	return extractFromTGZ(src, destDir, nil)
+}
+
+type archiveMetaJSON struct {
+	Name      string `json:"name"`
+	OsName    string `json:"osName,omitempty"`
+	OsVersion string `json:"osVersion,omitempty"`
+}
+
+func extractFromTGZ(src io.Reader, destDir string, meta *archiveMetaJSON) (string, error) {
 	gz, err := gzip.NewReader(src)
 	if err != nil {
 		return "", fmt.Errorf("failed to read gzip stream: %w", err)
@@ -71,6 +82,18 @@ func extractSingleQcow2FromTGZ(src io.Reader, destDir string) (string, error) {
 		}
 
 		base := filepath.Base(hdr.Name)
+
+		if base == "metadata.json" && meta != nil {
+			data, err := io.ReadAll(tr)
+			if err != nil {
+				return "", fmt.Errorf("failed to read metadata.json: %w", err)
+			}
+			if err := json.Unmarshal(data, meta); err != nil {
+				slog.Warn("extractFromTGZ: failed to parse metadata.json; ignoring", "err", err)
+			}
+			continue
+		}
+
 		if !strings.HasSuffix(strings.ToLower(base), ".qcow2") {
 			continue
 		}

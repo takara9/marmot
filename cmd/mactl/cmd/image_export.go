@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/client"
 	"github.com/takara9/marmot/pkg/db"
 )
 
@@ -41,18 +43,24 @@ var imageExportCmd = &cobra.Command{
 			return fmt.Errorf("failed to parse images: %w", err)
 		}
 
-		image, err := pickExportableImageByName(images, name)
+		localNodeName, err := getLocalNodeName(m)
+		if err != nil {
+			return fmt.Errorf("failed to resolve current endpoint node name: %w", err)
+		}
+
+		candidates, err := pickExportableImagesByName(images, name, localNodeName)
 		if err != nil {
 			return err
 		}
 
+		image := candidates[0]
 		qcowBytes, err := m.DownloadImageQcow2ById(image.Metadata.Id)
 		if err != nil {
 			return fmt.Errorf("failed to download qcow2 for image %q: %w", image.Metadata.Id, err)
 		}
 
 		outPath := filepath.Join(".", fmt.Sprintf("marmot-machine-image-%s.tgz", sanitizeArchiveName(name)))
-		if err := writeImageArchive(outPath, image.Metadata.Name, qcowBytes); err != nil {
+		if err := writeImageArchive(outPath, image, qcowBytes); err != nil {
 			return fmt.Errorf("failed to write archive: %w", err)
 		}
 
@@ -65,13 +73,26 @@ func init() {
 	imageCmd.AddCommand(imageExportCmd)
 }
 
-func pickExportableImageByName(images []api.Image, name string) (*api.Image, error) {
+func getLocalNodeName(m *client.MarmotEndpoint) (string, error) {
+	body, _, err := m.GetMarmotStatus()
+	if err != nil {
+		return "", err
+	}
+	var status api.HostStatus
+	if err := json.Unmarshal(body, &status); err != nil {
+		return "", err
+	}
+	if status.NodeName == nil || strings.TrimSpace(*status.NodeName) == "" {
+		return "", fmt.Errorf("nodeName is not available in marmot status")
+	}
+	return strings.TrimSpace(*status.NodeName), nil
+}
+
+func pickExportableImagesByName(images []api.Image, name, preferredNode string) ([]api.Image, error) {
 	matched := make([]api.Image, 0)
+	localMatched := make([]api.Image, 0)
 	for _, image := range images {
 		if strings.TrimSpace(image.Metadata.Name) != name {
-			continue
-		}
-		if image.Metadata.Labels != nil && db.GetFollowerSyncRole(*image.Metadata.Labels) == "follower" {
 			continue
 		}
 		if image.Status == nil || image.Status.StatusCode != db.IMAGE_AVAILABLE {
@@ -80,23 +101,55 @@ func pickExportableImageByName(images []api.Image, name string) (*api.Image, err
 		if image.Spec.Qcow2Path == nil || strings.TrimSpace(*image.Spec.Qcow2Path) == "" {
 			continue
 		}
+
+		if preferredNode != "" {
+			if image.Metadata.NodeName != nil && strings.TrimSpace(*image.Metadata.NodeName) == preferredNode {
+				localMatched = append(localMatched, image)
+			}
+		}
+
+		if image.Metadata.Labels != nil && db.GetFollowerSyncRole(*image.Metadata.Labels) == "follower" {
+			continue
+		}
 		matched = append(matched, image)
+	}
+
+	if preferredNode != "" {
+		if len(localMatched) == 0 {
+			return nil, fmt.Errorf("exportable image not found on current endpoint node (%s): %s", preferredNode, name)
+		}
+		sort.SliceStable(localMatched, func(i, j int) bool {
+			return creationTime(localMatched[i].Status).After(creationTime(localMatched[j].Status))
+		})
+		return localMatched, nil
 	}
 
 	if len(matched) == 0 {
 		return nil, fmt.Errorf("exportable image not found: %s", name)
 	}
 
-	best := matched[0]
-	for _, image := range matched[1:] {
-		if creationTime(image.Status).After(creationTime(best.Status)) {
-			best = image
-		}
-	}
-	return &best, nil
+	sort.SliceStable(matched, func(i, j int) bool {
+		return creationTime(matched[i].Status).After(creationTime(matched[j].Status))
+	})
+	return matched, nil
 }
 
-func writeImageArchive(outPath, imageName string, qcow2Bytes []byte) error {
+func pickExportableImageByName(images []api.Image, name string) (*api.Image, error) {
+	matched, err := pickExportableImagesByName(images, name, "")
+	if err != nil {
+		return nil, err
+	}
+	return &matched[0], nil
+}
+
+type imageArchiveMeta struct {
+	Name      string `json:"name"`
+	OsName    string `json:"osName,omitempty"`
+	OsVersion string `json:"osVersion,omitempty"`
+}
+
+func writeImageArchive(outPath string, image api.Image, qcow2Bytes []byte) error {
+	imageName := image.Metadata.Name
 	f, err := os.Create(outPath)
 	if err != nil {
 		return err
@@ -119,6 +172,29 @@ func writeImageArchive(outPath, imageName string, qcow2Bytes []byte) error {
 		return err
 	}
 	if _, err := tw.Write(qcow2Bytes); err != nil {
+		return err
+	}
+
+	meta := imageArchiveMeta{Name: imageName}
+	if image.Spec.OsName != nil {
+		meta.OsName = strings.TrimSpace(*image.Spec.OsName)
+	}
+	if image.Spec.OsVersion != nil {
+		meta.OsVersion = strings.TrimSpace(*image.Spec.OsVersion)
+	}
+	metaBytes, err := json.Marshal(meta)
+	if err != nil {
+		return fmt.Errorf("failed to marshal image metadata: %w", err)
+	}
+	metaHdr := &tar.Header{
+		Name: "metadata.json",
+		Mode: 0644,
+		Size: int64(len(metaBytes)),
+	}
+	if err := tw.WriteHeader(metaHdr); err != nil {
+		return err
+	}
+	if _, err := tw.Write(metaBytes); err != nil {
 		return err
 	}
 

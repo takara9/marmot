@@ -365,6 +365,7 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 		"source":   "bootVolume",
 		"serverId": serverId,
 	}
+	resolvedOSName, resolvedOSVersion := d.resolveImageOSMetadataFromBootVolume(bootVol, serverNodeName)
 	var img api.Image
 	if bootVol.Spec.Type != nil && *bootVol.Spec.Type == "qcow2" {
 		// イメージのqcow2ボリューム名を設定
@@ -388,6 +389,8 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 				LogicalVolume: nil,
 				LvPath:        nil,
 				Qcow2Path:     util.StringPtr(imagePath),
+				OsName:        resolvedOSName,
+				OsVersion:     resolvedOSVersion,
 				Size:          bootVol.Spec.Size,
 				SourceUrl:     nil,
 			},
@@ -419,6 +422,8 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 				LogicalVolume: util.StringPtr(logicalVolumeName),
 				LvPath:        util.StringPtr(logicalVolumePath),
 				Qcow2Path:     nil,
+				OsName:        resolvedOSName,
+				OsVersion:     resolvedOSVersion,
 				Size:          bootVol.Spec.Size,
 				SourceUrl:     nil,
 			},
@@ -439,6 +444,82 @@ func (d *Database) MakeImageEntryFromRunningVM(serverId, name string) (api.Image
 	}
 
 	return img, nil
+}
+
+func (d *Database) resolveImageOSMetadataFromBootVolume(bootVol *api.Volume, serverNodeName *string) (*string, *string) {
+	if bootVol == nil {
+		return nil, nil
+	}
+	variant := ""
+	if bootVol.Spec.OsVariant != nil {
+		variant = strings.TrimSpace(*bootVol.Spec.OsVariant)
+	}
+	if variant == "" {
+		return nil, nil
+	}
+
+	if serverNodeName != nil && strings.TrimSpace(*serverNodeName) != "" {
+		sourceImage, err := d.FindImageByNameAndNode(variant, strings.TrimSpace(*serverNodeName))
+		if err == nil {
+			osName, osVersion := extractImageOSMetadata(sourceImage)
+			if osName != nil || osVersion != nil {
+				return osName, osVersion
+			}
+		}
+	}
+
+	sourceImage, err := d.FindImageByName(variant)
+	if err == nil {
+		osName, osVersion := extractImageOSMetadata(sourceImage)
+		if osName != nil || osVersion != nil {
+			return osName, osVersion
+		}
+	}
+
+	osName, osVersion := deriveImageOSFromVariant(variant)
+	if osName == "" && osVersion == "" {
+		return nil, nil
+	}
+
+	namePtr, versionPtr := (*string)(nil), (*string)(nil)
+	if osName != "" {
+		namePtr = util.StringPtr(osName)
+	}
+	if osVersion != "" {
+		versionPtr = util.StringPtr(osVersion)
+	}
+	return namePtr, versionPtr
+}
+
+func extractImageOSMetadata(image api.Image) (*string, *string) {
+	var osName, osVersion *string
+	if image.Spec.OsName != nil {
+		name := strings.TrimSpace(*image.Spec.OsName)
+		if name != "" {
+			osName = util.StringPtr(name)
+		}
+	}
+	if image.Spec.OsVersion != nil {
+		version := strings.TrimSpace(*image.Spec.OsVersion)
+		if version != "" {
+			osVersion = util.StringPtr(version)
+		}
+	}
+	return osName, osVersion
+}
+
+func deriveImageOSFromVariant(osVariant string) (string, string) {
+	v := strings.ToLower(strings.TrimSpace(osVariant))
+	switch {
+	case strings.HasPrefix(v, "ubuntu22.04"):
+		return "ubuntu", "22.04"
+	case strings.HasPrefix(v, "ubuntu24.04"):
+		return "ubuntu", "24.04"
+	case strings.HasPrefix(v, "alpine3.23"):
+		return "alpine", "3.23"
+	default:
+		return "", ""
+	}
 }
 
 // IDを指定してイメージの情報を取得する
