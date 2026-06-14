@@ -221,7 +221,8 @@ func (m *Marmot) ImportImageArchiveWithNode(src io.Reader, imageName, nodeName s
 		_ = os.RemoveAll(importDir)
 	}()
 
-	importedQcow2, err := extractSingleQcow2FromTGZ(src, importDir)
+	var archiveMeta archiveMetaJSON
+	importedQcow2, err := extractFromTGZ(src, importDir, &archiveMeta)
 	if err != nil {
 		return api.Image{}, err
 	}
@@ -233,6 +234,14 @@ func (m *Marmot) ImportImageArchiveWithNode(src io.Reader, imageName, nodeName s
 	if err != nil {
 		return api.Image{}, err
 	}
+
+	if archiveMeta.OsName != "" {
+		image.Spec.OsName = util.StringPtr(archiveMeta.OsName)
+	}
+	if archiveMeta.OsVersion != "" {
+		image.Spec.OsVersion = util.StringPtr(archiveMeta.OsVersion)
+	}
+
 	cleanupEntry := func() {
 		if err := m.Db.DeleteImage(image.Metadata.Id); err != nil {
 			slog.Warn("ImportImageArchiveWithNode() failed to rollback imported image entry", "imageId", image.Metadata.Id, "err", err)

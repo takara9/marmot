@@ -5,12 +5,15 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/client"
 	"github.com/takara9/marmot/pkg/db"
 )
 
@@ -41,18 +44,47 @@ var imageExportCmd = &cobra.Command{
 			return fmt.Errorf("failed to parse images: %w", err)
 		}
 
-		image, err := pickExportableImageByName(images, name)
+		localNodeName, err := getLocalNodeName(m)
+		if err != nil {
+			slog.Warn("failed to get local node name; exporting by creation time only", "err", err)
+		}
+
+		candidates, err := pickExportableImagesByName(images, name, localNodeName)
 		if err != nil {
 			return err
 		}
 
-		qcowBytes, err := m.DownloadImageQcow2ById(image.Metadata.Id)
+		clusterStatuses, err := getClusterStatuses(m)
 		if err != nil {
-			return fmt.Errorf("failed to download qcow2 for image %q: %w", image.Metadata.Id, err)
+			slog.Warn("failed to resolve cluster statuses; falling back to current endpoint", "err", err)
+		}
+
+		var image *api.Image
+		var qcowBytes []byte
+		var downloadErr error
+		for _, candidate := range candidates {
+			endpoint := m
+			if targetNode := imageNodeName(candidate); targetNode != "" && len(clusterStatuses) > 0 {
+				if targetHostPort, hpErr := hostPortForNode(clusterStatuses, targetNode, m.HostPort); hpErr == nil && strings.TrimSpace(targetHostPort) != "" {
+					endpoint = cloneEndpointForHostPort(m, targetHostPort)
+				}
+			}
+
+			qcowBytes, downloadErr = endpoint.DownloadImageQcow2ById(candidate.Metadata.Id)
+			if downloadErr == nil {
+				image = &candidate
+				break
+			}
+			if !strings.Contains(downloadErr.Error(), "qcow2 file does not exist") && !strings.Contains(downloadErr.Error(), "qcow2 path is not set") {
+				return fmt.Errorf("failed to download qcow2 for image %q: %w", candidate.Metadata.Id, downloadErr)
+			}
+		}
+		if image == nil {
+			return fmt.Errorf("failed to download qcow2 for image %q: %w", name, downloadErr)
 		}
 
 		outPath := filepath.Join(".", fmt.Sprintf("marmot-machine-image-%s.tgz", sanitizeArchiveName(name)))
-		if err := writeImageArchive(outPath, image.Metadata.Name, qcowBytes); err != nil {
+		if err := writeImageArchive(outPath, *image, qcowBytes); err != nil {
 			return fmt.Errorf("failed to write archive: %w", err)
 		}
 
@@ -65,7 +97,50 @@ func init() {
 	imageCmd.AddCommand(imageExportCmd)
 }
 
-func pickExportableImageByName(images []api.Image, name string) (*api.Image, error) {
+func getLocalNodeName(m *client.MarmotEndpoint) (string, error) {
+	body, _, err := m.GetMarmotStatus()
+	if err != nil {
+		return "", err
+	}
+	var status api.HostStatus
+	if err := json.Unmarshal(body, &status); err != nil {
+		return "", err
+	}
+	if status.NodeName == nil {
+		return "", nil
+	}
+	return strings.TrimSpace(*status.NodeName), nil
+}
+
+func getClusterStatuses(m *client.MarmotEndpoint) ([]api.HostStatus, error) {
+	body, _, err := m.GetMarmotCluster()
+	if err != nil {
+		return nil, err
+	}
+	var statuses []api.HostStatus
+	if err := json.Unmarshal(body, &statuses); err != nil {
+		return nil, err
+	}
+	return statuses, nil
+}
+
+func imageNodeName(image api.Image) string {
+	if image.Metadata.NodeName == nil {
+		return ""
+	}
+	return strings.TrimSpace(*image.Metadata.NodeName)
+}
+
+func cloneEndpointForHostPort(src *client.MarmotEndpoint, hostPort string) *client.MarmotEndpoint {
+	if src == nil {
+		return nil
+	}
+	clone := *src
+	clone.HostPort = strings.TrimSpace(hostPort)
+	return &clone
+}
+
+func pickExportableImagesByName(images []api.Image, name, preferredNode string) ([]api.Image, error) {
 	matched := make([]api.Image, 0)
 	for _, image := range images {
 		if strings.TrimSpace(image.Metadata.Name) != name {
@@ -87,16 +162,40 @@ func pickExportableImageByName(images []api.Image, name string) (*api.Image, err
 		return nil, fmt.Errorf("exportable image not found: %s", name)
 	}
 
-	best := matched[0]
-	for _, image := range matched[1:] {
-		if creationTime(image.Status).After(creationTime(best.Status)) {
-			best = image
-		}
+	if preferredNode != "" {
+		sort.SliceStable(matched, func(i, j int) bool {
+			imatch := matched[i].Metadata.NodeName != nil && strings.TrimSpace(*matched[i].Metadata.NodeName) == preferredNode
+			jmatch := matched[j].Metadata.NodeName != nil && strings.TrimSpace(*matched[j].Metadata.NodeName) == preferredNode
+			if imatch != jmatch {
+				return imatch
+			}
+			return creationTime(matched[i].Status).After(creationTime(matched[j].Status))
+		})
+		return matched, nil
 	}
-	return &best, nil
+
+	sort.SliceStable(matched, func(i, j int) bool {
+		return creationTime(matched[i].Status).After(creationTime(matched[j].Status))
+	})
+	return matched, nil
 }
 
-func writeImageArchive(outPath, imageName string, qcow2Bytes []byte) error {
+func pickExportableImageByName(images []api.Image, name string) (*api.Image, error) {
+	matched, err := pickExportableImagesByName(images, name, "")
+	if err != nil {
+		return nil, err
+	}
+	return &matched[0], nil
+}
+
+type imageArchiveMeta struct {
+	Name      string `json:"name"`
+	OsName    string `json:"osName,omitempty"`
+	OsVersion string `json:"osVersion,omitempty"`
+}
+
+func writeImageArchive(outPath string, image api.Image, qcow2Bytes []byte) error {
+	imageName := image.Metadata.Name
 	f, err := os.Create(outPath)
 	if err != nil {
 		return err
@@ -119,6 +218,29 @@ func writeImageArchive(outPath, imageName string, qcow2Bytes []byte) error {
 		return err
 	}
 	if _, err := tw.Write(qcow2Bytes); err != nil {
+		return err
+	}
+
+	meta := imageArchiveMeta{Name: imageName}
+	if image.Spec.OsName != nil {
+		meta.OsName = strings.TrimSpace(*image.Spec.OsName)
+	}
+	if image.Spec.OsVersion != nil {
+		meta.OsVersion = strings.TrimSpace(*image.Spec.OsVersion)
+	}
+	metaBytes, err := json.Marshal(meta)
+	if err != nil {
+		return fmt.Errorf("failed to marshal image metadata: %w", err)
+	}
+	metaHdr := &tar.Header{
+		Name: "metadata.json",
+		Mode: 0644,
+		Size: int64(len(metaBytes)),
+	}
+	if err := tw.WriteHeader(metaHdr); err != nil {
+		return err
+	}
+	if _, err := tw.Write(metaBytes); err != nil {
 		return err
 	}
 
