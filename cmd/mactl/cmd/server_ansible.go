@@ -97,8 +97,17 @@ func extractSuccessID(body []byte) (string, error) {
 
 func waitServerRunning(m *client.MarmotEndpoint, serverID string, timeout, interval time.Duration) error {
 	deadline := time.Now().Add(timeout)
+	var lastErr error
 	for {
 		body, _, err := m.GetServerById(serverID)
+		if err != nil {
+			lastErr = err
+			if strings.Contains(err.Error(), "IDが存在しません") {
+				return fmt.Errorf("server %s is not found before ansible apply: %w", serverID, err)
+			}
+		} else {
+			lastErr = nil
+		}
 		if err == nil {
 			var srv api.Server
 			if err := json.Unmarshal(body, &srv); err == nil {
@@ -120,6 +129,9 @@ func waitServerRunning(m *client.MarmotEndpoint, serverID string, timeout, inter
 			}
 		}
 		if time.Now().After(deadline) {
+			if lastErr != nil {
+				return fmt.Errorf("timeout waiting for server %s to become RUNNING: last error: %w", serverID, lastErr)
+			}
 			return fmt.Errorf("timeout waiting for server %s to become RUNNING", serverID)
 		}
 		time.Sleep(interval)
