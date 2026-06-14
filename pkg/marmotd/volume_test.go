@@ -99,6 +99,12 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 			//url := "http://hmc/ubuntu-22.04-server-cloudimg-amd64.img"
 			osImageID, err = marmotServer.Ma.Db.MakeImageEntryFromURLWithNode("ubuntu22.04", osImageURL, nodeName)
 			Expect(err).NotTo(HaveOccurred())
+			img, err := marmotServer.Ma.Db.GetImage(osImageID)
+			Expect(err).NotTo(HaveOccurred())
+			img.Spec.OsName = ut.StringPtr("ubuntu")
+			img.Spec.OsVersion = ut.StringPtr("22.04")
+			err = marmotServer.Ma.Db.UpdateImage(osImageID, img)
+			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("取得したイメージID: ", osImageID)
 		})
 

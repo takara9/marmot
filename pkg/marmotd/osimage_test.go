@@ -13,6 +13,7 @@ import (
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/marmotd"
+	"github.com/takara9/marmot/pkg/util"
 )
 
 var _ = Describe("ImageManagmentTest", Ordered, func() {
@@ -95,6 +96,12 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 			GinkgoWriter.Println("URLを指定してイメージのIDを取得")
 			osImageid1, err = marmotServer.Ma.Db.MakeImageEntryFromURLWithNode("ubuntu-22.04", osImage1URL, nodeName)
 			Expect(err).NotTo(HaveOccurred())
+			img, err := marmotServer.Ma.Db.GetImage(osImageid1)
+			Expect(err).NotTo(HaveOccurred())
+			img.Spec.OsName = util.StringPtr("ubuntu")
+			img.Spec.OsVersion = util.StringPtr("22.04")
+			err = marmotServer.Ma.Db.UpdateImage(osImageid1, img)
+			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("取得したイメージID: ", osImageid1)
 		})
 
@@ -112,6 +119,12 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 			var err error
 			GinkgoWriter.Println("URLを指定してイメージのIDを取得")
 			osImageid2, err = marmotServer.Ma.Db.MakeImageEntryFromURLWithNode("ubuntu-24.04", osImage2URL, nodeName)
+			Expect(err).NotTo(HaveOccurred())
+			img, err := marmotServer.Ma.Db.GetImage(osImageid2)
+			Expect(err).NotTo(HaveOccurred())
+			img.Spec.OsName = util.StringPtr("ubuntu")
+			img.Spec.OsVersion = util.StringPtr("24.04")
+			err = marmotServer.Ma.Db.UpdateImage(osImageid2, img)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("取得したイメージID: ", osImageid2)
 		})

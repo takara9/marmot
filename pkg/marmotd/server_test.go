@@ -168,6 +168,12 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			GinkgoWriter.Println("URLを指定してイメージのIDを取得")
 			osImageid, err = marmotServer.Ma.Db.MakeImageEntryFromURLWithNode("ubuntu22.04", osImageURL, nodeName)
 			Expect(err).NotTo(HaveOccurred())
+			img, err := marmotServer.Ma.Db.GetImage(osImageid)
+			Expect(err).NotTo(HaveOccurred())
+			img.Spec.OsName = util.StringPtr("ubuntu")
+			img.Spec.OsVersion = util.StringPtr("22.04")
+			err = marmotServer.Ma.Db.UpdateImage(osImageid, img)
+			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("取得したイメージID: ", osImageid)
 		})
 
