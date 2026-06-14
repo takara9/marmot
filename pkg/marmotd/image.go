@@ -585,6 +585,7 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 
 	_ = runCmd(ctx, "partprobe", nbdDev)
 	resizeTarget := nbdDev
+	usingPartitionTarget := false
 	if err := waitForBlockDevice(ctx, partDev, 5*time.Second); err == nil {
 		if err := runCmd(ctx, "parted", nbdDev, "--fix", "--script", "resizepart", "1", "100%"); err != nil {
 			return err
@@ -595,12 +596,29 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 			return err
 		}
 		resizeTarget = partDev
+		usingPartitionTarget = true
 	} else {
 		slog.Warn("Partition device was not detected; fallback to whole-disk filesystem resize", "nbdDevice", nbdDev, "partition", partDev, "err", err)
 	}
 
+	if usingPartitionTarget {
+		if _, err := os.Stat(partDev); err != nil {
+			slog.Warn("Partition device disappeared before filesystem resize; fallback to whole disk", "nbdDevice", nbdDev, "partition", partDev, "err", err)
+			resizeTarget = nbdDev
+			usingPartitionTarget = false
+		}
+	}
+
 	if err := runCmd(ctx, "e2fsck", "-f", resizeTarget, "-y"); err != nil {
+		if usingPartitionTarget && isMissingBlockDeviceError(err) {
+			slog.Warn("Partition device became unavailable during e2fsck; retry on whole disk", "nbdDevice", nbdDev, "partition", partDev, "err", err)
+			resizeTarget = nbdDev
+			if retryErr := runCmd(ctx, "e2fsck", "-f", resizeTarget, "-y"); retryErr != nil {
+				return retryErr
+			}
+		} else {
 		return err
+		}
 	}
 	if err := runCmd(ctx, "resize2fs", resizeTarget); err != nil {
 		return err
@@ -645,6 +663,16 @@ func waitForBlockDevice(ctx context.Context, devicePath string, timeout time.Dur
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
+}
+
+func isMissingBlockDeviceError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "no such file or directory") ||
+		strings.Contains(msg, "possibly non-existent device") ||
+		strings.Contains(msg, "does not exist")
 }
 
 // runCmd はコマンド実行とエラー出力整形を行うヘルパー。

@@ -4,3 +4,5 @@ metadata:
     name: ubuntu22.04
 spec:
     sourceUrl: http://hmc/ubuntu-22.04-server-cloudimg-amd64.img
+    osName: ubuntu
+    osVersion: "22.04"

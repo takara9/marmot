@@ -2,6 +2,7 @@ package marmotd
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -34,4 +35,46 @@ func TestWaitForBlockDevice(t *testing.T) {
 			t.Fatalf("expected timeout error")
 		}
 	})
+}
+
+func TestIsMissingBlockDeviceError(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "nil error",
+			err:  nil,
+			want: false,
+		},
+		{
+			name: "e2fsck missing partition",
+			err:  errors.New("e2fsck -f /dev/nbd0p1 -y failed: exit status 8, output=e2fsck: No such file or directory while trying to open /dev/nbd0p1"),
+			want: true,
+		},
+		{
+			name: "non existent device message",
+			err:  errors.New("Possibly non-existent device?"),
+			want: true,
+		},
+		{
+			name: "unrelated error",
+			err:  errors.New("permission denied"),
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := isMissingBlockDeviceError(tt.err)
+			if got != tt.want {
+				t.Fatalf("isMissingBlockDeviceError() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
