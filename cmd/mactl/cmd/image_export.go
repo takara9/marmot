@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -46,7 +45,7 @@ var imageExportCmd = &cobra.Command{
 
 		localNodeName, err := getLocalNodeName(m)
 		if err != nil {
-			slog.Warn("failed to get local node name; exporting by creation time only", "err", err)
+			return fmt.Errorf("failed to resolve current endpoint node name: %w", err)
 		}
 
 		candidates, err := pickExportableImagesByName(images, name, localNodeName)
@@ -83,8 +82,8 @@ func getLocalNodeName(m *client.MarmotEndpoint) (string, error) {
 	if err := json.Unmarshal(body, &status); err != nil {
 		return "", err
 	}
-	if status.NodeName == nil {
-		return "", nil
+	if status.NodeName == nil || strings.TrimSpace(*status.NodeName) == "" {
+		return "", fmt.Errorf("nodeName is not available in marmot status")
 	}
 	return strings.TrimSpace(*status.NodeName), nil
 }
