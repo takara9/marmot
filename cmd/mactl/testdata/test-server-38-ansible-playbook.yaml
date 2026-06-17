@@ -9,7 +9,13 @@ spec:
     osVariant: ubuntu24.04
     auth:
         url: https://github.com/takara9.keys
-    ansible-playbook: playbook/setup.yaml
+    ansible:
+        playbook: playbook/setup.yaml
+        inventory: hosts
+        extra-args:
+            - --flush-cache
+            - --tags=nginx,mysql
+            - --skip-tags=cache
     networkInterface:
         - networkname: "host-bridge"
           address: "192.168.1.64"

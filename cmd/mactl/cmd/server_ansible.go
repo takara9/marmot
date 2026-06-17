@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/client"
@@ -26,11 +27,11 @@ const (
 var serverAnsibleExecCommand = exec.Command
 
 func maybeApplyServerAnsiblePlaybook(m *client.MarmotEndpoint, server api.Server, createResponse []byte) error {
-	if server.Spec.AnsiblePlaybook == nil || strings.TrimSpace(*server.Spec.AnsiblePlaybook) == "" {
+	if server.Spec.Ansible == nil {
 		return nil
 	}
 
-	targetAddress, err := validateServerAnsiblePlaybookSpec(server)
+	targetAddress, err := validateServerAnsibleSpec(server)
 	if err != nil {
 		return err
 	}
@@ -45,7 +46,11 @@ func maybeApplyServerAnsiblePlaybook(m *client.MarmotEndpoint, server api.Server
 		return err
 	}
 
-	playbookPath, err := resolveServerAnsiblePlaybookPath(*server.Spec.AnsiblePlaybook)
+	playbookPath, err := resolveServerAnsiblePlaybookPath(server.Spec.Ansible.Playbook)
+	if err != nil {
+		return err
+	}
+	inventoryPath, err := resolveServerAnsibleInventoryPath(server.Spec.Ansible.Inventory)
 	if err != nil {
 		return err
 	}
@@ -59,29 +64,35 @@ func maybeApplyServerAnsiblePlaybook(m *client.MarmotEndpoint, server api.Server
 	}
 
 	fmt.Fprintln(os.Stderr, "playbook 適用開始.....")
-	if err := runServerAnsiblePlaybook(playbookPath, targetAddress, privateKeyPath); err != nil {
+	if err := runServerAnsiblePlaybook(playbookPath, inventoryPath, privateKeyPath, server.Spec.Ansible.ExtraArgs); err != nil {
 		return err
 	}
 	return nil
 }
 
-func validateServerAnsiblePlaybookSpec(server api.Server) (string, error) {
-	if server.Spec.AnsiblePlaybook == nil || strings.TrimSpace(*server.Spec.AnsiblePlaybook) == "" {
+func validateServerAnsibleSpec(server api.Server) (string, error) {
+	if server.Spec.Ansible == nil {
 		return "", nil
 	}
+	if strings.TrimSpace(server.Spec.Ansible.Playbook) == "" {
+		return "", fmt.Errorf("spec.ansible.playbook is required when spec.ansible is set")
+	}
+	if strings.TrimSpace(server.Spec.Ansible.Inventory) == "" {
+		return "", fmt.Errorf("spec.ansible.inventory is required when spec.ansible is set")
+	}
 	if server.Spec.NetworkInterface == nil || len(*server.Spec.NetworkInterface) == 0 {
-		return "", fmt.Errorf("spec.ansible-playbook requires spec.networkInterface with host-bridge and static address")
+		return "", fmt.Errorf("spec.ansible requires spec.networkInterface with host-bridge and static address")
 	}
 	for _, nic := range *server.Spec.NetworkInterface {
 		if strings.TrimSpace(nic.Networkname) != "host-bridge" {
 			continue
 		}
 		if nic.Address == nil || strings.TrimSpace(*nic.Address) == "" {
-			return "", fmt.Errorf("spec.ansible-playbook requires host-bridge address to be set")
+			return "", fmt.Errorf("spec.ansible requires host-bridge address to be set")
 		}
 		return strings.TrimSpace(*nic.Address), nil
 	}
-	return "", fmt.Errorf("spec.ansible-playbook can be used only when host-bridge is specified in spec.networkInterface")
+	return "", fmt.Errorf("spec.ansible can be used only when host-bridge is specified in spec.networkInterface")
 }
 
 func extractSuccessID(body []byte) (string, error) {
@@ -139,9 +150,17 @@ func waitServerRunning(m *client.MarmotEndpoint, serverID string, timeout, inter
 }
 
 func resolveServerAnsiblePlaybookPath(path string) (string, error) {
+	return resolveServerAnsibleFilePath(path, "playbook")
+}
+
+func resolveServerAnsibleInventoryPath(path string) (string, error) {
+	return resolveServerAnsibleFilePath(path, "inventory")
+}
+
+func resolveServerAnsibleFilePath(path, field string) (string, error) {
 	p := strings.TrimSpace(path)
 	if p == "" {
-		return "", fmt.Errorf("spec.ansible-playbook is empty")
+		return "", fmt.Errorf("spec.ansible.%s is empty", field)
 	}
 	if !filepath.IsAbs(p) {
 		cwd, err := os.Getwd()
@@ -151,9 +170,9 @@ func resolveServerAnsiblePlaybookPath(path string) (string, error) {
 		p = filepath.Join(cwd, p)
 	}
 	if info, err := os.Stat(p); err != nil {
-		return "", fmt.Errorf("ansible playbook file is not found: %s", p)
+		return "", fmt.Errorf("ansible %s file is not found: %s", field, p)
 	} else if info.IsDir() {
-		return "", fmt.Errorf("ansible playbook path is a directory: %s", p)
+		return "", fmt.Errorf("ansible %s path is a directory: %s", field, p)
 	}
 	return p, nil
 }
@@ -204,7 +223,6 @@ func runServerAnsiblePing(targetAddress, privateKeyPath string) error {
 		"all",
 		"-i", targetAddress + ",",
 		"-m", "ping",
-		"-u", serverAnsibleDefaultUser,
 		"--private-key", privateKeyPath,
 	}
 	cmd := serverAnsibleExecCommand("ansible", args...)
@@ -220,12 +238,18 @@ func runServerAnsiblePing(targetAddress, privateKeyPath string) error {
 	return nil
 }
 
-func runServerAnsiblePlaybook(playbookPath, targetAddress, privateKeyPath string) error {
+func runServerAnsiblePlaybook(playbookPath, inventoryPath, privateKeyPath string, extraArgs *[]string) error {
 	args := []string{
-		"-i", targetAddress + ",",
+		"-i", inventoryPath,
 		playbookPath,
 		"--private-key", privateKeyPath,
-		"-u", serverAnsibleDefaultUser,
+	}
+	if extraArgs != nil {
+		expandedArgs, err := expandServerAnsibleExtraArgs(*extraArgs)
+		if err != nil {
+			return err
+		}
+		args = append(args, expandedArgs...)
 	}
 	cmd := serverAnsibleExecCommand("ansible-playbook", args...)
 	cmd.Env = serverAnsibleCommandEnv()
@@ -235,6 +259,93 @@ func runServerAnsiblePlaybook(playbookPath, targetAddress, privateKeyPath string
 		return fmt.Errorf("ansible-playbook failed: %w", err)
 	}
 	return nil
+}
+
+func expandServerAnsibleExtraArgs(entries []string) ([]string, error) {
+	args := make([]string, 0)
+	for _, entry := range entries {
+		trimmed := strings.TrimSpace(entry)
+		if trimmed == "" {
+			continue
+		}
+		tokens, err := splitServerAnsibleExtraArg(trimmed)
+		if err != nil {
+			return nil, fmt.Errorf("invalid spec.ansible.extra-args entry %q: %w", trimmed, err)
+		}
+		if len(tokens) == 0 {
+			continue
+		}
+		if !strings.HasPrefix(tokens[0], "-") {
+			tokens[0] = "--" + tokens[0]
+		}
+		args = append(args, tokens...)
+	}
+	return args, nil
+}
+
+func splitServerAnsibleExtraArg(value string) ([]string, error) {
+	tokens := make([]string, 0)
+	var current strings.Builder
+	inSingle := false
+	inDouble := false
+	escaped := false
+
+	flush := func() {
+		if current.Len() > 0 {
+			tokens = append(tokens, current.String())
+			current.Reset()
+		}
+	}
+
+	for _, r := range value {
+		if escaped {
+			current.WriteRune(r)
+			escaped = false
+			continue
+		}
+
+		if inSingle {
+			if r == '\'' {
+				inSingle = false
+				continue
+			}
+			current.WriteRune(r)
+			continue
+		}
+
+		if inDouble {
+			if r == '"' {
+				inDouble = false
+				continue
+			}
+			if r == '\\' {
+				escaped = true
+				continue
+			}
+			current.WriteRune(r)
+			continue
+		}
+
+		switch {
+		case r == '\\':
+			escaped = true
+		case r == '\'':
+			inSingle = true
+		case r == '"':
+			inDouble = true
+		case unicode.IsSpace(r):
+			flush()
+		default:
+			current.WriteRune(r)
+		}
+	}
+
+	if escaped || inSingle || inDouble {
+		return nil, fmt.Errorf("unterminated quoted string")
+	}
+
+	flush()
+	return tokens, nil
 }
 
 func serverAnsibleCommandEnv() []string {
