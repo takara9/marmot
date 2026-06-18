@@ -41,7 +41,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		fmt.Printf("Container2 started with ID: %s\n", containerID2)
 
 		e := echo.New()
-		server := marmotd.NewServer("hvc", "http://127.0.0.1:3379")
+		server := marmotd.NewServerWithOptions("hvc", "http://127.0.0.1:3379", true)
 		go func() {
 			// Setup slog
 			opts := &slog.HandlerOptions{

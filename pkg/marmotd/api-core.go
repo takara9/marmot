@@ -181,9 +181,17 @@ func (m *Marmot) Close() error {
 // marmotd サーバーの生成、REST API サーバーを起動する
 // marmotdで定義された関数に対して、REST API 経由でアクセスできるようにする
 func NewServer(node string, etcdurl string) *Server {
-	if err := ValidateStartupPrerequisites(etcdurl, CurrentConfig().DNSListenAddr); err != nil {
-		slog.Error("Startup preflight check failed", "err", err)
-		os.Exit(1)
+	return NewServerWithOptions(node, etcdurl, false)
+}
+
+func NewServerWithOptions(node string, etcdurl string, skipPreflight bool) *Server {
+	if !skipPreflight {
+		if err := ValidateStartupPrerequisites(etcdurl, CurrentConfig().DNSListenAddr); err != nil {
+			slog.Error("Startup preflight check failed", "err", err)
+			os.Exit(1)
+		}
+	} else {
+		slog.Debug("Startup preflight check is skipped", "node", node, "etcd", etcdurl)
 	}
 
 	marmotInstance, err := NewMarmot(node, etcdurl)

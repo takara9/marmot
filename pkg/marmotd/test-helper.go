@@ -22,7 +22,7 @@ func StartMockServer(ctx context.Context, marmotPort int, etcdPort int) (*Server
 		slog.SetDefault(logger)
 	*/
 	e := echo.New()
-	server := NewServer("hvc", "http://127.0.0.1:"+fmt.Sprintf("%d", etcdPort))
+	server := NewServerWithOptions("hvc", "http://127.0.0.1:"+fmt.Sprintf("%d", etcdPort), true)
 
 	done := make(chan struct{})
 
