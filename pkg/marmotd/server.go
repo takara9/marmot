@@ -390,7 +390,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			PortID:  uuid.New().String(),
 			Bus:     1,
 		}
-		if xnet.Spec.BridgeName != nil && shouldAttachOVSInterfaceID(xnet, strings.TrimSpace(*xnet.Spec.BridgeName)) {
+		if xnet.Spec.BridgeName != nil && isOVSBridge(strings.TrimSpace(*xnet.Spec.BridgeName)) {
 			defaultNS.InterfaceID = defaultNS.PortID
 		}
 		virtSpec.NetSpecs = []virt.NetSpec{defaultNS}
@@ -527,7 +527,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 				PortID:  uuid.New().String(),
 				Bus:     busno,
 			}
-			if vnet.Spec.BridgeName != nil && shouldAttachOVSInterfaceID(vnet, strings.TrimSpace(*vnet.Spec.BridgeName)) {
+			if vnet.Spec.BridgeName != nil && isOVSBridge(strings.TrimSpace(*vnet.Spec.BridgeName)) {
 				ns.InterfaceID = ns.PortID
 			}
 
@@ -922,7 +922,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			}
 			ns.Bridge = strings.TrimSpace(*vnet.Spec.BridgeName)
 			ns.Network = ""
-			if ns.InterfaceID == "" && shouldAttachOVSInterfaceID(vnet, ns.Bridge) {
+			if ns.InterfaceID == "" && isOVSBridge(ns.Bridge) {
 				ns.InterfaceID = ns.PortID
 			}
 			fallbackApplied = true
@@ -1165,23 +1165,9 @@ func isOVSBridge(bridgeName string) bool {
 
 	cmd := exec.CommandContext(ctx, "ovs-vsctl", "br-exists", name)
 	if err := cmd.Run(); err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			slog.Warn("ovs bridge check skipped: ovs-vsctl not found", "bridge", name, "err", err)
-		} else if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			slog.Warn("ovs bridge check timed out", "bridge", name, "timeout", "2s")
-		} else {
-			slog.Warn("ovs bridge check failed", "bridge", name, "err", err)
-		}
 		return false
 	}
 	return true
-}
-
-func shouldAttachOVSInterfaceID(vnet api.VirtualNetwork, bridgeName string) bool {
-	if isManagedOverlayNetwork(vnet) {
-		return true
-	}
-	return isOVSBridge(bridgeName)
 }
 
 func isManagedOverlayNetwork(vnet api.VirtualNetwork) bool {
