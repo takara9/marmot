@@ -118,7 +118,9 @@ func (c *schedulerController) schedulerControllerLoop() {
 			if !clusterHasNode(statuses, assignedNode) {
 				msg := "metadata.nodeName=" + assignedNode + " はクラスタ内に存在しません"
 				slog.Warn("存在しない nodeName が指定されたサーバーを ERROR に更新", "serverId", api.ServerID(server), "nodeName", assignedNode)
-				c.marmot.Db.UpdateServerStatus(api.ServerID(server), db.SERVER_ERROR, msg)
+					if dbErr := c.marmot.Db.UpdateServerStatus(api.ServerID(server), db.SERVER_ERROR, msg); dbErr != nil {
+						slog.Error("UpdateServerStatus() failed", "serverId", api.ServerID(server), "err", dbErr)
+					}
 			}
 			continue
 		}

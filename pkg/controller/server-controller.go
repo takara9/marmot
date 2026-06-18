@@ -113,7 +113,9 @@ func (c *controller) serverControllerLoop() {
 			if assignErr != nil {
 				slog.Error("ResolveAndAssignServerNodeByStorage()", "serverId", api.ServerID(spec), "err", assignErr)
 				msg := fmt.Sprintf("サーバーのノード割当解決に失敗した。原因エラー: %v", assignErr)
-				c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_ERROR, msg)
+				if dbErr := c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_ERROR, msg); dbErr != nil {
+					slog.Error("UpdateServerStatus() failed", "serverId", api.ServerID(spec), "err", dbErr)
+				}
 				continue
 			}
 			if strings.TrimSpace(assignedNode) != "" {
@@ -126,7 +128,9 @@ func (c *controller) serverControllerLoop() {
 			deletionTime := *spec.Status.DeletionTimeStamp
 			if time.Since(deletionTime) > c.deletionDelay {
 				slog.Debug("削除のタイムスタンプが一定時間以上経過しているサーバー検出", "SERVER", api.ServerID(spec))
-				c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_DELETING, "")
+				if dbErr := c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_DELETING, ""); dbErr != nil {
+					slog.Error("UpdateServerStatus() failed", "serverId", api.ServerID(spec), "err", dbErr)
+				}
 				spec.Status.StatusCode = db.SERVER_DELETING
 				spec.Status.Status = util.StringPtr(db.ServerStatus[db.SERVER_DELETING])
 			}
@@ -164,20 +168,28 @@ func (c *controller) serverControllerLoop() {
 		switch spec.Status.StatusCode {
 		case db.SERVER_PENDING:
 			slog.Debug("生成待ち状態のサーバー検出", "SERVER", api.ServerID(spec))
-			c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_PROVISIONING, "")
+			if dbErr := c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_PROVISIONING, ""); dbErr != nil {
+				slog.Error("UpdateServerStatus() failed", "serverId", api.ServerID(spec), "err", dbErr)
+			}
 			if _, err := c.marmot.CreateServerManage(api.ServerID(spec)); err != nil {
 				slog.Error("CreateServerManage()", "err", err)
 				msg := fmt.Sprintf("サーバーのプロビジョニングに失敗した。原因エラー: %v", err)
 				if isRetryableServerProvisionError(err) {
 					retryMsg := fmt.Sprintf("サーバーのプロビジョニング待機中（依存関係の準備待ち）: %v", err)
 					slog.Warn("CreateServerManage() failed with retryable error; keep server pending", "server", api.ServerID(spec), "err", err)
-					c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_PENDING, retryMsg)
+					if dbErr := c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_PENDING, retryMsg); dbErr != nil {
+						slog.Error("UpdateServerStatus() failed", "serverId", api.ServerID(spec), "err", dbErr)
+					}
 					continue
 				}
-				c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_ERROR, msg)
+				if dbErr := c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_ERROR, msg); dbErr != nil {
+					slog.Error("UpdateServerStatus() failed", "serverId", api.ServerID(spec), "err", dbErr)
+				}
 				continue
 			}
-			c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_RUNNING, "")
+			if dbErr := c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_RUNNING, ""); dbErr != nil {
+				slog.Error("UpdateServerStatus() failed", "serverId", api.ServerID(spec), "err", dbErr)
+			}
 		case db.SERVER_RUNNING:
 			slog.Debug("稼働中のサーバー検出", "SERVER", api.ServerID(spec))
 		case db.SERVER_STOPPING:
@@ -185,7 +197,9 @@ func (c *controller) serverControllerLoop() {
 			if err := c.marmot.StopServerManage(api.ServerID(spec)); err != nil {
 				slog.Error("StopServerManage()", "err", err)
 				msg := fmt.Sprintf("サーバーの停止に失敗: %v", err)
-				c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_ERROR, msg)
+				if dbErr := c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_ERROR, msg); dbErr != nil {
+					slog.Error("UpdateServerStatus() failed", "serverId", api.ServerID(spec), "err", dbErr)
+				}
 			}
 		case db.SERVER_STOPPED:
 			slog.Debug("停止中のサーバー検出", "SERVER", api.ServerID(spec))
@@ -194,7 +208,9 @@ func (c *controller) serverControllerLoop() {
 			if err := c.marmot.StartServerManage(api.ServerID(spec)); err != nil {
 				slog.Error("StartServerManage()", "err", err)
 				msg := fmt.Sprintf("サーバーの起動に失敗: %v", err)
-				c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_ERROR, msg)
+				if dbErr := c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_ERROR, msg); dbErr != nil {
+					slog.Error("UpdateServerStatus() failed", "serverId", api.ServerID(spec), "err", dbErr)
+				}
 			}
 		case db.SERVER_ERROR:
 			slog.Debug("エラー状態のサーバー検出", "SERVER", api.ServerID(spec))
@@ -222,7 +238,9 @@ func (c *controller) serverControllerLoop() {
 				if err := c.marmot.DeleteServerByIdManage(api.ServerID(spec)); err != nil {
 					slog.Error("DeleteServerById()", "err", err)
 					msg := fmt.Sprintf("サーバーの削除に失敗: %v", err)
-					c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_ERROR, msg)
+					if dbErr := c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_ERROR, msg); dbErr != nil {
+						slog.Error("UpdateServerStatus() failed", "serverId", api.ServerID(spec), "err", dbErr)
+					}
 				}
 			}
 
@@ -259,7 +277,9 @@ func (c *controller) serverControllerLoop() {
 			if err := c.marmot.Db.DeleteServerById(api.ServerID(spec)); err != nil {
 				slog.Error("DeleteServerById()", "err", err)
 				msg := fmt.Sprintf("サーバーのデータベースからの削除に失敗: %v", err)
-				c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_ERROR, msg)
+				if dbErr := c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_ERROR, msg); dbErr != nil {
+					slog.Error("UpdateServerStatus() failed", "serverId", api.ServerID(spec), "err", dbErr)
+				}
 			}
 
 		case db.SERVER_PROVISIONING:
@@ -268,7 +288,9 @@ func (c *controller) serverControllerLoop() {
 			if spec.Status != nil && spec.Status.Message != nil && strings.TrimSpace(*spec.Status.Message) != "" {
 				msg = *spec.Status.Message
 			}
-			c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_ERROR, msg)
+			if dbErr := c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_ERROR, msg); dbErr != nil {
+				slog.Error("UpdateServerStatus() failed", "serverId", api.ServerID(spec), "err", dbErr)
+			}
 
 		default:
 			slog.Warn("不明な状態のサーバー検出", "SERVER", api.ServerID(spec), "STATUS", *spec.Status.Status)

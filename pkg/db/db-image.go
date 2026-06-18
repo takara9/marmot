@@ -603,12 +603,12 @@ func (d *Database) DeleteImage(id string) error {
 }
 
 // ステータスの変更
-func (d *Database) UpdateImageStatus(id string, status int) {
-	d.UpdateImageStatusMessage(id, status, "")
+func (d *Database) UpdateImageStatus(id string, status int) error {
+	return d.UpdateImageStatusMessage(id, status, "")
 }
 
 // ステータスとメッセージの変更
-func (d *Database) UpdateImageStatusMessage(id string, status int, message string) {
+func (d *Database) UpdateImageStatusMessage(id string, status int, message string) error {
 	for {
 		err := d.updateImageStatusMessage(id, status, message)
 		if err == ErrUpdateConflict {
@@ -617,9 +617,9 @@ func (d *Database) UpdateImageStatusMessage(id string, status int, message strin
 		}
 		if err != nil {
 			slog.Error("UpdateImageStatusMessage() failed", "err", err, "imageId", id)
-			panic(err)
+			return err
 		}
-		return
+		return nil
 	}
 }
 

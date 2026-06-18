@@ -195,7 +195,7 @@ func (d *Database) updateServer(id string, spec api.Server) error {
 }
 
 // サーバーオブジェクトのステータスを更新
-func (d *Database) UpdateServerStatus(id string, status int, message string) {
+func (d *Database) UpdateServerStatus(id string, status int, message string) error {
 	for {
 		err := d.updateServerStatus(id, status, message)
 		if err == ErrUpdateConflict {
@@ -203,9 +203,9 @@ func (d *Database) UpdateServerStatus(id string, status int, message string) {
 			continue
 		} else if err != nil {
 			slog.Error("UpdateServerStatus() failed", "err", err, "serverId", id)
-			panic(err)
+			return err
 		}
-		break
+		return nil
 	}
 }
 
