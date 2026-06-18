@@ -6,10 +6,16 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
 const marmotResolvConfTemplate = "# generate by marmotd\nnameserver %s\noptions edns0 trust-ad\nsearch host-bridge\n"
+
+const (
+	resolvConfPath             = "/etc/resolv.conf"
+	marmotResolvConfBackupFile = "resolv.conf.marmot.bak"
+)
 
 // SetupLocalResolver disables systemd-resolved and rewrites /etc/resolv.conf for marmot internal DNS.
 // If /etc/resolv.conf already has a nameserver entry that matches the IP derived from dnsListenAddr,
@@ -23,6 +29,10 @@ func SetupLocalResolver(dnsListenAddr string) error {
 	}
 
 	resolvConfContent := fmt.Sprintf(marmotResolvConfTemplate, nameserver)
+	backupPath := filepath.Join(filepath.Dir(resolvConfPath), marmotResolvConfBackupFile)
+	if err := backupResolvConfIfNeeded(resolvConfPath, backupPath); err != nil {
+		return err
+	}
 
 	if err := runSystemctlResolved("stop"); err != nil {
 		return err
@@ -30,18 +40,50 @@ func SetupLocalResolver(dnsListenAddr string) error {
 	if err := runSystemctlResolved("disable"); err != nil {
 		return err
 	}
-	if err := os.Remove("/etc/resolv.conf"); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("remove /etc/resolv.conf: %w", err)
+	if err := os.Remove(resolvConfPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove %s: %w", resolvConfPath, err)
 	}
-	if err := os.WriteFile("/etc/resolv.conf", []byte(resolvConfContent), 0644); err != nil {
-		return fmt.Errorf("write /etc/resolv.conf: %w", err)
+	if err := os.WriteFile(resolvConfPath, []byte(resolvConfContent), 0644); err != nil {
+		return fmt.Errorf("write %s: %w", resolvConfPath, err)
 	}
+	return nil
+}
+
+func backupResolvConfIfNeeded(sourcePath, backupPath string) error {
+	if _, err := os.Stat(backupPath); err == nil {
+		return nil
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("stat %s: %w", backupPath, err)
+	}
+
+	content, err := os.ReadFile(sourcePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("read %s for backup: %w", sourcePath, err)
+	}
+
+	f, err := os.OpenFile(backupPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+	if err != nil {
+		if os.IsExist(err) {
+			return nil
+		}
+		return fmt.Errorf("create backup %s: %w", backupPath, err)
+	}
+	defer f.Close()
+
+	if _, err := f.Write(content); err != nil {
+		return fmt.Errorf("write backup %s: %w", backupPath, err)
+	}
+
+	slog.Info("resolv.conf backup created", "path", backupPath)
 	return nil
 }
 
 // currentNameserverInResolvConf returns the first nameserver IP found in /etc/resolv.conf.
 func currentNameserverInResolvConf() (string, error) {
-	data, err := os.ReadFile("/etc/resolv.conf")
+	data, err := os.ReadFile(resolvConfPath)
 	if err != nil {
 		return "", err
 	}
