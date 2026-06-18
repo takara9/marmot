@@ -170,6 +170,7 @@ func (c *controller) serverControllerLoop() {
 			slog.Debug("生成待ち状態のサーバー検出", "SERVER", api.ServerID(spec))
 			if dbErr := c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_PROVISIONING, ""); dbErr != nil {
 				slog.Error("UpdateServerStatus() failed", "serverId", api.ServerID(spec), "err", dbErr)
+				continue
 			}
 			if _, err := c.marmot.CreateServerManage(api.ServerID(spec)); err != nil {
 				slog.Error("CreateServerManage()", "err", err)

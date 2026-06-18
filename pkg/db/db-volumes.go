@@ -348,7 +348,7 @@ func (d *Database) FindVolumeByName(name, kind string) ([]api.Volume, error) {
 }
 
 // OSボリュームの状態更新
-// エラーが出る場合、パニックして停止させるべき
+// エラー時はログ出力して処理を中断する（panic は発生させない）
 func (d *Database) UpdateVolumeStatus(id string, status int) {
 	d.UpdateVolumeStatusMessage(id, status, "")
 }

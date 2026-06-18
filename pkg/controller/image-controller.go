@@ -121,6 +121,7 @@ func (c *controller) imageControllerLoop() {
 			}
 			if dbErr := c.marmot.Db.UpdateImageStatus(image.Metadata.Id, db.IMAGE_CREATING); dbErr != nil {
 				slog.Error("UpdateImageStatus() failed", "imageId", image.Metadata.Id, "err", dbErr)
+				continue
 			}
 			// ラベルの存在をチェック
 			if image.Metadata.Labels != nil {

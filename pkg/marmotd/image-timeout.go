@@ -16,8 +16,8 @@ var updateImageRecord = func(m *Marmot, image api.Image) error {
 	return m.Db.UpdateImage(image.Metadata.Id, image)
 }
 
-var updateImageFailureStatus = func(m *Marmot, imageID, message string) {
-	m.Db.UpdateImageStatusMessage(imageID, db.IMAGE_CREATION_FAILED, message)
+var updateImageFailureStatus = func(m *Marmot, imageID, message string) error {
+	return m.Db.UpdateImageStatusMessage(imageID, db.IMAGE_CREATION_FAILED, message)
 }
 
 func contextTimeoutHint(ctx context.Context) time.Duration {
@@ -71,6 +71,8 @@ func (m *Marmot) markImageCreationFailed(image api.Image, err error) error {
 		return err
 	}
 
-	updateImageFailureStatus(m, image.Metadata.Id, err.Error())
+	if updateErr := updateImageFailureStatus(m, image.Metadata.Id, err.Error()); updateErr != nil {
+		slog.Error("UpdateImageStatusMessage() failed while setting image failure status", "image id", image.Metadata.Id, "err", updateErr)
+	}
 	return err
 }
