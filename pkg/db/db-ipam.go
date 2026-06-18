@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"math"
 	"math/big"
 	"net/netip"
 	"strings"
@@ -113,7 +112,19 @@ func (d *Database) CreateIpNetwork(vnetid string, spec *api.IPNetwork) (string, 
 	addr := networkAddr.Next()
 	net.Netmasklen = util.IntPtrInt(prefix.Bits())
 	net.StartAddress = util.StringPtr(addr.String())
-	addr = addIP(addr, int64(math.Pow(2, float64(int(prefix.Addr().BitLen()-prefix.Bits()))))-3) // ブロードキャストアドレスとゲートウェイを考慮して-3
+	hostBits := prefix.Addr().BitLen() - prefix.Bits()
+	if hostBits < 2 {
+		slog.Error("CreateIpNetwork()", "err", "prefix is too small for gateway and usable host", "addressMaskLen", prefix.String())
+		return "", fmt.Errorf("prefix is too small for gateway and usable host")
+	}
+	// ブロードキャストアドレスとゲートウェイを考慮して -3 する。
+	endDelta := new(big.Int).Lsh(big.NewInt(1), uint(hostBits))
+	endDelta.Sub(endDelta, big.NewInt(3))
+	addr, err = addIPBig(addr, endDelta)
+	if err != nil {
+		slog.Error("CreateIpNetwork()", "err", err, "addressMaskLen", prefix.String())
+		return "", err
+	}
 	net.EndAddress = util.StringPtr(addr.String())
 	net.NetworkAddress = util.StringPtr(networkAddr.String())
 	net.Gateway = util.StringPtr(networkAddr.Next().String()) // ゲートウェイはネットワークアドレスの次のアドレスとする
@@ -227,9 +238,12 @@ func (d *Database) DeleteIpNetworkById(vnetId, ipnetId string) error {
 // 渡したホストIDは、このホストによって使用中であることを示すために使用される。
 func (d *Database) AllocateIP(vnetId, ipnetId, hostId string) (string, int, error) {
 	net, err := d.GetIpNetworkById(vnetId, ipnetId)
-	if err == nil || err.Error() == "not found" {
-		// NOP
-	} else if err != nil {
+	if err != nil {
+		slog.Error("AllocateIP()", "err", err, "vnetId", vnetId, "ipnetId", ipnetId)
+		return "", 0, err
+	}
+	if net.AddressMaskLen == nil || strings.TrimSpace(*net.AddressMaskLen) == "" {
+		err := fmt.Errorf("ip network AddressMaskLen is empty")
 		slog.Error("AllocateIP()", "err", err, "vnetId", vnetId, "ipnetId", ipnetId)
 		return "", 0, err
 	}
@@ -239,31 +253,34 @@ func (d *Database) AllocateIP(vnetId, ipnetId, hostId string) (string, int, erro
 		slog.Error("AllocateIP()", "err", err, "vnetId", vnetId, "ipnetId", ipnetId)
 		return "", 0, err
 	}
+	prefix = prefix.Masked()
+
+	lockKey := NetworkPrefix + "/" + vnetId + "/ip_network/" + ipnetId + "/ipam_lock"
+	mutex, err := d.LockKey(lockKey)
+	if err != nil {
+		slog.Error("AllocateIP()", "err", err, "vnetId", vnetId, "ipnetId", ipnetId, "lockKey", lockKey)
+		return "", 0, err
+	}
+	defer d.UnlockKey(mutex)
+
 	networkAddr := prefix.Masked().Addr()
-	// 最初のホストアドレス (.1) から開始
-	addr := networkAddr.Next()
+	// .0 はネットワークアドレス、.1 はゲートウェイとして予約しているため .2 から探索する。
+	addr := networkAddr.Next().Next()
 
 	// 割り当てられているIPアドレスと比較して、未割り当てのIPアドレスを見つける
 	for {
-		nextAddr := addr.Next()
-		if !prefix.Contains(nextAddr) {
+		if !addr.IsValid() || !prefix.Contains(addr) {
 			slog.Error("AllocateIP()", "err", "no available IP addresses in the network", "vnetId", vnetId, "ipnetId", ipnetId)
 			return "", 0, fmt.Errorf("no available IP addresses in the network")
 		}
-		// 次へ進む
-		addr = nextAddr
 
-		// 異常値チェック
-		if !addr.IsValid() {
-			slog.Error("AllocateIP()", "err", "IP address is not valid", "vnetId", vnetId, "ipnetId", ipnetId)
-			return "", 0, fmt.Errorf("no available IP addresses in the network")
-		}
-
-		// ブロードキャストアドレスは使わない
-		nextAddr2 := addr.Next()
-		if !prefix.Contains(nextAddr2) {
-			slog.Error("AllocateIP()", "err", "no available IP addresses in the network", "vnetId", vnetId, "ipnetId", ipnetId)
-			return "", 0, fmt.Errorf("no available IP addresses in the network")
+		// IPv4 のブロードキャストアドレスは使わない。
+		if addr.Is4() {
+			nextAddr := addr.Next()
+			if !nextAddr.IsValid() || !prefix.Contains(nextAddr) {
+				slog.Error("AllocateIP()", "err", "no available IP addresses in the network", "vnetId", vnetId, "ipnetId", ipnetId)
+				return "", 0, fmt.Errorf("no available IP addresses in the network")
+			}
 		}
 
 		// 一致するものが無かったら、そのIPアドレスを割り当てる
@@ -273,14 +290,21 @@ func (d *Database) AllocateIP(vnetId, ipnetId, hostId string) (string, int, erro
 			return "", 0, err
 		}
 		if !found {
-			slog.Debug("割り当てられたIPアドレス", "IP	", addr.String())
-			d.SetIPaddrInUse(vnetId, ipnetId, addr.String(), hostId)
+			slog.Debug("割り当てられたIPアドレス", "IP\t", addr.String())
+			if err := d.SetIPaddrInUse(vnetId, ipnetId, addr.String(), hostId); err != nil {
+				slog.Error("AllocateIP()", "err", err, "vnetId", vnetId, "ipnetId", ipnetId, "candidateIP", addr.String(), "hostId", hostId)
+				return "", 0, err
+			}
 			return addr.String(), prefix.Bits(), nil
 		}
-	}
 
-	// ここに到達した場合、利用可能なIPアドレスがないことを意味する
-	return "", 0, fmt.Errorf("no available IP addresses in the network")
+		nextAddr := addr.Next()
+		if !nextAddr.IsValid() {
+			slog.Error("AllocateIP()", "err", "no available IP addresses in the network", "vnetId", vnetId, "ipnetId", ipnetId)
+			return "", 0, fmt.Errorf("no available IP addresses in the network")
+		}
+		addr = nextAddr
+	}
 }
 
 // IPアドレスを解放する
@@ -339,15 +363,6 @@ func (d *Database) SetIPaddrInUse(vnetId, ipnetId, ip, hostId string) error {
 		return err
 	}
 	key := NetworkPrefix + "/" + vnetId + "/ip_network/" + ipnetId + "/ip_address/" + *net.AddressMaskLen + "/" + ip
-	//key := IPAddressPrefix + "/" + *net.AddressMaskLen + "/" + ip
-
-	// デバック
-	fmt.Println("key=", key)
-	byteJson, err := json.MarshalIndent(rec, "", "    ")
-	if err != nil {
-		slog.Error("SetIPaddrInUse()", "err", err, "rec", rec)
-	}
-	fmt.Println("rec=", string(byteJson))
 
 	return d.PutJSON(key, rec)
 }
@@ -408,6 +423,28 @@ func addIP(ip netip.Addr, delta int64) netip.Addr {
 		return newIP.Unmap() // 元がIPv4ならIPv4形式に戻す
 	}
 	return newIP
+}
+
+func addIPBig(ip netip.Addr, delta *big.Int) (netip.Addr, error) {
+	ipBytes := ip.As16()
+	val := new(big.Int).SetBytes(ipBytes[:])
+	result := new(big.Int).Add(val, delta)
+
+	max := new(big.Int).Lsh(big.NewInt(1), uint(ip.BitLen()))
+	max.Sub(max, big.NewInt(1))
+	if result.Sign() < 0 || result.Cmp(max) > 0 {
+		return netip.Addr{}, fmt.Errorf("ip calculation overflow")
+	}
+
+	resultBytes := result.Bytes()
+	var newAddr [16]byte
+	copy(newAddr[16-len(resultBytes):], resultBytes)
+
+	newIP := netip.AddrFrom16(newAddr)
+	if ip.Is4() {
+		return newIP.Unmap(), nil
+	}
+	return newIP, nil
 }
 
 // PrefixLenToMask はプレフィックス長からネットマスク文字列を生成する（IPv4/IPv6 対応）
