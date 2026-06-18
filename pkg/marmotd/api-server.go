@@ -127,7 +127,10 @@ func (s *Server) ApiStopServerById(ctx echo.Context, id string) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	s.Ma.Db.UpdateServerStatus(id, db.SERVER_STOPPING, "")
+	if err := s.Ma.Db.UpdateServerStatus(id, db.SERVER_STOPPING, ""); err != nil {
+		slog.Error("UpdateServerStatus()", "err", err, "id", id)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
 
 	var resp api.Success
 	resp.Id = id
@@ -145,7 +148,10 @@ func (s *Server) ApiStartServerById(ctx echo.Context, id string) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	s.Ma.Db.UpdateServerStatus(id, db.SERVER_STARTING, "")
+	if err := s.Ma.Db.UpdateServerStatus(id, db.SERVER_STARTING, ""); err != nil {
+		slog.Error("UpdateServerStatus()", "err", err, "id", id)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
 
 	var resp api.Success
 	resp.Id = id

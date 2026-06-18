@@ -85,7 +85,9 @@ func (c *controller) imageControllerLoop() {
 			deletionTime := *image.Status.DeletionTimeStamp
 			if time.Since(deletionTime) > c.deletionDelay {
 				slog.Debug("削除のタイムスタンプが一定時間以上経過しているイメージ検出", "IMAGE", image.Metadata.Name)
-				c.marmot.Db.UpdateImageStatus(image.Metadata.Id, db.IMAGE_DELETING)
+				if dbErr := c.marmot.Db.UpdateImageStatus(image.Metadata.Id, db.IMAGE_DELETING); dbErr != nil {
+					slog.Error("UpdateImageStatus() failed", "imageId", image.Metadata.Id, "err", dbErr)
+				}
 			}
 		}
 
@@ -112,10 +114,15 @@ func (c *controller) imageControllerLoop() {
 			// bootVolume 由来のイメージは、インポート済み扱いにせず必ずVMコピー処理へ進める。
 			if source != "bootVolume" && image.Spec.SourceUrl == nil && strings.TrimSpace(util.OrDefault(image.Spec.Qcow2Path, "")) != "" {
 				slog.Debug("インポート済みQCOW2イメージを利用可能に遷移", "image", image.Metadata.Name, "imageId", image.Metadata.Id)
-				c.marmot.Db.UpdateImageStatusMessage(image.Metadata.Id, db.IMAGE_AVAILABLE, "")
+				if dbErr := c.marmot.Db.UpdateImageStatusMessage(image.Metadata.Id, db.IMAGE_AVAILABLE, ""); dbErr != nil {
+					slog.Error("UpdateImageStatusMessage() failed", "imageId", image.Metadata.Id, "err", dbErr)
+				}
 				continue
 			}
-			c.marmot.Db.UpdateImageStatus(image.Metadata.Id, db.IMAGE_CREATING)
+			if dbErr := c.marmot.Db.UpdateImageStatus(image.Metadata.Id, db.IMAGE_CREATING); dbErr != nil {
+				slog.Error("UpdateImageStatus() failed", "imageId", image.Metadata.Id, "err", dbErr)
+				continue
+			}
 			// ラベルの存在をチェック
 			if image.Metadata.Labels != nil {
 				if source == "bootVolume" {
@@ -166,7 +173,9 @@ func (c *controller) imageControllerLoop() {
 			slog.Debug("イメージは利用可能", "image", image.Metadata.Name)
 			if err := marmotd.CheckImageBackingStore(image); err != nil {
 				slog.Warn("AVAILABLE イメージの実体が見つからないため DELETED に更新", "imageId", image.Metadata.Id, "err", err)
-				c.marmot.Db.UpdateImageStatusMessage(image.Metadata.Id, db.IMAGE_DELETED, err.Error())
+				if dbErr := c.marmot.Db.UpdateImageStatusMessage(image.Metadata.Id, db.IMAGE_DELETED, err.Error()); dbErr != nil {
+					slog.Error("UpdateImageStatusMessage() failed", "imageId", image.Metadata.Id, "err", dbErr)
+				}
 				continue
 			}
 			if err := c.reconcileFollowerImageSpec(image); err != nil {
@@ -246,16 +255,22 @@ func (c *controller) startFollowerSync(waitingImage api.Image) error {
 
 	switch headImage.Status.StatusCode {
 	case db.IMAGE_AVAILABLE:
-		c.marmot.Db.UpdateImageStatusMessage(waitingImage.Metadata.Id, db.IMAGE_CREATING, "ヘッドノードからQCOW2イメージを取得中")
+		if dbErr := c.marmot.Db.UpdateImageStatusMessage(waitingImage.Metadata.Id, db.IMAGE_CREATING, "ヘッドノードからQCOW2イメージを取得中"); dbErr != nil {
+			slog.Error("UpdateImageStatusMessage() failed", "imageId", waitingImage.Metadata.Id, "err", dbErr)
+		}
 		go func(image api.Image, head api.Image) {
 			if err := c.syncFollowerImageFromHead(image, head); err != nil {
 				slog.Error("フォロワーイメージ同期に失敗", "imageId", image.Metadata.Id, "headImageId", head.Metadata.Id, "err", err)
-				c.marmot.Db.UpdateImageStatusMessage(image.Metadata.Id, db.IMAGE_CREATION_FAILED, err.Error())
+				if dbErr := c.marmot.Db.UpdateImageStatusMessage(image.Metadata.Id, db.IMAGE_CREATION_FAILED, err.Error()); dbErr != nil {
+					slog.Error("UpdateImageStatusMessage() failed", "imageId", image.Metadata.Id, "err", dbErr)
+				}
 			}
 		}(waitingImage, headImage)
 	case db.IMAGE_CREATION_FAILED, db.IMAGE_DELETED:
 		msg := fmt.Sprintf("head image is not available: headImageId=%s status=%s", headImage.Metadata.Id, util.OrDefault(headImage.Status.Status, ""))
-		c.marmot.Db.UpdateImageStatusMessage(waitingImage.Metadata.Id, db.IMAGE_CREATION_FAILED, msg)
+		if dbErr := c.marmot.Db.UpdateImageStatusMessage(waitingImage.Metadata.Id, db.IMAGE_CREATION_FAILED, msg); dbErr != nil {
+			slog.Error("UpdateImageStatusMessage() failed", "imageId", waitingImage.Metadata.Id, "err", dbErr)
+		}
 	default:
 		// WAITING を維持する。
 	}
@@ -333,7 +348,9 @@ func (c *controller) syncFollowerImageFromHead(followerImage api.Image, headImag
 		"followerNode", followerLatest.Metadata.NodeName,
 		"module", moduleKey,
 	)
-	c.marmot.Db.UpdateImageStatus(followerLatest.Metadata.Id, db.IMAGE_AVAILABLE)
+	if dbErr := c.marmot.Db.UpdateImageStatus(followerLatest.Metadata.Id, db.IMAGE_AVAILABLE); dbErr != nil {
+		slog.Error("UpdateImageStatus() failed", "imageId", followerLatest.Metadata.Id, "err", dbErr)
+	}
 
 	return nil
 }

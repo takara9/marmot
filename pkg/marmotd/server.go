@@ -1522,7 +1522,10 @@ func (m *Marmot) MakeImageEntryFromRunningVMWithContext(ctx context.Context, ser
 		slog.Error("MakeImageEntryFromRunningVMWithContext()", "err", err, "serverId", serverId, "imageName", name)
 		return "", markFailed(err)
 	}
-	m.Db.UpdateImageStatus(imageID, db.IMAGE_AVAILABLE)
+	if err := m.Db.UpdateImageStatus(imageID, db.IMAGE_AVAILABLE); err != nil {
+		slog.Error("UpdateImageStatus()", "imageId", imageID, "err", err)
+		return "", markFailed(err)
+	}
 
 	return imageID, nil
 }

@@ -89,7 +89,7 @@ var _ = Describe("Image timeout helpers", func() {
 	Describe("markImageCreationFailed", func() {
 		var (
 			originalUpdateImageRecord        func(*Marmot, api.Image) error
-			originalUpdateImageFailureStatus func(*Marmot, string, string)
+			originalUpdateImageFailureStatus func(*Marmot, string, string) error
 		)
 
 		BeforeEach(func() {
@@ -124,8 +124,9 @@ var _ = Describe("Image timeout helpers", func() {
 				updated = in
 				return nil
 			}
-			updateImageFailureStatus = func(_ *Marmot, imageID, message string) {
+			updateImageFailureStatus = func(_ *Marmot, imageID, message string) error {
 				Fail("fallback status update should not be called")
+				return nil
 			}
 
 			err := m.markImageCreationFailed(image, baseErr)
@@ -151,10 +152,11 @@ var _ = Describe("Image timeout helpers", func() {
 				Fail("direct image update should not be called")
 				return nil
 			}
-			updateImageFailureStatus = func(_ *Marmot, imageID, message string) {
+			updateImageFailureStatus = func(_ *Marmot, imageID, message string) error {
 				called = true
 				Expect(imageID).To(Equal("img-3"))
 				Expect(message).To(Equal("timeout"))
+				return nil
 			}
 
 			err := m.markImageCreationFailed(image, baseErr)

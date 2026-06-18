@@ -348,7 +348,7 @@ func (d *Database) FindVolumeByName(name, kind string) ([]api.Volume, error) {
 }
 
 // OSボリュームの状態更新
-// エラーが出る場合、パニックして停止させるべき
+// エラー時はログ出力して処理を中断する（panic は発生させない）
 func (d *Database) UpdateVolumeStatus(id string, status int) {
 	d.UpdateVolumeStatusMessage(id, status, "")
 }
@@ -360,8 +360,8 @@ func (d *Database) UpdateVolumeStatusMessage(id string, status int, message stri
 	}
 	vol, err := d.GetVolumeById(id)
 	if err != nil {
-		slog.Error("panic! failed to get volume by id", "err", err, "id", id)
-		//panic(fmt.Sprintf("failed to get volume by id: %s", id))
+		slog.Error("UpdateVolumeStatusMessage() failed to get volume", "err", err, "id", id)
+		return
 	}
 	vol.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	vol.Status.StatusCode = status
@@ -373,8 +373,7 @@ func (d *Database) UpdateVolumeStatusMessage(id string, status int, message stri
 	}
 
 	if err = d.UpdateVolume(id, vol); err != nil {
-		slog.Error("panic! failed to update volume", "err", err, "volId", id)
-		//panic(fmt.Sprintf("failed to update volume: %s", id))
+		slog.Error("UpdateVolumeStatusMessage() failed to update volume", "err", err, "volId", id)
 	}
 }
 
@@ -386,13 +385,12 @@ func (d *Database) SetVolumeDeletionTimestamp(id string) {
 	}
 	vol, err := d.GetVolumeById(id)
 	if err != nil {
-		slog.Error("panic! failed to get volume by id", "err", err, "id", id)
-		//panic(fmt.Sprintf("failed to get volume by id: %s", id))
+		slog.Error("SetVolumeDeletionTimestamp() failed to get volume", "err", err, "id", id)
+		return
 	}
 	vol.Status.DeletionTimeStamp = util.TimePtr(time.Now())
 	if err = d.UpdateVolume(id, vol); err != nil {
-		slog.Error("panic! failed to update volume", "err", err, "volId", id)
-		//panic(fmt.Sprintf("failed to update volume: %s", id))
+		slog.Error("SetVolumeDeletionTimestamp() failed to update volume", "err", err, "volId", id)
 	}
 }
 
