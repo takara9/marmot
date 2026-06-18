@@ -1,8 +1,11 @@
 package cmd
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"os"
+	"reflect"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -119,6 +122,18 @@ func applyServer(manifest map[string]interface{}) error {
 
 	var byteBody []byte
 	if exists {
+		existingBody, _, getErr := m.GetServerById(existingId)
+		if getErr != nil {
+			return fmt.Errorf("failed to get existing server: %w", getErr)
+		}
+		var existingServer api.Server
+		if unmarshalErr := json.Unmarshal(existingBody, &existingServer); unmarshalErr != nil {
+			return fmt.Errorf("failed to parse existing server: %w", unmarshalErr)
+		}
+		if err := validateServerApplyForbiddenChanges(existingServer, *server); err != nil {
+			return err
+		}
+
 		// 更新
 		api.SetServerID(server, existingId)
 		byteBody, _, err = m.UpdateServerById(existingId, *server)
@@ -143,6 +158,23 @@ func applyServer(manifest map[string]interface{}) error {
 		}
 	}
 	return nil
+}
+
+func confirmDowntimeForServerApply(serverName string) (bool, error) {
+	displayName := strings.TrimSpace(serverName)
+	if displayName == "" {
+		displayName = "(unknown)"
+	}
+
+	fmt.Printf("Warning: server %s will be stopped and restarted to apply changes. Continue? [y/N]: ", displayName)
+	reader := bufio.NewReader(os.Stdin)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return false, err
+	}
+
+	answer := strings.ToLower(strings.TrimSpace(input))
+	return answer == "y" || answer == "yes", nil
 }
 
 func applyImage(manifest map[string]interface{}) error {
@@ -323,6 +355,188 @@ func applyNetwork(manifest map[string]interface{}) error {
 	}
 
 	return processApplyResponse(byteBody, exists)
+}
+
+func validateServerApplyForbiddenChanges(existing api.Server, desired api.Server) error {
+	forbidden := make([]string, 0, 16)
+
+	if desired.ApiVersion != "" && desired.ApiVersion != existing.ApiVersion {
+		forbidden = append(forbidden, "apiVersion")
+	}
+	if desired.Kind != "" && desired.Kind != existing.Kind {
+		forbidden = append(forbidden, "kind")
+	}
+
+	if desired.Metadata.Id != "" && desired.Metadata.Id != existing.Metadata.Id {
+		forbidden = append(forbidden, "metadata.id")
+	}
+	if desired.Metadata.Name != "" && desired.Metadata.Name != existing.Metadata.Name {
+		forbidden = append(forbidden, "metadata.name")
+	}
+	if desired.Metadata.InstanceName != nil && !reflect.DeepEqual(desired.Metadata.InstanceName, existing.Metadata.InstanceName) {
+		forbidden = append(forbidden, "metadata.instanceName")
+	}
+	if desired.Metadata.Key != nil && !reflect.DeepEqual(desired.Metadata.Key, existing.Metadata.Key) {
+		forbidden = append(forbidden, "metadata.key")
+	}
+	if desired.Metadata.NodeName != nil && !reflect.DeepEqual(desired.Metadata.NodeName, existing.Metadata.NodeName) {
+		forbidden = append(forbidden, "metadata.nodeName")
+	}
+	if desired.Metadata.Uuid != nil && !reflect.DeepEqual(desired.Metadata.Uuid, existing.Metadata.Uuid) {
+		forbidden = append(forbidden, "metadata.uuid")
+	}
+
+	if desired.Spec.Ansible != nil && !reflect.DeepEqual(desired.Spec.Ansible, existing.Spec.Ansible) {
+		forbidden = append(forbidden, "spec.ansible")
+	}
+	if desired.Spec.Auth != nil && !reflect.DeepEqual(desired.Spec.Auth, existing.Spec.Auth) {
+		forbidden = append(forbidden, "spec.auth")
+	}
+	if desired.Spec.BootVolume != nil && !reflect.DeepEqual(desired.Spec.BootVolume, existing.Spec.BootVolume) {
+		forbidden = append(forbidden, "spec.bootVolume")
+	}
+	if desired.Spec.NetworkInterface != nil && !reflect.DeepEqual(desired.Spec.NetworkInterface, existing.Spec.NetworkInterface) {
+		if !networkInterfacesMatchRequested(existing.Spec.NetworkInterface, desired.Spec.NetworkInterface) {
+			forbidden = append(forbidden, "spec.networkInterface")
+		}
+	}
+	if desired.Spec.OsLv != nil && !reflect.DeepEqual(desired.Spec.OsLv, existing.Spec.OsLv) {
+		forbidden = append(forbidden, "spec.osLv")
+	}
+	if desired.Spec.OsVariant != nil && !reflect.DeepEqual(desired.Spec.OsVariant, existing.Spec.OsVariant) {
+		forbidden = append(forbidden, "spec.osVariant")
+	}
+	if desired.Spec.OsVg != nil && !reflect.DeepEqual(desired.Spec.OsVg, existing.Spec.OsVg) {
+		forbidden = append(forbidden, "spec.osVg")
+	}
+	if desired.Spec.Storage != nil && !reflect.DeepEqual(desired.Spec.Storage, existing.Spec.Storage) {
+		forbidden = append(forbidden, "spec.storage")
+	}
+
+	if desired.Status != nil && !reflect.DeepEqual(desired.Status, existing.Status) {
+		forbidden = append(forbidden, "status")
+	}
+
+	if len(forbidden) > 0 {
+		return fmt.Errorf("%s の変更は許可されていません", strings.Join(forbidden, ", "))
+	}
+
+	return nil
+}
+
+func networkInterfacesMatchRequested(existingPtr, desiredPtr *[]api.NetworkInterface) bool {
+	if desiredPtr == nil {
+		return true
+	}
+	if existingPtr == nil {
+		return false
+	}
+
+	existing := *existingPtr
+	desired := *desiredPtr
+	if len(existing) != len(desired) {
+		return false
+	}
+
+	for i := range desired {
+		if !networkInterfaceMatchesRequested(existing[i], desired[i]) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func networkInterfaceMatchesRequested(existing, desired api.NetworkInterface) bool {
+	if strings.TrimSpace(desired.Networkname) != "" && desired.Networkname != existing.Networkname {
+		return false
+	}
+	if strings.TrimSpace(desired.Networkid) != "" && desired.Networkid != existing.Networkid {
+		return false
+	}
+
+	if !stringPtrFieldMatchesRequested(existing.Address, desired.Address) {
+		return false
+	}
+	if !stringPtrFieldMatchesRequested(existing.Ethernet, desired.Ethernet) {
+		return false
+	}
+	if !stringPtrFieldMatchesRequested(existing.IpGateway, desired.IpGateway) {
+		return false
+	}
+	if !stringPtrFieldMatchesRequested(existing.IpNetworkId, desired.IpNetworkId) {
+		return false
+	}
+	if !stringPtrFieldMatchesRequested(existing.Mac, desired.Mac) {
+		return false
+	}
+	if !stringPtrFieldMatchesRequested(existing.Netmask, desired.Netmask) {
+		return false
+	}
+	if !stringPtrFieldMatchesRequested(existing.Portgroup, desired.Portgroup) {
+		return false
+	}
+	if !stringPtrFieldMatchesRequested(existing.Uuid, desired.Uuid) {
+		return false
+	}
+
+	if !boolPtrFieldMatchesRequested(existing.Dhcp4, desired.Dhcp4) {
+		return false
+	}
+	if !boolPtrFieldMatchesRequested(existing.Dhcp6, desired.Dhcp6) {
+		return false
+	}
+	if !intPtrFieldMatchesRequested(existing.Netmasklen, desired.Netmasklen) {
+		return false
+	}
+
+	if desired.Nameservers != nil {
+		if existing.Nameservers == nil || !reflect.DeepEqual(existing.Nameservers, desired.Nameservers) {
+			return false
+		}
+	}
+	if desired.Routes != nil {
+		if existing.Routes == nil || !reflect.DeepEqual(existing.Routes, desired.Routes) {
+			return false
+		}
+	}
+	if desired.Vlans != nil {
+		if existing.Vlans == nil || !reflect.DeepEqual(existing.Vlans, desired.Vlans) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func stringPtrFieldMatchesRequested(existing, desired *string) bool {
+	if desired == nil {
+		return true
+	}
+	if existing == nil {
+		return false
+	}
+	return *existing == *desired
+}
+
+func boolPtrFieldMatchesRequested(existing, desired *bool) bool {
+	if desired == nil {
+		return true
+	}
+	if existing == nil {
+		return false
+	}
+	return *existing == *desired
+}
+
+func intPtrFieldMatchesRequested(existing, desired *int) bool {
+	if desired == nil {
+		return true
+	}
+	if existing == nil {
+		return false
+	}
+	return *existing == *desired
 }
 
 func applyGateway(manifest map[string]interface{}) error {

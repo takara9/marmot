@@ -42,7 +42,7 @@ func startMockServer() (*mockServerHandle, error) {
 	etcdEp := "http://127.0.0.1:3379"
 
 	e := echo.New()
-	server := marmotd.NewServerWithOptions(nodeName, etcdEp, true)
+	server := marmotd.NewServer(nodeName, etcdEp)
 	h.server = server
 
 	readyCh := make(chan struct{})

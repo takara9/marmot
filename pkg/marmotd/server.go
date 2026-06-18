@@ -1471,6 +1471,64 @@ func (m *Marmot) UpdateServerById(id string, serverSpec api.Server) error {
 	return nil
 }
 
+// SyncServerResourcesManage reconciles CPU/Memory spec against libvirt domain settings.
+func (m *Marmot) SyncServerResourcesManage(id string) error {
+	sv, err := m.Db.GetServerById(id)
+	if err != nil {
+		slog.Error("GetServerById()", "err", err)
+		return err
+	}
+
+	if sv.Metadata.InstanceName == nil || strings.TrimSpace(*sv.Metadata.InstanceName) == "" {
+		return fmt.Errorf("server %s has no instance name", id)
+	}
+
+	if sv.Spec.Cpu == nil && sv.Spec.Memory == nil {
+		return nil
+	}
+
+	liveCheck, err := virt.NewLibVirtEp("qemu:///system")
+	if err != nil {
+		slog.Error("NewLibVirtEp()", "err", err)
+		return err
+	}
+	needsUpdate, err := liveCheck.HasDomainResourceDrift(*sv.Metadata.InstanceName, sv.Spec.Cpu, sv.Spec.Memory)
+	liveCheck.Close()
+	if err != nil {
+		return err
+	}
+	if !needsUpdate {
+		return nil
+	}
+
+	if err := m.StopServerManage(id); err != nil {
+		return fmt.Errorf("failed to stop server before applying resource changes: %w", err)
+	}
+
+	l, err := virt.NewLibVirtEp("qemu:///system")
+	if err != nil {
+		slog.Error("NewLibVirtEp()", "err", err)
+		return err
+	}
+	changed, syncErr := l.SyncDomainResources(*sv.Metadata.InstanceName, sv.Spec.Cpu, sv.Spec.Memory)
+	l.Close()
+	if syncErr != nil {
+		if startErr := m.StartServerManage(id); startErr != nil {
+			return fmt.Errorf("failed to apply persistent resource changes: %v; additionally failed to restart server: %w", syncErr, startErr)
+		}
+		return fmt.Errorf("failed to apply persistent resource changes: %w", syncErr)
+	}
+
+	if err := m.StartServerManage(id); err != nil {
+		return fmt.Errorf("resource changes applied but failed to restart server: %w", err)
+	}
+	if changed {
+		slog.Info("server resource settings reconciled with downtime workflow", "serverId", id, "instanceName", *sv.Metadata.InstanceName)
+	}
+
+	return nil
+}
+
 // ボリュームリクエストに基づいて、新しいボリュームを作成する
 func (m *Marmot) CreateNewVolumeWithWait(volReq api.Volume) (api.Volume, error) {
 	slog.Debug("===CreateNewVolume is called===", "volume request", volReq)

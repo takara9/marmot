@@ -8,17 +8,12 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/pkg/controller"
-	"github.com/takara9/marmot/pkg/db"
 	internaldns "github.com/takara9/marmot/pkg/internal-dns"
 	"github.com/takara9/marmot/pkg/marmotd"
-	"github.com/takara9/marmot/pkg/networkfabric"
 	"github.com/takara9/marmot/pkg/util"
-	"github.com/takara9/marmot/pkg/virt"
 )
 
-var debugMode bool = false
-
-//var controllerCounter uint64 = 0
+var controllerCounter uint64 = 0
 
 // 定期的に実行したい関数
 //func dispatchJobTask() {
@@ -64,14 +59,6 @@ func main() {
 		cfg.NodeName = hostname
 	}
 	marmotd.SetRuntimeConfig(cfg)
-	db.SetDebugMode(debugMode)
-	controller.SetDebugMode(debugMode)
-	marmotd.SetDebugMode(debugMode)
-	networkfabric.SetOVNNBCTLDebugLogging(debugMode)
-	networkfabric.SetOVSVSCTLDebugLogging(debugMode)
-	marmotd.SetOVNBootstrapDebugLogging(debugMode)
-	util.SetDebugMode(debugMode)
-	virt.SetDebugMode(debugMode)
 	if err := marmotd.EnsureGatewayRuntimeAssets(); err != nil {
 		slog.Error("Failed to initialize gateway runtime assets", "err", err)
 		return
