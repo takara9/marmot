@@ -2,16 +2,18 @@ package cmd
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/takara9/marmot/api"
-	"github.com/takara9/marmot/pkg/util"
 )
 
-func TestValidateServerAnsiblePlaybookSpec(t *testing.T) {
+func TestValidateServerAnsibleSpec(t *testing.T) {
 	playbook := "playbook/setup.yaml"
+	inventory := "hosts"
 	ip := "192.168.1.64"
 
 	tests := []struct {
@@ -21,14 +23,17 @@ func TestValidateServerAnsiblePlaybookSpec(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name:   "playbook not specified",
+			name:   "ansible not specified",
 			server: api.Server{Spec: api.ServerSpec{}},
 			wantIP: "",
 		},
 		{
-			name: "host-bridge with address",
+			name: "ansible with host-bridge and address",
 			server: api.Server{Spec: api.ServerSpec{
-				AnsiblePlaybook: &playbook,
+				Ansible: &api.ServerAnsible{
+					Playbook:  playbook,
+					Inventory: inventory,
+				},
 				NetworkInterface: &[]api.NetworkInterface{{
 					Networkname: "host-bridge",
 					Address:     &ip,
@@ -39,14 +44,38 @@ func TestValidateServerAnsiblePlaybookSpec(t *testing.T) {
 		{
 			name: "missing network interface",
 			server: api.Server{Spec: api.ServerSpec{
-				AnsiblePlaybook: &playbook,
+				Ansible: &api.ServerAnsible{
+					Playbook:  playbook,
+					Inventory: inventory,
+				},
 			}},
 			wantErr: "requires spec.networkInterface",
 		},
 		{
+			name: "missing playbook",
+			server: api.Server{Spec: api.ServerSpec{
+				Ansible: &api.ServerAnsible{
+					Inventory: inventory,
+				},
+			}},
+			wantErr: "spec.ansible.playbook is required",
+		},
+		{
+			name: "missing inventory",
+			server: api.Server{Spec: api.ServerSpec{
+				Ansible: &api.ServerAnsible{
+					Playbook: playbook,
+				},
+			}},
+			wantErr: "spec.ansible.inventory is required",
+		},
+		{
 			name: "host-bridge without address",
 			server: api.Server{Spec: api.ServerSpec{
-				AnsiblePlaybook: &playbook,
+				Ansible: &api.ServerAnsible{
+					Playbook:  playbook,
+					Inventory: inventory,
+				},
 				NetworkInterface: &[]api.NetworkInterface{{
 					Networkname: "host-bridge",
 				}},
@@ -56,7 +85,10 @@ func TestValidateServerAnsiblePlaybookSpec(t *testing.T) {
 		{
 			name: "host-bridge missing",
 			server: api.Server{Spec: api.ServerSpec{
-				AnsiblePlaybook: &playbook,
+				Ansible: &api.ServerAnsible{
+					Playbook:  playbook,
+					Inventory: inventory,
+				},
 				NetworkInterface: &[]api.NetworkInterface{{
 					Networkname: "default",
 					Address:     &ip,
@@ -68,21 +100,21 @@ func TestValidateServerAnsiblePlaybookSpec(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotIP, err := validateServerAnsiblePlaybookSpec(tt.server)
+			gotIP, err := validateServerAnsibleSpec(tt.server)
 			if tt.wantErr == "" {
 				if err != nil {
-					t.Fatalf("validateServerAnsiblePlaybookSpec() unexpected err: %v", err)
+					t.Fatalf("validateServerAnsibleSpec() unexpected err: %v", err)
 				}
 				if gotIP != tt.wantIP {
-					t.Fatalf("validateServerAnsiblePlaybookSpec() ip = %q, want %q", gotIP, tt.wantIP)
+					t.Fatalf("validateServerAnsibleSpec() ip = %q, want %q", gotIP, tt.wantIP)
 				}
 				return
 			}
 			if err == nil {
-				t.Fatalf("validateServerAnsiblePlaybookSpec() expected error containing %q", tt.wantErr)
+				t.Fatalf("validateServerAnsibleSpec() expected error containing %q", tt.wantErr)
 			}
 			if !strings.Contains(err.Error(), tt.wantErr) {
-				t.Fatalf("validateServerAnsiblePlaybookSpec() err = %q, want contains %q", err.Error(), tt.wantErr)
+				t.Fatalf("validateServerAnsibleSpec() err = %q, want contains %q", err.Error(), tt.wantErr)
 			}
 		})
 	}
@@ -205,21 +237,130 @@ func TestResolveServerAnsiblePlaybookPathRelative(t *testing.T) {
 	}
 }
 
-func TestValidateServerAnsiblePlaybookSpecUsesStringPtr(t *testing.T) {
-	playbook := util.StringPtr("playbook/setup.yaml")
-	ip := util.StringPtr("192.168.1.64")
+func TestResolveServerAnsibleInventoryPathRelative(t *testing.T) {
+	tmp := t.TempDir()
+	cwd, _ := os.Getwd()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("Chdir() failed: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(cwd)
+	})
+
+	relPath := "hosts"
+	if err := os.WriteFile(relPath, []byte("[all]\nserver ansible_host=192.168.1.64\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile() failed: %v", err)
+	}
+
+	path, err := resolveServerAnsibleInventoryPath(relPath)
+	if err != nil {
+		t.Fatalf("resolveServerAnsibleInventoryPath() unexpected err: %v", err)
+	}
+	if path != filepath.Join(tmp, relPath) {
+		t.Fatalf("resolveServerAnsibleInventoryPath() = %q, want %q", path, filepath.Join(tmp, relPath))
+	}
+}
+
+func TestValidateServerAnsibleSpecUsesStrings(t *testing.T) {
+	playbook := "playbook/setup.yaml"
+	inventory := "hosts"
+	ip := "192.168.1.64"
 	server := api.Server{Spec: api.ServerSpec{
-		AnsiblePlaybook: playbook,
+		Ansible: &api.ServerAnsible{
+			Playbook:  playbook,
+			Inventory: inventory,
+		},
 		NetworkInterface: &[]api.NetworkInterface{{
 			Networkname: "host-bridge",
-			Address:     ip,
+			Address:     &ip,
 		}},
 	}}
-	got, err := validateServerAnsiblePlaybookSpec(server)
+	got, err := validateServerAnsibleSpec(server)
 	if err != nil {
-		t.Fatalf("validateServerAnsiblePlaybookSpec() unexpected err: %v", err)
+		t.Fatalf("validateServerAnsibleSpec() unexpected err: %v", err)
 	}
-	if got != *ip {
-		t.Fatalf("validateServerAnsiblePlaybookSpec() = %q, want %q", got, *ip)
+	if got != ip {
+		t.Fatalf("validateServerAnsibleSpec() = %q, want %q", got, ip)
+	}
+}
+
+func TestRunServerAnsiblePlaybookWithExtraArgs(t *testing.T) {
+	original := serverAnsibleExecCommand
+	t.Cleanup(func() {
+		serverAnsibleExecCommand = original
+	})
+
+	var gotName string
+	var gotArgs []string
+	serverAnsibleExecCommand = func(name string, args ...string) *exec.Cmd {
+		gotName = name
+		gotArgs = append([]string{}, args...)
+		return exec.Command("true")
+	}
+
+	extraArgs := []string{"flush-cache", `tags "nginx,mysql"`, "", "   ", "--skip-tags=cache"}
+	err := runServerAnsiblePlaybook("/tmp/playbook.yaml", "/tmp/hosts", "/tmp/id_test", &extraArgs)
+	if err != nil {
+		t.Fatalf("runServerAnsiblePlaybook() unexpected err: %v", err)
+	}
+
+	if gotName != "ansible-playbook" {
+		t.Fatalf("command name = %q, want ansible-playbook", gotName)
+	}
+	wantArgs := []string{
+		"-i", "/tmp/hosts",
+		"/tmp/playbook.yaml",
+		"--private-key", "/tmp/id_test",
+		"--flush-cache",
+		"--tags",
+		"nginx,mysql",
+		"--skip-tags=cache",
+	}
+	if !reflect.DeepEqual(gotArgs, wantArgs) {
+		t.Fatalf("args = %#v, want %#v", gotArgs, wantArgs)
+	}
+}
+
+func TestRunServerAnsiblePlaybookWithInvalidExtraArgs(t *testing.T) {
+	extraArgs := []string{`tags "nginx,mysql`}
+	err := runServerAnsiblePlaybook("/tmp/playbook.yaml", "/tmp/hosts", "/tmp/id_test", &extraArgs)
+	if err == nil {
+		t.Fatalf("runServerAnsiblePlaybook() expected error for invalid extra args")
+	}
+	if !strings.Contains(err.Error(), "invalid spec.ansible.extra-args entry") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunServerAnsiblePingWithoutUserOption(t *testing.T) {
+	original := serverAnsibleExecCommand
+	t.Cleanup(func() {
+		serverAnsibleExecCommand = original
+	})
+
+	var gotName string
+	var gotArgs []string
+	serverAnsibleExecCommand = func(name string, args ...string) *exec.Cmd {
+		gotName = name
+		gotArgs = append([]string{}, args...)
+		return exec.Command("true")
+	}
+
+	err := runServerAnsiblePing("192.168.1.64", "/tmp/id_test")
+	if err != nil {
+		t.Fatalf("runServerAnsiblePing() unexpected err: %v", err)
+	}
+
+	if gotName != "ansible" {
+		t.Fatalf("command name = %q, want ansible", gotName)
+	}
+	wantArgs := []string{
+		"all",
+		"-i", "192.168.1.64,",
+		"-m", "ping",
+		"--private-key", "/tmp/id_test",
+	}
+	if !reflect.DeepEqual(gotArgs, wantArgs) {
+		t.Fatalf("args = %#v, want %#v", gotArgs, wantArgs)
 	}
 }

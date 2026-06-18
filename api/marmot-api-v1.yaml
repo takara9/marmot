@@ -1510,8 +1510,8 @@ components:
     ServerSpec:
       type: object
       properties:
-        ansible-playbook:
-          type: string
+        ansible:
+          $ref: "#/components/schemas/ServerAnsible"
         cpu:
           type: integer
           format: int
@@ -1538,6 +1538,20 @@ components:
           $ref: "#/components/schemas/Volume"
         auth:
           $ref: "#/components/schemas/Auth"
+    ServerAnsible:
+      type: object
+      required:
+        - playbook
+        - inventory
+      properties:
+        playbook:
+          type: string
+        inventory:
+          type: string
+        extra-args:
+          type: array
+          items:
+            type: string
     VirtualNetwork:
       type: object
       required:
