@@ -313,12 +313,12 @@ func (d *Database) UpdateVirtualNetworkById(vnetId string, spec api.VirtualNetwo
 		break
 	}
 
-	fmt.Println("=== 書き込みデータの情報確認 ===", "network Id", vnetId)
+	debugPrintln("=== 書き込みデータの情報確認 ===", "network Id", vnetId)
 	data3, err := json.MarshalIndent(spec, "", "  ")
 	if err != nil {
 		slog.Error("json.MarshalIndent()", "err", err)
 	} else {
-		fmt.Println("仮想ネットワーク情報(network): ", string(data3))
+		debugPrintln("仮想ネットワーク情報(network): ", string(data3))
 	}
 
 	return nil

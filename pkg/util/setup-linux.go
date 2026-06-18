@@ -322,7 +322,7 @@ func MountVolume(v api.Volume) (string, string, error) {
 		mountCandidates := []string{fmt.Sprintf("%sp1", nbdDevice), nbdDevice}
 		mounted := false
 		for _, dev := range mountCandidates {
-			fmt.Println("Mounting", "mount", "-t", "ext4", dev, mountPoint)
+			debugPrintln("Mounting", "mount", "-t", "ext4", dev, mountPoint)
 			cmd = exec.Command("mount", "-t", "ext4", dev, mountPoint)
 			err = cmd.Run()
 			if err == nil {
@@ -502,14 +502,14 @@ func CreateNetplanInterfaces(requestConfig []api.NetworkInterface, mountPoint st
 			slog.Debug("Configuring interface", "index", idx, "ifaceName", ifaceName, "nic", nic)
 
 			// IPアドレスの設定が無ければ、DHCPでIPアドレスを取得する設定にする
-			fmt.Println("DEBUG ===============================================================")
+			debugPrintln("DEBUG ===============================================================")
 			json, err := json.MarshalIndent(nic, "", "  ")
 			if err != nil {
 				slog.Error("json.MarshalIndent()", "err", err)
 			} else {
-				fmt.Println("NIC情報(nic): ", string(json))
+				debugPrintln("NIC情報(nic): ", string(json))
 			}
-			fmt.Println("=====================================================================")
+			debugPrintln("=====================================================================")
 
 			// IPアドレスとネットマスク長があれば、DHCPは無効にする
 			if nic.Address != nil && nic.Netmasklen != nil {
@@ -585,7 +585,7 @@ func CreateNetplanInterfaces(requestConfig []api.NetworkInterface, mountPoint st
 		return fmt.Errorf("write netplan config failed: %w", err)
 	}
 
-	fmt.Printf("Generated %s successfully:\n\n%s", filePath, string(data))
+	debugPrintln(fmt.Sprintf("Generated %s successfully:\n\n%s", filePath, string(data)))
 
 	return nil
 }

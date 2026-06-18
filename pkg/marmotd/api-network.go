@@ -4,7 +4,6 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -42,7 +41,7 @@ func (s *Server) ApiCreateNetwork(ctx echo.Context) error {
 		slog.Error("failed to marshal request body", "err", err)
 		return echo.NewHTTPError(500, "failed to marshal request body")
 	}
-	fmt.Println("request body", "body", string(jsonbytes))
+	debugPrintln("request body", "body", string(jsonbytes))
 
 	// 仮想ネットワークを作成する
 	network, err := s.Ma.Db.CreateVirtualNetwork(spec)

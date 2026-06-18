@@ -219,7 +219,7 @@ func (l *LibVirtEp) DefineAndStartVirtualNetwork(network libvirtxml.Network) err
 		return err
 	}
 
-	fmt.Println("Generated Network XML:", string(xmlString))
+	debugPrintln("Generated Network XML:", string(xmlString))
 
 	// Create Network
 	net, err := l.Com.NetworkDefineXML(xmlString)

@@ -254,7 +254,7 @@ func (d *Job) RunJob(job api.Job) error {
 	}
 
 	// ジョブの実行
-	fmt.Println("===", (*job.Spec.Command)[0], (*job.Spec.Command)[1:], "===")
+	debugPrintln("===", (*job.Spec.Command)[0], (*job.Spec.Command)[1:], "===")
 	cmd := exec.Command((*job.Spec.Command)[0], (*job.Spec.Command)[1:]...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
