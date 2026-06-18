@@ -64,10 +64,16 @@ func backupResolvConfIfNeeded(sourcePath, backupPath string) error {
 		return fmt.Errorf("read %s for backup: %w", sourcePath, err)
 	}
 
-	if err := os.WriteFile(backupPath, content, 0644); err != nil {
+	f, err := os.OpenFile(backupPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+	if err != nil {
 		if os.IsExist(err) {
 			return nil
 		}
+		return fmt.Errorf("create backup %s: %w", backupPath, err)
+	}
+	defer f.Close()
+
+	if _, err := f.Write(content); err != nil {
 		return fmt.Errorf("write backup %s: %w", backupPath, err)
 	}
 
