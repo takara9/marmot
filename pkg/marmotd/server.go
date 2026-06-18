@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -389,6 +390,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			PortID:  uuid.New().String(),
 			Bus:     1,
 		}
+		if xnet.Spec.BridgeName != nil && isOVSBridge(strings.TrimSpace(*xnet.Spec.BridgeName)) {
+			defaultNS.InterfaceID = defaultNS.PortID
+		}
 		virtSpec.NetSpecs = []virt.NetSpec{defaultNS}
 
 		net.Networkid = api.VirtualNetworkID(xnet)
@@ -522,6 +526,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 				Network: vnet.Metadata.Name,
 				PortID:  uuid.New().String(),
 				Bus:     busno,
+			}
+			if vnet.Spec.BridgeName != nil && isOVSBridge(strings.TrimSpace(*vnet.Spec.BridgeName)) {
+				ns.InterfaceID = ns.PortID
 			}
 
 			// VLAN対応
@@ -876,10 +883,10 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		}
 	}
 
-	// VM 起動直前に、オーバーレイネットワークのブリッジ存在を再確認する。
-	// ネットワークコントローラーとのタイミング競合でブリッジがまだ見えない場合に備える。
-	if err := m.ensureOverlayBridgesForServer(serverConfig); err != nil {
-		slog.Error("ensureOverlayBridgesForServer()", "err", err)
+	// VM 起動直前に、依存ネットワーク実体とオーバーレイブリッジを再確認する。
+	// ネットワークコントローラーとのタイミング競合や host 再起動後の実体欠落に備える。
+	if err := m.ensureServerNetworkDependencies(serverConfig); err != nil {
+		slog.Error("ensureServerNetworkDependencies()", "err", err)
 		return "", err
 	}
 
@@ -915,6 +922,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			}
 			ns.Bridge = strings.TrimSpace(*vnet.Spec.BridgeName)
 			ns.Network = ""
+			if ns.InterfaceID == "" && isOVSBridge(ns.Bridge) {
+				ns.InterfaceID = ns.PortID
+			}
 			fallbackApplied = true
 		}
 		if fallbackApplied {
@@ -926,9 +936,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		}
 	}
 	if err != nil && isLibvirtBridgeDeviceMissingError(err) {
-		slog.Warn("bridge device not ready; retrying after ensuring overlay bridges", "err", err)
-		if ensureErr := m.ensureOverlayBridgesForServer(serverConfig); ensureErr != nil {
-			slog.Error("ensureOverlayBridgesForServer() on retry", "err", ensureErr)
+		slog.Warn("bridge device not ready; retrying after ensuring server network dependencies", "err", err)
+		if ensureErr := m.ensureServerNetworkDependencies(serverConfig); ensureErr != nil {
+			slog.Error("ensureServerNetworkDependencies() on retry", "err", ensureErr)
 		} else {
 			consolePath, err = l.DefineAndStartVM(*dom)
 		}
@@ -1144,12 +1154,92 @@ func isLibvirtBridgeDeviceMissingError(err error) bool {
 	return strings.Contains(msg, "cannot get interface mtu") || strings.Contains(msg, "no such device")
 }
 
+func isOVSBridge(bridgeName string) bool {
+	name := strings.TrimSpace(bridgeName)
+	if name == "" {
+		return false
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "ovs-vsctl", "br-exists", name)
+	if err := cmd.Run(); err != nil {
+		return false
+	}
+	return true
+}
+
 func isManagedOverlayNetwork(vnet api.VirtualNetwork) bool {
 	if vnet.Spec.OverlayMode == nil {
 		return false
 	}
 	mode := strings.TrimSpace(string(*vnet.Spec.OverlayMode))
 	return strings.EqualFold(mode, string(api.Vxlan)) || strings.EqualFold(mode, string(api.Geneve))
+}
+
+func (m *Marmot) ensureServerNetworkDependencies(serverConfig api.Server) error {
+	if err := m.ensureServerLibvirtNetworks(serverConfig); err != nil {
+		return err
+	}
+	if err := m.ensureOverlayBridgesForServer(serverConfig); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *Marmot) ensureServerLibvirtNetworks(serverConfig api.Server) error {
+	if serverConfig.Spec.NetworkInterface == nil {
+		return nil
+	}
+
+	for _, nic := range *serverConfig.Spec.NetworkInterface {
+		networkName := strings.TrimSpace(nic.Networkname)
+		if networkName == "" {
+			continue
+		}
+
+		vnet, err := m.Db.GetVirtualNetworkByName(networkName)
+		if err != nil {
+			return fmt.Errorf("failed to lookup virtual network %s: %w", networkName, err)
+		}
+
+		libvirtNet, found, err := m.Virt.GetVirtualNetworkByName(vnet.Metadata.Name)
+		if err != nil {
+			return fmt.Errorf("failed to lookup libvirt network %s: %w", vnet.Metadata.Name, err)
+		}
+
+		if !found {
+			xml, xmlErr := virt.CreateVirtualNetworkXML(vnet)
+			if xmlErr != nil {
+				return fmt.Errorf("failed to build virtual network XML for %s: %w", vnet.Metadata.Name, xmlErr)
+			}
+			if startErr := m.Virt.DefineAndStartVirtualNetwork(*xml); startErr != nil {
+				return fmt.Errorf("failed to define/start virtual network %s: %w", vnet.Metadata.Name, startErr)
+			}
+			continue
+		}
+
+		active, activeErr := libvirtNet.IsActive()
+		if activeErr != nil {
+			_ = libvirtNet.Free()
+			return fmt.Errorf("failed to check libvirt network state %s: %w", vnet.Metadata.Name, activeErr)
+		}
+
+		if !active {
+			if createErr := libvirtNet.Create(); createErr != nil {
+				_ = libvirtNet.Free()
+				return fmt.Errorf("failed to start libvirt network %s: %w", vnet.Metadata.Name, createErr)
+			}
+		}
+
+		if autostartErr := libvirtNet.SetAutostart(true); autostartErr != nil {
+			slog.Warn("failed to set network autostart", "network", vnet.Metadata.Name, "err", autostartErr)
+		}
+		_ = libvirtNet.Free()
+	}
+
+	return nil
 }
 
 func (m *Marmot) ensureOverlayBridgesForServer(serverConfig api.Server) error {
