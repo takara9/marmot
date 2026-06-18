@@ -426,11 +426,29 @@ func addIP(ip netip.Addr, delta int64) netip.Addr {
 }
 
 func addIPBig(ip netip.Addr, delta *big.Int) (netip.Addr, error) {
+	if ip.Is4() {
+		if delta.Sign() < 0 {
+			return netip.Addr{}, fmt.Errorf("ip calculation overflow")
+		}
+		if delta.BitLen() > 32 {
+			return netip.Addr{}, fmt.Errorf("ip calculation overflow")
+		}
+
+		a4 := ip.As4()
+		base := uint32(a4[0])<<24 | uint32(a4[1])<<16 | uint32(a4[2])<<8 | uint32(a4[3])
+		d := uint32(delta.Uint64())
+		if d > (^uint32(0) - base) {
+			return netip.Addr{}, fmt.Errorf("ip calculation overflow")
+		}
+		out := base + d
+		return netip.AddrFrom4([4]byte{byte(out >> 24), byte(out >> 16), byte(out >> 8), byte(out)}), nil
+	}
+
 	ipBytes := ip.As16()
 	val := new(big.Int).SetBytes(ipBytes[:])
 	result := new(big.Int).Add(val, delta)
 
-	max := new(big.Int).Lsh(big.NewInt(1), uint(ip.BitLen()))
+	max := new(big.Int).Lsh(big.NewInt(1), 128)
 	max.Sub(max, big.NewInt(1))
 	if result.Sign() < 0 || result.Cmp(max) > 0 {
 		return netip.Addr{}, fmt.Errorf("ip calculation overflow")
