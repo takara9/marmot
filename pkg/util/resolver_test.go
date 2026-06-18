@@ -2,6 +2,7 @@ package util
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -87,4 +88,70 @@ func TestNameserverForDNSListenAddr(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBackupResolvConfIfNeeded(t *testing.T) {
+	t.Run("creates backup when missing", func(t *testing.T) {
+		dir := t.TempDir()
+		src := filepath.Join(dir, "resolv.conf")
+		bak := filepath.Join(dir, "resolv.conf.marmot.bak")
+		original := "nameserver 8.8.8.8\n"
+
+		if err := os.WriteFile(src, []byte(original), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := backupResolvConfIfNeeded(src, bak); err != nil {
+			t.Fatalf("backupResolvConfIfNeeded() error = %v", err)
+		}
+
+		got, err := os.ReadFile(bak)
+		if err != nil {
+			t.Fatalf("failed to read backup: %v", err)
+		}
+		if string(got) != original {
+			t.Fatalf("backup content = %q, want %q", string(got), original)
+		}
+	})
+
+	t.Run("does not overwrite existing backup", func(t *testing.T) {
+		dir := t.TempDir()
+		src := filepath.Join(dir, "resolv.conf")
+		bak := filepath.Join(dir, "resolv.conf.marmot.bak")
+		existing := "nameserver 1.1.1.1\n"
+		updatedSrc := "nameserver 9.9.9.9\n"
+
+		if err := os.WriteFile(src, []byte(updatedSrc), 0644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(bak, []byte(existing), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := backupResolvConfIfNeeded(src, bak); err != nil {
+			t.Fatalf("backupResolvConfIfNeeded() error = %v", err)
+		}
+
+		got, err := os.ReadFile(bak)
+		if err != nil {
+			t.Fatalf("failed to read backup: %v", err)
+		}
+		if string(got) != existing {
+			t.Fatalf("backup was overwritten: got %q, want %q", string(got), existing)
+		}
+	})
+
+	t.Run("no source file still succeeds", func(t *testing.T) {
+		dir := t.TempDir()
+		src := filepath.Join(dir, "resolv.conf")
+		bak := filepath.Join(dir, "resolv.conf.marmot.bak")
+
+		if err := backupResolvConfIfNeeded(src, bak); err != nil {
+			t.Fatalf("backupResolvConfIfNeeded() error = %v", err)
+		}
+
+		if _, err := os.Stat(bak); !os.IsNotExist(err) {
+			t.Fatalf("backup should not be created when source is missing")
+		}
+	})
 }
