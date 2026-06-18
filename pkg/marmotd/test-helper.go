@@ -33,7 +33,7 @@ func StartMockServer(ctx context.Context, marmotPort int, etcdPort int) (*Server
 		// サーバー起動
 		go func() {
 			if err := e.Start("0.0.0.0:" + fmt.Sprintf("%d", marmotPort)); err != nil && err != http.ErrServerClosed {
-				fmt.Println("server error:", err)
+				debugPrintln("server error:", err)
 			}
 		}()
 
@@ -47,7 +47,7 @@ func StartMockServer(ctx context.Context, marmotPort int, etcdPort int) (*Server
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := e.Shutdown(shutdownCtx); err != nil {
-			fmt.Println("shutdown error:", err)
+			debugPrintln("shutdown error:", err)
 		}
 	}()
 

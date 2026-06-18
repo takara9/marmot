@@ -248,14 +248,14 @@ func (c *controller) serverControllerLoop() {
 			// IPアドレス開放処理の実行
 			if spec.Spec.NetworkInterface != nil {
 				for _, nic := range *spec.Spec.NetworkInterface {
-					fmt.Println("NIC=========================================")
+					debugPrintln("NIC=========================================")
 					jsonbyte, err := json.MarshalIndent(nic, "", "  ")
 					if err != nil {
 						slog.Error("json.MarshalIndent()", "err", err)
 						continue
 					}
-					fmt.Println(string(jsonbyte))
-					fmt.Println("=========================================")
+					debugPrintln(string(jsonbyte))
+					debugPrintln("=========================================")
 
 					if nic.IpNetworkId != nil && nic.Address != nil {
 						if err := c.marmot.Db.ReleaseIP(nic.Networkid, *nic.IpNetworkId, *nic.Address); err != nil {

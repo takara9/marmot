@@ -2,7 +2,6 @@ package db
 
 import (
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -151,12 +150,12 @@ func (d *Database) UpdateServer(id string, spec api.Server) error {
 		break
 	}
 
-	fmt.Println("=== 書き込みデータの情報確認 ===", "server Id", id)
+	debugPrintln("=== 書き込みデータの情報確認 ===", "server Id", id)
 	data, err := json.MarshalIndent(spec, "", "  ")
 	if err != nil {
 		slog.Error("json.MarshalIndent()", "err", err)
 	} else {
-		fmt.Println("サーバー情報(server): ", string(data))
+		debugPrintln("サーバー情報(server): ", string(data))
 	}
 
 	return nil

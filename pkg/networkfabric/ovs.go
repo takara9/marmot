@@ -28,6 +28,29 @@ const (
 
 const bridgeDeviceWaitTimeout = 10 * time.Second
 
+var ovsVSCTLDebugLogging = false
+
+// SetOVSVSCTLDebugLogging enables/disables ovs-vsctl syslog verbosity.
+// When disabled, ovs-vsctl "Called as ..." INFO logs are suppressed.
+func SetOVSVSCTLDebugLogging(enabled bool) {
+	ovsVSCTLDebugLogging = enabled
+}
+
+func ovsVSCTLArgs(args ...string) []string {
+	if !ovsVSCTLDebugLogging {
+		return append([]string{"--verbose=vsctl:syslog:off"}, args...)
+	}
+	return args
+}
+
+func ovsVSCTLCmd(args ...string) *exec.Cmd {
+	return exec.Command("ovs-vsctl", ovsVSCTLArgs(args...)...)
+}
+
+func ovsVSCTLCmdCtx(ctx context.Context, args ...string) *exec.Cmd {
+	return exec.CommandContext(ctx, "ovs-vsctl", ovsVSCTLArgs(args...)...)
+}
+
 // NewOVSFabric は OVSFabric インスタンスを生成する。
 func NewOVSFabric() *OVSFabric {
 	return &OVSFabric{}
@@ -44,7 +67,7 @@ func (o *OVSFabric) EnsureBridge(vnet *api.VirtualNetwork) error {
 	// ブリッジ存在確認
 	checkCtx, checkCancel := context.WithTimeout(context.Background(), ovsCommandTimeout)
 	defer checkCancel()
-	cmd := exec.CommandContext(checkCtx, "ovs-vsctl", "br-exists", bridgeName)
+	cmd := ovsVSCTLCmdCtx(checkCtx, "br-exists", bridgeName)
 	if err := cmd.Run(); err == nil {
 		// OVS DB 上にあっても Linux 側デバイスが無いケースがあるため確認する。
 		if waitLinuxBridgeDeviceReady(bridgeName, bridgeDeviceWaitTimeout) {
@@ -68,13 +91,13 @@ func (o *OVSFabric) EnsureBridge(vnet *api.VirtualNetwork) error {
 	// ブリッジ作成
 	addCtx, addCancel := context.WithTimeout(context.Background(), ovsCommandTimeout)
 	defer addCancel()
-	cmd = exec.CommandContext(addCtx, "ovs-vsctl", "--may-exist", "add-br", bridgeName)
+	cmd = ovsVSCTLCmdCtx(addCtx, "--may-exist", "add-br", bridgeName)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		if addCtx.Err() == context.DeadlineExceeded {
 			// タイムアウトでも作成完了している場合があるため、再確認して存在すれば成功扱いにする。
 			recheckCtx, recheckCancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer recheckCancel()
-			recheckCmd := exec.CommandContext(recheckCtx, "ovs-vsctl", "br-exists", bridgeName)
+			recheckCmd := ovsVSCTLCmdCtx(recheckCtx, "br-exists", bridgeName)
 			if recheckErr := recheckCmd.Run(); recheckErr == nil {
 				slog.Warn("OVS bridge create timed out but bridge exists", "bridge", bridgeName)
 				return nil
@@ -85,7 +108,7 @@ func (o *OVSFabric) EnsureBridge(vnet *api.VirtualNetwork) error {
 		// エラーでも競合で既存化している場合があるため再確認する。
 		recheckCtx, recheckCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer recheckCancel()
-		recheckCmd := exec.CommandContext(recheckCtx, "ovs-vsctl", "br-exists", bridgeName)
+		recheckCmd := ovsVSCTLCmdCtx(recheckCtx, "br-exists", bridgeName)
 		if recheckErr := recheckCmd.Run(); recheckErr == nil {
 			slog.Warn("OVS bridge create returned error but bridge exists", "bridge", bridgeName, "err", err, "output", string(output))
 			return nil
@@ -106,7 +129,7 @@ func (o *OVSFabric) EnsureBridge(vnet *api.VirtualNetwork) error {
 func recreateBridge(bridgeName string) error {
 	delCtx, delCancel := context.WithTimeout(context.Background(), ovsCommandTimeout)
 	defer delCancel()
-	delCmd := exec.CommandContext(delCtx, "ovs-vsctl", "--if-exists", "del-br", bridgeName)
+	delCmd := ovsVSCTLCmdCtx(delCtx, "--if-exists", "del-br", bridgeName)
 	if output, err := delCmd.CombinedOutput(); err != nil {
 		if delCtx.Err() == context.DeadlineExceeded {
 			return fmt.Errorf("timeout while deleting stale bridge %s", bridgeName)
@@ -116,7 +139,7 @@ func recreateBridge(bridgeName string) error {
 
 	addCtx, addCancel := context.WithTimeout(context.Background(), ovsCommandTimeout)
 	defer addCancel()
-	addCmd := exec.CommandContext(addCtx, "ovs-vsctl", "--may-exist", "add-br", bridgeName)
+	addCmd := ovsVSCTLCmdCtx(addCtx, "--may-exist", "add-br", bridgeName)
 	if output, err := addCmd.CombinedOutput(); err != nil {
 		if addCtx.Err() == context.DeadlineExceeded {
 			return fmt.Errorf("timeout while recreating bridge %s", bridgeName)
@@ -200,7 +223,7 @@ func (o *OVSFabric) EnsureOverlayMesh(vnet *api.VirtualNetwork, peers []string) 
 		}
 
 		if !exists {
-			createCmd := exec.Command("ovs-vsctl", "add-port", bridgeName, tunnelName)
+			createCmd := ovsVSCTLCmd("add-port", bridgeName, tunnelName)
 			if output, err := createCmd.CombinedOutput(); err != nil {
 				slog.Error("failed to add VXLAN port", "bridge", bridgeName, "tunnel", tunnelName, "peer", peerIP, "err", err, "output", string(output))
 				return fmt.Errorf("failed to add tunnel port %s to %s: %w (output=%s)", tunnelName, peerIP, err, strings.TrimSpace(string(output)))
@@ -218,7 +241,7 @@ func (o *OVSFabric) EnsureOverlayMesh(vnet *api.VirtualNetwork, peers []string) 
 			args = append(args, fmt.Sprintf("options:local_ip=%s", localIP))
 		}
 
-		setCmd := exec.Command("ovs-vsctl", args...)
+		setCmd := ovsVSCTLCmd(args...)
 		if output, err := setCmd.CombinedOutput(); err != nil {
 			slog.Error("failed to configure VXLAN tunnel", "bridge", bridgeName, "tunnel", tunnelName, "peer", peerIP, "err", err, "output", string(output))
 			return fmt.Errorf("failed to configure tunnel %s to %s: %w (output=%s)", tunnelName, peerIP, err, strings.TrimSpace(string(output)))
@@ -250,7 +273,7 @@ func tunnelNameForPeer(bridgeName, peerIP string) string {
 }
 
 func portExistsOnBridge(bridgeName, portName string) (bool, error) {
-	cmd := exec.Command("ovs-vsctl", "list-ports", bridgeName)
+	cmd := ovsVSCTLCmd("list-ports", bridgeName)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return false, fmt.Errorf("ovs-vsctl list-ports %s failed: %w (output=%s)", bridgeName, err, strings.TrimSpace(string(output)))
@@ -310,7 +333,7 @@ func (o *OVSFabric) PruneOverlayMesh(vnet *api.VirtualNetwork, remainPeers []str
 	bridgeName := *vnet.Spec.BridgeName
 
 	// 現在のトンネル一覧を取得
-	cmd := exec.Command("ovs-vsctl", "list-ports", bridgeName)
+	cmd := ovsVSCTLCmd("list-ports", bridgeName)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		slog.Error("failed to list ports", "bridge", bridgeName, "err", err)
@@ -334,7 +357,7 @@ func (o *OVSFabric) PruneOverlayMesh(vnet *api.VirtualNetwork, remainPeers []str
 		port = strings.TrimSpace(port)
 		isVxlanPort := strings.HasPrefix(port, "vxlan-") || strings.HasPrefix(port, "vx-")
 		if isVxlanPort && !keepTunnels[port] {
-			delCmd := exec.Command("ovs-vsctl", "del-port", bridgeName, port)
+			delCmd := ovsVSCTLCmd("del-port", bridgeName, port)
 			if output, err := delCmd.CombinedOutput(); err != nil {
 				slog.Warn("failed to delete VXLAN tunnel", "bridge", bridgeName, "tunnel", port, "err", err, "output", string(output))
 			} else {
@@ -505,7 +528,7 @@ func flowSetsEqual(a, b []string) bool {
 }
 
 func listAccessPortsOnBridge(bridgeName string) ([]string, error) {
-	cmd := exec.Command("ovs-vsctl", "list-ports", bridgeName)
+	cmd := ovsVSCTLCmd("list-ports", bridgeName)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("ovs-vsctl list-ports %s failed: %w (output=%s)", bridgeName, err, strings.TrimSpace(string(output)))
@@ -518,7 +541,7 @@ func listAccessPortsOnBridge(bridgeName string) ([]string, error) {
 		if port == "" {
 			continue
 		}
-		typeCmd := exec.Command("ovs-vsctl", "get", "interface", port, "type")
+		typeCmd := ovsVSCTLCmd("get", "interface", port, "type")
 		typeOut, typeErr := typeCmd.CombinedOutput()
 		if typeErr != nil {
 			return nil, fmt.Errorf("ovs-vsctl get interface %s type failed: %w (output=%s)", port, typeErr, strings.TrimSpace(string(typeOut)))
@@ -533,7 +556,7 @@ func listAccessPortsOnBridge(bridgeName string) ([]string, error) {
 }
 
 func listVxlanPortsOnBridge(bridgeName string) ([]string, error) {
-	cmd := exec.Command("ovs-vsctl", "list-ports", bridgeName)
+	cmd := ovsVSCTLCmd("list-ports", bridgeName)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("ovs-vsctl list-ports %s failed: %w (output=%s)", bridgeName, err, strings.TrimSpace(string(output)))
@@ -547,7 +570,7 @@ func listVxlanPortsOnBridge(bridgeName string) ([]string, error) {
 			continue
 		}
 
-		typeCmd := exec.Command("ovs-vsctl", "get", "interface", port, "type")
+		typeCmd := ovsVSCTLCmd("get", "interface", port, "type")
 		typeOut, typeErr := typeCmd.CombinedOutput()
 		if typeErr != nil {
 			return nil, fmt.Errorf("ovs-vsctl get interface %s type failed: %w (output=%s)", port, typeErr, strings.TrimSpace(string(typeOut)))
@@ -574,7 +597,7 @@ func getInterfaceOfport(portName string) (int, error) {
 }
 
 func getInterfaceOfportIfReady(portName string) (int, bool, error) {
-	cmd := exec.Command("ovs-vsctl", "get", "interface", portName, "ofport")
+	cmd := ovsVSCTLCmd("get", "interface", portName, "ofport")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return 0, false, fmt.Errorf("ovs-vsctl get interface %s ofport failed: %w (output=%s)", portName, err, strings.TrimSpace(string(output)))
@@ -628,7 +651,7 @@ func (o *OVSFabric) DeleteBridge(vnet *api.VirtualNetwork) error {
 	bridgeName := *vnet.Spec.BridgeName
 
 	// ブリッジ存在確認
-	checkCmd := exec.Command("ovs-vsctl", "br-exists", bridgeName)
+	checkCmd := ovsVSCTLCmd("br-exists", bridgeName)
 	if err := checkCmd.Run(); err != nil {
 		// 既に存在しない
 		slog.Debug("OVS bridge does not exist, skipping delete", "bridge", bridgeName)
@@ -636,7 +659,7 @@ func (o *OVSFabric) DeleteBridge(vnet *api.VirtualNetwork) error {
 	}
 
 	// ブリッジ削除
-	cmd := exec.Command("ovs-vsctl", "del-br", bridgeName)
+	cmd := ovsVSCTLCmd("del-br", bridgeName)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		slog.Error("failed to delete OVS bridge", "bridge", bridgeName, "err", err, "output", string(output))
 		return fmt.Errorf("failed to delete bridge %s: %w", bridgeName, err)
@@ -655,13 +678,13 @@ func (o *OVSFabric) GetBridgeStatus(vnet *api.VirtualNetwork) (bool, int, error)
 	bridgeName := *vnet.Spec.BridgeName
 
 	// ブリッジ存在確認
-	checkCmd := exec.Command("ovs-vsctl", "br-exists", bridgeName)
+	checkCmd := ovsVSCTLCmd("br-exists", bridgeName)
 	if err := checkCmd.Run(); err != nil {
 		return false, 0, nil
 	}
 
 	// ポート数を取得
-	listCmd := exec.Command("ovs-vsctl", "list-ports", bridgeName)
+	listCmd := ovsVSCTLCmd("list-ports", bridgeName)
 	output, err := listCmd.CombinedOutput()
 	if err != nil {
 		return true, 0, err

@@ -15,6 +15,12 @@ const ovnBootstrapCommandTimeout = 5 * time.Second
 
 var ovnNBCTLBootstrapLookPath = exec.LookPath
 var ovnSBCTLBootstrapLookPath = exec.LookPath
+var ovnNBCTLBootstrapDebugLogging = false
+
+// SetOVNBootstrapDebugLogging toggles ovn-nbctl verbosity in bootstrap path.
+func SetOVNBootstrapDebugLogging(enabled bool) {
+	ovnNBCTLBootstrapDebugLogging = enabled
+}
 
 // EnsureOVNRuntimeBootstrap は marmotd 起動時に OVS external_ids と OVN central listener を整合させる。
 func EnsureOVNRuntimeBootstrap(ma *Marmot, cfg *MarmotdConfig) error {
@@ -235,7 +241,12 @@ func runOVNDBControl(command string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ovnBootstrapCommandTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, command, args...)
+	resolvedArgs := args
+	if strings.EqualFold(command, "ovn-nbctl") && !ovnNBCTLBootstrapDebugLogging {
+		resolvedArgs = append([]string{"--verbose=ovn_dbctl:syslog:off"}, resolvedArgs...)
+	}
+
+	cmd := exec.CommandContext(ctx, command, resolvedArgs...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("%s failed: %w (output=%s)", command, err, strings.TrimSpace(string(output)))

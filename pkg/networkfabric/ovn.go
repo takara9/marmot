@@ -28,10 +28,17 @@ var runOVSVSCTLCommand = runOVSVSCTL
 var ovnNBCTLLookPath = exec.LookPath
 var ovnSBCTLLookPath = exec.LookPath
 var enableGeneveOVSTunnelMesh = true
+var ovnNBCTLDebugLogging = false
 
 // NewOVNFabric は OVNFabric インスタンスを生成する。
 func NewOVNFabric() *OVNFabric {
 	return &OVNFabric{ovs: NewOVSFabric()}
+}
+
+// SetOVNNBCTLDebugLogging enables/disables ovn-nbctl syslog verbosity for this package.
+// When disabled, ovn-nbctl "Called as ..." INFO logs are suppressed.
+func SetOVNNBCTLDebugLogging(enabled bool) {
+	ovnNBCTLDebugLogging = enabled
 }
 
 func (o *OVNFabric) EnsureBridge(vnet *api.VirtualNetwork) error {
@@ -297,6 +304,9 @@ func runOVNNBCTL(args ...string) (string, error) {
 	defer cancel()
 
 	resolvedArgs := appendOVNDBTargetArgs(args, ovnNorthboundDBTarget())
+	if !ovnNBCTLDebugLogging {
+		resolvedArgs = append([]string{"--verbose=ovn_dbctl:syslog:off"}, resolvedArgs...)
+	}
 	cmd := exec.CommandContext(ctx, "ovn-nbctl", resolvedArgs...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -386,7 +396,7 @@ func runOVSVSCTL(args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ovnCommandTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "ovs-vsctl", args...)
+	cmd := ovsVSCTLCmdCtx(ctx, args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {

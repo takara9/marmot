@@ -666,12 +666,12 @@ func (d *Database) UpdateImage(id string, spec api.Image) error {
 		break
 	}
 
-	fmt.Println("=== 書き込みデータの情報確認 ===", "image Id", id)
+	debugPrintln("=== 書き込みデータの情報確認 ===", "image Id", id)
 	data3, err := json.MarshalIndent(spec, "", "  ")
 	if err != nil {
 		slog.Error("json.MarshalIndent()", "err", err)
 	} else {
-		fmt.Println("イメージ情報(image): ", string(data3))
+		debugPrintln("イメージ情報(image): ", string(data3))
 	}
 
 	return nil

@@ -133,7 +133,7 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 	}
 
 	byteData, _ := json.MarshalIndent(volume, "", "    ")
-	fmt.Println("Volume to be created:", string(byteData))
+	debugPrintln("Volume to be created:", string(byteData))
 
 	// データベースに登録
 	if err := d.PutJSON(key, volume); err != nil {

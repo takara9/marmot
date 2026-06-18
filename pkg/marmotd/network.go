@@ -67,7 +67,7 @@ func (m *Marmot) GetVirtualNetworksAndPutDB() ([]api.VirtualNetwork, error) {
 			slog.Error("Failed to get virtual network XML", "err", err)
 			continue
 		}
-		fmt.Println(string(xml))
+		debugPrintln(string(xml))
 
 		// libvirt XMLをパースして、APIのVirtualNetworkに変換る
 		var libnet libvirtxml.Network
@@ -212,12 +212,12 @@ func (m *Marmot) DeleteVirtualNetwork(networkId string) error {
 		return err
 	}
 
-	fmt.Println("==== Deleting virtual network:", vnet.Metadata.Name, "====")
+	debugPrintln("==== Deleting virtual network:", vnet.Metadata.Name, "====")
 	jsonBytes, err := json.MarshalIndent(vnet, "", "  ")
 	if err != nil {
 		slog.Error("Failed to marshal virtual network for deletion", "err", err)
 	} else {
-		fmt.Println(string(jsonBytes))
+		debugPrintln(string(jsonBytes))
 	}
 
 	// 仮想ネットワークに関連付いているIPネットワークをチェックして、使用していれば消せないエラーを返す

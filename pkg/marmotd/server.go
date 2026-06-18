@@ -427,7 +427,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			if err != nil {
 				slog.Error("failed to marshal network interface", "err", err)
 			} else {
-				fmt.Println("=== ネットワークインターフェースの情報 ===", "ni", string(jsonBytes0))
+				debugPrintln("=== ネットワークインターフェースの情報 ===", "ni", string(jsonBytes0))
 			}
 
 			reqNic.Networkid = api.VirtualNetworkID(vnet) // ネットワークIDをセット
@@ -566,14 +566,14 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 				ni.Nameservers = defaultNameserversFromConfig()
 			}
 
-			fmt.Println("=== ネットワークインターフェースの情報確認 ===", "network interface", "ipaddr", ipaddr, "bitmask", bitmask)
+			debugPrintln("=== ネットワークインターフェースの情報確認 ===", "network interface", "ipaddr", ipaddr, "bitmask", bitmask)
 
 			// DEBUG
 			jsonBytes, err := json.MarshalIndent(ni, "", "  ")
 			if err != nil {
 				slog.Error("failed to marshal network interface", "err", err)
 			} else {
-				fmt.Println("ネットワークインターフェースの情報", "ni", string(jsonBytes))
+				debugPrintln("ネットワークインターフェースの情報", "ni", string(jsonBytes))
 			}
 
 			// DEBUG
@@ -581,7 +581,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			if err != nil {
 				slog.Error("failed to marshal requested network interface", "err", err)
 			} else {
-				fmt.Println("要求されたネットワークインターフェースの情報", "reqNic", string(jsonBytes2))
+				debugPrintln("要求されたネットワークインターフェースの情報", "reqNic", string(jsonBytes2))
 			}
 
 			// netplanで静的IPアドレスを設定する場合のために、IPアドレス情報もサーバーに保存しておく
@@ -591,7 +591,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 				if err != nil {
 					slog.Error("failed to marshal IP network", "err", err)
 				} else {
-					fmt.Println("IPネットワークの情報", "ipnet", string(jsonBytes3))
+					debugPrintln("IPネットワークの情報", "ipnet", string(jsonBytes3))
 				}
 
 				if ipnet.Netmasklen != nil {
@@ -701,12 +701,12 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		}
 	}
 
-	fmt.Println("=== データボリュームの情報確認2 ===", "server Id", api.ServerID(serverConfig))
+	debugPrintln("=== データボリュームの情報確認2 ===", "server Id", api.ServerID(serverConfig))
 	data3, err := json.MarshalIndent(serverConfig, "", "  ")
 	if err != nil {
 		slog.Error("json.MarshalIndent()", "err", err)
 	} else {
-		fmt.Println("サーバー情報(serverConfig): ", string(data3))
+		debugPrintln("サーバー情報(serverConfig): ", string(data3))
 	}
 
 	// データボリュームのIDをサーバーに設定
@@ -892,7 +892,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 
 	dom := virt.CreateDomainXML(virtSpec)
 	xml, err := dom.Marshal()
-	fmt.Println("Generated", "libvirt XML:\n", string(xml))
+	debugPrintln("Generated", "libvirt XML:\n", string(xml))
 
 	l, err := virt.NewLibVirtEp("qemu:///system")
 	if err != nil {
@@ -930,7 +930,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		if fallbackApplied {
 			dom = virt.CreateDomainXML(virtSpec)
 			if xml2, marshalErr := dom.Marshal(); marshalErr == nil {
-				fmt.Println("Generated", "libvirt XML (fallback):\n", string(xml2))
+				debugPrintln("Generated", "libvirt XML (fallback):\n", string(xml2))
 			}
 			consolePath, err = l.DefineAndStartVM(*dom)
 		}
