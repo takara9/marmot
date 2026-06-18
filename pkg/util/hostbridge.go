@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"go.yaml.in/yaml/v3"
 )
 
 // SetupHostBridge checks and configures host bridge for marmot
@@ -44,6 +46,12 @@ func SetupHostBridge() bool {
 		return false
 	}
 
+	preservedEthernets, err := loadPreservedNetplanEthernets("/etc/netplan", primaryNIC)
+	if err != nil {
+		slog.Warn("Failed to load existing netplan ethernet configs", "err", err)
+		preservedEthernets = map[string]Ethernet{}
+	}
+
 	// Backup existing netplan files
 	if err := backupNetplanFiles(); err != nil {
 		slog.Warn("Failed to backup netplan files", "err", err)
@@ -52,7 +60,7 @@ func SetupHostBridge() bool {
 
 	// Create netplan configuration
 	netplanFile := "/etc/netplan/00-host-bridge.yaml"
-	if err := createNetplanConfig(netplanFile, primaryNIC, bridgeConfig); err != nil {
+	if err := createNetplanConfig(netplanFile, primaryNIC, bridgeConfig, preservedEthernets); err != nil {
 		slog.Error("Failed to create netplan config", "file", netplanFile, "err", err)
 		return false
 	}
@@ -199,6 +207,49 @@ func getBridgeConfig(nicName string) bridgeConfigInfo {
 	return config
 }
 
+func loadPreservedNetplanEthernets(netplanDir string, primaryNIC string) (map[string]Ethernet, error) {
+	files, err := ioutil.ReadDir(netplanDir)
+	if err != nil {
+		return nil, err
+	}
+
+	preserved := make(map[string]Ethernet)
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		name := file.Name()
+		if !strings.HasSuffix(name, ".yaml") && !strings.HasSuffix(name, ".yml") {
+			continue
+		}
+		if strings.HasSuffix(name, ".marmot.bak") || strings.HasSuffix(name, ".bak") {
+			continue
+		}
+
+		path := filepath.Join(netplanDir, name)
+		input, err := ioutil.ReadFile(path)
+		if err != nil {
+			slog.Warn("Failed to read netplan file for preserve", "file", path, "err", err)
+			continue
+		}
+
+		var config NetplanConfig
+		if err := yaml.Unmarshal(input, &config); err != nil {
+			slog.Warn("Failed to parse netplan file for preserve", "file", path, "err", err)
+			continue
+		}
+
+		for ifaceName, ethCfg := range config.Network.Ethernets {
+			if ifaceName == primaryNIC {
+				continue
+			}
+			preserved[ifaceName] = ethCfg
+		}
+	}
+
+	return preserved, nil
+}
+
 // backupNetplanFiles backs up existing netplan configuration files
 func backupNetplanFiles() error {
 	netplanDir := "/etc/netplan"
@@ -211,15 +262,12 @@ func backupNetplanFiles() error {
 		if file.IsDir() {
 			continue
 		}
-		if file.Name()[0] == '_' {
-			continue // Already backed up
-		}
 		if !strings.HasSuffix(file.Name(), ".yaml") && !strings.HasSuffix(file.Name(), ".yml") {
 			continue
 		}
 
 		originalPath := filepath.Join(netplanDir, file.Name())
-		backupPath := filepath.Join(netplanDir, "_"+file.Name())
+		backupPath := filepath.Join(netplanDir, file.Name()+".marmot.bak")
 
 		input, err := ioutil.ReadFile(originalPath)
 		if err != nil {
@@ -227,18 +275,30 @@ func backupNetplanFiles() error {
 			continue
 		}
 
-		if err := ioutil.WriteFile(backupPath, input, 0644); err != nil {
-			slog.Warn("Failed to backup netplan file", "file", originalPath, "backup", backupPath, "err", err)
+		backedUp := false
+		if _, err := os.Stat(backupPath); err == nil {
+			slog.Debug("Netplan backup already exists", "backup", backupPath)
+			backedUp = true
+		} else if os.IsNotExist(err) {
+			if err := ioutil.WriteFile(backupPath, input, 0644); err != nil {
+				slog.Warn("Failed to backup netplan file", "file", originalPath, "backup", backupPath, "err", err)
+				continue
+			}
+			backedUp = true
+		} else {
+			slog.Warn("Failed to stat netplan backup file", "backup", backupPath, "err", err)
 			continue
 		}
 
 		slog.Debug("Backed up netplan file", "original", originalPath, "backup", backupPath)
 
-		// Remove original file after successful backup
-		if err := os.Remove(originalPath); err != nil {
-			slog.Warn("Failed to remove original netplan file", "file", originalPath, "err", err)
-		} else {
-			slog.Debug("Removed original netplan file", "file", originalPath)
+		if backedUp {
+			// Remove original file after successful backup or when backup already exists
+			if err := os.Remove(originalPath); err != nil {
+				slog.Warn("Failed to remove original netplan file", "file", originalPath, "err", err)
+			} else {
+				slog.Debug("Removed original netplan file", "file", originalPath)
+			}
 		}
 	}
 
@@ -246,57 +306,54 @@ func backupNetplanFiles() error {
 }
 
 // createNetplanConfig creates netplan configuration for bridge
-func createNetplanConfig(filePath string, nicName string, config bridgeConfigInfo) error {
-	yaml := fmt.Sprintf(`network:
-  version: 2
-  renderer: networkd
-  ethernets:
-    %s:
-      dhcp4: false
-      dhcp6: false
-  bridges:
-    br0:
-      interfaces: [%s]
-`, nicName, nicName)
+func createNetplanConfig(filePath string, nicName string, config bridgeConfigInfo, preservedEthernets map[string]Ethernet) error {
+	netplan := NetplanConfig{
+		Network: Network{
+			Version:  2,
+			Renderer: "networkd",
+			Ethernets: map[string]Ethernet{
+				nicName: {
+					DHCP4: false,
+					DHCP6: false,
+				},
+			},
+			Bridges: map[string]Bridge{},
+		},
+	}
 
-	// Add IP address if available
+	for ifaceName, ethCfg := range preservedEthernets {
+		if ifaceName == nicName {
+			continue
+		}
+		netplan.Network.Ethernets[ifaceName] = ethCfg
+	}
+
+	bridge := Bridge{
+		Interfaces: []string{nicName},
+		DHCP4:      false,
+		DHCP6:      false,
+		Parameters: BridgeParameters{STP: false},
+		Nameservers: Nameserver{
+			Addresses: []string{"8.8.8.8"},
+		},
+	}
 	if config.IPAddress != "" {
-		yaml += fmt.Sprintf(`      addresses:
-        - %s
-`, config.IPAddress)
+		bridge.Addresses = []string{config.IPAddress}
 	}
-
-	// Add routes if gateway available
 	if config.Gateway != "" {
-		yaml += fmt.Sprintf(`      routes:
-        - to: default
-          via: %s
-`, config.Gateway)
+		bridge.Routes = []Route{{To: "default", Via: config.Gateway}}
 	}
-
-	// Add nameservers with default 8.8.8.8
-	yaml += `      nameservers:
-`
-	yaml += `        addresses:
-`
-	yaml += `          - 8.8.8.8
-`
-
 	if config.Domain != "" {
-		yaml += `        search:
-`
-		yaml += fmt.Sprintf(`          - %s
-`, config.Domain)
+		bridge.Nameservers.Search = []string{config.Domain}
+	}
+	netplan.Network.Bridges["br0"] = bridge
+
+	data, err := yaml.Marshal(&netplan)
+	if err != nil {
+		return err
 	}
 
-	// Add bridge parameters
-	yaml += `      parameters:
-        stp: false
-      dhcp4: no
-      dhcp6: no
-`
-
-	if err := ioutil.WriteFile(filePath, []byte(yaml), 0644); err != nil {
+	if err := ioutil.WriteFile(filePath, data, 0644); err != nil {
 		return err
 	}
 

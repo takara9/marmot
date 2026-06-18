@@ -441,6 +441,7 @@ type Network struct {
 	Version   int                 `yaml:"version"`
 	Renderer  string              `yaml:"renderer,omitempty"`
 	Ethernets map[string]Ethernet `yaml:"ethernets,omitempty"`
+	Bridges   map[string]Bridge   `yaml:"bridges,omitempty"`
 }
 
 type Ethernet struct {
@@ -449,6 +450,20 @@ type Ethernet struct {
 	DHCP6       bool       `yaml:"dhcp6"`
 	Routes      []Route    `yaml:"routes,omitempty"`
 	Nameservers Nameserver `yaml:"nameservers,omitempty"`
+}
+
+type Bridge struct {
+	Interfaces  []string         `yaml:"interfaces,omitempty"`
+	Addresses   []string         `yaml:"addresses,omitempty"`
+	DHCP4       bool             `yaml:"dhcp4"`
+	DHCP6       bool             `yaml:"dhcp6"`
+	Routes      []Route          `yaml:"routes,omitempty"`
+	Nameservers Nameserver       `yaml:"nameservers,omitempty"`
+	Parameters  BridgeParameters `yaml:"parameters,omitempty"`
+}
+
+type BridgeParameters struct {
+	STP bool `yaml:"stp"`
 }
 
 type Route struct {
@@ -512,12 +527,15 @@ func CreateNetplanInterfaces(requestConfig []api.NetworkInterface, mountPoint st
 			// ルート設定 (IPv4/IPv6共通)
 			if nic.Routes != nil {
 				for _, r := range *nic.Routes {
-					var route Route
-					if r.To != nil || r.Via != nil {
-						route = Route{
-							To:  *r.To,
-							Via: *r.Via,
-						}
+					if r.To == nil || r.Via == nil {
+						return fmt.Errorf("route requires both to and via on interface %s", ifaceName)
+					}
+					route := Route{
+						To:  *r.To,
+						Via: *r.Via,
+					}
+					if err := validateNetplanRoute(nic, route, ifaceName); err != nil {
+						return err
 					}
 					ethCfg.Routes = append(ethCfg.Routes, route)
 				}
@@ -568,6 +586,35 @@ func CreateNetplanInterfaces(requestConfig []api.NetworkInterface, mountPoint st
 	}
 
 	fmt.Printf("Generated %s successfully:\n\n%s", filePath, string(data))
+
+	return nil
+}
+
+func validateNetplanRoute(nic api.NetworkInterface, route Route, ifaceName string) error {
+	to := strings.TrimSpace(route.To)
+	via := strings.TrimSpace(route.Via)
+	if to == "" || via == "" {
+		return fmt.Errorf("route requires non-empty to and via on interface %s", ifaceName)
+	}
+	if !strings.EqualFold(to, "default") {
+		return nil
+	}
+	if nic.Address == nil || nic.Netmasklen == nil {
+		return nil
+	}
+
+	addr, err := netip.ParseAddr(strings.TrimSpace(*nic.Address))
+	if err != nil {
+		return fmt.Errorf("invalid interface address %q on interface %s: %w", *nic.Address, ifaceName, err)
+	}
+	prefix := netip.PrefixFrom(addr, *nic.Netmasklen).Masked()
+	viaAddr, err := netip.ParseAddr(via)
+	if err != nil {
+		return fmt.Errorf("invalid route gateway %q on interface %s: %w", via, ifaceName, err)
+	}
+	if viaAddr == prefix.Addr() {
+		return fmt.Errorf("default route gateway %s on interface %s must not be the network address %s", via, ifaceName, prefix.Addr())
+	}
 
 	return nil
 }
