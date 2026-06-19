@@ -512,7 +512,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 						return "", err
 					}
 				} else {
-					slog.Debug("IPネットワークIDが指定されていないため、IPアドレスの割り当てができない", "network id", api.VirtualNetworkID(vnet), "network name", vnet.Metadata.Name)
+					// 仮想ネットワーク作成直後は IPAM 初期化前の可能性があるため、
+					// このサーバー作成は失敗させてコントローラーの再試行に委ねる。
+					return "", fmt.Errorf("network '%s' is not ready for IP allocation", reqNic.Networkname)
 				}
 			}
 

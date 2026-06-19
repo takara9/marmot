@@ -57,6 +57,7 @@ var _ = Describe("server controller helpers", func() {
 				Expect(isRetryableServerProvisionError(err)).To(Equal(want))
 			},
 			Entry("network missing is retryable", errors.New("network 'webservers-net' is not found"), true),
+			Entry("network ipam not ready is retryable", errors.New("network 'private-net' is not ready for IP allocation"), true),
 			Entry("ssh key fetch transport error is retryable", errors.New("failed to fetch keys from https://github.com/foo.keys: Get \"https://github.com/foo.keys\": dial tcp: i/o timeout"), true),
 			Entry("ssh key fetch http status error is retryable", errors.New("unexpected HTTP status 503 from https://github.com/foo.keys"), true),
 			Entry("ssh key empty response is retryable", errors.New("no public keys found at https://github.com/foo.keys"), true),
