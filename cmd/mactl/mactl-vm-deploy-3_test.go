@@ -640,6 +640,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			for i := 31; i <= 33; i++ {
 				Eventually(func(g Gomega) {
 					serverId := ""
+					wantStatus := int(db.SERVER_RUNNING)
 					switch i {
 					case 31:
 						serverId = serverId_1
@@ -647,6 +648,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 						serverId = serverId_2
 					case 33:
 						serverId = serverId_3
+						wantStatus = int(db.SERVER_ERROR)
 					}
 					cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "detail", serverId, "--output", "json")
 					stdoutStderr, err := cmd.CombinedOutput()
@@ -656,8 +658,14 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 					var server api.Server
 					err = json.Unmarshal(stdoutStderr, &server)
 					Expect(err).NotTo(HaveOccurred())
-					g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_RUNNING)))
-					expectServerBootVolumeNodeName(g, server)
+					g.Expect(server.Status.StatusCode).To(Equal(wantStatus))
+					if wantStatus == int(db.SERVER_RUNNING) {
+						expectServerBootVolumeNodeName(g, server)
+					} else {
+						g.Expect(server.Status).NotTo(BeNil())
+						g.Expect(server.Status.Message).NotTo(BeNil())
+						g.Expect(*server.Status.Message).To(ContainSubstring("already in use"))
+					}
 				}, 120*time.Second, 5*time.Second).Should(Succeed())
 			}
 		})
