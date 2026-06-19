@@ -193,6 +193,13 @@ func (c *controller) serverControllerLoop() {
 			}
 		case db.SERVER_RUNNING:
 			slog.Debug("稼働中のサーバー検出", "SERVER", api.ServerID(spec))
+			if err := c.marmot.SyncServerResourcesManage(api.ServerID(spec)); err != nil {
+				slog.Error("SyncServerResourcesManage()", "serverId", api.ServerID(spec), "err", err)
+				msg := fmt.Sprintf("サーバー設定(CPU/Memory)の反映に失敗: %v", err)
+				if dbErr := c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_ERROR, msg); dbErr != nil {
+					slog.Error("UpdateServerStatus() failed", "serverId", api.ServerID(spec), "err", dbErr)
+				}
+			}
 		case db.SERVER_STOPPING:
 			slog.Debug("停止要求のサーバー検出", "SERVER", api.ServerID(spec))
 			if err := c.marmot.StopServerManage(api.ServerID(spec)); err != nil {

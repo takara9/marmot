@@ -6,7 +6,11 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
+	"os"
+	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,7 +27,47 @@ type mockServerHandle struct {
 	once   sync.Once
 }
 
-func startMockServer() (*mockServerHandle, error) {
+func ensureMactlTestBinary() error {
+	if _, err := os.Stat("bin/mactl-test"); err == nil {
+		return nil
+	}
+
+	if err := os.MkdirAll("bin", 0755); err != nil {
+		return fmt.Errorf("failed to create bin directory: %w", err)
+	}
+
+	cmd := exec.Command("go", "build", "-o", "bin/mactl-test", ".")
+	cmd.Dir = "."
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to build bin/mactl-test: %w (output=%s)", err, string(output))
+	}
+
+	return nil
+}
+
+func startEtcdContainer() (string, string, error) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return "", "", fmt.Errorf("failed to allocate free port: %w", err)
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	_ = listener.Close()
+
+	cmd := exec.Command("docker", "run", "-d", "--rm", "-p", fmt.Sprintf("%d:2379", port), "ghcr.io/takara9/etcd:3.6.5")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to start etcd container: %s, %w", string(output), err)
+	}
+
+	containerID := strings.TrimSpace(string(output))
+	if len(containerID) > 12 {
+		containerID = containerID[:12]
+	}
+	return containerID, fmt.Sprintf("http://127.0.0.1:%d", port), nil
+}
+
+func startMockServer(etcdEp string) (*mockServerHandle, error) {
 	// 個別にログを確認したい場合はコメントアウトを外す
 	//opts := &slog.HandlerOptions{
 	//	AddSource: true,
@@ -39,7 +83,6 @@ func startMockServer() (*mockServerHandle, error) {
 	}
 
 	nodeName := "hvc"
-	etcdEp := "http://127.0.0.1:3379"
 
 	e := echo.New()
 	server := marmotd.NewServerWithOptions(nodeName, etcdEp, true)

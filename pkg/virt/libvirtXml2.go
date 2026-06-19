@@ -611,3 +611,220 @@ func (l *LibVirtEp) StartDomain(vmname string) error {
 
 	return nil
 }
+
+func memoryToKiB(value uint, unit string) uint64 {
+	u := strings.ToLower(strings.TrimSpace(unit))
+	if u == "" || u == "kib" || u == "kb" || u == "k" {
+		return uint64(value)
+	}
+
+	mul := uint64(1)
+	switch u {
+	case "mib", "mb", "m":
+		mul = 1024
+	case "gib", "gb", "g":
+		mul = 1024 * 1024
+	case "tib", "tb", "t":
+		mul = 1024 * 1024 * 1024
+	case "b", "bytes":
+		mul = 1
+		value = value / 1024
+	default:
+		if strings.HasSuffix(u, "ib") {
+			prefix := strings.TrimSuffix(u, "ib")
+			pow := 0
+			switch prefix {
+			case "k":
+				pow = 1
+			case "m":
+				pow = 2
+			case "g":
+				pow = 3
+			case "t":
+				pow = 4
+			case "p":
+				pow = 5
+			case "e":
+				pow = 6
+			}
+			if pow > 0 {
+				mul = 1
+				for i := 1; i < pow; i++ {
+					mul *= 1024
+				}
+			}
+		}
+	}
+
+	return uint64(value) * mul
+}
+
+func memoryMBToKiB(memoryMB int) uint64 {
+	if memoryMB <= 0 {
+		return 0
+	}
+	return uint64(memoryMB) * 1024
+}
+
+func domainResourceDrift(cfg libvirtxml.Domain, cpu *int, memoryMB *int) bool {
+	if cpu != nil && *cpu > 0 {
+		currentVCPU := uint(0)
+		if cfg.VCPU != nil {
+			currentVCPU = cfg.VCPU.Value
+		}
+		if currentVCPU != uint(*cpu) {
+			return true
+		}
+	}
+
+	if memoryMB != nil && *memoryMB > 0 {
+		currentMemKiB := uint64(0)
+		if cfg.Memory != nil {
+			currentMemKiB = memoryToKiB(cfg.Memory.Value, cfg.Memory.Unit)
+		}
+		if currentMemKiB != memoryMBToKiB(*memoryMB) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isDomainLive(state libvirt.DomainState) bool {
+	switch state {
+	case libvirt.DOMAIN_RUNNING, libvirt.DOMAIN_BLOCKED, libvirt.DOMAIN_PAUSED, libvirt.DOMAIN_PMSUSPENDED:
+		return true
+	default:
+		return false
+	}
+}
+
+// HasDomainResourceDrift reports whether desired CPU/Memory differs from persistent domain XML.
+func (l *LibVirtEp) HasDomainResourceDrift(vmname string, cpu *int, memoryMB *int) (bool, error) {
+	if cpu == nil && memoryMB == nil {
+		return false, nil
+	}
+
+	domain, err := l.Com.LookupDomainByName(vmname)
+	if err != nil {
+		return false, err
+	}
+	defer domain.Free()
+
+	xml, err := domain.GetXMLDesc(0)
+	if err != nil {
+		return false, err
+	}
+
+	var cfg libvirtxml.Domain
+	if err := cfg.Unmarshal(xml); err != nil {
+		return false, err
+	}
+
+	return domainResourceDrift(cfg, cpu, memoryMB), nil
+}
+
+func (l *LibVirtEp) syncDomainVCPU(domain *libvirt.Domain, current uint, desired uint, live bool) (bool, error) {
+	if desired == 0 || current == desired {
+		return false, nil
+	}
+
+	if err := domain.SetVcpusFlags(desired, libvirt.DOMAIN_VCPU_CONFIG); err != nil {
+		// libvirt のエラーメッセージ文言に依存せず、max vcpu 更新後に再試行する。
+		if maxErr := domain.SetVcpusFlags(desired, libvirt.DOMAIN_VCPU_CONFIG|libvirt.DOMAIN_VCPU_MAXIMUM); maxErr != nil {
+			return false, err
+		}
+		if retryErr := domain.SetVcpusFlags(desired, libvirt.DOMAIN_VCPU_CONFIG); retryErr != nil {
+			return false, retryErr
+		}
+	}
+
+	if live {
+		if err := domain.SetVcpusFlags(desired, libvirt.DOMAIN_VCPU_LIVE); err != nil {
+			slog.Warn("failed to apply live vcpu change; config is updated and will apply on reboot", "desired", desired, "err", err)
+		}
+	}
+
+	return true, nil
+}
+
+func (l *LibVirtEp) syncDomainMemory(domain *libvirt.Domain, currentKiB uint64, desiredKiB uint64, live bool) (bool, error) {
+	if desiredKiB == 0 || currentKiB == desiredKiB {
+		return false, nil
+	}
+
+	desired := desiredKiB
+
+	if err := domain.SetMemoryFlags(desired, libvirt.DOMAIN_MEM_CONFIG|libvirt.DOMAIN_MEM_MAXIMUM); err != nil {
+		slog.Warn("failed to set persistent max memory; trying current memory only", "desiredKiB", desiredKiB, "err", err)
+	}
+	if err := domain.SetMemoryFlags(desired, libvirt.DOMAIN_MEM_CONFIG); err != nil {
+		return false, err
+	}
+
+	if live {
+		if err := domain.SetMemoryFlags(desired, libvirt.DOMAIN_MEM_LIVE); err != nil {
+			slog.Warn("failed to apply live memory change; config is updated and will apply on reboot", "desiredKiB", desiredKiB, "err", err)
+		}
+	}
+
+	return true, nil
+}
+
+// SyncDomainResources compares desired CPU/Memory with current libvirt domain config and applies drift.
+func (l *LibVirtEp) SyncDomainResources(vmname string, cpu *int, memoryMB *int) (bool, error) {
+	if cpu == nil && memoryMB == nil {
+		return false, nil
+	}
+
+	domain, err := l.Com.LookupDomainByName(vmname)
+	if err != nil {
+		return false, err
+	}
+	defer domain.Free()
+
+	xml, err := domain.GetXMLDesc(0)
+	if err != nil {
+		return false, err
+	}
+
+	var cfg libvirtxml.Domain
+	if err := cfg.Unmarshal(xml); err != nil {
+		return false, err
+	}
+
+	state, _, err := domain.GetState()
+	if err != nil {
+		return false, err
+	}
+	live := isDomainLive(state)
+
+	changed := false
+
+	if cpu != nil && *cpu > 0 {
+		currentVCPU := uint(0)
+		if cfg.VCPU != nil {
+			currentVCPU = cfg.VCPU.Value
+		}
+		vcpuChanged, err := l.syncDomainVCPU(domain, currentVCPU, uint(*cpu), live)
+		if err != nil {
+			return changed, err
+		}
+		changed = changed || vcpuChanged
+	}
+
+	if memoryMB != nil && *memoryMB > 0 {
+		currentMemKiB := uint64(0)
+		if cfg.Memory != nil {
+			currentMemKiB = memoryToKiB(cfg.Memory.Value, cfg.Memory.Unit)
+		}
+		desiredMemKiB := memoryMBToKiB(*memoryMB)
+		memoryChanged, err := l.syncDomainMemory(domain, currentMemKiB, desiredMemKiB, live)
+		if err != nil {
+			return changed, err
+		}
+		changed = changed || memoryChanged
+	}
+
+	return changed, nil
+}
