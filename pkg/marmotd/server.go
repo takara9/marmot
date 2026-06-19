@@ -511,6 +511,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 						slog.Error("PutDnsEntry()", "err", err)
 						return "", err
 					}
+				} else if vnet.Metadata.Name == "default" {
+					// default ネットワークは libvirt 側 DHCP を利用し、Marmot の IPAM 対象外とする。
+					slog.Debug("Skipping Marmot IP allocation for default network", "network id", api.VirtualNetworkID(vnet), "network name", vnet.Metadata.Name)
 				} else {
 					// 仮想ネットワーク作成直後は IPAM 初期化前の可能性があるため、
 					// このサーバー作成は失敗させてコントローラーの再試行に委ねる。
