@@ -29,18 +29,21 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
 		slog.SetDefault(logger)
 		cleanupTestEnvironment()
+		if err := ensureMactlTestBinary(); err != nil {
+			Fail(fmt.Sprintf("Failed to build mactl test binary: %v", err))
+		}
 
 		By("モックサーバー用etcdの起動")
-		cmd := exec.Command("docker", "run", "-d", "--name", "etcd0", "-p", "3379:2379", "-p", "3380:2380", "ghcr.io/takara9/etcd:3.6.5")
-		output, err := cmd.CombinedOutput()
+		var etcdEp string
+		var err error
+		containerID, etcdEp, err = startEtcdContainer()
 		if err != nil {
-			Fail(fmt.Sprintf("Failed to start container: %s, %v", string(output), err))
+			Fail(fmt.Sprintf("Failed to start container: %v", err))
 		}
-		containerID = string(output[:12]) // 最初の12文字をIDとして取得
 		fmt.Printf("Container started with ID: %s\n", containerID)
 
 		By("モックサーバーの起動")
-		mockServer, err = startMockServer()
+		mockServer, err = startMockServer(etcdEp)
 		Expect(err).NotTo(HaveOccurred())
 	})
 

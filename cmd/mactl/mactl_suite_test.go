@@ -8,6 +8,9 @@ import (
 )
 
 func TestUtil(t *testing.T) {
+	if err := ensureMactlTestBinary(); err != nil {
+		t.Fatalf("failed to prepare mactl test binary: %v", err)
+	}
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Util Suite")
 }
