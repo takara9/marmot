@@ -855,7 +855,7 @@ func outputServers(servers []api.Server) error {
 			if !getServerShowAll {
 				filteredLines = make([]serverNetworkLine, 0, len(networkLines))
 				for _, line := range networkLines {
-					if line.address != "N/A" {
+					if line.address != "N/A" || line.network != "N/A" {
 						filteredLines = append(filteredLines, line)
 					}
 				}

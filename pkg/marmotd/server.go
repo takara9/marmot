@@ -479,6 +479,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 					slog.Error("AllocateIP()", "err", err, "vnetId", api.VirtualNetworkID(vnet), "ipnetId", ipNetId, "candidateIP", ipaddr)
 					return "", err
 				}
+				if found {
+					return "", fmt.Errorf("ip address '%s' is already in use on network '%s'", ipaddr, reqNic.Networkname)
+				}
 				if !found {
 					slog.Debug("セットさられたIPアドレス", "IP	", ipaddr)
 					m.Db.SetIPaddrInUse(api.VirtualNetworkID(vnet), ipNetId, ipaddr, serverConfig.Metadata.Name)
