@@ -268,31 +268,42 @@ func (d *Database) SetDeleteTimestampGateway(id string) error {
 
 // UpdateGatewayStatusWithMessage updates status and optional message for gateway objects.
 func (d *Database) UpdateGatewayStatusWithMessage(id string, status int, message string) error {
-	gateway, err := d.GetGatewayById(id)
-	if err != nil {
-		return err
-	}
-	if gateway.Status == nil {
-		gateway.Status = &api.Status{}
-	}
-	statusChanged := gateway.Status.StatusCode != status
-	gateway.Status.StatusCode = status
-	gateway.Status.Status = util.StringPtr(GatewayStatus[status])
-	gateway.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
-	trimmedMessage := strings.TrimSpace(message)
-	if statusChanged {
-		// PatchStruct skips nil pointers, so use empty string to reliably clear stale messages.
-		gateway.Status.Message = util.StringPtr("")
-	}
-	if trimmedMessage == "" {
-		if gateway.Status.Message == nil {
+	for {
+		key := GatewayPrefix + "/" + id
+		var gateway api.Gateway
+		resp, err := d.GetJSON(key, &gateway)
+		if err != nil {
+			return err
+		}
+		if gateway.Status == nil {
+			gateway.Status = &api.Status{}
+		}
+		statusChanged := gateway.Status.StatusCode != status
+		gateway.Status.StatusCode = status
+		gateway.Status.Status = util.StringPtr(GatewayStatus[status])
+		gateway.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+		trimmedMessage := strings.TrimSpace(message)
+		if statusChanged {
+			// Clear stale messages on status transition.
 			gateway.Status.Message = util.StringPtr("")
 		}
-	} else {
-		gateway.Status.Message = util.StringPtr(trimmedMessage)
-	}
+		if trimmedMessage == "" {
+			if gateway.Status.Message == nil {
+				gateway.Status.Message = util.StringPtr("")
+			}
+		} else {
+			gateway.Status.Message = util.StringPtr(trimmedMessage)
+		}
 
-	return d.UpdateGatewayById(id, gateway)
+		expected := resp.Kvs[0].ModRevision
+		if err := d.PutJSONCAS(key, expected, &gateway); err != nil {
+			if err == ErrUpdateConflict {
+				continue
+			}
+			return err
+		}
+		return nil
+	}
 }
 
 // GetGatewayByName returns gateways matching the given name.

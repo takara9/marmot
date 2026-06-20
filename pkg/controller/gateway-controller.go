@@ -115,11 +115,51 @@ func (c *controller) gatewayControllerLoop() {
 		case db.GATEWAY_DELETING:
 			c.reconcileGatewayDeleting(gateway)
 		case db.GATEWAY_FAILED:
-			slog.Debug("FAILED 状態のゲートウェイを検出", "gatewayId", gatewayID)
+			c.reconcileGatewayFailed(gateway)
 		default:
 			slog.Warn("不明なゲートウェイ状態", "gatewayId", gatewayID, "statusCode", gateway.Status.StatusCode)
 		}
 	}
+}
+
+func (c *controller) reconcileGatewayFailed(gateway api.Gateway) {
+	gatewayID := api.GatewayID(gateway)
+	serverID := strings.TrimSpace(gatewayManagedServerID(gateway))
+	if serverID == "" {
+		if err := c.recoverFailedGateway(gatewayID, "recovering failed gateway: missing server reference", func(labels map[string]interface{}) {
+			db.SetGatewayAnsibleRetries(labels, 0)
+			db.SetGatewayAppliedConfigHash(labels, "")
+		}); err != nil {
+			slog.Warn("recoverFailedGateway() failed", "gatewayId", gatewayID, "err", err)
+			return
+		}
+		return
+	}
+
+	if _, err := c.db.GetServerById(serverID); err != nil {
+		message := "gateway server not found, recreating"
+		if !errors.Is(err, db.ErrNotFound) {
+			message = fmt.Sprintf("gateway server lookup failed, recreating: %v", err)
+			slog.Warn("GetServerById() failed while reconciling failed gateway; forcing recovery", "gatewayId", gatewayID, "serverId", serverID, "err", err)
+		}
+		if err := c.recoverFailedGateway(gatewayID, message, func(labels map[string]interface{}) {
+			db.SetGatewayManagedServerID(labels, "")
+			db.SetGatewayAnsibleRetries(labels, 0)
+			db.SetGatewayAppliedConfigHash(labels, "")
+		}); err != nil {
+			slog.Warn("recoverFailedGateway() failed", "gatewayId", gatewayID, "err", err)
+		}
+		return
+	}
+
+	slog.Debug("FAILED 状態のゲートウェイを検出", "gatewayId", gatewayID)
+}
+
+func (c *controller) recoverFailedGateway(gatewayID string, message string, mutate func(labels map[string]interface{})) error {
+	if err := c.updateGatewayLabels(gatewayID, mutate); err != nil {
+		return err
+	}
+	return c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_PENDING, message)
 }
 
 func (c *controller) isGatewayInternalServerMissing(gateway api.Gateway) (bool, error) {
@@ -431,9 +471,11 @@ func (c *controller) buildGatewayServerSpec(gateway api.Gateway, serverName stri
 		NetworkInterface: &nics,
 	}
 
-	if key := readGatewayPublicKeyIfExists(); key != "" {
-		spec.Auth = &api.Auth{PublicKey: util.StringPtr(key), User: util.StringPtr("root")}
+	key := readGatewayPublicKeyIfExists()
+	if key == "" {
+		return api.Server{}, fmt.Errorf("gateway SSH public key is not available")
 	}
+	spec.Auth = &api.Auth{PublicKey: util.StringPtr(key), User: util.StringPtr(gatewayAnsibleDefaultUsername)}
 
 	return api.Server{ApiVersion: "v1", Kind: "Server", Metadata: meta, Spec: spec}, nil
 }
@@ -602,7 +644,11 @@ func gatewayServerName(gateway api.Gateway) string {
 }
 
 func readGatewayPublicKeyIfExists() string {
-	data, err := os.ReadFile("/etc/marmot/keys/public.key")
+	return readAuthorizedKeyFile(gatewayPublicKeyPath)
+}
+
+func readAuthorizedKeyFile(path string) string {
+	data, err := os.ReadFile(strings.TrimSpace(path))
 	if err != nil {
 		return ""
 	}

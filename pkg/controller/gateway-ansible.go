@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/marmotd"
@@ -20,7 +21,9 @@ import (
 const (
 	gatewayAnsiblePlaybookDir     = "/var/lib/marmot/ansible-playbooks"
 	gatewayAnsibleMaxRetryCount   = 3
-	gatewayAnsibleDefaultUsername = "root"
+	gatewayAnsibleDefaultUsername = "ubuntu"
+	gatewayAnsiblePingMaxRetry    = 12
+	gatewayAnsiblePingRetryDelay  = 5 * time.Second
 )
 
 //go:embed gateway-playbooks/gateway-iptables.yaml.tmpl
@@ -29,6 +32,7 @@ var gatewayPlaybookTemplate string
 var (
 	gatewayPlaybookDir    = gatewayAnsiblePlaybookDir
 	gatewayPrivateKeyPath = marmotd.GatewayPrivateKeyPath()
+	gatewayPublicKeyPath  = marmotd.GatewayPublicKeyPath()
 	runGatewayPlaybook    = runGatewayPlaybookCommand
 )
 
@@ -126,7 +130,7 @@ func gatewayRemoteCIDRs(spec api.GatewaySpec) []string {
 		}
 	} else if spec.RemoteCIDR != nil {
 		if trimmed := strings.TrimSpace(*spec.RemoteCIDR); trimmed != "" {
-		remoteCIDRs = append(remoteCIDRs, trimmed)
+			remoteCIDRs = append(remoteCIDRs, trimmed)
 		}
 	}
 	if len(remoteCIDRs) == 0 {
@@ -171,15 +175,24 @@ func runGatewayPlaybookCommand(playbookPath, gatewayAddress, privateKeyPath stri
 	if _, err := os.Stat(key); err != nil {
 		return fmt.Errorf("private key is not available: %w", err)
 	}
+	inventoryPath, err := writeGatewayInventoryFile(address)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(inventoryPath)
+
+	if err := waitForGatewayAnsiblePing(address, key); err != nil {
+		return err
+	}
 
 	args := []string{
-		"-i", address + ",",
+		"-i", inventoryPath,
 		playbookPath,
 		"--private-key", key,
 		"-u", gatewayAnsibleDefaultUsername,
-		"--ssh-common-args", "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
 	}
 	cmd := exec.Command("ansible-playbook", args...)
+	cmd.Env = append(os.Environ(), "ANSIBLE_HOST_KEY_CHECKING=False")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		trimmed := strings.TrimSpace(string(output))
@@ -189,4 +202,71 @@ func runGatewayPlaybookCommand(playbookPath, gatewayAddress, privateKeyPath stri
 		return fmt.Errorf("ansible-playbook failed: %w: %s", err, trimmed)
 	}
 	return nil
+}
+
+func waitForGatewayAnsiblePing(address, privateKeyPath string) error {
+	var lastErr error
+	for i := 1; i <= gatewayAnsiblePingMaxRetry; i++ {
+		if err := runGatewayAnsiblePing(address, privateKeyPath); err == nil {
+			return nil
+		} else {
+			lastErr = err
+		}
+		if i < gatewayAnsiblePingMaxRetry {
+			time.Sleep(gatewayAnsiblePingRetryDelay)
+		}
+	}
+	if lastErr == nil {
+		return fmt.Errorf("ansible ping failed before playbook: unknown error")
+	}
+	return fmt.Errorf("ansible ping failed before playbook (%d/%d): %w", gatewayAnsiblePingMaxRetry, gatewayAnsiblePingMaxRetry, lastErr)
+}
+
+func runGatewayAnsiblePing(address, privateKeyPath string) error {
+	inventoryPath, err := writeGatewayInventoryFile(address)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(inventoryPath)
+
+	args := []string{
+		"-i", inventoryPath,
+		"--private-key", privateKeyPath,
+		"-u", gatewayAnsibleDefaultUsername,
+		"-m", "ping",
+		"all",
+	}
+	cmd := exec.Command("ansible", args...)
+	cmd.Env = append(os.Environ(), "ANSIBLE_HOST_KEY_CHECKING=False")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		trimmed := strings.TrimSpace(string(output))
+		if trimmed == "" {
+			return fmt.Errorf("ansible ping failed: %w", err)
+		}
+		return fmt.Errorf("ansible ping failed: %w: %s", err, trimmed)
+	}
+	return nil
+}
+
+func writeGatewayInventoryFile(address string) (string, error) {
+	trimmed := strings.TrimSpace(address)
+	if trimmed == "" {
+		return "", fmt.Errorf("gateway address is empty")
+	}
+	file, err := os.CreateTemp("", "marmot-gateway-inventory-*.ini")
+	if err != nil {
+		return "", err
+	}
+	content := "[all]\n" + trimmed + "\n"
+	if _, err := file.WriteString(content); err != nil {
+		_ = file.Close()
+		_ = os.Remove(file.Name())
+		return "", err
+	}
+	if err := file.Close(); err != nil {
+		_ = os.Remove(file.Name())
+		return "", err
+	}
+	return file.Name(), nil
 }

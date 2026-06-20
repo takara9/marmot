@@ -1,6 +1,10 @@
 package controller
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"net"
@@ -15,7 +19,43 @@ import (
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
 	"github.com/takara9/marmot/pkg/util"
+	"golang.org/x/crypto/ssh"
 )
+
+func TestReadGatewayPublicKeyIfExists_ReadsPublicKeyFile(t *testing.T) {
+	oldPublicKeyPath := gatewayPublicKeyPath
+	t.Cleanup(func() {
+		gatewayPublicKeyPath = oldPublicKeyPath
+	})
+
+	tempDir := t.TempDir()
+	gatewayPublicKeyPath = filepath.Join(tempDir, "public.key")
+
+	want := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDmarmot-test-key marmot-gateway"
+	if err := os.WriteFile(gatewayPublicKeyPath, []byte(want+"\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile() failed for public key: %v", err)
+	}
+
+	got := readGatewayPublicKeyIfExists()
+	if got != want {
+		t.Fatalf("readGatewayPublicKeyIfExists() = %q, want %q", got, want)
+	}
+}
+
+func TestReadGatewayPublicKeyIfExists_ReturnsEmptyWhenPublicKeyFileMissing(t *testing.T) {
+	oldPublicKeyPath := gatewayPublicKeyPath
+	t.Cleanup(func() {
+		gatewayPublicKeyPath = oldPublicKeyPath
+	})
+
+	tempDir := t.TempDir()
+	gatewayPublicKeyPath = filepath.Join(tempDir, "public.key")
+
+	got := readGatewayPublicKeyIfExists()
+	if got != "" {
+		t.Fatalf("readGatewayPublicKeyIfExists() = %q, want empty", got)
+	}
+}
 
 func TestGatewayControllerStateTransitions(t *testing.T) {
 	database := newGatewayTestDatabase(t)
@@ -222,6 +262,81 @@ func TestGatewayControllerDeletesGatewayWhenInternalServerMissing(t *testing.T) 
 	}
 }
 
+func TestGatewayControllerFailedStateRecoversWhenManagedServerMissing(t *testing.T) {
+	database := newGatewayTestDatabase(t)
+	setupGatewayAnsibleTestHooks(t, func(playbookPath, gatewayAddress, privateKeyPath string) error {
+		return nil
+	})
+	ctrl := &controller{
+		db:            database,
+		marmot:        &marmotd.Marmot{NodeName: "hvc", Db: database},
+		deletionDelay: 15 * time.Second,
+	}
+
+	_ = mustCreateVirtualNetwork(t, database, "web-servers")
+	mustCreateInternalServer(t, database, "server-10", "web-servers", "172.16.10.2")
+	createdGateway := mustCreateGateway(t, database, "igw-failed-recover", "web-servers", "192.168.1.114")
+	gatewayID := api.GatewayID(createdGateway)
+
+	failedGateway, err := database.GetGatewayById(gatewayID)
+	if err != nil {
+		t.Fatalf("GetGatewayById() failed: %v", err)
+	}
+	if failedGateway.Metadata.Labels == nil {
+		labels := map[string]interface{}{}
+		failedGateway.Metadata.Labels = &labels
+	}
+	labels := *failedGateway.Metadata.Labels
+	db.SetGatewayManagedServerID(labels, "missing-server")
+	db.SetGatewayAnsibleRetries(labels, 3)
+	failedGateway.Metadata.Labels = &labels
+	now := time.Now()
+	failedGateway.Status = &api.Status{
+		StatusCode:          db.GATEWAY_FAILED,
+		Status:              util.StringPtr(db.GatewayStatus[db.GATEWAY_FAILED]),
+		Message:             util.StringPtr("gateway ansible apply failed (3/3): simulated"),
+		CreationTimeStamp:   util.TimePtr(now),
+		LastUpdateTimeStamp: util.TimePtr(now),
+	}
+	if err := database.UpdateGatewayById(gatewayID, failedGateway); err != nil {
+		t.Fatalf("UpdateGatewayById() failed: %v", err)
+	}
+
+	ctrl.gatewayControllerLoop()
+
+	afterRecovery, err := database.GetGatewayById(gatewayID)
+	if err != nil {
+		t.Fatalf("GetGatewayById() failed after recovery loop: %v", err)
+	}
+	if afterRecovery.Status == nil || afterRecovery.Status.StatusCode != db.GATEWAY_PENDING {
+		t.Fatalf("gateway status after failed recovery = %v, want %d(PENDING)", afterRecovery.Status, db.GATEWAY_PENDING)
+	}
+	if afterRecovery.Metadata.Labels != nil {
+		if got := db.GetGatewayManagedServerID(*afterRecovery.Metadata.Labels); got != "" {
+			t.Fatalf("gateway managed server id after recovery = %q, want empty", got)
+		}
+		if got := db.GetGatewayAnsibleRetries(*afterRecovery.Metadata.Labels); got != 0 {
+			t.Fatalf("gateway ansible retries after recovery = %d, want 0", got)
+		}
+	}
+
+	ctrl.gatewayControllerLoop()
+
+	afterRecreate, err := database.GetGatewayById(gatewayID)
+	if err != nil {
+		t.Fatalf("GetGatewayById() failed after recreate loop: %v", err)
+	}
+	if afterRecreate.Status == nil || afterRecreate.Status.StatusCode != db.GATEWAY_PROVISIONING {
+		t.Fatalf("gateway status after recreate loop = %v, want %d(PROVISIONING)", afterRecreate.Status, db.GATEWAY_PROVISIONING)
+	}
+	if afterRecreate.Metadata.Labels == nil {
+		t.Fatalf("gateway labels missing after recreate loop")
+	}
+	if got := db.GetGatewayManagedServerID(*afterRecreate.Metadata.Labels); strings.TrimSpace(got) == "" {
+		t.Fatalf("gateway managed server id after recreate loop is empty")
+	}
+}
+
 func mustCreateVirtualNetwork(t *testing.T, database *db.Database, name string) api.VirtualNetwork {
 	t.Helper()
 	vnet, err := database.CreateVirtualNetwork(api.VirtualNetwork{
@@ -291,21 +406,37 @@ func setupGatewayAnsibleTestHooks(t *testing.T, runner func(playbookPath, gatewa
 	oldRunner := runGatewayPlaybook
 	oldDir := gatewayPlaybookDir
 	oldKey := gatewayPrivateKeyPath
+	oldPublic := gatewayPublicKeyPath
 
 	tempDir := t.TempDir()
 	keyPath := filepath.Join(tempDir, "private.key")
-	if err := os.WriteFile(keyPath, []byte("dummy-private-key"), 0o600); err != nil {
+	publicKeyPath := filepath.Join(tempDir, "public.key")
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("GenerateKey() failed for test private key: %v", err)
+	}
+	privateBlock := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(privateKey)}
+	if err := os.WriteFile(keyPath, pem.EncodeToMemory(privateBlock), 0o600); err != nil {
 		t.Fatalf("WriteFile() failed for test private key: %v", err)
+	}
+	publicKey, err := ssh.NewPublicKey(&privateKey.PublicKey)
+	if err != nil {
+		t.Fatalf("ssh.NewPublicKey() failed for test private key: %v", err)
+	}
+	if err := os.WriteFile(publicKeyPath, ssh.MarshalAuthorizedKey(publicKey), 0o644); err != nil {
+		t.Fatalf("WriteFile() failed for test public key: %v", err)
 	}
 
 	runGatewayPlaybook = runner
 	gatewayPlaybookDir = filepath.Join(tempDir, "playbooks")
 	gatewayPrivateKeyPath = keyPath
+	gatewayPublicKeyPath = publicKeyPath
 
 	t.Cleanup(func() {
 		runGatewayPlaybook = oldRunner
 		gatewayPlaybookDir = oldDir
 		gatewayPrivateKeyPath = oldKey
+		gatewayPublicKeyPath = oldPublic
 	})
 }
 
