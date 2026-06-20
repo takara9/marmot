@@ -480,7 +480,34 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 					return "", err
 				}
 				if found {
-					return "", fmt.Errorf("ip address '%s' is already in use on network '%s'", ipaddr, reqNic.Networkname)
+					ownerName, ownerErr := m.lookupIPAllocationOwner(api.VirtualNetworkID(vnet), ipNetId, ipaddr)
+					if ownerErr != nil {
+						return "", ownerErr
+					}
+
+					// host-bridge/default は IPAM 非管理扱いだが、静的IP重複チェックは実施する。
+					// ただし残骸レコード(所有サーバーが存在しない)は再取得可能とする。
+					if isIPAMUnmanagedNetwork(vnet.Metadata.Name) {
+						if ownerName == "" || ownerName == serverConfig.Metadata.Name {
+							found = false
+						} else {
+							exists, existsErr := m.serverExistsByName(ownerName)
+							if existsErr != nil {
+								return "", existsErr
+							}
+							if !exists {
+								slog.Warn("Reclaiming stale IP allocation record", "network", reqNic.Networkname, "ip", ipaddr, "staleOwner", ownerName)
+								found = false
+							}
+						}
+					}
+
+					if found {
+						if ownerName != "" {
+							return "", fmt.Errorf("ip address '%s' is already in use on network '%s' by server '%s'", ipaddr, reqNic.Networkname, ownerName)
+						}
+						return "", fmt.Errorf("ip address '%s' is already in use on network '%s'", ipaddr, reqNic.Networkname)
+					}
 				}
 				if !found {
 					slog.Debug("セットさられたIPアドレス", "IP	", ipaddr)
@@ -1153,6 +1180,40 @@ func isIPAMUnmanagedNetwork(name string) bool {
 	default:
 		return false
 	}
+}
+
+func (m *Marmot) lookupIPAllocationOwner(vnetID, ipNetID, ip string) (string, error) {
+	allocatedIPs, err := m.Db.GetAllocatedIPs(vnetID, ipNetID)
+	if err != nil {
+		return "", err
+	}
+	for _, rec := range allocatedIPs {
+		if strings.TrimSpace(rec.IpAddress) != strings.TrimSpace(ip) {
+			continue
+		}
+		if rec.HostId == nil {
+			return "", nil
+		}
+		return strings.TrimSpace(*rec.HostId), nil
+	}
+	return "", nil
+}
+
+func (m *Marmot) serverExistsByName(name string) (bool, error) {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return false, nil
+	}
+	servers, err := m.Db.GetServers()
+	if err != nil {
+		return false, err
+	}
+	for _, srv := range servers {
+		if strings.TrimSpace(srv.Metadata.Name) == trimmed {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func isLibvirtNetworkNotFoundError(err error) bool {
