@@ -188,7 +188,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 
 	Context("最小構成 QCOW2 仮想サーバーの起動と終了のテスト", func() {
 		It("仮想ネットワークの取得", func() {
-			net, err := marmotServer.Ma.Db.GetVirtualNetworks()
+			net, err := marmotServer.Ma.GetVirtualNetworksAndPutDB()
 			Expect(err).NotTo(HaveOccurred())
 			data, err := json.MarshalIndent(net, "", "  ")
 			Expect(err).NotTo(HaveOccurred())

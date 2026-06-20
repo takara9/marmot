@@ -479,6 +479,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 					slog.Error("AllocateIP()", "err", err, "vnetId", api.VirtualNetworkID(vnet), "ipnetId", ipNetId, "candidateIP", ipaddr)
 					return "", err
 				}
+				if found {
+					return "", fmt.Errorf("ip address '%s' is already in use on network '%s'", ipaddr, reqNic.Networkname)
+				}
 				if !found {
 					slog.Debug("セットさられたIPアドレス", "IP	", ipaddr)
 					m.Db.SetIPaddrInUse(api.VirtualNetworkID(vnet), ipNetId, ipaddr, serverConfig.Metadata.Name)
@@ -511,8 +514,13 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 						slog.Error("PutDnsEntry()", "err", err)
 						return "", err
 					}
+				} else if isIPAMUnmanagedNetwork(vnet.Metadata.Name) {
+					// default/host-bridge は libvirt 側 DHCP を利用し、Marmot の IPAM 対象外とする。
+					slog.Debug("Skipping Marmot IP allocation for unmanaged network", "network id", api.VirtualNetworkID(vnet), "network name", vnet.Metadata.Name)
 				} else {
-					slog.Debug("IPネットワークIDが指定されていないため、IPアドレスの割り当てができない", "network id", api.VirtualNetworkID(vnet), "network name", vnet.Metadata.Name)
+					// 仮想ネットワーク作成直後は IPAM 初期化前の可能性があるため、
+					// このサーバー作成は失敗させてコントローラーの再試行に委ねる。
+					return "", fmt.Errorf("network '%s' is not ready for IP allocation", reqNic.Networkname)
 				}
 			}
 
@@ -1136,6 +1144,15 @@ func appendUniqueAddress(addrs []string, addr string) []string {
 		}
 	}
 	return append(addrs, trimmed)
+}
+
+func isIPAMUnmanagedNetwork(name string) bool {
+	switch strings.TrimSpace(name) {
+	case "default", "host-bridge":
+		return true
+	default:
+		return false
+	}
 }
 
 func isLibvirtNetworkNotFoundError(err error) bool {

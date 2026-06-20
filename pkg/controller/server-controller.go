@@ -361,6 +361,9 @@ func isRetryableServerProvisionError(err error) bool {
 	if strings.Contains(msg, "network '") && strings.Contains(msg, "is not found") {
 		return true
 	}
+	if strings.Contains(msg, "network '") && strings.Contains(msg, "is not ready for ip allocation") {
+		return true
+	}
 
 	// GitHub 等からの公開鍵取得失敗は一時的障害の可能性があるため再試行する。
 	if strings.Contains(msg, "failed to fetch keys from") {

@@ -79,7 +79,7 @@ var _ = Describe("Output formatting", func() {
 			Expect(lines[2]).To(ContainSubstring("2h"), output)
 		})
 
-		It("omits continuation lines with N/A IP by default", func() {
+		It("keeps continuation lines that have network even when IP is N/A by default", func() {
 			originalShowAll := getServerShowAll
 			getServerShowAll = false
 			DeferCleanup(func() {
@@ -102,7 +102,7 @@ var _ = Describe("Output formatting", func() {
 
 			Expect(output).To(ContainSubstring("app-net"), output)
 			Expect(output).To(ContainSubstring("host-bridge"), output)
-			Expect(output).NotTo(ContainSubstring("default"), output)
+			Expect(output).To(ContainSubstring("default"), output)
 		})
 
 		It("keeps all continuation lines including N/A IP when --all is enabled", func() {
