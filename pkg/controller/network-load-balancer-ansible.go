@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -163,6 +162,7 @@ func runNetworkLoadBalancerPlaybookCommand(playbookPath, targetAddress, privateK
 	if address == "" {
 		return fmt.Errorf("target address is empty")
 	}
+	resourceID := resourceIDFromPlaybookPath(playbookPath, "network-load-balancer-")
 	key := strings.TrimSpace(privateKeyPath)
 	if key == "" {
 		return fmt.Errorf("private key path is empty")
@@ -178,16 +178,7 @@ func runNetworkLoadBalancerPlaybookCommand(playbookPath, targetAddress, privateK
 		"-u", networkLoadBalancerAnsibleDefaultUser,
 		"--ssh-common-args", "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
 	}
-	cmd := exec.Command("ansible-playbook", args...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		trimmed := strings.TrimSpace(string(output))
-		if trimmed == "" {
-			return fmt.Errorf("ansible-playbook failed: %w", err)
-		}
-		return fmt.Errorf("ansible-playbook failed: %w: %s", err, trimmed)
-	}
-	return nil
+	return runAnsiblePlaybookWithLogging(args, "network-load-balancer", resourceID)
 }
 
 func networkLoadBalancerBackendAvailabilityMessage(loadBalancer api.NetworkLoadBalancer, listenerBackends map[string][]networkLoadBalancerBackendServer) string {
