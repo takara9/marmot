@@ -6,7 +6,6 @@ import (
 	_ "embed"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -164,6 +163,7 @@ func runGatewayPlaybookCommand(playbookPath, gatewayAddress, privateKeyPath stri
 	if address == "" {
 		return fmt.Errorf("gateway address is empty")
 	}
+	resourceID := resourceIDFromPlaybookPath(playbookPath, "gateway-")
 	key := strings.TrimSpace(privateKeyPath)
 	if key == "" {
 		return fmt.Errorf("private key path is empty")
@@ -179,14 +179,5 @@ func runGatewayPlaybookCommand(playbookPath, gatewayAddress, privateKeyPath stri
 		"-u", gatewayAnsibleDefaultUsername,
 		"--ssh-common-args", "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
 	}
-	cmd := exec.Command("ansible-playbook", args...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		trimmed := strings.TrimSpace(string(output))
-		if trimmed == "" {
-			return fmt.Errorf("ansible-playbook failed: %w", err)
-		}
-		return fmt.Errorf("ansible-playbook failed: %w: %s", err, trimmed)
-	}
-	return nil
+	return runAnsiblePlaybookWithLogging(args, "gateway", resourceID)
 }
