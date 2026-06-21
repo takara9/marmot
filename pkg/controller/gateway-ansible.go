@@ -29,11 +29,16 @@ const (
 //go:embed gateway-playbooks/gateway-iptables.yaml.tmpl
 var gatewayPlaybookTemplate string
 
+//go:embed gateway-playbooks/gateway-iptables-pessistence.yaml.tmpl
+var gatewayPersistencePlaybook string
+
 var (
 	gatewayPlaybookDir    = gatewayAnsiblePlaybookDir
 	gatewayPrivateKeyPath = marmotd.GatewayPrivateKeyPath()
 	gatewayPublicKeyPath  = marmotd.GatewayPublicKeyPath()
 	runGatewayPlaybook    = runGatewayPlaybookCommand
+	runGatewayPing        = waitForGatewayAnsiblePing
+	runGatewayBecomeCheck = waitForGatewayAnsibleBecome
 )
 
 type gatewayPortRule struct {
@@ -118,6 +123,20 @@ func renderGatewayPlaybook(playbookPath string, targetIP string, serverPorts []s
 	return os.WriteFile(playbookPath, buf.Bytes(), 0o644)
 }
 
+func renderGatewayPersistencePlaybook(playbookPath string) error {
+	if strings.TrimSpace(playbookPath) == "" {
+		return fmt.Errorf("playbook path is empty")
+	}
+	if err := os.MkdirAll(filepath.Dir(playbookPath), 0o755); err != nil {
+		return err
+	}
+	content := strings.TrimSpace(gatewayPersistencePlaybook)
+	if content == "" {
+		return fmt.Errorf("gateway persistence playbook template is empty")
+	}
+	return os.WriteFile(playbookPath, []byte(content+"\n"), 0o644)
+}
+
 func gatewayRemoteCIDRs(spec api.GatewaySpec) []string {
 	remoteCIDRs := make([]string, 0)
 	if spec.RemoteCIDRs != nil {
@@ -181,15 +200,12 @@ func runGatewayPlaybookCommand(playbookPath, gatewayAddress, privateKeyPath stri
 	}
 	defer os.Remove(inventoryPath)
 
-	if err := waitForGatewayAnsiblePing(address, key); err != nil {
-		return err
-	}
-
 	args := []string{
 		"-i", inventoryPath,
 		playbookPath,
 		"--private-key", key,
 		"-u", gatewayAnsibleDefaultUsername,
+		"-e", "ansible_become_timeout=60",
 	}
 	cmd := exec.Command("ansible-playbook", args...)
 	cmd.Env = append(os.Environ(), "ANSIBLE_HOST_KEY_CHECKING=False")
@@ -220,6 +236,53 @@ func waitForGatewayAnsiblePing(address, privateKeyPath string) error {
 		return fmt.Errorf("ansible ping failed before playbook: unknown error")
 	}
 	return fmt.Errorf("ansible ping failed before playbook (%d/%d): %w", gatewayAnsiblePingMaxRetry, gatewayAnsiblePingMaxRetry, lastErr)
+}
+
+func waitForGatewayAnsibleBecome(address, privateKeyPath string) error {
+	var lastErr error
+	for i := 1; i <= gatewayAnsiblePingMaxRetry; i++ {
+		if err := runGatewayAnsibleBecomeCheck(address, privateKeyPath); err == nil {
+			return nil
+		} else {
+			lastErr = err
+		}
+		if i < gatewayAnsiblePingMaxRetry {
+			time.Sleep(gatewayAnsiblePingRetryDelay)
+		}
+	}
+	if lastErr == nil {
+		return fmt.Errorf("ansible become check failed before playbook: unknown error")
+	}
+	return fmt.Errorf("ansible become check failed before playbook (%d/%d): %w", gatewayAnsiblePingMaxRetry, gatewayAnsiblePingMaxRetry, lastErr)
+}
+
+func runGatewayAnsibleBecomeCheck(address, privateKeyPath string) error {
+	inventoryPath, err := writeGatewayInventoryFile(address)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(inventoryPath)
+
+	args := []string{
+		"-i", inventoryPath,
+		"-b",
+		"-m", "command",
+		"-a", "true",
+		"all",
+		"--private-key", privateKeyPath,
+		"-u", gatewayAnsibleDefaultUsername,
+	}
+	cmd := exec.Command("ansible", args...)
+	cmd.Env = append(os.Environ(), "ANSIBLE_HOST_KEY_CHECKING=False")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		trimmed := strings.TrimSpace(string(output))
+		if trimmed == "" {
+			return fmt.Errorf("ansible become check failed: %w", err)
+		}
+		return fmt.Errorf("ansible become check failed: %w: %s", err, trimmed)
+	}
+	return nil
 }
 
 func runGatewayAnsiblePing(address, privateKeyPath string) error {
@@ -258,7 +321,7 @@ func writeGatewayInventoryFile(address string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	content := "[all]\n" + trimmed + "\n"
+	content := "[all]\n" + trimmed + " ansible_ssh_common_args=\"-o ControlMaster=auto -o ControlPersist=60s\"\n"
 	if _, err := file.WriteString(content); err != nil {
 		_ = file.Close()
 		_ = os.Remove(file.Name())

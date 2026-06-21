@@ -108,6 +108,8 @@ func (c *controller) gatewayControllerLoop() {
 			c.reconcileGatewayPending(gateway)
 		case db.GATEWAY_PROVISIONING:
 			c.reconcileGatewayProvisioning(gateway)
+		case db.GATEWAY_WAITING_READY:
+			c.reconcileGatewayWaitOSUp(gateway)
 		case db.GATEWAY_CONFIGURING:
 			c.reconcileGatewayConfiguring(gateway)
 		case db.GATEWAY_ACTIVE:
@@ -129,6 +131,7 @@ func (c *controller) reconcileGatewayFailed(gateway api.Gateway) {
 		if err := c.recoverFailedGateway(gatewayID, "recovering failed gateway: missing server reference", func(labels map[string]interface{}) {
 			db.SetGatewayAnsibleRetries(labels, 0)
 			db.SetGatewayAppliedConfigHash(labels, "")
+			db.SetGatewayWaitOSUpReadyAt(labels, 0)
 		}); err != nil {
 			slog.Warn("recoverFailedGateway() failed", "gatewayId", gatewayID, "err", err)
 			return
@@ -146,6 +149,7 @@ func (c *controller) reconcileGatewayFailed(gateway api.Gateway) {
 			db.SetGatewayManagedServerID(labels, "")
 			db.SetGatewayAnsibleRetries(labels, 0)
 			db.SetGatewayAppliedConfigHash(labels, "")
+			db.SetGatewayWaitOSUpReadyAt(labels, 0)
 		}); err != nil {
 			slog.Warn("recoverFailedGateway() failed", "gatewayId", gatewayID, "err", err)
 		}
@@ -244,7 +248,14 @@ func (c *controller) reconcileGatewayProvisioning(gateway api.Gateway) {
 
 	switch server.Status.StatusCode {
 	case db.SERVER_RUNNING:
-		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_CONFIGURING, "gateway VM running, applying ansible")
+		if err := c.updateGatewayLabels(gatewayID, func(labels map[string]interface{}) {
+			db.SetGatewayAnsibleRetries(labels, 0)
+			db.SetGatewayWaitOSUpReadyAt(labels, 0)
+		}); err != nil {
+			_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_FAILED, err.Error())
+			return
+		}
+		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_WAITING_READY, "gateway VM running, waiting for OS readiness")
 	case db.SERVER_ERROR:
 		msg := "gateway server entered error state"
 		if server.Status.Message != nil && strings.TrimSpace(*server.Status.Message) != "" {
@@ -252,6 +263,63 @@ func (c *controller) reconcileGatewayProvisioning(gateway api.Gateway) {
 		}
 		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_FAILED, msg)
 	}
+}
+
+func (c *controller) reconcileGatewayWaitOSUp(gateway api.Gateway) {
+	gatewayID := api.GatewayID(gateway)
+	serverID := gatewayManagedServerID(gateway)
+	if strings.TrimSpace(serverID) == "" {
+		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_PENDING, "gateway server reference is missing")
+		return
+	}
+
+	server, err := c.db.GetServerById(serverID)
+	if err != nil {
+		if errors.Is(err, db.ErrNotFound) {
+			_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_PENDING, "gateway server not found, recreating")
+			return
+		}
+		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_FAILED, err.Error())
+		return
+	}
+	if server.Status == nil || server.Status.StatusCode != db.SERVER_RUNNING {
+		return
+	}
+
+	readyAt := int64(0)
+	if gateway.Metadata.Labels != nil {
+		readyAt = db.GetGatewayWaitOSUpReadyAt(*gateway.Metadata.Labels)
+	}
+
+	if readyAt == 0 {
+		if err := runGatewayPing(gateway.Spec.BindPublicIpAddress, gatewayPrivateKeyPath); err != nil {
+			c.handleGatewayWaitOSUpFailure(gatewayID, err)
+			return
+		}
+		nextReadyAt := time.Now().Add(20 * time.Second).Unix()
+		if err := c.updateGatewayLabels(gatewayID, func(labels map[string]interface{}) {
+			db.SetGatewayWaitOSUpReadyAt(labels, nextReadyAt)
+		}); err != nil {
+			_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_FAILED, err.Error())
+			return
+		}
+		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_WAITING_READY, "gateway ping succeeded, waiting 20s before ansible apply")
+		return
+	}
+
+	remaining := readyAt - time.Now().Unix()
+	if remaining > 0 {
+			_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_WAITING_READY, fmt.Sprintf("gateway ping succeeded, waiting %ds before ansible apply", remaining))
+		return
+	}
+
+	if err := c.updateGatewayLabels(gatewayID, func(labels map[string]interface{}) {
+		db.SetGatewayWaitOSUpReadyAt(labels, 0)
+	}); err != nil {
+		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_FAILED, err.Error())
+		return
+	}
+	_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_CONFIGURING, "gateway OS is ready, applying ansible")
 }
 
 func (c *controller) reconcileGatewayConfiguring(gateway api.Gateway) {
@@ -282,11 +350,24 @@ func (c *controller) reconcileGatewayConfiguring(gateway api.Gateway) {
 	}
 	configHash := desiredGatewayConfigHash(gateway, targetIP)
 	playbookPath := filepath.Join(gatewayPlaybookDir, fmt.Sprintf("gateway-%s.yaml", gatewayID))
+	persistencePlaybookPath := filepath.Join(gatewayPlaybookDir, fmt.Sprintf("gateway-pessistence-%s.yaml", gatewayID))
 	if err := renderGatewayPlaybook(playbookPath, targetIP, gateway.Spec.ServerPorts, gatewayRemoteCIDRs(gateway.Spec)); err != nil {
 		c.handleGatewayConfigFailure(gatewayID, err)
 		return
 	}
+	if err := renderGatewayPersistencePlaybook(persistencePlaybookPath); err != nil {
+		c.handleGatewayConfigFailure(gatewayID, err)
+		return
+	}
 	if err := runGatewayPlaybook(playbookPath, gateway.Spec.BindPublicIpAddress, gatewayPrivateKeyPath); err != nil {
+		c.handleGatewayConfigFailure(gatewayID, err)
+		return
+	}
+	if err := runGatewayBecomeCheck(gateway.Spec.BindPublicIpAddress, gatewayPrivateKeyPath); err != nil {
+		c.handleGatewayConfigFailure(gatewayID, err)
+		return
+	}
+	if err := runGatewayPlaybook(persistencePlaybookPath, gateway.Spec.BindPublicIpAddress, gatewayPrivateKeyPath); err != nil {
 		c.handleGatewayConfigFailure(gatewayID, err)
 		return
 	}
@@ -333,11 +414,12 @@ func (c *controller) reconcileGatewayActive(gateway api.Gateway) {
 	if gatewayAppliedConfigHash(gateway) != desiredGatewayConfigHash(gateway, targetIP) {
 		if err := c.updateGatewayLabels(gatewayID, func(labels map[string]interface{}) {
 			db.SetGatewayAnsibleRetries(labels, 0)
+			db.SetGatewayWaitOSUpReadyAt(labels, 0)
 		}); err != nil {
 			_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_FAILED, err.Error())
 			return
 		}
-		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_CONFIGURING, "gateway configuration drift detected")
+		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_WAITING_READY, "gateway configuration drift detected; waiting for OS readiness")
 	}
 }
 
@@ -593,6 +675,23 @@ func (c *controller) handleGatewayConfigFailure(gatewayID string, err error) {
 		return
 	}
 	_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_CONFIGURING, message)
+}
+
+func (c *controller) handleGatewayWaitOSUpFailure(gatewayID string, err error) {
+	if err == nil {
+		return
+	}
+	retries, labelErr := c.incrementGatewayConfigRetries(gatewayID)
+	if labelErr != nil {
+		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_FAILED, labelErr.Error())
+		return
+	}
+	message := fmt.Sprintf("gateway ping failed before ansible apply (%d/%d): %v", retries, gatewayAnsibleMaxRetryCount, err)
+	if retries >= gatewayAnsibleMaxRetryCount {
+		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_FAILED, message)
+		return
+	}
+	_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_WAITING_READY, message)
 }
 
 func (c *controller) incrementGatewayConfigRetries(gatewayID string) (int, error) {

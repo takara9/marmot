@@ -15,10 +15,11 @@ import (
 const (
 	GATEWAY_PENDING      = 0
 	GATEWAY_PROVISIONING = 1
-	GATEWAY_CONFIGURING  = 2
-	GATEWAY_ACTIVE       = 3
-	GATEWAY_FAILED       = 4
-	GATEWAY_DELETING     = 5
+	GATEWAY_WAITING_READY = 2
+	GATEWAY_CONFIGURING  = 3
+	GATEWAY_ACTIVE       = 4
+	GATEWAY_FAILED       = 5
+	GATEWAY_DELETING     = 6
 
 	GatewayLabelManagedServerID = "gatewayServerId"
 	GatewayLabelManagedBy       = "managedBy"
@@ -28,15 +29,17 @@ const (
 	GatewayServerLabelRoleValue = "gateway"
 	GatewayLabelAnsibleRetries  = "ansibleRetries"
 	GatewayLabelAppliedConfig   = "appliedConfigHash"
+	GatewayLabelWaitOSUpReadyAt = "waitOsUpReadyAt"
 )
 
 var GatewayStatus = map[int]string{
 	0: "PENDING",
 	1: "PROVISIONING",
-	2: "CONFIGURING",
-	3: "ACTIVE",
-	4: "FAILED",
-	5: "DELETING",
+	2: "WAITING_READY",
+	3: "CONFIGURING",
+	4: "ACTIVE",
+	5: "FAILED",
+	6: "DELETING",
 }
 
 func SetGatewayManagedServerID(labels map[string]interface{}, serverID string) {
@@ -95,6 +98,29 @@ func GetGatewayAppliedConfigHash(labels map[string]interface{}) string {
 		return ""
 	}
 	return strings.TrimSpace(val)
+}
+
+func SetGatewayWaitOSUpReadyAt(labels map[string]interface{}, unixTs int64) {
+	if labels == nil {
+		return
+	}
+	labels[GatewayLabelWaitOSUpReadyAt] = unixTs
+}
+
+func GetGatewayWaitOSUpReadyAt(labels map[string]interface{}) int64 {
+	if labels == nil {
+		return 0
+	}
+	switch val := labels[GatewayLabelWaitOSUpReadyAt].(type) {
+	case int:
+		return int64(val)
+	case int64:
+		return val
+	case float64:
+		return int64(val)
+	default:
+		return 0
+	}
 }
 
 // CreateGateway stores a gateway object in etcd with a generated ID and PENDING status.

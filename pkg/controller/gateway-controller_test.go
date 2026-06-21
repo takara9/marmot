@@ -108,11 +108,37 @@ func TestGatewayControllerStateTransitions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetGatewayById() failed after provisioning reconcile: %v", err)
 	}
-	if gatewayAfterProvisioning.Status == nil || gatewayAfterProvisioning.Status.StatusCode != db.GATEWAY_CONFIGURING {
-		t.Fatalf("gateway status after provisioning reconcile = %v, want %d(CONFIGURING)", gatewayAfterProvisioning.Status, db.GATEWAY_CONFIGURING)
+	if gatewayAfterProvisioning.Status == nil || gatewayAfterProvisioning.Status.StatusCode != db.GATEWAY_WAITING_READY {
+		t.Fatalf("gateway status after provisioning reconcile = %v, want %d(WAITING_READY)", gatewayAfterProvisioning.Status, db.GATEWAY_WAITING_READY)
 	}
 
-	ctrl.reconcileGatewayConfiguring(gatewayAfterProvisioning)
+	ctrl.reconcileGatewayWaitOSUp(gatewayAfterProvisioning)
+	gatewayAfterWaitOSUpFirst, err := database.GetGatewayById(gatewayID)
+	if err != nil {
+		t.Fatalf("GetGatewayById() failed after first wait-os-up reconcile: %v", err)
+	}
+	if gatewayAfterWaitOSUpFirst.Status == nil || gatewayAfterWaitOSUpFirst.Status.StatusCode != db.GATEWAY_WAITING_READY {
+		t.Fatalf("gateway status after first wait-os-up reconcile = %v, want %d(WAITING_READY)", gatewayAfterWaitOSUpFirst.Status, db.GATEWAY_WAITING_READY)
+	}
+	if err := ctrl.updateGatewayLabels(gatewayID, func(labels map[string]interface{}) {
+		db.SetGatewayWaitOSUpReadyAt(labels, time.Now().Add(-1*time.Second).Unix())
+	}); err != nil {
+		t.Fatalf("updateGatewayLabels() failed for wait-os-up readiness: %v", err)
+	}
+	gatewayBeforeWaitOSUpSecond, err := database.GetGatewayById(gatewayID)
+	if err != nil {
+		t.Fatalf("GetGatewayById() failed before second wait-os-up reconcile: %v", err)
+	}
+	ctrl.reconcileGatewayWaitOSUp(gatewayBeforeWaitOSUpSecond)
+	gatewayAfterWaitOSUpSecond, err := database.GetGatewayById(gatewayID)
+	if err != nil {
+		t.Fatalf("GetGatewayById() failed after second wait-os-up reconcile: %v", err)
+	}
+	if gatewayAfterWaitOSUpSecond.Status == nil || gatewayAfterWaitOSUpSecond.Status.StatusCode != db.GATEWAY_CONFIGURING {
+		t.Fatalf("gateway status after second wait-os-up reconcile = %v, want %d(CONFIGURING)", gatewayAfterWaitOSUpSecond.Status, db.GATEWAY_CONFIGURING)
+	}
+
+	ctrl.reconcileGatewayConfiguring(gatewayAfterWaitOSUpSecond)
 
 	gatewayAfterConfiguring, err := database.GetGatewayById(gatewayID)
 	if err != nil {
@@ -167,21 +193,36 @@ func TestGatewayControllerLoopIntegration_CreateToActive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetGatewayById() failed after second loop: %v", err)
 	}
-	if gatewayAfterSecondLoop.Status == nil || gatewayAfterSecondLoop.Status.StatusCode != db.GATEWAY_CONFIGURING {
-		t.Fatalf("gateway status after second loop = %v, want %d(CONFIGURING)", gatewayAfterSecondLoop.Status, db.GATEWAY_CONFIGURING)
+	if gatewayAfterSecondLoop.Status == nil || gatewayAfterSecondLoop.Status.StatusCode != db.GATEWAY_WAITING_READY {
+		t.Fatalf("gateway status after second loop = %v, want %d(WAITING_READY)", gatewayAfterSecondLoop.Status, db.GATEWAY_WAITING_READY)
 	}
 
+	if err := ctrl.updateGatewayLabels(gatewayID, func(labels map[string]interface{}) {
+		db.SetGatewayWaitOSUpReadyAt(labels, time.Now().Add(-1*time.Second).Unix())
+	}); err != nil {
+		t.Fatalf("updateGatewayLabels() failed for integration wait-os-up readiness: %v", err)
+	}
 	ctrl.gatewayControllerLoop()
 
 	gatewayAfterThirdLoop, err := database.GetGatewayById(gatewayID)
 	if err != nil {
 		t.Fatalf("GetGatewayById() failed after third loop: %v", err)
 	}
-	if gatewayAfterThirdLoop.Status == nil || gatewayAfterThirdLoop.Status.StatusCode != db.GATEWAY_ACTIVE {
-		t.Fatalf("gateway status after third loop = %v, want %d(ACTIVE)", gatewayAfterThirdLoop.Status, db.GATEWAY_ACTIVE)
+	if gatewayAfterThirdLoop.Status == nil || gatewayAfterThirdLoop.Status.StatusCode != db.GATEWAY_CONFIGURING {
+		t.Fatalf("gateway status after third loop = %v, want %d(CONFIGURING)", gatewayAfterThirdLoop.Status, db.GATEWAY_CONFIGURING)
 	}
-	if gatewayAfterThirdLoop.Status.Message != nil && strings.TrimSpace(*gatewayAfterThirdLoop.Status.Message) != "" {
-		t.Fatalf("gateway message after third loop = %q, want empty", *gatewayAfterThirdLoop.Status.Message)
+
+	ctrl.gatewayControllerLoop()
+
+	gatewayAfterFourthLoop, err := database.GetGatewayById(gatewayID)
+	if err != nil {
+		t.Fatalf("GetGatewayById() failed after fourth loop: %v", err)
+	}
+	if gatewayAfterFourthLoop.Status == nil || gatewayAfterFourthLoop.Status.StatusCode != db.GATEWAY_ACTIVE {
+		t.Fatalf("gateway status after fourth loop = %v, want %d(ACTIVE)", gatewayAfterFourthLoop.Status, db.GATEWAY_ACTIVE)
+	}
+	if gatewayAfterFourthLoop.Status.Message != nil && strings.TrimSpace(*gatewayAfterFourthLoop.Status.Message) != "" {
+		t.Fatalf("gateway message after fourth loop = %q, want empty", *gatewayAfterFourthLoop.Status.Message)
 	}
 }
 
@@ -404,6 +445,8 @@ func mustCreateInternalServer(t *testing.T, database *db.Database, name, network
 func setupGatewayAnsibleTestHooks(t *testing.T, runner func(playbookPath, gatewayAddress, privateKeyPath string) error) {
 	t.Helper()
 	oldRunner := runGatewayPlaybook
+	oldPing := runGatewayPing
+	oldBecomeCheck := runGatewayBecomeCheck
 	oldDir := gatewayPlaybookDir
 	oldKey := gatewayPrivateKeyPath
 	oldPublic := gatewayPublicKeyPath
@@ -428,12 +471,16 @@ func setupGatewayAnsibleTestHooks(t *testing.T, runner func(playbookPath, gatewa
 	}
 
 	runGatewayPlaybook = runner
+	runGatewayPing = func(address, privateKeyPath string) error { return nil }
+	runGatewayBecomeCheck = func(address, privateKeyPath string) error { return nil }
 	gatewayPlaybookDir = filepath.Join(tempDir, "playbooks")
 	gatewayPrivateKeyPath = keyPath
 	gatewayPublicKeyPath = publicKeyPath
 
 	t.Cleanup(func() {
 		runGatewayPlaybook = oldRunner
+		runGatewayPing = oldPing
+		runGatewayBecomeCheck = oldBecomeCheck
 		gatewayPlaybookDir = oldDir
 		gatewayPrivateKeyPath = oldKey
 		gatewayPublicKeyPath = oldPublic

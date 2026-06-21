@@ -1,0 +1,43 @@
+---
+- name: Configure marmot gateway iptables persistence
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Ensure /etc/iptables exists
+      ansible.builtin.file:
+        path: /etc/iptables
+        state: directory
+        mode: '0755'
+
+    - name: Save iptables rules
+      ansible.builtin.shell: |
+        set -euo pipefail
+        iptables-save > /etc/iptables/rules.v4
+      args:
+        executable: /bin/bash
+
+    - name: Install iptables restore service unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/marmot-iptables-restore.service
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Restore iptables rules from /etc/iptables/rules.v4
+          DefaultDependencies=no
+          Before=network-pre.target
+          Wants=network-pre.target
+          ConditionPathExists=/etc/iptables/rules.v4
+
+          [Service]
+          Type=oneshot
+          ExecStart=/bin/sh -c 'iptables-restore < /etc/iptables/rules.v4'
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Enable iptables restore service
+      ansible.builtin.systemd:
+        name: marmot-iptables-restore.service
+        enabled: yes
+        daemon_reload: yes
