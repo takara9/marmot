@@ -14,6 +14,73 @@
     - name: Apply sysctl configuration
       ansible.builtin.command: sysctl -p
 
+    - name: Ensure directory for persisted iptables rules exists
+      ansible.builtin.file:
+        path: /etc/marmot/iptables
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Install gateway iptables restore script
+      ansible.builtin.copy:
+        dest: /usr/local/sbin/marmot-gateway-iptables-restore.sh
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          RULES_FILE="/etc/marmot/iptables/gateway-rules.v4"
+          if [[ "${1:-}" == "save" ]]; then
+            iptables-save > "${RULES_FILE}"
+            exit 0
+          fi
+
+          if [[ ! -s "${RULES_FILE}" ]]; then
+            exit 0
+          fi
+
+          IPTABLES_RESTORE="$(command -v iptables-restore || true)"
+          if [[ -z "${IPTABLES_RESTORE}" ]]; then
+            IPTABLES_RESTORE="/sbin/iptables-restore"
+          fi
+
+          "${IPTABLES_RESTORE}" < "${RULES_FILE}"
+
+    - name: Install gateway iptables restore service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/marmot-gateway-iptables-restore.service
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Marmot gateway iptables restore
+          DefaultDependencies=no
+          Wants=network-pre.target
+          After=network-pre.target local-fs.target
+          Before=network.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/sbin/marmot-gateway-iptables-restore.sh
+          ExecStop=/usr/local/sbin/marmot-gateway-iptables-restore.sh save
+          RemainAfterExit=yes
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Reload systemd manager configuration
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Enable gateway iptables restore service
+      ansible.builtin.systemd:
+        name: marmot-gateway-iptables-restore.service
+        enabled: true
+
     - name: Ensure gateway dedicated filter chains exist
       ansible.builtin.shell: |
         set -euo pipefail
@@ -152,3 +219,10 @@
         chain: POSTROUTING
         jump: MASQUERADE
         comment: marmot-gateway
+
+    - name: Persist iptables rules for reboot
+      ansible.builtin.shell: |
+        set -euo pipefail
+        /usr/local/sbin/marmot-gateway-iptables-restore.sh save
+      args:
+        executable: /bin/bash
