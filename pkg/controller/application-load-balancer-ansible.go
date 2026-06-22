@@ -299,6 +299,10 @@ func buildApplicationLoadBalancerHAProxyConfig(loadBalancer api.ApplicationLoadB
 		b.WriteString("backend " + backendName + "\n")
 		b.WriteString("  mode " + mode + "\n")
 		b.WriteString("  balance " + algorithm + "\n")
+		if mode == "http" {
+			b.WriteString("  option forwardfor if-none\n")
+			b.WriteString("  http-request set-header X-Real-IP %[src]\n")
+		}
 		if listener.HealthCheck != nil && listener.HealthCheck.Enabled && mode == "http" {
 			path := ""
 			if listener.HealthCheck.Path != nil {
