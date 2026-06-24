@@ -44,11 +44,55 @@ func TestBuildApplicationLoadBalancerHAProxyConfig_WithResolvedBackends(t *testi
 	if err != nil {
 		t.Fatalf("buildApplicationLoadBalancerHAProxyConfig() failed: %v", err)
 	}
+	if !strings.Contains(cfg, "option forwardfor if-none") {
+		t.Fatalf("generated cfg does not enable X-Forwarded-For propagation: %s", cfg)
+	}
+	if !strings.Contains(cfg, "http-request set-header X-Real-IP %[src]") {
+		t.Fatalf("generated cfg does not set X-Real-IP header: %s", cfg)
+	}
 	if !strings.Contains(cfg, "server srv-1-web-a 172.16.10.11:8080 check") {
 		t.Fatalf("generated cfg does not contain backend web-a entry: %s", cfg)
 	}
 	if !strings.Contains(cfg, "server srv-2-web-b 172.16.10.12:8080 check") {
 		t.Fatalf("generated cfg does not contain backend web-b entry: %s", cfg)
+	}
+}
+
+func TestBuildApplicationLoadBalancerHAProxyConfig_TCPListenerDoesNotInjectHTTPHeaders(t *testing.T) {
+	loadBalancer := api.ApplicationLoadBalancer{
+		ApiVersion: "v1",
+		Kind:       "ApplicationLoadBalancer",
+		Metadata: api.Metadata{
+			Name: "lb-tcp",
+			Id:   "lb-tcp-1",
+		},
+		Spec: api.ApplicationLoadBalancerSpec{
+			BindPublicIpAddress:    "192.168.1.130",
+			InternalVirtualNetwork: "db-net",
+			Listeners: []api.ApplicationLoadBalancerListener{{
+				Name:                   "db-tcp",
+				Protocol:               "TCP",
+				VipPort:                3306,
+				BackendPort:            3306,
+				LoadBalancingAlgorithm: "roundrobin",
+				BackendSelector: api.ApplicationLoadBalancerLabelSelector{
+					MatchLabels: map[string]string{"app": "db"},
+				},
+			}},
+		},
+	}
+
+	cfg, err := buildApplicationLoadBalancerHAProxyConfig(loadBalancer, map[string][]applicationLoadBalancerBackendServer{
+		"db-tcp": {{Name: "db-a", IP: "172.16.20.11"}},
+	})
+	if err != nil {
+		t.Fatalf("buildApplicationLoadBalancerHAProxyConfig() failed: %v", err)
+	}
+	if strings.Contains(cfg, "option forwardfor if-none") {
+		t.Fatalf("generated cfg must not include HTTP client IP propagation for TCP listeners: %s", cfg)
+	}
+	if strings.Contains(cfg, "http-request set-header X-Real-IP %[src]") {
+		t.Fatalf("generated cfg must not include X-Real-IP header injection for TCP listeners: %s", cfg)
 	}
 }
 

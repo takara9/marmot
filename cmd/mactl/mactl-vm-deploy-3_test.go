@@ -19,6 +19,7 @@ import (
 var _ = Describe("MarmotdTest", Ordered, func() {
 	var mockServer *mockServerHandle
 	var containerID string
+	var serverId_1, serverId_2, serverId_3 string
 
 	BeforeAll(func(specCtx SpecContext) {
 		opts := &slog.HandlerOptions{
@@ -47,6 +48,31 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 	})
 
 	AfterAll(func(specCtx SpecContext) {
+		// マルチホームの仮想サーバーの削除
+		for _, serverId := range []string{serverId_1, serverId_2, serverId_3} {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "delete", serverId, "--output", "json")
+			stdoutStderr, _ := cmd.CombinedOutput()
+			fmt.Println(string(stdoutStderr))
+		}
+
+		// マルチホームの仮想サーバーの削除状態確認
+		for _, serverId := range []string{serverId_1, serverId_2, serverId_3} {
+			if strings.TrimSpace(serverId) == "" {
+				continue
+			}
+			Eventually(func(g Gomega) {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "detail", serverId, "--output", "json")
+				stdoutStderr, _ := cmd.CombinedOutput()
+				output := strings.ToLower(string(stdoutStderr))
+				fmt.Println("checking not found:", string(stdoutStderr))
+				g.Expect(
+					strings.Contains(output, "not found") ||
+						strings.Contains(output, "404") ||
+						strings.Contains(output, "idが存在しません"),
+				).To(BeTrue())
+			}, 60*time.Second, 5*time.Second).Should(Succeed())
+		}
+
 		mockServer.Stop() // モックサーバー停止
 		cmd := exec.Command("docker", "kill", containerID)
 		_, err := cmd.CombinedOutput()
@@ -407,8 +433,6 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 	})
 
 	Context("様々に条件を変えてサーバーのデプロイ", func() {
-		var serverId_1, serverId_2, serverId_3 string
-
 		It("外部接続の仮想サーバー作成 test-23", func() {
 			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "create", "--configfile", "testdata/test-server-23-test-net-3-host-bridge-ip.yaml", "--output", "json")
 			stdoutStderr, err := cmd.CombinedOutput()
@@ -633,6 +657,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 				case 33:
 					serverId_3 = reply.Id
 				}
+				time.Sleep(15 * time.Second) // 連続で作成すると、生成順番が入れ替わるため、エラーになることがあるので少し待つ
 			}
 		})
 
@@ -666,7 +691,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 						g.Expect(server.Status.Message).NotTo(BeNil())
 						g.Expect(*server.Status.Message).To(ContainSubstring("already in use"))
 					}
-				}, 120*time.Second, 5*time.Second).Should(Succeed())
+				}, 90*time.Second, 5*time.Second).Should(Succeed())
 			}
 		})
 
@@ -685,7 +710,6 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 					cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "detail", serverId, "--output", "json")
 					stdoutStderr, err := cmd.CombinedOutput()
 					fmt.Println(string(stdoutStderr))
-
 					if err != nil {
 						// Accept not found as terminal state when deletion finishes before polling.
 						if strings.Contains(strings.ToLower(string(stdoutStderr)), "not found") || strings.Contains(strings.ToLower(string(stdoutStderr)), "404") {
