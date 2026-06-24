@@ -62,6 +62,35 @@ func volumeKindOrDefault(spec api.VolSpec) string {
 	return "data"
 }
 
+func shouldResolvePreCreatedStorageVolume(disk api.Volume) bool {
+	if strings.TrimSpace(api.VolumeID(disk)) != "" {
+		return true
+	}
+	if disk.Spec.Persistent != nil && *disk.Spec.Persistent {
+		return true
+	}
+	return false
+}
+
+func serverScopedStorageName(name, serverID string) string {
+	trimmedName := strings.TrimSpace(name)
+	if trimmedName == "" {
+		return ""
+	}
+
+	trimmedServerID := strings.TrimSpace(serverID)
+	if trimmedServerID == "" {
+		return trimmedName
+	}
+
+	suffix := "-" + trimmedServerID
+	if strings.HasSuffix(trimmedName, suffix) {
+		return trimmedName
+	}
+
+	return trimmedName + suffix
+}
+
 func chooseAssignedNodeName(defaultNode string, requestedNode *string, storageNode string) (string, error) {
 	defaultAssigned := strings.TrimSpace(defaultNode)
 	assigned := defaultAssigned
@@ -142,6 +171,11 @@ func (m *Marmot) resolveStorageBoundNodeName(storage *[]api.Volume) (string, err
 
 	vols := make([]*api.Volume, 0, len(*storage))
 	for i, disk := range *storage {
+		if !shouldResolvePreCreatedStorageVolume(disk) {
+			vols = append(vols, nil)
+			continue
+		}
+
 		vol, err := m.findPreCreatedStorageVolume(disk)
 		if err != nil {
 			return "", fmt.Errorf("storage[%d] volume lookup failed: %w", i, err)
@@ -689,26 +723,33 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	// データボリュームの作成
 	slog.Debug("データボリュームの生成")
 	if serverConfig.Spec.Storage != nil {
+		serverID := api.ServerID(serverConfig)
 		for i, disk := range *serverConfig.Spec.Storage {
 			disk.ApiVersion = "v1"
 			disk.Kind = "Volume"
 
-			diskVol, err := m.findPreCreatedStorageVolume(disk)
-			if err != nil {
-				slog.Error("findPreCreatedStorageVolume()", "err", err, "disk index", i)
-				return "", err
+			if shouldResolvePreCreatedStorageVolume(disk) {
+				diskVol, err := m.findPreCreatedStorageVolume(disk)
+				if err != nil {
+					slog.Error("findPreCreatedStorageVolume()", "err", err, "disk index", i)
+					return "", err
+				}
+				if diskVol != nil {
+					slog.Debug("既存ボリュームを使用", "disk index", i, "volume id", api.VolumeID(*diskVol))
+
+					// 永続フラグを立てる
+					var persistent bool = true
+					diskVol.Spec.Persistent = &persistent
+
+					slog.Debug("既存ボリュームの情報取得成功", "disk index", i, "volume id", api.VolumeID(*diskVol), "path", diskVol.Spec.Path, "status", diskVol.Status.Status)
+					(*serverConfig.Spec.Storage)[i] = *diskVol
+					slog.Debug("既存ボリュームの情報設定成功", "disk index", i, "volume id", api.VolumeID(*diskVol), "disk", disk)
+					continue
+				}
 			}
-			if diskVol != nil {
-				slog.Debug("既存ボリュームを使用", "disk index", i, "volume id", api.VolumeID(*diskVol))
 
-				// 永続フラグを立てる
-				var persistent bool = true
-				diskVol.Spec.Persistent = &persistent
-
-				slog.Debug("既存ボリュームの情報取得成功", "disk index", i, "volume id", api.VolumeID(*diskVol), "path", diskVol.Spec.Path, "status", diskVol.Status.Status)
-				(*serverConfig.Spec.Storage)[i] = *diskVol
-				slog.Debug("既存ボリュームの情報設定成功", "disk index", i, "volume id", api.VolumeID(*diskVol), "disk", disk)
-				continue
+			if strings.TrimSpace(disk.Metadata.Name) != "" {
+				disk.Metadata.Name = serverScopedStorageName(disk.Metadata.Name, serverID)
 			}
 
 			if disk.Spec.Type != nil && *disk.Spec.Type == "qcow2" {
