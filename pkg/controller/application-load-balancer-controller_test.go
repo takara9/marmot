@@ -93,6 +93,150 @@ func TestLoadBalancerControllerStateTransitions(t *testing.T) {
 	}
 }
 
+func TestBuildApplicationLoadBalancerServerSpecSetsDefaultRouteOnPublicNIC(t *testing.T) {
+	database := newGatewayTestDatabase(t)
+	ctrl := &controller{
+		db:     database,
+		marmot: &marmotd.Marmot{NodeName: "hvc", Db: database},
+	}
+
+	hostBridge, err := database.CreateVirtualNetwork(api.VirtualNetwork{
+		ApiVersion: "v1",
+		Kind:       "VirtualNetwork",
+		Metadata:   api.Metadata{Name: "host-bridge"},
+		Spec: api.VirtualNetworkSpec{
+			IPNetworkAddress: util.StringPtr("10.10.0.0/24"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateVirtualNetwork(host-bridge) failed: %v", err)
+	}
+	ipNetID, err := database.CreateIpNetwork(api.VirtualNetworkID(hostBridge), &api.IPNetwork{AddressMaskLen: util.StringPtr("10.10.0.0/24")})
+	if err != nil {
+		t.Fatalf("CreateIpNetwork(host-bridge) failed: %v", err)
+	}
+	hostBridge.Spec.IpNetworkId = util.StringPtr(ipNetID)
+	if err := database.UpdateVirtualNetworkById(api.VirtualNetworkID(hostBridge), hostBridge); err != nil {
+		t.Fatalf("UpdateVirtualNetworkById(host-bridge) failed: %v", err)
+	}
+
+	if _, err := database.CreateVirtualNetwork(api.VirtualNetwork{
+		ApiVersion: "v1",
+		Kind:       "VirtualNetwork",
+		Metadata:   api.Metadata{Name: "app-net"},
+		Spec: api.VirtualNetworkSpec{
+			IPNetworkAddress: util.StringPtr("172.16.9.0/24"),
+		},
+	}); err != nil {
+		t.Fatalf("CreateVirtualNetwork(app-net) failed: %v", err)
+	}
+
+	lb := api.ApplicationLoadBalancer{
+		ApiVersion: "v1",
+		Kind:       "ApplicationLoadBalancer",
+		Metadata:   api.Metadata{Name: "alb-web"},
+		Spec: api.ApplicationLoadBalancerSpec{
+			BindPublicIpAddress:    "10.10.0.70",
+			InternalVirtualNetwork: "app-net",
+		},
+	}
+
+	serverSpec, err := ctrl.buildApplicationLoadBalancerServerSpec(lb, "lb-alb-web")
+	if err != nil {
+		t.Fatalf("buildApplicationLoadBalancerServerSpec() failed: %v", err)
+	}
+	if serverSpec.Spec.NetworkInterface == nil || len(*serverSpec.Spec.NetworkInterface) == 0 {
+		t.Fatalf("NetworkInterface is empty")
+	}
+
+	publicNIC := (*serverSpec.Spec.NetworkInterface)[0]
+	if publicNIC.Routes == nil || len(*publicNIC.Routes) == 0 {
+		t.Fatalf("public NIC routes are empty")
+	}
+	route := (*publicNIC.Routes)[0]
+	if route.To == nil || strings.TrimSpace(*route.To) != "default" {
+		t.Fatalf("public NIC default route To = %v, want default", route.To)
+	}
+	if route.Via == nil || strings.TrimSpace(*route.Via) != "10.10.0.1" {
+		t.Fatalf("public NIC default route Via = %v, want 10.10.0.1", route.Via)
+	}
+}
+
+func TestBuildApplicationLoadBalancerServerSpecUsesCustomPublicNetworkAndRoutes(t *testing.T) {
+	database := newGatewayTestDatabase(t)
+	ctrl := &controller{
+		db:     database,
+		marmot: &marmotd.Marmot{NodeName: "hvc", Db: database},
+	}
+
+	publicNet, err := database.CreateVirtualNetwork(api.VirtualNetwork{
+		ApiVersion: "v1",
+		Kind:       "VirtualNetwork",
+		Metadata:   api.Metadata{Name: "pub-net"},
+		Spec: api.VirtualNetworkSpec{
+			IPNetworkAddress: util.StringPtr("10.10.0.0/24"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateVirtualNetwork(pub-net) failed: %v", err)
+	}
+	ipNetID, err := database.CreateIpNetwork(api.VirtualNetworkID(publicNet), &api.IPNetwork{AddressMaskLen: util.StringPtr("10.10.0.0/24")})
+	if err != nil {
+		t.Fatalf("CreateIpNetwork(pub-net) failed: %v", err)
+	}
+	publicNet.Spec.IpNetworkId = util.StringPtr(ipNetID)
+	if err := database.UpdateVirtualNetworkById(api.VirtualNetworkID(publicNet), publicNet); err != nil {
+		t.Fatalf("UpdateVirtualNetworkById(pub-net) failed: %v", err)
+	}
+
+	if _, err := database.CreateVirtualNetwork(api.VirtualNetwork{
+		ApiVersion: "v1",
+		Kind:       "VirtualNetwork",
+		Metadata:   api.Metadata{Name: "app-net"},
+		Spec: api.VirtualNetworkSpec{
+			IPNetworkAddress: util.StringPtr("172.16.9.0/24"),
+		},
+	}); err != nil {
+		t.Fatalf("CreateVirtualNetwork(app-net) failed: %v", err)
+	}
+
+	to := "default"
+	via := "10.10.0.254"
+	pubNetName := "pub-net"
+	lb := api.ApplicationLoadBalancer{
+		ApiVersion: "v1",
+		Kind:       "ApplicationLoadBalancer",
+		Metadata:   api.Metadata{Name: "alb-web"},
+		Spec: api.ApplicationLoadBalancerSpec{
+			BindPublicNetworkName: &pubNetName,
+			BindPublicIpAddress:   "10.10.0.70/24",
+			Routes:                &[]api.Route{{To: &to, Via: &via}},
+			InternalVirtualNetwork: "app-net",
+		},
+	}
+
+	serverSpec, err := ctrl.buildApplicationLoadBalancerServerSpec(lb, "lb-alb-web")
+	if err != nil {
+		t.Fatalf("buildApplicationLoadBalancerServerSpec() failed: %v", err)
+	}
+	publicNIC := (*serverSpec.Spec.NetworkInterface)[0]
+	if publicNIC.Networkname != "pub-net" {
+		t.Fatalf("public NIC networkname = %q, want %q", publicNIC.Networkname, "pub-net")
+	}
+	if publicNIC.Address == nil || strings.TrimSpace(*publicNIC.Address) != "10.10.0.70" {
+		t.Fatalf("public NIC address = %v, want 10.10.0.70", publicNIC.Address)
+	}
+	if publicNIC.Netmasklen == nil || *publicNIC.Netmasklen != 24 {
+		t.Fatalf("public NIC netmasklen = %v, want 24", publicNIC.Netmasklen)
+	}
+	if publicNIC.Routes == nil || len(*publicNIC.Routes) != 1 {
+		t.Fatalf("public NIC routes = %v, want 1 route", publicNIC.Routes)
+	}
+	if gotVia := strings.TrimSpace(util.OrDefault((*publicNIC.Routes)[0].Via, "")); gotVia != via {
+		t.Fatalf("public NIC route via = %q, want %q", gotVia, via)
+	}
+}
+
 func TestLoadBalancerControllerWaitsForAgentApply(t *testing.T) {
 	database := newGatewayTestDatabase(t)
 	setupApplicationLoadBalancerAnsibleTestHooks(t, func(playbookPath, targetAddress, privateKeyPath string) error {
@@ -190,6 +334,24 @@ func TestLoadBalancerControllerWaitsForNewerAgentApplyResult(t *testing.T) {
 	}
 	if afterConfiguring.Status == nil || afterConfiguring.Status.StatusCode != db.LOAD_BALANCER_CONFIGURING {
 		t.Fatalf("load balancer status with stale agent timestamp = %v, want %d(CONFIGURING)", afterConfiguring.Status, db.LOAD_BALANCER_CONFIGURING)
+	}
+}
+
+func TestApplicationLoadBalancerAgentApplyResultIsStale_AllowsUnderThreeSecondsSkew(t *testing.T) {
+	stagedAt := time.Date(2026, 6, 25, 10, 0, 0, 0, time.UTC)
+	lastAppliedAt := stagedAt.Add(-2999 * time.Millisecond)
+
+	if applicationLoadBalancerAgentApplyResultIsStale(lastAppliedAt, stagedAt) {
+		t.Fatalf("expected non-stale result when skew is less than 3 seconds")
+	}
+}
+
+func TestApplicationLoadBalancerAgentApplyResultIsStale_RejectsThreeSecondsOrMoreSkew(t *testing.T) {
+	stagedAt := time.Date(2026, 6, 25, 10, 0, 0, 0, time.UTC)
+	lastAppliedAt := stagedAt.Add(-3 * time.Second)
+
+	if !applicationLoadBalancerAgentApplyResultIsStale(lastAppliedAt, stagedAt) {
+		t.Fatalf("expected stale result when skew is 3 seconds or more")
 	}
 }
 

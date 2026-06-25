@@ -1710,8 +1710,17 @@ components:
         - remoteCIDR
         - listeners
       properties:
+        bindPublicNetworkName:
+          type: string
+          description: Public network name for ALB bind address. Defaults to host-bridge.
         bindPublicIpAddress:
           type: string
+          description: Public bind IP address. CIDR form (e.g. 10.10.0.70/24) is also accepted.
+        routes:
+          type: array
+          description: Static routes applied to public NIC.
+          items:
+            $ref: "#/components/schemas/Route"
         internalVirtualNetwork:
           type: string
         remoteCIDR:
