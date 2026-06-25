@@ -95,9 +95,11 @@ type ApplicationLoadBalancerPersistence struct {
 
 // ApplicationLoadBalancerSpec defines model for ApplicationLoadBalancerSpec.
 type ApplicationLoadBalancerSpec struct {
+	BindPublicNetworkName *string                           `json:"bindPublicNetworkName,omitempty" yaml:"bindPublicNetworkName,omitempty"`
 	BindPublicIpAddress    string                            `json:"bindPublicIpAddress" yaml:"bindPublicIpAddress"`
 	InternalVirtualNetwork string                            `json:"internalVirtualNetwork" yaml:"internalVirtualNetwork"`
 	Listeners              []ApplicationLoadBalancerListener `json:"listeners" yaml:"listeners"`
+	Routes                 *[]Route                          `json:"routes,omitempty" yaml:"routes,omitempty"`
 
 	// RemoteCIDR Source CIDR allowed to access load balancer forwarding. Empty means allow all.
 	RemoteCIDR string `json:"remoteCIDR" yaml:"remoteCIDR"`

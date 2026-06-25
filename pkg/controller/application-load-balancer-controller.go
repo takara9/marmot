@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"path/filepath"
 	"sort"
@@ -21,6 +22,7 @@ const (
 	defaultApplicationLoadBalancerControllerIntervalSeconds         = 15
 	defaultApplicationLoadBalancerAgentStateReadMaxFailures         = 3
 	defaultApplicationLoadBalancerAgentStateRecoverySuccessRequired = 2
+	applicationLoadBalancerApplyResultFreshnessThreshold            = 3 * time.Second
 )
 
 var (
@@ -550,7 +552,10 @@ func (c *controller) ensureApplicationLoadBalancerServerEntry(loadBalancer api.A
 }
 
 func (c *controller) buildApplicationLoadBalancerServerSpec(loadBalancer api.ApplicationLoadBalancer, serverName string) (api.Server, error) {
-	publicIP := strings.TrimSpace(loadBalancer.Spec.BindPublicIpAddress)
+	publicIP, cidrMaskLen, err := normalizePublicBindAddress(loadBalancer.Spec.BindPublicIpAddress)
+	if err != nil {
+		return api.Server{}, fmt.Errorf("invalid bindPublicIpAddress: %w", err)
+	}
 	if publicIP == "" {
 		return api.Server{}, fmt.Errorf("load balancer bindPublicIpAddress is empty")
 	}
@@ -558,11 +563,20 @@ func (c *controller) buildApplicationLoadBalancerServerSpec(loadBalancer api.App
 	if internalNetwork == "" {
 		return api.Server{}, fmt.Errorf("load balancer internalVirtualNetwork is empty")
 	}
+	publicNetwork := applicationLoadBalancerPublicNetworkName(loadBalancer.Spec)
 
 	nics := make([]api.NetworkInterface, 0, 2)
-	publicNIC := api.NetworkInterface{Networkname: "host-bridge", Address: util.StringPtr(publicIP)}
-	if maskLen, err := c.lookupNetworkMaskLen("host-bridge"); err == nil && maskLen > 0 {
+	publicNIC := api.NetworkInterface{Networkname: publicNetwork, Address: util.StringPtr(publicIP)}
+	if cidrMaskLen > 0 {
+		publicNIC.Netmasklen = util.IntPtrInt(cidrMaskLen)
+	} else if maskLen, err := c.lookupNetworkMaskLen(publicNetwork); err == nil && maskLen > 0 {
 		publicNIC.Netmasklen = util.IntPtrInt(maskLen)
+	}
+	if loadBalancer.Spec.Routes != nil && len(*loadBalancer.Spec.Routes) > 0 {
+		publicNIC.Routes = loadBalancer.Spec.Routes
+	} else if gw, err := c.lookupNetworkGateway(publicNetwork); err == nil && strings.TrimSpace(gw) != "" {
+		defaultTo := "default"
+		publicNIC.Routes = &[]api.Route{{To: &defaultTo, Via: util.StringPtr(gw)}}
 	}
 	nics = append(nics, publicNIC)
 
@@ -678,12 +692,10 @@ func (c *controller) observeApplicationLoadBalancerAgentState(loadBalancer api.A
 		_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_CONFIGURING, "waiting for load balancer agent to apply desired config")
 		return true
 	}
-	if !stagedAt.IsZero() {
-		if state.LastAppliedAt.IsZero() || state.LastAppliedAt.UTC().Before(stagedAt.UTC()) {
-			_ = c.resetApplicationLoadBalancerAgentStateReadSuccesses(loadBalancerID)
-			_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_CONFIGURING, "waiting for newer load balancer agent apply result")
-			return true
-		}
+	if applicationLoadBalancerAgentApplyResultIsStale(state.LastAppliedAt, stagedAt) {
+		_ = c.resetApplicationLoadBalancerAgentStateReadSuccesses(loadBalancerID)
+		_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_CONFIGURING, "waiting for newer load balancer agent apply result")
+		return true
 	}
 	if err := c.updateApplicationLoadBalancerLabels(loadBalancerID, func(labels map[string]interface{}) {
 		db.SetLoadBalancerAppliedConfigHash(labels, desiredHash)
@@ -702,6 +714,16 @@ func (c *controller) observeApplicationLoadBalancerAgentState(loadBalancer api.A
 	return true
 }
 
+func applicationLoadBalancerAgentApplyResultIsStale(lastAppliedAt, stagedAt time.Time) bool {
+	if stagedAt.IsZero() {
+		return false
+	}
+	if lastAppliedAt.IsZero() {
+		return true
+	}
+	return stagedAt.UTC().Sub(lastAppliedAt.UTC()) >= applicationLoadBalancerApplyResultFreshnessThreshold
+}
+
 func (c *controller) resolveApplicationLoadBalancerTargetAddress(loadBalancer api.ApplicationLoadBalancer) (string, error) {
 	serverID := strings.TrimSpace(applicationLoadBalancerManagedServerID(loadBalancer))
 	if serverID == "" {
@@ -714,14 +736,18 @@ func (c *controller) resolveApplicationLoadBalancerTargetAddress(loadBalancer ap
 	if server.Spec.NetworkInterface == nil {
 		return "", fmt.Errorf("load balancer server has no network interface")
 	}
-	publicIP := strings.TrimSpace(loadBalancer.Spec.BindPublicIpAddress)
+	publicIP, _, err := normalizePublicBindAddress(loadBalancer.Spec.BindPublicIpAddress)
+	if err != nil {
+		return "", fmt.Errorf("invalid bindPublicIpAddress: %w", err)
+	}
+	publicNetwork := applicationLoadBalancerPublicNetworkName(loadBalancer.Spec)
 	for _, nic := range *server.Spec.NetworkInterface {
 		if nic.Address != nil {
 			if ip := strings.TrimSpace(*nic.Address); publicIP != "" && ip == publicIP {
 				return ip, nil
 			}
 		}
-		if strings.TrimSpace(nic.Networkname) == "host-bridge" && nic.Address != nil {
+		if strings.TrimSpace(nic.Networkname) == publicNetwork && nic.Address != nil {
 			if ip := strings.TrimSpace(*nic.Address); ip != "" {
 				return ip, nil
 			}
@@ -731,6 +757,34 @@ func (c *controller) resolveApplicationLoadBalancerTargetAddress(loadBalancer ap
 		return publicIP, nil
 	}
 	return "", fmt.Errorf("load balancer public target address is missing")
+}
+
+func applicationLoadBalancerPublicNetworkName(spec api.ApplicationLoadBalancerSpec) string {
+	if spec.BindPublicNetworkName != nil {
+		if network := strings.TrimSpace(*spec.BindPublicNetworkName); network != "" {
+			return network
+		}
+	}
+	return "host-bridge"
+}
+
+func normalizePublicBindAddress(raw string) (string, int, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", 0, nil
+	}
+	if strings.Contains(trimmed, "/") {
+		ip, ipNet, err := net.ParseCIDR(trimmed)
+		if err != nil {
+			return "", 0, err
+		}
+		bits, _ := ipNet.Mask.Size()
+		return strings.TrimSpace(ip.String()), bits, nil
+	}
+	if parsed := net.ParseIP(trimmed); parsed != nil {
+		return strings.TrimSpace(parsed.String()), 0, nil
+	}
+	return "", 0, fmt.Errorf("invalid ip address %q", trimmed)
 }
 
 func (c *controller) handleApplicationLoadBalancerConfigFailure(loadBalancerID string, err error) {

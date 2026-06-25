@@ -291,8 +291,12 @@ func buildApplicationLoadBalancerHAProxyConfig(loadBalancer api.ApplicationLoadB
 		frontendName := sanitizeHAProxyToken(fmt.Sprintf("%s-fe-%s", id, name))
 		backendName := sanitizeHAProxyToken(fmt.Sprintf("%s-be-%s", id, name))
 
+		bindAddress, _, err := normalizePublicBindAddress(loadBalancer.Spec.BindPublicIpAddress)
+		if err != nil {
+			return "", fmt.Errorf("invalid bindPublicIpAddress: %w", err)
+		}
 		b.WriteString("frontend " + frontendName + "\n")
-		b.WriteString(fmt.Sprintf("  bind %s:%d\n", strings.TrimSpace(loadBalancer.Spec.BindPublicIpAddress), listener.VipPort))
+		b.WriteString(fmt.Sprintf("  bind %s:%d\n", bindAddress, listener.VipPort))
 		b.WriteString("  mode " + mode + "\n")
 		b.WriteString("  default_backend " + backendName + "\n\n")
 

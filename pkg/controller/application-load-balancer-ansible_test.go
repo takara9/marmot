@@ -96,6 +96,41 @@ func TestBuildApplicationLoadBalancerHAProxyConfig_TCPListenerDoesNotInjectHTTPH
 	}
 }
 
+func TestBuildApplicationLoadBalancerHAProxyConfig_NormalizesCIDRBindAddress(t *testing.T) {
+	loadBalancer := api.ApplicationLoadBalancer{
+		ApiVersion: "v1",
+		Kind:       "ApplicationLoadBalancer",
+		Metadata: api.Metadata{
+			Name: "lb-cidr",
+			Id:   "lb-cidr-1",
+		},
+		Spec: api.ApplicationLoadBalancerSpec{
+			BindPublicIpAddress:    "192.168.1.130/24",
+			InternalVirtualNetwork: "db-net",
+			Listeners: []api.ApplicationLoadBalancerListener{{
+				Name:                   "db-tcp",
+				Protocol:               "TCP",
+				VipPort:                3306,
+				BackendPort:            3306,
+				LoadBalancingAlgorithm: "roundrobin",
+				BackendSelector: api.ApplicationLoadBalancerLabelSelector{
+					MatchLabels: map[string]string{"app": "db"},
+				},
+			}},
+		},
+	}
+
+	cfg, err := buildApplicationLoadBalancerHAProxyConfig(loadBalancer, map[string][]applicationLoadBalancerBackendServer{
+		"db-tcp": {{Name: "db-a", IP: "172.16.20.11"}},
+	})
+	if err != nil {
+		t.Fatalf("buildApplicationLoadBalancerHAProxyConfig() failed: %v", err)
+	}
+	if !strings.Contains(cfg, "bind 192.168.1.130:3306") {
+		t.Fatalf("generated cfg does not normalize CIDR bind address: %s", cfg)
+	}
+}
+
 func TestDesiredApplicationLoadBalancerConfigHash_ChangesWhenBackendsChange(t *testing.T) {
 	loadBalancer := api.ApplicationLoadBalancer{
 		ApiVersion: "v1",
