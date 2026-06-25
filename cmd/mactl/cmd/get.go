@@ -1135,8 +1135,8 @@ func outputVolumes(volumes []api.Volume) error {
 		sort.SliceStable(volumes, func(i, j int) bool {
 			return creationTime(volumes[i].Status).Before(creationTime(volumes[j].Status))
 		})
-		fmt.Println("NAME          NODE        KIND  TYPE   iSCSI  SIZE(GB)  STATUS     PATH                  AGE")
-		fmt.Println("----          ----        ----  ----   -----  --------  ------     ----                  ---")
+		fmt.Println("NAME                        NODE        KIND  TYPE   iSCSI  SIZE(GB)  STATUS     PATH                  AGE")
+		fmt.Println("----                        ----        ----  ----   -----  --------  ------     ----                  ---")
 		for _, v := range volumes {
 			size := 0
 			if v.Spec.Size != nil {
@@ -1173,7 +1173,7 @@ func outputVolumes(volumes []api.Volume) error {
 				path = truncatePath(strings.TrimSpace(*v.Spec.Path), 22)
 			}
 
-			fmt.Printf("%-12s  %-10s  %-4s  %-5s  %-5s  %-8d  %-9s  %-20s  %s\n",
+			fmt.Printf("%-26s  %-10s  %-4s  %-5s  %-5s  %-8d  %-9s  %-20s  %s\n",
 				v.Metadata.Name,
 				node,
 				volKind,
