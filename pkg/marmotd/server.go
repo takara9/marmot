@@ -66,10 +66,31 @@ func shouldResolvePreCreatedStorageVolume(disk api.Volume) bool {
 	if strings.TrimSpace(api.VolumeID(disk)) != "" {
 		return true
 	}
+	if strings.TrimSpace(disk.Metadata.Name) != "" {
+		return true
+	}
 	if disk.Spec.Persistent != nil && *disk.Spec.Persistent {
 		return true
 	}
 	return false
+}
+
+func normalizeNewStorageVolumeRequest(disk api.Volume, index int) (api.Volume, error) {
+	volType := strings.TrimSpace(util.OrDefault(disk.Spec.Type, ""))
+	if volType == "" {
+		disk.Spec.Type = util.StringPtr("qcow2")
+		volType = "qcow2"
+	}
+
+	if volType != "qcow2" && volType != "lvm" {
+		return api.Volume{}, fmt.Errorf("storage[%d].spec.type must be qcow2 or lvm", index)
+	}
+
+	if volumeKindOrDefault(disk.Spec) == "data" && (disk.Spec.Size == nil || *disk.Spec.Size <= 0) {
+		return api.Volume{}, fmt.Errorf("storage[%d].spec.size must be greater than 0 when creating a new %s volume", index, volType)
+	}
+
+	return disk, nil
 }
 
 func serverScopedStorageName(name, serverID string) string {
@@ -727,6 +748,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		for i, disk := range *serverConfig.Spec.Storage {
 			disk.ApiVersion = "v1"
 			disk.Kind = "Volume"
+			requestedName := strings.TrimSpace(disk.Metadata.Name)
 
 			if shouldResolvePreCreatedStorageVolume(disk) {
 				diskVol, err := m.findPreCreatedStorageVolume(disk)
@@ -748,32 +770,24 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 				}
 			}
 
-			if strings.TrimSpace(disk.Metadata.Name) != "" {
+			disk, err = normalizeNewStorageVolumeRequest(disk, i)
+			if err != nil {
+				return "", err
+			}
+
+			if requestedName != "" {
 				disk.Metadata.Name = serverScopedStorageName(disk.Metadata.Name, serverID)
 			}
 
-			if disk.Spec.Type != nil && *disk.Spec.Type == "qcow2" {
-				slog.Debug("qcow2ボリュームを作成", "disk index", i)
-				assignNodeNameIfUnset(&disk.Metadata, assignedNodeName)
-				diskVol, err := m.CreateNewVolumeWithWait(disk)
-				if err != nil {
-					slog.Error("CreateNewVolumeWithWait()", "err", err)
-					return "", err
-				}
-				(*serverConfig.Spec.Storage)[i] = diskVol
-				slog.Debug("データボリューム 作成成功", "disk index", i, "volume id", api.VolumeID(diskVol))
+			slog.Debug("データボリュームを作成", "disk index", i, "type", util.OrDefault(disk.Spec.Type, ""))
+			assignNodeNameIfUnset(&disk.Metadata, assignedNodeName)
+			diskVol, err := m.CreateNewVolumeWithWait(disk)
+			if err != nil {
+				slog.Error("CreateNewVolumeWithWait()", "err", err)
+				return "", err
 			}
-			if disk.Spec.Type != nil && *disk.Spec.Type == "lvm" {
-				slog.Debug("lvmボリュームを作成", "disk index", i)
-				assignNodeNameIfUnset(&disk.Metadata, assignedNodeName)
-				diskVol, err := m.CreateNewVolumeWithWait(disk)
-				if err != nil {
-					slog.Error("CreateNewVolumeWithWait()", "err", err)
-					return "", err
-				}
-				(*serverConfig.Spec.Storage)[i] = diskVol
-				slog.Debug("データボリューム 作成成功", "disk index", i, "volume id", api.VolumeID(diskVol))
-			}
+			(*serverConfig.Spec.Storage)[i] = diskVol
+			slog.Debug("データボリューム 作成成功", "disk index", i, "volume id", api.VolumeID(diskVol))
 		}
 	}
 
