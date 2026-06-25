@@ -1679,6 +1679,11 @@ components:
           type: string
         internalVirtualNetwork:
           type: string
+        routes:
+          type: array
+          description: Static routes applied to public NIC.
+          items:
+            $ref: "#/components/schemas/Route"
         remoteCIDRs:
           type: array
           description: Source CIDR list allowed to access vpn gateway. Empty means allow all.
