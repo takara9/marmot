@@ -95,7 +95,7 @@ func TestNormalizeNewStorageVolumeRequest(t *testing.T) {
 	t.Run("defaults type to qcow2", func(t *testing.T) {
 		size := 10
 		disk := api.Volume{Spec: api.VolSpec{Size: &size}}
-		got, err := normalizeNewStorageVolumeRequest(disk, 0, true)
+		got, err := normalizeNewStorageVolumeRequest(disk, 0)
 		if err != nil {
 			t.Fatalf("normalizeNewStorageVolumeRequest() unexpected error: %v", err)
 		}
@@ -104,9 +104,9 @@ func TestNormalizeNewStorageVolumeRequest(t *testing.T) {
 		}
 	})
 
-	t.Run("rejects missing size when required", func(t *testing.T) {
+	t.Run("rejects missing size for data volume", func(t *testing.T) {
 		disk := api.Volume{}
-		if _, err := normalizeNewStorageVolumeRequest(disk, 2, true); err == nil {
+		if _, err := normalizeNewStorageVolumeRequest(disk, 2); err == nil {
 			t.Fatal("normalizeNewStorageVolumeRequest() expected error, got nil")
 		}
 	})
@@ -115,7 +115,7 @@ func TestNormalizeNewStorageVolumeRequest(t *testing.T) {
 		size := 10
 		typ := "raw"
 		disk := api.Volume{Spec: api.VolSpec{Size: &size, Type: &typ}}
-		if _, err := normalizeNewStorageVolumeRequest(disk, 1, true); err == nil {
+		if _, err := normalizeNewStorageVolumeRequest(disk, 1); err == nil {
 			t.Fatal("normalizeNewStorageVolumeRequest() expected error, got nil")
 		}
 	})
@@ -124,7 +124,15 @@ func TestNormalizeNewStorageVolumeRequest(t *testing.T) {
 		size := 1
 		typ := "lvm"
 		disk := api.Volume{Spec: api.VolSpec{Size: &size, Type: &typ}}
-		if _, err := normalizeNewStorageVolumeRequest(disk, 0, true); err != nil {
+		if _, err := normalizeNewStorageVolumeRequest(disk, 0); err != nil {
+			t.Fatalf("normalizeNewStorageVolumeRequest() unexpected error: %v", err)
+		}
+	})
+
+	t.Run("allows os volume without size", func(t *testing.T) {
+		kind := "os"
+		disk := api.Volume{Spec: api.VolSpec{Kind: &kind}}
+		if _, err := normalizeNewStorageVolumeRequest(disk, 0); err != nil {
 			t.Fatalf("normalizeNewStorageVolumeRequest() unexpected error: %v", err)
 		}
 	})

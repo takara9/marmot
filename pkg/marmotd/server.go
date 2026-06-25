@@ -75,7 +75,7 @@ func shouldResolvePreCreatedStorageVolume(disk api.Volume) bool {
 	return false
 }
 
-func normalizeNewStorageVolumeRequest(disk api.Volume, index int, requireSize bool) (api.Volume, error) {
+func normalizeNewStorageVolumeRequest(disk api.Volume, index int) (api.Volume, error) {
 	volType := strings.TrimSpace(util.OrDefault(disk.Spec.Type, ""))
 	if volType == "" {
 		disk.Spec.Type = util.StringPtr("qcow2")
@@ -86,7 +86,7 @@ func normalizeNewStorageVolumeRequest(disk api.Volume, index int, requireSize bo
 		return api.Volume{}, fmt.Errorf("storage[%d].spec.type must be qcow2 or lvm", index)
 	}
 
-	if requireSize && (disk.Spec.Size == nil || *disk.Spec.Size <= 0) {
+	if volumeKindOrDefault(disk.Spec) == "data" && (disk.Spec.Size == nil || *disk.Spec.Size <= 0) {
 		return api.Volume{}, fmt.Errorf("storage[%d].spec.size must be greater than 0 when creating a new %s volume", index, volType)
 	}
 
@@ -770,7 +770,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 				}
 			}
 
-			disk, err = normalizeNewStorageVolumeRequest(disk, i, requestedName != "")
+			disk, err = normalizeNewStorageVolumeRequest(disk, i)
 			if err != nil {
 				return "", err
 			}
