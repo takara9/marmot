@@ -467,6 +467,7 @@ type VpnGateway struct {
 type VpnGatewaySpec struct {
 	BindPublicIpAddress    string `json:"bindPublicIpAddress" yaml:"bindPublicIpAddress"`
 	InternalVirtualNetwork string `json:"internalVirtualNetwork" yaml:"internalVirtualNetwork"`
+	Routes                 *[]Route `json:"routes,omitempty" yaml:"routes,omitempty"`
 
 	// RemoteCIDRs Source CIDR list allowed to access vpn gateway. Empty means allow all.
 	RemoteCIDRs *[]string `json:"remoteCIDRs,omitempty" yaml:"remoteCIDRs,omitempty"`

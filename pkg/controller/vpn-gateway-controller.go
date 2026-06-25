@@ -383,6 +383,12 @@ func (c *controller) buildVpnGatewayServerSpec(vpnGateway api.VpnGateway, server
 	if maskLen, err := c.lookupNetworkMaskLen("host-bridge"); err == nil && maskLen > 0 {
 		publicNIC.Netmasklen = util.IntPtrInt(maskLen)
 	}
+	if vpnGateway.Spec.Routes != nil && len(*vpnGateway.Spec.Routes) > 0 {
+		publicNIC.Routes = vpnGateway.Spec.Routes
+	} else if gw, err := c.lookupNetworkGateway("host-bridge"); err == nil && strings.TrimSpace(gw) != "" {
+		defaultTo := "default"
+		publicNIC.Routes = &[]api.Route{{To: &defaultTo, Via: util.StringPtr(gw)}}
+	}
 	nics = append(nics, publicNIC)
 
 	internalNIC := api.NetworkInterface{Networkname: internalNetwork}
