@@ -12,10 +12,11 @@ import (
 var delManifestFile string
 
 var delCmd = &cobra.Command{
-	Use:   "del [RESOURCE NAME]",
-	Short: "Delete a resource",
-	Long:  `Delete a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw, applicationloadbalancer/alb, networkloadbalancer/nlb) with NAME specified. With -f, process manifest(s) and delete by metadata.name for each document.`,
-	Args:  cobra.ArbitraryArgs,
+	Use:     "del [RESOURCE NAME]",
+	Aliases: []string{"delete"},
+	Short:   "Delete a resource",
+	Long:    `Delete a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw, applicationloadbalancer/alb, networkloadbalancer/nlb) with NAME specified. With -f, process manifest(s) and delete by metadata.name for each document.`,
+	Args:    cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if strings.TrimSpace(delManifestFile) != "" {
 			if len(args) > 1 {
