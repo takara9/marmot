@@ -1,0 +1,46 @@
+PROGRAMS = mactl
+all: $(PROGRAMS)
+
+GO = go
+CURDIR := $(shell cd)
+TAG := $(shell type TAG)
+OSNAME = windows
+MARCH = $(shell go env GOARCH)
+BINDIR = $(CURDIR)\mactl-v$(TAG).$(OSNAME)-$(MARCH)
+
+$(PROGRAMS):
+	if not exist "$(BINDIR)" mkdir "$(BINDIR)"
+	cd cmd\$@ && $(MAKE) -f Makefile.windows
+
+setup:
+	type TAG > cmd\mactl\version.txt
+	set GOFLAGS= && go install golang.org/x/tools/cmd/goimports@latest
+	set GOFLAGS= && go install honnef.co/go/tools/cmd/staticcheck@latest
+	cd $(CURDIR)\pkg\client && go mod tidy
+	cd $(CURDIR)\pkg\config && go mod tidy
+	cd $(CURDIR)\pkg\types && go mod tidy
+	cd $(CURDIR)\api && go mod tidy
+	cd $(CURDIR) && go mod tidy
+
+test:
+	gofmt -s -l .
+	staticcheck ./...
+
+.PHONY: package
+package: clean all
+	@echo $(TAG)
+	powershell -Command "Compress-Archive -Path $(BINDIR) -DestinationPath $(CURDIR)\mactl-v$(TAG).$(OSNAME)-$(MARCH).zip -Force"
+
+.PHONY: clean
+clean:
+	if exist "$(BINDIR)" rmdir /s /q "$(BINDIR)"
+	if exist "mactl-v$(TAG).$(OSNAME)-$(MARCH).zip" del "mactl-v$(TAG).$(OSNAME)-$(MARCH).zip"
+
+DISTDIR = C:\marmot
+CLIENT_CMD = mactl.exe
+
+.PHONY: install
+install:
+	if exist "$(DISTDIR)" rmdir /s /q "$(DISTDIR)"
+	mkdir "$(DISTDIR)"
+	if exist "$(BINDIR)\$(CLIENT_CMD)" copy "$(BINDIR)\$(CLIENT_CMD)" "%USERPROFILE%\AppData\Local\bin\"

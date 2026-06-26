@@ -1,0 +1,59 @@
+PROGRAMS = mactl marmotd maadm marmot-lb-agent
+.PHONY: all $(PROGRAMS)
+all: $(PROGRAMS)
+
+MAKE = nmake
+CURDIR := $(shell cd)
+TAG := $(shell type TAG)
+BINDIR = dist\marmot-v$(TAG)
+
+$(PROGRAMS):
+	if not exist "$(BINDIR)" mkdir "$(BINDIR)"
+	cd cmd\$@ && $(MAKE) -f Makefile.windows
+
+generate:
+	oapi-codegen -config api\config-v1.yaml api\marmot-api-v1.yaml
+	npx @redocly/cli build-docs api\marmot-api-v1.yaml -o api\marmot-api-v1.html
+	powershell -Command "(Get-Content api\marmot-api-v1.go) | %%{$$_ -replace '``json:\"([^\"]*),omitempty\"``','``json:\"$$1,omitempty\" yaml:\"$$1,omitempty\"``' -replace '``json:\"([^\"]*)\"``','``json:\"$$1\" yaml:\"$$1\"``'} | Set-Content api\marmot-api-v1.go"
+	go mod tidy
+
+setup:
+	set GOFLAGS= && go install golang.org/x/tools/cmd/goimports@latest
+	set GOFLAGS= && go install honnef.co/go/tools/cmd/staticcheck@latest
+	set GOFLAGS= && go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
+
+test: setup
+	gofmt -s -l .
+	staticcheck ./...
+
+.PHONY: package
+package: clean all setup
+	@echo $(TAG)
+	if not exist "$(BINDIR)" mkdir "$(BINDIR)"
+	copy TAG pkg\marmotd\version.txt
+	copy TAG cmd\mactl\cmd\version.txt
+	copy TAG cmd\maadm\cmd\version.txt
+	copy cmd\install.bat "$(BINDIR)\install.bat"
+	copy cmd\mactl\.marmot.example "$(BINDIR)\.marmot.example"
+	copy cmd\marmotd\marmot.service "$(BINDIR)\marmot.service"
+	copy cmd\marmotd\marmotd.json "$(BINDIR)\marmotd.json"
+	powershell -Command "Compress-Archive -Path $(BINDIR) -DestinationPath dist\marmot-v$(TAG).zip -Force"
+
+.PHONY: clean
+clean:
+	if exist "dist" rmdir /s /q "dist"
+
+DISTDIR = C:\marmot
+SERVER_EXE = marmotd.exe
+CLIENT_CMD = mactl.exe
+ADMIN_CMD = maadm.exe
+
+.PHONY: install
+install:
+	if exist "$(DISTDIR)" rmdir /s /q "$(DISTDIR)"
+	mkdir "$(DISTDIR)"
+	copy "$(BINDIR)\$(SERVER_EXE)" "$(DISTDIR)"
+	copy "$(BINDIR)\marmot-lb-agent.exe" "$(DISTDIR)"
+	copy "$(BINDIR)\marmot.service" "$(DISTDIR)"
+	copy "$(BINDIR)\$(CLIENT_CMD)" "%USERPROFILE%\AppData\Local\bin\"
+	copy "$(BINDIR)\$(ADMIN_CMD)" "%USERPROFILE%\AppData\Local\bin\"
