@@ -7,7 +7,7 @@
   "dns_upstream_allow_cidrs": [
     "192.168.1.0/24"
   ],
-  "default_underlay_interface": "",
+  "default_underlay_interface": "br0",
   "os_volume_group": "vg1",
   "data_volume_group": "vg2",
   "deletion_delay_seconds": 10,
@@ -29,5 +29,6 @@
       "osName": "ubuntu",
       "osVersion": "24.04"
     }
-  ]
+  ],
+  "loki_push_url": "http://127.0.0.1:3100/loki/api/v1/push"
 }
