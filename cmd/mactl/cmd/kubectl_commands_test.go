@@ -71,6 +71,25 @@ var _ = Describe("kubectl-like commands", Ordered, func() {
 		})
 	})
 
+	Describe("parseGetResourceNames", func() {
+		It("parses comma separated resources and normalizes aliases", func() {
+			resources, err := parseGetResourceNames("srv,net,vol")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resources).To(Equal([]string{"server", "network", "volume"}))
+		})
+
+		It("trims spaces around each resource", func() {
+			resources, err := parseGetResourceNames(" srv , net ")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resources).To(Equal([]string{"server", "network"}))
+		})
+
+		It("returns error when empty resource is included", func() {
+			_, err := parseGetResourceNames("srv,,net")
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
 	Describe("ApplyServerDefaults", func() {
 		It("handles nil server gracefully", func() {
 			Expect(func() {
