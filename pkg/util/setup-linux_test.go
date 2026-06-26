@@ -73,7 +73,7 @@ var _ = Describe("Linux セットアップ", Ordered, Label("integration", "requ
 		// テスト用のサーバースペックを定義
 		testSpec := api.Server{
 			Metadata: api.Metadata{
-				Id: "a123456",
+				Id:   "a123456",
 				Name: "test-linux",
 				Uuid: util.StringPtr("550e8400-e29b-41d4-a716-446655440000"),
 			},
@@ -135,7 +135,7 @@ var _ = Describe("Linux セットアップ", Ordered, Label("integration", "requ
 		// テスト用のサーバースペックを定義
 		testSpec := api.Server{
 			Metadata: api.Metadata{
-				Id: "b123456",
+				Id:   "b123456",
 				Name: "test-linux-lvm",
 				Uuid: util.StringPtr("550e8400-e29b-41d4-a716-446655440001"),
 			},
@@ -199,7 +199,7 @@ var _ = Describe("Linux セットアップ", Ordered, Label("integration", "requ
 	Context("複数NIC設定のテスト", func() {
 		testSpec := api.Server{
 			Metadata: api.Metadata{
-				Id: "c123456",
+				Id:   "c123456",
 				Name: "test-linux-mh",
 				Uuid: util.StringPtr("550e8400-e29b-41d4-a716-446655440002"),
 			},
@@ -271,7 +271,7 @@ var _ = Describe("Linux セットアップ", Ordered, Label("integration", "requ
 	Context("最大NIC設定のテスト", func() {
 		testSpec := api.Server{
 			Metadata: api.Metadata{
-				Id: "d123456",
+				Id:   "d123456",
 				Name: "test-linux-mh",
 				Uuid: util.StringPtr("550e8400-e29b-41d4-a716-446655440003"),
 			},
