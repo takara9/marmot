@@ -2,7 +2,6 @@ PROGRAMS = mactl marmotd maadm marmot-lb-agent
 .PHONY: all $(PROGRAMS)
 all: $(PROGRAMS)
 
-MAKE = nmake
 CURDIR := $(shell cd)
 TAG := $(shell type TAG)
 BINDIR = dist\marmot-v$(TAG)
@@ -33,7 +32,6 @@ package: clean all setup
 	copy TAG pkg\marmotd\version.txt
 	copy TAG cmd\mactl\cmd\version.txt
 	copy TAG cmd\maadm\cmd\version.txt
-	copy cmd\install.bat "$(BINDIR)\install.bat"
 	copy cmd\mactl\.marmot.example "$(BINDIR)\.marmot.example"
 	copy cmd\marmotd\marmot.service "$(BINDIR)\marmot.service"
 	copy cmd\marmotd\marmotd.json "$(BINDIR)\marmotd.json"
