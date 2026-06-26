@@ -97,6 +97,10 @@ type MarmotdConfig struct {
 	// 起動時に自動ダウンロード・登録する OS イメージの一覧
 	// marmotd 起動時に各イメージをチェックし、存在しなければ登録する
 	OSImages []OSImage `json:"os_images"`
+
+	// Loki ログ受信用の Push API エンドポイント URL。
+	// 例: "http://127.0.0.1:3100/loki/api/v1/push"
+	LokiPushURL string `json:"loki_push_url"`
 }
 
 var runtimeConfigState = struct {
@@ -130,6 +134,7 @@ func defaultConfig() *MarmotdConfig {
 		ImageDownloadTimeoutSeconds:      1800,
 		ImageResizeTimeoutSeconds:        600,
 		ImageDeleteTimeoutSeconds:        120,
+		LokiPushURL:                      "",
 	}
 }
 
@@ -200,6 +205,7 @@ func normalizeConfig(cfg *MarmotdConfig) *MarmotdConfig {
 	if normalized.ImageDeleteTimeoutSeconds <= 0 {
 		normalized.ImageDeleteTimeoutSeconds = defaults.ImageDeleteTimeoutSeconds
 	}
+	normalized.LokiPushURL = strings.TrimSpace(normalized.LokiPushURL)
 	return normalized
 }
 
