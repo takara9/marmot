@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/takara9/marmot/api"
@@ -13,6 +14,57 @@ import (
 	"libvirt.org/go/libvirt"
 	"libvirt.org/go/libvirtxml"
 )
+
+func shouldPreserveSystemNetworkCreationTimestamp(name string) bool {
+	switch strings.TrimSpace(name) {
+	case "default", "host-bridge":
+		return true
+	default:
+		return false
+	}
+}
+
+func mergeImportedNetworkPreservingCreation(existing api.VirtualNetwork, imported api.VirtualNetwork, nodeName string, now time.Time) api.VirtualNetwork {
+	merged := existing
+	merged.ApiVersion = imported.ApiVersion
+	merged.Kind = imported.Kind
+	merged.Metadata.Name = imported.Metadata.Name
+	if strings.TrimSpace(nodeName) != "" {
+		merged.Metadata.NodeName = util.StringPtr(strings.TrimSpace(nodeName))
+	}
+	merged.Spec = imported.Spec
+	if merged.Status == nil {
+		merged.Status = &api.Status{}
+	}
+	if merged.Status.CreationTimeStamp == nil {
+		merged.Status.CreationTimeStamp = util.TimePtr(now)
+	}
+	merged.Status.StatusCode = db.NETWORK_ACTIVE
+	merged.Status.Status = util.StringPtr(db.NetworkStatus[db.NETWORK_ACTIVE])
+	merged.Status.LastUpdateTimeStamp = util.TimePtr(now)
+	merged.Status.Message = nil
+	return merged
+}
+
+func findNetworkByNameAndNode(networks []api.VirtualNetwork, name string, nodeName string) (api.VirtualNetwork, bool) {
+	targetName := strings.TrimSpace(name)
+	targetNode := strings.TrimSpace(nodeName)
+	for _, network := range networks {
+		if strings.TrimSpace(network.Metadata.Name) != targetName {
+			continue
+		}
+		if targetNode == "" {
+			return network, true
+		}
+		if network.Metadata.NodeName == nil {
+			continue
+		}
+		if strings.TrimSpace(*network.Metadata.NodeName) == targetNode {
+			return network, true
+		}
+	}
+	return api.VirtualNetwork{}, false
+}
 
 // 起動時に既存ネットワークを取得して、データベースへの登録
 func (m *Marmot) GetVirtualNetworksAndPutDB() ([]api.VirtualNetwork, error) {
@@ -95,14 +147,32 @@ func (m *Marmot) GetVirtualNetworksAndPutDB() ([]api.VirtualNetwork, error) {
 
 		// TODO: VLAN Trunk を追加
 
-		// 同じ名前のネットワークが既にETCDに登録されているか確認
-		existingNet, err := m.Db.GetVirtualNetworkByName(name)
-		if err == nil {
+		// 同じ名前・同じノードのネットワークが既にETCDに登録されているか確認
+		networksInDB, err := m.Db.GetVirtualNetworks()
+		if err != nil {
+			slog.Error("Failed to list virtual networks from ETCD", "err", err)
+			continue
+		}
+		existingNet, found := findNetworkByNameAndNode(networksInDB, name, m.NodeName)
+		if found {
 			if networkDeletionRequested(existingNet) {
 				slog.Debug("Skipping libvirt network import because deletion is already requested for same-name network", "networkName", name, "existingNetworkId", api.VirtualNetworkID(existingNet))
 				continue
 			}
-			if existingNet.Metadata.Uuid != net.Metadata.Uuid {
+			existingUUID := strings.TrimSpace(util.OrDefault(existingNet.Metadata.Uuid, ""))
+			importedUUID := strings.TrimSpace(util.OrDefault(net.Metadata.Uuid, ""))
+			if existingUUID != importedUUID {
+				if shouldPreserveSystemNetworkCreationTimestamp(name) && existingNet.Status != nil && existingNet.Status.CreationTimeStamp != nil {
+					merged := mergeImportedNetworkPreservingCreation(existingNet, net, m.NodeName, time.Now())
+					err := m.Db.UpdateVirtualNetworkById(api.VirtualNetworkID(existingNet), merged)
+					if err != nil {
+						slog.Error("Failed to preserve system network creation timestamp", "err", err, "networkName", name, "networkId", api.VirtualNetworkID(existingNet))
+						continue
+					}
+					apiNetworks = append(apiNetworks, merged)
+					continue
+				}
+
 				err := m.Db.DeleteVirtualNetworkById(api.VirtualNetworkID(existingNet))
 				if err != nil {
 					slog.Error("Failed to delete existing virtual network in ETCD", "err", err, "networkId", api.VirtualNetworkID(existingNet))
@@ -330,16 +400,37 @@ func (m *Marmot) CheckVirtualNetworks() error {
 			continue
 		}
 
-		// 同じ名前のネットワークが既にETCDに登録されている場合は、何もしない。
-		existingNet, err := m.Db.GetVirtualNetworkByName(vnet.Metadata.Name)
-		if err != nil {
-			if err != db.ErrNotFound {
-				slog.Error("Failed to check existing virtual network in ETCD", "err", err, "networkName", vnet.Metadata.Name)
+		// 同じ名前・同じノードのネットワークが既にETCDに登録されている場合は、UUID差分を確認する。
+		networksInDB, listErr := m.Db.GetVirtualNetworks()
+		if listErr != nil {
+			slog.Error("Failed to list virtual networks from ETCD", "err", listErr)
+			continue
+		}
+		existingNet, found := findNetworkByNameAndNode(networksInDB, vnet.Metadata.Name, m.NodeName)
+		if found {
+			if networkDeletionRequested(existingNet) {
+				slog.Debug("Skipping libvirt network import because deletion is already requested for same-name network", "networkName", vnet.Metadata.Name, "existingNetworkId", api.VirtualNetworkID(existingNet))
 				continue
 			}
-		} else if networkDeletionRequested(existingNet) {
-			slog.Debug("Skipping libvirt network import because deletion is already requested for same-name network", "networkName", vnet.Metadata.Name, "existingNetworkId", api.VirtualNetworkID(existingNet))
-			continue
+
+			existingUUID := strings.TrimSpace(util.OrDefault(existingNet.Metadata.Uuid, ""))
+			importedUUID := strings.TrimSpace(util.OrDefault(vnet.Metadata.Uuid, ""))
+			if existingUUID != importedUUID {
+				if shouldPreserveSystemNetworkCreationTimestamp(vnet.Metadata.Name) && existingNet.Status != nil && existingNet.Status.CreationTimeStamp != nil {
+					merged := mergeImportedNetworkPreservingCreation(existingNet, *vnet, m.NodeName, time.Now())
+					if err := m.Db.UpdateVirtualNetworkById(api.VirtualNetworkID(existingNet), merged); err != nil {
+						slog.Error("Failed to preserve system network creation timestamp", "err", err, "networkName", vnet.Metadata.Name, "networkId", api.VirtualNetworkID(existingNet))
+						continue
+					}
+					m.Db.UpdateVirtualNetworkStatus(api.VirtualNetworkID(existingNet), db.NETWORK_ACTIVE)
+					continue
+				}
+
+				if err := m.Db.DeleteVirtualNetworkById(api.VirtualNetworkID(existingNet)); err != nil {
+					slog.Error("Failed to delete existing virtual network in ETCD", "err", err, "networkId", api.VirtualNetworkID(existingNet))
+					continue
+				}
+			}
 		}
 
 		// 既にETCDに登録されているか確認
