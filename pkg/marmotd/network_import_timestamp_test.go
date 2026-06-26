@@ -80,7 +80,7 @@ func TestMergeImportedNetworkPreservingCreation(t *testing.T) {
 	if merged.Status.Status == nil || *merged.Status.Status != db.NetworkStatus[db.NETWORK_ACTIVE] {
 		t.Fatalf("status mismatch: got %v want %s", merged.Status.Status, db.NetworkStatus[db.NETWORK_ACTIVE])
 	}
-	if merged.Metadata.Uuid == nil || *merged.Metadata.Uuid != "new-uuid" {
-		t.Fatalf("uuid should be updated from import")
+	if merged.Metadata.Uuid == nil || *merged.Metadata.Uuid != "old-uuid" {
+		t.Fatalf("uuid should remain stable, got %v", merged.Metadata.Uuid)
 	}
 }

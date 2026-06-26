@@ -29,7 +29,6 @@ func mergeImportedNetworkPreservingCreation(existing api.VirtualNetwork, importe
 	merged.ApiVersion = imported.ApiVersion
 	merged.Kind = imported.Kind
 	merged.Metadata.Name = imported.Metadata.Name
-	merged.Metadata.Uuid = imported.Metadata.Uuid
 	if strings.TrimSpace(nodeName) != "" {
 		merged.Metadata.NodeName = util.StringPtr(strings.TrimSpace(nodeName))
 	}
