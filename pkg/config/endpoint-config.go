@@ -9,23 +9,23 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const exampleConfigPath = "/etc/marmot/.marmot.example"
+// defaultMarmotConfig は ~/.marmot が存在しない場合に書き込むデフォルト設定内容
+const defaultMarmotConfig = `current: 0
+endpoints:
+  - http://localhost:8750
+`
 
 // EnsureMarmotConfig は $HOME/.marmot が存在しない場合、
-// /etc/marmot/.marmot.example からコピーして自動作成する。
+// デフォルト設定を直接書き込んで自動作成する。
 func EnsureMarmotConfig() error {
 	dest := MarmotConfigPath()
 	if _, err := os.Stat(dest); err == nil {
 		return nil // すでに存在する
 	}
-	data, err := os.ReadFile(exampleConfigPath)
-	if err != nil {
-		return fmt.Errorf("サンプル設定ファイルが見つかりません (%s): %w", exampleConfigPath, err)
-	}
-	if err := os.WriteFile(dest, data, 0600); err != nil {
+	if err := os.WriteFile(dest, []byte(defaultMarmotConfig), 0600); err != nil {
 		return fmt.Errorf("設定ファイルの作成に失敗しました (%s): %w", dest, err)
 	}
-	slog.Debug("設定ファイルを作成しました", "path", dest, "from", exampleConfigPath)
+	slog.Debug("設定ファイルを作成しました", "path", dest)
 	return nil
 }
 
@@ -37,9 +37,14 @@ type MarmotConfig struct {
 	EndpointComments []string `yaml:"endpointComments,omitempty"`
 }
 
-// MarmotConfigPath は $HOME/.marmot のパスを返す
+// MarmotConfigPath は $HOME/.marmot のパスを返す。
+// Windows では USERPROFILE を HOME の代わりに使う。
 func MarmotConfigPath() string {
-	return filepath.Join(os.Getenv("HOME"), ".marmot")
+	home := os.Getenv("HOME")
+	if home == "" {
+		home = os.Getenv("USERPROFILE")
+	}
+	return filepath.Join(home, ".marmot")
 }
 
 // ReadMarmotConfig は指定パスから MarmotConfig を読み込む

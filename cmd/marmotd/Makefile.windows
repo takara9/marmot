@@ -1,0 +1,27 @@
+GO = go
+PROGRAM = marmotd
+all: $(PROGRAM)
+
+TAG := $(shell type ..\..\TAG)
+BINDIR = ..\..\dist\marmot-v$(TAG)
+
+$(PROGRAM):
+	@echo $(BINDIR)
+	if not exist "$(BINDIR)" mkdir "$(BINDIR)"
+	$(GO) build -o "$(BINDIR)\$@.exe" $^
+
+.PHONY: clean
+clean:
+	if exist "$(BINDIR)" rmdir /s /q "$(BINDIR)"
+
+.PHONY: install
+install:
+	copy "$(BINDIR)\$(PROGRAM).exe" "%USERPROFILE%\AppData\Local\bin\"
+
+.PHONY: test
+test:
+	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -coverprofile cover.out
+
+.PHONY: set-version
+set-version:
+	powershell -Command "(Get-Content cmd\version._) -replace 'MARMOT_VERSION','$(TAG)' | Set-Content cmd\version.go"

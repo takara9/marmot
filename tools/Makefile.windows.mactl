@@ -1,0 +1,29 @@
+GO = go
+PROGRAM = mactl
+all: $(PROGRAM)
+
+CURDIR := $(shell cd)
+TAG := $(shell type ..\..\TAG)
+OSNAME = windows
+MARCH = $(shell go env GOARCH)
+BINDIR = ..\..\mactl-v$(TAG).$(OSNAME)-$(MARCH)
+TESTBINDIR = bin
+
+$(PROGRAM):
+	@echo Building for $(BINDIR)
+	if not exist "$(BINDIR)" mkdir "$(BINDIR)"
+	cmd /C "set GOOS=windows&& set GOARCH=$(MARCH)&& $(GO) build -o $(BINDIR)\$@.exe"
+
+.PHONY: clean
+clean:
+	if exist "$(BINDIR)" rmdir /s /q "$(BINDIR)"
+	if exist "$(TESTBINDIR)" rmdir /s /q "$(TESTBINDIR)"
+
+.PHONY: install
+install:
+	if exist "$(BINDIR)\$(PROGRAM).exe" copy "$(BINDIR)\$(PROGRAM).exe" "%USERPROFILE%\AppData\Local\bin\"
+
+.PHONY: test
+test:
+	gofmt -s -l .
+	staticcheck ./...
