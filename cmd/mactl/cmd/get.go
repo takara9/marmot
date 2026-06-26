@@ -370,8 +370,17 @@ func getImageResources(name string) error {
 			images = filterImagesByLabel(images, labelSelector)
 		}
 
+		clusterNodeCount := 0
+		clusterBody, _, clusterErr := m.GetMarmotCluster()
+		if clusterErr == nil {
+			var statuses []api.HostStatus
+			if err := json.Unmarshal(clusterBody, &statuses); err == nil {
+				clusterNodeCount = len(statuses)
+			}
+		}
+
 		// 出力
-		return outputImages(images)
+		return outputImages(images, clusterNodeCount)
 	}
 
 	return runList(listFn)
@@ -939,7 +948,7 @@ func outputServers(servers []api.Server) error {
 	}
 }
 
-func outputImages(images []api.Image) error {
+func outputImages(images []api.Image, clusterNodeCount int) error {
 	switch outputStyle {
 	case "text":
 		if getServerShowAll {
@@ -987,7 +996,7 @@ func outputImages(images []api.Image) error {
 			return nil
 		}
 
-		aggregated := summarizeImages(images)
+		aggregated := summarizeImagesWithTotalNodes(images, clusterNodeCount)
 		sort.SliceStable(aggregated, func(i, j int) bool {
 			return creationTime(aggregated[i].ageStatus).Before(creationTime(aggregated[j].ageStatus))
 		})
@@ -1033,7 +1042,13 @@ type imageSummary struct {
 }
 
 func summarizeImages(images []api.Image) []imageSummary {
-	totalNodes := collectUniqueNodeCount(images)
+	return summarizeImagesWithTotalNodes(images, 0)
+}
+
+func summarizeImagesWithTotalNodes(images []api.Image, totalNodes int) []imageSummary {
+	if totalNodes <= 0 {
+		totalNodes = collectUniqueNodeCount(images)
+	}
 	byName := map[string][]api.Image{}
 	for _, img := range images {
 		name := strings.TrimSpace(img.Metadata.Name)
@@ -1096,11 +1111,14 @@ func summarizeImageGroup(name string, images []api.Image, totalNodes int) imageS
 		expectedNodes = len(nodeSet)
 	}
 	uniform := len(statusSet) == 1 && len(qcow2Set) == 1
-	complete := uniform && len(nodeSet) == expectedNodes
+	complete := uniform && len(nodeSet) == expectedNodes && status == "AVAILABLE"
 
-	synced := "DEGRADE"
-	if complete {
-		synced = "COMPLETE"
+	synced := "N/A"
+	if expectedNodes > 1 && status != "FAILED" {
+		synced = "DEGRADE"
+		if complete {
+			synced = "COMPLETE"
+		}
 	}
 
 	return imageSummary{

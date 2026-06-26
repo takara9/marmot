@@ -30,6 +30,30 @@ var _ = Describe("summarizeImages", func() {
 		Expect(summaries[0].hasQcow2).To(Equal("yes"))
 	})
 
+	It("marks image N/A for single-node setups", func() {
+		node1 := "marmot1"
+		images := []api.Image{
+			{Metadata: api.Metadata{Name: "ubuntu", NodeName: &node1}, Status: &api.Status{Status: &statusAvailable}, Spec: api.ImageSpec{Qcow2Path: &qcow2Path}},
+		}
+
+		summaries := summarizeImagesWithTotalNodes(images, 1)
+		Expect(summaries).To(HaveLen(1))
+		Expect(summaries[0].synced).To(Equal("N/A"))
+	})
+
+	It("prefers actual cluster size over image node distribution", func() {
+		node1 := "marmot1"
+		node2 := "marmot2"
+		images := []api.Image{
+			{Metadata: api.Metadata{Name: "ubuntu", NodeName: &node1}, Status: &api.Status{Status: &statusAvailable}, Spec: api.ImageSpec{Qcow2Path: &qcow2Path}},
+			{Metadata: api.Metadata{Name: "ubuntu", NodeName: &node2}, Status: &api.Status{Status: &statusAvailable}, Spec: api.ImageSpec{Qcow2Path: &qcow2Path}},
+		}
+
+		summaries := summarizeImagesWithTotalNodes(images, 1)
+		Expect(summaries).To(HaveLen(1))
+		Expect(summaries[0].synced).To(Equal("N/A"))
+	})
+
 	It("marks image DEGRADE when image is missing on one of the cluster nodes", func() {
 		node1 := "marmot1"
 		node2 := "marmot2"
@@ -83,6 +107,21 @@ var _ = Describe("summarizeImages", func() {
 		Expect(summaries).To(HaveLen(1))
 		Expect(summaries[0].synced).To(Equal("DEGRADE"))
 		Expect(summaries[0].status).To(Equal("MIXED"))
+	})
+
+	It("marks image N/A when status is FAILED", func() {
+		node1 := "marmot1"
+		node2 := "marmot2"
+		statusFailed := "FAILED"
+		images := []api.Image{
+			{Metadata: api.Metadata{Name: "ubuntu", NodeName: &node1}, Status: &api.Status{Status: &statusFailed}, Spec: api.ImageSpec{Qcow2Path: &qcow2Path}},
+			{Metadata: api.Metadata{Name: "ubuntu", NodeName: &node2}, Status: &api.Status{Status: &statusFailed}, Spec: api.ImageSpec{Qcow2Path: &qcow2Path}},
+		}
+
+		summaries := summarizeImages(images)
+		Expect(summaries).To(HaveLen(1))
+		Expect(summaries[0].status).To(Equal("FAILED"))
+		Expect(summaries[0].synced).To(Equal("N/A"))
 	})
 
 	It("renders WAITING images as QCOW2 no", func() {
