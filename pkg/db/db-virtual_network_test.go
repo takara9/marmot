@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -88,6 +89,48 @@ var _ = Describe("Networks", Ordered, func() {
 				}
 				err = v.UpdateVirtualNetworkById(api.VirtualNetworkID(netSpec), net)
 				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("UpdateVirtualNetworkStatusWithMessage は ACTIVE 遷移時に status.message をクリアする", func() {
+				if v == nil {
+					var createErr error
+					v, createErr = db.NewDatabase(url)
+					Expect(createErr).NotTo(HaveOccurred())
+				}
+
+				if strings.TrimSpace(api.VirtualNetworkID(netSpec)) == "" {
+					net := &api.VirtualNetwork{
+						Metadata: api.Metadata{
+							Name: "net-status-reset",
+						},
+						Spec: api.VirtualNetworkSpec{
+							BridgeName:       util.StringPtr("br-status-reset"),
+							DhcpEndAddress:   util.StringPtr("192.168.123.254"),
+							DhcpStartAddress: util.StringPtr("192.168.123.10"),
+							MacAddress:       util.StringPtr("52:54:00:6b:3c:59"),
+							ForwardMode:      util.StringPtr("NAT"),
+						},
+					}
+					created, createErr := v.CreateVirtualNetwork(*net)
+					Expect(createErr).NotTo(HaveOccurred())
+					netSpec = created
+				}
+
+				id := api.VirtualNetworkID(netSpec)
+
+				v.UpdateVirtualNetworkStatusWithMessage(id, db.NETWORK_PROVISIONING, "provisioning:in-progress")
+				provisioning, getErr := v.GetVirtualNetworkById(id)
+				Expect(getErr).NotTo(HaveOccurred())
+				Expect(provisioning.Status).NotTo(BeNil())
+				Expect(provisioning.Status.Message).NotTo(BeNil())
+				Expect(*provisioning.Status.Message).To(Equal("provisioning:in-progress"))
+
+				v.UpdateVirtualNetworkStatusWithMessage(id, db.NETWORK_ACTIVE, "")
+				active, getErr := v.GetVirtualNetworkById(id)
+				Expect(getErr).NotTo(HaveOccurred())
+				Expect(active.Status).NotTo(BeNil())
+				Expect(active.Status.StatusCode).To(Equal(db.NETWORK_ACTIVE))
+				Expect(active.Status.Message).To(BeNil())
 			})
 
 			It("Keyからネットワーク情報を取得", func() {

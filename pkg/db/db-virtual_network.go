@@ -364,37 +364,70 @@ func (d *Database) UpdateVirtualNetworkStatus(id string, status int) {
 // UpdateVirtualNetworkStatusWithMessage はステータスとメッセージを同時に更新する。
 // message が空の場合は、ステータスに応じたデフォルト値を設定。
 func (d *Database) UpdateVirtualNetworkStatusWithMessage(id string, status int, message string) {
-	network, err := d.GetVirtualNetworkById(id)
-	if err != nil {
-		if err == ErrNotFound {
-			slog.Warn("UpdateVirtualNetworkStatusWithMessage() skip missing network", "networkId", id, "status", status)
+	for {
+		network, err := d.GetVirtualNetworkById(id)
+		if err != nil {
+			if err == ErrNotFound {
+				slog.Warn("UpdateVirtualNetworkStatusWithMessage() skip missing network", "networkId", id, "status", status)
+				return
+			}
+			slog.Error("UpdateVirtualNetworkStatusWithMessage() GetVirtualNetworkById() failed", "err", err, "networkId", id)
 			return
 		}
-		slog.Error("UpdateVirtualNetworkStatusWithMessage() GetVirtualNetworkById() failed", "err", err, "networkId", id)
-		return
-	}
-	network.Status.StatusCode = status
-	network.Status.Status = util.StringPtr(NetworkStatus[network.Status.StatusCode])
-	network.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+		if network.Status == nil {
+			network.Status = &api.Status{}
+		}
 
-	// メッセージ設定
-	if status == NETWORK_ACTIVE {
-		network.Status.Message = nil
-	} else if message != "" {
-		network.Status.Message = util.StringPtr(message)
-	} else {
-		// デフォルトメッセージ
-		network.Status.Message = util.StringPtr(defaultMessageForStatus(status))
-	}
+		network.Status.StatusCode = status
+		network.Status.Status = util.StringPtr(NetworkStatus[network.Status.StatusCode])
+		network.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
 
-	if err := d.UpdateVirtualNetworkById(id, network); err != nil {
+		trimmedMessage := strings.TrimSpace(message)
+		if status == NETWORK_ACTIVE {
+			network.Status.Message = nil
+		} else if trimmedMessage != "" {
+			network.Status.Message = util.StringPtr(trimmedMessage)
+		} else {
+			network.Status.Message = util.StringPtr(defaultMessageForStatus(status))
+		}
+
+		err = d.putVirtualNetworkByID(network)
+		if err == ErrUpdateConflict {
+			continue
+		}
 		if err == ErrNotFound {
 			slog.Warn("UpdateVirtualNetworkStatusWithMessage() update skipped; network disappeared", "networkId", id, "status", status)
 			return
 		}
-		slog.Error("UpdateVirtualNetworkStatusWithMessage() UpdateVirtualNetwork() failed", "err", err, "networkId", id)
+		if err != nil {
+			slog.Error("UpdateVirtualNetworkStatusWithMessage() putVirtualNetworkByID() failed", "err", err, "networkId", id)
+		}
 		return
 	}
+}
+
+func (d *Database) putVirtualNetworkByID(rec api.VirtualNetwork) error {
+	id := api.VirtualNetworkID(rec)
+	if strings.TrimSpace(id) == "" {
+		return ErrNotFound
+	}
+
+	lockKey := "/lock/virtualnetwork/" + id
+	mutex, err := d.LockKey(lockKey)
+	if err != nil {
+		return err
+	}
+	defer d.UnlockKey(mutex)
+
+	key := NetworkPrefix + "/" + id
+	var current api.VirtualNetwork
+	resp, err := d.GetJSON(key, &current)
+	if err != nil {
+		return err
+	}
+
+	api.SetVirtualNetworkID(&rec, id)
+	return d.PutJSONCAS(key, resp.Kvs[0].ModRevision, &rec)
 }
 
 // defaultMessageForStatus はステータスコードに対するデフォルトメッセージを返す。
