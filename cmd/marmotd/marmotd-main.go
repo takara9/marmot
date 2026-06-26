@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/pkg/controller"
@@ -34,7 +35,8 @@ var controllerCounter uint64 = 0
 //}
 
 func main() {
-	// Setup slog
+	// LoadConfig 失敗時のエラー出力用の仮ロガー。
+	// SetRuntimeConfig 後に SetupDefaultLogger で Loki 対応ロガーに置き換えられる。
 	opts := &slog.HandlerOptions{
 		AddSource: true,
 		//Level:     slog.LevelDebug,
@@ -59,6 +61,18 @@ func main() {
 		cfg.NodeName = hostname
 	}
 	marmotd.SetRuntimeConfig(cfg)
+	logShutdown, err := marmotd.SetupDefaultLogger(cfg)
+	if err != nil {
+		slog.Warn("Failed to initialize Loki logger; continuing with stderr logger", "err", err)
+	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := logShutdown(ctx); err != nil {
+			slog.Warn("Failed to flush logger on shutdown", "err", err)
+		}
+	}()
+
 	if err := marmotd.EnsureGatewayRuntimeAssets(); err != nil {
 		slog.Error("Failed to initialize gateway runtime assets", "err", err)
 		return
@@ -77,7 +91,8 @@ func main() {
 		"image_create_from_url_timeout_seconds", cfg.ImageCreateFromURLTimeoutSeconds,
 		"image_download_timeout_seconds", cfg.ImageDownloadTimeoutSeconds,
 		"image_resize_timeout_seconds", cfg.ImageResizeTimeoutSeconds,
-		"image_delete_timeout_seconds", cfg.ImageDeleteTimeoutSeconds)
+		"image_delete_timeout_seconds", cfg.ImageDeleteTimeoutSeconds,
+		"loki_push_url", cfg.LokiPushURL)
 
 	// Setup host-bridge for libvirt
 	util.SetupHostBridge()
@@ -88,6 +103,19 @@ func main() {
 	e := echo.New()
 	slog.Debug("Starting api server #2", "nodeName", cfg.NodeName, "etcdURL", cfg.EtcdURL, "apiListenAddr", cfg.APIListenAddr)
 	Server := marmotd.NewServer(cfg.NodeName, cfg.EtcdURL)
+	telemetry, err := marmotd.RegisterOpenTelemetryMetrics(e, Server.Ma.Db)
+	if err != nil {
+		slog.Error("Failed to initialize OpenTelemetry metrics", "err", err)
+		return
+	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := telemetry.Shutdown(ctx); err != nil {
+			slog.Warn("Failed to shutdown telemetry", "err", err)
+		}
+	}()
+
 	if err := Server.Ma.CollectAndUpdateHostStatus(); err != nil {
 		slog.Warn("Failed to collect initial host status before OVN bootstrap", "err", err)
 	}
@@ -193,6 +221,6 @@ func main() {
 
 	if err := e.Start(cfg.APIListenAddr); err != nil {
 		slog.Error("API server stopped", "err", err)
-		os.Exit(1)
+		return
 	}
 }
