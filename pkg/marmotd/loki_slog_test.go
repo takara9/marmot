@@ -12,7 +12,8 @@ func TestNormalizeLokiPushURL(t *testing.T) {
 		{name: "already push path", input: "http://127.0.0.1:3100/loki/api/v1/push", want: "http://127.0.0.1:3100/loki/api/v1/push"},
 		{name: "base url", input: "http://127.0.0.1:3100", want: "http://127.0.0.1:3100/loki/api/v1/push"},
 		{name: "base url with slash", input: "http://127.0.0.1:3100/", want: "http://127.0.0.1:3100/loki/api/v1/push"},
-		{name: "custom path", input: "http://127.0.0.1:3100/loki", want: "http://127.0.0.1:3100/loki/loki/api/v1/push"},
+		{name: "custom path kept as-is", input: "http://127.0.0.1:3100/loki/api/v1/push", want: "http://127.0.0.1:3100/loki/api/v1/push"},
+		{name: "arbitrary path kept as-is", input: "http://127.0.0.1:3100/custom/push", want: "http://127.0.0.1:3100/custom/push"},
 		{name: "invalid", input: "127.0.0.1:3100", wantErr: true},
 	}
 

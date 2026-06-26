@@ -111,8 +111,6 @@ func normalizeLokiPushURL(rawURL string) (string, error) {
 	const pushPath = "/loki/api/v1/push"
 	if u.Path == "" || u.Path == "/" {
 		u.Path = pushPath
-	} else if !strings.HasSuffix(u.Path, pushPath) {
-		u.Path = strings.TrimSuffix(u.Path, "/") + pushPath
 	}
 
 	return u.String(), nil
@@ -219,9 +217,8 @@ func attrValueToAny(v slog.Value) interface{} {
 
 func (w *lokiWriter) Enqueue(ts time.Time, line string) {
 	w.mu.Lock()
-	closed := w.closed
-	w.mu.Unlock()
-	if closed {
+	defer w.mu.Unlock()
+	if w.closed {
 		return
 	}
 

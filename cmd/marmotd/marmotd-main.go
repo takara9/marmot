@@ -35,7 +35,8 @@ var controllerCounter uint64 = 0
 //}
 
 func main() {
-	// Setup slog
+	// LoadConfig 失敗時のエラー出力用の仮ロガー。
+	// SetRuntimeConfig 後に SetupDefaultLogger で Loki 対応ロガーに置き換えられる。
 	opts := &slog.HandlerOptions{
 		AddSource: true,
 		//Level:     slog.LevelDebug,
