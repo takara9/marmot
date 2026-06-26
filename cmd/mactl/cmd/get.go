@@ -23,7 +23,7 @@ var getManifestFile string
 var getCmd = &cobra.Command{
 	Use:   "get [RESOURCE [NAME]]",
 	Short: "Get resource(s) of a specific type",
-	Long:  `Get resource(s) (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw, applicationloadbalancer/alb, networkloadbalancer/nlb). If NAME is provided, show only that resource. Otherwise, list all resources. With -f, process manifest(s) and query by metadata.name for each document.`,
+	Long:  `Get resource(s) (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw, applicationloadbalancer/alb, networkloadbalancer/nlb). If NAME is provided, show only that resource. Otherwise, list all resources. RESOURCE supports comma-separated values such as "srv,net". With -f, process manifest(s) and query by metadata.name for each document.`,
 	Args:  cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if strings.TrimSpace(getManifestFile) != "" {
@@ -59,17 +59,48 @@ var getCmd = &cobra.Command{
 			return fmt.Errorf("resource is required unless -f is specified")
 		}
 
-		resourceName := args[0]
-		resourceName = normalizeResourceName(resourceName)
+		resourceNames, err := parseGetResourceNames(args[0])
+		if err != nil {
+			return err
+		}
 
-		// NAME が指定されているかチェック
-		var resourceSpec string
+		// NAME 指定は単一リソース時のみ許可
+		if len(resourceNames) > 1 && len(args) > 1 {
+			return fmt.Errorf("NAME is not supported when multiple resources are specified")
+		}
+
+		// 単一リソースの場合のみ NAME を適用
+		resourceSpec := ""
 		if len(args) > 1 {
 			resourceSpec = args[1]
 		}
 
-		return getResourceByTypeAndName(resourceName, resourceSpec)
+		for i, resourceName := range resourceNames {
+			if i > 0 {
+				fmt.Println()
+			}
+			if err := getResourceByTypeAndName(resourceName, resourceSpec); err != nil {
+				return fmt.Errorf("resource %q: %w", resourceName, err)
+			}
+		}
+
+		return nil
 	},
+}
+
+func parseGetResourceNames(resourceArg string) ([]string, error) {
+	parts := strings.Split(resourceArg, ",")
+	resourceNames := make([]string, 0, len(parts))
+
+	for _, part := range parts {
+		name := normalizeResourceName(strings.TrimSpace(part))
+		if name == "" {
+			return nil, fmt.Errorf("resource is required unless -f is specified")
+		}
+		resourceNames = append(resourceNames, name)
+	}
+
+	return resourceNames, nil
 }
 
 func getResourceByTypeAndName(resourceName string, resourceSpec string) error {
