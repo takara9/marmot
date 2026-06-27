@@ -14,9 +14,526 @@ servers:
         default: /api/v1
         description: Base path for the API
 tags:
+  - name: auth
   - name: user
+  - name: role
+  - name: authz
   - name: version
 paths:
+  /auth/login:
+    post:
+      summary: "Login and issue access token"
+      operationId: apiAuthLogin
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthLoginRequest"
+      responses:
+        "200":
+          description: "Login succeeded"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthLoginResponse"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /auth/logout:
+    post:
+      summary: "Logout current session"
+      operationId: apiAuthLogout
+      tags:
+        - auth
+      security:
+        - BearerAuth: []
+      responses:
+        "204":
+          description: "Logged out"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /auth/me:
+    get:
+      summary: "Get current authenticated user"
+      operationId: apiAuthMe
+      tags:
+        - auth
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: "Current user information"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMe"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /users:
+    post:
+      summary: "Create a user"
+      operationId: apiCreateUser
+      tags:
+        - user
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+      responses:
+        "201":
+          description: "Created the user"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      summary: "List users"
+      operationId: apiListUsers
+      tags:
+        - user
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: "List of users"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Users"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /users/{userId}:
+    get:
+      summary: "Get a user"
+      operationId: apiGetUserById
+      tags:
+        - user
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "User information"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      summary: "Update a user"
+      operationId: apiUpdateUserById
+      tags:
+        - user
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+      responses:
+        "200":
+          description: "Updated the user"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: "Delete a user"
+      operationId: apiDeleteUserById
+      tags:
+        - user
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: "Deleted the user"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /users/{userId}/password:
+    post:
+      summary: "Change or reset user password"
+      operationId: apiChangeUserPassword
+      tags:
+        - user
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordChangeRequest"
+      responses:
+        "204":
+          description: "Password updated"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /users/{userId}/lock:
+    post:
+      summary: "Lock a user"
+      operationId: apiLockUserById
+      tags:
+        - user
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: "User locked"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /users/{userId}/unlock:
+    post:
+      summary: "Unlock a user"
+      operationId: apiUnlockUserById
+      tags:
+        - user
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: "User unlocked"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /users/{userId}/roles:
+    get:
+      summary: "List roles assigned to a user"
+      operationId: apiListUserRoles
+      tags:
+        - user
+        - role
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Roles assigned to the user"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleNames"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: "Add a role to a user"
+      operationId: apiAddUserRole
+      tags:
+        - user
+        - role
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleAssignmentRequest"
+      responses:
+        "204":
+          description: "Role added"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /users/{userId}/roles/{roleName}:
+    delete:
+      summary: "Remove a role from a user"
+      operationId: apiDeleteUserRole
+      tags:
+        - user
+        - role
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: roleName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: "Role removed"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /users/{userId}/apikeys:
+    get:
+      summary: "List API keys issued by a user"
+      operationId: apiListUserApiKeys
+      tags:
+        - user
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "API keys for the user"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeys"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: "Create an API key for a user"
+      operationId: apiCreateUserApiKey
+      tags:
+        - user
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApiKeyCreateRequest"
+      responses:
+        "201":
+          description: "API key created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKey"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /users/{userId}/apikeys/{apiKeyId}:
+    delete:
+      summary: "Delete an API key"
+      operationId: apiDeleteUserApiKey
+      tags:
+        - user
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: apiKeyId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: "API key deleted"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /roles:
+    get:
+      summary: "List available roles"
+      operationId: apiListRoles
+      tags:
+        - role
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: "List of roles"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Roles"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /roles/{roleName}:
+    get:
+      summary: "Get a role"
+      operationId: apiGetRoleByName
+      tags:
+        - role
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: roleName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Role information"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Role"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /authz/check:
+    post:
+      summary: "Check authorization for an action"
+      operationId: apiAuthzCheck
+      tags:
+        - authz
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthzCheckRequest"
+      responses:
+        "200":
+          description: "Authorization decision"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthzCheckResponse"
+        default:
+          description: "An error occurred."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /version:
     get:
       summary: "Get Version"
@@ -2017,6 +2534,263 @@ components:
             type: string
         rootPassword:
           type: string
+    AuthLoginRequest:
+      type: object
+      required:
+        - userId
+        - password
+      properties:
+        userId:
+          type: string
+        password:
+          type: string
+          format: password
+    AuthLoginResponse:
+      type: object
+      required:
+        - accessToken
+        - tokenType
+      properties:
+        accessToken:
+          type: string
+        tokenType:
+          type: string
+          example: Bearer
+        expiresIn:
+          type: integer
+          format: int64
+        refreshToken:
+          type: string
+        mustChangePassword:
+          type: boolean
+        user:
+          $ref: "#/components/schemas/User"
+    AuthMe:
+      type: object
+      required:
+        - userId
+        - roles
+      properties:
+        userId:
+          type: string
+        displayName:
+          type: string
+        enabled:
+          type: boolean
+        mustChangePassword:
+          type: boolean
+        roles:
+          type: array
+          items:
+            type: string
+    PasswordChangeRequest:
+      type: object
+      required:
+        - newPassword
+      properties:
+        currentPassword:
+          type: string
+          format: password
+        newPassword:
+          type: string
+          format: password
+    RoleAssignmentRequest:
+      type: object
+      required:
+        - roleName
+      properties:
+        roleName:
+          type: string
+    User:
+      type: object
+      required:
+        - apiVersion
+        - kind
+        - metadata
+        - spec
+      properties:
+        apiVersion:
+          type: string
+        kind:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+        spec:
+          $ref: "#/components/schemas/UserSpec"
+        status:
+          $ref: "#/components/schemas/UserStatus"
+    Users:
+      type: array
+      items:
+        $ref: "#/components/schemas/User"
+    UserSpec:
+      type: object
+      required:
+        - enabled
+      properties:
+        enabled:
+          type: boolean
+        mustChangePassword:
+          type: boolean
+        email:
+          type: string
+        passwordHash:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        comment:
+          type: string
+    UserStatus:
+      type: object
+      properties:
+        lastLoginAt:
+          type: string
+          format: date-time
+        passwordUpdatedAt:
+          type: string
+          format: date-time
+        lockedAt:
+          type: string
+          format: date-time
+        lockedUntil:
+          type: string
+          format: date-time
+        apiKeyCount:
+          type: integer
+          format: int32
+    Permission:
+      type: object
+      required:
+        - resource
+        - verbs
+      properties:
+        resource:
+          type: string
+        verbs:
+          type: array
+          items:
+            type: string
+    Role:
+      type: object
+      required:
+        - apiVersion
+        - kind
+        - metadata
+        - spec
+      properties:
+        apiVersion:
+          type: string
+        kind:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+        spec:
+          $ref: "#/components/schemas/RoleSpec"
+    Roles:
+      type: array
+      items:
+        $ref: "#/components/schemas/Role"
+    RoleSpec:
+      type: object
+      required:
+        - permissions
+      properties:
+        description:
+          type: string
+        permissions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Permission"
+    RoleNames:
+      type: array
+      items:
+        type: string
+    ApiKey:
+      type: object
+      required:
+        - apiVersion
+        - kind
+        - metadata
+        - spec
+      properties:
+        apiVersion:
+          type: string
+        kind:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+        spec:
+          $ref: "#/components/schemas/ApiKeySpec"
+        status:
+          $ref: "#/components/schemas/ApiKeyStatus"
+    ApiKeys:
+      type: array
+      items:
+        $ref: "#/components/schemas/ApiKey"
+    ApiKeyCreateRequest:
+      type: object
+      properties:
+        comment:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+    ApiKeySpec:
+      type: object
+      properties:
+        comment:
+          type: string
+        tokenPrefix:
+          type: string
+        issuedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        revoked:
+          type: boolean
+    ApiKeyStatus:
+      type: object
+      properties:
+        lastUsedAt:
+          type: string
+          format: date-time
+        revokedAt:
+          type: string
+          format: date-time
+    AuthzCheckRequest:
+      type: object
+      required:
+        - resource
+        - action
+      properties:
+        userId:
+          type: string
+        resource:
+          type: string
+        resourceId:
+          type: string
+        action:
+          type: string
+        context:
+          type: object
+          additionalProperties: true
+    AuthzCheckResponse:
+      type: object
+      required:
+        - allowed
+      properties:
+        allowed:
+          type: boolean
+        reason:
+          type: string
+        matchedRoles:
+          type: array
+          items:
+            type: string
     HostStatus:
       type: object
       properties:
@@ -2077,4 +2851,9 @@ components:
         virtualNetworks:
           type: integer
           format: int
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
 

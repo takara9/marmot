@@ -120,3 +120,59 @@ CREATE TABLE audit_logs (
 REVOKE UPDATE, DELETE ON audit_logs FROM app_user;
 GRANT INSERT, SELECT ON audit_logs TO app_user;
 ```
+
+
+## APIセット
+
+初期実装の最小 API セット。
+
+### 前提
+1. Group/Org は初期実装しない
+2. 監査ログ API は初期実装しない
+3. API キー認証を主軸にする
+4. 管理者がロール候補を取得できるようにする
+
+### 初期実装 API セット
+
+1. 認証
+1. POST /auth/login
+2. POST /auth/logout
+3. GET /auth/me
+4. POST /auth/refresh は初期は任意。API キー中心なら後回し可
+
+2. ユーザー本人操作
+1. POST /users/me/password
+2. GET /users/me/roles
+3. POST /users/me/apikeys
+4. GET /users/me/apikeys
+5. DELETE /users/me/apikeys/{apiKeyId}
+
+3. 管理者のユーザー管理
+1. POST /users
+2. GET /users
+3. GET /users/{userId}
+4. PUT /users/{userId}
+5. DELETE /users/{userId}
+6. POST /users/{userId}/password
+7. POST /users/{userId}/lock
+8. POST /users/{userId}/unlock
+
+4. 管理者のロール割当管理
+1. GET /roles
+2. GET /roles/{roleName} は任意だが推奨
+3. GET /users/{userId}/roles
+4. POST /users/{userId}/roles
+5. DELETE /users/{userId}/roles/{roleName}
+
+5. 認可判定
+1. POST /authz/check
+
+### このセットが最小である理由
+1. mactl login, logout, passwd を満たせる
+2. mactl role を満たせる
+3. mactl user generate-apikey, list-apikey, delete-apikey を満たせる
+4. 管理者の user add, delete, set-passwd, lock を満たせる
+5. 管理者の add-role, del-role, list-role を満たせる
+6. 管理者が付与可能ロール一覧を取得できる
+
+必要なら次に、この API セットをそのまま marmot-api-v1.yaml に追加できる OpenAPI の Path 定義ひな形まで作成します。

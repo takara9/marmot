@@ -6,11 +6,14 @@ package api
 import (
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/oapi-codegen/runtime"
+)
+
+const (
+	BearerAuthScopes bearerAuthContextKey = "BearerAuth.Scopes"
 )
 
 // Defines values for VirtualNetworkSpecOverlayMode.
@@ -51,6 +54,39 @@ func (e VirtualNetworkSpecPeerPolicy) Valid() bool {
 		return false
 	}
 }
+
+// ApiKey defines model for ApiKey.
+type ApiKey struct {
+	ApiVersion string        `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string        `json:"kind" yaml:"kind"`
+	Metadata   Metadata      `json:"metadata" yaml:"metadata"`
+	Spec       ApiKeySpec    `json:"spec" yaml:"spec"`
+	Status     *ApiKeyStatus `json:"status,omitempty" yaml:"status,omitempty"`
+}
+
+// ApiKeyCreateRequest defines model for ApiKeyCreateRequest.
+type ApiKeyCreateRequest struct {
+	Comment   *string    `json:"comment,omitempty" yaml:"comment,omitempty"`
+	ExpiresAt *time.Time `json:"expiresAt,omitempty" yaml:"expiresAt,omitempty"`
+}
+
+// ApiKeySpec defines model for ApiKeySpec.
+type ApiKeySpec struct {
+	Comment     *string    `json:"comment,omitempty" yaml:"comment,omitempty"`
+	ExpiresAt   *time.Time `json:"expiresAt,omitempty" yaml:"expiresAt,omitempty"`
+	IssuedAt    *time.Time `json:"issuedAt,omitempty" yaml:"issuedAt,omitempty"`
+	Revoked     *bool      `json:"revoked,omitempty" yaml:"revoked,omitempty"`
+	TokenPrefix *string    `json:"tokenPrefix,omitempty" yaml:"tokenPrefix,omitempty"`
+}
+
+// ApiKeyStatus defines model for ApiKeyStatus.
+type ApiKeyStatus struct {
+	LastUsedAt *time.Time `json:"lastUsedAt,omitempty" yaml:"lastUsedAt,omitempty"`
+	RevokedAt  *time.Time `json:"revokedAt,omitempty" yaml:"revokedAt,omitempty"`
+}
+
+// ApiKeys defines model for ApiKeys.
+type ApiKeys = []ApiKey
 
 // ApplicationLoadBalancer defines model for ApplicationLoadBalancer.
 type ApplicationLoadBalancer struct {
@@ -118,6 +154,47 @@ type Auth struct {
 	Url          *string   `json:"url,omitempty" yaml:"url,omitempty"`
 	User         *string   `json:"user,omitempty" yaml:"user,omitempty"`
 	Users        *[]string `json:"users,omitempty" yaml:"users,omitempty"`
+}
+
+// AuthLoginRequest defines model for AuthLoginRequest.
+type AuthLoginRequest struct {
+	Password string `json:"password" yaml:"password"`
+	UserId   string `json:"userId" yaml:"userId"`
+}
+
+// AuthLoginResponse defines model for AuthLoginResponse.
+type AuthLoginResponse struct {
+	AccessToken        string  `json:"accessToken" yaml:"accessToken"`
+	ExpiresIn          *int64  `json:"expiresIn,omitempty" yaml:"expiresIn,omitempty"`
+	MustChangePassword *bool   `json:"mustChangePassword,omitempty" yaml:"mustChangePassword,omitempty"`
+	RefreshToken       *string `json:"refreshToken,omitempty" yaml:"refreshToken,omitempty"`
+	TokenType          string  `json:"tokenType" yaml:"tokenType"`
+	User               *User   `json:"user,omitempty" yaml:"user,omitempty"`
+}
+
+// AuthMe defines model for AuthMe.
+type AuthMe struct {
+	DisplayName        *string  `json:"displayName,omitempty" yaml:"displayName,omitempty"`
+	Enabled            *bool    `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	MustChangePassword *bool    `json:"mustChangePassword,omitempty" yaml:"mustChangePassword,omitempty"`
+	Roles              []string `json:"roles" yaml:"roles"`
+	UserId             string   `json:"userId" yaml:"userId"`
+}
+
+// AuthzCheckRequest defines model for AuthzCheckRequest.
+type AuthzCheckRequest struct {
+	Action     string                  `json:"action" yaml:"action"`
+	Context    *map[string]interface{} `json:"context,omitempty" yaml:"context,omitempty"`
+	Resource   string                  `json:"resource" yaml:"resource"`
+	ResourceId *string                 `json:"resourceId,omitempty" yaml:"resourceId,omitempty"`
+	UserId     *string                 `json:"userId,omitempty" yaml:"userId,omitempty"`
+}
+
+// AuthzCheckResponse defines model for AuthzCheckResponse.
+type AuthzCheckResponse struct {
+	Allowed      bool      `json:"allowed" yaml:"allowed"`
+	MatchedRoles *[]string `json:"matchedRoles,omitempty" yaml:"matchedRoles,omitempty"`
+	Reason       *string   `json:"reason,omitempty" yaml:"reason,omitempty"`
 }
 
 // Error defines model for Error.
@@ -319,6 +396,18 @@ type NetworkLoadBalancerSpec struct {
 	RemoteCIDR string `json:"remoteCIDR" yaml:"remoteCIDR"`
 }
 
+// PasswordChangeRequest defines model for PasswordChangeRequest.
+type PasswordChangeRequest struct {
+	CurrentPassword *string `json:"currentPassword,omitempty" yaml:"currentPassword,omitempty"`
+	NewPassword     string  `json:"newPassword" yaml:"newPassword"`
+}
+
+// Permission defines model for Permission.
+type Permission struct {
+	Resource string   `json:"resource" yaml:"resource"`
+	Verbs    []string `json:"verbs" yaml:"verbs"`
+}
+
 // Pong defines model for Pong.
 type Pong struct {
 	Ping string `json:"ping" yaml:"ping"`
@@ -328,6 +417,31 @@ type Pong struct {
 type ReplyMessage struct {
 	Message string `json:"message" yaml:"message"`
 }
+
+// Role defines model for Role.
+type Role struct {
+	ApiVersion string   `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string   `json:"kind" yaml:"kind"`
+	Metadata   Metadata `json:"metadata" yaml:"metadata"`
+	Spec       RoleSpec `json:"spec" yaml:"spec"`
+}
+
+// RoleAssignmentRequest defines model for RoleAssignmentRequest.
+type RoleAssignmentRequest struct {
+	RoleName string `json:"roleName" yaml:"roleName"`
+}
+
+// RoleNames defines model for RoleNames.
+type RoleNames = []string
+
+// RoleSpec defines model for RoleSpec.
+type RoleSpec struct {
+	Description *string      `json:"description,omitempty" yaml:"description,omitempty"`
+	Permissions []Permission `json:"permissions" yaml:"permissions"`
+}
+
+// Roles defines model for Roles.
+type Roles = []Role
 
 // Route defines model for Route.
 type Route struct {
@@ -361,38 +475,14 @@ type ServerSpec struct {
 	MmImage          *string             `json:"mmImage,omitempty" yaml:"mmImage,omitempty"`
 	NetworkInterface *[]NetworkInterface `json:"networkInterface,omitempty" yaml:"networkInterface,omitempty"`
 	OsLv             *string             `json:"osLv,omitempty" yaml:"osLv,omitempty"`
-	OsVariant        *string             `json:"osVariant,omitempty" yaml:"osVariant,omitempty"`
-	OsVg             *string             `json:"osVg,omitempty" yaml:"osVg,omitempty"`
-	Storage          *[]Volume           `json:"storage,omitempty" yaml:"storage,omitempty"`
+	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	OsVariant *string   `json:"osVariant,omitempty" yaml:"osVariant,omitempty"`
+	OsVg      *string   `json:"osVg,omitempty" yaml:"osVg,omitempty"`
+	Storage   *[]Volume `json:"storage,omitempty" yaml:"storage,omitempty"`
 }
 
 // Servers defines model for Servers.
 type Servers = []Server
-
-// NormalizeMMImageAlias keeps ServerSpec.mmImage and ServerSpec.osVariant in sync.
-// mmImage is the preferred field name and takes precedence when both are set.
-func (s *ServerSpec) NormalizeMMImageAlias() {
-	if s == nil {
-		return
-	}
-
-	if s.MmImage != nil && strings.TrimSpace(*s.MmImage) != "" {
-		s.OsVariant = s.MmImage
-		return
-	}
-
-	if s.OsVariant != nil && strings.TrimSpace(*s.OsVariant) != "" {
-		s.MmImage = s.OsVariant
-	}
-}
-
-// NormalizeMMImageAlias keeps Server.spec.mmImage and Server.spec.osVariant in sync.
-func (s *Server) NormalizeMMImageAlias() {
-	if s == nil {
-		return
-	}
-	s.Spec.NormalizeMMImageAlias()
-}
 
 // Status defines model for Status.
 type Status struct {
@@ -410,6 +500,37 @@ type Success struct {
 	Id      string  `json:"id" yaml:"id"`
 	Message *string `json:"message,omitempty" yaml:"message,omitempty"`
 }
+
+// User defines model for User.
+type User struct {
+	ApiVersion string      `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string      `json:"kind" yaml:"kind"`
+	Metadata   Metadata    `json:"metadata" yaml:"metadata"`
+	Spec       UserSpec    `json:"spec" yaml:"spec"`
+	Status     *UserStatus `json:"status,omitempty" yaml:"status,omitempty"`
+}
+
+// UserSpec defines model for UserSpec.
+type UserSpec struct {
+	Comment            *string   `json:"comment,omitempty" yaml:"comment,omitempty"`
+	Email              *string   `json:"email,omitempty" yaml:"email,omitempty"`
+	Enabled            bool      `json:"enabled" yaml:"enabled"`
+	MustChangePassword *bool     `json:"mustChangePassword,omitempty" yaml:"mustChangePassword,omitempty"`
+	PasswordHash       *string   `json:"passwordHash,omitempty" yaml:"passwordHash,omitempty"`
+	Roles              *[]string `json:"roles,omitempty" yaml:"roles,omitempty"`
+}
+
+// UserStatus defines model for UserStatus.
+type UserStatus struct {
+	ApiKeyCount       *int32     `json:"apiKeyCount,omitempty" yaml:"apiKeyCount,omitempty"`
+	LastLoginAt       *time.Time `json:"lastLoginAt,omitempty" yaml:"lastLoginAt,omitempty"`
+	LockedAt          *time.Time `json:"lockedAt,omitempty" yaml:"lockedAt,omitempty"`
+	LockedUntil       *time.Time `json:"lockedUntil,omitempty" yaml:"lockedUntil,omitempty"`
+	PasswordUpdatedAt *time.Time `json:"passwordUpdatedAt,omitempty" yaml:"passwordUpdatedAt,omitempty"`
+}
+
+// Users defines model for Users.
+type Users = []User
 
 // Version defines model for Version.
 type Version struct {
@@ -507,11 +628,20 @@ type VpnGatewaySpec struct {
 	Routes *[]Route `json:"routes,omitempty" yaml:"routes,omitempty"`
 }
 
+// bearerAuthContextKey is the context key for BearerAuth security scheme
+type bearerAuthContextKey string
+
 // ApiCreateLoadBalancerJSONRequestBody defines body for ApiCreateLoadBalancer for application/json ContentType.
 type ApiCreateLoadBalancerJSONRequestBody = ApplicationLoadBalancer
 
 // ApiUpdateLoadBalancerByIdJSONRequestBody defines body for ApiUpdateLoadBalancerById for application/json ContentType.
 type ApiUpdateLoadBalancerByIdJSONRequestBody = ApplicationLoadBalancer
+
+// ApiAuthLoginJSONRequestBody defines body for ApiAuthLogin for application/json ContentType.
+type ApiAuthLoginJSONRequestBody = AuthLoginRequest
+
+// ApiAuthzCheckJSONRequestBody defines body for ApiAuthzCheck for application/json ContentType.
+type ApiAuthzCheckJSONRequestBody = AuthzCheckRequest
 
 // ApiCreateGatewayJSONRequestBody defines body for ApiCreateGateway for application/json ContentType.
 type ApiCreateGatewayJSONRequestBody = Gateway
@@ -546,6 +676,21 @@ type ApiMakeImageEntryFromRunningVMByIdJSONRequestBody = Image
 // ApiUpdateServerByIdJSONRequestBody defines body for ApiUpdateServerById for application/json ContentType.
 type ApiUpdateServerByIdJSONRequestBody = Server
 
+// ApiCreateUserJSONRequestBody defines body for ApiCreateUser for application/json ContentType.
+type ApiCreateUserJSONRequestBody = User
+
+// ApiUpdateUserByIdJSONRequestBody defines body for ApiUpdateUserById for application/json ContentType.
+type ApiUpdateUserByIdJSONRequestBody = User
+
+// ApiCreateUserApiKeyJSONRequestBody defines body for ApiCreateUserApiKey for application/json ContentType.
+type ApiCreateUserApiKeyJSONRequestBody = ApiKeyCreateRequest
+
+// ApiChangeUserPasswordJSONRequestBody defines body for ApiChangeUserPassword for application/json ContentType.
+type ApiChangeUserPasswordJSONRequestBody = PasswordChangeRequest
+
+// ApiAddUserRoleJSONRequestBody defines body for ApiAddUserRole for application/json ContentType.
+type ApiAddUserRoleJSONRequestBody = RoleAssignmentRequest
+
 // ApiCreateVolumeJSONRequestBody defines body for ApiCreateVolume for application/json ContentType.
 type ApiCreateVolumeJSONRequestBody = Volume
 
@@ -575,6 +720,18 @@ type ServerInterface interface {
 	// Update ApplicationLoadBalancer
 	// (PUT /application-load-balancer/{id})
 	ApiUpdateLoadBalancerById(ctx echo.Context, id string) error
+	// Login and issue access token
+	// (POST /auth/login)
+	ApiAuthLogin(ctx echo.Context) error
+	// Logout current session
+	// (POST /auth/logout)
+	ApiAuthLogout(ctx echo.Context) error
+	// Get current authenticated user
+	// (GET /auth/me)
+	ApiAuthMe(ctx echo.Context) error
+	// Check authorization for an action
+	// (POST /authz/check)
+	ApiAuthzCheck(ctx echo.Context) error
 	// List Gateways
 	// (GET /gateway)
 	ApiGetGateways(ctx echo.Context) error
@@ -656,6 +813,12 @@ type ServerInterface interface {
 	// Alive
 	// (GET /ping)
 	ApiReplyPing(ctx echo.Context) error
+	// List available roles
+	// (GET /roles)
+	ApiListRoles(ctx echo.Context) error
+	// Get a role
+	// (GET /roles/{roleName})
+	ApiGetRoleByName(ctx echo.Context, roleName string) error
 	// Get Server Information
 	// (GET /server)
 	ApiGetServers(ctx echo.Context) error
@@ -683,6 +846,48 @@ type ServerInterface interface {
 	// Stop Server by Id
 	// (POST /server/{id}/stop)
 	ApiStopServerById(ctx echo.Context, id string) error
+	// List users
+	// (GET /users)
+	ApiListUsers(ctx echo.Context) error
+	// Create a user
+	// (POST /users)
+	ApiCreateUser(ctx echo.Context) error
+	// Delete a user
+	// (DELETE /users/{userId})
+	ApiDeleteUserById(ctx echo.Context, userId string) error
+	// Get a user
+	// (GET /users/{userId})
+	ApiGetUserById(ctx echo.Context, userId string) error
+	// Update a user
+	// (PUT /users/{userId})
+	ApiUpdateUserById(ctx echo.Context, userId string) error
+	// List API keys issued by a user
+	// (GET /users/{userId}/apikeys)
+	ApiListUserApiKeys(ctx echo.Context, userId string) error
+	// Create an API key for a user
+	// (POST /users/{userId}/apikeys)
+	ApiCreateUserApiKey(ctx echo.Context, userId string) error
+	// Delete an API key
+	// (DELETE /users/{userId}/apikeys/{apiKeyId})
+	ApiDeleteUserApiKey(ctx echo.Context, userId string, apiKeyId string) error
+	// Lock a user
+	// (POST /users/{userId}/lock)
+	ApiLockUserById(ctx echo.Context, userId string) error
+	// Change or reset user password
+	// (POST /users/{userId}/password)
+	ApiChangeUserPassword(ctx echo.Context, userId string) error
+	// List roles assigned to a user
+	// (GET /users/{userId}/roles)
+	ApiListUserRoles(ctx echo.Context, userId string) error
+	// Add a role to a user
+	// (POST /users/{userId}/roles)
+	ApiAddUserRole(ctx echo.Context, userId string) error
+	// Remove a role from a user
+	// (DELETE /users/{userId}/roles/{roleName})
+	ApiDeleteUserRole(ctx echo.Context, userId string, roleName string) error
+	// Unlock a user
+	// (POST /users/{userId}/unlock)
+	ApiUnlockUserById(ctx echo.Context, userId string) error
 	// Get Version
 	// (GET /version)
 	ApiGetVersion(ctx echo.Context) error
@@ -789,6 +994,48 @@ func (w *ServerInterfaceWrapper) ApiUpdateLoadBalancerById(ctx echo.Context) err
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.ApiUpdateLoadBalancerById(ctx, id)
+	return err
+}
+
+// ApiAuthLogin converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiAuthLogin(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiAuthLogin(ctx)
+	return err
+}
+
+// ApiAuthLogout converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiAuthLogout(ctx echo.Context) error {
+	var err error
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiAuthLogout(ctx)
+	return err
+}
+
+// ApiAuthMe converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiAuthMe(ctx echo.Context) error {
+	var err error
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiAuthMe(ctx)
+	return err
+}
+
+// ApiAuthzCheck converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiAuthzCheck(ctx echo.Context) error {
+	var err error
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiAuthzCheck(ctx)
 	return err
 }
 
@@ -1140,6 +1387,35 @@ func (w *ServerInterfaceWrapper) ApiReplyPing(ctx echo.Context) error {
 	return err
 }
 
+// ApiListRoles converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiListRoles(ctx echo.Context) error {
+	var err error
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiListRoles(ctx)
+	return err
+}
+
+// ApiGetRoleByName converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiGetRoleByName(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "roleName" -------------
+	var roleName string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "roleName", ctx.Param("roleName"), &roleName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter roleName: %s", err))
+	}
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiGetRoleByName(ctx, roleName)
+	return err
+}
+
 // ApiGetServers converts echo context to params.
 func (w *ServerInterfaceWrapper) ApiGetServers(ctx echo.Context) error {
 	var err error
@@ -1267,6 +1543,260 @@ func (w *ServerInterfaceWrapper) ApiStopServerById(ctx echo.Context) error {
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.ApiStopServerById(ctx, id)
+	return err
+}
+
+// ApiListUsers converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiListUsers(ctx echo.Context) error {
+	var err error
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiListUsers(ctx)
+	return err
+}
+
+// ApiCreateUser converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiCreateUser(ctx echo.Context) error {
+	var err error
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiCreateUser(ctx)
+	return err
+}
+
+// ApiDeleteUserById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiDeleteUserById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "userId" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", ctx.Param("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter userId: %s", err))
+	}
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiDeleteUserById(ctx, userId)
+	return err
+}
+
+// ApiGetUserById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiGetUserById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "userId" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", ctx.Param("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter userId: %s", err))
+	}
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiGetUserById(ctx, userId)
+	return err
+}
+
+// ApiUpdateUserById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiUpdateUserById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "userId" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", ctx.Param("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter userId: %s", err))
+	}
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiUpdateUserById(ctx, userId)
+	return err
+}
+
+// ApiListUserApiKeys converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiListUserApiKeys(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "userId" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", ctx.Param("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter userId: %s", err))
+	}
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiListUserApiKeys(ctx, userId)
+	return err
+}
+
+// ApiCreateUserApiKey converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiCreateUserApiKey(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "userId" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", ctx.Param("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter userId: %s", err))
+	}
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiCreateUserApiKey(ctx, userId)
+	return err
+}
+
+// ApiDeleteUserApiKey converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiDeleteUserApiKey(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "userId" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", ctx.Param("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter userId: %s", err))
+	}
+
+	// ------------- Path parameter "apiKeyId" -------------
+	var apiKeyId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "apiKeyId", ctx.Param("apiKeyId"), &apiKeyId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter apiKeyId: %s", err))
+	}
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiDeleteUserApiKey(ctx, userId, apiKeyId)
+	return err
+}
+
+// ApiLockUserById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiLockUserById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "userId" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", ctx.Param("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter userId: %s", err))
+	}
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiLockUserById(ctx, userId)
+	return err
+}
+
+// ApiChangeUserPassword converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiChangeUserPassword(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "userId" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", ctx.Param("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter userId: %s", err))
+	}
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiChangeUserPassword(ctx, userId)
+	return err
+}
+
+// ApiListUserRoles converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiListUserRoles(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "userId" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", ctx.Param("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter userId: %s", err))
+	}
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiListUserRoles(ctx, userId)
+	return err
+}
+
+// ApiAddUserRole converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiAddUserRole(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "userId" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", ctx.Param("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter userId: %s", err))
+	}
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiAddUserRole(ctx, userId)
+	return err
+}
+
+// ApiDeleteUserRole converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiDeleteUserRole(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "userId" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", ctx.Param("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter userId: %s", err))
+	}
+
+	// ------------- Path parameter "roleName" -------------
+	var roleName string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "roleName", ctx.Param("roleName"), &roleName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter roleName: %s", err))
+	}
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiDeleteUserRole(ctx, userId, roleName)
+	return err
+}
+
+// ApiUnlockUserById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiUnlockUserById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "userId" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", ctx.Param("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter userId: %s", err))
+	}
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiUnlockUserById(ctx, userId)
 	return err
 }
 
@@ -1479,6 +2009,10 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.DELETE(options.BaseURL+"/application-load-balancer/:id", wrapper.ApiDeleteLoadBalancerById, options.OperationMiddlewares["apiDeleteLoadBalancerById"]...)
 	router.GET(options.BaseURL+"/application-load-balancer/:id", wrapper.ApiGetLoadBalancerById, options.OperationMiddlewares["apiGetLoadBalancerById"]...)
 	router.PUT(options.BaseURL+"/application-load-balancer/:id", wrapper.ApiUpdateLoadBalancerById, options.OperationMiddlewares["apiUpdateLoadBalancerById"]...)
+	router.POST(options.BaseURL+"/auth/login", wrapper.ApiAuthLogin, options.OperationMiddlewares["apiAuthLogin"]...)
+	router.POST(options.BaseURL+"/auth/logout", wrapper.ApiAuthLogout, options.OperationMiddlewares["apiAuthLogout"]...)
+	router.GET(options.BaseURL+"/auth/me", wrapper.ApiAuthMe, options.OperationMiddlewares["apiAuthMe"]...)
+	router.POST(options.BaseURL+"/authz/check", wrapper.ApiAuthzCheck, options.OperationMiddlewares["apiAuthzCheck"]...)
 	router.GET(options.BaseURL+"/gateway", wrapper.ApiGetGateways, options.OperationMiddlewares["apiGetGateways"]...)
 	router.POST(options.BaseURL+"/gateway", wrapper.ApiCreateGateway, options.OperationMiddlewares["apiCreateGateway"]...)
 	router.DELETE(options.BaseURL+"/gateway/:id", wrapper.ApiDeleteGatewayById, options.OperationMiddlewares["apiDeleteGatewayById"]...)
@@ -1506,6 +2040,8 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.PUT(options.BaseURL+"/network/:id", wrapper.ApiUpdateNetworkById, options.OperationMiddlewares["apiUpdateNetworkById"]...)
 	router.GET(options.BaseURL+"/network/:id/ipnetworks", wrapper.ApiGetNetworkIpNetworks, options.OperationMiddlewares["apiGetNetworkIpNetworks"]...)
 	router.GET(options.BaseURL+"/ping", wrapper.ApiReplyPing, options.OperationMiddlewares["apiReplyPing"]...)
+	router.GET(options.BaseURL+"/roles", wrapper.ApiListRoles, options.OperationMiddlewares["apiListRoles"]...)
+	router.GET(options.BaseURL+"/roles/:roleName", wrapper.ApiGetRoleByName, options.OperationMiddlewares["apiGetRoleByName"]...)
 	router.GET(options.BaseURL+"/server", wrapper.ApiGetServers, options.OperationMiddlewares["apiGetServers"]...)
 	router.POST(options.BaseURL+"/server", wrapper.ApiCreateServer, options.OperationMiddlewares["apiCreateServer"]...)
 	router.DELETE(options.BaseURL+"/server/:id", wrapper.ApiDeleteServerById, options.OperationMiddlewares["apiDeleteServerById"]...)
@@ -1515,6 +2051,20 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.GET(options.BaseURL+"/server/:id/console", wrapper.ApiConsoleServerById, options.OperationMiddlewares["apiConsoleServerById"]...)
 	router.POST(options.BaseURL+"/server/:id/start", wrapper.ApiStartServerById, options.OperationMiddlewares["apiStartServerById"]...)
 	router.POST(options.BaseURL+"/server/:id/stop", wrapper.ApiStopServerById, options.OperationMiddlewares["apiStopServerById"]...)
+	router.GET(options.BaseURL+"/users", wrapper.ApiListUsers, options.OperationMiddlewares["apiListUsers"]...)
+	router.POST(options.BaseURL+"/users", wrapper.ApiCreateUser, options.OperationMiddlewares["apiCreateUser"]...)
+	router.DELETE(options.BaseURL+"/users/:userId", wrapper.ApiDeleteUserById, options.OperationMiddlewares["apiDeleteUserById"]...)
+	router.GET(options.BaseURL+"/users/:userId", wrapper.ApiGetUserById, options.OperationMiddlewares["apiGetUserById"]...)
+	router.PUT(options.BaseURL+"/users/:userId", wrapper.ApiUpdateUserById, options.OperationMiddlewares["apiUpdateUserById"]...)
+	router.GET(options.BaseURL+"/users/:userId/apikeys", wrapper.ApiListUserApiKeys, options.OperationMiddlewares["apiListUserApiKeys"]...)
+	router.POST(options.BaseURL+"/users/:userId/apikeys", wrapper.ApiCreateUserApiKey, options.OperationMiddlewares["apiCreateUserApiKey"]...)
+	router.DELETE(options.BaseURL+"/users/:userId/apikeys/:apiKeyId", wrapper.ApiDeleteUserApiKey, options.OperationMiddlewares["apiDeleteUserApiKey"]...)
+	router.POST(options.BaseURL+"/users/:userId/lock", wrapper.ApiLockUserById, options.OperationMiddlewares["apiLockUserById"]...)
+	router.POST(options.BaseURL+"/users/:userId/password", wrapper.ApiChangeUserPassword, options.OperationMiddlewares["apiChangeUserPassword"]...)
+	router.GET(options.BaseURL+"/users/:userId/roles", wrapper.ApiListUserRoles, options.OperationMiddlewares["apiListUserRoles"]...)
+	router.POST(options.BaseURL+"/users/:userId/roles", wrapper.ApiAddUserRole, options.OperationMiddlewares["apiAddUserRole"]...)
+	router.DELETE(options.BaseURL+"/users/:userId/roles/:roleName", wrapper.ApiDeleteUserRole, options.OperationMiddlewares["apiDeleteUserRole"]...)
+	router.POST(options.BaseURL+"/users/:userId/unlock", wrapper.ApiUnlockUserById, options.OperationMiddlewares["apiUnlockUserById"]...)
 	router.GET(options.BaseURL+"/version", wrapper.ApiGetVersion, options.OperationMiddlewares["apiGetVersion"]...)
 	router.GET(options.BaseURL+"/volume", wrapper.ApiListVolumes, options.OperationMiddlewares["apiListVolumes"]...)
 	router.POST(options.BaseURL+"/volume", wrapper.ApiCreateVolume, options.OperationMiddlewares["apiCreateVolume"]...)
