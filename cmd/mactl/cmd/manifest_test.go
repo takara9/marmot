@@ -7,6 +7,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/util"
 )
 
 var _ = Describe("manifest", func() {
@@ -206,6 +207,32 @@ spec:
 			Expect(func() {
 				ApplyServerDefaults(server)
 			}).NotTo(Panic())
+		})
+
+		It("copies spec.mmImage into spec.osVariant", func() {
+			server := &api.Server{
+				Spec: api.ServerSpec{
+					MmImage: util.StringPtr("ubuntu24.04"),
+				},
+			}
+
+			ApplyServerDefaults(server)
+
+			Expect(server.Spec.OsVariant).NotTo(BeNil())
+			Expect(*server.Spec.OsVariant).To(Equal("ubuntu24.04"))
+		})
+
+		It("keeps spec.mmImage in sync when only spec.osVariant is set", func() {
+			server := &api.Server{
+				Spec: api.ServerSpec{
+					OsVariant: util.StringPtr("ubuntu22.04"),
+				},
+			}
+
+			ApplyServerDefaults(server)
+
+			Expect(server.Spec.MmImage).NotTo(BeNil())
+			Expect(*server.Spec.MmImage).To(Equal("ubuntu22.04"))
 		})
 
 		Describe("ManifestToImage", func() {

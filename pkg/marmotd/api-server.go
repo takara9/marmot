@@ -27,6 +27,9 @@ func (s *Server) ApiGetServers(ctx echo.Context) error {
 		slog.Error("ApiGetServers()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
+	for i := range recs {
+		recs[i].NormalizeMMImageAlias()
+	}
 	return ctx.JSON(http.StatusOK, recs)
 }
 
@@ -40,6 +43,7 @@ func (s *Server) ApiCreateServer(ctx echo.Context) error {
 		slog.Error("ApiCreateServer()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
+	virtualServer.NormalizeMMImageAlias()
 	slog.Debug("Recived post body", "serverSpec=", virtualServer, "cpu=", virtualServer.Spec.Cpu, "memory=", virtualServer.Spec.Memory, "os", virtualServer.Spec.OsVariant)
 	// nodeName の割当はスケジューラーが担当する。
 
@@ -69,6 +73,7 @@ func (s *Server) ApiGetServerById(ctx echo.Context, id string) error {
 		}
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
+	server.NormalizeMMImageAlias()
 	return ctx.JSON(http.StatusOK, server)
 }
 
@@ -106,6 +111,7 @@ func (s *Server) ApiUpdateServerById(ctx echo.Context, id string) error {
 		slog.Error("ApiUpdateServerById()", "err", err)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
+	serverSpec.NormalizeMMImageAlias()
 
 	if err := s.Ma.UpdateServerById(id, serverSpec); err != nil {
 		slog.Error("UpdateServerById()", "err", err)

@@ -240,7 +240,13 @@ func ManifestToServer(manifest map[string]interface{}) (*api.Server, error) {
 // ApplyServerDefaults は server.spec.storage 配下の既定値を補完する。
 // storage[].spec.type が未指定なら qcow2、storage[].spec.kind が未指定なら data を設定する。
 func ApplyServerDefaults(server *api.Server) {
-	if server == nil || server.Spec.Storage == nil {
+	if server == nil {
+		return
+	}
+
+	server.NormalizeMMImageAlias()
+
+	if server.Spec.Storage == nil {
 		return
 	}
 
