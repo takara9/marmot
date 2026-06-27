@@ -216,11 +216,21 @@ func main() {
 	}
 
 	//startDispatcher()
-	// And we serve HTTP until the world ends.
+	// And we serve HTTP(S) until the world ends.
 	slog.Debug("Starting API server", "addr", cfg.APIListenAddr)
 
-	if err := e.Start(cfg.APIListenAddr); err != nil {
-		slog.Error("API server stopped", "err", err)
-		return
+	// Use TLS if both cert and key are configured, otherwise use HTTP.
+	if cfg.TLSCertFile != "" && cfg.TLSKeyFile != "" {
+		slog.Info("Starting API server with TLS", "addr", cfg.APIListenAddr, "cert", cfg.TLSCertFile, "key", cfg.TLSKeyFile)
+		if err := e.StartTLS(cfg.APIListenAddr, cfg.TLSCertFile, cfg.TLSKeyFile); err != nil {
+			slog.Error("API server stopped", "err", err)
+			return
+		}
+	} else {
+		slog.Warn("Starting API server without TLS (no cert/key configured)", "addr", cfg.APIListenAddr)
+		if err := e.Start(cfg.APIListenAddr); err != nil {
+			slog.Error("API server stopped", "err", err)
+			return
+		}
 	}
 }

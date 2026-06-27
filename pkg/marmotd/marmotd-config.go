@@ -101,6 +101,16 @@ type MarmotdConfig struct {
 	// Loki ログ受信用の Push API エンドポイント URL。
 	// 例: "http://127.0.0.1:3100/loki/api/v1/push"
 	LokiPushURL string `json:"loki_push_url"`
+
+	// API サーバーが HTTPS を使用する場合の TLS 証明書ファイルパス。
+	// 例: "/etc/marmot/certs/server.crt"
+	// 空の場合は HTTP を使用する。
+	TLSCertFile string `json:"tls_cert_file"`
+
+	// API サーバーが HTTPS を使用する場合の TLS 秘密鍵ファイルパス。
+	// 例: "/etc/marmot/certs/server.key"
+	// 空の場合は HTTP を使用する。
+	TLSKeyFile string `json:"tls_key_file"`
 }
 
 var runtimeConfigState = struct {
@@ -135,6 +145,8 @@ func defaultConfig() *MarmotdConfig {
 		ImageResizeTimeoutSeconds:        600,
 		ImageDeleteTimeoutSeconds:        120,
 		LokiPushURL:                      "",
+		TLSCertFile:                      "",
+		TLSKeyFile:                       "",
 	}
 }
 
@@ -206,6 +218,8 @@ func normalizeConfig(cfg *MarmotdConfig) *MarmotdConfig {
 		normalized.ImageDeleteTimeoutSeconds = defaults.ImageDeleteTimeoutSeconds
 	}
 	normalized.LokiPushURL = strings.TrimSpace(normalized.LokiPushURL)
+	normalized.TLSCertFile = strings.TrimSpace(normalized.TLSCertFile)
+	normalized.TLSKeyFile = strings.TrimSpace(normalized.TLSKeyFile)
 	return normalized
 }
 

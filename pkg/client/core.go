@@ -36,9 +36,18 @@ type MarmotEndpoint struct {
 func NewMarmotdEp(schame string, address string, basePath string, timeout int) (*MarmotEndpoint, error) {
 	tr := http.DefaultTransport.(*http.Transport).Clone()
 	tr.DisableCompression = true
+	// For development/testing environments, disable TLS certificate validation.
+	// Self-signed certificates are created during installation.
 	tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+
+	// Use input scheme if provided, otherwise default to http.
+	scheme := "http"
+	if schame != "" {
+		scheme = schame
+	}
+
 	return &MarmotEndpoint{
-		Scheme:   "http",
+		Scheme:   scheme,
 		HostPort: address,
 		BasePath: basePath,
 		Client:   &http.Client{Transport: tr, Timeout: time.Duration(timeout) * time.Second},

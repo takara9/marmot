@@ -30,5 +30,7 @@
       "osVersion": "24.04"
     }
   ],
-  "loki_push_url": "http://127.0.0.1:3100/loki/api/v1/push"
+  "loki_push_url": "http://127.0.0.1:3100/loki/api/v1/push",
+  "tls_cert_file": "/etc/marmot/certs/server.crt",
+  "tls_key_file": "/etc/marmot/certs/server.key"
 }
