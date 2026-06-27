@@ -95,14 +95,19 @@ type ApplicationLoadBalancerPersistence struct {
 
 // ApplicationLoadBalancerSpec defines model for ApplicationLoadBalancerSpec.
 type ApplicationLoadBalancerSpec struct {
-	BindPublicNetworkName *string                           `json:"bindPublicNetworkName,omitempty" yaml:"bindPublicNetworkName,omitempty"`
-	BindPublicIpAddress    string                            `json:"bindPublicIpAddress" yaml:"bindPublicIpAddress"`
+	// BindPublicIpAddress Public bind IP address. CIDR form (e.g. 10.10.0.70/24) is also accepted.
+	BindPublicIpAddress string `json:"bindPublicIpAddress" yaml:"bindPublicIpAddress"`
+
+	// BindPublicNetworkName Public network name for ALB bind address. Defaults to host-bridge.
+	BindPublicNetworkName  *string                           `json:"bindPublicNetworkName,omitempty" yaml:"bindPublicNetworkName,omitempty"`
 	InternalVirtualNetwork string                            `json:"internalVirtualNetwork" yaml:"internalVirtualNetwork"`
 	Listeners              []ApplicationLoadBalancerListener `json:"listeners" yaml:"listeners"`
-	Routes                 *[]Route                          `json:"routes,omitempty" yaml:"routes,omitempty"`
 
 	// RemoteCIDR Source CIDR allowed to access load balancer forwarding. Empty means allow all.
 	RemoteCIDR string `json:"remoteCIDR" yaml:"remoteCIDR"`
+
+	// Routes Static routes applied to public NIC.
+	Routes *[]Route `json:"routes,omitempty" yaml:"routes,omitempty"`
 }
 
 // Auth defines model for Auth.
@@ -467,10 +472,12 @@ type VpnGateway struct {
 type VpnGatewaySpec struct {
 	BindPublicIpAddress    string `json:"bindPublicIpAddress" yaml:"bindPublicIpAddress"`
 	InternalVirtualNetwork string `json:"internalVirtualNetwork" yaml:"internalVirtualNetwork"`
-	Routes                 *[]Route `json:"routes,omitempty" yaml:"routes,omitempty"`
 
 	// RemoteCIDRs Source CIDR list allowed to access vpn gateway. Empty means allow all.
 	RemoteCIDRs *[]string `json:"remoteCIDRs,omitempty" yaml:"remoteCIDRs,omitempty"`
+
+	// Routes Static routes applied to public NIC.
+	Routes *[]Route `json:"routes,omitempty" yaml:"routes,omitempty"`
 }
 
 // ApiCreateLoadBalancerJSONRequestBody defines body for ApiCreateLoadBalancer for application/json ContentType.
