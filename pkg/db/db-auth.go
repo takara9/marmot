@@ -281,9 +281,6 @@ func (d *Database) CreateUser(input api.User) (api.User, error) {
 	if user.Status == nil {
 		user.Status = &api.UserStatus{}
 	}
-	if !user.Spec.Enabled {
-		user.Spec.Enabled = true
-	}
 	if user.Status.PasswordUpdatedAt == nil && user.Spec.PasswordHash != nil && strings.TrimSpace(*user.Spec.PasswordHash) != "" {
 		user.Status.PasswordUpdatedAt = util.TimePtr(time.Now())
 	}
@@ -394,6 +391,9 @@ func (d *Database) SetUserPasswordHash(userID, passwordHash string, mustChangePa
 	resp, err := d.GetJSON(key, &user)
 	if err != nil {
 		return err
+	}
+	if user.Status == nil {
+		user.Status = &api.UserStatus{}
 	}
 	if user.Spec.PasswordHash == nil {
 		user.Spec.PasswordHash = util.StringPtr(passwordHash)
@@ -794,13 +794,6 @@ func (d *Database) revokeUserApiKeyLocked(userID, apiKeyID string) error {
 	if err != nil {
 		return err
 	}
-	var indexRef struct {
-		TokenHash string `json:"tokenHash"`
-	}
-	if _, err := d.GetJSON(apiKeyIdIndexKey(userID, apiKeyID), &indexRef); err == nil && strings.TrimSpace(indexRef.TokenHash) != "" {
-		_ = d.DeleteJSON(AuthApiKeyIndexPrefix + "/" + strings.TrimSpace(indexRef.TokenHash))
-		_ = d.DeleteJSON(apiKeyIdIndexKey(userID, apiKeyID))
-	}
 	if apiKey.Spec.Revoked == nil {
 		apiKey.Spec.Revoked = util.BoolPtr(true)
 	} else {
@@ -812,6 +805,15 @@ func (d *Database) revokeUserApiKeyLocked(userID, apiKeyID string) error {
 	apiKey.Status.RevokedAt = util.TimePtr(time.Now())
 	if err := d.PutJSONCAS(key, resp.Kvs[0].ModRevision, apiKey); err != nil {
 		return err
+	}
+	var indexRef struct {
+		TokenHash string `json:"tokenHash"`
+	}
+	if _, err := d.GetJSON(apiKeyIdIndexKey(userID, apiKeyID), &indexRef); err == nil {
+		if strings.TrimSpace(indexRef.TokenHash) != "" {
+			_ = d.DeleteJSON(AuthApiKeyIndexPrefix + "/" + strings.TrimSpace(indexRef.TokenHash))
+		}
+		_ = d.DeleteJSON(apiKeyIdIndexKey(userID, apiKeyID))
 	}
 	return nil
 }
@@ -862,7 +864,8 @@ func (d *Database) AuthenticateApiKey(token string) (api.User, api.ApiKey, error
 		return api.User{}, api.ApiKey{}, ErrUserDisabled
 	}
 	var apiKey api.ApiKey
-	if _, err := d.GetJSON(userApiKeyKey(ref.UserID, ref.ApiKeyID), &apiKey); err != nil {
+	resp, err := d.GetJSON(userApiKeyKey(ref.UserID, ref.ApiKeyID), &apiKey)
+	if err != nil {
 		return api.User{}, api.ApiKey{}, ErrInvalidCredentials
 	}
 	if apiKey.Spec.Revoked != nil && *apiKey.Spec.Revoked {
@@ -878,7 +881,10 @@ func (d *Database) AuthenticateApiKey(token string) (api.User, api.ApiKey, error
 		apiKey.Status = &api.ApiKeyStatus{}
 	}
 	apiKey.Status.LastUsedAt = util.TimePtr(time.Now())
-	if err := d.PutJSON(userApiKeyKey(ref.UserID, ref.ApiKeyID), apiKey); err != nil {
+	if err := d.PutJSONCAS(userApiKeyKey(ref.UserID, ref.ApiKeyID), resp.Kvs[0].ModRevision, apiKey); err != nil {
+		if err == ErrUpdateConflict {
+			return api.User{}, api.ApiKey{}, ErrInvalidCredentials
+		}
 		slog.Warn("AuthenticateApiKey() failed to stamp last used", "err", err, "userId", ref.UserID, "apiKeyId", ref.ApiKeyID)
 	}
 	return user, apiKey, nil
