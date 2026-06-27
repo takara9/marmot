@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -77,7 +78,17 @@ var consoleCmd = &cobra.Command{
 		if m.Client != nil && m.Client.Timeout > 0 {
 			timeout = m.Client.Timeout
 		}
-		conn, err := net.DialTimeout("tcp", hostPort, timeout)
+		var conn net.Conn
+		if strings.ToLower(strings.TrimSpace(m.Scheme)) == "https" {
+			tlsCfg := &tls.Config{InsecureSkipVerify: true}
+			if timeout > 0 {
+				conn, err = tls.DialWithDialer(&net.Dialer{Timeout: timeout}, "tcp", hostPort, tlsCfg)
+			} else {
+				conn, err = tls.Dial("tcp", hostPort, tlsCfg)
+			}
+		} else {
+			conn, err = net.DialTimeout("tcp", hostPort, timeout)
+		}
 		if err != nil {
 			return fmt.Errorf("failed to connect to marmotd: %w", err)
 		}
