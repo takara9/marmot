@@ -132,3 +132,26 @@
 完了条件: mactl get server が HTTPS 構成で成功する
 ロールバック: 前回 deb を再配布し systemctl restart marmot
 ```
+
+> 運用ルールは、毎回インプットせず、永続的に命令として、設定することはできませんか？
+VS Code Copilot には `.github/copilot-instructions.md` に書いておくと、毎回の会話に自動適用される仕組みがあります。現状を確認してから作成します。 
+
+Searched for files matching `**/.github/copilot-instructions.md`, no matches
+
+Created [](file:///home/ubuntu/marmot/.github/copilot-instructions.md)
+
+作成しました。copilot-instructions.md に書いた内容は、このプロジェクトで Copilot を使う際に自動で読み込まれます。
+
+**効果**
+
+- 毎回テンプレートを貼る必要がなくなる
+- 変更前確認・禁止事項・予定外変更時の手順が常時有効になる
+- プロジェクトメンバー全員（チーム利用時）にも同じルールが適用される
+
+**注意点**
+
+- この設定はこのリポジトリ内でのみ有効です（他プロジェクトは別途設定が必要）
+- git push でチームメンバーにも共有されます
+- 変更が必要になったら、このファイルを直接編集してください
+
+変更を行いました。
