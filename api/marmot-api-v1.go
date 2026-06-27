@@ -6,6 +6,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -357,6 +358,7 @@ type ServerSpec struct {
 	BootVolume       *Volume             `json:"bootVolume,omitempty" yaml:"bootVolume,omitempty"`
 	Cpu              *int                `json:"cpu,omitempty" yaml:"cpu,omitempty"`
 	Memory           *int                `json:"memory,omitempty" yaml:"memory,omitempty"`
+	MmImage          *string             `json:"mmImage,omitempty" yaml:"mmImage,omitempty"`
 	NetworkInterface *[]NetworkInterface `json:"networkInterface,omitempty" yaml:"networkInterface,omitempty"`
 	OsLv             *string             `json:"osLv,omitempty" yaml:"osLv,omitempty"`
 	OsVariant        *string             `json:"osVariant,omitempty" yaml:"osVariant,omitempty"`
@@ -366,6 +368,31 @@ type ServerSpec struct {
 
 // Servers defines model for Servers.
 type Servers = []Server
+
+// NormalizeMMImageAlias keeps ServerSpec.mmImage and ServerSpec.osVariant in sync.
+// mmImage is the preferred field name and takes precedence when both are set.
+func (s *ServerSpec) NormalizeMMImageAlias() {
+	if s == nil {
+		return
+	}
+
+	if s.MmImage != nil && strings.TrimSpace(*s.MmImage) != "" {
+		s.OsVariant = s.MmImage
+		return
+	}
+
+	if s.OsVariant != nil && strings.TrimSpace(*s.OsVariant) != "" {
+		s.MmImage = s.OsVariant
+	}
+}
+
+// NormalizeMMImageAlias keeps Server.spec.mmImage and Server.spec.osVariant in sync.
+func (s *Server) NormalizeMMImageAlias() {
+	if s == nil {
+		return
+	}
+	s.Spec.NormalizeMMImageAlias()
+}
 
 // Status defines model for Status.
 type Status struct {
