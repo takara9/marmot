@@ -8,13 +8,13 @@ import (
 )
 
 func TestChooseAssignedNodeName(t *testing.T) {
-	t.Run("keeps nodeName empty when request and storage are both unset", func(t *testing.T) {
+	t.Run("uses default node when request and storage are both unset", func(t *testing.T) {
 		node, err := chooseAssignedNodeName("hv-default", nil, "")
 		if err != nil {
 			t.Fatalf("chooseAssignedNodeName() error = %v", err)
 		}
-		if node != "" {
-			t.Fatalf("chooseAssignedNodeName() = %q, want empty", node)
+		if node != "hv-default" {
+			t.Fatalf("chooseAssignedNodeName() = %q, want %q", node, "hv-default")
 		}
 	})
 

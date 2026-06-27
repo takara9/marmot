@@ -54,3 +54,4 @@
 - 設定ファイル: `/etc/marmot/marmotd.json`
 - クライアント設定: `~/.marmot`
 - デフォルト API ポート: 8750
+
