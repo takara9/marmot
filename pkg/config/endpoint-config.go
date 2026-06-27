@@ -12,7 +12,8 @@ import (
 // defaultMarmotConfig は ~/.marmot が存在しない場合に書き込むデフォルト設定内容
 const defaultMarmotConfig = `current: 0
 endpoints:
-  - http://localhost:8750
+  - https://localhost:8750
+insecure-skip-tls-verify: false
 `
 
 // EnsureMarmotConfig は $HOME/.marmot が存在しない場合、
@@ -34,6 +35,7 @@ type MarmotConfig struct {
 	// Current はアクティブなエンドポイントのインデックス (0始まり)
 	Current          int      `yaml:"current"`
 	Endpoints        []string `yaml:"endpoints"`
+	InsecureSkipTLSVerify bool `yaml:"insecure-skip-tls-verify"`
 	EndpointComments []string `yaml:"endpointComments,omitempty"`
 }
 

@@ -71,6 +71,7 @@ var _ = Describe("関数テスト", Ordered, func() {
 				marmotEp,
 				"/api/v1",
 				60,
+				false,
 			)
 			Expect(err).NotTo(HaveOccurred())
 		})

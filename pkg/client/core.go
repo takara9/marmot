@@ -30,17 +30,26 @@ type MarmotEndpoint struct {
 	Scheme   string // Scheme for the endpoint, e.g., "http" or "https".
 	HostPort string
 	BasePath string       // Base path for the API, e.g., "/api/v1".
+	InsecureSkipTLSVerify bool
 	Client   *http.Client // Specialized client.
 }
 
-func NewMarmotdEp(schame string, address string, basePath string, timeout int) (*MarmotEndpoint, error) {
+func NewMarmotdEp(schame string, address string, basePath string, timeout int, insecureSkipTLSVerify bool) (*MarmotEndpoint, error) {
 	tr := http.DefaultTransport.(*http.Transport).Clone()
 	tr.DisableCompression = true
-	tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: insecureSkipTLSVerify}
+
+	// Use input scheme if provided, otherwise default to http.
+	scheme := "http"
+	if schame != "" {
+		scheme = schame
+	}
+
 	return &MarmotEndpoint{
-		Scheme:   "http",
+		Scheme:   scheme,
 		HostPort: address,
 		BasePath: basePath,
+		InsecureSkipTLSVerify: insecureSkipTLSVerify,
 		Client:   &http.Client{Transport: tr, Timeout: time.Duration(timeout) * time.Second},
 	}, nil
 }

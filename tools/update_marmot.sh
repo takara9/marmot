@@ -40,9 +40,6 @@ install -m 0755 ${BINDIR}/${ADMIN_CMD} /usr/local/bin
 rm -f /etc/marmot/marmotd.json
 install -m 0644 ${BINDIR}/marmotd.json /etc/marmot
 
-rm -f /etc/marmot/.marmot.example
-install -m 0644 ${BINDIR}/.marmot.example /etc/marmot
-
 echo "marmot version ${VERSION} is installed."
 
 echo "Starting marmot service..."

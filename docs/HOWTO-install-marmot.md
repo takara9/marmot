@@ -214,7 +214,6 @@ iSCSI ターゲットサーバーにするノードは `/etc/marmot/marmotd.json
 `mactl` は marmot API への接続先を `~/.marmot` ファイルで管理します。
 
 ```bash
-cp /etc/marmot/.marmot.example ~/.marmot
 vi ~/.marmot
 ```
 

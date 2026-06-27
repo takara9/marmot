@@ -38,7 +38,6 @@ package: clean all setup
 	cp TAG cmd/mactl/cmd/version.txt
 	cp TAG cmd/maadm/cmd/version.txt
 	cp cmd/install.sh $(BINDIR)/install.sh
-	cp cmd/mactl/.marmot.example $(BINDIR)/.marmot.example
 	cp cmd/marmotd/marmot.service $(BINDIR)/marmot.service
 	cp cmd/marmotd/marmotd.json $(BINDIR)/marmotd.json
 	tar -C $(BINDIR) -czvf dist/marmot-v$(TAG).tgz .

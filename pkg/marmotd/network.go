@@ -46,6 +46,18 @@ func mergeImportedNetworkPreservingCreation(existing api.VirtualNetwork, importe
 	return merged
 }
 
+func shouldPreserveDistributedNetworkEntry(existing api.VirtualNetwork) bool {
+	if existing.Metadata.Labels == nil {
+		return false
+	}
+	labels := *existing.Metadata.Labels
+	role := strings.TrimSpace(db.GetNetworkSyncRole(labels))
+	if role == "head" || role == "follower" {
+		return true
+	}
+	return strings.TrimSpace(db.GetHeadNetworkID(labels)) != ""
+}
+
 func findNetworkByNameAndNode(networks []api.VirtualNetwork, name string, nodeName string) (api.VirtualNetwork, bool) {
 	targetName := strings.TrimSpace(name)
 	targetNode := strings.TrimSpace(nodeName)
@@ -162,6 +174,16 @@ func (m *Marmot) GetVirtualNetworksAndPutDB() ([]api.VirtualNetwork, error) {
 			existingUUID := strings.TrimSpace(util.OrDefault(existingNet.Metadata.Uuid, ""))
 			importedUUID := strings.TrimSpace(util.OrDefault(net.Metadata.Uuid, ""))
 			if existingUUID != importedUUID {
+				if shouldPreserveDistributedNetworkEntry(existingNet) {
+					merged := mergeImportedNetworkPreservingCreation(existingNet, net, m.NodeName, time.Now())
+					err := m.Db.UpdateVirtualNetworkById(api.VirtualNetworkID(existingNet), merged)
+					if err != nil {
+						slog.Error("Failed to preserve distributed network entry during import", "err", err, "networkName", name, "networkId", api.VirtualNetworkID(existingNet))
+						continue
+					}
+					apiNetworks = append(apiNetworks, merged)
+					continue
+				}
 				if shouldPreserveSystemNetworkCreationTimestamp(name) && existingNet.Status != nil && existingNet.Status.CreationTimeStamp != nil {
 					merged := mergeImportedNetworkPreservingCreation(existingNet, net, m.NodeName, time.Now())
 					err := m.Db.UpdateVirtualNetworkById(api.VirtualNetworkID(existingNet), merged)
@@ -416,6 +438,15 @@ func (m *Marmot) CheckVirtualNetworks() error {
 			existingUUID := strings.TrimSpace(util.OrDefault(existingNet.Metadata.Uuid, ""))
 			importedUUID := strings.TrimSpace(util.OrDefault(vnet.Metadata.Uuid, ""))
 			if existingUUID != importedUUID {
+				if shouldPreserveDistributedNetworkEntry(existingNet) {
+					merged := mergeImportedNetworkPreservingCreation(existingNet, *vnet, m.NodeName, time.Now())
+					if err := m.Db.UpdateVirtualNetworkById(api.VirtualNetworkID(existingNet), merged); err != nil {
+						slog.Error("Failed to preserve distributed network entry during sync", "err", err, "networkName", vnet.Metadata.Name, "networkId", api.VirtualNetworkID(existingNet))
+						continue
+					}
+					m.Db.UpdateVirtualNetworkStatus(api.VirtualNetworkID(existingNet), db.NETWORK_ACTIVE)
+					continue
+				}
 				if shouldPreserveSystemNetworkCreationTimestamp(vnet.Metadata.Name) && existingNet.Status != nil && existingNet.Status.CreationTimeStamp != nil {
 					merged := mergeImportedNetworkPreservingCreation(existingNet, *vnet, m.NodeName, time.Now())
 					if err := m.Db.UpdateVirtualNetworkById(api.VirtualNetworkID(existingNet), merged); err != nil {

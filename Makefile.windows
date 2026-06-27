@@ -32,7 +32,6 @@ package: clean all setup
 	copy TAG pkg\marmotd\version.txt
 	copy TAG cmd\mactl\cmd\version.txt
 	copy TAG cmd\maadm\cmd\version.txt
-	copy cmd\mactl\.marmot.example "$(BINDIR)\.marmot.example"
 	copy cmd\marmotd\marmot.service "$(BINDIR)\marmot.service"
 	copy cmd\marmotd\marmotd.json "$(BINDIR)\marmotd.json"
 	powershell -Command "Compress-Archive -Path $(BINDIR) -DestinationPath dist\marmot-v$(TAG).zip -Force"

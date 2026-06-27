@@ -12,6 +12,7 @@ import (
 // 省略時は EnsureMarmotConfig() で $HOME/.marmot を保証してから読み込む。
 func GetClientConfig2(apiConfigFilename string) (*client.MarmotEndpoint, error) {
 	var rawURL string
+	var insecureSkipTLSVerify bool
 
 	if len(apiConfigFilename) > 0 {
 		// ファイルパスとして .marmot フォーマットで読み込む
@@ -25,6 +26,7 @@ func GetClientConfig2(apiConfigFilename string) (*client.MarmotEndpoint, error) 
 			slog.Error("GetClientConfig2", "active endpoint error", err)
 			return nil, err
 		}
+		insecureSkipTLSVerify = cfg.InsecureSkipTLSVerify
 	} else {
 		// $HOME/.marmot を保証し読み込む
 		if err := EnsureMarmotConfig(); err != nil {
@@ -42,6 +44,7 @@ func GetClientConfig2(apiConfigFilename string) (*client.MarmotEndpoint, error) 
 			slog.Error("GetClientConfig2", "active endpoint error", aErr)
 			return nil, aErr
 		}
+		insecureSkipTLSVerify = cfg.InsecureSkipTLSVerify
 	}
 
 	if len(rawURL) == 0 {
@@ -59,5 +62,6 @@ func GetClientConfig2(apiConfigFilename string) (*client.MarmotEndpoint, error) 
 		u.Host,
 		"/api/v1",
 		60,
+		insecureSkipTLSVerify,
 	)
 }
