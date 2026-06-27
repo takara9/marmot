@@ -33,7 +33,6 @@ func deletionMarker(status *api.Status) string {
 // 優先順位:
 //  1. --api フラグで明示指定された URL または .marmot ファイルパス
 //  2. $HOME/.marmot に登録されたアクティブエンドポイント
-//     ($HOME/.marmot が無い場合は /etc/marmot/.marmot.example からコピーして自動作成)
 func getClientConfig() (*client.MarmotEndpoint, error) {
 	return config.GetClientConfig2(apiConfigFilename)
 }

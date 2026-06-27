@@ -80,7 +80,7 @@ var consoleCmd = &cobra.Command{
 		}
 		var conn net.Conn
 		if strings.ToLower(strings.TrimSpace(m.Scheme)) == "https" {
-			tlsCfg := &tls.Config{InsecureSkipVerify: true}
+			tlsCfg := &tls.Config{InsecureSkipVerify: m.InsecureSkipTLSVerify}
 			if timeout > 0 {
 				conn, err = tls.DialWithDialer(&net.Dialer{Timeout: timeout}, "tcp", hostPort, tlsCfg)
 			} else {

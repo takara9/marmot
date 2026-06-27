@@ -92,9 +92,6 @@ install -m 0644 "${ROOT_DIR}/cmd/marmotd/marmotd.json" \
     "${PKG_DIR}/etc/marmot/marmotd.json"
 
 echo "設定ファイルのサンプルをコピー中..."
-install -m 0644 "${ROOT_DIR}/cmd/mactl/.marmot.example" \
-    "${PKG_DIR}/etc/marmot/.marmot.example"
-
 # インストール済みサイズを計算 (KB単位)
 INSTALLED_SIZE=$(du -sk "${PKG_DIR}" | cut -f1)
 
@@ -137,7 +134,6 @@ EOF
 echo "DEBIAN/conffiles を生成中..."
 cat > "${PKG_DIR}/DEBIAN/conffiles" <<'CONFFILES'
 /etc/marmot/marmotd.json
-/etc/marmot/.marmot.example
 CONFFILES
 
 echo "DEBIAN/postinst を生成中..."
