@@ -175,4 +175,34 @@ GRANT INSERT, SELECT ON audit_logs TO app_user;
 5. 管理者の add-role, del-role, list-role を満たせる
 6. 管理者が付与可能ロール一覧を取得できる
 
-必要なら次に、この API セットをそのまま marmot-api-v1.yaml に追加できる OpenAPI の Path 定義ひな形まで作成します。
+
+---
+以下、今回追加した mactl コマンド案と REST API の対応表です。  
+実装状況は現時点でサーバー側スタブ（501 Not Implemented）です。
+
+| mactl コマンド | 用途 | REST API | 備考 |
+|---|---|---|---|
+| mactl login USER-ID | ログイン | POST /auth/login | 認証トークン取得 |
+| mactl logout | ログアウト | POST /auth/logout | Bearer 必須 |
+| mactl passwd | 自分のパスワード変更 | POST /users/{userId}/password | 現仕様は me 専用ではなく userId 指定 |
+| mactl role | 自分のロール表示 | GET /auth/me または GET /users/{userId}/roles | 最小実装はどちらでも成立 |
+| mactl user generate-apikey --comment TEXT | 自分の API キー発行 | POST /users/{userId}/apikeys | body に comment/expiresAt |
+| mactl user list-apikey | 自分の API キー一覧 | GET /users/{userId}/apikeys | userId 指定 |
+| mactl user delete-apikey API-ID | API キー削除 | DELETE /users/{userId}/apikeys/{apiKeyId} | userId と apiKeyId 指定 |
+| mactl user add USER-ID --role ROLE-NAME --passwd PASSWORD | ユーザー作成 | POST /users | role/password は User spec へ反映 |
+| mactl user delete USER-ID | ユーザー削除 | DELETE /users/{userId} | - |
+| mactl user set-passwd USER-ID --passwd PASSWORD | 管理者による再設定 | POST /users/{userId}/password | currentPassword なしで運用可 |
+| mactl user lock USER-ID | ユーザーロック | POST /users/{userId}/lock | - |
+| mactl user unlock USER-ID | ユーザーアンロック | POST /users/{userId}/unlock | コマンドは今後追加候補 |
+| mactl user list-role USER-ID | ユーザーロール一覧 | GET /users/{userId}/roles | - |
+| mactl user add-role USER-ID ROLE-NAME | ロール追加 | POST /users/{userId}/roles | body は roleName |
+| mactl user del-role USER-ID ROLE-NAME | ロール削除 | DELETE /users/{userId}/roles/{roleName} | - |
+| （内部利用） | ロール定義一覧取得 | GET /roles | 補完・検証用に利用可能 |
+| （内部利用） | ロール詳細取得 | GET /roles/{roleName} | 任意だが推奨 |
+| （内部利用） | 認可判定 | POST /authz/check | クライアント事前判定やデバッグ用 |
+
+補足
+1. 仕様メモでは users/me 系も候補でしたが、今回 OpenAPI 反映済みなのは users/{userId} 系です。
+2. したがって mactl 側は、当面「ログイン中ユーザーIDを userId に埋める」実装にすると整合が取れます。
+3. 参照元は MEMO-mactl-authenticvation.md と marmot-api-v1.yaml です。
+

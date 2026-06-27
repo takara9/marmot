@@ -9,14 +9,25 @@ func (s *Server) NormalizeMMImageAlias() {
 		return
 	}
 
-	if s.Spec.MmImage != nil && strings.TrimSpace(*s.Spec.MmImage) != "" {
+	mmImage := ""
+	if s.Spec.MmImage != nil {
+		mmImage = strings.TrimSpace(*s.Spec.MmImage)
+	}
+	osVariant := ""
+	if s.Spec.OsVariant != nil {
+		osVariant = strings.TrimSpace(*s.Spec.OsVariant)
+	}
+
+	if mmImage != "" {
+		if osVariant == "" {
+			v := mmImage
+			s.Spec.OsVariant = &v
+		}
 		return
 	}
 
-	if s.Spec.OsVariant != nil {
-		v := strings.TrimSpace(*s.Spec.OsVariant)
-		if v != "" {
-			s.Spec.MmImage = &v
-		}
+	if osVariant != "" {
+		v := osVariant
+		s.Spec.MmImage = &v
 	}
 }
