@@ -114,7 +114,7 @@ func serverScopedStorageName(name, serverID string) string {
 
 func chooseAssignedNodeName(defaultNode string, requestedNode *string, storageNode string) (string, error) {
 	defaultAssigned := strings.TrimSpace(defaultNode)
-	assigned := defaultAssigned
+	assigned := ""
 	requested := ""
 	if requestedNode != nil {
 		requested = strings.TrimSpace(*requestedNode)
