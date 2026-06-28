@@ -10,6 +10,7 @@ import (
 
 var roleCmd = &cobra.Command{
 	Use:   "role",
+	Aliases: []string{"whoami"},
 	Short: "Show your roles",
 	Long:  `Display the roles assigned to the currently logged-in user.`,
 	Args:  cobra.NoArgs,

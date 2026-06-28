@@ -68,15 +68,21 @@ type ApiKey struct {
 type ApiKeyCreateRequest struct {
 	Comment   *string    `json:"comment,omitempty" yaml:"comment,omitempty"`
 	ExpiresAt *time.Time `json:"expiresAt,omitempty" yaml:"expiresAt,omitempty"`
+
+	// SessionType Session scope for the API key. Login sessions may be revoked automatically after inactivity; generated keys remain persistent until explicitly deleted.
+	SessionType *string `json:"sessionType,omitempty" yaml:"sessionType,omitempty"`
 }
 
 // ApiKeySpec defines model for ApiKeySpec.
 type ApiKeySpec struct {
-	Comment     *string    `json:"comment,omitempty" yaml:"comment,omitempty"`
-	ExpiresAt   *time.Time `json:"expiresAt,omitempty" yaml:"expiresAt,omitempty"`
-	IssuedAt    *time.Time `json:"issuedAt,omitempty" yaml:"issuedAt,omitempty"`
-	Revoked     *bool      `json:"revoked,omitempty" yaml:"revoked,omitempty"`
-	TokenPrefix *string    `json:"tokenPrefix,omitempty" yaml:"tokenPrefix,omitempty"`
+	Comment   *string    `json:"comment,omitempty" yaml:"comment,omitempty"`
+	ExpiresAt *time.Time `json:"expiresAt,omitempty" yaml:"expiresAt,omitempty"`
+	IssuedAt  *time.Time `json:"issuedAt,omitempty" yaml:"issuedAt,omitempty"`
+	Revoked   *bool      `json:"revoked,omitempty" yaml:"revoked,omitempty"`
+
+	// SessionType Session scope for the API key. login marks a bearer token created by POST /auth/login; other values are treated as persistent user-generated keys.
+	SessionType *string `json:"sessionType,omitempty" yaml:"sessionType,omitempty"`
+	TokenPrefix *string `json:"tokenPrefix,omitempty" yaml:"tokenPrefix,omitempty"`
 }
 
 // ApiKeyStatus defines model for ApiKeyStatus.

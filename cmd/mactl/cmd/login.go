@@ -35,6 +35,12 @@ var loginCmd = &cobra.Command{
 			return err
 		}
 
+		previousToken, prevErr := loadAccessToken()
+		if prevErr != nil {
+			fmt.Fprintln(os.Stderr, "Warning: Failed to load existing token:", prevErr)
+			previousToken = ""
+		}
+
 		loginResp, err := m.AuthLogin(userID, password)
 		if err != nil {
 			return fmt.Errorf("login failed: %w", err)
@@ -42,6 +48,19 @@ var loginCmd = &cobra.Command{
 
 		if loginResp == nil || strings.TrimSpace(loginResp.AccessToken) == "" {
 			return fmt.Errorf("no access token returned")
+		}
+
+		previousToken = strings.TrimSpace(previousToken)
+		if previousToken != "" && previousToken != strings.TrimSpace(loginResp.AccessToken) {
+			oldSessionClient, oldErr := getClientConfig()
+			if oldErr != nil {
+				fmt.Fprintln(os.Stderr, "Warning: Failed to initialize client for previous session logout:", oldErr)
+			} else {
+				oldSessionClient.SetAccessToken(previousToken)
+				if err := oldSessionClient.AuthLogout(); err != nil {
+					fmt.Fprintln(os.Stderr, "Warning: Failed to logout previous session:", err)
+				}
+			}
 		}
 
 		if err := saveAccessToken(loginResp.AccessToken); err != nil {

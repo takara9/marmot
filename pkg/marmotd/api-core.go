@@ -35,9 +35,17 @@ type Marmot struct {
 }
 
 type Server struct {
-	Lock sync.Mutex
-	Ma   *Marmot
+	Lock          sync.Mutex
+	Ma            *Marmot
+	cleanupCancel context.CancelFunc
+	cleanupDone   chan struct{}
 }
+
+const (
+	idleLoginSessionRevokeInterval   = 1 * time.Minute
+	revokedAPIKeyCleanupInterval    = 1 * time.Minute
+	revokedAPIKeyPhysicalDeleteAfter = 1 * time.Minute
+)
 
 var (
 	netDialTimeout       = net.DialTimeout
@@ -199,14 +207,74 @@ func NewServerWithOptions(node string, etcdurl string, skipPreflight bool) *Serv
 		slog.Error("Failed to initialize Marmot core", "err", err)
 		os.Exit(1)
 	}
-	return &Server{
+	if err := marmotInstance.Db.EnsureBootstrapAdmin(); err != nil {
+		slog.Error("Failed to seed bootstrap admin user", "err", err)
+		os.Exit(1)
+	}
+	s := &Server{
 		Ma: marmotInstance,
 	}
+	s.startRevokedAPIKeyCleanupWorker()
+	return s
 }
 
 // サーバーの終了
 func (s *Server) Close() error {
+	if s.cleanupCancel != nil {
+		s.cleanupCancel()
+	}
+	if s.cleanupDone != nil {
+		select {
+		case <-s.cleanupDone:
+		case <-time.After(3 * time.Second):
+			slog.Warn("Timed out waiting for revoked API key cleanup worker to stop")
+		}
+	}
 	return s.Ma.Db.Close()
+}
+
+func (s *Server) startRevokedAPIKeyCleanupWorker() {
+	if s == nil || s.Ma == nil || s.Ma.Db == nil {
+		return
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cleanupCancel = cancel
+	s.cleanupDone = make(chan struct{})
+
+	go func() {
+		defer close(s.cleanupDone)
+		revokeTicker := time.NewTicker(idleLoginSessionRevokeInterval)
+		defer revokeTicker.Stop()
+		ticker := time.NewTicker(revokedAPIKeyCleanupInterval)
+		defer ticker.Stop()
+
+		slog.Info("Started API key maintenance worker", "revokeInterval", idleLoginSessionRevokeInterval.String(), "cleanupInterval", revokedAPIKeyCleanupInterval.String(), "deleteAfter", revokedAPIKeyPhysicalDeleteAfter.String())
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-revokeTicker.C:
+				revoked, err := s.Ma.Db.RevokeIdleLoginSessionsOlderThan(db.AuthSessionIdleTimeout)
+				if err != nil {
+					slog.Warn("Idle login session revocation failed", "err", err, "revoked", revoked)
+					continue
+				}
+				if revoked > 0 {
+					slog.Info("Idle login session revocation completed", "revoked", revoked)
+				}
+			case <-ticker.C:
+				deleted, err := s.Ma.Db.CleanupRevokedApiKeysOlderThan(revokedAPIKeyPhysicalDeleteAfter)
+				if err != nil {
+					slog.Warn("Revoked API key cleanup failed", "err", err, "deleted", deleted)
+					continue
+				}
+				if deleted > 0 {
+					slog.Info("Revoked API key cleanup completed", "deleted", deleted)
+				}
+			}
+		}
+	}()
 }
 
 // ＝＝＝＝＝＝＝＝＝＝＝＝＝＝　API 関数群  ＝＝＝＝＝＝＝＝＝＝＝＝＝＝

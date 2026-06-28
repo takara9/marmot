@@ -167,6 +167,205 @@ var _ = Describe("Auth", Ordered, func() {
 			Expect(err).To(HaveOccurred())
 		})
 
+		It("physically cleans up revoked API keys after threshold", func() {
+			targetUserID := userID
+			if targetUserID == "" {
+				targetUserID = "alice-cleanup"
+			}
+
+			if _, err := d.GetUserById(targetUserID); err != nil {
+				hash, hashErr := bcrypt.GenerateFromPassword([]byte("passw0rd"), bcrypt.DefaultCost)
+				Expect(hashErr).NotTo(HaveOccurred())
+				_, createErr := d.CreateUser(api.User{
+					ApiVersion: "v1",
+					Kind:       "User",
+					Metadata: api.Metadata{
+						Id:   targetUserID,
+						Name: targetUserID,
+					},
+					Spec: api.UserSpec{
+						Enabled:      true,
+						PasswordHash: util.StringPtr(string(hash)),
+					},
+				})
+				Expect(createErr).NotTo(HaveOccurred())
+			}
+
+			revokedKey, _, err := d.CreateUserApiKey(targetUserID, api.ApiKeyCreateRequest{
+				Comment: util.StringPtr("revoked-for-cleanup"),
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			activeKey, _, err := d.CreateUserApiKey(targetUserID, api.ApiKeyCreateRequest{
+				Comment: util.StringPtr("active-for-cleanup"),
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = d.DeleteUserApiKey(targetUserID, revokedKey.Metadata.Id)
+			Expect(err).NotTo(HaveOccurred())
+
+			deleted, err := d.CleanupRevokedApiKeysOlderThan(0)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(deleted).To(BeNumerically(">=", 1))
+
+			var removed api.ApiKey
+			_, err = d.GetJSON("/marmot/user-apikey/"+targetUserID+"/"+revokedKey.Metadata.Id, &removed)
+			Expect(err).To(HaveOccurred())
+
+			var kept api.ApiKey
+			_, err = d.GetJSON("/marmot/user-apikey/"+targetUserID+"/"+activeKey.Metadata.Id, &kept)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = d.DeleteUserApiKey(targetUserID, activeKey.Metadata.Id)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("invalidates login session API key after 30 minutes of inactivity", func() {
+			idleUserID := "idle-timeout-user"
+			if _, err := d.GetUserById(idleUserID); err != nil {
+				hash, hashErr := bcrypt.GenerateFromPassword([]byte("passw0rd"), bcrypt.DefaultCost)
+				Expect(hashErr).NotTo(HaveOccurred())
+				_, createErr := d.CreateUser(api.User{
+					ApiVersion: "v1",
+					Kind:       "User",
+					Metadata: api.Metadata{Id: idleUserID, Name: idleUserID},
+					Spec: api.UserSpec{
+						Enabled:      true,
+						PasswordHash: util.StringPtr(string(hash)),
+					},
+				})
+				Expect(createErr).NotTo(HaveOccurred())
+			}
+
+			sessionType := db.ApiKeySessionTypeLogin
+			key, raw, err := d.CreateUserApiKey(idleUserID, api.ApiKeyCreateRequest{Comment: util.StringPtr("idle-timeout"), SessionType: &sessionType})
+			Expect(err).NotTo(HaveOccurred())
+
+			storageKey := "/marmot/user-apikey/" + idleUserID + "/" + key.Metadata.Id
+			var rec api.ApiKey
+			resp, err := d.GetJSON(storageKey, &rec)
+			Expect(err).NotTo(HaveOccurred())
+			if rec.Status == nil {
+				rec.Status = &api.ApiKeyStatus{}
+			}
+			rec.Status.LastUsedAt = util.TimePtr(time.Now().Add(-31 * time.Minute))
+			err = d.PutJSONCAS(storageKey, resp.Kvs[0].ModRevision, rec)
+			Expect(err).NotTo(HaveOccurred())
+
+			_, _, err = d.AuthenticateApiKey(raw)
+			Expect(err).To(HaveOccurred())
+
+			var after api.ApiKey
+			_, err = d.GetJSON(storageKey, &after)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(after.Spec.Revoked).NotTo(BeNil())
+			Expect(*after.Spec.Revoked).To(BeFalse())
+			Expect(after.Status).NotTo(BeNil())
+			Expect(after.Status.RevokedAt).To(BeNil())
+
+			revoked, err := d.RevokeIdleLoginSessionsOlderThan(db.AuthSessionIdleTimeout)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(revoked).To(BeNumerically(">=", 1))
+
+			_, err = d.GetJSON(storageKey, &after)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(after.Spec.Revoked).NotTo(BeNil())
+			Expect(*after.Spec.Revoked).To(BeTrue())
+			Expect(after.Status).NotTo(BeNil())
+			Expect(after.Status.RevokedAt).NotTo(BeNil())
+		})
+
+		It("keeps login session API key valid before 30 minutes of inactivity", func() {
+			activeUserID := "idle-timeout-user-active"
+			if _, err := d.GetUserById(activeUserID); err != nil {
+				hash, hashErr := bcrypt.GenerateFromPassword([]byte("passw0rd"), bcrypt.DefaultCost)
+				Expect(hashErr).NotTo(HaveOccurred())
+				_, createErr := d.CreateUser(api.User{
+					ApiVersion: "v1",
+					Kind:       "User",
+					Metadata: api.Metadata{Id: activeUserID, Name: activeUserID},
+					Spec: api.UserSpec{
+						Enabled:      true,
+						PasswordHash: util.StringPtr(string(hash)),
+					},
+				})
+				Expect(createErr).NotTo(HaveOccurred())
+			}
+
+			sessionType := db.ApiKeySessionTypeLogin
+			key, raw, err := d.CreateUserApiKey(activeUserID, api.ApiKeyCreateRequest{Comment: util.StringPtr("idle-active"), SessionType: &sessionType})
+			Expect(err).NotTo(HaveOccurred())
+
+			storageKey := "/marmot/user-apikey/" + activeUserID + "/" + key.Metadata.Id
+			var rec api.ApiKey
+			resp, err := d.GetJSON(storageKey, &rec)
+			Expect(err).NotTo(HaveOccurred())
+			if rec.Status == nil {
+				rec.Status = &api.ApiKeyStatus{}
+			}
+			rec.Status.LastUsedAt = util.TimePtr(time.Now().Add(-29 * time.Minute))
+			err = d.PutJSONCAS(storageKey, resp.Kvs[0].ModRevision, rec)
+			Expect(err).NotTo(HaveOccurred())
+
+			_, _, err = d.AuthenticateApiKey(raw)
+			Expect(err).NotTo(HaveOccurred())
+
+			var after api.ApiKey
+			_, err = d.GetJSON(storageKey, &after)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(after.Spec.Revoked).NotTo(BeNil())
+			Expect(*after.Spec.Revoked).To(BeFalse())
+			Expect(after.Status).NotTo(BeNil())
+			Expect(after.Status.RevokedAt).To(BeNil())
+		})
+
+		It("does not revoke generated API keys when they are idle", func() {
+			persistentUserID := "idle-timeout-user-persistent"
+			if _, err := d.GetUserById(persistentUserID); err != nil {
+				hash, hashErr := bcrypt.GenerateFromPassword([]byte("passw0rd"), bcrypt.DefaultCost)
+				Expect(hashErr).NotTo(HaveOccurred())
+				_, createErr := d.CreateUser(api.User{
+					ApiVersion: "v1",
+					Kind:       "User",
+					Metadata: api.Metadata{Id: persistentUserID, Name: persistentUserID},
+					Spec: api.UserSpec{
+						Enabled:      true,
+						PasswordHash: util.StringPtr(string(hash)),
+					},
+				})
+				Expect(createErr).NotTo(HaveOccurred())
+			}
+
+			key, raw, err := d.CreateUserApiKey(persistentUserID, api.ApiKeyCreateRequest{Comment: util.StringPtr("generated-key")})
+			Expect(err).NotTo(HaveOccurred())
+
+			storageKey := "/marmot/user-apikey/" + persistentUserID + "/" + key.Metadata.Id
+			var rec api.ApiKey
+			resp, err := d.GetJSON(storageKey, &rec)
+			Expect(err).NotTo(HaveOccurred())
+			if rec.Status == nil {
+				rec.Status = &api.ApiKeyStatus{}
+			}
+			rec.Status.LastUsedAt = util.TimePtr(time.Now().Add(-2 * time.Hour))
+			err = d.PutJSONCAS(storageKey, resp.Kvs[0].ModRevision, rec)
+			Expect(err).NotTo(HaveOccurred())
+
+			_, _, err = d.AuthenticateApiKey(raw)
+			Expect(err).NotTo(HaveOccurred())
+
+			revoked, err := d.RevokeIdleLoginSessionsOlderThan(db.AuthSessionIdleTimeout)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(revoked).To(BeZero())
+
+			var after api.ApiKey
+			_, err = d.GetJSON(storageKey, &after)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(after.Spec.Revoked).NotTo(BeNil())
+			Expect(*after.Spec.Revoked).To(BeFalse())
+			Expect(after.Status).NotTo(BeNil())
+			Expect(after.Status.RevokedAt).To(BeNil())
+		})
+
 		It("locks and unlocks the user", func() {
 			err := d.LockUserById(userID)
 			Expect(err).NotTo(HaveOccurred())
@@ -251,6 +450,48 @@ var _ = Describe("Auth", Ordered, func() {
 			Expect(*updated.Spec.MustChangePassword).To(BeTrue())
 
 			err = d.DeleteUserById(legacyID)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("EnsureBootstrapAdmin seeds the default admin only on empty auth store", func() {
+			err := d.EnsureBootstrapAdmin()
+			Expect(err).NotTo(HaveOccurred())
+
+			admin, err := d.GetUserById(db.BootstrapAdminUserID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(admin.Spec.Enabled).To(BeTrue())
+			Expect(admin.Spec.PasswordHash).NotTo(BeNil())
+			Expect(admin.Spec.MustChangePassword).NotTo(BeNil())
+			Expect(*admin.Spec.MustChangePassword).To(BeTrue())
+			Expect(admin.Spec.Roles).NotTo(BeNil())
+			Expect(*admin.Spec.Roles).To(ContainElement(db.BootstrapAdminRoleName))
+
+			_, err = d.AuthenticateUser(db.BootstrapAdminUserID, db.BootstrapAdminPassword)
+			Expect(err).NotTo(HaveOccurred())
+
+			customHash, err := bcrypt.GenerateFromPassword([]byte("userpass1"), bcrypt.DefaultCost)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = d.CreateUser(api.User{
+				ApiVersion: "v1",
+				Kind:       "User",
+				Metadata: api.Metadata{Id: "bob", Name: "bob"},
+				Spec: api.UserSpec{
+					Enabled:      true,
+					PasswordHash: util.StringPtr(string(customHash)),
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = d.DeleteUserById(db.BootstrapAdminUserID)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = d.EnsureBootstrapAdmin()
+			Expect(err).NotTo(HaveOccurred())
+
+			_, err = d.GetUserById(db.BootstrapAdminUserID)
+			Expect(err).To(HaveOccurred())
+
+			err = d.DeleteUserById("bob")
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})

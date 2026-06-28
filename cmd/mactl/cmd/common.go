@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -74,7 +73,7 @@ func accessTokenPath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("could not determine home directory: %w", err)
 	}
-	return filepath.Join(home, ".marmot", "token"), nil
+	return home + "/.marmot-token", nil
 }
 
 // saveAccessToken saves the access token to a file
@@ -82,10 +81,6 @@ func saveAccessToken(token string) error {
 	tokenPath, err := accessTokenPath()
 	if err != nil {
 		return err
-	}
-	dir := filepath.Dir(tokenPath)
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return fmt.Errorf("failed to create token directory: %w", err)
 	}
 	if err := os.WriteFile(tokenPath, []byte(token), 0600); err != nil {
 		return fmt.Errorf("failed to save token: %w", err)
