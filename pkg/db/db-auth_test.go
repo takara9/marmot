@@ -188,5 +188,70 @@ var _ = Describe("Auth", Ordered, func() {
 			_, err = d.GetUserById(userID)
 			Expect(err).To(HaveOccurred())
 		})
+
+		It("preserves enabled=false on create", func() {
+			hash, err := bcrypt.GenerateFromPassword([]byte("passw0rd"), bcrypt.DefaultCost)
+			Expect(err).NotTo(HaveOccurred())
+
+			disabledID := "disabled-user"
+			created, err := d.CreateUser(api.User{
+				ApiVersion: "v1",
+				Kind:       "User",
+				Metadata: api.Metadata{
+					Id:   disabledID,
+					Name: disabledID,
+				},
+				Spec: api.UserSpec{
+					Enabled:      false,
+					PasswordHash: util.StringPtr(string(hash)),
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(created.Spec.Enabled).To(BeFalse())
+
+			got, err := d.GetUserById(disabledID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(got.Spec.Enabled).To(BeFalse())
+
+			err = d.DeleteUserById(disabledID)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("SetUserPasswordHash initializes nil status safely", func() {
+			hash, err := bcrypt.GenerateFromPassword([]byte("passw0rd"), bcrypt.DefaultCost)
+			Expect(err).NotTo(HaveOccurred())
+
+			legacyID := "legacy-user"
+			legacy := api.User{
+				ApiVersion: "v1",
+				Kind:       "User",
+				Metadata: api.Metadata{
+					Id:   legacyID,
+					Name: legacyID,
+				},
+				Spec: api.UserSpec{
+					Enabled:      true,
+					PasswordHash: util.StringPtr(string(hash)),
+				},
+				Status: nil,
+			}
+			err = d.PutJSON("/marmot/user/"+legacyID, legacy)
+			Expect(err).NotTo(HaveOccurred())
+
+			newHash, err := bcrypt.GenerateFromPassword([]byte("newpassw0rd"), bcrypt.DefaultCost)
+			Expect(err).NotTo(HaveOccurred())
+			err = d.SetUserPasswordHash(legacyID, string(newHash), util.BoolPtr(true))
+			Expect(err).NotTo(HaveOccurred())
+
+			updated, err := d.GetUserById(legacyID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(updated.Status).NotTo(BeNil())
+			Expect(updated.Status.PasswordUpdatedAt).NotTo(BeNil())
+			Expect(updated.Spec.MustChangePassword).NotTo(BeNil())
+			Expect(*updated.Spec.MustChangePassword).To(BeTrue())
+
+			err = d.DeleteUserById(legacyID)
+			Expect(err).NotTo(HaveOccurred())
+		})
 	})
 })
