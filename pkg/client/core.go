@@ -27,11 +27,12 @@ func NewMarmot(nodeName string, etcdUrl string) (*MarmotClient, error) {
 }
 
 type MarmotEndpoint struct {
-	Scheme   string // Scheme for the endpoint, e.g., "http" or "https".
-	HostPort string
-	BasePath string       // Base path for the API, e.g., "/api/v1".
+	Scheme                string // Scheme for the endpoint, e.g., "http" or "https".
+	HostPort              string
+	BasePath              string // Base path for the API, e.g., "/api/v1".
 	InsecureSkipTLSVerify bool
-	Client   *http.Client // Specialized client.
+	AccessToken           string
+	Client                *http.Client // Specialized client.
 }
 
 func NewMarmotdEp(schame string, address string, basePath string, timeout int, insecureSkipTLSVerify bool) (*MarmotEndpoint, error) {
@@ -46,11 +47,11 @@ func NewMarmotdEp(schame string, address string, basePath string, timeout int, i
 	}
 
 	return &MarmotEndpoint{
-		Scheme:   scheme,
-		HostPort: address,
-		BasePath: basePath,
+		Scheme:                scheme,
+		HostPort:              address,
+		BasePath:              basePath,
 		InsecureSkipTLSVerify: insecureSkipTLSVerify,
-		Client:   &http.Client{Transport: tr, Timeout: time.Duration(timeout) * time.Second},
+		Client:                &http.Client{Transport: tr, Timeout: time.Duration(timeout) * time.Second},
 	}, nil
 }
 
@@ -81,6 +82,9 @@ func (m *MarmotEndpoint) httpRequest2(req *http.Request) ([]byte, *url.URL, erro
 	req.Header.Set("User-Agent", "MarmotdClient/1.0")
 	if strings.TrimSpace(req.Header.Get("Content-Type")) == "" {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	if token := strings.TrimSpace(m.AccessToken); token != "" && strings.TrimSpace(req.Header.Get("Authorization")) == "" {
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
 	resp, err := m.Client.Do(req)
