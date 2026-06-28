@@ -98,6 +98,8 @@ var _ = Describe("Auth API handlers", Ordered, func() {
 
 	It("supports login, me, and logout flow", func() {
 		loginResp := login("admin", "passw0rd")
+		Expect(loginResp.User).NotTo(BeNil())
+		Expect(loginResp.User.Spec.PasswordHash).To(BeNil())
 		token := loginResp.AccessToken
 
 		meCtx, meRec := newContext(http.MethodGet, "/auth/me", "", token)
@@ -119,6 +121,18 @@ var _ = Describe("Auth API handlers", Ordered, func() {
 		err = s.ApiAuthMe(meCtx2)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(meRec2.Code).To(Equal(http.StatusUnauthorized))
+	})
+
+	It("returns uniform unauthorized for unknown user and bad password", func() {
+		unknownCtx, unknownRec := newContext(http.MethodPost, "/auth/login", `{"userId":"nouser","password":"passw0rd"}`, "")
+		err := s.ApiAuthLogin(unknownCtx)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(unknownRec.Code).To(Equal(http.StatusUnauthorized), unknownRec.Body.String())
+
+		badPassCtx, badPassRec := newContext(http.MethodPost, "/auth/login", `{"userId":"admin","password":"wrongpass"}`, "")
+		err = s.ApiAuthLogin(badPassCtx)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(badPassRec.Code).To(Equal(http.StatusUnauthorized), badPassRec.Body.String())
 	})
 
 	It("supports user CRUD, role assignment, and password policy", func() {

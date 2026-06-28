@@ -33,6 +33,16 @@ func mapAuthDBError(ctx echo.Context, err error) error {
 	}
 }
 
+func mapLoginError(ctx echo.Context, err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, db.ErrNotFound) || errors.Is(err, db.ErrInvalidCredentials) {
+		return apiErrorJSON(ctx, http.StatusUnauthorized, db.ErrInvalidCredentials.Error())
+	}
+	return mapAuthDBError(ctx, err)
+}
+
 func bearerTokenFromAuthzHeader(authz string) (string, bool) {
 	a := strings.TrimSpace(authz)
 	if a == "" {
@@ -88,17 +98,20 @@ func (s *Server) ApiAuthLogin(ctx echo.Context) error {
 
 	user, err := s.Ma.Db.AuthenticateUser(userID, password)
 	if err != nil {
-		return mapAuthDBError(ctx, err)
+		return mapLoginError(ctx, err)
 	}
 	apiKey, rawToken, err := s.Ma.Db.CreateUserApiKey(userID, api.ApiKeyCreateRequest{Comment: util.StringPtr("login-session")})
 	if err != nil {
 		return mapAuthDBError(ctx, err)
 	}
 
+	responseUser := user
+	responseUser.Spec.PasswordHash = nil
+
 	resp := api.AuthLoginResponse{
 		AccessToken: rawToken,
 		TokenType:   "Bearer",
-		User:        &user,
+		User:        &responseUser,
 	}
 	if user.Spec.MustChangePassword != nil {
 		resp.MustChangePassword = user.Spec.MustChangePassword
