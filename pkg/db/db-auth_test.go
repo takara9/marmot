@@ -454,7 +454,21 @@ var _ = Describe("Auth", Ordered, func() {
 		})
 
 		It("EnsureBootstrapAdmin seeds the default admin only on empty auth store", func() {
-			err := d.EnsureBootstrapAdmin()
+			users, err := d.ListUsers()
+			Expect(err).NotTo(HaveOccurred())
+			for _, u := range users {
+				id := u.Metadata.Id
+				if id == "" {
+					id = u.Metadata.Name
+				}
+				if id == "" {
+					continue
+				}
+				err = d.DeleteUserById(id)
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			err = d.EnsureBootstrapAdmin()
 			Expect(err).NotTo(HaveOccurred())
 
 			admin, err := d.GetUserById(db.BootstrapAdminUserID)
