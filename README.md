@@ -21,6 +21,7 @@ Marmotは、プライベートクラウド運用をよりシンプルにし、In
 
 
 ## 技術的特徴
+**marmot**に実装した魅力的な特徴を以下に列挙します。この複合的で統合された環境を**marmot**をインストールすることで手に入れることができます。
 
 - **YAML ベースの宣言的構成** — サーバー・ネットワーク・ボリュームをファイル一枚で定義
 - **OpenAPI v3 REST API** — `marmotd` サーバーを API で完全制御
@@ -41,45 +42,10 @@ Marmotは、プライベートクラウド運用をよりシンプルにし、In
 - **ゲストOS Ubuntu Linux 22.04/24.04, Alpine Linux 3.23 サポート**
 - **ホストOS Ubuntu 24.04 サポート**
 
-## コンポーネント
 
-| コンポーネント | 説明 |
-|---|---|
-| `marmotd` | ハイパーバイザーノード上で動作するデーモン。LibVirt / LVM / OVN(OVS) を操作して VM を管理する |
-| `mactl` | CLI クライアント。YAML ファイルまたは URL を指定してサーバー・ネットワーク・ボリュームを操作する |
-| `maadm` | 管理者向け補助ツール（開発途上） |
 
 ## クイックスタート
-
-### 仮想サーバーの作成
-
-仮想サーバーを起動するためのマニフェスト
-
-```yaml
-apiVersion: v1
-kind: Server
-metadata:
-    name: server-20
-    comment: marmotホストが繋がるネットワークに接続する仮想サーバー
-spec:
-    cpu: 1
-    memory: 1024
-    osVariant: ubuntu24.04
-    auth: # 利用者の公開鍵に変更してください。
-        url: https://github.com/takara9.keys
-    networkInterface:
-        - networkname: host-bridge  # marmot のサーバーが接続されるネットワーク
-          address: 192.168.1.20     # IPアドレスを手動設定（IPアドレスの重複使用に注意)
-          netmasklen: 24            # ネットマスク
-          routes:                   # デフォルトGW ルーターのアドレスを指定
-            - to: default
-              via: 192.168.1.1
-          nameservers:              # DNSサーバー
-            addresses:
-                - 192.168.1.9       # ローカル環境のDNSサーバー
-            search:                 # ドメイン名を省略可能なドメインをセット
-                - labo.local
-```
+インストールして利用する前に、このパートで使用体験を感じてみてください。
 
 ### ログイン
 
@@ -119,27 +85,64 @@ Successfully logged out
 
 ### 仮想サーバーの作成
 
-次のKubernetesライクなコマンドで、仮想サーバーを起動
+仮想サーバーを起動するためのマニフェストを準備します。
+
+```yaml
+apiVersion: v1
+kind: Server
+metadata:
+    name: server-20
+    comment: marmotホストが繋がるネットワークに接続する仮想サーバー
+spec:
+    cpu: 1
+    memory: 1024
+    osVariant: ubuntu24.04
+    auth: # 利用者の公開鍵に変更してください。
+        url: https://github.com/takara9.keys
+    networkInterface:
+        - networkname: host-bridge  # marmot のサーバーが接続されるネットワーク
+          address: 192.168.1.20     # IPアドレスを手動設定（IPアドレスの重複使用に注意)
+          netmasklen: 24            # ネットマスク
+          routes:                   # デフォルトGW ルーターのアドレスを指定
+            - to: default
+              via: 192.168.1.1
+          nameservers:              # 仮想サーバーが参照するDNSサーバー
+            addresses:
+                - 8.8.8.8
+            search:                 # ドメイン名を省略可能なドメインをセット
+                - labo.local
+```
+
+### 仮想サーバーの作成
+
+次のKubernetesライクなコマンドで、仮想サーバーを起動できます。
+環境により、しばらく時間が必要なことがあります。
 
 ```console
+# サーバーの作成
 $ mactl create -f server-20.yaml 
-リソースの作成要求が受け入れられました。ID: 9451a
 
-$ mactl get srv
+# 起動の確認
+$ mactl get server
 NAME             NODE          STATUS        CPU  RAM(MB)  IP-ADDRESS       NETWORK          AGE
 ----             ----          ------        ---  -------  ----------       -------          ---
 server-20        marmot3       RUNNING       1    1024     192.168.1.20     host-bridge      5s
 
+# sshでのログイン
 $ ssh 192.168.1.20
 ubuntu@server-20:~$ 
+
+# サーバーの削除
+$ mactl delete server server-20
 ```
+
 
 ## インストール
 
 ### 必要最小条件
 - Ubuntu Linux 24.04 がインストールされていること。
 - ルート`/`ファイルシステムが、3G程度空いていること。 marmotが依存モジュール 1.2GBほどが、インストールされます。
-- `/var/lib/marmot` が、100GB程度の空きがあること。（OSイメージ取得で約2GB、１台の仮想マシン起動で16GBを消費します。
+- `/var/lib/marmot` が、30GB程度の空きがあること。（OSイメージ取得で約2GB、１台の仮想マシン起動で16GBを消費します。
 
 
 ### deb パッケージのインストール
@@ -153,8 +156,12 @@ VERSION=0.25.1
 curl -OL https://github.com/takara9/marmot/releases/download/v${VERSION}/marmot_v${VERSION}_amd64.deb
 sudo apt install -y ./marmot_v${VERSION}_amd64.deb
 ```
-インストール完了後に、`/etc/marmot/marmotd.json`を編集して、`systemctl restart marmot` を実行します。
-シングル構成時は、以下の２箇所に注意してください。
+
+### marmotdの設定ファイルの編集
+
+marmotd は、`/etc/marmot/matmotd.json` を読み込んで起動します。
+デフォルト設定では、動作しないケースがありますので、インストール完了後に、`/etc/marmot/marmotd.json`を編集して、`systemctl restart marmot` を実行します。シングル構成時は、以下の２箇所に注意してください。
+
 
 ```json
 # cat marmotd.json 
@@ -171,12 +178,61 @@ sudo apt install -y ./marmot_v${VERSION}_amd64.deb
 以下省略
 ```
 
-
+インストールが完了したら、ダウンロードしたファイルは消しておくのがお勧めです。
 ```console
 sudo rm -f ./marmot_v${VERSION}_amd64.deb
 ```
 
+### クライアント側の設定ファイル
+
+mactl コマンドは、ホームディレクトリの`.marmot`ファイルから、接続先とプロトコルを選択して marmotd と連携します。
+`mactl version` を実行することで、初期設定の入った`.marmot`が作成されるので、編集して利用してください。
+
+```yaml
+current: 0
+endpoints:
+  - http://localhost:8750        # marmotd が、TLS暗号化が有効なっていれば https に変更する
+insecure-skip-tls-verify: false  # サーバーの証明書が、自己証明書（オレオレ証明書）の場合は、tureにする。
+```
+
+実行結果に、Serverのバージョンが表示されれば、サーバーと正しく通信できていることになります。
+
+```console
+$ mactl vesion
+Server version = 0.25.0
+Client version = 0.25.0
+```
+
+## チュートリアル
+はじめて **marmot** を利用する方は、チュートリアルから始めるのがお勧めです。
+基本操作を把握できる 30分コースと、じっくり楽しめる2時間コースを用意しています。
+
+- [Marmot Tutorial](https://github.com/takara9/marmot-manifests/blob/main/TUTORIAL.md)
+
+
+## 活用例
+**marmot** の利用法を確認できるマニフェスト集もあります。このマニフェスト集から、順番を選んでチュートリアルを作成しました。
+
+- [marmotマニフェスト集](https://github.com/takara9/marmot-manifests)
+
+
+## リファレンスマニュアル
+コマンドとサブコマンド、オプションについての知りたい時は、リファレンスマニュアルをお勧めします。
+
+- [Command Reference](https://github.com/takara9/marmot-manifests/blob/main/COMMAND_REFERENCE.md)
+
+
+## コンポーネント
+
+| コンポーネント | 説明 |
+|---|---|
+| `marmotd` | ハイパーバイザーノード上で動作するデーモン。LibVirt / LVM / OVN(OVS) を操作して VM を管理する |
+| `mactl` | CLI クライアント。YAML ファイルまたは URL を指定してサーバー・ネットワーク・ボリュームを操作する |
+| `maadm` | 管理者向け補助ツール（改修中のため使用は非推奨） |
+
+
 ## 主な利用技術
+**marmot**は、複数のOSS技術を利用して構成されています。現在、使用しているOSS技術を以下に列挙します。
 
 - [KVM / QEMU](https://www.linux-kvm.org/) — 仮想化
 - [LibVirt](https://libvirt.org/) — VM ライフサイクル管理
@@ -184,16 +240,11 @@ sudo rm -f ./marmot_v${VERSION}_amd64.deb
 - [etcd](https://etcd.io/) — 分散 KV ストア（クラスター状態管理）
 - [LVM](https://sourceware.org/lvm2/) — 論理ボリューム管理
 - [open-iscsi / targetcli](https://github.com/open-iscsi/open-iscsi) — iSCSI ネットワークブロックストレージ
-
-## 活用例
-
-- [marmotマニフェスト集](https://github.com/takara9/marmot-manifests)
-
-## チュートリアル
-- [Marmot Tutorial](https://github.com/takara9/marmot-manifests/blob/main/TUTORIAL.md)
-
-## リファレンスマニュアル
-- [Command Reference](https://github.com/takara9/marmot-manifests/blob/main/COMMAND_REFERENCE.md)
+- [OpenTelemetry](https://opentelemetry.io/ja/) — 可観測性のためのメトリックス公開、ログ送信のために使用
+- [Geneve protocl](https://www.redhat.com/ja/blog/what-geneve) — marmotdをクラスタ構成に使用するオーバーレイ・ネットワークに使用します。
+- [OpenVPN](https://openvpn.net/) — marmotd が管理するプライベートネットワークにセキュアに接続するために使用します。 
+- [Go言語](https://go.dev/) — **marmot**は、Go言語で書かれています。
+- [Ansible](https://docs.ansible.com/) — **mactl**コマンドは、Ansibleと連携して、起動した仮想サーバーをセットアップします。
 
 ## ライセンス
 
