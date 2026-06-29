@@ -7,6 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/util"
+	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/term"
 )
 
@@ -48,6 +50,11 @@ var userAddCmd = &cobra.Command{
 			return fmt.Errorf("password cannot be empty")
 		}
 
+		passwordHash, err := passwordHashFromPlain(passwdStr)
+		if err != nil {
+			return err
+		}
+
 		enabled := true
 		user := api.User{
 			ApiVersion: "v1",
@@ -56,7 +63,8 @@ var userAddCmd = &cobra.Command{
 				Name: userID,
 			},
 			Spec: api.UserSpec{
-				Enabled: enabled,
+				Enabled:      enabled,
+				PasswordHash: util.StringPtr(passwordHash),
 			},
 		}
 
@@ -81,6 +89,14 @@ var userAddCmd = &cobra.Command{
 		}
 		return nil
 	},
+}
+
+func passwordHashFromPlain(password string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", fmt.Errorf("failed to hash password: %w", err)
+	}
+	return string(hash), nil
 }
 
 func init() {

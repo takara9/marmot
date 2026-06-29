@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 func TestExtractResponseIDPrefersMetadataID(t *testing.T) {
@@ -97,4 +99,20 @@ func captureStdoutForIDTest(t *testing.T, fn func()) string {
 	}
 	_ = r.Close()
 	return buf.String()
+}
+
+func TestPasswordHashFromPlain(t *testing.T) {
+	hash, err := passwordHashFromPlain("lemon123")
+	if err != nil {
+		t.Fatalf("passwordHashFromPlain returned error: %v", err)
+	}
+	if hash == "" {
+		t.Fatalf("passwordHashFromPlain returned empty hash")
+	}
+	if hash == "lemon123" {
+		t.Fatalf("passwordHashFromPlain returned plaintext instead of hash")
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte("lemon123")); err != nil {
+		t.Fatalf("generated hash does not match original password: %v", err)
+	}
 }

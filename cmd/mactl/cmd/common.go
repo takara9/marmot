@@ -35,7 +35,12 @@ func deletionMarker(status *api.Status) string {
 //  1. --api フラグで明示指定された URL または .marmot ファイルパス
 //  2. $HOME/.marmot に登録されたアクティブエンドポイント
 func getClientConfig() (*client.MarmotEndpoint, error) {
-	return config.GetClientConfig2(apiConfigFilename)
+	m, err := config.GetClientConfig2(apiConfigFilename)
+	if err != nil {
+		return nil, err
+	}
+	_ = loadTokenForEndpoint(m) // best-effort; token file may not exist yet
+	return m, nil
 }
 
 // clearScreen はターミナル画面をクリアする。

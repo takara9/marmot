@@ -212,4 +212,47 @@ var _ = Describe("Auth API handlers", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(delRec.Code).To(Equal(http.StatusNoContent), delRec.Body.String())
 	})
+
+	It("enforces role-based access on registered routes", func() {
+		adminToken := login("admin", "passw0rd").AccessToken
+
+		viewerHash, err := bcrypt.GenerateFromPassword([]byte("viewerpass1"), bcrypt.DefaultCost)
+		Expect(err).NotTo(HaveOccurred())
+		_, err = d.CreateUser(api.User{
+			ApiVersion: "v1",
+			Kind:       "User",
+			Metadata: api.Metadata{Id: "viewer1", Name: "viewer1"},
+			Spec: api.UserSpec{
+				Enabled:      true,
+				PasswordHash: util.StringPtr(string(viewerHash)),
+				Roles:        &[]string{"Viewer"},
+			},
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		viewerToken := login("viewer1", "viewerpass1").AccessToken
+
+		router := echo.New()
+		marmotd.RegisterRoutes(router, s, "/api/v1")
+
+		createReq := httptest.NewRequest(http.MethodPost, "/api/v1/users", strings.NewReader(`{"apiVersion":"v1","kind":"User","metadata":{"id":"blocked","name":"blocked"},"spec":{"enabled":true,"passwordHash":"dummy"}}`))
+		createReq.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		createReq.Header.Set("Authorization", "Bearer "+viewerToken)
+		createRec := httptest.NewRecorder()
+		router.ServeHTTP(createRec, createReq)
+		Expect(createRec.Code).To(Equal(http.StatusForbidden), createRec.Body.String())
+
+		passReq := httptest.NewRequest(http.MethodPost, "/api/v1/users/viewer1/password", strings.NewReader(`{"newPassword":"viewerpass2"}`))
+		passReq.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		passReq.Header.Set("Authorization", "Bearer "+viewerToken)
+		passRec := httptest.NewRecorder()
+		router.ServeHTTP(passRec, passReq)
+		Expect(passRec.Code).To(Equal(http.StatusNoContent), passRec.Body.String())
+
+		cleanupReq := httptest.NewRequest(http.MethodDelete, "/api/v1/users/viewer1", nil)
+		cleanupReq.Header.Set("Authorization", "Bearer "+adminToken)
+		cleanupRec := httptest.NewRecorder()
+		router.ServeHTTP(cleanupRec, cleanupReq)
+		Expect(cleanupRec.Code).To(Equal(http.StatusNoContent), cleanupRec.Body.String())
+	})
 })
