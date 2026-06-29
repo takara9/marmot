@@ -33,6 +33,11 @@ Marmotは、プライベートクラウド運用をよりシンプルにし、In
 - **ノードセレクター** — marmotクラスタ環境では、複数のMarmotノードから指定ノードへVMを 配置制御可能
 - **etcd による状態管理** — Kubernetesで実績のあるetcdを利用し、クラスター全体の状態を安全かつ一貫性のある形で管理します。
 - **内部 DNS** — VM に対する名前解決を自動提供
+- **OpenVPN ゲートウェイ** — VPN Gateway リソースで、PCとVM用プライベートネットワーク間を暗号化接続
+- **Application Load Balancer** — HAProxy ベースの L7 ロードバランサーを VM として自動デプロイ
+- **Network Load Balancer** — iptables ベースの L4 ロードバランサーで仮想ネットワーク内トラフィックを分散
+- **OpenTelemetry メトリクス** — Prometheus エクスポーターによる可観測性を標準提供, Loki へのログ転送も標準装備
+- **RBAC によるアクセス制御** — Administrator / Compute-Operator / Viewer などのロールベースで API 操作を制限
 - **ゲストOS Ubuntu Linux 22.04/24.04, Alpine Linux 3.23 サポート**
 - **ホストOS Ubuntu 24.04 サポート**
 
@@ -42,7 +47,7 @@ Marmotは、プライベートクラウド運用をよりシンプルにし、In
 |---|---|
 | `marmotd` | ハイパーバイザーノード上で動作するデーモン。LibVirt / LVM / OVN(OVS) を操作して VM を管理する |
 | `mactl` | CLI クライアント。YAML ファイルまたは URL を指定してサーバー・ネットワーク・ボリュームを操作する |
-| `maadm` | 管理者向け補助ツール |
+| `maadm` | 管理者向け補助ツール（開発途上） |
 
 ## クイックスタート
 
@@ -76,6 +81,44 @@ spec:
                 - labo.local
 ```
 
+### ログイン
+
+`marmotd` への接続は認証が必要です。初期管理者アカウント（`admin`）でログインします。
+インストール直後のパスワードは、`passw0rd`ですので、下記の手順で変更してください。
+
+```console
+$ mactl login admin
+Password: ＜パスワードを入力＞
+Successfully logged in as admin
+⚠️  You must change your password before using other commands.
+   Run: mactl passwd
+```
+
+初回ログイン時はパスワード変更を求められます。`mactl passwd` で変更してください。
+
+```console
+$ mactl passwd
+Current Password: ＜現在のパスワードを入力＞
+New Password:     ＜新しいパスワードを入力（英数字 8 文字以上）＞
+```
+
+ログイン中のユーザー情報は `mactl whoami` で確認できます。
+
+```console
+$ mactl whoami
+User:  admin
+Roles: [Administrator]
+```
+
+セッションを終了するときは `mactl logout` を実行します。
+
+```console
+$ mactl logout
+Successfully logged out
+```
+
+### 仮想サーバーの作成
+
 次のKubernetesライクなコマンドで、仮想サーバーを起動
 
 ```console
@@ -94,7 +137,7 @@ ubuntu@server-20:~$
 ## インストール
 
 ### 必要最小条件
-- Ubuntu Linux 24.06 がインストールされていること。
+- Ubuntu Linux 24.04 がインストールされていること。
 - ルート`/`ファイルシステムが、3G程度空いていること。 marmotが依存モジュール 1.2GBほどが、インストールされます。
 - `/var/lib/marmot` が、100GB程度の空きがあること。（OSイメージ取得で約2GB、１台の仮想マシン起動で16GBを消費します。
 
@@ -106,11 +149,11 @@ ubuntu@server-20:~$
 ```console
 cd /tmp
 apt-get update
-VERSION=0.23.0
+VERSION=0.25.1
 curl -OL https://github.com/takara9/marmot/releases/download/v${VERSION}/marmot_v${VERSION}_amd64.deb
 sudo apt install -y ./marmot_v${VERSION}_amd64.deb
 ```
-インストール完了後に、`/etc/marmot/marmotd.json`を編集して、`systemctl restart mamort` を実行します。
+インストール完了後に、`/etc/marmot/marmotd.json`を編集して、`systemctl restart marmot` を実行します。
 シングル構成時は、以下の２箇所に注意してください。
 
 ```json
