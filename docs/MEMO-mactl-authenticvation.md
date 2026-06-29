@@ -28,6 +28,7 @@
 - `mactl login USER-ID` ログイン、他ユーザーでログインしている時は、ログインが成功すると既存セッションはログアウトする
 - `mactl whoami` 自分のユーザーIDとロールを表示、`mactl role` のエリアス
 - `mactl role` 自身に付与されたロールのリスト表示
+- `mactl role list` 組み込みロール一覧の表示
 - `mactl logout`
 - `mactl passwd` ユーザーのパスワード変更用
 - `mactl user generate-apikey --comment TEXT` APIキーを生成する。コメントは任意
@@ -44,7 +45,6 @@
 - `mactl user delete USER-ID` USER-IDの削除
 - `mactl user set-passwd USER-ID --passwd PASSWORD` USER-IDのパスワード再セット用
 - `mactl user lock USER-ID` ユーザーの使用を停止する。ユーザーのAPIキーも同様に無効化される。
-- `mactl role list` 組み込みロール一覧の表示
 - `mactl user list` ユーザー一覧の表示、表示列: USER-ID / ENABLED / ROLE / AGE
 
 ### ユーザーがパスワードをロスした時の処理
@@ -53,6 +53,9 @@
 
 ## 認可
 - ユーザーは、割当られたロールで、コマンドを実行する権限が与えられる RBAC方式を採用する。
+- `/authz/check` は、`userId` 未指定時は認証済みの自ユーザーを照会対象とする。
+- `/authz/check` で `userId` を指定する場合、照会可能なのは「自ユーザー」または `Administrator` ロールのみとする。
+- `Administrator` 以外が他ユーザーを指定して照会した場合は、`403 forbidden` を返す。
 - ロールには、以下の種類と権限がある。
     - Administrator
         - Server: 作成, 参照, 更新, 削除

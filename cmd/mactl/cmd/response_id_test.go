@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 func TestExtractResponseIDPrefersMetadataID(t *testing.T) {
@@ -97,4 +99,50 @@ func captureStdoutForIDTest(t *testing.T, fn func()) string {
 	}
 	_ = r.Close()
 	return buf.String()
+}
+
+func TestPasswordHashFromPlain(t *testing.T) {
+	hash, err := passwordHashFromPlain("lemon123")
+	if err != nil {
+		t.Fatalf("passwordHashFromPlain returned error: %v", err)
+	}
+	if hash == "" {
+		t.Fatalf("passwordHashFromPlain returned empty hash")
+	}
+	if hash == "lemon123" {
+		t.Fatalf("passwordHashFromPlain returned plaintext instead of hash")
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte("lemon123")); err != nil {
+		t.Fatalf("generated hash does not match original password: %v", err)
+	}
+}
+
+func TestValidateUserAddPasswordPolicy(t *testing.T) {
+	tests := []struct {
+		name        string
+		password    string
+		wantErrText string
+	}{
+		{name: "accepts alphanumeric length 8", password: "lemon123"},
+		{name: "rejects short password", password: "abc123", wantErrText: "at least 8 characters"},
+		{name: "rejects non alphanumeric", password: "lemon123!", wantErrText: "alphanumeric"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateUserAddPasswordPolicy(tt.password)
+			if tt.wantErrText == "" {
+				if err != nil {
+					t.Fatalf("validateUserAddPasswordPolicy(%q) unexpected error: %v", tt.password, err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("validateUserAddPasswordPolicy(%q) expected error containing %q", tt.password, tt.wantErrText)
+			}
+			if !strings.Contains(err.Error(), tt.wantErrText) {
+				t.Fatalf("validateUserAddPasswordPolicy(%q) error = %q, want contains %q", tt.password, err.Error(), tt.wantErrText)
+			}
+		})
+	}
 }

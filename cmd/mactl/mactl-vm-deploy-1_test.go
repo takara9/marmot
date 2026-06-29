@@ -18,6 +18,7 @@ import (
 var _ = Describe("MarmotdTest", Ordered, func() {
 	var mockServer *mockServerHandle
 	var containerID string
+	var testHomeDir string
 
 	BeforeAll(func(specCtx SpecContext) {
 		opts := &slog.HandlerOptions{
@@ -27,13 +28,15 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
 		slog.SetDefault(logger)
 		cleanupTestEnvironment()
+		var err error
+		testHomeDir, err = setupMactlTestHome()
+		Expect(err).NotTo(HaveOccurred())
 		if err := ensureMactlTestBinary(); err != nil {
 			Fail(fmt.Sprintf("Failed to build mactl test binary: %v", err))
 		}
 
 		By("モックサーバー用etcdの起動")
 		var etcdEp string
-		var err error
 		containerID, etcdEp, err = startEtcdContainer()
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to start container: %v", err))
@@ -43,6 +46,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 		By("モックサーバーの起動")
 		mockServer, err = startMockServer(etcdEp)
 		Expect(err).NotTo(HaveOccurred())
+		Expect(loginAsAdmin()).NotTo(HaveOccurred())
 	})
 
 	AfterAll(func(specCtx SpecContext) {
@@ -56,6 +60,9 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 		_, err = cmd.CombinedOutput()
 		if err != nil {
 			fmt.Printf("Failed to remove container: %v\n", err)
+		}
+		if strings.TrimSpace(testHomeDir) != "" {
+			_ = os.RemoveAll(testHomeDir)
 		}
 		os.Remove("bin/mactl-test")
 		os.Remove("/var/actions-runner/_work/marmot/marmot/cmd/mactl/bin/mactl-test")

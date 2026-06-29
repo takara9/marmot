@@ -46,6 +46,27 @@ func ensureMactlTestBinary() error {
 	return nil
 }
 
+func loginAsAdmin() error {
+	cmd := exec.Command("sh", "-lc", "printf 'passw0rd\n' | script -qec './bin/mactl-test --api testdata/.marmot login admin' /dev/null")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to login as admin: %w (output=%s)", err, string(output))
+	}
+	return nil
+}
+
+func setupMactlTestHome() (string, error) {
+	homeDir, err := os.MkdirTemp("", "mactl-home-")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp HOME: %w", err)
+	}
+	if err := os.Setenv("HOME", homeDir); err != nil {
+		_ = os.RemoveAll(homeDir)
+		return "", fmt.Errorf("failed to set HOME: %w", err)
+	}
+	return homeDir, nil
+}
+
 func startEtcdContainer() (string, string, error) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
