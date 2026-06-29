@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -64,4 +65,65 @@ func runList(fn func() error) error {
 		case <-time.After(time.Duration(watchInterval) * time.Second):
 		}
 	}
+}
+
+// accessTokenPath returns the path to the access token file
+func accessTokenPath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("could not determine home directory: %w", err)
+	}
+	return home + "/.marmot-token", nil
+}
+
+// saveAccessToken saves the access token to a file
+func saveAccessToken(token string) error {
+	tokenPath, err := accessTokenPath()
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(tokenPath, []byte(token), 0600); err != nil {
+		return fmt.Errorf("failed to save token: %w", err)
+	}
+	return nil
+}
+
+// loadAccessToken loads the access token from file
+func loadAccessToken() (string, error) {
+	tokenPath, err := accessTokenPath()
+	if err != nil {
+		return "", err
+	}
+	data, err := os.ReadFile(tokenPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", fmt.Errorf("failed to read token: %w", err)
+	}
+	return strings.TrimSpace(string(data)), nil
+}
+
+// clearAccessToken removes the access token file
+func clearAccessToken() error {
+	tokenPath, err := accessTokenPath()
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(tokenPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to clear token: %w", err)
+	}
+	return nil
+}
+
+// loadTokenForEndpoint loads and sets the access token for the endpoint
+func loadTokenForEndpoint(m *client.MarmotEndpoint) error {
+	token, err := loadAccessToken()
+	if err != nil {
+		return err
+	}
+	if token != "" {
+		m.SetAccessToken(token)
+	}
+	return nil
 }

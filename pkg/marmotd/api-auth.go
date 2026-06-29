@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
@@ -100,7 +101,8 @@ func (s *Server) ApiAuthLogin(ctx echo.Context) error {
 	if err != nil {
 		return mapLoginError(ctx, err)
 	}
-	apiKey, rawToken, err := s.Ma.Db.CreateUserApiKey(userID, api.ApiKeyCreateRequest{Comment: util.StringPtr("login-session")})
+	sessionType := db.ApiKeySessionTypeLogin
+	apiKey, rawToken, err := s.Ma.Db.CreateUserApiKey(userID, api.ApiKeyCreateRequest{Comment: util.StringPtr("login-session"), SessionType: &sessionType})
 	if err != nil {
 		return mapAuthDBError(ctx, err)
 	}
@@ -116,11 +118,15 @@ func (s *Server) ApiAuthLogin(ctx echo.Context) error {
 	if user.Spec.MustChangePassword != nil {
 		resp.MustChangePassword = user.Spec.MustChangePassword
 	}
-	if apiKey.Spec.ExpiresAt != nil && apiKey.Spec.IssuedAt != nil {
-		expiresIn := int64(apiKey.Spec.ExpiresAt.Sub(*apiKey.Spec.IssuedAt).Seconds())
-		if expiresIn > 0 {
-			resp.ExpiresIn = &expiresIn
+	idleExpiresIn := int64(db.AuthSessionIdleTimeout.Seconds())
+	if apiKey.Spec.ExpiresAt != nil {
+		remaining := int64(time.Until(*apiKey.Spec.ExpiresAt).Seconds())
+		if remaining > 0 && remaining < idleExpiresIn {
+			idleExpiresIn = remaining
 		}
+	}
+	if idleExpiresIn > 0 {
+		resp.ExpiresIn = &idleExpiresIn
 	}
 	ctx.Response().Header().Set("X-Marmot-ApiKey-Id", apiKey.Metadata.Id)
 	return ctx.JSON(http.StatusOK, resp)

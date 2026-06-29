@@ -2737,6 +2737,9 @@ components:
         expiresAt:
           type: string
           format: date-time
+        sessionType:
+          type: string
+          description: Session scope for the API key. Login sessions may be revoked automatically after inactivity; generated keys remain persistent until explicitly deleted.
     ApiKeySpec:
       type: object
       properties:
@@ -2752,6 +2755,9 @@ components:
           format: date-time
         revoked:
           type: boolean
+        sessionType:
+          type: string
+          description: Session scope for the API key. login marks a bearer token created by POST /auth/login; other values are treated as persistent user-generated keys.
     ApiKeyStatus:
       type: object
       properties:

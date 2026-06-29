@@ -18,11 +18,20 @@ import (
 )
 
 const (
+	BootstrapAdminUserID       = "admin"
+	BootstrapAdminPassword     = "passw0rd"
+	BootstrapAdminRoleName     = "Administrator"
+	BootstrapAdminComment      = "bootstrap administrator"
+)
+
+const (
 	AuthUserPrefix          = "/marmot/user"
 	AuthRolePrefix          = "/marmot/role"
 	AuthUserApiKeyPrefix    = "/marmot/user-apikey"
 	AuthApiKeyIndexPrefix   = "/marmot/apikey-index"
 	AuthApiKeyTokenPrefixLen = 8
+	AuthSessionIdleTimeout  = 30 * time.Minute
+	ApiKeySessionTypeLogin  = "login"
 )
 
 var ErrInvalidCredentials = errors.New("invalid credentials")
@@ -201,9 +210,23 @@ func normalizeApiKey(apiKey *api.ApiKey, fallbackUserID, fallbackKeyID string) {
 	if apiKey.Spec.Revoked == nil {
 		apiKey.Spec.Revoked = util.BoolPtr(false)
 	}
+	if apiKey.Spec.SessionType != nil {
+		t := strings.TrimSpace(*apiKey.Spec.SessionType)
+		apiKey.Spec.SessionType = &t
+	}
 	if apiKey.Status == nil {
 		apiKey.Status = &api.ApiKeyStatus{}
 	}
+}
+
+func isLoginSessionApiKey(apiKey api.ApiKey) bool {
+	if apiKey.Spec.SessionType != nil {
+		return strings.EqualFold(strings.TrimSpace(*apiKey.Spec.SessionType), ApiKeySessionTypeLogin)
+	}
+	if apiKey.Spec.Comment != nil {
+		return strings.TrimSpace(*apiKey.Spec.Comment) == "login-session"
+	}
+	return false
 }
 
 func isUserLocked(user api.User) bool {
@@ -290,6 +313,43 @@ func (d *Database) CreateUser(input api.User) (api.User, error) {
 	return user, nil
 }
 
+// EnsureBootstrapAdmin seeds the default admin user when the auth store is empty.
+// Existing users are never modified.
+func (d *Database) EnsureBootstrapAdmin() error {
+	users, err := d.ListUsers()
+	if err != nil {
+		return err
+	}
+	if len(users) > 0 {
+		return nil
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(BootstrapAdminPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to generate bootstrap admin password hash: %w", err)
+	}
+
+	_, err = d.CreateUser(api.User{
+		ApiVersion: "v1",
+		Kind:       "User",
+		Metadata: api.Metadata{
+			Id:   BootstrapAdminUserID,
+			Name: BootstrapAdminUserID,
+		},
+		Spec: api.UserSpec{
+			Enabled:            true,
+			Comment:            util.StringPtr(BootstrapAdminComment),
+			PasswordHash:       util.StringPtr(string(hash)),
+			Roles:              &[]string{BootstrapAdminRoleName},
+			MustChangePassword: util.BoolPtr(true),
+		},
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // GetUserById returns a user by id.
 func (d *Database) GetUserById(userID string) (api.User, error) {
 	var user api.User
@@ -303,7 +363,7 @@ func (d *Database) GetUserById(userID string) (api.User, error) {
 
 // ListUsers returns all users.
 func (d *Database) ListUsers() (api.Users, error) {
-	resp, err := d.GetByPrefix(AuthUserPrefix)
+	resp, err := d.GetByPrefix(AuthUserPrefix + "/")
 	if err == ErrNotFound {
 		return api.Users{}, nil
 	}
@@ -671,10 +731,11 @@ func (d *Database) CreateUserApiKey(userID string, req api.ApiKeyCreateRequest) 
 		},
 		Spec: api.ApiKeySpec{
 			Comment:     req.Comment,
-			ExpiresAt:    req.ExpiresAt,
-			IssuedAt:     util.TimePtr(time.Now()),
-			Revoked:      util.BoolPtr(false),
-			TokenPrefix:  &tokenPrefix,
+			ExpiresAt:   req.ExpiresAt,
+			IssuedAt:    util.TimePtr(time.Now()),
+			Revoked:     util.BoolPtr(false),
+			SessionType: req.SessionType,
+			TokenPrefix: &tokenPrefix,
 		},
 	}
 	normalizeApiKey(&apiKey, userID, apiKeyID)
@@ -787,6 +848,208 @@ func (d *Database) deleteUserApiKeyLocked(userID, apiKeyID string) error {
 	return d.refreshUserApiKeyCountLocked(userID)
 }
 
+func (d *Database) physicallyDeleteUserApiKeyLocked(userID, apiKeyID string) error {
+	var indexRef struct {
+		TokenHash string `json:"tokenHash"`
+	}
+	if _, err := d.GetJSON(apiKeyIdIndexKey(userID, apiKeyID), &indexRef); err == nil {
+		if strings.TrimSpace(indexRef.TokenHash) != "" {
+			_ = d.DeleteJSON(AuthApiKeyIndexPrefix + "/" + strings.TrimSpace(indexRef.TokenHash))
+		}
+		_ = d.DeleteJSON(apiKeyIdIndexKey(userID, apiKeyID))
+	} else if err != ErrNotFound {
+		return err
+	}
+	return d.DeleteJSON(userApiKeyKey(userID, apiKeyID))
+}
+
+// CleanupRevokedApiKeysOlderThan physically deletes revoked API keys whose RevokedAt is older than the threshold.
+func (d *Database) CleanupRevokedApiKeysOlderThan(olderThan time.Duration) (int, error) {
+	if olderThan < 0 {
+		olderThan = 0
+	}
+	resp, err := d.GetByPrefix(AuthUserApiKeyPrefix + "/")
+	if err == ErrNotFound {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+
+	type cleanupTarget struct {
+		UserID   string
+		ApiKeyID string
+	}
+
+	cutoff := time.Now().Add(-olderThan)
+	targets := make([]cleanupTarget, 0)
+
+	for _, kv := range resp.Kvs {
+		path := strings.TrimPrefix(string(kv.Key), AuthUserApiKeyPrefix+"/")
+		parts := strings.Split(path, "/")
+		if len(parts) < 2 {
+			continue
+		}
+		userID := strings.TrimSpace(parts[0])
+		apiKeyID := strings.TrimSpace(parts[1])
+		if userID == "" || apiKeyID == "" {
+			continue
+		}
+
+		var rec api.ApiKey
+		if err := json.Unmarshal(kv.Value, &rec); err != nil {
+			slog.Warn("CleanupRevokedApiKeysOlderThan() unmarshal failed", "err", err, "key", string(kv.Key))
+			continue
+		}
+		normalizeApiKey(&rec, userID, apiKeyID)
+
+		isRevoked := (rec.Spec.Revoked != nil && *rec.Spec.Revoked) || (rec.Status != nil && rec.Status.RevokedAt != nil)
+		if !isRevoked {
+			continue
+		}
+		if rec.Status == nil || rec.Status.RevokedAt == nil {
+			continue
+		}
+		if rec.Status.RevokedAt.After(cutoff) {
+			continue
+		}
+
+		targets = append(targets, cleanupTarget{UserID: userID, ApiKeyID: apiKeyID})
+	}
+
+	deletedCount := 0
+	var firstErr error
+	for _, target := range targets {
+		mutex, err := d.LockKey(userKey(target.UserID))
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			slog.Warn("CleanupRevokedApiKeysOlderThan() lock failed", "err", err, "userId", target.UserID)
+			continue
+		}
+
+		delErr := d.physicallyDeleteUserApiKeyLocked(target.UserID, target.ApiKeyID)
+		d.UnlockKey(mutex)
+
+		if delErr != nil {
+			if delErr == ErrNotFound {
+				continue
+			}
+			if firstErr == nil {
+				firstErr = delErr
+			}
+			slog.Warn("CleanupRevokedApiKeysOlderThan() delete failed", "err", delErr, "userId", target.UserID, "apiKeyId", target.ApiKeyID)
+			continue
+		}
+		deletedCount++
+	}
+
+	return deletedCount, firstErr
+}
+
+// RevokeIdleLoginSessionsOlderThan revokes login session API keys whose last activity is older than the threshold.
+func (d *Database) RevokeIdleLoginSessionsOlderThan(olderThan time.Duration) (int, error) {
+	if olderThan < 0 {
+		olderThan = 0
+	}
+	resp, err := d.GetByPrefix(AuthUserApiKeyPrefix + "/")
+	if err == ErrNotFound {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+
+	type revokeTarget struct {
+		UserID   string
+		ApiKeyID string
+	}
+
+	cutoff := time.Now().Add(-olderThan)
+	targetsByUser := make(map[string][]string)
+
+	for _, kv := range resp.Kvs {
+		path := strings.TrimPrefix(string(kv.Key), AuthUserApiKeyPrefix+"/")
+		parts := strings.Split(path, "/")
+		if len(parts) < 2 {
+			continue
+		}
+		userID := strings.TrimSpace(parts[0])
+		apiKeyID := strings.TrimSpace(parts[1])
+		if userID == "" || apiKeyID == "" {
+			continue
+		}
+
+		var rec api.ApiKey
+		if err := json.Unmarshal(kv.Value, &rec); err != nil {
+			slog.Warn("RevokeIdleLoginSessionsOlderThan() unmarshal failed", "err", err, "key", string(kv.Key))
+			continue
+		}
+		normalizeApiKey(&rec, userID, apiKeyID)
+
+		if !isLoginSessionApiKey(rec) {
+			continue
+		}
+		if rec.Spec.Revoked != nil && *rec.Spec.Revoked {
+			continue
+		}
+		if rec.Status != nil && rec.Status.RevokedAt != nil {
+			continue
+		}
+
+		lastActivityAt := time.Time{}
+		if rec.Status != nil && rec.Status.LastUsedAt != nil {
+			lastActivityAt = *rec.Status.LastUsedAt
+		} else if rec.Spec.IssuedAt != nil {
+			lastActivityAt = *rec.Spec.IssuedAt
+		}
+		if lastActivityAt.IsZero() || lastActivityAt.After(cutoff) {
+			continue
+		}
+
+		targetsByUser[userID] = append(targetsByUser[userID], apiKeyID)
+	}
+
+	revokedCount := 0
+	var firstErr error
+	for userID, keyIDs := range targetsByUser {
+		mutex, err := d.LockKey(userKey(userID))
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			slog.Warn("RevokeIdleLoginSessionsOlderThan() lock failed", "err", err, "userId", userID)
+			continue
+		}
+
+		for _, keyID := range keyIDs {
+			if err := d.revokeUserApiKeyLocked(userID, keyID); err != nil {
+				if err == ErrNotFound {
+					continue
+				}
+				if firstErr == nil {
+					firstErr = err
+				}
+				slog.Warn("RevokeIdleLoginSessionsOlderThan() revoke failed", "err", err, "userId", userID, "apiKeyId", keyID)
+				continue
+			}
+			revokedCount++
+		}
+
+		if err := d.refreshUserApiKeyCountLocked(userID); err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			slog.Warn("RevokeIdleLoginSessionsOlderThan() refresh count failed", "err", err, "userId", userID)
+		}
+
+		d.UnlockKey(mutex)
+	}
+
+	return revokedCount, firstErr
+}
+
 func (d *Database) revokeUserApiKeyLocked(userID, apiKeyID string) error {
 	key := userApiKeyKey(userID, apiKeyID)
 	var apiKey api.ApiKey
@@ -877,10 +1140,33 @@ func (d *Database) AuthenticateApiKey(token string) (api.User, api.ApiKey, error
 	if apiKey.Spec.ExpiresAt != nil && time.Now().After(*apiKey.Spec.ExpiresAt) {
 		return api.User{}, api.ApiKey{}, ErrInvalidCredentials
 	}
+	if !isLoginSessionApiKey(apiKey) {
+		if apiKey.Status == nil {
+			apiKey.Status = &api.ApiKeyStatus{}
+		}
+		apiKey.Status.LastUsedAt = util.TimePtr(time.Now())
+		if err := d.PutJSONCAS(userApiKeyKey(ref.UserID, ref.ApiKeyID), resp.Kvs[0].ModRevision, apiKey); err != nil {
+			if err == ErrUpdateConflict {
+				return api.User{}, api.ApiKey{}, ErrInvalidCredentials
+			}
+			slog.Warn("AuthenticateApiKey() failed to stamp last used", "err", err, "userId", ref.UserID, "apiKeyId", ref.ApiKeyID)
+		}
+		return user, apiKey, nil
+	}
+	now := time.Now()
+	lastActivityAt := now
+	if apiKey.Status != nil && apiKey.Status.LastUsedAt != nil {
+		lastActivityAt = *apiKey.Status.LastUsedAt
+	} else if apiKey.Spec.IssuedAt != nil {
+		lastActivityAt = *apiKey.Spec.IssuedAt
+	}
+	if now.Sub(lastActivityAt) >= AuthSessionIdleTimeout {
+		return api.User{}, api.ApiKey{}, ErrInvalidCredentials
+	}
 	if apiKey.Status == nil {
 		apiKey.Status = &api.ApiKeyStatus{}
 	}
-	apiKey.Status.LastUsedAt = util.TimePtr(time.Now())
+	apiKey.Status.LastUsedAt = util.TimePtr(now)
 	if err := d.PutJSONCAS(userApiKeyKey(ref.UserID, ref.ApiKeyID), resp.Kvs[0].ModRevision, apiKey); err != nil {
 		if err == ErrUpdateConflict {
 			return api.User{}, api.ApiKey{}, ErrInvalidCredentials

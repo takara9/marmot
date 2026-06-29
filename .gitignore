@@ -29,4 +29,6 @@ tools/lv_list.json
 tools/lv_to_remove.txt
 tools/lxc_domain_list.txt
 dist/
+memories/
+mactl
 
