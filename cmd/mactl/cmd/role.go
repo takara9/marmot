@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 var roleCmd = &cobra.Command{
@@ -57,8 +58,8 @@ var roleCmd = &cobra.Command{
 				"userId": me.UserId,
 				"roles":  me.Roles,
 			}
-			jsonBytes, _ := json.MarshalIndent(output, "", "  ")
-			fmt.Println(string(jsonBytes))
+			yamlBytes, _ := yaml.Marshal(output)
+			fmt.Println(string(yamlBytes))
 		}
 		return nil
 	},
