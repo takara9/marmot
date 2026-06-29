@@ -295,4 +295,54 @@ var _ = Describe("Auth API handlers", Ordered, func() {
 		router.ServeHTTP(cleanupRec, cleanupReq)
 		Expect(cleanupRec.Code).To(Equal(http.StatusNoContent), cleanupRec.Body.String())
 	})
+
+	It("restricts authz check target to self or administrator", func() {
+		adminToken := login("admin", "passw0rd").AccessToken
+
+		viewerHash, err := bcrypt.GenerateFromPassword([]byte("viewerpass3"), bcrypt.DefaultCost)
+		Expect(err).NotTo(HaveOccurred())
+		_, err = d.CreateUser(api.User{
+			ApiVersion: "v1",
+			Kind:       "User",
+			Metadata: api.Metadata{Id: "viewer3", Name: "viewer3"},
+			Spec: api.UserSpec{
+				Enabled:      true,
+				PasswordHash: util.StringPtr(string(viewerHash)),
+				Roles:        &[]string{"Viewer"},
+			},
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		viewerToken := login("viewer3", "viewerpass3").AccessToken
+
+		router := echo.New()
+		marmotd.RegisterRoutes(router, s, "/api/v1")
+
+		selfReq := httptest.NewRequest(http.MethodPost, "/api/v1/authz/check", strings.NewReader(`{"resource":"Server","action":"read"}`))
+		selfReq.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		selfReq.Header.Set("Authorization", "Bearer "+viewerToken)
+		selfRec := httptest.NewRecorder()
+		router.ServeHTTP(selfRec, selfReq)
+		Expect(selfRec.Code).To(Equal(http.StatusOK), selfRec.Body.String())
+
+		otherReq := httptest.NewRequest(http.MethodPost, "/api/v1/authz/check", strings.NewReader(`{"userId":"admin","resource":"Server","action":"read"}`))
+		otherReq.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		otherReq.Header.Set("Authorization", "Bearer "+viewerToken)
+		otherRec := httptest.NewRecorder()
+		router.ServeHTTP(otherRec, otherReq)
+		Expect(otherRec.Code).To(Equal(http.StatusForbidden), otherRec.Body.String())
+
+		adminReq := httptest.NewRequest(http.MethodPost, "/api/v1/authz/check", strings.NewReader(`{"userId":"viewer3","resource":"Server","action":"read"}`))
+		adminReq.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		adminReq.Header.Set("Authorization", "Bearer "+adminToken)
+		adminRec := httptest.NewRecorder()
+		router.ServeHTTP(adminRec, adminReq)
+		Expect(adminRec.Code).To(Equal(http.StatusOK), adminRec.Body.String())
+
+		cleanupReq := httptest.NewRequest(http.MethodDelete, "/api/v1/users/viewer3", nil)
+		cleanupReq.Header.Set("Authorization", "Bearer "+adminToken)
+		cleanupRec := httptest.NewRecorder()
+		router.ServeHTTP(cleanupRec, cleanupReq)
+		Expect(cleanupRec.Code).To(Equal(http.StatusNoContent), cleanupRec.Body.String())
+	})
 })

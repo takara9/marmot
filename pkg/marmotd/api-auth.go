@@ -184,6 +184,9 @@ func (s *Server) ApiAuthzCheck(ctx echo.Context) error {
 	if req.UserId != nil && strings.TrimSpace(*req.UserId) != "" {
 		checkUserID = strings.TrimSpace(*req.UserId)
 	}
+	if strings.TrimSpace(checkUserID) != strings.TrimSpace(user.Metadata.Id) && !userHasAnyRole(user, []string{"Administrator"}) {
+		return apiErrorJSON(ctx, http.StatusForbidden, "forbidden")
+	}
 	allowed, err := s.Ma.Db.Authorize(checkUserID, resource, action)
 	if err != nil {
 		return mapAuthDBError(ctx, err)

@@ -53,6 +53,9 @@
 
 ## 認可
 - ユーザーは、割当られたロールで、コマンドを実行する権限が与えられる RBAC方式を採用する。
+- `/authz/check` は、`userId` 未指定時は認証済みの自ユーザーを照会対象とする。
+- `/authz/check` で `userId` を指定する場合、照会可能なのは「自ユーザー」または `Administrator` ロールのみとする。
+- `Administrator` 以外が他ユーザーを指定して照会した場合は、`403 forbidden` を返す。
 - ロールには、以下の種類と権限がある。
     - Administrator
         - Server: 作成, 参照, 更新, 削除
