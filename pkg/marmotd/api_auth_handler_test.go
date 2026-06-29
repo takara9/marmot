@@ -185,6 +185,46 @@ var _ = Describe("Auth API handlers", Ordered, func() {
 		Expect(deleteRec.Code).To(Equal(http.StatusNoContent), deleteRec.Body.String())
 	})
 
+	It("denies user list to non-administrator roles", func() {
+		viewerHash, err := bcrypt.GenerateFromPassword([]byte("viewerpass1"), bcrypt.DefaultCost)
+		Expect(err).NotTo(HaveOccurred())
+		_, err = d.CreateUser(api.User{
+			ApiVersion: "v1",
+			Kind:       "User",
+			Metadata: api.Metadata{Id: "viewer2", Name: "viewer2"},
+			Spec: api.UserSpec{
+				Enabled:      true,
+				PasswordHash: util.StringPtr(string(viewerHash)),
+				Roles:        &[]string{"Viewer"},
+			},
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		viewerToken := login("viewer2", "viewerpass1").AccessToken
+
+		router := echo.New()
+		marmotd.RegisterRoutes(router, s, "/api/v1")
+
+		viewerReq := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		viewerReq.Header.Set("Authorization", "Bearer "+viewerToken)
+		viewerRec := httptest.NewRecorder()
+		router.ServeHTTP(viewerRec, viewerReq)
+		Expect(viewerRec.Code).To(Equal(http.StatusForbidden), viewerRec.Body.String())
+
+		adminToken := login("admin", "passw0rd").AccessToken
+		adminReq := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		adminReq.Header.Set("Authorization", "Bearer "+adminToken)
+		adminRec := httptest.NewRecorder()
+		router.ServeHTTP(adminRec, adminReq)
+		Expect(adminRec.Code).To(Equal(http.StatusOK), adminRec.Body.String())
+
+		cleanupReq := httptest.NewRequest(http.MethodDelete, "/api/v1/users/viewer2", nil)
+		cleanupReq.Header.Set("Authorization", "Bearer "+adminToken)
+		cleanupRec := httptest.NewRecorder()
+		router.ServeHTTP(cleanupRec, cleanupReq)
+		Expect(cleanupRec.Code).To(Equal(http.StatusNoContent), cleanupRec.Body.String())
+	})
+
 	It("supports API key create/list/delete", func() {
 		token := login("admin", "passw0rd").AccessToken
 

@@ -49,6 +49,9 @@ var userAddCmd = &cobra.Command{
 		if strings.TrimSpace(passwdStr) == "" {
 			return fmt.Errorf("password cannot be empty")
 		}
+		if err := validateUserAddPasswordPolicy(passwdStr); err != nil {
+			return err
+		}
 
 		passwordHash, err := passwordHashFromPlain(passwdStr)
 		if err != nil {
@@ -89,6 +92,20 @@ var userAddCmd = &cobra.Command{
 		}
 		return nil
 	},
+}
+
+func validateUserAddPasswordPolicy(password string) error {
+	p := strings.TrimSpace(password)
+	if len(p) < 8 {
+		return fmt.Errorf("password must be at least 8 characters")
+	}
+	for _, ch := range p {
+		if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') {
+			continue
+		}
+		return fmt.Errorf("password must be alphanumeric")
+	}
+	return nil
 }
 
 func passwordHashFromPlain(password string) (string, error) {

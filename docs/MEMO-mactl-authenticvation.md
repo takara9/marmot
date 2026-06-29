@@ -28,6 +28,7 @@
 - `mactl login USER-ID` ログイン、他ユーザーでログインしている時は、ログインが成功すると既存セッションはログアウトする
 - `mactl whoami` 自分のユーザーIDとロールを表示、`mactl role` のエリアス
 - `mactl role` 自身に付与されたロールのリスト表示
+- `mactl role list` 組み込みロール一覧の表示
 - `mactl logout`
 - `mactl passwd` ユーザーのパスワード変更用
 - `mactl user generate-apikey --comment TEXT` APIキーを生成する。コメントは任意
@@ -44,7 +45,6 @@
 - `mactl user delete USER-ID` USER-IDの削除
 - `mactl user set-passwd USER-ID --passwd PASSWORD` USER-IDのパスワード再セット用
 - `mactl user lock USER-ID` ユーザーの使用を停止する。ユーザーのAPIキーも同様に無効化される。
-- `mactl role list` 組み込みロール一覧の表示
 - `mactl user list` ユーザー一覧の表示、表示列: USER-ID / ENABLED / ROLE / AGE
 
 ### ユーザーがパスワードをロスした時の処理

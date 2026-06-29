@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
+	"github.com/takara9/marmot/api"
 )
 
 type operationRBACRule struct {
@@ -12,6 +13,7 @@ type operationRBACRule struct {
 	Verb      string
 	AllowSelf bool
 	SelfParam string
+	RequiredRoles []string
 }
 
 func rbacOperationMiddlewares(s *Server) map[string][]echo.MiddlewareFunc {
@@ -85,7 +87,7 @@ func rbacOperationMiddlewares(s *Server) map[string][]echo.MiddlewareFunc {
 		"apiDownloadImageQcow2ById": {Resource: "Server", Verb: "read"},
 		"apiImportImageArchive":   {Resource: "Server", Verb: "create"},
 
-		"apiListUsers":       {Resource: "User", Verb: "read"},
+		"apiListUsers":       {Resource: "User", Verb: "read", RequiredRoles: []string{"Administrator"}},
 		"apiCreateUser":      {Resource: "User", Verb: "create"},
 		"apiGetUserById":     {Resource: "User", Verb: "read", AllowSelf: true, SelfParam: "userId"},
 		"apiUpdateUserById":  {Resource: "User", Verb: "update"},
@@ -125,6 +127,12 @@ func rbacOperationMiddlewares(s *Server) map[string][]echo.MiddlewareFunc {
 					}
 				}
 
+				if len(r.RequiredRoles) > 0 {
+					if !userHasAnyRole(user, r.RequiredRoles) {
+						return apiErrorJSON(ctx, http.StatusForbidden, "forbidden")
+					}
+				}
+
 				allowed, authErr := s.Ma.Db.Authorize(user.Metadata.Id, r.Resource, r.Verb)
 				if authErr != nil {
 					return mapAuthDBError(ctx, authErr)
@@ -139,4 +147,22 @@ func rbacOperationMiddlewares(s *Server) map[string][]echo.MiddlewareFunc {
 	}
 
 	return middlewares
+}
+
+func userHasAnyRole(user api.User, requiredRoles []string) bool {
+	if user.Spec.Roles == nil || len(*user.Spec.Roles) == 0 {
+		return false
+	}
+	for _, userRole := range *user.Spec.Roles {
+		trimmedUserRole := strings.TrimSpace(userRole)
+		if trimmedUserRole == "" {
+			continue
+		}
+		for _, requiredRole := range requiredRoles {
+			if strings.EqualFold(trimmedUserRole, strings.TrimSpace(requiredRole)) {
+				return true
+			}
+		}
+	}
+	return false
 }
