@@ -754,4 +754,70 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
+
+	Context("ユーザー認証のテスト", func() {
+		loginWithPassword := func(userID, password string) ([]byte, error) {
+			cmdLine := fmt.Sprintf(`printf "%%s\n" %q | script -qec "./bin/mactl-test --api testdata/.marmot login %s" /dev/null`, password, userID)
+			cmd := exec.Command("sh", "-lc", cmdLine)
+			return cmd.CombinedOutput()
+		}
+
+		AfterEach(func() {
+			Expect(loginAsAdmin()).NotTo(HaveOccurred())
+		})
+
+		It("mactl whoami で admin のロール情報を表示できる", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "whoami")
+			stdoutStderr, err := cmd.CombinedOutput()
+			GinkgoWriter.Println(string(stdoutStderr))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(stdoutStderr)).To(ContainSubstring("User: admin"))
+			Expect(string(stdoutStderr)).To(ContainSubstring("Administrator"))
+		})
+
+		It("作成したユーザーで login 後に whoami へ反映される", func() {
+			const userID = "auth-test-user"
+			const password = "lemon123"
+
+			cleanupCmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "user", "delete", userID)
+			_, _ = cleanupCmd.CombinedOutput()
+
+			createCmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "user", "add", userID, "--passwd", password, "--role", "Compute-Operator")
+			createOut, err := createCmd.CombinedOutput()
+			GinkgoWriter.Println(string(createOut))
+			Expect(err).NotTo(HaveOccurred())
+
+			loginOut, err := loginWithPassword(userID, password)
+			GinkgoWriter.Println(string(loginOut))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(loginOut)).To(ContainSubstring("Successfully logged in as "+userID))
+
+			whoamiCmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "whoami")
+			whoamiOut, err := whoamiCmd.CombinedOutput()
+			GinkgoWriter.Println(string(whoamiOut))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(whoamiOut)).To(ContainSubstring("User: " + userID))
+			Expect(string(whoamiOut)).To(ContainSubstring("Compute-Operator"))
+
+			Expect(loginAsAdmin()).NotTo(HaveOccurred())
+			delCmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "user", "delete", userID)
+			delOut, delErr := delCmd.CombinedOutput()
+			GinkgoWriter.Println(string(delOut))
+			Expect(delErr).NotTo(HaveOccurred())
+		})
+
+		It("logout 後の whoami は失敗する", func() {
+			logoutCmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "logout")
+			logoutOut, err := logoutCmd.CombinedOutput()
+			GinkgoWriter.Println(string(logoutOut))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(logoutOut)).To(ContainSubstring("Successfully logged out"))
+
+			whoamiCmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "whoami")
+			whoamiOut, whoamiErr := whoamiCmd.CombinedOutput()
+			GinkgoWriter.Println(string(whoamiOut))
+			Expect(whoamiErr).To(HaveOccurred())
+			Expect(strings.Contains(string(whoamiOut), "failed to get current user") || strings.Contains(string(whoamiOut), "missing or invalid Authorization header")).To(BeTrue())
+		})
+	})
 })
