@@ -190,10 +190,10 @@ sudo rm -f ./marmot_v${VERSION}_amd64.deb
 - [marmotマニフェスト集](https://github.com/takara9/marmot-manifests)
 
 ## チュートリアル
-準備中
+- [Marmot Tutorial](https://github.com/takara9/marmot-manifests/blob/main/TUTORIAL.md)
 
 ## リファレンスマニュアル
-準備中
+- [Command Reference](https://github.com/takara9/marmot-manifests/blob/main/COMMAND_REFERENCE.md)
 
 ## ライセンス
 
