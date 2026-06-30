@@ -4,12 +4,10 @@
   "api_listen_addr": "0.0.0.0:8750",
   "dns_listen_addr": "127.0.0.1:53",
   "dns_upstream": "8.8.8.8:53",
-  "dns_upstream_allow_cidrs": [
-    "192.168.1.0/24"
-  ],
+  "dns_upstream_allow_cidrs": [],
   "default_underlay_interface": "br0",
-  "os_volume_group": "vg1",
-  "data_volume_group": "vg2",
+  "os_volume_group": "",
+  "data_volume_group": "",
   "deletion_delay_seconds": 10,
   "image_create_from_vm_timeout_seconds": 600,
   "image_create_from_url_timeout_seconds": 1800,
@@ -18,19 +16,13 @@
   "image_delete_timeout_seconds": 120,
   "os_images": [
     {
-      "name": "ubuntu22.04",
-      "url": "https://cloud-images.ubuntu.com/releases/jammy/release/ubuntu-22.04-server-cloudimg-amd64.img",
-      "osName": "ubuntu",
-      "osVersion": "22.04"
-    },
-    {
       "name": "ubuntu24.04",
       "url": "https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img",
       "osName": "ubuntu",
       "osVersion": "24.04"
     }
   ],
-  "loki_push_url": "http://127.0.0.1:3100/loki/api/v1/push",
-  "tls_cert_file": "/etc/marmot/certs/server.crt",
-  "tls_key_file": "/etc/marmot/certs/server.key"
+  "loki_push_url": "",
+  "tls_cert_file": "",
+  "tls_key_file": ""
 }

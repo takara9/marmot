@@ -85,7 +85,13 @@ Successfully logged out
 
 ### 仮想サーバーの作成
 
-仮想サーバーを起動するためのマニフェストを準備します。
+sshの鍵ペアを準備して、公開鍵を表示します。
+```console
+$ ssh-keygen -t ed25519 -f ./vmkey -C "For marmot VMs" -N ""
+$ cat ./vmkey.pub 
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGAAL3eo+VgR6pj9eGuz62rBp/wbs4dSp3XljqBBymnW For marmot VMs
+```
+仮想サーバーを起動するため、上記で作成した公開鍵をspec.auth.publicKeyに貼り付けたマニフェストを準備します。
 
 ```yaml
 apiVersion: v1
@@ -96,9 +102,11 @@ metadata:
 spec:
     cpu: 1
     memory: 1024
-    osVariant: ubuntu24.04
-    auth: # 利用者の公開鍵に変更してください。
-        url: https://github.com/takara9.keys
+    mmImage: ubuntu24.04
+    auth:
+        publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGAAL3eo+VgR6pj9eGuz62rBp/wbs4dSp3XljqBBymnW For marmot VMs"
+        users:
+         - ubuntu       
     networkInterface:
         - networkname: host-bridge  # marmot のサーバーが接続されるネットワーク
           address: 192.168.1.20     # IPアドレスを手動設定（IPアドレスの重複使用に注意)
@@ -129,8 +137,9 @@ NAME             NODE          STATUS        CPU  RAM(MB)  IP-ADDRESS       NETW
 server-20        marmot3       RUNNING       1    1024     192.168.1.20     host-bridge      5s
 
 # sshでのログイン
-$ ssh 192.168.1.20
+$ ssh ubuntu@192.168.1.20 -i vmkey
 ubuntu@server-20:~$ 
+ubuntu@server-20:~$ exit
 
 # サーバーの削除
 $ mactl delete server server-20
@@ -157,51 +166,17 @@ curl -OL https://github.com/takara9/marmot/releases/download/v${VERSION}/marmot_
 sudo apt install -y ./marmot_v${VERSION}_amd64.deb
 ```
 
-### marmotdの設定ファイルの編集
-
-marmotd は、`/etc/marmot/matmotd.json` を読み込んで起動します。
-デフォルト設定では、動作しないケースがありますので、インストール完了後に、`/etc/marmot/marmotd.json`を編集して、`systemctl restart marmot` を実行します。シングル構成時は、以下の２箇所に注意してください。
-
-
-```json
-# cat marmotd.json 
-{
-  "node_name": "marmot0",
-  "etcd_url": "http://127.0.0.1:2379",
-  "api_listen_addr": "0.0.0.0:8750",
-  "dns_listen_addr": "127.0.0.1:53", # 仮想マシンのDNS名を参照する時に、hostのIPアドレスに変更
-  "dns_upstream": "8.8.8.8:53",      # 内部DNSで解決できない時の上位 DNSサーバー
-  "dns_upstream_allow_cidrs": [
-    "192.168.1.0/24"
-  ],
-  "default_underlay_interface": "",
-以下省略
-```
-
-インストールが完了したら、ダウンロードしたファイルは消しておくのがお勧めです。
-```console
-sudo rm -f ./marmot_v${VERSION}_amd64.deb
-```
-
-### クライアント側の設定ファイル
-
-mactl コマンドは、ホームディレクトリの`.marmot`ファイルから、接続先とプロトコルを選択して marmotd と連携します。
-`mactl version` を実行することで、初期設定の入った`.marmot`が作成されるので、編集して利用してください。
-
-```yaml
-current: 0
-endpoints:
-  - http://localhost:8750        # marmotd が、TLS暗号化が有効なっていれば https に変更する
-insecure-skip-tls-verify: false  # サーバーの証明書が、自己証明書（オレオレ証明書）の場合は、tureにする。
-```
-
 実行結果に、Serverのバージョンが表示されれば、サーバーと正しく通信できていることになります。
 
 ```console
 $ mactl vesion
-Server version = 0.25.0
-Client version = 0.25.0
+Server version = 0.25.1
+Client version = 0.25.1
 ```
+
+詳しいインストール手順は、以下のドキュメントを参照してください。
+- [marmotd シングル構成](docs/HOWTO-install-marmot.md)
+- [marmotd クラスタ構成](docs/HOWTO-install-marmot-cluster.md)
 
 ## チュートリアル
 はじめて **marmot** を利用する方は、チュートリアルから始めるのがお勧めです。
