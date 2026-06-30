@@ -1,179 +1,224 @@
-# マイクロ プライベート クラウド Marmot 
+# Marmot — プライベートクラウド基盤
 
-Marmotは、テスト、学習、実験用に設計された、高速で軽量な仮想サーバーオーケストレーションツールです。
-YAMLで仮想サーバーのクラスタ構成を定義し、KVMやその他のLinuxネイティブテクノロジーを使用して数秒で起動できます。
+Marmot（マーモット）は、シンプルなYAMLで仮想サーバー、ネットワーク、ストレージを管理できるプライベートクラウド基盤です。Kubernetesライクな宣言型APIを採用し、学習・検証環境から実運用まで、迅速かつ再現性の高いインフラ構築を実現します。
 
-## 特徴
+![マーモットのイメージキャラ](docs/marmot-logo-quarter.png)
 
-- 高速起動（約30秒）の仮想サーバー
-- YAMLベースの構成
-- 複数マシンにわたるクラスタサポート
-- CoreDNS、etcd、Open vSwitchなどとの統合
-- Ubuntu 20.04/22.04のサポート
-- Ansibleベースのセットアップ自動化
-- OpenAPI v3 ベースのREST-APIで [MarmotサーバーをAPI](marmot-api-v1.html)操作
+## コンセプト
+
+利用者は、Kubernetesのマニフェストを書く感覚で仮想マシンを管理できます。しかし、Kubernetesのような複雑な概念や高い学習コストはありません。シンプルで理解しやすいYAMLを記述するだけで、仮想サーバー、ネットワーク、ストレージを宣言的に管理できます。[Marmotマニフェスト集](https://github.com/takara9/marmot-manifests)を参考にすれば、Linuxをインストールした1台のマシンから始めて、プライベートネットワークの構築、仮想ストレージの確保、仮想サーバーの展開までを数分で実現できます。複雑な設定作業に悩まされることなく、学習、検証、実験に集中できます。
 
 
-## インストール方法
-
-CoreDNS,etcd,Open vSwitch,LVM,KVM などのインストールと設定の後、以下の要領で、起動することができます。インストールなどのドキュメントは順次拡充していきます。
-
-データベースサーバーに、etcdを使用しています。
-hvサーバー個別に、etcdをインストールするときは、以下の手順でインストールしてください。
-
-```
-sudo apt update && sudo apt install etcd
-systemctl status etcd
+```yaml
+apiVersion:
+kind:
+spec:
 ```
 
-- [ネットワークの設定方法](network-setup.md)
-- [データベースの初期化方法](hv-admin/README.md)
-- [VMのmachine-idとhostidの生成規則](MEMO-hostid-generation.md)
-- [Application LoadBalancer 運用マニュアル](HOWTO-application-load-balancer.md)
+Marmotは、複雑化し続けるインフラ運用をシンプルにするためのプライベートクラウド基盤です。パブリッククラウドのコスト増大、高額なVMwareライセンス、GUI依存の運用、そしてOpenStackの重厚なアーキテクチャに代わり、シンプルなYAMLによるIaCを中心とした運用モデルを提供します。Ansibleによる自動構成管理やコンテナとの連携を標準化し、小規模なチームでも効率的にクラウド基盤を構築・運用できる世界を目指します。
 
-marmotのインストール
+Marmotは、プライベートクラウド運用をよりシンプルにし、Infrastructure as Codeを誰もが実践できる環境を目指しています。
 
-```
-TAG=v0.8.8
-mkdir marmot
-cd marmot
-curl -OL https://github.com/takara9/marmot/releases/download/$TAG/marmot-$TAG.tgz
-tar xzvf marmot-$TAG.tgz
-sudo ./install.sh
-```
 
-## 使用例
+## 技術的特徴
 
-構成ファイル　cluster-config.yaml を準備します。
+- **YAML ベースの宣言的構成** — サーバー・ネットワーク・ボリュームをファイル一枚で定義
+- **OpenAPI v3 REST API** — `marmotd` サーバーを API で完全制御
+* **リソースコントローラーによる自動化** — 利用者は「どうなっていてほしいか」をYAMLで記述するだけ。Marmotが仮想マシンやネットワークの作成・変更を自動的に実行します。
+- **Cloud Image による仮想マシン** — UbuntuやAlmaLinuxなどのCloud Imageを利用して、OSインストールの手間なく仮想マシンを即座に作成できます。
+- **iSCSI ネットワークブロックストレージ** — LVM ボリュームを iSCSI ターゲットとして VM にアタッチ可能
+- **ローカルブロックストレージ** — LVM / QCOW2 を利用した高速にアクセスできるストレージをVM にアタッチ可能
+- **仮想ネットワーク管理** — ホストブリッジ・OVN/Geneve オーバーレイ・VLAN をサポート
+- **マルチホーム対応** — 1 台の VM に複数の仮想ネットワークを割り当て可能
+- **ノードセレクター** — marmotクラスタ環境では、複数のMarmotノードから指定ノードへVMを 配置制御可能
+- **etcd による状態管理** — Kubernetesで実績のあるetcdを利用し、クラスター全体の状態を安全かつ一貫性のある形で管理します。
+- **内部 DNS** — VM に対する名前解決を自動提供
+- **OpenVPN ゲートウェイ** — VPN Gateway リソースで、PCとVM用プライベートネットワーク間を暗号化接続
+- **Application Load Balancer** — HAProxy ベースの L7 ロードバランサーを VM として自動デプロイ
+- **Network Load Balancer** — iptables ベースの L4 ロードバランサーで仮想ネットワーク内トラフィックを分散
+- **OpenTelemetry メトリクス** — Prometheus エクスポーターによる可観測性を標準提供, Loki へのログ転送も標準装備
+- **RBAC によるアクセス制御** — Administrator / Compute-Operator / Viewer などのロールベースで API 操作を制限
+- **ゲストOS Ubuntu Linux 22.04/24.04, Alpine Linux 3.23 サポート**
+- **ホストOS Ubuntu 24.04 サポート**
 
-```
-domain: labo.local
-os_variant:  ubuntu22.04
-cluster_name: test
-vm_spec:
-  - name: "srv1"
+## コンポーネント
+
+| コンポーネント | 説明 |
+|---|---|
+| `marmotd` | ハイパーバイザーノード上で動作するデーモン。LibVirt / LVM / OVN(OVS) を操作して VM を管理する |
+| `mactl` | CLI クライアント。YAML ファイルまたは URL を指定してサーバー・ネットワーク・ボリュームを操作する |
+| `maadm` | 管理者向け補助ツール（開発途上） |
+
+## クイックスタート
+
+### 仮想サーバーの作成
+
+仮想サーバーを起動するためのマニフェスト
+
+```yaml
+apiVersion: v1
+kind: Server
+metadata:
+    name: server-20
+    comment: marmotホストが繋がるネットワークに接続する仮想サーバー
+spec:
     cpu: 1
     memory: 1024
-    private_ip: "172.16.9.11"
-    storage:
-    - name: data
-      size: 10
-      vg:   vg2
-    comment: "test node #1"
-  - name: "srv2"
-    cpu: 1
-    memory: 1024
-    private_ip: "172.16.9.12"
-    storage:
-    - name: data
-      size: 10
-      vg:   vg2
-    comment: "test node #2"
+    osVariant: ubuntu24.04
+    auth: # 利用者の公開鍵に変更してください。
+        url: https://github.com/takara9.keys
+    networkInterface:
+        - networkname: host-bridge  # marmot のサーバーが接続されるネットワーク
+          address: 192.168.1.20     # IPアドレスを手動設定（IPアドレスの重複使用に注意)
+          netmasklen: 24            # ネットマスク
+          routes:                   # デフォルトGW ルーターのアドレスを指定
+            - to: default
+              via: 192.168.1.1
+          nameservers:              # DNSサーバー
+            addresses:
+                - 192.168.1.9       # ローカル環境のDNSサーバー
+            search:                 # ドメイン名を省略可能なドメインをセット
+                - labo.local
 ```
 
-構成ファイルが存在するディレクトリで、'mactl create'を実行することで、サーバーがデプロイされます。
-起動まで、約30秒程度です。
+### ログイン
 
-```
-ubuntu@hv0:~/marmot-apl$ mactl create
-成功終了
-ubuntu@hv0:~/marmot-apl$ mactl status
-CLUSTER    VM-NAME          H-Visr STAT  VKEY                 VCPU  RAM    PubIP           PriIP           DATA STORAGE        
-test       srv1             hv0    RUN   vm_srv1_0110         1     1024   172.16.9.11                     10  
-test       srv2             hv0    RUN   vm_srv2_0111         1     1024   172.16.9.12                     10  
-```
+`marmotd` への接続は認証が必要です。初期管理者アカウント（`admin`）でログインします。
+インストール直後のパスワードは、`passw0rd`ですので、下記の手順で変更してください。
 
-あとは、ログインして、追加の設定を実施できます。
-
-
-```
-ubuntu@hv0:~/marmot-apl$ ssh ubuntu@srv1.test.a.labo.local
-Warning: Permanently added 'srv1.test.a.labo.local' (ED25519) to the list of known hosts.
-Welcome to Ubuntu 22.04.1 LTS (GNU/Linux 5.15.0-86-generic x86_64)
-
- * Documentation:  https://help.ubuntu.com
- * Management:     https://landscape.canonical.com
- * Support:        https://ubuntu.com/advantage
-
+```console
+$ mactl login admin
+Password: ＜パスワードを入力＞
+Successfully logged in as admin
+⚠️  You must change your password before using other commands.
+   Run: mactl passwd
 ```
 
-起動したサーバーは、Ansibleを利用して、セットアップもできます。
+初回ログイン時はパスワード変更を求められます。`mactl passwd` で変更してください。
 
-```
-ubuntu@hv0:~/marmot-apl$ ansible -i inventory all -m ping
-srv1 | SUCCESS => {
-    "ansible_facts": {
-        "discovered_interpreter_python": "/usr/bin/python3"
-    },
-    "changed": false,
-    "ping": "pong"
-}
-srv2 | SUCCESS => {
-    "ansible_facts": {
-        "discovered_interpreter_python": "/usr/bin/python3"
-    },
-    "changed": false,
-    "ping": "pong"
-}
+```console
+$ mactl passwd
+Current Password: ＜現在のパスワードを入力＞
+New Password:     ＜新しいパスワードを入力（英数字 8 文字以上）＞
 ```
 
+ログイン中のユーザー情報は `mactl whoami` で確認できます。
 
-## インストール方法
-
-CoreDNS,etcd,Open vSwitch,LVM,KVM などのインストールと設定の後、以下の要領で、起動することができます。インストールなどのドキュメントは順次拡充していきます。
-
-データベースサーバーに、etcdを使用しています。
-hvサーバー個別に、etcdをインストールするときは、以下の手順でインストールしてください。
-
-```
-sudo apt update && sudo apt install etcd
-systemctl status etcd
+```console
+$ mactl whoami
+User:  admin
+Roles: [Administrator]
 ```
 
-- [ネットワークの設定方法](network-setup.md)
-- [データベースの初期化方法](hv-admin/README.md)
+セッションを終了するときは `mactl logout` を実行します。
 
-
-marmotのダウンロードとインストール
-
-```
-TAG=v0.8.2
-mkdir marmot
-cd marmot
-curl -OL https://github.com/takara9/marmot/releases/download/$TAG/marmot-$TAG.tgz
-tar xzvf marmot-$TAG.tgz
-sudo ./install.sh
+```console
+$ mactl logout
+Successfully logged out
 ```
 
-*応用例*
+### 仮想サーバーの作成
 
-- [設定用Ansibles集](https://github.com/takara9/marmot-servers)
-- [Kubernetesクラスタの実行](https://github.com/takara9/marmot-servers/tree/main/kubernetes)
-- [Cephストレージシステムの実行](Https://Github.Com/Takara9/Marmot-servers/tree/main/ceph)
-- [メトリックスとログ分析基盤](https://github.com/takara9/docker_and_k8s/tree/main/4-10_Observability)
-- [GitHub Actionと連携したmarmot開発環境](https://github.com/takara9/marmot/docs/HOWTO-CI.md)
+次のKubernetesライクなコマンドで、仮想サーバーを起動
+
+```console
+$ mactl create -f server-20.yaml 
+リソースの作成要求が受け入れられました。ID: 9451a
+
+$ mactl get srv
+NAME             NODE          STATUS        CPU  RAM(MB)  IP-ADDRESS       NETWORK          AGE
+----             ----          ------        ---  -------  ----------       -------          ---
+server-20        marmot3       RUNNING       1    1024     192.168.1.20     host-bridge      5s
+
+$ ssh 192.168.1.20
+ubuntu@server-20:~$ 
+```
+
+## インストール
+
+### 必要最小条件
+- Ubuntu Linux 24.04 がインストールされていること。
+- ルート`/`ファイルシステムが、3G程度空いていること。 marmotが依存モジュール 1.2GBほどが、インストールされます。
+- `/var/lib/marmot` が、100GB程度の空きがあること。（OSイメージ取得で約2GB、１台の仮想マシン起動で16GBを消費します。
 
 
-## アーキテクチャ
-mactlコマンドに、仮想マシンのクラスタ構成 YAML を添えて実行することで、仮想マシンが起動します。クラスタは、1サーバーから、リソースのあるだけ起動できます。
+### deb パッケージのインストール
 
-![Architecture](architecture-1.png)
+[Releases](https://github.com/takara9/marmot/releases) から最新の `.deb` ファイルをダウンロードしてインストールします。
+
+```console
+cd /tmp
+apt-get update
+VERSION=0.25.1
+curl -OL https://github.com/takara9/marmot/releases/download/v${VERSION}/marmot_v${VERSION}_amd64.deb
+sudo apt install -y ./marmot_v${VERSION}_amd64.deb
+```
+インストール完了後に、`/etc/marmot/marmotd.json`を編集して、`systemctl restart marmot` を実行します。
+シングル構成時は、以下の２箇所に注意してください。
+
+```json
+# cat marmotd.json 
+{
+  "node_name": "marmot0",
+  "etcd_url": "http://127.0.0.1:2379",
+  "api_listen_addr": "0.0.0.0:8750",
+  "dns_listen_addr": "127.0.0.1:53", # 仮想マシンのDNS名を参照する時に、hostのIPアドレスに変更
+  "dns_upstream": "8.8.8.8:53",      # 内部DNSで解決できない時の上位 DNSサーバー
+  "dns_upstream_allow_cidrs": [
+    "192.168.1.0/24"
+  ],
+  "default_underlay_interface": "",
+以下省略
+```
 
 
-複数のmarmotを導入したサーバーを並列化して、クラウドの様な環境を構築できます。
+```console
+sudo rm -f ./marmot_v${VERSION}_amd64.deb
+```
 
-![Architecture](architecture-2.png)
+## 主な利用技術
 
+- [KVM / QEMU](https://www.linux-kvm.org/) — 仮想化
+- [LibVirt](https://libvirt.org/) — VM ライフサイクル管理
+- [OVN](https://www.ovn.org/) / [Open vSwitch](https://www.openvswitch.org/) — 仮想ネットワーク制御プレーン/データプレーン
+- [etcd](https://etcd.io/) — 分散 KV ストア（クラスター状態管理）
+- [LVM](https://sourceware.org/lvm2/) — 論理ボリューム管理
+- [open-iscsi / targetcli](https://github.com/open-iscsi/open-iscsi) — iSCSI ネットワークブロックストレージ
+
+## 活用例
+
+- [marmotマニフェスト集](https://github.com/takara9/marmot-manifests)
+
+## チュートリアル
+- [Marmot Tutorial](https://github.com/takara9/marmot-manifests/blob/main/TUTORIAL.md)
+
+## リファレンスマニュアル
+- [Command Reference](https://github.com/takara9/marmot-manifests/blob/main/COMMAND_REFERENCE.md)
 
 ## ライセンス
 
-このプロジェクトはMITライセンスの下で提供されています。詳細は[LICENSE](https://github.com/takara9/marmot?tab=MIT-1-ov-file)ファイルをご覧ください。
+GNU General Public License v3.0 — 詳細は [LICENSE](LICENSE) を参照してください。
 
 ## 貢献
 
-貢献を歓迎します！ガイドラインについては[CONTRIBUTING.md](https://github.com/takara9/marmot?tab=contributing-ov-file)をご覧ください。
+貢献を歓迎します。ガイドラインは [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
+
+## 開発者の経歴について
+
+Marmotは、30年以上にわたりエンタープライズシステム、仮想化基盤、クラウド技術に携わってきたインフラエンジニアによって開発されています。
+
+長年にわたり、大規模システムの構築・運用を経験した後、クラウド基盤を利用した開発とテクニカルセールスに従事する中で、Kuberntesとコンテナは画期的な技術革新である反面、導入や運用が複雑化し、多くの利用者にとって扱いにくいものになっていると感じてきました。
+
+Marmotは、その課題に対する一つの答えとして生まれました。
+
+「プライベートクラウドをもっとシンプルに。」
+
+この理念のもと、Kubernetesの宣言型運用の良さを取り入れながら、より少ない学習コストで利用できるクラウド基盤を目指しています。
+
+Marmotは、複雑な仕組みを増やすのではなく、本当に必要な機能に集中し、学習・検証・実験から実運用まで幅広く活用できるプラットフォームとして進化を続けています。
+
 
 ## 連絡先
 
-メンテナー: [takara9](https://github.com/takara9)
-ご質問や議論については、[GitHub Discussions](https://github.com/takara9/marmot/discussions) をご利用ください。
+メンテナー: [takara9](https://github.com/takara9)  
+ご質問・議論は [GitHub Discussions](https://github.com/takara9/marmot/discussions) へ。
