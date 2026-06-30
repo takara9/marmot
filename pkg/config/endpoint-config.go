@@ -12,7 +12,7 @@ import (
 // defaultMarmotConfig は ~/.marmot が存在しない場合に書き込むデフォルト設定内容
 const defaultMarmotConfig = `current: 0
 endpoints:
-  - https://localhost:8750
+  - http://localhost:8750
 insecure-skip-tls-verify: false
 `
 
