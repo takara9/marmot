@@ -85,7 +85,13 @@ Successfully logged out
 
 ### 仮想サーバーの作成
 
-仮想サーバーを起動するためのマニフェストを準備します。
+sshの鍵ペアを準備して、公開鍵を表示します。
+```console
+$ ssh-keygen -t ed25519 -f ./vmkey -C "For marmot VMs" -N ""
+$ cat ./vmkey.pub 
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGAAL3eo+VgR6pj9eGuz62rBp/wbs4dSp3XljqBBymnW For marmot VMs
+```
+仮想サーバーを起動するため、上記で作成した公開鍵をspec.auth.publicKeyに貼り付けたマニフェストを準備します。
 
 ```yaml
 apiVersion: v1
@@ -96,9 +102,11 @@ metadata:
 spec:
     cpu: 1
     memory: 1024
-    osVariant: ubuntu24.04
-    auth: # 利用者の公開鍵に変更してください。
-        url: https://github.com/takara9.keys
+    mmImage: ubuntu24.04
+    auth:
+        publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGAAL3eo+VgR6pj9eGuz62rBp/wbs4dSp3XljqBBymnW For marmot VMs"
+        users:
+         - ubuntu       
     networkInterface:
         - networkname: host-bridge  # marmot のサーバーが接続されるネットワーク
           address: 192.168.1.20     # IPアドレスを手動設定（IPアドレスの重複使用に注意)
@@ -129,8 +137,9 @@ NAME             NODE          STATUS        CPU  RAM(MB)  IP-ADDRESS       NETW
 server-20        marmot3       RUNNING       1    1024     192.168.1.20     host-bridge      5s
 
 # sshでのログイン
-$ ssh 192.168.1.20
+$ ssh ubuntu@192.168.1.20 -i vmkey
 ubuntu@server-20:~$ 
+ubuntu@server-20:~$ exit
 
 # サーバーの削除
 $ mactl delete server server-20
