@@ -1,22 +1,19 @@
-# marmot インストール手順
+# marmot シングル構成のインストール手順
 
 marmot を Ubuntu ハイパーバイザーノードへインストールする手順です。  
-クラスターを構成する全ノードで同じ手順を実施してください。
+
 
 ## 前提条件
 
 - OS: Ubuntu 24.04 (amd64)です。 22.04には対応していません。
 - KVM が利用できること（`kvm-ok` で確認）
-- 各ノードに SSH 公開鍵認証でログインできること
-- LVM 用に使える未フォーマットのディスクが 1 本以上あること
+- SSH 公開鍵認証でログインできること
 
 ---
 
 ## 1. debパッケージのインストール
 
-### リリースパッケージを使う場合
-
-GitHub Releases からパッケージをダウンロードしてインストールします。
+GitHub Releases からパッケージを/tmpにダウンロードしてインストールします。
 
 ```bash
 # 2026-06-30 時点の最新バージョン
@@ -99,168 +96,6 @@ sudo systemctl restart marmot
 sudo systemctl status marmot
 ```
 
----
-
-## 3. LVM ボリュームグループの設定（任意）
-
-marmot は OS ボリュームとデータボリュームに別々の VG を使います。  
-新規ノードではディスクに VG を作成してください。
-
-```bash
-# ディスクを確認する
-lsblk
-
-# Physical Volume を作成する (例: /dev/vdc, /dev/vdd)
-sudo pvcreate /dev/vdc
-sudo pvcreate /dev/vdd
-
-# Volume Group を作成する
-sudo vgcreate vg1 /dev/vdc   # OS ボリューム用
-sudo vgcreate vg2 /dev/vdd   # データボリューム用
-
-# 確認
-vgs
-```
-
----
-
-## 4. etcd の設定（クラスタ構成では必須、シングル構成では不要）
-
-marmot クラスターは etcd をデータストアとして使います。  
-`apt install marmot` で `etcd-server` も依存として入りますが、クラスター外部の etcd に接続する場合は次の設定は不要です。
-
-ローカルの etcd をクラスター向けに公開する場合:
-
-```bash
-sudo systemctl edit etcd
-```
-
-以下の内容を追加します。
-
-```ini
-[Service]
-Environment=ETCD_LISTEN_CLIENT_URLS="http://0.0.0.0:12379"
-Environment=ETCD_ADVERTISE_CLIENT_URLS="http://0.0.0.0:12379"
-```
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl restart etcd
-sudo systemctl status etcd
-```
-
-`/etc/marmot/marmotd.json` の `etcd_url` を etcd のアドレスに合わせて更新した後、marmot を再起動します。
-
----
-
-## 5. ネットワークの設定
-
-OVN 運用では、OVS/OVN サービス起動と libvirt 仮想ネットワーク定義を毎回同じ手順で適用します。
-直接 `ovs-vsctl` を手で実行する運用は推奨しません。
-
-### OVS/OVN サービスの確認
-
-```bash
-sudo systemctl status openvswitch-switch || true
-sudo systemctl status ovn-central || true
-sudo systemctl status ovn-host || true
-```
-
-### libvirt 仮想ネットワークをセットアップ
-
-```bash
-sudo -E env "PATH=$PATH" ./tools/setup-libvirt-networks.sh
-virsh net-list
-```
-
-### テストや検証後のクリーンアップ
-
-```bash
-sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
-```
-
-### 旧手順について
-
-旧来の `ovs-vsctl add-br` など OVS 直操作の手順は移行対象です。必要な場合のみ参考として [docs/network-setup.md](network-setup.md) を参照してください。
-
----
-
-## 6. open-iscsi の確認
-
-iSCSI 機能を使う場合は `iscsid` が起動していることを確認します。
-
-```bash
-sudo systemctl status iscsid
-
-# initiator IQN の確認 (各ノードに固有の値が入っている)
-cat /etc/iscsi/initiatorname.iscsi
-```
-
-iSCSI ターゲットサーバーにするノードは `/etc/marmot/marmotd.json` に次を追加します。
-
-```json
-"iscsi_server": true
-```
-
-設定後に marmot を再起動すると、そのノードが iSCSI ターゲットサーバーとして選択されるようになります。
-
----
-
-## 7. mactl クライアントの設定
-
-`mactl` は marmot API への接続先を `~/.marmot` ファイルで管理します。
-
-未作成の場合は、次のコマンドでデフォルトの設定ファイルを生成してから編集します。
-
-```bash
-mactl version
-```
-
-```bash
-vi ~/.marmot
-```
-
-設定例:
-
-```yaml
-current: 0
-endpoints:
-  - https://192.168.1.200:8750
-insecure-skip-tls-verify: false
-```
-
-複数のノードを列挙して `current` で切り替えることができます。
-
-```yaml
-current: 0
-endpoints:
-  - https://192.168.1.200:8750   # marmot1
-  - https://192.168.1.201:8750   # marmot2
-insecure-skip-tls-verify: false
-```
-
-### .marmot の補足
-
-- `current` は `endpoints` の 0 始まりインデックスです。
-- `insecure-skip-tls-verify: true` は自己署名証明書の検証をスキップする開発用設定です。本番環境では `false` を推奨します。
-- API が HTTP 運用の場合のみ、`endpoints` を `http://` で指定してください。
-
----
-
-## 8. 動作確認
-
-```bash
-# クラスターのノード一覧を確認する
-mactl cluster list
-
-# 仮想ネットワーク一覧を確認する
-mactl network list
-
-# イメージ一覧を確認する
-mactl image list
-```
-
-正常にインストールされていれば、クラスターに参加しているノードが表示されます。
 
 ---
 
@@ -273,5 +108,7 @@ sudo apt remove marmot
 sudo apt purge marmot
 ```
 
-`purge` を実行すると `/usr/local/marmot` と `/etc/marmot` が削除されます。  
-LVM ボリュームグループは削除されません。必要に応じて `vgremove` で手動削除してください。
+アンインストール時の注意: 
+- `purge` を実行すると `/usr/local/marmot` と `/etc/marmot` が削除されます。  
+- LVM ボリュームグループは削除されません。必要に応じて `vgremove` で手動削除してください。
+- /etc/netplan/下のファイルは、復元されません。 .bakファイルが作成されているので、これを利用して設定を復旧してください。
