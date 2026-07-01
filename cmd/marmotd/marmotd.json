@@ -14,6 +14,17 @@
   "image_download_timeout_seconds": 1800,
   "image_resize_timeout_seconds": 600,
   "image_delete_timeout_seconds": 120,
+  "host-bridge-ip-net-addr": "",
+  "host-bridge-ip-addr-start": "",
+  "host-bridge-ip-addr-end": "",
+  "host-bridge-default": {
+    "netmasklen": 24,
+    "nameservers": {
+      "addresses": [],
+      "search": []
+    },
+    "routes": []
+  },
   "os_images": [
     {
       "name": "ubuntu24.04",

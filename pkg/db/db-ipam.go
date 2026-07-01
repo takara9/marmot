@@ -128,6 +128,31 @@ func (d *Database) CreateIpNetwork(vnetid string, spec *api.IPNetwork) (string, 
 	net.EndAddress = util.StringPtr(addr.String())
 	net.NetworkAddress = util.StringPtr(networkAddr.String())
 	net.Gateway = util.StringPtr(networkAddr.Next().String()) // ゲートウェイはネットワークアドレスの次のアドレスとする
+	if spec.StartAddress != nil {
+		start, err := parseAndValidateAllocRangeAddr(strings.TrimSpace(*spec.StartAddress), prefix, networkAddr)
+		if err != nil {
+			slog.Error("CreateIpNetwork()", "err", err)
+			return "", err
+		}
+		net.StartAddress = util.StringPtr(start.String())
+	}
+	if spec.EndAddress != nil {
+		end, err := parseAndValidateAllocRangeAddr(strings.TrimSpace(*spec.EndAddress), prefix, networkAddr)
+		if err != nil {
+			slog.Error("CreateIpNetwork()", "err", err)
+			return "", err
+		}
+		net.EndAddress = util.StringPtr(end.String())
+	}
+	if net.StartAddress != nil && net.EndAddress != nil {
+		start, _ := netip.ParseAddr(strings.TrimSpace(*net.StartAddress))
+		end, _ := netip.ParseAddr(strings.TrimSpace(*net.EndAddress))
+		if start.Compare(end) > 0 {
+			err := fmt.Errorf("startAddress must be less than or equal to endAddress")
+			slog.Error("CreateIpNetwork()", "err", err, "startAddress", *net.StartAddress, "endAddress", *net.EndAddress)
+			return "", err
+		}
+	}
 	netmask, err := PrefixLenToMask(prefix.Bits(), prefix.Addr().Is6())
 	if err != nil {
 		slog.Error("CreateIpNetwork()", "err", err)
@@ -265,10 +290,43 @@ func (d *Database) AllocateIP(vnetId, ipnetId, hostId string) (string, int, erro
 
 	networkAddr := prefix.Masked().Addr()
 	// .0 はネットワークアドレス、.1 はゲートウェイとして予約しているため .2 から探索する。
-	addr := networkAddr.Next().Next()
+	startAddr := networkAddr.Next().Next()
+	if net.StartAddress != nil && strings.TrimSpace(*net.StartAddress) != "" {
+		parsedStart, err := parseAndValidateAllocRangeAddr(strings.TrimSpace(*net.StartAddress), prefix, networkAddr)
+		if err != nil {
+			slog.Error("AllocateIP()", "err", err, "vnetId", vnetId, "ipnetId", ipnetId)
+			return "", 0, err
+		}
+		startAddr = parsedStart
+	}
+
+	var endAddr netip.Addr
+	hasEndAddr := false
+	if net.EndAddress != nil && strings.TrimSpace(*net.EndAddress) != "" {
+		parsedEnd, err := parseAndValidateAllocRangeAddr(strings.TrimSpace(*net.EndAddress), prefix, networkAddr)
+		if err != nil {
+			slog.Error("AllocateIP()", "err", err, "vnetId", vnetId, "ipnetId", ipnetId)
+			return "", 0, err
+		}
+		endAddr = parsedEnd
+		hasEndAddr = true
+	}
+
+	if hasEndAddr && startAddr.Compare(endAddr) > 0 {
+		err := fmt.Errorf("startAddress must be less than or equal to endAddress")
+		slog.Error("AllocateIP()", "err", err, "vnetId", vnetId, "ipnetId", ipnetId, "startAddress", startAddr.String(), "endAddress", endAddr.String())
+		return "", 0, err
+	}
+
+	addr := startAddr
 
 	// 割り当てられているIPアドレスと比較して、未割り当てのIPアドレスを見つける
 	for {
+		if hasEndAddr && addr.Compare(endAddr) > 0 {
+			slog.Error("AllocateIP()", "err", "no available IP addresses in the network", "vnetId", vnetId, "ipnetId", ipnetId)
+			return "", 0, fmt.Errorf("no available IP addresses in the network")
+		}
+
 		if !addr.IsValid() || !prefix.Contains(addr) {
 			slog.Error("AllocateIP()", "err", "no available IP addresses in the network", "vnetId", vnetId, "ipnetId", ipnetId)
 			return "", 0, fmt.Errorf("no available IP addresses in the network")
@@ -305,6 +363,29 @@ func (d *Database) AllocateIP(vnetId, ipnetId, hostId string) (string, int, erro
 		}
 		addr = nextAddr
 	}
+}
+
+func parseAndValidateAllocRangeAddr(raw string, prefix netip.Prefix, networkAddr netip.Addr) (netip.Addr, error) {
+	addr, err := netip.ParseAddr(strings.TrimSpace(raw))
+	if err != nil {
+		return netip.Addr{}, fmt.Errorf("invalid IP address %q: %w", raw, err)
+	}
+	if !prefix.Contains(addr) {
+		return netip.Addr{}, fmt.Errorf("ip address %q is outside network %s", raw, prefix.String())
+	}
+	if addr == networkAddr {
+		return netip.Addr{}, fmt.Errorf("ip address %q is network address", raw)
+	}
+	if addr == networkAddr.Next() {
+		return netip.Addr{}, fmt.Errorf("ip address %q is reserved for gateway", raw)
+	}
+	if addr.Is4() {
+		next := addr.Next()
+		if !next.IsValid() || !prefix.Contains(next) {
+			return netip.Addr{}, fmt.Errorf("ip address %q is broadcast address", raw)
+		}
+	}
+	return addr, nil
 }
 
 // IPアドレスを解放する

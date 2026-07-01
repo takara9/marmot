@@ -2,13 +2,16 @@ package marmotd
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 )
 
@@ -31,6 +34,12 @@ type OSImage struct {
 	// OS のバージョン
 	// 例: "22.04"
 	OSVersion string `json:"osVersion"`
+}
+
+type HostBridgeDefault struct {
+	Netmasklen  *int             `json:"netmasklen,omitempty"`
+	Nameservers *api.Nameservers `json:"nameservers,omitempty"`
+	Routes      *[]api.Route     `json:"routes,omitempty"`
 }
 
 // MarmotdConfig は /etc/marmot/marmotd.json で設定可能なパラメータを保持します。
@@ -111,6 +120,21 @@ type MarmotdConfig struct {
 	// 例: "/etc/marmot/certs/server.key"
 	// 空の場合は HTTP を使用する。
 	TLSKeyFile string `json:"tls_key_file"`
+
+	// host-bridge の自動IP割り当て対象ネットワーク (CIDR)
+	// 例: "192.168.1.0/24"
+	HostBridgeIPNetAddr string `json:"host-bridge-ip-net-addr"`
+
+	// host-bridge の自動IP割り当て開始アドレス
+	// 例: "192.168.1.129"
+	HostBridgeIPAddrStart string `json:"host-bridge-ip-addr-start"`
+
+	// host-bridge の自動IP割り当て終了アドレス
+	// 例: "192.168.1.190"
+	HostBridgeIPAddrEnd string `json:"host-bridge-ip-addr-end"`
+
+	// host-bridge 利用時に NIC に補完する既定値
+	HostBridgeDefault *HostBridgeDefault `json:"host-bridge-default,omitempty"`
 }
 
 var runtimeConfigState = struct {
@@ -220,7 +244,109 @@ func normalizeConfig(cfg *MarmotdConfig) *MarmotdConfig {
 	normalized.LokiPushURL = strings.TrimSpace(normalized.LokiPushURL)
 	normalized.TLSCertFile = strings.TrimSpace(normalized.TLSCertFile)
 	normalized.TLSKeyFile = strings.TrimSpace(normalized.TLSKeyFile)
+	normalized.HostBridgeIPNetAddr = strings.TrimSpace(normalized.HostBridgeIPNetAddr)
+	normalized.HostBridgeIPAddrStart = strings.TrimSpace(normalized.HostBridgeIPAddrStart)
+	normalized.HostBridgeIPAddrEnd = strings.TrimSpace(normalized.HostBridgeIPAddrEnd)
+	if normalized.HostBridgeDefault != nil {
+		normalized.HostBridgeDefault = normalizeHostBridgeDefault(normalized.HostBridgeDefault)
+	}
 	return normalized
+}
+
+func normalizeHostBridgeDefault(in *HostBridgeDefault) *HostBridgeDefault {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	if in.Nameservers != nil {
+		ns := *in.Nameservers
+		if ns.Addresses != nil {
+			trimmed := make([]string, 0, len(*ns.Addresses))
+			for _, addr := range *ns.Addresses {
+				if v := strings.TrimSpace(addr); v != "" {
+					trimmed = append(trimmed, v)
+				}
+			}
+			ns.Addresses = &trimmed
+		}
+		if ns.Search != nil {
+			trimmed := make([]string, 0, len(*ns.Search))
+			for _, domain := range *ns.Search {
+				if v := strings.TrimSpace(domain); v != "" {
+					trimmed = append(trimmed, v)
+				}
+			}
+			ns.Search = &trimmed
+		}
+		out.Nameservers = &ns
+	}
+	if in.Routes != nil {
+		routes := make([]api.Route, 0, len(*in.Routes))
+		for _, r := range *in.Routes {
+			to := strings.TrimSpace(valueOrEmpty(r.To))
+			via := strings.TrimSpace(valueOrEmpty(r.Via))
+			if to == "" || via == "" {
+				continue
+			}
+			routes = append(routes, api.Route{To: &to, Via: &via})
+		}
+		out.Routes = &routes
+	}
+	return &out
+}
+
+func valueOrEmpty(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func validateHostBridgeAutoIPConfig(cfg *MarmotdConfig) error {
+	if cfg == nil {
+		return nil
+	}
+	netCIDR := strings.TrimSpace(cfg.HostBridgeIPNetAddr)
+	startStr := strings.TrimSpace(cfg.HostBridgeIPAddrStart)
+	endStr := strings.TrimSpace(cfg.HostBridgeIPAddrEnd)
+	if netCIDR == "" && startStr == "" && endStr == "" {
+		return nil
+	}
+	if netCIDR == "" || startStr == "" || endStr == "" {
+		return fmt.Errorf("host-bridge auto IP settings require host-bridge-ip-net-addr, host-bridge-ip-addr-start, and host-bridge-ip-addr-end")
+	}
+
+	prefix, err := netip.ParsePrefix(netCIDR)
+	if err != nil {
+		return fmt.Errorf("invalid host-bridge-ip-net-addr: %w", err)
+	}
+	prefix = prefix.Masked()
+
+	startAddr, err := netip.ParseAddr(startStr)
+	if err != nil {
+		return fmt.Errorf("invalid host-bridge-ip-addr-start: %w", err)
+	}
+	endAddr, err := netip.ParseAddr(endStr)
+	if err != nil {
+		return fmt.Errorf("invalid host-bridge-ip-addr-end: %w", err)
+	}
+	if !prefix.Contains(startAddr) {
+		return fmt.Errorf("host-bridge-ip-addr-start %s is outside %s", startAddr, prefix)
+	}
+	if !prefix.Contains(endAddr) {
+		return fmt.Errorf("host-bridge-ip-addr-end %s is outside %s", endAddr, prefix)
+	}
+	if startAddr.Compare(endAddr) > 0 {
+		return fmt.Errorf("host-bridge-ip-addr-start must be less than or equal to host-bridge-ip-addr-end")
+	}
+	if cfg.HostBridgeDefault != nil && cfg.HostBridgeDefault.Netmasklen != nil {
+		bits := *cfg.HostBridgeDefault.Netmasklen
+		if bits <= 0 || bits > prefix.Addr().BitLen() {
+			return fmt.Errorf("host-bridge-default.netmasklen must be in range 1..%d", prefix.Addr().BitLen())
+		}
+	}
+
+	return nil
 }
 
 func resolveDNSListenAddrFromInterfaces() (string, bool) {
@@ -336,5 +462,9 @@ func LoadConfig(path string) (*MarmotdConfig, error) {
 		return nil, err
 	}
 
-	return normalizeConfig(cfg), nil
+	normalized := normalizeConfig(cfg)
+	if err := validateHostBridgeAutoIPConfig(normalized); err != nil {
+		return nil, err
+	}
+	return normalized, nil
 }

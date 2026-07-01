@@ -597,7 +597,10 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 						return "", err
 					}
 				} else if isIPAMUnmanagedNetwork(vnet.Metadata.Name) {
-					// default/host-bridge は libvirt 側 DHCP を利用し、Marmot の IPAM 対象外とする。
+					if strings.TrimSpace(vnet.Metadata.Name) == "host-bridge" {
+						return "", hostBridgeIPAMMissingConfigError(reqNic.Networkname)
+					}
+					// default は libvirt 側 DHCP を利用し、Marmot の IPAM 対象外とする。
 					slog.Debug("Skipping Marmot IP allocation for unmanaged network", "network id", api.VirtualNetworkID(vnet), "network name", vnet.Metadata.Name)
 				} else {
 					// 仮想ネットワーク作成直後は IPAM 初期化前の可能性があるため、
@@ -698,6 +701,42 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 					ni.IpNetworkId = util.StringPtr(*vnet.Spec.IpNetworkId)
 				} else {
 					ni.IpNetworkId = util.StringPtr(ni.Networkid)
+				}
+				if (ni.Routes == nil || len(*ni.Routes) == 0) && ipnet.Routes != nil {
+					routes := make([]api.Route, 0, len(*ipnet.Routes))
+					for _, r := range *ipnet.Routes {
+						to := strings.TrimSpace(util.OrDefault(r.To, ""))
+						via := strings.TrimSpace(util.OrDefault(r.Via, ""))
+						if to == "" || via == "" {
+							continue
+						}
+						routes = append(routes, api.Route{To: util.StringPtr(to), Via: util.StringPtr(via)})
+					}
+					if len(routes) > 0 {
+						ni.Routes = &routes
+					}
+				}
+				if ni.Nameservers == nil && ipnet.Nameservers != nil {
+					ns := api.Nameservers{}
+					if ipnet.Nameservers.Addresses != nil {
+						addresses := make([]string, 0, len(*ipnet.Nameservers.Addresses))
+						for _, addr := range *ipnet.Nameservers.Addresses {
+							if v := strings.TrimSpace(addr); v != "" {
+								addresses = append(addresses, v)
+							}
+						}
+						ns.Addresses = &addresses
+					}
+					if ipnet.Nameservers.Search != nil {
+						search := make([]string, 0, len(*ipnet.Nameservers.Search))
+						for _, domain := range *ipnet.Nameservers.Search {
+							if v := strings.TrimSpace(domain); v != "" {
+								search = append(search, v)
+							}
+						}
+						ns.Search = &search
+					}
+					ni.Nameservers = &ns
 				}
 			}
 
@@ -1235,6 +1274,14 @@ func isIPAMUnmanagedNetwork(name string) bool {
 	default:
 		return false
 	}
+}
+
+func hostBridgeIPAMMissingConfigError(networkName string) error {
+	name := strings.TrimSpace(networkName)
+	if name == "" {
+		name = "host-bridge"
+	}
+	return fmt.Errorf("network '%s' is not ready for IP allocation: configure host-bridge-ip-net-addr, host-bridge-ip-addr-start, host-bridge-ip-addr-end in marmotd.json and restart marmotd", name)
 }
 
 func (m *Marmot) lookupIPAllocationOwner(vnetID, ipNetID, ip string) (string, error) {
