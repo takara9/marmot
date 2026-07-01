@@ -1,6 +1,9 @@
 package marmotd
 
-import "testing"
+import (
+	"runtime"
+	"testing"
+)
 
 func TestNormalizeLokiPushURL(t *testing.T) {
 	tests := []struct {
@@ -33,5 +36,33 @@ func TestNormalizeLokiPushURL(t *testing.T) {
 				t.Fatalf("unexpected url: got=%s want=%s", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestSourceFromPC(t *testing.T) {
+	pc, _, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatalf("runtime.Caller failed")
+	}
+
+	source, found := sourceFromPC(pc)
+	if !found {
+		t.Fatalf("source not found")
+	}
+
+	if _, ok := source["file"].(string); !ok {
+		t.Fatalf("file is missing or not string: %#v", source["file"])
+	}
+	if _, ok := source["function"].(string); !ok {
+		t.Fatalf("function is missing or not string: %#v", source["function"])
+	}
+	if line, ok := source["line"].(int); !ok || line <= 0 {
+		t.Fatalf("line is missing or invalid: %#v", source["line"])
+	}
+}
+
+func TestSourceFromPCZero(t *testing.T) {
+	if _, ok := sourceFromPC(0); ok {
+		t.Fatalf("expected no source for pc=0")
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -134,6 +135,10 @@ func (h *lokiHandler) Handle(ctx context.Context, r slog.Record) error {
 		"msg":   r.Message,
 	}
 
+	if source, ok := sourceFromPC(r.PC); ok {
+		body["source"] = source
+	}
+
 	attrs := make(map[string]interface{})
 	for _, attr := range h.attrs {
 		appendAttr(attrs, h.group, attr)
@@ -188,6 +193,34 @@ func appendAttr(target map[string]interface{}, group string, attr slog.Attr) {
 	}
 
 	target[key] = attrValueToAny(value)
+}
+
+func sourceFromPC(pc uintptr) (map[string]interface{}, bool) {
+	if pc == 0 {
+		return nil, false
+	}
+
+	frames := runtime.CallersFrames([]uintptr{pc})
+	frame, _ := frames.Next()
+	if frame.File == "" && frame.Function == "" && frame.Line <= 0 {
+		return nil, false
+	}
+
+	source := map[string]interface{}{}
+	if frame.Function != "" {
+		source["function"] = frame.Function
+	}
+	if frame.File != "" {
+		source["file"] = frame.File
+	}
+	if frame.Line > 0 {
+		source["line"] = frame.Line
+	}
+
+	if len(source) == 0 {
+		return nil, false
+	}
+	return source, true
 }
 
 func attrValueToAny(v slog.Value) interface{} {
