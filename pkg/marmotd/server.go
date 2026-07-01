@@ -578,14 +578,39 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			} else {
 				// IPアドレスの指定が無いので、IPアドレスを割り当て
 				slog.Debug("IPアドレスの割り当て", "network id", api.VirtualNetworkID(vnet), "network name", vnet.Metadata.Name)
+				ipNetID := ""
 				if vnet.Spec.IpNetworkId != nil {
-					ipaddr, bitmask, err = m.Db.AllocateIP(api.VirtualNetworkID(vnet), *vnet.Spec.IpNetworkId, serverConfig.Metadata.Name)
+					ipNetID = strings.TrimSpace(*vnet.Spec.IpNetworkId)
+				}
+
+				// host-bridge はネットワーク同期のタイミング差で IpNetworkId が未設定のまま
+				// 到達する場合があるため、必要ならここで設定を同期して補完する。
+				if ipNetID == "" && strings.TrimSpace(vnet.Metadata.Name) == "host-bridge" {
+					if err := m.ensureHostBridgeIPNetwork(&vnet); err != nil {
+						return "", err
+					}
+					refreshedVNet, refreshErr := m.Db.GetVirtualNetworkByName(reqNic.Networkname)
+					if refreshErr != nil {
+						slog.Error("GetVirtualNetworkByName()", "err", refreshErr, "network name", reqNic.Networkname)
+						if refreshErr.Error() == "not found" {
+							refreshErr = fmt.Errorf("network '%s' is not found", reqNic.Networkname)
+						}
+						return "", refreshErr
+					}
+					vnet = refreshedVNet
+					if vnet.Spec.IpNetworkId != nil {
+						ipNetID = strings.TrimSpace(*vnet.Spec.IpNetworkId)
+					}
+				}
+
+				if ipNetID != "" {
+					ipaddr, bitmask, err = m.Db.AllocateIP(api.VirtualNetworkID(vnet), ipNetID, serverConfig.Metadata.Name)
 					if err != nil {
 						slog.Error("AllocateIP()", "err", err)
 						return "", err
 					}
 
-					ipnet, err = m.Db.GetIpNetworkById(api.VirtualNetworkID(vnet), *vnet.Spec.IpNetworkId)
+					ipnet, err = m.Db.GetIpNetworkById(api.VirtualNetworkID(vnet), ipNetID)
 					if err != nil {
 						slog.Error("GetIpNetworkById()", "err", err)
 						return "", err
