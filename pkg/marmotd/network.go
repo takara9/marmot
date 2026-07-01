@@ -602,7 +602,6 @@ func (m *Marmot) CheckVirtualNetworks() error {
 		_, err = m.Db.GetVirtualNetworkById(api.VirtualNetworkID(*vnet))
 		if err == nil {
 			slog.Debug("Virtual network already exists in ETCD, skipping", "id", api.VirtualNetworkID(*vnet))
-			continue
 		} else if err == db.ErrNotFound {
 			// このノードで発見したネットワークにノード名を付与する
 			if m != nil && m.NodeName != "" {
@@ -612,8 +611,17 @@ func (m *Marmot) CheckVirtualNetworks() error {
 			if err := m.Db.PutVirtualNetworksETCD(*vnet); err != nil {
 				slog.Error("Failed to put virtual network to ETCD", "err", err)
 			}
+		} else {
+			slog.Error("Failed to check virtual network in ETCD", "err", err, "id", api.VirtualNetworkID(*vnet))
+			continue
 		}
 		m.Db.UpdateVirtualNetworkStatus(api.VirtualNetworkID(*vnet), db.NETWORK_ACTIVE)
+		if strings.TrimSpace(vnet.Metadata.Name) == "host-bridge" {
+			if err := m.ensureHostBridgeIPNetwork(vnet); err != nil {
+				slog.Error("Failed to sync host-bridge IP network from config", "err", err, "networkId", api.VirtualNetworkID(*vnet))
+				continue
+			}
+		}
 	}
 
 	return nil
