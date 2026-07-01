@@ -149,7 +149,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			if err != nil {
 				GinkgoWriter.Println(string(stdoutStderr))
 			}
-			//Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			By("開始 デファルト")
 			cmd = exec.Command("virsh", "net-start", "default")
@@ -157,7 +157,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			if err != nil {
 				GinkgoWriter.Println(string(stdoutStderr))
 			}
-			//Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			By("自動起動設定  デファルト")
 			cmd = exec.Command("virsh", "net-autostart", "default")
@@ -165,7 +165,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			if err != nil {
 				GinkgoWriter.Println(string(stdoutStderr))
 			}
-			//Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("定義 host-bridge", func() {
@@ -175,7 +175,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			if err != nil {
 				GinkgoWriter.Println(string(stdoutStderr))
 			}
-			//Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			By("開始 ホストブリッジ")
 			cmd = exec.Command("virsh", "net-start", "host-bridge")
@@ -183,7 +183,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			if err != nil {
 				GinkgoWriter.Println(string(stdoutStderr))
 			}
-			//Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			By("自動起動設定  ホストブリッジ")
 			cmd = exec.Command("virsh", "net-autostart", "host-bridge")
@@ -191,7 +191,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			if err != nil {
 				GinkgoWriter.Println(string(stdoutStderr))
 			}
-			//Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("ネットワークの定義 ovs-network", func() {
@@ -201,7 +201,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			if err != nil {
 				GinkgoWriter.Println(string(stdoutStderr))
 			}
-			//Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			By("開始 Open-VSwitch")
 			cmd = exec.Command("virsh", "net-start", "ovs-network")
@@ -209,7 +209,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			if err != nil {
 				GinkgoWriter.Println(string(stdoutStderr))
 			}
-			//Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			By("自動起動設定  Open-VSwitch")
 			cmd = exec.Command("virsh", "net-autostart", "ovs-network")
@@ -217,7 +217,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			if err != nil {
 				GinkgoWriter.Println(string(stdoutStderr))
 			}
-			//Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("DB登録をチェック JSON形式", func() {
