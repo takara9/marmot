@@ -109,7 +109,8 @@ func (d *Database) CreateIpNetwork(vnetid string, spec *api.IPNetwork) (string, 
 
 	// IPアドレスの開始と終了アドレスを設定する
 	networkAddr := prefix.Addr()
-	addr := networkAddr.Next()
+	// .0 はネットワーク、.1 はゲートウェイとして予約するため、既定開始は .2 にする。
+	addr := networkAddr.Next().Next()
 	net.Netmasklen = util.IntPtrInt(prefix.Bits())
 	net.StartAddress = util.StringPtr(addr.String())
 	hostBits := prefix.Addr().BitLen() - prefix.Bits()
@@ -117,10 +118,16 @@ func (d *Database) CreateIpNetwork(vnetid string, spec *api.IPNetwork) (string, 
 		slog.Error("CreateIpNetwork()", "err", "prefix is too small for gateway and usable host", "addressMaskLen", prefix.String())
 		return "", fmt.Errorf("prefix is too small for gateway and usable host")
 	}
-	// ブロードキャストアドレスとゲートウェイを考慮して -3 する。
+	// 既定終了アドレスは、IPv4 ではブロードキャストを除外し、IPv6 では最終アドレスを許可する。
 	endDelta := new(big.Int).Lsh(big.NewInt(1), uint(hostBits))
-	endDelta.Sub(endDelta, big.NewInt(3))
-	addr, err = addIPBig(addr, endDelta)
+	if networkAddr.Is4() {
+		// network + (2^hostBits - 2) = 最終利用可能ホスト
+		endDelta.Sub(endDelta, big.NewInt(2))
+	} else {
+		// network + (2^hostBits - 1) = プレフィックス内の最終アドレス
+		endDelta.Sub(endDelta, big.NewInt(1))
+	}
+	addr, err = addIPBig(networkAddr, endDelta)
 	if err != nil {
 		slog.Error("CreateIpNetwork()", "err", err, "addressMaskLen", prefix.String())
 		return "", err

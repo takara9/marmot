@@ -86,6 +86,7 @@ var _ = Describe("IPAM", Ordered, func() {
 				Expect(*net.NetworkAddress).To(Equal("192.168.200.0"))
 				Expect(*net.Netmask).To(Equal("255.255.255.0"))
 				Expect(*net.Gateway).To(Equal("192.168.200.1"))
+				Expect(*net.StartAddress).To(Equal("192.168.200.2"))
 				Expect(*net.Netmasklen).To(Equal(24))
 			})
 
