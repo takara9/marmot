@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -88,6 +89,21 @@ func startEtcdContainer() (string, string, error) {
 	return containerID, fmt.Sprintf("http://127.0.0.1:%d", port), nil
 }
 
+func loadMockServerConfig(etcdEp string) (*marmotd.MarmotdConfig, error) {
+	cfg, err := marmotd.LoadConfig(filepath.Join("testdata", "marmotd.json"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to load mock server config: %w", err)
+	}
+
+	// テスト用の起動環境に合わせて runtime config を補正する。
+	cfg.EtcdURL = etcdEp
+	cfg.NodeName = "hvc"
+	cfg.DNSListenAddr = "127.0.0.1:1053"
+	marmotd.SetRuntimeConfig(cfg)
+
+	return cfg, nil
+}
+
 func startMockServer(etcdEp string) (*mockServerHandle, error) {
 	// 個別にログを確認したい場合はコメントアウトを外す
 	//opts := &slog.HandlerOptions{
@@ -103,7 +119,12 @@ func startMockServer(etcdEp string) (*mockServerHandle, error) {
 		done:   make(chan struct{}),
 	}
 
-	nodeName := "hvc"
+	cfg, err := loadMockServerConfig(etcdEp)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	nodeName := cfg.NodeName
 
 	e := echo.New()
 	server := marmotd.NewServerWithOptions(nodeName, etcdEp, true)
