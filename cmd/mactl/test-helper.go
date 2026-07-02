@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -89,41 +90,66 @@ func startEtcdContainer() (string, string, error) {
 	return containerID, fmt.Sprintf("http://127.0.0.1:%d", port), nil
 }
 
-func loadMockServerConfig(etcdEp string) (*marmotd.MarmotdConfig, error) {
-	configPaths := []string{
-		filepath.Join("testdata", "marmotd.json"),
-		filepath.Join("cmd", "mactl", "testdata", "marmotd.json"),
+func findMockServerConfigPath() (string, []string, error) {
+	candidates := make([]string, 0, 24)
+	seen := map[string]struct{}{}
+	addCandidate := func(baseDir, rel string) {
+		if strings.TrimSpace(baseDir) == "" || strings.TrimSpace(rel) == "" {
+			return
+		}
+		path := filepath.Clean(filepath.Join(baseDir, rel))
+		if _, ok := seen[path]; ok {
+			return
+		}
+		seen[path] = struct{}{}
+		candidates = append(candidates, path)
 	}
 
-	var (
-		cfg      *marmotd.MarmotdConfig
-		cfgPath  string
-		loadErrs []string
-	)
-	for _, p := range configPaths {
-		if _, err := os.Stat(p); err != nil {
-			if os.IsNotExist(err) {
-				continue
+	if envPath := strings.TrimSpace(os.Getenv("MARMOT_MOCK_SERVER_CONFIG")); envPath != "" {
+		addCandidate("", envPath)
+	}
+
+	if _, file, _, ok := runtime.Caller(0); ok {
+		srcDir := filepath.Dir(file)
+		addCandidate(srcDir, "testdata/marmotd.json")
+		addCandidate(filepath.Clean(filepath.Join(srcDir, "../..")), "cmd/mactl/testdata/marmotd.json")
+	}
+
+	if cwd, err := os.Getwd(); err == nil {
+		dir := cwd
+		for i := 0; i < 12; i++ {
+			addCandidate(dir, "testdata/marmotd.json")
+			addCandidate(dir, "cmd/mactl/testdata/marmotd.json")
+
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				break
 			}
-			loadErrs = append(loadErrs, fmt.Sprintf("%s: %v", p, err))
-			continue
+			dir = parent
 		}
-
-		var err error
-		cfg, err = marmotd.LoadConfig(p)
-		if err != nil {
-			loadErrs = append(loadErrs, fmt.Sprintf("%s: %v", p, err))
-			continue
-		}
-		cfgPath = p
-		break
 	}
 
-	if cfg == nil {
-		if len(loadErrs) > 0 {
-			return nil, fmt.Errorf("failed to load mock server config (%s)", strings.Join(loadErrs, "; "))
+	for _, p := range candidates {
+		if p == "" {
+			continue
 		}
-		return nil, fmt.Errorf("failed to find mock server config: tried %v", configPaths)
+		if info, err := os.Stat(p); err == nil && !info.IsDir() {
+			return p, candidates, nil
+		}
+	}
+
+	return "", candidates, fmt.Errorf("failed to find mock server config")
+}
+
+func loadMockServerConfig(etcdEp string) (*marmotd.MarmotdConfig, error) {
+	cfgPath, triedPaths, err := findMockServerConfigPath()
+	if err != nil {
+		return nil, fmt.Errorf("failed to find mock server config: tried %v", triedPaths)
+	}
+
+	cfg, err := marmotd.LoadConfig(cfgPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load mock server config %s: %w", cfgPath, err)
 	}
 
 	// テスト用の起動環境に合わせて runtime config を補正する。
