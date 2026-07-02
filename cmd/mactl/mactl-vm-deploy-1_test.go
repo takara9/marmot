@@ -142,6 +142,9 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 	})
 
 	Context("基礎ネットワークの準備", func() {
+		/*
+		以下の部分は、workflow/main.yaml から tools/setup-libvirt-networks.sh を呼び出しているので、テストコードからコメントアウトする
+
 		It("定義 default", func() {
 			By("定義設定 デファルト")
 			cmd := exec.Command("virsh", "net-define", "testdata/default-network.xml")
@@ -219,6 +222,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			}
 			//Expect(err).NotTo(HaveOccurred())
 		})
+		*/
 
 		It("DB登録をチェック JSON形式", func() {
 			Eventually(func(g Gomega) {
