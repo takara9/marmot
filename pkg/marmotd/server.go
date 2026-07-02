@@ -340,6 +340,43 @@ func (m *Marmot) resolveISCSIDiskAttachment(nodeName string, disk api.Volume) (t
 func (m *Marmot) CreateServerManage(id string) (string, error) {
 	slog.Debug("=====CreateServer2()=====", "", "")
 
+	type reservedIP struct {
+		vnetID   string
+		ipNetID  string
+		ip       string
+		hostname string
+		network  string
+	}
+
+	reservedIPs := make([]reservedIP, 0, 4)
+	commitReservations := false
+	defer func() {
+		if commitReservations {
+			return
+		}
+		for _, r := range reservedIPs {
+			if err := m.Db.ReleaseIP(r.vnetID, r.ipNetID, r.ip); err != nil && err != db.ErrNotFound {
+				slog.Warn("rollback ReleaseIP() failed", "network", r.network, "ip", r.ip, "err", err)
+			}
+			if err := m.Db.DeleteDnsEntryByName(r.hostname, r.network); err != nil && err != db.ErrNotFound {
+				slog.Warn("rollback DeleteDnsEntryByName() failed", "hostname", r.hostname, "network", r.network, "err", err)
+			}
+		}
+	}()
+
+	registerReservation := func(vnetID, ipNetID, ip, hostname, network string) {
+		if strings.TrimSpace(vnetID) == "" || strings.TrimSpace(ipNetID) == "" || strings.TrimSpace(ip) == "" {
+			return
+		}
+		reservedIPs = append(reservedIPs, reservedIP{
+			vnetID:   strings.TrimSpace(vnetID),
+			ipNetID:  strings.TrimSpace(ipNetID),
+			ip:       strings.TrimSpace(ip),
+			hostname: strings.TrimSpace(hostname),
+			network:  strings.TrimSpace(network),
+		})
+	}
+
 	var bootVol api.Volume
 	var bootVolSpec api.VolSpec
 	var bootVolMeta api.Metadata
@@ -539,22 +576,26 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 					if ownerErr != nil {
 						return "", ownerErr
 					}
-
-					// host-bridge/default は IPAM 非管理扱いだが、静的IP重複チェックは実施する。
-					// ただし残骸レコード(所有サーバーが存在しない)は再取得可能とする。
-					if isIPAMUnmanagedNetwork(vnet.Metadata.Name) {
-						if ownerName == "" || ownerName == serverConfig.Metadata.Name {
-							found = false
-						} else {
-							exists, existsErr := m.serverExistsByName(ownerName)
-							if existsErr != nil {
-								return "", existsErr
-							}
-							if !exists {
-								slog.Warn("Reclaiming stale IP allocation record", "network", reqNic.Networkname, "ip", ipaddr, "staleOwner", ownerName)
-								found = false
-							}
+					reclaim := false
+					sameOrEmptyOwner := shouldTreatIPAllocationAsReusable(ownerName, serverConfig.Metadata.Name)
+					if sameOrEmptyOwner {
+						reclaim = true
+					} else {
+						exists, existsErr := m.serverExistsByName(ownerName)
+						if existsErr != nil {
+							return "", existsErr
 						}
+						if !exists {
+							slog.Warn("Reclaiming stale IP allocation record", "network", reqNic.Networkname, "ip", ipaddr, "staleOwner", ownerName)
+							reclaim = true
+						}
+					}
+
+					if reclaim {
+						if relErr := m.Db.ReleaseIP(api.VirtualNetworkID(vnet), ipNetId, ipaddr); relErr != nil && relErr != db.ErrNotFound {
+							return "", relErr
+						}
+						found = false
 					}
 
 					if found {
@@ -566,7 +607,10 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 				}
 				if !found {
 					slog.Debug("セットさられたIPアドレス", "IP	", ipaddr)
-					m.Db.SetIPaddrInUse(api.VirtualNetworkID(vnet), ipNetId, ipaddr, serverConfig.Metadata.Name)
+					if err := m.Db.SetIPaddrInUse(api.VirtualNetworkID(vnet), ipNetId, ipaddr, serverConfig.Metadata.Name); err != nil {
+						return "", err
+					}
+					registerReservation(api.VirtualNetworkID(vnet), ipNetId, ipaddr, serverConfig.Metadata.Name, reqNic.Networkname)
 					//return ipaddr, nil
 				}
 				// 内部DNSへ登録
@@ -609,6 +653,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 						slog.Error("AllocateIP()", "err", err)
 						return "", err
 					}
+					registerReservation(api.VirtualNetworkID(vnet), ipNetID, ipaddr, serverConfig.Metadata.Name, reqNic.Networkname)
 
 					ipnet, err = m.Db.GetIpNetworkById(api.VirtualNetworkID(vnet), ipNetID)
 					if err != nil {
@@ -1112,6 +1157,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		slog.Error("UpdateServer()", "err", err)
 		return "", err
 	}
+	commitReservations = true
 
 	return id, nil
 }
@@ -1307,6 +1353,18 @@ func hostBridgeIPAMMissingConfigError(networkName string) error {
 		name = "host-bridge"
 	}
 	return fmt.Errorf("network '%s' is not ready for IP allocation: configure host-bridge-ip-net-addr, host-bridge-ip-addr-start, host-bridge-ip-addr-end in marmotd.json and restart marmotd", name)
+}
+
+func shouldTreatIPAllocationAsReusable(ownerName, requestServerName string) bool {
+	owner := strings.TrimSpace(ownerName)
+	requester := strings.TrimSpace(requestServerName)
+	if owner == "" {
+		return true
+	}
+	if requester != "" && owner == requester {
+		return true
+	}
+	return false
 }
 
 func (m *Marmot) lookupIPAllocationOwner(vnetID, ipNetID, ip string) (string, error) {
