@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/takara9/marmot/api"
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/pkg/controller"
 	internaldns "github.com/takara9/marmot/pkg/internal-dns"
@@ -28,6 +29,9 @@ type mockServerHandle struct {
 	done   chan struct{}
 	once   sync.Once
 }
+
+var findMockServerConfigPathFn = findMockServerConfigPath
+var defaultMockServerConfigFn = defaultMockServerConfig
 
 func ensureMactlTestBinary() error {
 	if _, err := os.Stat("bin/mactl-test"); err == nil {
@@ -94,10 +98,15 @@ func findMockServerConfigPath() (string, []string, error) {
 	candidates := make([]string, 0, 24)
 	seen := map[string]struct{}{}
 	addCandidate := func(baseDir, rel string) {
-		if strings.TrimSpace(baseDir) == "" || strings.TrimSpace(rel) == "" {
+		if strings.TrimSpace(rel) == "" {
 			return
 		}
-		path := filepath.Clean(filepath.Join(baseDir, rel))
+		path := ""
+		if strings.TrimSpace(baseDir) == "" {
+			path = filepath.Clean(rel)
+		} else {
+			path = filepath.Clean(filepath.Join(baseDir, rel))
+		}
 		if _, ok := seen[path]; ok {
 			return
 		}
@@ -141,10 +150,47 @@ func findMockServerConfigPath() (string, []string, error) {
 	return "", candidates, fmt.Errorf("failed to find mock server config")
 }
 
-func loadMockServerConfig(etcdEp string) (*marmotd.MarmotdConfig, error) {
-	cfgPath, triedPaths, err := findMockServerConfigPath()
+func defaultMockServerConfig() (*marmotd.MarmotdConfig, error) {
+	// 存在しないパスを指定して、marmotd 側のデフォルト設定を取得する。
+	baseCfg, err := marmotd.LoadConfig(filepath.Join(os.TempDir(), "marmotd-mock-defaults-do-not-create.json"))
 	if err != nil {
-		return nil, fmt.Errorf("failed to find mock server config: tried %v", triedPaths)
+		return nil, err
+	}
+
+	netmasklen := 24
+	defaultRouteTo := "default"
+	defaultRouteVia := "192.168.1.1"
+	baseCfg.HostBridgeIPNetAddr = "192.168.1.0/24"
+	baseCfg.HostBridgeIPAddrStart = "192.168.1.190"
+	baseCfg.HostBridgeIPAddrEnd = "192.168.1.194"
+	baseCfg.HostBridgeDefault = &marmotd.HostBridgeDefault{
+		Netmasklen: &netmasklen,
+		Nameservers: &api.Nameservers{
+			Addresses: &[]string{"8.8.8.8"},
+			Search:    &[]string{"labo.local"},
+		},
+		Routes: &[]api.Route{{
+			To:  &defaultRouteTo,
+			Via: &defaultRouteVia,
+		}},
+	}
+
+	return baseCfg, nil
+}
+
+func loadMockServerConfig(etcdEp string) (*marmotd.MarmotdConfig, error) {
+	cfgPath, triedPaths, err := findMockServerConfigPathFn()
+	if err != nil {
+		cfg, fallbackErr := defaultMockServerConfigFn()
+		if fallbackErr != nil {
+			return nil, fmt.Errorf("failed to find mock server config: tried %v (fallback error: %v)", triedPaths, fallbackErr)
+		}
+		slog.Warn("mock server config file not found; using built-in defaults", "tried", triedPaths)
+		cfg.EtcdURL = etcdEp
+		cfg.NodeName = "hvc"
+		cfg.DNSListenAddr = "127.0.0.1:1053"
+		marmotd.SetRuntimeConfig(cfg)
+		return cfg, nil
 	}
 
 	cfg, err := marmotd.LoadConfig(cfgPath)
