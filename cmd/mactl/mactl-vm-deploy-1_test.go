@@ -1060,7 +1060,6 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			stdoutStderr, err := cmd.CombinedOutput()
 			Expect(err).NotTo(HaveOccurred())
 			fmt.Println(string(stdoutStderr))
-
 			var reply api.Success
 			err = json.Unmarshal(stdoutStderr, &reply)
 			Expect(err).NotTo(HaveOccurred())
@@ -1073,7 +1072,6 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 				stdoutStderr, err := cmd.CombinedOutput()
 				g.Expect(err).NotTo(HaveOccurred())
 				fmt.Println(string(stdoutStderr))
-
 				var server api.Server
 				err = json.Unmarshal(stdoutStderr, &server)
 				Expect(err).NotTo(HaveOccurred())
