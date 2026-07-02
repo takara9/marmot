@@ -46,7 +46,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		fmt.Printf("Container started with ID: %s\n", containerID)
 
 		By("モックサーバーの起動")
-		mockServer, err = startMockServer(etcdEp)
+		mockServer, err = startMockServer(etcdEp, "testdata/marmotd.json")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(loginAsAdmin()).NotTo(HaveOccurred())
 	})

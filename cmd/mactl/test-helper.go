@@ -88,7 +88,7 @@ func startEtcdContainer() (string, string, error) {
 	return containerID, fmt.Sprintf("http://127.0.0.1:%d", port), nil
 }
 
-func startMockServer(etcdEp string) (*mockServerHandle, error) {
+func startMockServer(etcdEp string, configPath string) (*mockServerHandle, error) {
 	// 個別にログを確認したい場合はコメントアウトを外す
 	//opts := &slog.HandlerOptions{
 	//	AddSource: true,
@@ -104,6 +104,20 @@ func startMockServer(etcdEp string) (*mockServerHandle, error) {
 	}
 
 	nodeName := "hvc"
+	cfg := marmotd.CurrentConfig()
+	if strings.TrimSpace(configPath) != "" {
+		loadedCfg, err := marmotd.LoadConfig(configPath)
+		if err != nil {
+			cancel()
+			return nil, fmt.Errorf("failed to load marmotd config: %w", err)
+		}
+		cfg = loadedCfg
+	}
+	cfg.NodeName = nodeName
+	cfg.EtcdURL = etcdEp
+	// テスト時は 53 番ポート競合を避けるため固定ポートを使う
+	cfg.DNSListenAddr = "127.0.0.1:1053"
+	marmotd.SetRuntimeConfig(cfg)
 
 	e := echo.New()
 	server := marmotd.NewServerWithOptions(nodeName, etcdEp, true)
@@ -160,11 +174,7 @@ func startMockServer(etcdEp string) (*mockServerHandle, error) {
 		}
 		stoppers = append(stoppers, gatewayController)
 
-		dnsCfg := &marmotd.MarmotdConfig{
-			DNSListenAddr: "127.0.0.1:1053",
-			DNSUpstream:   "8.8.8.8:53",
-		}
-		_, err = internaldns.StartInternalDNSServer(ctx, nodeName, etcdEp, dnsCfg)
+		_, err = internaldns.StartInternalDNSServer(ctx, nodeName, etcdEp, cfg)
 		if err != nil {
 			slog.Error("Failed to start DNS server", "err", err)
 			stopControllers()
