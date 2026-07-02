@@ -8,7 +8,7 @@ spec:
     memory: 1024
     networkInterface:
         - networkname: "host-bridge"
-          address: "192.168.1.37"
+          address: "192.168.1.137"
           netmasklen: 24
           routes:
             - to: "default"

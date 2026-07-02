@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -224,11 +225,144 @@ func (m *Marmot) GetVirtualNetworksAndPutDB() ([]api.VirtualNetwork, error) {
 		//	Status: util.IntPtrInt(db.NETWORK_ACTIVE),
 		//}
 		m.Db.UpdateVirtualNetworkStatus(api.VirtualNetworkID(net), db.NETWORK_ACTIVE)
+		if strings.TrimSpace(net.Metadata.Name) == "host-bridge" {
+			if err := m.ensureHostBridgeIPNetwork(&net); err != nil {
+				slog.Error("Failed to sync host-bridge IP network from config", "err", err, "networkId", api.VirtualNetworkID(net))
+				continue
+			}
+		}
 
 		// 戻り値に追加
 		apiNetworks = append(apiNetworks, net)
 	}
 	return apiNetworks, nil
+}
+
+func cloneRoutes(routes *[]api.Route) *[]api.Route {
+	if routes == nil {
+		return nil
+	}
+	out := make([]api.Route, 0, len(*routes))
+	for _, r := range *routes {
+		to := strings.TrimSpace(util.OrDefault(r.To, ""))
+		via := strings.TrimSpace(util.OrDefault(r.Via, ""))
+		if to == "" || via == "" {
+			continue
+		}
+		out = append(out, api.Route{To: util.StringPtr(to), Via: util.StringPtr(via)})
+	}
+	return &out
+}
+
+func cloneNameservers(ns *api.Nameservers) *api.Nameservers {
+	if ns == nil {
+		return nil
+	}
+	copyNS := api.Nameservers{}
+	if ns.Addresses != nil {
+		addresses := make([]string, 0, len(*ns.Addresses))
+		for _, addr := range *ns.Addresses {
+			if v := strings.TrimSpace(addr); v != "" {
+				addresses = append(addresses, v)
+			}
+		}
+		copyNS.Addresses = &addresses
+	}
+	if ns.Search != nil {
+		search := make([]string, 0, len(*ns.Search))
+		for _, domain := range *ns.Search {
+			if v := strings.TrimSpace(domain); v != "" {
+				search = append(search, v)
+			}
+		}
+		copyNS.Search = &search
+	}
+	return &copyNS
+}
+
+func (m *Marmot) ensureHostBridgeIPNetwork(vnet *api.VirtualNetwork) error {
+	if m == nil || m.Db == nil || vnet == nil {
+		return nil
+	}
+	if strings.TrimSpace(vnet.Metadata.Name) != "host-bridge" {
+		return nil
+	}
+
+	cfg := CurrentConfig()
+	if cfg == nil {
+		return nil
+	}
+	netCIDR := strings.TrimSpace(cfg.HostBridgeIPNetAddr)
+	start := strings.TrimSpace(cfg.HostBridgeIPAddrStart)
+	end := strings.TrimSpace(cfg.HostBridgeIPAddrEnd)
+	if netCIDR == "" || start == "" || end == "" {
+		return nil
+	}
+
+	prefix, err := netip.ParsePrefix(netCIDR)
+	if err != nil {
+		return fmt.Errorf("invalid host-bridge-ip-net-addr: %w", err)
+	}
+	prefix = prefix.Masked()
+
+	vnetID := api.VirtualNetworkID(*vnet)
+	networks, err := m.Db.GetIpNetworks(vnetID)
+	if err != nil {
+		return err
+	}
+
+	targetID := ""
+	if vnet.Spec.IpNetworkId != nil && strings.TrimSpace(*vnet.Spec.IpNetworkId) != "" {
+		targetID = strings.TrimSpace(*vnet.Spec.IpNetworkId)
+	} else {
+		for _, ipn := range networks {
+			if ipn.AddressMaskLen == nil {
+				continue
+			}
+			if strings.TrimSpace(*ipn.AddressMaskLen) == prefix.String() {
+				targetID = ipn.Id
+				break
+			}
+		}
+	}
+
+	if targetID == "" {
+		id, err := m.Db.CreateIpNetwork(vnetID, &api.IPNetwork{
+			AddressMaskLen: util.StringPtr(prefix.String()),
+			StartAddress:   util.StringPtr(start),
+			EndAddress:     util.StringPtr(end),
+		})
+		if err != nil {
+			return err
+		}
+		targetID = id
+	}
+
+	ipnet, err := m.Db.GetIpNetworkById(vnetID, targetID)
+	if err != nil {
+		return err
+	}
+	ipnet.AddressMaskLen = util.StringPtr(prefix.String())
+	ipnet.StartAddress = util.StringPtr(start)
+	ipnet.EndAddress = util.StringPtr(end)
+	if cfg.HostBridgeDefault != nil {
+		ipnet.Routes = cloneRoutes(cfg.HostBridgeDefault.Routes)
+		ipnet.Nameservers = cloneNameservers(cfg.HostBridgeDefault.Nameservers)
+		if cfg.HostBridgeDefault.Netmasklen != nil {
+			ipnet.Netmasklen = util.IntPtrInt(*cfg.HostBridgeDefault.Netmasklen)
+		}
+	}
+	key := db.NetworkPrefix + "/" + vnetID + "/ip_network/" + targetID
+	if err := m.Db.PutJSON(key, *ipnet); err != nil {
+		return err
+	}
+
+	vnet.Spec.IpNetworkId = util.StringPtr(targetID)
+	if err := m.Db.UpdateVirtualNetworkById(vnetID, *vnet); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // 仮想ネットワークの作成
@@ -468,7 +602,6 @@ func (m *Marmot) CheckVirtualNetworks() error {
 		_, err = m.Db.GetVirtualNetworkById(api.VirtualNetworkID(*vnet))
 		if err == nil {
 			slog.Debug("Virtual network already exists in ETCD, skipping", "id", api.VirtualNetworkID(*vnet))
-			continue
 		} else if err == db.ErrNotFound {
 			// このノードで発見したネットワークにノード名を付与する
 			if m != nil && m.NodeName != "" {
@@ -478,8 +611,17 @@ func (m *Marmot) CheckVirtualNetworks() error {
 			if err := m.Db.PutVirtualNetworksETCD(*vnet); err != nil {
 				slog.Error("Failed to put virtual network to ETCD", "err", err)
 			}
+		} else {
+			slog.Error("Failed to check virtual network in ETCD", "err", err, "id", api.VirtualNetworkID(*vnet))
+			continue
 		}
 		m.Db.UpdateVirtualNetworkStatus(api.VirtualNetworkID(*vnet), db.NETWORK_ACTIVE)
+		if strings.TrimSpace(vnet.Metadata.Name) == "host-bridge" {
+			if err := m.ensureHostBridgeIPNetwork(vnet); err != nil {
+				slog.Error("Failed to sync host-bridge IP network from config", "err", err, "networkId", api.VirtualNetworkID(*vnet))
+				continue
+			}
+		}
 	}
 
 	return nil

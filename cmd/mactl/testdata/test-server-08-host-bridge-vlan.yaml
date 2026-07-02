@@ -11,7 +11,7 @@ spec:
           portgroup: "vlan-1002"
           vlans:
             - 1002
-          address: "192.168.1.37"
+          address: "192.168.1.138"
           netmasklen: 24
           routes:
             - to: "default"

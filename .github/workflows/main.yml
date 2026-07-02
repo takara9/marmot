@@ -271,9 +271,10 @@ jobs:
     if: always()
     steps:
     - uses: actions/checkout@v5
-    - name: 仮想ネットワーク作成
+    - name: 仮想ネットワーク削除
+      if: always()
       run: |
-        sudo -E env "PATH=$PATH" ./tools/setup-libvirt-networks.sh
+        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
     - name: mactlコマンドのテスト その１
       run: |
         cd cmd/mactl

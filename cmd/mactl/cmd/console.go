@@ -100,6 +100,9 @@ var consoleCmd = &cobra.Command{
 		}
 		req.Host = hostPort
 		req.Header.Set("Connection", "close")
+	if token := strings.TrimSpace(m.AccessToken); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 		if err := req.Write(conn); err != nil {
 			return fmt.Errorf("failed to send console request: %w", err)
 		}

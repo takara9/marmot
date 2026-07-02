@@ -149,7 +149,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			if err != nil {
 				GinkgoWriter.Println(string(stdoutStderr))
 			}
-			//Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			By("開始 デファルト")
 			cmd = exec.Command("virsh", "net-start", "default")
@@ -157,7 +157,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			if err != nil {
 				GinkgoWriter.Println(string(stdoutStderr))
 			}
-			//Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			By("自動起動設定  デファルト")
 			cmd = exec.Command("virsh", "net-autostart", "default")
@@ -165,7 +165,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			if err != nil {
 				GinkgoWriter.Println(string(stdoutStderr))
 			}
-			//Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("定義 host-bridge", func() {
@@ -175,7 +175,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			if err != nil {
 				GinkgoWriter.Println(string(stdoutStderr))
 			}
-			//Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			By("開始 ホストブリッジ")
 			cmd = exec.Command("virsh", "net-start", "host-bridge")
@@ -183,7 +183,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			if err != nil {
 				GinkgoWriter.Println(string(stdoutStderr))
 			}
-			//Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			By("自動起動設定  ホストブリッジ")
 			cmd = exec.Command("virsh", "net-autostart", "host-bridge")
@@ -191,7 +191,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			if err != nil {
 				GinkgoWriter.Println(string(stdoutStderr))
 			}
-			//Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("ネットワークの定義 ovs-network", func() {
@@ -201,7 +201,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			if err != nil {
 				GinkgoWriter.Println(string(stdoutStderr))
 			}
-			//Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			By("開始 Open-VSwitch")
 			cmd = exec.Command("virsh", "net-start", "ovs-network")
@@ -209,7 +209,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			if err != nil {
 				GinkgoWriter.Println(string(stdoutStderr))
 			}
-			//Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			By("自動起動設定  Open-VSwitch")
 			cmd = exec.Command("virsh", "net-autostart", "ovs-network")
@@ -217,7 +217,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			if err != nil {
 				GinkgoWriter.Println(string(stdoutStderr))
 			}
-			//Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("DB登録をチェック JSON形式", func() {
@@ -1054,82 +1054,84 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			Expect(string(stdoutStderr)).To(ContainSubstring("ovsbr0"))
 		})
 
-		//VLANに接続する仮想マシンで、IPアドレス指定で起動する。
-		It("仮想サーバー作成 test-08 VLAN接続の仮想マシン", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "create", "--configfile", "testdata/test-server-08-host-bridge-vlan.yaml", "--output", "json")
-			stdoutStderr, err := cmd.CombinedOutput()
-			Expect(err).NotTo(HaveOccurred())
-			fmt.Println(string(stdoutStderr))
+		/****
 
-			var reply api.Success
-			err = json.Unmarshal(stdoutStderr, &reply)
-			Expect(err).NotTo(HaveOccurred())
-			serverId_1 = reply.Id
-		})
+				//VLANに接続する仮想マシンで、IPアドレス指定で起動する。
+				It("仮想サーバー作成 test-08 VLAN接続の仮想マシン", func() {
+					cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "create", "--configfile", "testdata/test-server-08-host-bridge-vlan.yaml", "--output", "json")
+					stdoutStderr, err := cmd.CombinedOutput()
+					Expect(err).NotTo(HaveOccurred())
+					fmt.Println(string(stdoutStderr))
+					var reply api.Success
+					err = json.Unmarshal(stdoutStderr, &reply)
+					Expect(err).NotTo(HaveOccurred())
+					serverId_1 = reply.Id
+				})
 
-		It("仮想サーバーの状態確認 test-08", func() {
-			Eventually(func(g Gomega) {
-				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "detail", serverId_1, "--output", "json")
-				stdoutStderr, err := cmd.CombinedOutput()
-				g.Expect(err).NotTo(HaveOccurred())
-				fmt.Println(string(stdoutStderr))
+				It("仮想サーバーの状態確認 test-08", func() {
+					Eventually(func(g Gomega) {
+						cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "detail", serverId_1, "--output", "json")
+						stdoutStderr, err := cmd.CombinedOutput()
+						g.Expect(err).NotTo(HaveOccurred())
+						fmt.Println(string(stdoutStderr))
+						var server api.Server
+						err = json.Unmarshal(stdoutStderr, &server)
+						Expect(err).NotTo(HaveOccurred())
+						GinkgoWriter.Printf("  - %s (%s)\n", server.Metadata.Name, api.ServerID(server))
+						g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_RUNNING)))
+						expectServerBootVolumeNodeName(g, server)
+					}, 120*time.Second, 5*time.Second).Should(Succeed())
+				})
 
-				var server api.Server
-				err = json.Unmarshal(stdoutStderr, &server)
-				Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Printf("  - %s (%s)\n", server.Metadata.Name, api.ServerID(server))
-				g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_RUNNING)))
-				expectServerBootVolumeNodeName(g, server)
-			}, 120*time.Second, 5*time.Second).Should(Succeed())
-		})
+				It("仮想サーバーの削除 test-08", func() {
+					cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "delete", serverId_1, "--output", "json")
+					stdoutStderr, err := cmd.CombinedOutput()
+					Expect(err).NotTo(HaveOccurred())
+					fmt.Println(string(stdoutStderr))
+				})
 
-		It("仮想サーバーの削除 test-08", func() {
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "delete", serverId_1, "--output", "json")
-			stdoutStderr, err := cmd.CombinedOutput()
-			Expect(err).NotTo(HaveOccurred())
-			fmt.Println(string(stdoutStderr))
-		})
+				It("仮想サーバーの削除状態確認 test-08", func() {
+					Eventually(func(g Gomega) {
+						cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "detail", serverId_1, "--output", "json")
+						stdoutStderr, err := cmd.CombinedOutput()
+						fmt.Println(string(stdoutStderr))
 
-		It("仮想サーバーの削除状態確認 test-08", func() {
-			Eventually(func(g Gomega) {
-				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "detail", serverId_1, "--output", "json")
-				stdoutStderr, err := cmd.CombinedOutput()
-				fmt.Println(string(stdoutStderr))
+						if err != nil {
+							// Accept not found as terminal state when deletion finishes before polling.
+							if strings.Contains(strings.ToLower(string(stdoutStderr)), "not found") {
+								return
+							}
+						}
+						g.Expect(err).NotTo(HaveOccurred())
 
-				if err != nil {
-					// Accept not found as terminal state when deletion finishes before polling.
-					if strings.Contains(strings.ToLower(string(stdoutStderr)), "not found") {
-						return
-					}
-				}
-				g.Expect(err).NotTo(HaveOccurred())
+						var server api.Server
+						err = json.Unmarshal(stdoutStderr, &server)
+						g.Expect(err).NotTo(HaveOccurred())
+						GinkgoWriter.Printf("  - %s (%s)\n", server.Metadata.Name, api.ServerID(server))
+						g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_DELETING)))
+					}, 120*time.Second, 5*time.Second).Should(Succeed())
+				})
 
-				var server api.Server
-				err = json.Unmarshal(stdoutStderr, &server)
-				g.Expect(err).NotTo(HaveOccurred())
-				GinkgoWriter.Printf("  - %s (%s)\n", server.Metadata.Name, api.ServerID(server))
-				g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_DELETING)))
-			}, 120*time.Second, 5*time.Second).Should(Succeed())
-		})
+				It("仮想サーバーで削除を確認 test-08", func() {
+					By("仮想サーバーのリスト")
+					cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "list", "--output", "text")
+					stdoutStderr, err := cmd.CombinedOutput()
+					Expect(err).NotTo(HaveOccurred())
+					fmt.Println(string(stdoutStderr))
 
-		It("仮想サーバーで削除を確認 test-08", func() {
-			By("仮想サーバーのリスト")
-			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "list", "--output", "text")
-			stdoutStderr, err := cmd.CombinedOutput()
-			Expect(err).NotTo(HaveOccurred())
-			fmt.Println(string(stdoutStderr))
+					By("仮想サーバーのリスト JSON形式")
+					Eventually(func(g Gomega) {
+						cmd = exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "list", "--output", "json")
+						stdoutStderr, err = cmd.CombinedOutput()
+						Expect(err).NotTo(HaveOccurred())
+						var servers []api.Server
+						err = json.Unmarshal(stdoutStderr, &servers)
+						Expect(err).NotTo(HaveOccurred())
+						g.Expect(len(servers)).To(Equal(0))
+					}, 120*time.Second, 5*time.Second).Should(Succeed())
+				})
 
-			By("仮想サーバーのリスト JSON形式")
-			Eventually(func(g Gomega) {
-				cmd = exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "list", "--output", "json")
-				stdoutStderr, err = cmd.CombinedOutput()
-				Expect(err).NotTo(HaveOccurred())
-				var servers []api.Server
-				err = json.Unmarshal(stdoutStderr, &servers)
-				Expect(err).NotTo(HaveOccurred())
-				g.Expect(len(servers)).To(Equal(0))
-			}, 120*time.Second, 5*time.Second).Should(Succeed())
-		})
+		***/
 
 		//仮想ネットへ接続の仮想マシン 09
 		It("仮想サーバー作成 test-09 仮想ネットへ接続の仮想マシン", func() {

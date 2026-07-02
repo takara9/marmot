@@ -10,10 +10,13 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/takara9/marmot/api"
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/pkg/controller"
 	internaldns "github.com/takara9/marmot/pkg/internal-dns"
@@ -26,6 +29,9 @@ type mockServerHandle struct {
 	done   chan struct{}
 	once   sync.Once
 }
+
+var findMockServerConfigPathFn = findMockServerConfigPath
+var defaultMockServerConfigFn = defaultMockServerConfig
 
 func ensureMactlTestBinary() error {
 	if _, err := os.Stat("bin/mactl-test"); err == nil {
@@ -88,6 +94,122 @@ func startEtcdContainer() (string, string, error) {
 	return containerID, fmt.Sprintf("http://127.0.0.1:%d", port), nil
 }
 
+func findMockServerConfigPath() (string, []string, error) {
+	candidates := make([]string, 0, 24)
+	seen := map[string]struct{}{}
+	addCandidate := func(baseDir, rel string) {
+		if strings.TrimSpace(rel) == "" {
+			return
+		}
+		path := ""
+		if strings.TrimSpace(baseDir) == "" {
+			path = filepath.Clean(rel)
+		} else {
+			path = filepath.Clean(filepath.Join(baseDir, rel))
+		}
+		if _, ok := seen[path]; ok {
+			return
+		}
+		seen[path] = struct{}{}
+		candidates = append(candidates, path)
+	}
+
+	if envPath := strings.TrimSpace(os.Getenv("MARMOT_MOCK_SERVER_CONFIG")); envPath != "" {
+		addCandidate("", envPath)
+	}
+
+	if _, file, _, ok := runtime.Caller(0); ok {
+		srcDir := filepath.Dir(file)
+		addCandidate(srcDir, "testdata/marmotd.json")
+		addCandidate(filepath.Clean(filepath.Join(srcDir, "../..")), "cmd/mactl/testdata/marmotd.json")
+	}
+
+	if cwd, err := os.Getwd(); err == nil {
+		dir := cwd
+		for i := 0; i < 12; i++ {
+			addCandidate(dir, "testdata/marmotd.json")
+			addCandidate(dir, "cmd/mactl/testdata/marmotd.json")
+
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				break
+			}
+			dir = parent
+		}
+	}
+
+	for _, p := range candidates {
+		if p == "" {
+			continue
+		}
+		if info, err := os.Stat(p); err == nil && !info.IsDir() {
+			return p, candidates, nil
+		}
+	}
+
+	return "", candidates, fmt.Errorf("failed to find mock server config")
+}
+
+func defaultMockServerConfig() (*marmotd.MarmotdConfig, error) {
+	// 存在しないパスを指定して、marmotd 側のデフォルト設定を取得する。
+	baseCfg, err := marmotd.LoadConfig(filepath.Join(os.TempDir(), "marmotd-mock-defaults-do-not-create.json"))
+	if err != nil {
+		return nil, err
+	}
+
+	netmasklen := 24
+	defaultRouteTo := "default"
+	defaultRouteVia := "192.168.1.1"
+	baseCfg.HostBridgeIPNetAddr = "192.168.1.0/24"
+	baseCfg.HostBridgeIPAddrStart = "192.168.1.190"
+	baseCfg.HostBridgeIPAddrEnd = "192.168.1.194"
+	baseCfg.HostBridgeDefault = &marmotd.HostBridgeDefault{
+		Netmasklen: &netmasklen,
+		Nameservers: &api.Nameservers{
+			Addresses: &[]string{"8.8.8.8"},
+			Search:    &[]string{"labo.local"},
+		},
+		Routes: &[]api.Route{{
+			To:  &defaultRouteTo,
+			Via: &defaultRouteVia,
+		}},
+	}
+
+	return baseCfg, nil
+}
+
+func loadMockServerConfig(etcdEp string) (*marmotd.MarmotdConfig, error) {
+	cfgPath, triedPaths, err := findMockServerConfigPathFn()
+	if err != nil {
+		cfg, fallbackErr := defaultMockServerConfigFn()
+		if fallbackErr != nil {
+			return nil, fmt.Errorf("failed to find mock server config: tried %v (fallback error: %v)", triedPaths, fallbackErr)
+		}
+		slog.Warn("mock server config file not found; using built-in defaults", "tried", triedPaths)
+		cfg.EtcdURL = etcdEp
+		cfg.NodeName = "hvc"
+		cfg.DNSListenAddr = "127.0.0.1:1053"
+		marmotd.SetRuntimeConfig(cfg)
+		return cfg, nil
+	}
+
+	cfg, err := marmotd.LoadConfig(cfgPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load mock server config %s: %w", cfgPath, err)
+	}
+
+	// テスト用の起動環境に合わせて runtime config を補正する。
+	cfg.EtcdURL = etcdEp
+	cfg.NodeName = "hvc"
+	cfg.DNSListenAddr = "127.0.0.1:1053"
+	if strings.TrimSpace(cfg.HostBridgeIPNetAddr) == "" || strings.TrimSpace(cfg.HostBridgeIPAddrStart) == "" || strings.TrimSpace(cfg.HostBridgeIPAddrEnd) == "" {
+		return nil, fmt.Errorf("mock server config %s is missing host-bridge IPAM settings", cfgPath)
+	}
+	marmotd.SetRuntimeConfig(cfg)
+
+	return cfg, nil
+}
+
 func startMockServer(etcdEp string) (*mockServerHandle, error) {
 	// 個別にログを確認したい場合はコメントアウトを外す
 	//opts := &slog.HandlerOptions{
@@ -103,7 +225,12 @@ func startMockServer(etcdEp string) (*mockServerHandle, error) {
 		done:   make(chan struct{}),
 	}
 
-	nodeName := "hvc"
+	cfg, err := loadMockServerConfig(etcdEp)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	nodeName := cfg.NodeName
 
 	e := echo.New()
 	server := marmotd.NewServerWithOptions(nodeName, etcdEp, true)
