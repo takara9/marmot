@@ -1054,7 +1054,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 			Expect(string(stdoutStderr)).To(ContainSubstring("ovsbr0"))
 		})
 
-		//VLANに接続する仮想マシンで、IPアドレス指定で起動する。
+		//VLANに接続する仮想マシンで、IPアドレス指定で起動する。 ここが失敗するようになった
 		It("仮想サーバー作成 test-08 VLAN接続の仮想マシン", func() {
 			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "create", "--configfile", "testdata/test-server-08-host-bridge-vlan.yaml", "--output", "json")
 			stdoutStderr, err := cmd.CombinedOutput()
