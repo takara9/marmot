@@ -274,7 +274,7 @@ jobs:
     - name: 仮想ネットワーク作成
       run: |
         sudo -E env "PATH=$PATH" ./tools/setup-libvirt-networks.sh
-        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
+        #sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
     - name: mactlコマンドのテスト その１
       run: |
         cd cmd/mactl
