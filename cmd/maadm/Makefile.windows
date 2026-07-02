@@ -1,0 +1,30 @@
+GO = go
+PROGRAM = maadm
+all: $(PROGRAM)
+
+TAG := $(shell type ..\..\TAG)
+BINDIR = ..\..\dist\marmot-v$(TAG)
+TESTBINDIR = bin
+
+$(PROGRAM):
+	@echo $(BINDIR)
+	if not exist "$(BINDIR)" mkdir "$(BINDIR)"
+	$(GO) build -o "$(BINDIR)\$@.exe" $^
+
+maadm-test:
+	@echo $(TESTBINDIR)
+	if not exist "$(TESTBINDIR)" mkdir "$(TESTBINDIR)"
+	$(GO) build -o "$(TESTBINDIR)\$@.exe" $^
+
+.PHONY: clean
+clean:
+	if exist "$(BINDIR)" rmdir /s /q "$(BINDIR)"
+	if exist "$(TESTBINDIR)" rmdir /s /q "$(TESTBINDIR)"
+
+.PHONY: install
+install:
+	copy "$(BINDIR)\$(PROGRAM).exe" "%USERPROFILE%\AppData\Local\bin\"
+
+.PHONY: test
+test: maadm-test
+	$(GO) test -v -race . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -coverprofile cover.out
