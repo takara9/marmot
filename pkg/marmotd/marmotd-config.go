@@ -33,6 +33,22 @@ type OSImage struct {
 	OSVersion string `json:"osVersion"`
 }
 
+type HostBridgeRouteConfig struct {
+	To  string `json:"to"`
+	Via string `json:"via"`
+}
+
+type HostBridgeNameserversConfig struct {
+	Addresses []string `json:"addresses"`
+	Search    []string `json:"search"`
+}
+
+type HostBridgeDefaultConfig struct {
+	Netmasklen  int                          `json:"netmasklen"`
+	Nameservers HostBridgeNameserversConfig  `json:"nameservers"`
+	Routes      []HostBridgeRouteConfig      `json:"routes"`
+}
+
 // MarmotdConfig は /etc/marmot/marmotd.json で設定可能なパラメータを保持します。
 type MarmotdConfig struct {
 	// ハイパーバイザーのノード名
@@ -69,6 +85,21 @@ type MarmotdConfig struct {
 	// DATA ボリューム用の LVM Volume Group 名
 	// 例: "vg2"
 	DataVolumeGroup string `json:"data_volume_group"`
+
+	// host-bridge の IP アドレス範囲を表す CIDR
+	// 例: "192.168.1.0/24"
+	HostBridgeIPNetAddr string `json:"host-bridge-ip-net-addr"`
+
+	// host-bridge の IP アドレス払い出し開始アドレス
+	// 例: "192.168.1.190"
+	HostBridgeIPAddrStart string `json:"host-bridge-ip-addr-start"`
+
+	// host-bridge の IP アドレス払い出し終了アドレス
+	// 例: "192.168.1.194"
+	HostBridgeIPAddrEnd string `json:"host-bridge-ip-addr-end"`
+
+	// host-bridge 利用時のサーバー既定ネットワーク設定
+	HostBridgeDefault *HostBridgeDefaultConfig `json:"host-bridge-default"`
 
 	// コントローラーが DeletionTimestamp を検知してから実際に削除処理を
 	// 開始するまでの待機秒数
@@ -199,6 +230,17 @@ func normalizeConfig(cfg *MarmotdConfig) *MarmotdConfig {
 	if strings.TrimSpace(normalized.DataVolumeGroup) == "" {
 		normalized.DataVolumeGroup = db.DefaultDataVolumeGroup
 	}
+	normalized.HostBridgeIPNetAddr = strings.TrimSpace(normalized.HostBridgeIPNetAddr)
+	normalized.HostBridgeIPAddrStart = strings.TrimSpace(normalized.HostBridgeIPAddrStart)
+	normalized.HostBridgeIPAddrEnd = strings.TrimSpace(normalized.HostBridgeIPAddrEnd)
+	if normalized.HostBridgeDefault != nil {
+		normalized.HostBridgeDefault.Nameservers.Addresses = trimNonEmptyStrings(normalized.HostBridgeDefault.Nameservers.Addresses)
+		normalized.HostBridgeDefault.Nameservers.Search = trimNonEmptyStrings(normalized.HostBridgeDefault.Nameservers.Search)
+		for i := range normalized.HostBridgeDefault.Routes {
+			normalized.HostBridgeDefault.Routes[i].To = strings.TrimSpace(normalized.HostBridgeDefault.Routes[i].To)
+			normalized.HostBridgeDefault.Routes[i].Via = strings.TrimSpace(normalized.HostBridgeDefault.Routes[i].Via)
+		}
+	}
 	if normalized.DeletionDelaySeconds <= 0 {
 		normalized.DeletionDelaySeconds = defaults.DeletionDelaySeconds
 	}
@@ -274,6 +316,21 @@ func extractIPv4(addr net.Addr) net.IP {
 	default:
 		return nil
 	}
+}
+
+func trimNonEmptyStrings(values []string) []string {
+	if len(values) == 0 {
+		return values
+	}
+	trimmed := values[:0]
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		trimmed = append(trimmed, value)
+	}
+	return trimmed
 }
 
 func (c *MarmotdConfig) ImageCreateFromVMTimeout() time.Duration {
