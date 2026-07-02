@@ -589,9 +589,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 					if err := m.ensureHostBridgeIPNetwork(&vnet); err != nil {
 						return "", err
 					}
-					refreshedVNet, refreshErr := m.Db.GetVirtualNetworkByName(reqNic.Networkname)
+					refreshedVNet, refreshErr := m.Db.GetVirtualNetworkById(api.VirtualNetworkID(vnet))
 					if refreshErr != nil {
-						slog.Error("GetVirtualNetworkByName()", "err", refreshErr, "network name", reqNic.Networkname)
+						slog.Error("GetVirtualNetworkById()", "err", refreshErr, "network id", api.VirtualNetworkID(vnet), "network name", reqNic.Networkname)
 						if refreshErr.Error() == "not found" {
 							refreshErr = fmt.Errorf("network '%s' is not found", reqNic.Networkname)
 						}

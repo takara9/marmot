@@ -90,15 +90,49 @@ func startEtcdContainer() (string, string, error) {
 }
 
 func loadMockServerConfig(etcdEp string) (*marmotd.MarmotdConfig, error) {
-	cfg, err := marmotd.LoadConfig(filepath.Join("testdata", "marmotd.json"))
-	if err != nil {
-		return nil, fmt.Errorf("failed to load mock server config: %w", err)
+	configPaths := []string{
+		filepath.Join("testdata", "marmotd.json"),
+		filepath.Join("cmd", "mactl", "testdata", "marmotd.json"),
+	}
+
+	var (
+		cfg      *marmotd.MarmotdConfig
+		cfgPath  string
+		loadErrs []string
+	)
+	for _, p := range configPaths {
+		if _, err := os.Stat(p); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			loadErrs = append(loadErrs, fmt.Sprintf("%s: %v", p, err))
+			continue
+		}
+
+		var err error
+		cfg, err = marmotd.LoadConfig(p)
+		if err != nil {
+			loadErrs = append(loadErrs, fmt.Sprintf("%s: %v", p, err))
+			continue
+		}
+		cfgPath = p
+		break
+	}
+
+	if cfg == nil {
+		if len(loadErrs) > 0 {
+			return nil, fmt.Errorf("failed to load mock server config (%s)", strings.Join(loadErrs, "; "))
+		}
+		return nil, fmt.Errorf("failed to find mock server config: tried %v", configPaths)
 	}
 
 	// テスト用の起動環境に合わせて runtime config を補正する。
 	cfg.EtcdURL = etcdEp
 	cfg.NodeName = "hvc"
 	cfg.DNSListenAddr = "127.0.0.1:1053"
+	if strings.TrimSpace(cfg.HostBridgeIPNetAddr) == "" || strings.TrimSpace(cfg.HostBridgeIPAddrStart) == "" || strings.TrimSpace(cfg.HostBridgeIPAddrEnd) == "" {
+		return nil, fmt.Errorf("mock server config %s is missing host-bridge IPAM settings", cfgPath)
+	}
 	marmotd.SetRuntimeConfig(cfg)
 
 	return cfg, nil
