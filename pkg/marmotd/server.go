@@ -486,6 +486,16 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			}
 
 			reqNic.Networkid = api.VirtualNetworkID(vnet) // ネットワークIDをセット
+			if isHostBridgeNetwork(reqNic.Networkname) {
+				ensuredIPNet, ensureErr := m.ensureHostBridgeIPNetwork(&vnet)
+				if ensureErr != nil {
+					return "", ensureErr
+				}
+				ipnet = ensuredIPNet
+				if vnet.Spec.IpNetworkId != nil && strings.TrimSpace(*vnet.Spec.IpNetworkId) != "" {
+					reqNic.IpNetworkId = util.StringPtr(strings.TrimSpace(*vnet.Spec.IpNetworkId))
+				}
+			}
 			if reqNic.Address != nil {
 				// リクエストにIPアドレスが指定されている場合は、そのIPアドレスを使用する
 				ipaddr = *reqNic.Address
@@ -501,24 +511,33 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 						slog.Debug("Invalid or missing netmask format, using default 24", "netmask", *reqNic.Netmask)
 						bitmask = 24 // デフォルトのビットマスク長
 					}
+				} else if isHostBridgeNetwork(reqNic.Networkname) && ipnet != nil && ipnet.Netmasklen != nil {
+					bitmask = *ipnet.Netmasklen
 				} else {
 					slog.Debug("Netmask length is not specified, using default 24")
 					bitmask = 24 // デフォルトのビットマスク長
 				}
 				//slog.Debug("IP address is specified in the request, skipping IP allocation", "ip address", ipaddr, "netmask length", *reqNic.Netmasklen)
 
-				// IPネットワークが存在していれば、IPネットワークを作成する必要はない。
-				// IPネットワークと IPアドレスを設定
-				ipNetAddr := &api.IPNetwork{
-					AddressMaskLen: util.StringPtr(fmt.Sprintf("%s/%d", ipaddr, bitmask)),
+				ipNetId := strings.TrimSpace(util.OrDefault(reqNic.IpNetworkId, ""))
+				if ipNetId == "" && vnet.Spec.IpNetworkId != nil {
+					ipNetId = strings.TrimSpace(*vnet.Spec.IpNetworkId)
 				}
-				ipNetId, err := m.Db.CreateIpNetwork(api.VirtualNetworkID(vnet), ipNetAddr)
-				if err != nil {
-					if err.Error() == db.ErrAlreadyExists || err.Error() == db.ErrOverlapsExistingNetwork {
-						//NOP
-					} else {
-						slog.Error("CreateIpNetwork()", "err", err)
-						return "", err
+
+				if ipNetId == "" {
+					// IPネットワークが存在していれば、IPネットワークを作成する必要はない。
+					// IPネットワークと IPアドレスを設定
+					ipNetAddr := &api.IPNetwork{
+						AddressMaskLen: util.StringPtr(fmt.Sprintf("%s/%d", ipaddr, bitmask)),
+					}
+					ipNetId, err = m.Db.CreateIpNetwork(api.VirtualNetworkID(vnet), ipNetAddr)
+					if err != nil {
+						if err.Error() == db.ErrAlreadyExists || err.Error() == db.ErrOverlapsExistingNetwork {
+							// NOP
+						} else {
+							slog.Error("CreateIpNetwork()", "err", err)
+							return "", err
+						}
 					}
 				}
 
@@ -526,6 +545,14 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 				// ネットワークインターフェースのIPネットワークIDを設定
 				reqNic.IpNetworkId = util.StringPtr(ipNetId)
 				slog.Debug("ネットワークインターフェースのIPネットワークIDを設定成功", "network id", api.VirtualNetworkID(vnet), "ip network id", ipNetId)
+
+				if ipnet == nil {
+					ipnet, err = m.Db.GetIpNetworkById(api.VirtualNetworkID(vnet), ipNetId)
+					if err != nil {
+						slog.Error("GetIpNetworkById()", "err", err)
+						return "", err
+					}
+				}
 				// IPアドレスの使用済設定
 
 				// 一致するものが無かったら、そのIPアドレスを割り当てる
@@ -597,7 +624,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 						return "", err
 					}
 				} else if isIPAMUnmanagedNetwork(vnet.Metadata.Name) {
-					// default/host-bridge は libvirt 側 DHCP を利用し、Marmot の IPAM 対象外とする。
+					// default は libvirt 側 DHCP を利用し、Marmot の IPAM 対象外とする。
 					slog.Debug("Skipping Marmot IP allocation for unmanaged network", "network id", api.VirtualNetworkID(vnet), "network name", vnet.Metadata.Name)
 				} else {
 					// 仮想ネットワーク作成直後は IPAM 初期化前の可能性があるため、
@@ -652,6 +679,15 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 
 			ni.Routes = reqNic.Routes
 			ni.Nameservers = reqNic.Nameservers
+			if ni.Routes == nil && ipnet != nil && ipnet.Routes != nil {
+				ni.Routes = ipnet.Routes
+			}
+			if ni.Nameservers == nil && ipnet != nil && ipnet.Nameservers != nil {
+				ni.Nameservers = ipnet.Nameservers
+			}
+			if isHostBridgeNetwork(reqNic.Networkname) {
+				applyHostBridgeDefaultsFromConfig(&ni)
+			}
 			if ni.Nameservers == nil {
 				ni.Nameservers = defaultNameserversFromConfig()
 			}
@@ -1230,11 +1266,123 @@ func appendUniqueAddress(addrs []string, addr string) []string {
 
 func isIPAMUnmanagedNetwork(name string) bool {
 	switch strings.TrimSpace(name) {
-	case "default", "host-bridge":
+	case "default":
 		return true
 	default:
 		return false
 	}
+}
+
+func isHostBridgeNetwork(name string) bool {
+	return strings.TrimSpace(name) == "host-bridge"
+}
+
+func hostBridgeNameserversFromConfig() *api.Nameservers {
+	cfg := CurrentConfig()
+	if cfg.HostBridgeDefault == nil {
+		return nil
+	}
+
+	addrs := trimNonEmptyStrings(cfg.HostBridgeDefault.Nameservers.Addresses)
+	search := trimNonEmptyStrings(cfg.HostBridgeDefault.Nameservers.Search)
+	if len(addrs) == 0 && len(search) == 0 {
+		return nil
+	}
+
+	ns := &api.Nameservers{}
+	if len(addrs) > 0 {
+		ns.Addresses = &addrs
+	}
+	if len(search) > 0 {
+		ns.Search = &search
+	}
+	return ns
+}
+
+func hostBridgeRoutesFromConfig() *[]api.Route {
+	cfg := CurrentConfig()
+	if cfg.HostBridgeDefault == nil || len(cfg.HostBridgeDefault.Routes) == 0 {
+		return nil
+	}
+
+	routes := make([]api.Route, 0, len(cfg.HostBridgeDefault.Routes))
+	for _, route := range cfg.HostBridgeDefault.Routes {
+		to := strings.TrimSpace(route.To)
+		via := strings.TrimSpace(route.Via)
+		if to == "" || via == "" {
+			continue
+		}
+		routes = append(routes, api.Route{To: util.StringPtr(to), Via: util.StringPtr(via)})
+	}
+	if len(routes) == 0 {
+		return nil
+	}
+	return &routes
+}
+
+func applyHostBridgeDefaultsFromConfig(ni *api.NetworkInterface) {
+	if ni == nil {
+		return
+	}
+
+	cfg := CurrentConfig()
+	if ni.Netmasklen == nil && cfg.HostBridgeDefault != nil && cfg.HostBridgeDefault.Netmasklen > 0 {
+		ni.Netmasklen = util.IntPtrInt(cfg.HostBridgeDefault.Netmasklen)
+	}
+	if ni.Routes == nil {
+		ni.Routes = hostBridgeRoutesFromConfig()
+	}
+	if ni.Nameservers == nil {
+		ni.Nameservers = hostBridgeNameserversFromConfig()
+	}
+}
+
+func (m *Marmot) ensureHostBridgeIPNetwork(vnet *api.VirtualNetwork) (*api.IPNetwork, error) {
+	if vnet == nil {
+		return nil, fmt.Errorf("host-bridge virtual network is nil")
+	}
+
+	vnetID := api.VirtualNetworkID(*vnet)
+	if vnet.Spec.IpNetworkId != nil && strings.TrimSpace(*vnet.Spec.IpNetworkId) != "" {
+		ipnet, err := m.Db.GetIpNetworkById(vnetID, strings.TrimSpace(*vnet.Spec.IpNetworkId))
+		if err != nil {
+			return nil, fmt.Errorf("failed to get host-bridge ip network: %w", err)
+		}
+		return ipnet, nil
+	}
+
+	cfg := CurrentConfig()
+	if strings.TrimSpace(cfg.HostBridgeIPNetAddr) == "" || strings.TrimSpace(cfg.HostBridgeIPAddrStart) == "" || strings.TrimSpace(cfg.HostBridgeIPAddrEnd) == "" {
+		return nil, fmt.Errorf("host-bridge IPAM config is incomplete in marmotd.json")
+	}
+
+	ipNetSpec := &api.IPNetwork{
+		AddressMaskLen: util.StringPtr(cfg.HostBridgeIPNetAddr),
+		StartAddress:   util.StringPtr(cfg.HostBridgeIPAddrStart),
+		EndAddress:     util.StringPtr(cfg.HostBridgeIPAddrEnd),
+		Nameservers:    hostBridgeNameserversFromConfig(),
+		Routes:         hostBridgeRoutesFromConfig(),
+	}
+
+	ipNetID, err := m.Db.CreateIpNetwork(vnetID, ipNetSpec)
+	if err != nil && err.Error() != db.ErrAlreadyExists && err.Error() != db.ErrOverlapsExistingNetwork {
+		return nil, fmt.Errorf("failed to create host-bridge ip network: %w", err)
+	}
+	if strings.TrimSpace(ipNetID) == "" {
+		return nil, fmt.Errorf("failed to resolve host-bridge ip network id")
+	}
+
+	ipnet, err := m.Db.GetIpNetworkById(vnetID, ipNetID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get host-bridge ip network: %w", err)
+	}
+
+	vnet.Spec.IpNetworkId = util.StringPtr(ipNetID)
+	if updateErr := m.Db.UpdateVirtualNetworkById(vnetID, *vnet); updateErr != nil {
+		return nil, fmt.Errorf("failed to update host-bridge virtual network: %w", updateErr)
+	}
+
+	return ipnet, nil
 }
 
 func (m *Marmot) lookupIPAllocationOwner(vnetID, ipNetID, ip string) (string, error) {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"os/exec"
 	"strings"
@@ -603,6 +604,57 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Printf("  - %s (%s)\n", server.Metadata.Name, api.ServerID(server))
 				g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_RUNNING)))
+				g.Expect(server.Spec.NetworkInterface).NotTo(BeNil())
+				g.Expect(len(*server.Spec.NetworkInterface)).To(BeNumerically(">=", 1))
+
+				hostBridgeNIC := (*server.Spec.NetworkInterface)[0]
+				for _, nic := range *server.Spec.NetworkInterface {
+					if nic.Networkname == "host-bridge" {
+						hostBridgeNIC = nic
+						break
+					}
+				}
+
+				g.Expect(hostBridgeNIC.Networkname).To(Equal("host-bridge"))
+				g.Expect(hostBridgeNIC.Address).NotTo(BeNil())
+				if hostBridgeNIC.Address != nil {
+					ip := net.ParseIP(*hostBridgeNIC.Address).To4()
+					g.Expect(ip).NotTo(BeNil())
+					if ip != nil {
+						lastOctet := int(ip[3])
+						g.Expect(lastOctet).To(BeNumerically(">=", 190))
+						g.Expect(lastOctet).To(BeNumerically("<=", 194))
+					}
+				}
+				g.Expect(hostBridgeNIC.Netmasklen).NotTo(BeNil())
+				if hostBridgeNIC.Netmasklen != nil {
+					g.Expect(*hostBridgeNIC.Netmasklen).To(Equal(24))
+				}
+				g.Expect(hostBridgeNIC.Routes).NotTo(BeNil())
+				if hostBridgeNIC.Routes != nil {
+					g.Expect(len(*hostBridgeNIC.Routes)).To(BeNumerically(">=", 1))
+					if len(*hostBridgeNIC.Routes) > 0 {
+						g.Expect((*hostBridgeNIC.Routes)[0].To).NotTo(BeNil())
+						g.Expect((*hostBridgeNIC.Routes)[0].Via).NotTo(BeNil())
+						if (*hostBridgeNIC.Routes)[0].To != nil {
+							g.Expect(*(*hostBridgeNIC.Routes)[0].To).To(Equal("default"))
+						}
+						if (*hostBridgeNIC.Routes)[0].Via != nil {
+							g.Expect(*(*hostBridgeNIC.Routes)[0].Via).To(Equal("192.168.1.1"))
+						}
+					}
+				}
+				g.Expect(hostBridgeNIC.Nameservers).NotTo(BeNil())
+				if hostBridgeNIC.Nameservers != nil {
+					g.Expect(hostBridgeNIC.Nameservers.Addresses).NotTo(BeNil())
+					if hostBridgeNIC.Nameservers.Addresses != nil {
+						g.Expect(*hostBridgeNIC.Nameservers.Addresses).To(ContainElement("8.8.8.8"))
+					}
+					g.Expect(hostBridgeNIC.Nameservers.Search).NotTo(BeNil())
+					if hostBridgeNIC.Nameservers.Search != nil {
+						g.Expect(*hostBridgeNIC.Nameservers.Search).To(ContainElement("labo.local"))
+					}
+				}
 				expectServerBootVolumeNodeName(g, server)
 			}, 120*time.Second, 5*time.Second).Should(Succeed())
 		})

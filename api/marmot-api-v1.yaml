@@ -2428,6 +2428,13 @@ components:
           format: int
         gateway:
           type: string
+        nameservers:
+          $ref: "#/components/schemas/Nameservers"
+        routes:
+          type: array
+          maxItems: 6
+          items:
+            $ref: "#/components/schemas/Route"
     IPAddress:
       type: object
       required:
