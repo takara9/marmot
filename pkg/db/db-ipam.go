@@ -109,7 +109,7 @@ func (d *Database) CreateIpNetwork(vnetid string, spec *api.IPNetwork) (string, 
 
 	// IPアドレスの開始と終了アドレスを設定する
 	networkAddr := prefix.Addr()
-	addr := networkAddr.Next()
+	addr := networkAddr.Next().Next()
 	net.Netmasklen = util.IntPtrInt(prefix.Bits())
 	defaultStartAddr := addr
 	hostBits := prefix.Addr().BitLen() - prefix.Bits()
@@ -117,9 +117,9 @@ func (d *Database) CreateIpNetwork(vnetid string, spec *api.IPNetwork) (string, 
 		slog.Error("CreateIpNetwork()", "err", "prefix is too small for gateway and usable host", "addressMaskLen", prefix.String())
 		return "", fmt.Errorf("prefix is too small for gateway and usable host")
 	}
-	// ブロードキャストアドレスとゲートウェイを考慮して -3 する。
+	// 開始アドレス(.2)とブロードキャストアドレスを考慮して -4 する。
 	endDelta := new(big.Int).Lsh(big.NewInt(1), uint(hostBits))
-	endDelta.Sub(endDelta, big.NewInt(3))
+	endDelta.Sub(endDelta, big.NewInt(4))
 	defaultEndAddr, err := addIPBig(addr, endDelta)
 	if err != nil {
 		slog.Error("CreateIpNetwork()", "err", err, "addressMaskLen", prefix.String())
