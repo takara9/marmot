@@ -273,15 +273,17 @@ type IPAddress struct {
 
 // IPNetwork defines model for IPNetwork.
 type IPNetwork struct {
-	AddressMaskLen   *string `json:"addressMaskLen,omitempty" yaml:"addressMaskLen,omitempty"`
-	EndAddress       *string `json:"endAddress,omitempty" yaml:"endAddress,omitempty"`
-	Gateway          *string `json:"gateway,omitempty" yaml:"gateway,omitempty"`
-	Id               string  `json:"id" yaml:"id"`
-	Netmask          *string `json:"netmask,omitempty" yaml:"netmask,omitempty"`
-	Netmasklen       *int    `json:"netmasklen,omitempty" yaml:"netmasklen,omitempty"`
-	NetworkAddress   *string `json:"networkAddress,omitempty" yaml:"networkAddress,omitempty"`
-	StartAddress     *string `json:"startAddress,omitempty" yaml:"startAddress,omitempty"`
-	VirtualNetworkId *string `json:"virtualNetworkId,omitempty" yaml:"virtualNetworkId,omitempty"`
+	AddressMaskLen   *string      `json:"addressMaskLen,omitempty" yaml:"addressMaskLen,omitempty"`
+	EndAddress       *string      `json:"endAddress,omitempty" yaml:"endAddress,omitempty"`
+	Gateway          *string      `json:"gateway,omitempty" yaml:"gateway,omitempty"`
+	Id               string       `json:"id" yaml:"id"`
+	Nameservers      *Nameservers `json:"nameservers,omitempty" yaml:"nameservers,omitempty"`
+	Netmask          *string      `json:"netmask,omitempty" yaml:"netmask,omitempty"`
+	Netmasklen       *int         `json:"netmasklen,omitempty" yaml:"netmasklen,omitempty"`
+	NetworkAddress   *string      `json:"networkAddress,omitempty" yaml:"networkAddress,omitempty"`
+	Routes           *[]Route     `json:"routes,omitempty" yaml:"routes,omitempty"`
+	StartAddress     *string      `json:"startAddress,omitempty" yaml:"startAddress,omitempty"`
+	VirtualNetworkId *string      `json:"virtualNetworkId,omitempty" yaml:"virtualNetworkId,omitempty"`
 }
 
 // Image defines model for Image.
