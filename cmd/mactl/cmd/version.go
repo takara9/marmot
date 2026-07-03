@@ -26,11 +26,6 @@ var versionCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		fmt.Println("Getting server Information...")
-		fmt.Println("Host and Port:", m.HostPort)
-		fmt.Println("API Path:", m.BasePath)
-		fmt.Println("Scheme:", m.Scheme)
-
 		JsonVersion, err := m.GetVersion()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to get server version: %v\n", err)
@@ -44,6 +39,7 @@ var versionCmd = &cobra.Command{
 
 		switch outputStyle {
 		case "text":
+			fmt.Println("Getting server Information...")
 			fmt.Println("Server version =", sv)
 			fmt.Println("Client version =", version)
 			return nil
