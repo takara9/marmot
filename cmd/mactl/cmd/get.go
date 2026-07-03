@@ -890,14 +890,29 @@ func outputServers(servers []api.Server) error {
 			age := formatServerAge(s.Status)
 			networkLines := serverNetworkLines(s)
 
-			// Filter out N/A network lines when getServerShowAll is false
+			// --all なし時:
+			// - default 以外のネットワークがあれば default を隠す
+			// - default しかなければ表示を維持
+			// - N/A/N/A はノイズなので隠す
 			filteredLines := networkLines
 			if !getServerShowAll {
+				hasNonDefaultNetwork := false
+				for _, line := range networkLines {
+					if line.network != "default" && line.network != "N/A" {
+						hasNonDefaultNetwork = true
+						break
+					}
+				}
+
 				filteredLines = make([]serverNetworkLine, 0, len(networkLines))
 				for _, line := range networkLines {
-					if line.address != "N/A" || line.network != "N/A" {
-						filteredLines = append(filteredLines, line)
+					if hasNonDefaultNetwork && line.network == "default" {
+						continue
 					}
+					if line.address == "N/A" && line.network == "N/A" {
+						continue
+					}
+					filteredLines = append(filteredLines, line)
 				}
 				// Ensure we have at least one line to display
 				if len(filteredLines) == 0 {
