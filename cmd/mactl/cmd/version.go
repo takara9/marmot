@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -31,9 +32,10 @@ var versionCmd = &cobra.Command{
 			fmt.Fprintf(os.Stderr, "failed to get server version: %v\n", err)
 			return err
 		}
-		sv := string(*JsonVersion.ServerVersion)
+		sv := strings.TrimSpace(string(*JsonVersion.ServerVersion))
+		cv := strings.TrimSpace(version)
 		ver := api.Version{
-			ClientVersion: version,
+			ClientVersion: cv,
 			ServerVersion: &sv,
 		}
 
@@ -41,7 +43,7 @@ var versionCmd = &cobra.Command{
 		case "text":
 			fmt.Println("Getting server Information...")
 			fmt.Println("Server version =", sv)
-			fmt.Println("Client version =", version)
+			fmt.Println("Client version =", cv)
 			return nil
 		case "json":
 			textJson, err := json.MarshalIndent(ver, "", "    ")
