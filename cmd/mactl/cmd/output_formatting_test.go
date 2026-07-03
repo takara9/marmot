@@ -79,7 +79,7 @@ var _ = Describe("Output formatting", func() {
 			Expect(lines[2]).To(ContainSubstring("2h"), output)
 		})
 
-		It("keeps continuation lines that have network even when IP is N/A by default", func() {
+		It("hides default continuation line when non-default networks exist by default", func() {
 			originalShowAll := getServerShowAll
 			getServerShowAll = false
 			DeferCleanup(func() {
@@ -102,6 +102,26 @@ var _ = Describe("Output formatting", func() {
 
 			Expect(output).To(ContainSubstring("app-net"), output)
 			Expect(output).To(ContainSubstring("host-bridge"), output)
+			Expect(output).NotTo(ContainSubstring("default"), output)
+		})
+
+		It("keeps default line when default is the only attached network", func() {
+			originalShowAll := getServerShowAll
+			getServerShowAll = false
+			DeferCleanup(func() {
+				getServerShowAll = originalShowAll
+			})
+
+			output := captureOutput(func() {
+				err := outputServers([]api.Server{{
+					Metadata: api.Metadata{Name: "server-default-only"},
+					Spec: api.ServerSpec{NetworkInterface: &[]api.NetworkInterface{
+						{Networkname: "default"},
+					}},
+				}})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
 			Expect(output).To(ContainSubstring("default"), output)
 		})
 
