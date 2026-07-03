@@ -100,6 +100,7 @@ var consoleCmd = &cobra.Command{
 		}
 		req.Host = hostPort
 		req.Header.Set("Connection", "close")
+		setConsoleAuthorizationHeader(req, m.AccessToken)
 		if err := req.Write(conn); err != nil {
 			return fmt.Errorf("failed to send console request: %w", err)
 		}
@@ -264,6 +265,20 @@ func portFromHostPort(hostPort string) (string, error) {
 		return "", fmt.Errorf("invalid API host: %s", hostPort)
 	}
 	return port, nil
+}
+
+func setConsoleAuthorizationHeader(req *http.Request, accessToken string) {
+	if req == nil {
+		return
+	}
+	if strings.TrimSpace(req.Header.Get("Authorization")) != "" {
+		return
+	}
+	token := strings.TrimSpace(accessToken)
+	if token == "" {
+		return
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
 }
 
 func init() {
