@@ -567,9 +567,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 						return "", ownerErr
 					}
 
-					// host-bridge/default は IPAM 非管理扱いだが、静的IP重複チェックは実施する。
+					// default/host-bridge は静的IP再チェック時に自己所有IPの再利用を許可する。
 					// ただし残骸レコード(所有サーバーが存在しない)は再取得可能とする。
-					if isIPAMUnmanagedNetwork(vnet.Metadata.Name) {
+					if shouldAllowSelfOwnedIPReuseOnStaticCheck(vnet.Metadata.Name) {
 						if ownerName == "" || ownerName == serverConfig.Metadata.Name {
 							found = false
 						} else {
@@ -1275,6 +1275,10 @@ func isIPAMUnmanagedNetwork(name string) bool {
 
 func isHostBridgeNetwork(name string) bool {
 	return strings.TrimSpace(name) == "host-bridge"
+}
+
+func shouldAllowSelfOwnedIPReuseOnStaticCheck(name string) bool {
+	return isIPAMUnmanagedNetwork(name) || isHostBridgeNetwork(name)
 }
 
 func hostBridgeNameserversFromConfig() *api.Nameservers {
