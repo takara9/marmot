@@ -521,36 +521,32 @@ func (d *Database) ReleaseIPsByHostID(hostID string) error {
 		return nil
 	}
 
-	vnets, err := d.GetVirtualNetworks()
-	if err != nil {
-		slog.Error("ReleaseIPsByHostID() GetVirtualNetworks() failed", "err", err, "hostId", target)
+	resp, err := d.GetByPrefix(NetworkPrefix + "/")
+	if err == ErrNotFound {
+		return nil
+	} else if err != nil {
+		slog.Error("ReleaseIPsByHostID() GetByPrefix() failed", "err", err, "hostId", target)
 		return err
 	}
 
-	for _, vnet := range vnets {
-		vnetID := api.VirtualNetworkID(vnet)
-		ipnets, err := d.GetIpNetworks(vnetID)
-		if err != nil {
-			slog.Error("ReleaseIPsByHostID() GetIpNetworks() failed", "err", err, "hostId", target, "vnetId", vnetID)
-			return err
+	for _, kv := range resp.Kvs {
+		key := string(kv.Key)
+		if !strings.Contains(key, "/ip_network/") || !strings.Contains(key, "/ip_address/") {
+			continue
 		}
 
-		for _, ipnet := range ipnets {
-			ips, err := d.GetAllocatedIPs(vnetID, ipnet.Id)
-			if err != nil {
-				slog.Error("ReleaseIPsByHostID() GetAllocatedIPs() failed", "err", err, "hostId", target, "vnetId", vnetID, "ipnetId", ipnet.Id)
-				return err
-			}
+		var rec api.IPAddress
+		if err := json.Unmarshal(kv.Value, &rec); err != nil {
+			slog.Warn("ReleaseIPsByHostID() skipped malformed ip allocation record", "err", err, "key", key)
+			continue
+		}
+		if rec.HostId == nil || strings.TrimSpace(*rec.HostId) != target {
+			continue
+		}
 
-			for _, rec := range ips {
-				if rec.HostId == nil || strings.TrimSpace(*rec.HostId) != target {
-					continue
-				}
-				if err := d.ReleaseIP(vnetID, ipnet.Id, rec.IpAddress); err != nil && err != ErrNotFound {
-					slog.Error("ReleaseIPsByHostID() ReleaseIP() failed", "err", err, "hostId", target, "vnetId", vnetID, "ipnetId", ipnet.Id, "ip", rec.IpAddress)
-					return err
-				}
-			}
+		if err := d.DeleteJSON(key); err != nil && err != ErrNotFound {
+			slog.Error("ReleaseIPsByHostID() DeleteJSON() failed", "err", err, "hostId", target, "key", key)
+			return err
 		}
 	}
 
