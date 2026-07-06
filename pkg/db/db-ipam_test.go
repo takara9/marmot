@@ -322,6 +322,18 @@ var _ = Describe("IPAM", Ordered, func() {
 				fmt.Printf("Allocated IP: %s/%d\n", ip, mask)
 			})
 
+			It("ホストID指定でIPアドレスを一括解放できる", func() {
+				err := v.ReleaseIPsByHostID("host_b02")
+				Expect(err).NotTo(HaveOccurred())
+
+				ips, err := v.GetAllocatedIPs(vnetId, idIpv4_2)
+				Expect(err).NotTo(HaveOccurred())
+				for _, ip := range ips {
+					Expect(ip.HostId).NotTo(BeNil())
+					Expect(*ip.HostId).NotTo(Equal("host_b02"))
+				}
+			})
+
 			It("IPアドレスの割当リストの取得", func() {
 				ips, err := v.GetAllocatedIPs(vnetId, idIpv4_1)
 				Expect(err).NotTo(HaveOccurred())

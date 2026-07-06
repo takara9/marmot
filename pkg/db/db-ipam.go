@@ -513,6 +513,50 @@ func (d *Database) GetAllocatedIPs(vnetId, ipnetId string) ([]api.IPAddress, err
 	return allocatedIPs, nil
 }
 
+// ReleaseIPsByHostID は、全仮想ネットワークの IPAM テーブルから
+// 指定 hostId に紐づく割り当て済み IP を解放する。
+func (d *Database) ReleaseIPsByHostID(hostID string) error {
+	target := strings.TrimSpace(hostID)
+	if target == "" {
+		return nil
+	}
+
+	vnets, err := d.GetVirtualNetworks()
+	if err != nil {
+		slog.Error("ReleaseIPsByHostID() GetVirtualNetworks() failed", "err", err, "hostId", target)
+		return err
+	}
+
+	for _, vnet := range vnets {
+		vnetID := api.VirtualNetworkID(vnet)
+		ipnets, err := d.GetIpNetworks(vnetID)
+		if err != nil {
+			slog.Error("ReleaseIPsByHostID() GetIpNetworks() failed", "err", err, "hostId", target, "vnetId", vnetID)
+			return err
+		}
+
+		for _, ipnet := range ipnets {
+			ips, err := d.GetAllocatedIPs(vnetID, ipnet.Id)
+			if err != nil {
+				slog.Error("ReleaseIPsByHostID() GetAllocatedIPs() failed", "err", err, "hostId", target, "vnetId", vnetID, "ipnetId", ipnet.Id)
+				return err
+			}
+
+			for _, rec := range ips {
+				if rec.HostId == nil || strings.TrimSpace(*rec.HostId) != target {
+					continue
+				}
+				if err := d.ReleaseIP(vnetID, ipnet.Id, rec.IpAddress); err != nil && err != ErrNotFound {
+					slog.Error("ReleaseIPsByHostID() ReleaseIP() failed", "err", err, "hostId", target, "vnetId", vnetID, "ipnetId", ipnet.Id, "ip", rec.IpAddress)
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 // IPアドレスに整数を加算する関数
 func addIP(ip netip.Addr, delta int64) netip.Addr {
 	// IPアドレスを16バイトのバイトスライスに変換
