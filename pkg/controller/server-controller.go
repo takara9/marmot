@@ -281,6 +281,13 @@ func (c *controller) serverControllerLoop() {
 				}
 			}
 
+			// 作成失敗時など NIC 情報だけでは解放しきれない残留 IP を回収する。
+			if strings.TrimSpace(spec.Metadata.Name) != "" {
+				if err := c.marmot.Db.ReleaseIPsByHostID(spec.Metadata.Name); err != nil {
+					slog.Error("ReleaseIPsByHostID()", "err", err, "serverId", api.ServerID(spec), "serverName", spec.Metadata.Name)
+				}
+			}
+
 			// データベースから削除する
 			if err := c.marmot.Db.DeleteServerById(api.ServerID(spec)); err != nil {
 				slog.Error("DeleteServerById()", "err", err)

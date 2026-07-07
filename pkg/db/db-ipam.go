@@ -513,6 +513,46 @@ func (d *Database) GetAllocatedIPs(vnetId, ipnetId string) ([]api.IPAddress, err
 	return allocatedIPs, nil
 }
 
+// ReleaseIPsByHostID は、全仮想ネットワークの IPAM テーブルから
+// 指定 hostId に紐づく割り当て済み IP を解放する。
+func (d *Database) ReleaseIPsByHostID(hostID string) error {
+	target := strings.TrimSpace(hostID)
+	if target == "" {
+		return nil
+	}
+
+	resp, err := d.GetByPrefix(NetworkPrefix + "/")
+	if err == ErrNotFound {
+		return nil
+	} else if err != nil {
+		slog.Error("ReleaseIPsByHostID() GetByPrefix() failed", "err", err, "hostId", target)
+		return err
+	}
+
+	for _, kv := range resp.Kvs {
+		key := string(kv.Key)
+		if !strings.Contains(key, "/ip_network/") || !strings.Contains(key, "/ip_address/") {
+			continue
+		}
+
+		var rec api.IPAddress
+		if err := json.Unmarshal(kv.Value, &rec); err != nil {
+			slog.Warn("ReleaseIPsByHostID() skipped malformed ip allocation record", "err", err, "key", key)
+			continue
+		}
+		if rec.HostId == nil || strings.TrimSpace(*rec.HostId) != target {
+			continue
+		}
+
+		if err := d.DeleteJSON(key); err != nil && err != ErrNotFound {
+			slog.Error("ReleaseIPsByHostID() DeleteJSON() failed", "err", err, "hostId", target, "key", key)
+			return err
+		}
+	}
+
+	return nil
+}
+
 // IPアドレスに整数を加算する関数
 func addIP(ip netip.Addr, delta int64) netip.Addr {
 	// IPアドレスを16バイトのバイトスライスに変換
