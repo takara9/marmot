@@ -82,7 +82,7 @@ jobs:
     - name: mactl コマンド ユニットテスト
       run: |
         cd cmd/mactl
-        go test ./cmd -v -ginkgo.v -timeout=5m
+        make test-unit
         cd ../..
 
   packages-run-as-root:

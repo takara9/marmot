@@ -1,4 +1,4 @@
-GO ?= go
+GO ?= /usr/local/go/bin/go
 PROGRAM	= mactl
 GINKGO = /root/go/bin/ginkgo
 
@@ -46,3 +46,7 @@ test2:
 .PHONY:test3
 test3:
 	$(GO) test -v . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus-file mactl-vm-deploy-3_test.go -timeout=20m -coverprofile cover.out
+
+.PHONY: test-unit
+test-unit:
+	$(GO) test ./cmd -v -ginkgo.v -timeout=5m
