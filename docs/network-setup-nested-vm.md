@@ -156,7 +156,7 @@ network:
         - 172.16.99.101/16　　<--- VMのIPアドレスなので、対象によって変わる
       nameservers:
         search: [labo.local]
-        addresses: [172.16.0.8]
+          addresses: [172.16.0.8]
     enp7s0:
       addresses:
         - 192.168.1.201/24   <--- VMのIPアドレスなので、対象によって変わる

@@ -39,7 +39,14 @@ edge12.g.yimg.jp.
 # apt-get install virt-top virt-manager libvirt-dev libvirt-clients libvirt-daemon qemu-system-x86 openvswitch-switch ovn-central ovn-host libguestfs-tools libvirt-daemon-driver-lxc lxcfs bridge-utils genisoimage
 ```
 
-LXCを有効化するために
+Ubuntu Serverからでは、以下が入っていないので、以下を加える。
+```
+apt-get install -y linux-image-6.8.0-134-generic linux-modules-6.8.0-134-generic linux-modules-extra-6.8.0-134-generic linux-image-virtual etcd-client
+```
+
+
+# LXCを有効化するために(不要)
+
 ```
 systemctl stop libvirtd.service
 systemctl disable libvirtd.service
@@ -74,6 +81,15 @@ vdc    252:32   0   100G  0 disk
 vdd    252:48   0   100G  0 disk 
 ```
 
+```console
+# mkfs.ext4 /dev/vdb
+# blkid /dev/vdb
+# vi /etc/fstab
+# mkdir /build
+# mount /build
+# df -h
+```
+
 ## PVの作成
 
 ```
@@ -101,7 +117,23 @@ vdd    252:48   0   100G  0 disk
   vg2   1   0   0 wz--n- <100.00g <100.00g
 ```
 
-## イメージテンプレート用のロジカルボリュームの作成
+```
+# mv marmot /build/marmot-var
+# ln -s /build/marmot-var marmot
+# ls -la marmot
+lrwxrwxrwx 1 root root 17 Jul  8 08:44 marmot -> /build/marmot-var
+# cd marmot
+# chown -R ubuntu:ubuntu volumes
+# chown -R ubuntu:ubuntu jobs
+# exit
+$ cd /build
+```
+
+
+
+
+
+## イメージテンプレート用のロジカルボリュームの作成(不要)
 
 ```
 # lvcreate --name lv01 --size 16GB vg1
@@ -111,13 +143,13 @@ vdd    252:48   0   100G  0 disk
   lv01 vg1 -wi-a----- 16.00g   
 ```
 
-## NFSクライアントのインストール
+## NFSクライアントのインストール(不要)
 
 ```
 # apt install nfs-common
 ```
 
-## NFSサーバーのデータを利用するため、fstabに追加とNFSマウント
+## NFSサーバーのデータを利用するため、fstabに追加とNFSマウント（不要）
 
 ```
 # vi /etc/fstab
@@ -152,7 +184,7 @@ hmc-nfs:/exports/nfs/golang  110G   91G   14G  87% /nfs
 hmc-nfs:/backup              110G   51G   54G  49% /mnt
 ```
 
-## NFSサーバー上のディスクイメージをコピー
+## NFSサーバー上のディスクイメージをコピー（不要）
 
 ```
 # dd if=/nfs/lv03.img of=/dev/vg1/lv01 bs=4294967296
@@ -161,7 +193,7 @@ hmc-nfs:/backup              110G   51G   54G  49% /mnt
 17179869184 bytes (17 GB, 16 GiB) copied, 157.197 s, 109 MB/s
 ```
 
-## /var を専用ストレージに移行
+## /var を専用ストレージに移行(不要)
 
 ```
 # vi /etc/fstab
