@@ -413,7 +413,9 @@ func downloadImageWithContext(ctx context.Context, sourceURL, destPath string) e
 	if err != nil {
 		return wrapDeadlineExceeded(fmt.Errorf("http get failed: %w", err), "イメージのダウンロード", timeout)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status code: %s", resp.Status)
@@ -426,12 +428,12 @@ func downloadImageWithContext(ctx context.Context, sourceURL, destPath string) e
 	}
 
 	if _, err := io.Copy(f, resp.Body); err != nil {
-		f.Close()
+		_ = f.Close()
 		_ = os.Remove(tmpPath)
 		return wrapDeadlineExceeded(fmt.Errorf("copy response body failed: %w", err), "イメージのダウンロード", timeout)
 	}
 	if err := f.Sync(); err != nil {
-		f.Close()
+		_ = f.Close()
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("sync temp file failed: %w", err)
 	}
@@ -452,7 +454,9 @@ func validateQcowV2Image(path string) error {
 	if err != nil {
 		return fmt.Errorf("open image file failed: %w", err)
 	}
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 
 	header := make([]byte, 8)
 	if _, err := io.ReadFull(f, header); err != nil {

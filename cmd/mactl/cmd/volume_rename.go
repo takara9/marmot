@@ -24,7 +24,7 @@ var volumeRenameCmd = &cobra.Command{
 		volumeId := args[0]
 		newName := args[1]
 		var volume api.Volume
-			   volume.Metadata.Name = newName
+		volume.Metadata.Name = newName
 
 		byteBody, _, err := m.UpdateVolumeById(volumeId, volume)
 		if err != nil {
@@ -34,7 +34,7 @@ var volumeRenameCmd = &cobra.Command{
 
 		switch outputStyle {
 		case "text":
-			fmt.Fprintf(cmd.ErrOrStderr(), "Not implemented for text output\n")
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Not implemented for text output\n")
 			return nil
 
 		case "json":

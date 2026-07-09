@@ -112,34 +112,34 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 		for i := 0; i < len(bootVolId); i++ {
 			if i == 4 {
 				cmd := exec.Command("lvremove", "vg1/"+bootVolId[i])
-				cmd.Run()
+				_ = cmd.Run()
 			} else {
 				bootVolPath := fmt.Sprintf("/var/lib/marmot/volumes/boot-%s.qcow2", bootVolId[i])
-				os.RemoveAll(bootVolPath)
+				_ = os.RemoveAll(bootVolPath)
 			}
 		}
 
 		By("データボリュームの削除")
 		for i := 0; i < len(dataVolId); i++ {
 			dataVolPath := fmt.Sprintf("/var/lib/marmot/volumes/data-%s.qcow2", dataVolId[i])
-			os.RemoveAll(dataVolPath)
+			_ = os.RemoveAll(dataVolPath)
 		}
 
 		By("作成したイメージの削除-1")
 		fmt.Println("削除するイメージID: ", createdImageId1)
 		fmt.Println("削除するイメージのLV名: ", "vg1/osimage-"+createdImageId1)
 		fmt.Println("削除するイメージのパス: ", fmt.Sprintf("/var/lib/marmot/images/%s", createdImageId1))
-		exec.Command("lvremove", "-y", "vg1/osimage-"+createdImageId1).Run()
+		_ = exec.Command("lvremove", "-y", "vg1/osimage-"+createdImageId1).Run()
 		imageVolPath := fmt.Sprintf("/var/lib/marmot/images/%s", createdImageId1)
-		os.RemoveAll(imageVolPath)
+		_ = os.RemoveAll(imageVolPath)
 
 		By("作成したイメージの削除-2")
 		fmt.Println("削除するイメージID: ", createdImageId2)
 		fmt.Println("削除するイメージのLV名: ", "vg1/osimage-"+createdImageId2)
 		fmt.Println("削除するイメージのパス: ", fmt.Sprintf("/var/lib/marmot/images/%s", createdImageId2))
-		exec.Command("lvremove", "-y", "vg1/osimage-"+createdImageId2).Run()
+		_ = exec.Command("lvremove", "-y", "vg1/osimage-"+createdImageId2).Run()
 		imageVolPath = fmt.Sprintf("/var/lib/marmot/images/%s", createdImageId2)
-		os.RemoveAll(imageVolPath)
+		_ = os.RemoveAll(imageVolPath)
 
 	})
 
@@ -526,7 +526,7 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 		})
 
 		It("仮想サーバーの削除", func() {
-			marmotServer.Ma.DeleteServerByIdManage(vmId[4])
+			Expect(marmotServer.Ma.DeleteServerByIdManage(vmId[4])).NotTo(HaveOccurred())
 			//Expect(err).NotTo(HaveOccurred())
 		})
 	})

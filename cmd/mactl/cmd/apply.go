@@ -110,7 +110,9 @@ func applyServer(manifest map[string]interface{}) error {
 	list, _, err := m.GetServers()
 	if err == nil {
 		var servers []api.Server
-		json.Unmarshal(list, &servers)
+		if err := json.Unmarshal(list, &servers); err != nil {
+			return fmt.Errorf("failed to parse server list: %w", err)
+		}
 		for _, s := range servers {
 			if s.Metadata.Name == server.Metadata.Name {
 				exists = true
@@ -209,7 +211,9 @@ func applyImage(manifest map[string]interface{}) error {
 	list, _, err := m.GetImages()
 	if err == nil {
 		var images []api.Image
-		json.Unmarshal(list, &images)
+		if err := json.Unmarshal(list, &images); err != nil {
+			return fmt.Errorf("failed to parse image list: %w", err)
+		}
 		for _, img := range images {
 			if img.Metadata.Name == image.Metadata.Name {
 				exists = true
@@ -270,7 +274,9 @@ func applyVolume(manifest map[string]interface{}) error {
 	list, _, err := m.ListVolumes()
 	if err == nil {
 		var volumes []api.Volume
-		json.Unmarshal(list, &volumes)
+		if err := json.Unmarshal(list, &volumes); err != nil {
+			return fmt.Errorf("failed to parse volume list: %w", err)
+		}
 		for _, vol := range volumes {
 			if vol.Metadata.Name == volume.Metadata.Name {
 				exists = true
@@ -328,7 +334,9 @@ func applyNetwork(manifest map[string]interface{}) error {
 	list, _, err := m.GetVirtualNetworks()
 	if err == nil {
 		var networks []api.VirtualNetwork
-		json.Unmarshal(list, &networks)
+		if err := json.Unmarshal(list, &networks); err != nil {
+			return fmt.Errorf("failed to parse network list: %w", err)
+		}
 		for _, net := range networks {
 			if net.Metadata.Name == network.Metadata.Name {
 				exists = true
@@ -568,7 +576,9 @@ func applyGateway(manifest map[string]interface{}) error {
 	list, _, err := m.GetGateways()
 	if err == nil {
 		var gateways []api.Gateway
-		json.Unmarshal(list, &gateways)
+		if err := json.Unmarshal(list, &gateways); err != nil {
+			return fmt.Errorf("failed to parse gateway list: %w", err)
+		}
 		for _, g := range gateways {
 			if g.Metadata.Name != gateway.Metadata.Name {
 				continue
@@ -627,7 +637,9 @@ func applyVpnGateway(manifest map[string]interface{}) error {
 	list, _, err := m.GetVpnGateways()
 	if err == nil {
 		var items []api.VpnGateway
-		json.Unmarshal(list, &items)
+		if err := json.Unmarshal(list, &items); err != nil {
+			return fmt.Errorf("failed to parse vpn gateway list: %w", err)
+		}
 		for _, g := range items {
 			if g.Metadata.Name != vpnGateway.Metadata.Name {
 				continue
@@ -686,7 +698,9 @@ func applyLoadBalancer(manifest map[string]interface{}) error {
 	list, _, err := m.GetLoadBalancers()
 	if err == nil {
 		var items []api.ApplicationLoadBalancer
-		json.Unmarshal(list, &items)
+		if err := json.Unmarshal(list, &items); err != nil {
+			return fmt.Errorf("failed to parse application load balancer list: %w", err)
+		}
 		for _, item := range items {
 			if item.Metadata.Name != lb.Metadata.Name {
 				continue
@@ -745,7 +759,9 @@ func applyNetworkLoadBalancer(manifest map[string]interface{}) error {
 	list, _, err := m.GetNetworkLoadBalancers()
 	if err == nil {
 		var items []api.NetworkLoadBalancer
-		json.Unmarshal(list, &items)
+		if err := json.Unmarshal(list, &items); err != nil {
+			return fmt.Errorf("failed to parse network load balancer list: %w", err)
+		}
 		for _, item := range items {
 			if item.Metadata.Name != nlb.Metadata.Name {
 				continue
@@ -817,5 +833,7 @@ func processApplyResponse(byteBody []byte, updated bool) error {
 func init() {
 	rootCmd.AddCommand(applyCmd)
 	applyCmd.Flags().StringVarP(&manifestFile, "file", "f", "", "Manifest file, URL, or - for stdin")
-	applyCmd.MarkFlagRequired("file")
+	if err := applyCmd.MarkFlagRequired("file"); err != nil {
+		panic(err)
+	}
 }

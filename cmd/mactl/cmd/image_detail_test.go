@@ -17,7 +17,9 @@ func captureStdout(fn func()) string {
 	if err != nil {
 		Fail("os.Pipe failed: " + err.Error())
 	}
-	defer r.Close()
+	defer func() {
+		_ = r.Close()
+	}()
 
 	os.Stdout = w
 	defer func() {

@@ -127,7 +127,7 @@ var _ = Describe("Linux セットアップ", Ordered, Label("integration", "requ
 
 		It("アンマウントLinuxホスト名設定のチェック", func() {
 			fmt.Println("Unmounting volume...", mountPoint, nbdDev)
-			util.UnMountVolume(*testSpec.Spec.BootVolume, mountPoint, nbdDev)
+			Expect(util.UnMountVolume(*testSpec.Spec.BootVolume, mountPoint, nbdDev)).NotTo(HaveOccurred())
 		})
 	})
 

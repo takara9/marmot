@@ -18,7 +18,7 @@ var _ = Describe("Cloud-InitISO作成テスト", Ordered, func() {
 	})
 
 	AfterAll(func(ctx SpecContext) {
-		os.Remove(isoFile) // テスト後にISOファイルを削除
+		_ = os.Remove(isoFile) // テスト後にISOファイルを削除
 	})
 
 	Context("ISOの作成と確認", func() {

@@ -107,7 +107,9 @@ func createServer(manifest map[string]interface{}) error {
 	list, _, err := m.GetServers()
 	if err == nil {
 		var servers []api.Server
-		json.Unmarshal(list, &servers)
+		if err := json.Unmarshal(list, &servers); err != nil {
+			return fmt.Errorf("failed to parse server list: %w", err)
+		}
 		for _, s := range servers {
 			if s.Metadata.Name == server.Metadata.Name {
 				return fmt.Errorf("server %q already exists", server.Metadata.Name)
@@ -482,5 +484,7 @@ func processCreateResponse(byteBody []byte) error {
 func init() {
 	rootCmd.AddCommand(createCmd)
 	createCmd.Flags().StringVarP(&manifestFile, "file", "f", "", "Manifest file, URL, or - for stdin")
-	createCmd.MarkFlagRequired("file")
+	if err := createCmd.MarkFlagRequired("file"); err != nil {
+		panic(err)
+	}
 }

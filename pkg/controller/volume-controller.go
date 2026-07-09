@@ -199,7 +199,9 @@ func (c *controller) volumeControllerLoop() {
 					continue
 				}
 			}
-			c.db.DeleteVolume(volID)
+			if err := c.db.DeleteVolume(volID); err != nil {
+				slog.Error("DeleteVolume()", "err", err, "volId", volID)
+			}
 			slog.Debug("ボリュームの削除成功", "volId", volID)
 
 		case db.VOLUME_ERROR:

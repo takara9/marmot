@@ -62,7 +62,9 @@ func (m *MarmotEndpoint) httpRequest(req *http.Request) (int, []byte, *url.URL, 
 	}
 
 	byteJSON, err := io.ReadAll(resp.Body)
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	if err != nil {
 		return 0, nil, nil, err
 	}
@@ -93,7 +95,9 @@ func (m *MarmotEndpoint) httpRequest2(req *http.Request) ([]byte, *url.URL, erro
 	}
 
 	byteJSON, err := io.ReadAll(resp.Body)
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	if err != nil {
 		return nil, nil, err
 	}

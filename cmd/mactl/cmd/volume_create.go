@@ -83,5 +83,7 @@ var volumeCreateCmd = &cobra.Command{
 func init() {
 	volumeCmd.AddCommand(volumeCreateCmd)
 	volumeCreateCmd.Flags().StringVarP(&configFilename, "configfile", "f", "", "Configuration file or raw URL for the volume")
-	volumeCreateCmd.MarkFlagRequired("configfile")
+	if err := volumeCreateCmd.MarkFlagRequired("configfile"); err != nil {
+		panic(err)
+	}
 }

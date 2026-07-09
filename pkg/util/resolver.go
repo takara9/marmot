@@ -71,7 +71,9 @@ func backupResolvConfIfNeeded(sourcePath, backupPath string) error {
 		}
 		return fmt.Errorf("create backup %s: %w", backupPath, err)
 	}
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 
 	if _, err := f.Write(content); err != nil {
 		return fmt.Errorf("write backup %s: %w", backupPath, err)

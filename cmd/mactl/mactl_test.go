@@ -66,7 +66,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		if strings.TrimSpace(testHomeDir) != "" {
 			_ = os.RemoveAll(testHomeDir)
 		}
-		os.Remove("bin/mactl-test")
+		_ = os.Remove("bin/mactl-test")
 		os.Remove("/var/actions-runner/_work/marmot/marmot/cmd/mactl/bin/mactl-test")
 		cleanupTestEnvironment()
 	})
@@ -558,7 +558,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		})
 
 		AfterEach(func() {
-			os.RemoveAll(tmpHome)
+			_ = os.RemoveAll(tmpHome)
 		})
 
 		// HOME を上書きした環境変数リストを返すヘルパー

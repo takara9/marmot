@@ -28,7 +28,9 @@ func (s *Server) ApiImportImageArchive(ctx echo.Context) error {
 	if err != nil {
 		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: err.Error()})
 	}
-	defer src.Close()
+	defer func() {
+		_ = src.Close()
+	}()
 
 	baseName := strings.TrimSuffix(filepath.Base(fileHeader.Filename), filepath.Ext(fileHeader.Filename))
 	baseName = strings.TrimSuffix(baseName, filepath.Ext(baseName))
@@ -64,7 +66,9 @@ func extractFromTGZ(src io.Reader, destDir string, meta *archiveMetaJSON) (strin
 	if err != nil {
 		return "", fmt.Errorf("failed to read gzip stream: %w", err)
 	}
-	defer gz.Close()
+	defer func() {
+		_ = gz.Close()
+	}()
 
 	tr := tar.NewReader(gz)
 	var found string

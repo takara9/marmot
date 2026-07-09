@@ -132,7 +132,9 @@ func (m *MarmotEndpoint) ImportImageArchive(tgzPath string) ([]byte, *url.URL, e
 	if err != nil {
 		return nil, nil, err
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)

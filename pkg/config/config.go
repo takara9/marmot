@@ -86,7 +86,9 @@ func readYAMLFromFile(fn string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	byteData, err := io.ReadAll(io.LimitReader(file, maxYAMLConfigSize+1))
 	if err != nil {
@@ -104,7 +106,9 @@ func readYAMLFromURL(source string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch yaml config from url %q: %w", source, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to fetch yaml config from url %q: %s", source, resp.Status)

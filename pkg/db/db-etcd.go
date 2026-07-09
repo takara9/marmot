@@ -103,7 +103,7 @@ func NewDatabase(url string) (*Database, error) {
 	// セッションの生成、分散ロックの有効化のため
 	session, err := concurrency.NewSession(cli, concurrency.WithContext(ctx))
 	if err != nil {
-		cli.Close()
+		_ = cli.Close()
 		slog.Error("failed to create etcd session", "err", err)
 		return nil, fmt.Errorf("failed to create etcd session: %w", err)
 	}
@@ -128,7 +128,8 @@ func (d *Database) Close() error {
 
 // LockKey: 指定キーに対する分散ロックを取得
 func (d *Database) LockKey(lockName string) (*concurrency.Mutex, error) {
-	ctx, _ := context.WithTimeout(d.Ctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(d.Ctx, 5*time.Second)
+	defer cancel()
 	d.Mutex = concurrency.NewMutex(d.Session, lockName)
 	if err := d.Mutex.Lock(ctx); err != nil {
 		return nil, fmt.Errorf("failed to acquire lock %s: %w", lockName, err)
@@ -143,7 +144,8 @@ func (d *Database) UnlockKey(m *concurrency.Mutex) {
 
 // 単純 Put（ロック前提・上書きで良い場合）
 func (d *Database) PutJSON(key string, v interface{}) error {
-	ctx, _ := context.WithTimeout(d.Ctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(d.Ctx, 5*time.Second)
+	defer cancel()
 	byteJSON, err := json.Marshal(v)
 	if err != nil {
 		return fmt.Errorf("json marshal failed: %w", err)
@@ -157,7 +159,8 @@ func (d *Database) PutJSON(key string, v interface{}) error {
 
 // 生データ取得
 func (d *Database) getRaw(key string) (*etcd.GetResponse, error) {
-	ctx, _ := context.WithTimeout(d.Ctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(d.Ctx, 5*time.Second)
+	defer cancel()
 	resp, err := d.Cli.Get(ctx, key, etcd.WithLimit(1))
 	if err != nil {
 		return nil, fmt.Errorf("etcd get failed: %w", err)
@@ -182,7 +185,8 @@ func (d *Database) GetJSON(key string, out interface{}) (*etcd.GetResponse, erro
 
 // プレフィックス検索で取得
 func (d *Database) GetByPrefix(prefix string) (*etcd.GetResponse, error) {
-	ctx, _ := context.WithTimeout(d.Ctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(d.Ctx, 5*time.Second)
+	defer cancel()
 	resp, err := d.Cli.Get(ctx, prefix, etcd.WithPrefix())
 	if err != nil {
 		return nil, fmt.Errorf("etcd get prefix failed: %w", err)
@@ -196,7 +200,8 @@ func (d *Database) GetByPrefix(prefix string) (*etcd.GetResponse, error) {
 
 // PutJSONCAS: ModRevision が expectedRev の時だけ更新する
 func (d *Database) PutJSONCAS(key string, expectedRev int64, v interface{}) error {
-	ctx, _ := context.WithTimeout(d.Ctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(d.Ctx, 5*time.Second)
+	defer cancel()
 
 	byteData, err := json.Marshal(v)
 	if err != nil {
@@ -219,7 +224,8 @@ func (d *Database) PutJSONCAS(key string, expectedRev int64, v interface{}) erro
 }
 
 func (d *Database) DeleteJSON(key string) error {
-	ctx, _ := context.WithTimeout(d.Ctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(d.Ctx, 5*time.Second)
+	defer cancel()
 	_, err := d.Cli.Delete(ctx, key)
 	if err != nil {
 		slog.Error("DeleteJSON() failed", "err", err, "key", key)

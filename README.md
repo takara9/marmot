@@ -1,3 +1,10 @@
+[![GitHub release](https://img.shields.io/github/v/release/takara9/marmot)](https://github.com/takara9/marmot/releases)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![golangci-lint](https://github.com/takara9/marmot/actions/workflows/golangci-lint.yml/badge.svg)](https://github.com/takara9/marmot/actions/workflows/golangci-lint.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/takara9/marmot.svg)](https://pkg.go.dev/github.com/takara9/marmot)
+[![GitHub stars](https://img.shields.io/github/stars/takara9/marmot?style=social)](https://github.com/takara9/marmot/stargazers)
+
+
 # Marmot — プライベートクラウド基盤
 
 Marmot（マーモット）は、シンプルなYAMLで仮想サーバー、ネットワーク、ストレージを管理できるプライベートクラウド基盤です。Kubernetesライクな宣言型APIを採用し、学習・検証環境から実運用まで、迅速かつ再現性の高いインフラ構築を実現します。
@@ -6,7 +13,7 @@ Marmot（マーモット）は、シンプルなYAMLで仮想サーバー、ネ�
 
 ## コンセプト
 
-利用者は、Kubernetesのマニフェストを書く感覚で仮想マシンを管理できます。しかし、Kubernetesのような複雑な概念や高い学習コストはありません。シンプルで理解しやすいYAMLを記述するだけで、仮想サーバー、ネットワーク、ストレージを宣言的に管理できます。[Marmotマニフェスト集](https://github.com/takara9/marmot-manifests)を参考にすれば、Linuxをインストールした1台のマシンから始めて、プライベートネットワークの構築、仮想ストレージの確保、仮想サーバーの展開までを数分で実現できます。複雑な設定作業に悩まされることなく、学習、検証、実験に集中できます。
+利用者は、Kubernetesのマニフェストを書く感覚で仮想マシンを管理できます。しかし、Kubernetesのような複雑な概念や高い学習コストは、必要ありません。シンプルで理解しやすいYAMLを記述するだけで、仮想サーバー、ネットワーク、ストレージを宣言的に管理できます。[Marmotマニフェスト集](https://github.com/takara9/marmot-manifests)を参考にすれば、Linuxをインストールした1台のマシンから始めて、プライベートネットワークの構築、仮想ストレージの確保、仮想サーバーの展開までを数分で実現できます。複雑な設定作業に悩まされることなく、学習、検証、実験に集中できます。
 
 
 ```yaml

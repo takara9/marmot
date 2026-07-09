@@ -154,13 +154,19 @@ func writeImageArchive(outPath string, image api.Image, qcow2Bytes []byte) error
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 
 	gz := gzip.NewWriter(f)
-	defer gz.Close()
+	defer func() {
+		_ = gz.Close()
+	}()
 
 	tw := tar.NewWriter(gz)
-	defer tw.Close()
+	defer func() {
+		_ = tw.Close()
+	}()
 
 	qcowName := fmt.Sprintf("%s.qcow2", sanitizeArchiveName(imageName))
 	hdr := &tar.Header{

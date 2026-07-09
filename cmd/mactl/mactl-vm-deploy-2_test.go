@@ -66,8 +66,8 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 		if strings.TrimSpace(testHomeDir) != "" {
 			_ = os.RemoveAll(testHomeDir)
 		}
-		os.Remove("bin/mactl-test")
-		os.Remove("/var/actions-runner/_work/marmot/marmot/cmd/mactl/bin/mactl-test")
+		_ = os.Remove("bin/mactl-test")
+		_ = os.Remove("/var/actions-runner/_work/marmot/marmot/cmd/mactl/bin/mactl-test")
 		cleanupTestEnvironment()
 
 		By("ネットワークの削除 デファルト")

@@ -16,7 +16,9 @@ func FetchPublicKeys(url string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch keys from %s: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, fmt.Errorf("user not found: %s", url)

@@ -108,7 +108,7 @@ var _ = Describe("manifest", func() {
 		})
 
 		AfterEach(func() {
-			os.RemoveAll(tmpDir)
+			_ = os.RemoveAll(tmpDir)
 		})
 
 		It("loads YAML manifest from file", func() {

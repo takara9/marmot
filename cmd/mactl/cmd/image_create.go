@@ -90,5 +90,7 @@ var imageCreateCmd = &cobra.Command{
 func init() {
 	imageCmd.AddCommand(imageCreateCmd)
 	imageCreateCmd.Flags().StringVarP(&configFilename, "configfile", "f", "", "Configuration file or raw URL for the image")
-	imageCreateCmd.MarkFlagRequired("configfile")
+	if err := imageCreateCmd.MarkFlagRequired("configfile"); err != nil {
+		panic(err)
+	}
 }

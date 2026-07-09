@@ -26,7 +26,7 @@ var networkIPAddressListCmd = &cobra.Command{
 			for _, ipNetworkId := range args {
 				byteBody, _, err := m.GetIpAddressesByNetworkId(ipNetworkId)
 				if err != nil {
-					fmt.Fprintln(cmd.ErrOrStderr(), "GetIpAddressesByNetworkId", "Id", ipNetworkId, "err", err)
+					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "GetIpAddressesByNetworkId", "Id", ipNetworkId, "err", err)
 					continue
 				}
 
@@ -38,7 +38,7 @@ var networkIPAddressListCmd = &cobra.Command{
 						continue
 					}
 					if err := json.Unmarshal(byteBody, &data); err != nil {
-						fmt.Fprintln(cmd.ErrOrStderr(), "Failed to Unmarshal", "Id", ipNetworkId, "err", err)
+						_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Failed to Unmarshal", "Id", ipNetworkId, "err", err)
 						continue
 					}
 					fmt.Println("IpNetwork:", ipNetworkId)

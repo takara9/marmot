@@ -196,14 +196,14 @@ var _ = Describe("Image", Ordered, func() {
 				createdID, err := v.MakeImageEntryFromURLWithNode("test-image-status-message", "http://hmc/status-message.qcow2", "marmot1")
 				Expect(err).NotTo(HaveOccurred())
 
-				v.UpdateImageStatusMessage(createdID, db.IMAGE_CREATING, "ヘッドノードからQCOW2イメージを取得中")
+				Expect(v.UpdateImageStatusMessage(createdID, db.IMAGE_CREATING, "ヘッドノードからQCOW2イメージを取得中")).NotTo(HaveOccurred())
 				creating, err := v.GetImage(createdID)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(creating.Status).NotTo(BeNil())
 				Expect(creating.Status.Message).NotTo(BeNil())
 				Expect(*creating.Status.Message).To(Equal("ヘッドノードからQCOW2イメージを取得中"))
 
-				v.UpdateImageStatus(createdID, db.IMAGE_AVAILABLE)
+				Expect(v.UpdateImageStatus(createdID, db.IMAGE_AVAILABLE)).NotTo(HaveOccurred())
 				available, err := v.GetImage(createdID)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(available.Status).NotTo(BeNil())

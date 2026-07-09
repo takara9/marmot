@@ -35,7 +35,7 @@ var _ = Describe("iSCSI Initiator ID", Label("iscsi-initiator"), func() {
 	AfterEach(func() {
 		iscsiInitiatornameFile = origFile
 		systemctlRestartIscsid = origRestart
-		os.RemoveAll(tempDir)
+		_ = os.RemoveAll(tempDir)
 	})
 
 	Context("getISCSIInitiatorID", func() {

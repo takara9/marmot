@@ -370,7 +370,9 @@ func getFreeTCPPort(t *testing.T) int {
 	if err != nil {
 		t.Fatalf("net.Listen() failed while reserving test port: %v", err)
 	}
-	defer listener.Close()
+	defer func() {
+		_ = listener.Close()
+	}()
 	addr, ok := listener.Addr().(*net.TCPAddr)
 	if !ok {
 		t.Fatalf("listener address is not TCP")

@@ -152,7 +152,7 @@ func (c *controller) handleRequest(w dns.ResponseWriter, r *dns.Msg) {
 				Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 300},
 				A:   ip,
 			})
-			w.WriteMsg(m)
+			_ = w.WriteMsg(m)
 			return
 		}
 	}
@@ -162,7 +162,7 @@ func (c *controller) handleRequest(w dns.ResponseWriter, r *dns.Msg) {
 		m := new(dns.Msg)
 		m.SetReply(r)
 		m.Rcode = dns.RcodeRefused
-		w.WriteMsg(m)
+		_ = w.WriteMsg(m)
 		return
 	}
 
@@ -172,7 +172,7 @@ func (c *controller) handleRequest(w dns.ResponseWriter, r *dns.Msg) {
 		dns.HandleFailed(w, r)
 		return
 	}
-	w.WriteMsg(reply)
+	_ = w.WriteMsg(reply)
 }
 
 func decodeDNSRecordIP(raw []byte) (net.IP, string, error) {
