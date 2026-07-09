@@ -14,7 +14,7 @@ import (
 var sshExecCommand = exec.Command
 
 var sshCmd = &cobra.Command{
-	Use:   "ssh SERVER-NAME [SSH-ARGS...]",
+	Use:   "ssh [USER@]SERVER-NAME -- [SSH-ARGS...]",
 	Short: "Connect to a server via SSH using host-bridge IP",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -25,9 +25,9 @@ var sshCmd = &cobra.Command{
 			return fmt.Errorf("failed to get API client config: %w", err)
 		}
 
-		serverName := strings.TrimSpace(args[0])
-		if serverName == "" {
-			return fmt.Errorf("server name is required")
+		sshUser, serverName, err := parseSSHLoginTarget(args[0])
+		if err != nil {
+			return err
 		}
 
 		list, _, err := m.GetServers()
@@ -49,8 +49,9 @@ var sshCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("server %q %w", serverName, err)
 		}
+		sshTarget := buildSSHTargetAddress(sshUser, targetAddress)
 
-		sshArgs := composeSSHArgs(targetAddress, args[1:])
+		sshArgs := composeSSHArgs(sshTarget, args[1:])
 		sshCommand := sshExecCommand("ssh", sshArgs...)
 		sshCommand.Stdin = os.Stdin
 		sshCommand.Stdout = os.Stdout
@@ -61,6 +62,31 @@ var sshCmd = &cobra.Command{
 		}
 		return nil
 	},
+}
+
+func parseSSHLoginTarget(value string) (string, string, error) {
+	target := strings.TrimSpace(value)
+	if target == "" {
+		return "", "", fmt.Errorf("server name is required")
+	}
+	if !strings.Contains(target, "@") {
+		return "", target, nil
+	}
+
+	parts := strings.SplitN(target, "@", 2)
+	user := strings.TrimSpace(parts[0])
+	serverName := strings.TrimSpace(parts[1])
+	if user == "" || serverName == "" {
+		return "", "", fmt.Errorf("invalid ssh target %q; use [USER@]SERVER-NAME", target)
+	}
+	return user, serverName, nil
+}
+
+func buildSSHTargetAddress(user, ipAddress string) string {
+	if strings.TrimSpace(user) == "" {
+		return strings.TrimSpace(ipAddress)
+	}
+	return strings.TrimSpace(user) + "@" + strings.TrimSpace(ipAddress)
 }
 
 func findServerByName(servers []api.Server, name string) (*api.Server, error) {
