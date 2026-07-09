@@ -31,8 +31,7 @@ func maybeApplyServerAnsiblePlaybook(m *client.MarmotEndpoint, server api.Server
 		return nil
 	}
 
-	targetAddress, err := validateServerAnsibleSpec(server)
-	if err != nil {
+	if err := validateServerAnsibleSpec(server); err != nil {
 		return err
 	}
 
@@ -43,6 +42,11 @@ func maybeApplyServerAnsiblePlaybook(m *client.MarmotEndpoint, server api.Server
 
 	fmt.Fprintln(os.Stderr, "OS起動待機中.....")
 	if err := waitServerRunning(m, serverID, serverAnsibleWaitTimeout, serverAnsibleWaitPollInterval); err != nil {
+		return err
+	}
+
+	targetAddress, err := waitServerHostBridgeAddress(m, serverID, serverAnsiblePingTimeout, serverAnsiblePingPollInterval)
+	if err != nil {
 		return err
 	}
 
@@ -70,29 +74,72 @@ func maybeApplyServerAnsiblePlaybook(m *client.MarmotEndpoint, server api.Server
 	return nil
 }
 
-func validateServerAnsibleSpec(server api.Server) (string, error) {
+func validateServerAnsibleSpec(server api.Server) error {
 	if server.Spec.Ansible == nil {
-		return "", nil
+		return nil
 	}
 	if strings.TrimSpace(server.Spec.Ansible.Playbook) == "" {
-		return "", fmt.Errorf("spec.ansible.playbook is required when spec.ansible is set")
+		return fmt.Errorf("spec.ansible.playbook is required when spec.ansible is set")
 	}
 	if strings.TrimSpace(server.Spec.Ansible.Inventory) == "" {
-		return "", fmt.Errorf("spec.ansible.inventory is required when spec.ansible is set")
+		return fmt.Errorf("spec.ansible.inventory is required when spec.ansible is set")
 	}
 	if server.Spec.NetworkInterface == nil || len(*server.Spec.NetworkInterface) == 0 {
-		return "", fmt.Errorf("spec.ansible requires spec.networkInterface with host-bridge and static address")
+		return fmt.Errorf("spec.ansible requires spec.networkInterface with host-bridge")
+	}
+	for _, nic := range *server.Spec.NetworkInterface {
+		if strings.TrimSpace(nic.Networkname) != "host-bridge" {
+			continue
+		}
+		return nil
+	}
+	return fmt.Errorf("spec.ansible can be used only when host-bridge is specified in spec.networkInterface")
+}
+
+func waitServerHostBridgeAddress(m *client.MarmotEndpoint, serverID string, timeout, interval time.Duration) (string, error) {
+	deadline := time.Now().Add(timeout)
+	var lastErr error
+	for {
+		body, _, err := m.GetServerById(serverID)
+		if err != nil {
+			lastErr = fmt.Errorf("failed to get server %s while waiting for host-bridge address: %w", serverID, err)
+		} else {
+			var srv api.Server
+			if err := json.Unmarshal(body, &srv); err != nil {
+				lastErr = fmt.Errorf("failed to parse server %s while waiting for host-bridge address: %w", serverID, err)
+			} else {
+				addr, err := hostBridgeAddressFromServer(srv)
+				if err == nil {
+					return addr, nil
+				}
+				lastErr = err
+			}
+		}
+
+		if time.Now().After(deadline) {
+			if lastErr != nil {
+				return "", fmt.Errorf("timeout waiting for host-bridge address for server %s: %w", serverID, lastErr)
+			}
+			return "", fmt.Errorf("timeout waiting for host-bridge address for server %s", serverID)
+		}
+		time.Sleep(interval)
+	}
+}
+
+func hostBridgeAddressFromServer(server api.Server) (string, error) {
+	if server.Spec.NetworkInterface == nil || len(*server.Spec.NetworkInterface) == 0 {
+		return "", fmt.Errorf("spec.networkInterface with host-bridge is not set")
 	}
 	for _, nic := range *server.Spec.NetworkInterface {
 		if strings.TrimSpace(nic.Networkname) != "host-bridge" {
 			continue
 		}
 		if nic.Address == nil || strings.TrimSpace(*nic.Address) == "" {
-			return "", fmt.Errorf("spec.ansible requires host-bridge address to be set")
+			return "", fmt.Errorf("host-bridge address is not assigned yet")
 		}
 		return strings.TrimSpace(*nic.Address), nil
 	}
-	return "", fmt.Errorf("spec.ansible can be used only when host-bridge is specified in spec.networkInterface")
+	return "", fmt.Errorf("host-bridge is not set in spec.networkInterface")
 }
 
 func extractSuccessID(body []byte) (string, error) {
