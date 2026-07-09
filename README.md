@@ -109,17 +109,10 @@ spec:
          - ubuntu       
     networkInterface:
         - networkname: host-bridge  # marmot のサーバーが接続されるネットワーク
-          address: 192.168.1.20     # IPアドレスを手動設定（IPアドレスの重複使用に注意)
-          netmasklen: 24            # ネットマスク
-          routes:                   # デフォルトGW ルーターのアドレスを指定
-            - to: default
-              via: 192.168.1.1
-          nameservers:              # 仮想サーバーが参照するDNSサーバー
-            addresses:
-                - 8.8.8.8
-            search:                 # ドメイン名を省略可能なドメインをセット
-                - labo.local
 ```
+
+注) `networkname=host-bridge` の時に設定するデフォルト値は、/etc/marmot/marmotd.josn に設定しておく必要があります。
+
 
 ### 仮想サーバーの作成
 
