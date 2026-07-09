@@ -130,13 +130,18 @@ NAME             NODE          STATUS        CPU  RAM(MB)  IP-ADDRESS       NETW
 server-20        marmot3       RUNNING       1    1024     192.168.1.20     host-bridge      5s
 
 # sshでのログイン
-$ ssh ubuntu@192.168.1.20 -i vmkey
+$ mactl ssh ubuntu@server-20 -- -i vmkey 
 ubuntu@server-20:~$ 
 ubuntu@server-20:~$ exit
 
 # サーバーの削除
 $ mactl delete server server-20
 ```
+
+`mactl ssh` を使うと、DNSを設定することなく、サーバー名で、sshログインできます。
+
+mactl [mactlのフラグ] ssh [USER@]SERVER-NAME -- [SSH-ARGS...]
+
 
 
 ## インストール

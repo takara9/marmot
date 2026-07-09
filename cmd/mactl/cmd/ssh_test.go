@@ -8,6 +8,40 @@ import (
 )
 
 var _ = Describe("ssh helper functions", func() {
+	Describe("parseSSHLoginTarget", func() {
+		It("parses server name without user", func() {
+			user, serverName, err := parseSSHLoginTarget("server-20")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(user).To(Equal(""))
+			Expect(serverName).To(Equal("server-20"))
+		})
+
+		It("parses user and server name", func() {
+			user, serverName, err := parseSSHLoginTarget("ubuntu@server-20")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(user).To(Equal("ubuntu"))
+			Expect(serverName).To(Equal("server-20"))
+		})
+
+		It("returns error for malformed user at target", func() {
+			_, _, err := parseSSHLoginTarget("ubuntu@")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("invalid ssh target"))
+		})
+	})
+
+	Describe("buildSSHTargetAddress", func() {
+		It("returns IP when user is empty", func() {
+			target := buildSSHTargetAddress("", "192.168.10.50")
+			Expect(target).To(Equal("192.168.10.50"))
+		})
+
+		It("returns user at IP when user is specified", func() {
+			target := buildSSHTargetAddress("ubuntu", "192.168.10.50")
+			Expect(target).To(Equal("ubuntu@192.168.10.50"))
+		})
+	})
+
 	Describe("findServerByName", func() {
 		It("returns a matching server", func() {
 			servers := []api.Server{
