@@ -14,21 +14,18 @@ import (
 func TestValidateServerAnsibleSpec(t *testing.T) {
 	playbook := "playbook/setup.yaml"
 	inventory := "hosts"
-	ip := "192.168.1.64"
 
 	tests := []struct {
 		name    string
 		server  api.Server
-		wantIP  string
 		wantErr string
 	}{
 		{
 			name:   "ansible not specified",
 			server: api.Server{Spec: api.ServerSpec{}},
-			wantIP: "",
 		},
 		{
-			name: "ansible with host-bridge and address",
+			name: "ansible with host-bridge without address is accepted",
 			server: api.Server{Spec: api.ServerSpec{
 				Ansible: &api.ServerAnsible{
 					Playbook:  playbook,
@@ -36,10 +33,8 @@ func TestValidateServerAnsibleSpec(t *testing.T) {
 				},
 				NetworkInterface: &[]api.NetworkInterface{{
 					Networkname: "host-bridge",
-					Address:     &ip,
 				}},
 			}},
-			wantIP: ip,
 		},
 		{
 			name: "missing network interface",
@@ -49,7 +44,7 @@ func TestValidateServerAnsibleSpec(t *testing.T) {
 					Inventory: inventory,
 				},
 			}},
-			wantErr: "requires spec.networkInterface",
+			wantErr: "requires spec.networkInterface with host-bridge",
 		},
 		{
 			name: "missing playbook",
@@ -70,19 +65,6 @@ func TestValidateServerAnsibleSpec(t *testing.T) {
 			wantErr: "spec.ansible.inventory is required",
 		},
 		{
-			name: "host-bridge without address",
-			server: api.Server{Spec: api.ServerSpec{
-				Ansible: &api.ServerAnsible{
-					Playbook:  playbook,
-					Inventory: inventory,
-				},
-				NetworkInterface: &[]api.NetworkInterface{{
-					Networkname: "host-bridge",
-				}},
-			}},
-			wantErr: "requires host-bridge address",
-		},
-		{
 			name: "host-bridge missing",
 			server: api.Server{Spec: api.ServerSpec{
 				Ansible: &api.ServerAnsible{
@@ -91,7 +73,6 @@ func TestValidateServerAnsibleSpec(t *testing.T) {
 				},
 				NetworkInterface: &[]api.NetworkInterface{{
 					Networkname: "default",
-					Address:     &ip,
 				}},
 			}},
 			wantErr: "only when host-bridge is specified",
@@ -100,13 +81,10 @@ func TestValidateServerAnsibleSpec(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotIP, err := validateServerAnsibleSpec(tt.server)
+			err := validateServerAnsibleSpec(tt.server)
 			if tt.wantErr == "" {
 				if err != nil {
 					t.Fatalf("validateServerAnsibleSpec() unexpected err: %v", err)
-				}
-				if gotIP != tt.wantIP {
-					t.Fatalf("validateServerAnsibleSpec() ip = %q, want %q", gotIP, tt.wantIP)
 				}
 				return
 			}
@@ -264,7 +242,6 @@ func TestResolveServerAnsibleInventoryPathRelative(t *testing.T) {
 func TestValidateServerAnsibleSpecUsesStrings(t *testing.T) {
 	playbook := "playbook/setup.yaml"
 	inventory := "hosts"
-	ip := "192.168.1.64"
 	server := api.Server{Spec: api.ServerSpec{
 		Ansible: &api.ServerAnsible{
 			Playbook:  playbook,
@@ -272,16 +249,42 @@ func TestValidateServerAnsibleSpecUsesStrings(t *testing.T) {
 		},
 		NetworkInterface: &[]api.NetworkInterface{{
 			Networkname: "host-bridge",
-			Address:     &ip,
 		}},
 	}}
-	got, err := validateServerAnsibleSpec(server)
+	err := validateServerAnsibleSpec(server)
 	if err != nil {
 		t.Fatalf("validateServerAnsibleSpec() unexpected err: %v", err)
 	}
-	if got != ip {
-		t.Fatalf("validateServerAnsibleSpec() = %q, want %q", got, ip)
-	}
+}
+
+func TestHostBridgeAddressFromServer(t *testing.T) {
+	ip := "192.168.1.64"
+
+	t.Run("address is resolved", func(t *testing.T) {
+		nics := []api.NetworkInterface{{Networkname: "host-bridge", Address: &ip}}
+		server := api.Server{Spec: api.ServerSpec{NetworkInterface: &nics}}
+
+		got, err := hostBridgeAddressFromServer(server)
+		if err != nil {
+			t.Fatalf("hostBridgeAddressFromServer() unexpected err: %v", err)
+		}
+		if got != ip {
+			t.Fatalf("hostBridgeAddressFromServer() = %q, want %q", got, ip)
+		}
+	})
+
+	t.Run("host-bridge without address returns error", func(t *testing.T) {
+		nics := []api.NetworkInterface{{Networkname: "host-bridge"}}
+		server := api.Server{Spec: api.ServerSpec{NetworkInterface: &nics}}
+
+		_, err := hostBridgeAddressFromServer(server)
+		if err == nil {
+			t.Fatalf("hostBridgeAddressFromServer() expected error")
+		}
+		if !strings.Contains(err.Error(), "not assigned yet") {
+			t.Fatalf("hostBridgeAddressFromServer() err = %q, want contains %q", err.Error(), "not assigned yet")
+		}
+	})
 }
 
 func TestRunServerAnsiblePlaybookWithExtraArgs(t *testing.T) {

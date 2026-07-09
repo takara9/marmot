@@ -113,6 +113,9 @@ API キー:
 - mactl apply [RESOURCE]
 - mactl del [RESOURCE NAME]
 - mactl console SERVER-NAME
+- mactl ssh SERVER-NAME [SSH引数...]
+  - Marmot が管理する SERVER-NAME の host-bridge IP を解決して ssh 接続
+  - host-bridge 未接続、または host-bridge address 未設定の場合はエラー
 - mactl version
 
 ## 運用メモ
