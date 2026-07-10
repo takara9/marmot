@@ -1,6 +1,6 @@
 [![GitHub release](https://img.shields.io/github/v/release/takara9/marmot)](https://github.com/takara9/marmot/releases)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![golangci-lint](https://github.com/takara9/marmot/actions/workflows/golangci-lint.yml/badge.svg)](https://github.com/takara9/marmot/actions/workflows/golangci-lint.yml)
+[![golangci-lint](https://github.com/takara9/marmot/actions/workflows/main.yml/badge.svg)](https://github.com/takara9/marmot/actions/workflows/main.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/takara9/marmot.svg)](https://pkg.go.dev/github.com/takara9/marmot)
 [![GitHub stars](https://img.shields.io/github/stars/takara9/marmot?style=social)](https://github.com/takara9/marmot/stargazers)
 
