@@ -486,12 +486,12 @@ func downloadImageFromHeadWithContext(ctx context.Context, sourceURL, destPath s
 	}
 
 	if _, err := io.Copy(f, resp.Body); err != nil {
-		f.Close()
+		_ = f.Close()
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("failed to copy response body: %w", err)
 	}
 	if err := f.Sync(); err != nil {
-		f.Close()
+		_ = f.Close()
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("failed to sync temp file: %w", err)
 	}

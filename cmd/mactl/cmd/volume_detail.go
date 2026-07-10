@@ -25,7 +25,7 @@ var volumeDetailCmd = &cobra.Command{
 		for _, volumeId := range args {
 			byteBody, _, err := m.ShowVolumeById(volumeId)
 			if err != nil {
-				fmt.Fprintln(cmd.ErrOrStderr(), "ShowVolumeById", "Id", volumeId, "err", err)
+				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "ShowVolumeById", "Id", volumeId, "err", err)
 				continue
 			}
 
@@ -55,7 +55,7 @@ var volumeDetailCmd = &cobra.Command{
 			case "yaml":
 				yamlBytes, err := yaml.Marshal(data)
 				if err != nil {
-					fmt.Fprintln(cmd.ErrOrStderr(), "Failed to Marshal", "Id", volumeId, "err", err)
+					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Failed to Marshal", "Id", volumeId, "err", err)
 					continue
 
 				}
@@ -63,7 +63,7 @@ var volumeDetailCmd = &cobra.Command{
 				continue
 
 			default:
-				fmt.Fprintln(cmd.ErrOrStderr(), "output style must set text/json/yaml")
+				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "output style must set text/json/yaml")
 				continue
 
 			}

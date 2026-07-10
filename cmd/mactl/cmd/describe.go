@@ -1099,7 +1099,9 @@ func describeResource(resource interface{}) error {
 			return fmt.Errorf("failed to marshal: %w", err)
 		}
 		var obj interface{}
-		json.Unmarshal(data, &obj)
+		if err := json.Unmarshal(data, &obj); err != nil {
+			return fmt.Errorf("failed to unmarshal YAML source: %w", err)
+		}
 		yamlBytes, err := yaml.Marshal(obj)
 		if err != nil {
 			return fmt.Errorf("failed to marshal to YAML: %w", err)

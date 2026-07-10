@@ -5,7 +5,7 @@
 [![GitHub stars](https://img.shields.io/github/stars/takara9/marmot?style=social)](https://github.com/takara9/marmot/stargazers)
 
 
-# Marmot — プライベートクラウド基盤
+# Marmot — 1台のサーバーから始められる、Kubernetes対応のシンプルなプライベートクラウド
 
 Marmot（マーモット）は、シンプルなYAMLで仮想サーバー、ネットワーク、ストレージを管理できるプライベートクラウド基盤です。Kubernetesライクな宣言型APIを採用し、学習・検証環境から実運用まで、迅速かつ再現性の高いインフラ構築を実現します。
 

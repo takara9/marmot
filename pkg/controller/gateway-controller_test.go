@@ -57,7 +57,9 @@ func TestGatewayControllerStateTransitions(t *testing.T) {
 		t.Fatalf("GetServerById() failed for managed server %q: %v", serverID, err)
 	}
 
-	database.UpdateServerStatus(serverID, db.SERVER_RUNNING, "")
+	if err := database.UpdateServerStatus(serverID, db.SERVER_RUNNING, ""); err != nil {
+		t.Fatalf("UpdateServerStatus() failed for running transition: %v", err)
+	}
 
 	gatewayBeforeProvisioning, err := database.GetGatewayById(gatewayID)
 	if err != nil {
@@ -120,7 +122,9 @@ func TestGatewayControllerLoopIntegration_CreateToActive(t *testing.T) {
 		t.Fatalf("gateway managed server id is empty after first loop")
 	}
 
-	database.UpdateServerStatus(serverID, db.SERVER_RUNNING, "")
+	if err := database.UpdateServerStatus(serverID, db.SERVER_RUNNING, ""); err != nil {
+		t.Fatalf("UpdateServerStatus() failed for running transition: %v", err)
+	}
 	ctrl.gatewayControllerLoop()
 
 	gatewayAfterSecondLoop, err := database.GetGatewayById(gatewayID)
@@ -167,7 +171,9 @@ func TestGatewayControllerConfigRetryExceeded(t *testing.T) {
 		t.Fatalf("GetGatewayById() failed after pending reconcile: %v", err)
 	}
 	serverID := gatewayManagedServerID(gatewayAfterPending)
-	database.UpdateServerStatus(serverID, db.SERVER_RUNNING, "")
+	if err := database.UpdateServerStatus(serverID, db.SERVER_RUNNING, ""); err != nil {
+		t.Fatalf("UpdateServerStatus() failed for running transition: %v", err)
+	}
 	ctrl.reconcileGatewayProvisioning(gatewayAfterPending)
 
 	for i := 0; i < gatewayAnsibleMaxRetryCount; i++ {
@@ -282,7 +288,9 @@ func mustCreateInternalServer(t *testing.T, database *db.Database, name, network
 	if err != nil {
 		t.Fatalf("MakeServerEntry() failed for internal server: %v", err)
 	}
-	database.UpdateServerStatus(api.ServerID(server), db.SERVER_RUNNING, "")
+	if err := database.UpdateServerStatus(api.ServerID(server), db.SERVER_RUNNING, ""); err != nil {
+		t.Fatalf("UpdateServerStatus() failed for running transition: %v", err)
+	}
 	return server
 }
 
