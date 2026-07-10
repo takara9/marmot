@@ -33,10 +33,3 @@ func evaluateNodeAssignment(metadata *api.Metadata, nodeName string) (bool, stri
 	}
 	return false, assigned, "assigned_node_mismatch"
 }
-
-// shouldProcessOnNode returns true when the object is assigned to this node
-// or has no explicit node assignment (for backward compatibility).
-func shouldProcessOnNode(metadata *api.Metadata, nodeName string) bool {
-	ok, _, _ := evaluateNodeAssignment(metadata, nodeName)
-	return ok
-}

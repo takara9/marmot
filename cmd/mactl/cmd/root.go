@@ -8,7 +8,6 @@ import (
 )
 
 var apiConfigFilename string
-var clusterConfigFilename string
 var outputStyle string
 var watchMode bool
 var watchInterval int
