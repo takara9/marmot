@@ -407,10 +407,20 @@ func UnMountVolume(v api.Volume, mountPoint string, nbdDevice string) error {
 		}
 
 		// nbdモジュールのアンロード
-		cmd = exec.Command("modprobe", "-r", "nbd")
-		err = cmd.Run()
+		for attempt := 1; attempt <= 3; attempt++ {
+			cmd = exec.Command("modprobe", "-r", "nbd")
+			err = cmd.Run()
+			if err == nil {
+				break
+			}
+
+			slog.Warn("modprobe -r nbd command failed", "error", err, "attempt", attempt, "maxAttempts", 3)
+			if attempt < 3 {
+				time.Sleep(2 * time.Second)
+			}
+		}
 		if err != nil {
-			slog.Error("modprobe -r nbd command failed", "error", err)
+			slog.Error("modprobe -r nbd command failed after retries", "error", err)
 			return err
 		}
 
