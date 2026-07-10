@@ -13,7 +13,9 @@ func TestConfirmDowntimeForServerApplyYes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("os.Pipe() failed: %v", err)
 	}
-	defer r.Close()
+	defer func() {
+		_ = r.Close()
+	}()
 
 	os.Stdin = r
 	if _, err := w.WriteString("Y\n"); err != nil {
@@ -38,7 +40,9 @@ func TestConfirmDowntimeForServerApplyNo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("os.Pipe() failed: %v", err)
 	}
-	defer r.Close()
+	defer func() {
+		_ = r.Close()
+	}()
 
 	os.Stdin = r
 	if _, err := w.WriteString("n\n"); err != nil {

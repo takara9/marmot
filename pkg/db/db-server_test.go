@@ -97,14 +97,14 @@ var _ = Describe("Servers", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 				targetID := api.ServerID(created)
 
-				localDB.UpdateServerStatus(targetID, db.SERVER_PROVISIONING, "provisioning")
+				Expect(localDB.UpdateServerStatus(targetID, db.SERVER_PROVISIONING, "provisioning")).NotTo(HaveOccurred())
 				srv1, err := localDB.GetServerById(targetID)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(srv1.Status).NotTo(BeNil())
 				Expect(srv1.Status.StatusCode).To(Equal(db.SERVER_PROVISIONING))
 				Expect(*srv1.Status.Status).To(Equal(db.ServerStatus[db.SERVER_PROVISIONING]))
 
-				localDB.UpdateServerStatus(targetID, db.SERVER_PENDING, "retry")
+				Expect(localDB.UpdateServerStatus(targetID, db.SERVER_PENDING, "retry")).NotTo(HaveOccurred())
 				srv2, err := localDB.GetServerById(targetID)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(srv2.Status).NotTo(BeNil())

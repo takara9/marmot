@@ -11,13 +11,13 @@ import (
 var _ = Describe("QCOW2 Volume", Ordered, func() {
 
 	BeforeAll(func() {
-		os.MkdirAll("testdata", 0755)
+		Expect(os.MkdirAll("testdata", 0755)).NotTo(HaveOccurred())
 	})
 
 	AfterAll(func() {
-		os.Remove("testdata/test.qcow2")
-		os.Remove("testdata/test_copy.qcow2")
-		os.RemoveAll("testdata")
+		_ = os.Remove("testdata/test.qcow2")
+		_ = os.Remove("testdata/test_copy.qcow2")
+		_ = os.RemoveAll("testdata")
 	})
 
 	Describe("Manipulation QCOW2 Volume", func() {

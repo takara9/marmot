@@ -44,7 +44,7 @@ func TestCurrentNameserverInResolvConf(t *testing.T) {
 			if _, err := f.WriteString(tc.content); err != nil {
 				t.Fatal(err)
 			}
-			f.Close()
+					_ = f.Close()
 
 			// Temporarily override ReadFile target by writing to a known path and
 			// testing the helper via a wrapper that accepts a path argument.

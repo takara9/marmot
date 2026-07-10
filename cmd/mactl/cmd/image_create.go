@@ -39,10 +39,10 @@ var imageCreateCmd = &cobra.Command{
 		}
 
 		if strings.TrimSpace(image.Metadata.Name) == "" {
-			return fmt.Errorf("Metadata.name is required in the configuration")
+			return fmt.Errorf("metadata.name is required in the configuration")
 		}
 		if image.Spec.SourceUrl == nil || strings.TrimSpace(*image.Spec.SourceUrl) == "" {
-			return fmt.Errorf("Spec.source_url is required in the configuration")
+			return fmt.Errorf("spec.source_url is required in the configuration")
 		}
 
 		byteBody, _, err := m.CreateImage(image)
@@ -90,5 +90,7 @@ var imageCreateCmd = &cobra.Command{
 func init() {
 	imageCmd.AddCommand(imageCreateCmd)
 	imageCreateCmd.Flags().StringVarP(&configFilename, "configfile", "f", "", "Configuration file or raw URL for the image")
-	imageCreateCmd.MarkFlagRequired("configfile")
+	if err := imageCreateCmd.MarkFlagRequired("configfile"); err != nil {
+		panic(err)
+	}
 }

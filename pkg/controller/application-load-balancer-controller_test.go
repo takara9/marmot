@@ -57,7 +57,9 @@ func TestLoadBalancerControllerStateTransitions(t *testing.T) {
 		t.Fatalf("GetServerById() failed for managed server %q: %v", serverID, err)
 	}
 
-	database.UpdateServerStatus(serverID, db.SERVER_RUNNING, "")
+		if err := database.UpdateServerStatus(serverID, db.SERVER_RUNNING, ""); err != nil {
+			t.Fatalf("UpdateServerStatus() failed for running transition: %v", err)
+		}
 
 	beforeProvisioning, err := database.GetLoadBalancerById(lbID)
 	if err != nil {
@@ -261,7 +263,9 @@ func TestLoadBalancerControllerWaitsForAgentApply(t *testing.T) {
 		t.Fatalf("GetLoadBalancerById() failed after pending reconcile: %v", err)
 	}
 	serverID := applicationLoadBalancerManagedServerID(afterPending)
-	database.UpdateServerStatus(serverID, db.SERVER_RUNNING, "")
+	if err := database.UpdateServerStatus(serverID, db.SERVER_RUNNING, ""); err != nil {
+		t.Fatalf("UpdateServerStatus() failed for running transition: %v", err)
+	}
 	ctrl.reconcileApplicationLoadBalancerProvisioning(afterPending)
 
 	configuring, err := database.GetLoadBalancerById(lbID)
@@ -310,7 +314,9 @@ func TestLoadBalancerControllerWaitsForNewerAgentApplyResult(t *testing.T) {
 		t.Fatalf("GetLoadBalancerById() failed after pending reconcile: %v", err)
 	}
 	serverID := applicationLoadBalancerManagedServerID(afterPending)
-	database.UpdateServerStatus(serverID, db.SERVER_RUNNING, "")
+	if err := database.UpdateServerStatus(serverID, db.SERVER_RUNNING, ""); err != nil {
+		t.Fatalf("UpdateServerStatus() failed for running transition: %v", err)
+	}
 	ctrl.reconcileApplicationLoadBalancerProvisioning(afterPending)
 
 	configuring, err := database.GetLoadBalancerById(lbID)
@@ -379,7 +385,9 @@ func TestLoadBalancerControllerAgentStateReadFailureThreshold(t *testing.T) {
 		t.Fatalf("GetLoadBalancerById() failed after pending reconcile: %v", err)
 	}
 	serverID := applicationLoadBalancerManagedServerID(afterPending)
-	database.UpdateServerStatus(serverID, db.SERVER_RUNNING, "")
+	if err := database.UpdateServerStatus(serverID, db.SERVER_RUNNING, ""); err != nil {
+		t.Fatalf("UpdateServerStatus() failed for running transition: %v", err)
+	}
 	ctrl.reconcileApplicationLoadBalancerProvisioning(afterPending)
 
 	for i := 0; i < applicationLoadBalancerAgentStateReadMaxFailures; i++ {
@@ -434,7 +442,9 @@ func TestLoadBalancerControllerRecoversAfterConsecutiveAgentReadSuccesses(t *tes
 		t.Fatalf("GetLoadBalancerById() failed after pending reconcile: %v", err)
 	}
 	serverID := applicationLoadBalancerManagedServerID(afterPending)
-	database.UpdateServerStatus(serverID, db.SERVER_RUNNING, "")
+	if err := database.UpdateServerStatus(serverID, db.SERVER_RUNNING, ""); err != nil {
+		t.Fatalf("UpdateServerStatus() failed for running transition: %v", err)
+	}
 	ctrl.reconcileApplicationLoadBalancerProvisioning(afterPending)
 
 	configuring, err := database.GetLoadBalancerById(lbID)
@@ -593,7 +603,9 @@ func TestLoadBalancerControllerDegradedRecoveryByBackendMatch(t *testing.T) {
 		t.Fatalf("GetLoadBalancerById() failed after pending reconcile: %v", err)
 	}
 	serverID := applicationLoadBalancerManagedServerID(afterPending)
-	database.UpdateServerStatus(serverID, db.SERVER_RUNNING, "")
+	if err := database.UpdateServerStatus(serverID, db.SERVER_RUNNING, ""); err != nil {
+		t.Fatalf("UpdateServerStatus() failed for running transition: %v", err)
+	}
 
 	ctrl.reconcileApplicationLoadBalancerProvisioning(afterPending)
 	configuring, err := database.GetLoadBalancerById(lbID)
@@ -677,7 +689,9 @@ func mustCreateLoadBalancerBackendServer(t *testing.T, database *db.Database, na
 	if err != nil {
 		t.Fatalf("MakeServerEntry() failed for load balancer backend server: %v", err)
 	}
-	database.UpdateServerStatus(api.ServerID(server), db.SERVER_RUNNING, "")
+	if err := database.UpdateServerStatus(api.ServerID(server), db.SERVER_RUNNING, ""); err != nil {
+		t.Fatalf("UpdateServerStatus() failed for running transition: %v", err)
+	}
 	return server
 }
 

@@ -35,7 +35,9 @@ func SetupLinux(spec api.Server) error {
 		slog.Error("MountVolume failed", "error", err)
 		return err
 	}
-	defer UnMountVolume(*spec.Spec.BootVolume, mountPoint, nbdDev)
+	defer func() {
+		_ = UnMountVolume(*spec.Spec.BootVolume, mountPoint, nbdDev)
+	}()
 
 	return setupLinuxMountedVolume(spec, mountPoint)
 }
@@ -50,7 +52,9 @@ func SetupAlpineLinux(spec api.Server) error {
 		slog.Error("MountVolume failed", "error", err)
 		return err
 	}
-	defer UnMountVolume(*spec.Spec.BootVolume, mountPoint, nbdDev)
+	defer func() {
+		_ = UnMountVolume(*spec.Spec.BootVolume, mountPoint, nbdDev)
+	}()
 
 	if err := setupMountedIdentity(spec, mountPoint); err != nil {
 		return err
@@ -356,18 +360,18 @@ func MountVolume(v api.Volume) (string, string, error) {
 		lvdev, err := findTargertPartition(lvPath)
 		if err != nil {
 			slog.Error("FindTargertPartition failed", "error", err)
-			os.RemoveAll(mountPoint)
+						_ = os.RemoveAll(mountPoint)
 			return "", "", err
 		}
 		cmd := exec.Command("mount", "-t", "ext4", lvdev, mountPoint)
 		err = cmd.Run()
 		if err != nil {
 			err := errors.New("mount failed to setup OS-Disk")
-			os.RemoveAll(mountPoint)
+						_ = os.RemoveAll(mountPoint)
 			return "", "", err
 		}
 	default:
-		os.RemoveAll(mountPoint)
+				_ = os.RemoveAll(mountPoint)
 		return "", "", fmt.Errorf("unsupported volume type: %s", *v.Spec.Type)
 	}
 
@@ -403,10 +407,20 @@ func UnMountVolume(v api.Volume, mountPoint string, nbdDevice string) error {
 		}
 
 		// nbdモジュールのアンロード
-		cmd = exec.Command("modprobe", "-r", "nbd")
-		err = cmd.Run()
+		for attempt := 1; attempt <= 3; attempt++ {
+			cmd = exec.Command("modprobe", "-r", "nbd")
+			err = cmd.Run()
+			if err == nil {
+				break
+			}
+
+			slog.Warn("modprobe -r nbd command failed", "error", err, "attempt", attempt, "maxAttempts", 3)
+			if attempt < 3 {
+				time.Sleep(2 * time.Second)
+			}
+		}
 		if err != nil {
-			slog.Error("modprobe -r nbd command failed", "error", err)
+			slog.Error("modprobe -r nbd command failed after retries", "error", err)
 			return err
 		}
 
@@ -632,7 +646,9 @@ func getFreeLoopDevice() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to open /dev/loop-control: %v", err)
 	}
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 
 	// 2. ioctl システムコールで空き番号を取得
 	// 第3引数に 0 を渡すと、未使用のデバイス番号が返ってくる

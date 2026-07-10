@@ -49,7 +49,7 @@ var _ = Describe("Output formatting", func() {
 
 			Expect(func() {
 				captureOutput(func() {
-					outputServers(servers)
+					Expect(outputServers(servers)).NotTo(HaveOccurred())
 				})
 			}).NotTo(Panic())
 		})
@@ -57,7 +57,7 @@ var _ = Describe("Output formatting", func() {
 		It("outputs empty server list without panicking", func() {
 			Expect(func() {
 				captureOutput(func() {
-					outputServers([]api.Server{})
+					Expect(outputServers([]api.Server{})).NotTo(HaveOccurred())
 				})
 			}).NotTo(Panic())
 		})
@@ -220,7 +220,9 @@ func captureOutput(fn func()) string {
 	if err != nil {
 		Fail("os.Pipe failed: " + err.Error())
 	}
-	defer r.Close()
+	defer func() {
+		_ = r.Close()
+	}()
 
 	os.Stdout = w
 	defer func() {

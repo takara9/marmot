@@ -410,7 +410,6 @@ func (d *Database) UpdateUser(userID string, input api.User) error {
 		current.Metadata.Name = current.Metadata.Id
 	}
 	normalizeUserIdentity(&current, userID)
-	current.Status = current.Status
 	if err := d.PutJSONCAS(key, resp.Kvs[0].ModRevision, current); err != nil {
 		return err
 	}

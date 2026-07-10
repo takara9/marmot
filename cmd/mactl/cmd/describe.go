@@ -135,9 +135,11 @@ func describeServerText(s *api.Server) error {
 		cpu = fmt.Sprintf("%d", *s.Spec.Cpu)
 	}
 	mem := formatMemoryGB(s.Spec.Memory)
-	osVariant := "-"
-	if s.Spec.OsVariant != nil && strings.TrimSpace(*s.Spec.OsVariant) != "" {
-		osVariant = strings.TrimSpace(*s.Spec.OsVariant)
+	serverCopy := s
+	serverCopy.NormalizeMMImageAlias()
+	osImage := "-"
+	if serverCopy.Spec.MmImage != nil && strings.TrimSpace(*serverCopy.Spec.MmImage) != "" {
+		osImage = strings.TrimSpace(*serverCopy.Spec.MmImage)
 	}
 
 	fmt.Println("Metadata:")
@@ -174,7 +176,7 @@ func describeServerText(s *api.Server) error {
 	fmt.Println("\nSpec:")
 	fmt.Printf("  CPU:           %s\n", cpu)
 	fmt.Printf("  Memory:        %s GB\n", mem)
-	fmt.Printf("  OS:            %s\n", osVariant)
+	fmt.Printf("  OS:            %s\n", osImage)
 	fmt.Printf("  IP/CIDR:       %s\n", formatServerIPCIDR(*s))
 
 	fmt.Println("\nNetworkInterfaces:")
@@ -1099,7 +1101,9 @@ func describeResource(resource interface{}) error {
 			return fmt.Errorf("failed to marshal: %w", err)
 		}
 		var obj interface{}
-		json.Unmarshal(data, &obj)
+		if err := json.Unmarshal(data, &obj); err != nil {
+			return fmt.Errorf("failed to unmarshal YAML source: %w", err)
+		}
 		yamlBytes, err := yaml.Marshal(obj)
 		if err != nil {
 			return fmt.Errorf("failed to marshal to YAML: %w", err)

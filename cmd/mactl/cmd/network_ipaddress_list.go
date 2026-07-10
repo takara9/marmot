@@ -26,7 +26,7 @@ var networkIPAddressListCmd = &cobra.Command{
 			for _, ipNetworkId := range args {
 				byteBody, _, err := m.GetIpAddressesByNetworkId(ipNetworkId)
 				if err != nil {
-					fmt.Fprintln(cmd.ErrOrStderr(), "GetIpAddressesByNetworkId", "Id", ipNetworkId, "err", err)
+					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "GetIpAddressesByNetworkId", "Id", ipNetworkId, "err", err)
 					continue
 				}
 
@@ -38,7 +38,7 @@ var networkIPAddressListCmd = &cobra.Command{
 						continue
 					}
 					if err := json.Unmarshal(byteBody, &data); err != nil {
-						fmt.Fprintln(cmd.ErrOrStderr(), "Failed to Unmarshal", "Id", ipNetworkId, "err", err)
+						_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Failed to Unmarshal", "Id", ipNetworkId, "err", err)
 						continue
 					}
 					fmt.Println("IpNetwork:", ipNetworkId)
@@ -62,12 +62,12 @@ var networkIPAddressListCmd = &cobra.Command{
 				case "json":
 					var v interface{}
 					if err := json.Unmarshal(byteBody, &v); err != nil {
-						fmt.Fprintln(cmd.ErrOrStderr(), "Failed to Unmarshal", "Id", ipNetworkId, "err", err)
+						_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Failed to Unmarshal", "Id", ipNetworkId, "err", err)
 						continue
 					}
 					formatted, err := json.MarshalIndent(v, "", "  ")
 					if err != nil {
-						fmt.Fprintln(cmd.ErrOrStderr(), "Failed to Marshal", "Id", ipNetworkId, "err", err)
+						_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Failed to Marshal", "Id", ipNetworkId, "err", err)
 						continue
 					}
 					fmt.Println(string(formatted))
@@ -76,19 +76,19 @@ var networkIPAddressListCmd = &cobra.Command{
 				case "yaml":
 					var v interface{}
 					if err := json.Unmarshal(byteBody, &v); err != nil {
-						fmt.Fprintln(cmd.ErrOrStderr(), "Failed to Unmarshal", "Id", ipNetworkId, "err", err)
+						_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Failed to Unmarshal", "Id", ipNetworkId, "err", err)
 						continue
 					}
 					yamlBytes, err := yaml.Marshal(v)
 					if err != nil {
-						fmt.Fprintln(cmd.ErrOrStderr(), "Failed to Marshal", "Id", ipNetworkId, "err", err)
+						_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Failed to Marshal", "Id", ipNetworkId, "err", err)
 						continue
 					}
 					fmt.Println(string(yamlBytes))
 					continue
 
 				default:
-					fmt.Fprintln(cmd.ErrOrStderr(), "output style must set text/json/yaml")
+					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "output style must set text/json/yaml")
 					continue
 				}
 			}

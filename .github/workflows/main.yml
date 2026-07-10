@@ -16,6 +16,14 @@ jobs:
     runs-on: [ self-hosted, any ]
     steps:
     - uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+    - uses: actions/setup-go@v6
+      with:
+        go-version: '1.26.4'
+    - uses: golangci/golangci-lint-action@v9
+      with:
+        args: --new-from-rev=origin/main
 
   moodule-tests:
     runs-on: [ self-hosted, any ]
@@ -23,8 +31,8 @@ jobs:
       - start
     if: always() 
     steps:
-    - uses: actions/checkout@v5
-    - name: 時間調整
+    #- uses: actions/checkout@v5
+    - name: 時間調整 緩やかに後発にする
       run: | 
         sleep 10
 
@@ -34,7 +42,10 @@ jobs:
       - start
     if: always() 
     steps:
-    - uses: actions/checkout@v5
+    - name: 時間調整 緩やかに先行させる
+      run: | 
+        sleep 1
+    #- uses: actions/checkout@v5
 
   packages-run-as-nonroot:
     runs-on: [ self-hosted, any ]

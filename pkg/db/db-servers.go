@@ -36,8 +36,11 @@ var ServerStatus = map[int]string{
 
 // サーバーを登録、サーバーを一意に識別するIDを自動生成、サーバーのステータスは、PENDINGで開始
 func (d *Database) MakeServerEntry(spec api.Server) (api.Server, error) {
-	d.LockKey("/lock/server/create")
-	defer d.UnlockKey(d.Mutex)
+	mutex, err := d.LockKey("/lock/server/create")
+	if err != nil {
+		return api.Server{}, err
+	}
+	defer d.UnlockKey(mutex)
 
 	// DeepCopyでspecの内容をコピー
 	server, err := util.DeepCopy(spec)

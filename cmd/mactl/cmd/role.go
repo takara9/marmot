@@ -38,7 +38,7 @@ var roleCmd = &cobra.Command{
 		switch outputStyle {
 		case "text":
 			fmt.Printf("User: %s\n", me.UserId)
-			if me.Roles != nil && len(me.Roles) > 0 {
+			if len(me.Roles) > 0 {
 				fmt.Println("Roles:")
 				for _, role := range me.Roles {
 					fmt.Printf("  - %s\n", role)

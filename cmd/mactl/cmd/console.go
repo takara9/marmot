@@ -92,7 +92,9 @@ var consoleCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to connect to marmotd: %w", err)
 		}
-		defer conn.Close()
+		defer func() {
+			_ = conn.Close()
+		}()
 
 		req, err := http.NewRequest(http.MethodGet, requestPath, nil)
 		if err != nil {
@@ -110,7 +112,9 @@ var consoleCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to read console response: %w", err)
 		}
-		defer resp.Body.Close()
+			defer func() {
+				_ = resp.Body.Close()
+			}()
 		if resp.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(resp.Body)
 			message := strings.TrimSpace(string(body))
@@ -127,7 +131,7 @@ var consoleCmd = &cobra.Command{
 			}
 			defer func() {
 				_ = term.Restore(int(os.Stdin.Fd()), oldState)
-				fmt.Fprint(os.Stdout, "\r\n")
+				_, _ = fmt.Fprint(os.Stdout, "\r\n")
 			}()
 		}
 

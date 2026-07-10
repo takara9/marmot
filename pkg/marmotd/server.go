@@ -593,7 +593,10 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 				}
 				if !found {
 					slog.Debug("セットさられたIPアドレス", "IP	", ipaddr)
-					m.Db.SetIPaddrInUse(api.VirtualNetworkID(vnet), ipNetId, ipaddr, serverConfig.Metadata.Name)
+					if err := m.Db.SetIPaddrInUse(api.VirtualNetworkID(vnet), ipNetId, ipaddr, serverConfig.Metadata.Name); err != nil {
+						slog.Error("SetIPaddrInUse()", "err", err)
+						return "", err
+					}
 					//return ipaddr, nil
 				}
 				// 内部DNSへ登録
@@ -1639,7 +1642,9 @@ func (m *Marmot) StartServerManage(id string) error {
 		slog.Error("LookupDomainByName()", "err", err)
 		return err
 	}
-	defer dom.Free()
+	defer func() {
+		_ = dom.Free()
+	}()
 
 	consolePath, err := virt.GetDomainConsolePath(dom)
 	if err != nil {

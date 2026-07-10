@@ -18,8 +18,6 @@ const (
 	SERVER_CONTROLLER_INTERVAL = 5 * time.Second
 )
 
-var controllerCounter uint64 = 0
-
 type controller struct {
 	db                         *db.Database
 	Lock                       sync.Mutex

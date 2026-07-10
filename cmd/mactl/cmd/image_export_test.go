@@ -111,11 +111,15 @@ var _ = Describe("writeImageArchive / extractFromTGZ round-trip", func() {
 
 		f, err := os.Open(outPath)
 		Expect(err).NotTo(HaveOccurred())
-		defer f.Close()
+		defer func() {
+			_ = f.Close()
+		}()
 
 		gz, err := gzip.NewReader(f)
 		Expect(err).NotTo(HaveOccurred())
-		defer gz.Close()
+		defer func() {
+			_ = gz.Close()
+		}()
 
 		tr := tar.NewReader(gz)
 		meta := imageArchiveMeta{}

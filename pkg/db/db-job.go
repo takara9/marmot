@@ -238,10 +238,13 @@ func (d *Job) RunJob(job api.Job) error {
 	file, err := os.Create(jobLogFile)
 	if err != nil {
 		slog.Error("failed to create job log file", "err", err, "file", jobLogFile)
+		return err
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
-	fmt.Fprintf(file, "Job Name: [%v] ID [%v] at %v\n", job.Metadata.Name, job.Id, *job.Spec.RequestTime)
+	_, _ = fmt.Fprintf(file, "Job Name: [%v] ID [%v] at %v\n", job.Metadata.Name, job.Id, *job.Spec.RequestTime)
 
 	// ジョブ状態の更新 （ここだけ別関数にして排他制御を入れるのが良いかも）
 	key := JobPrefix + "/" + job.Id
@@ -259,47 +262,50 @@ func (d *Job) RunJob(job api.Job) error {
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		slog.Error("failed to get stdout pipe", "err", err)
-		fmt.Fprintln(file, "Failed to get stdout pipe:", err)
+		_, _ = fmt.Fprintln(file, "Failed to get stdout pipe:", err)
+		return err
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		slog.Error("failed to get stderr pipe", "err", err)
-		fmt.Fprintln(file, "Failed to get stderr pipe:", err)
+		_, _ = fmt.Fprintln(file, "Failed to get stderr pipe:", err)
+		return err
 	}
 	if err := cmd.Start(); err != nil {
 		slog.Error("failed to start command", "err", err, "cmd", *job.Spec.Command)
-		fmt.Fprintln(file, "Failed to start command:", err)
+		_, _ = fmt.Fprintln(file, "Failed to start command:", err)
+		return err
 	}
 
-	fmt.Fprintln(file, "Command:", *job.Spec.Command)
-	fmt.Fprintln(file, "Stdout:")
+	_, _ = fmt.Fprintln(file, "Command:", *job.Spec.Command)
+	_, _ = fmt.Fprintln(file, "Stdout:")
 
 	buf := make([]byte, 1024)
 	for {
 		n, err := stdout.Read(buf)
 		if n > 0 {
-			fmt.Fprint(file, "  ", string(buf[:n]))
+			_, _ = fmt.Fprint(file, "  ", string(buf[:n]))
 		} else {
 			break
 		}
 		if err != nil {
 			slog.Error("failed to read stdout", "err", err)
-			fmt.Fprintln(file, "Failed to read stdout:", err)
+			_, _ = fmt.Fprintln(file, "Failed to read stdout:", err)
 			break
 		}
 	}
 
-	fmt.Fprintln(file, "Stderr:")
+	_, _ = fmt.Fprintln(file, "Stderr:")
 	for {
 		n, err := stderr.Read(buf)
 		if n > 0 {
-			fmt.Fprint(file, "  ", string(buf[:n]))
+			_, _ = fmt.Fprint(file, "  ", string(buf[:n]))
 		} else {
 			break
 		}
 		if err != nil {
 			slog.Error("failed to read stderr", "err", err)
-			fmt.Fprintln(file, "Failed to read stderr:", err)
+			_, _ = fmt.Fprintln(file, "Failed to read stderr:", err)
 			break
 		}
 	}
@@ -307,9 +313,9 @@ func (d *Job) RunJob(job api.Job) error {
 	// ジョブの終了待ち
 	if err := cmd.Wait(); err != nil {
 		slog.Error("command execution failed", "err", err, "cmd", *job.Spec.Command)
-		fmt.Fprintln(file, "Command execution failed:", err)
+		_, _ = fmt.Fprintln(file, "Command execution failed:", err)
 	}
-	fmt.Fprintln(file, "Job Finished at", *job.Spec.StartTime, "with exit code=", cmd.ProcessState.ExitCode())
+	_, _ = fmt.Fprintln(file, "Job Finished at", *job.Spec.StartTime, "with exit code=", cmd.ProcessState.ExitCode())
 
 	// ジョブ状態の更新
 	job.Spec.FinishTime = util.TimePtr(time.Now())

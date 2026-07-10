@@ -15,8 +15,6 @@ import (
 	"github.com/takara9/marmot/pkg/db"
 )
 
-const testServerConfigRawURL = "https://raw.githubusercontent.com/takara9/marmot/refs/heads/config-server-to-api-server/cmd/mactl/testdata/test-server-1.yaml"
-
 var _ = Describe("Marmotd Test", Ordered, func() {
 	var mockServer *mockServerHandle
 	var containerID string
@@ -66,8 +64,8 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		if strings.TrimSpace(testHomeDir) != "" {
 			_ = os.RemoveAll(testHomeDir)
 		}
-		os.Remove("bin/mactl-test")
-		os.Remove("/var/actions-runner/_work/marmot/marmot/cmd/mactl/bin/mactl-test")
+		_ = os.Remove("bin/mactl-test")
+		_ = os.Remove("/var/actions-runner/_work/marmot/marmot/cmd/mactl/bin/mactl-test")
 		cleanupTestEnvironment()
 	})
 
@@ -84,11 +82,13 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 		It("Marmotd のバージョン情報取得", func() {
 			cmd0 := exec.Command("pwd")
-			stdoutStderr0, err := cmd0.CombinedOutput()
+			stdoutStderr0, err0 := cmd0.CombinedOutput()
+			Expect(err0).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr0))
 
 			cmd1 := exec.Command("ls", "-lR")
-			stdoutStderr1, err := cmd1.CombinedOutput()
+			stdoutStderr1, err1 := cmd1.CombinedOutput()
+			Expect(err1).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr1))
 
 			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "version")
@@ -558,7 +558,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		})
 
 		AfterEach(func() {
-			os.RemoveAll(tmpHome)
+			_ = os.RemoveAll(tmpHome)
 		})
 
 		// HOME を上書きした環境変数リストを返すヘルパー

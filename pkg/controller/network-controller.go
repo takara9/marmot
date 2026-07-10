@@ -324,7 +324,9 @@ func (c *controller) reconcileHeadProvisioningNetwork(vnet api.VirtualNetwork, f
 			return fmt.Errorf("libvirt:deploy-failed:%w", err)
 		}
 	} else {
-		defer net.Free()
+		defer func() {
+			_ = net.Free()
+		}()
 	}
 
 	if err := c.ensureOverlayMeshForNetwork(fabric, vnet); err != nil {

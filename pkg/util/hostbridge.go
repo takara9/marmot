@@ -409,14 +409,16 @@ func configureVirshBridge() bool {
 		slog.Error("Failed to create temp file for virsh XML", "err", err)
 		return false
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
 
 	if _, err := tmpFile.Write([]byte(hostBridgeXML)); err != nil {
 		slog.Error("Failed to write virsh XML", "err", err)
-		tmpFile.Close()
+		_ = tmpFile.Close()
 		return false
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	// Define network
 	cmd = exec.Command("virsh", "net-define", tmpFile.Name())

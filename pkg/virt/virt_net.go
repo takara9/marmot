@@ -241,7 +241,9 @@ func (l *LibVirtEp) DefineAndStartVirtualNetwork(network libvirtxml.Network) err
 		slog.Error("Error setting network autostart", "err", err)
 		return err
 	}
-	defer net.Free()
+	defer func() {
+		_ = net.Free()
+	}()
 
 	return nil
 }

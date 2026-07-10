@@ -44,7 +44,7 @@ func (s *Server) ApiCreateServer(ctx echo.Context) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 	virtualServer.NormalizeMMImageAlias()
-	slog.Debug("Recived post body", "serverSpec=", virtualServer, "cpu=", virtualServer.Spec.Cpu, "memory=", virtualServer.Spec.Memory, "os", virtualServer.Spec.OsVariant)
+	slog.Debug("Recived post body", "serverSpec=", virtualServer, "cpu=", virtualServer.Spec.Cpu, "memory=", virtualServer.Spec.Memory, "mmImage", virtualServer.Spec.MmImage)
 	// nodeName の割当はスケジューラーが担当する。
 
 	// リクエストをetcdに登録し、正常応答を返す

@@ -103,8 +103,11 @@ func (d *Database) getUniqueVirtualNetworkID() (string, error) {
 
 // 仮想ネットワークを登録、仮想ネットワークを一意に識別するIDを自動生成
 func (d *Database) CreateVirtualNetwork(spec api.VirtualNetwork) (api.VirtualNetwork, error) {
-	d.LockKey("/lock/virtualnetwork/create")
-	defer d.UnlockKey(d.Mutex)
+	mutex, err := d.LockKey("/lock/virtualnetwork/create")
+	if err != nil {
+		return api.VirtualNetwork{}, err
+	}
+	defer d.UnlockKey(mutex)
 
 	// 同一ネットワーク名のネットワークが存在しないか確認
 	networks, err := d.GetVirtualNetworks()
@@ -472,8 +475,11 @@ func (d *Database) PutVirtualNetworksETCD(vnet api.VirtualNetwork) error {
 	slog.Debug("PutVirtualNetworksETCD called")
 
 	// 作成したオブジェクトをデータベースに保存
-	d.LockKey("/lock/virtualnetwork/create")
-	defer d.UnlockKey(d.Mutex)
+	mutex, err := d.LockKey("/lock/virtualnetwork/create")
+	if err != nil {
+		return err
+	}
+	defer d.UnlockKey(mutex)
 
 	// DeepCopyでvnetの内容をコピー
 	network, err := util.DeepCopy(vnet)

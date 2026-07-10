@@ -26,7 +26,7 @@ var networkDetailCmd = &cobra.Command{
 		for _, networkId := range args {
 			byteBody, _, err := m.GetVirtualNetworkById(networkId)
 			if err != nil {
-				fmt.Fprintln(cmd.ErrOrStderr(), "GetVirtualNetworkById", "Id", networkId, "err", err)
+				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "GetVirtualNetworkById", "Id", networkId, "err", err)
 				continue
 			}
 
@@ -40,7 +40,7 @@ var networkDetailCmd = &cobra.Command{
 			case "text":
 				ipNetworks, err := getRelatedIPNetworks(m, networkId)
 				if err != nil {
-					fmt.Fprintln(cmd.ErrOrStderr(), "GetIpNetworksByVirtualNetworkId", "Id", networkId, "err", err)
+					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "GetIpNetworksByVirtualNetworkId", "Id", networkId, "err", err)
 				}
 				printNetworkDetails(data, ipNetworks)
 				fmt.Println()
@@ -53,7 +53,7 @@ var networkDetailCmd = &cobra.Command{
 			case "yaml":
 				yamlBytes, err := yaml.Marshal(data)
 				if err != nil {
-					fmt.Fprintln(cmd.ErrOrStderr(), "Failed to Marshal", "Id", networkId, "err", err)
+					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Failed to Marshal", "Id", networkId, "err", err)
 					continue
 
 				}
@@ -61,7 +61,7 @@ var networkDetailCmd = &cobra.Command{
 				continue
 
 			default:
-				fmt.Fprintln(cmd.ErrOrStderr(), "output style must set text/json/yaml")
+				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "output style must set text/json/yaml")
 				continue
 
 			}

@@ -24,7 +24,7 @@ var volumeRenameCmd = &cobra.Command{
 		volumeId := args[0]
 		newName := args[1]
 		var volume api.Volume
-			   volume.Metadata.Name = newName
+		volume.Metadata.Name = newName
 
 		byteBody, _, err := m.UpdateVolumeById(volumeId, volume)
 		if err != nil {
@@ -34,7 +34,7 @@ var volumeRenameCmd = &cobra.Command{
 
 		switch outputStyle {
 		case "text":
-			fmt.Fprintf(cmd.ErrOrStderr(), "Not implemented for text output\n")
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Not implemented for text output\n")
 			return nil
 
 		case "json":
@@ -44,12 +44,12 @@ var volumeRenameCmd = &cobra.Command{
 		case "yaml":
 			var data interface{}
 			if err := json.Unmarshal(byteBody, &data); err != nil {
-				fmt.Fprintln(cmd.ErrOrStderr(), "Failed to Unmarshal", err)
+				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Failed to Unmarshal", err)
 				return err
 			}
 			yamlBytes, err := yaml.Marshal(data)
 			if err != nil {
-				fmt.Fprintln(cmd.ErrOrStderr(), "Failed to Marshal", err)
+				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Failed to Marshal", err)
 				return err
 
 			}
@@ -57,7 +57,7 @@ var volumeRenameCmd = &cobra.Command{
 			return nil
 
 		default:
-			fmt.Fprintln(cmd.ErrOrStderr(), "output style must set text/json/yaml")
+			_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "output style must set text/json/yaml")
 			return fmt.Errorf("output style must set text/json/yaml")
 		}
 	},

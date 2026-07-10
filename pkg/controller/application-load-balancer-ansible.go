@@ -296,7 +296,7 @@ func buildApplicationLoadBalancerHAProxyConfig(loadBalancer api.ApplicationLoadB
 			return "", fmt.Errorf("invalid bindPublicIpAddress: %w", err)
 		}
 		b.WriteString("frontend " + frontendName + "\n")
-		b.WriteString(fmt.Sprintf("  bind %s:%d\n", bindAddress, listener.VipPort))
+		_, _ = fmt.Fprintf(&b, "  bind %s:%d\n", bindAddress, listener.VipPort)
 		b.WriteString("  mode " + mode + "\n")
 		b.WriteString("  default_backend " + backendName + "\n\n")
 
@@ -329,7 +329,7 @@ func buildApplicationLoadBalancerHAProxyConfig(loadBalancer api.ApplicationLoadB
 		}
 		backends := listenerBackends[strings.TrimSpace(listener.Name)]
 		if len(backends) == 0 {
-			b.WriteString(fmt.Sprintf("  server-template srv 20 _placeholder_:%d check disabled\n\n", listener.BackendPort))
+			_, _ = fmt.Fprintf(&b, "  server-template srv 20 _placeholder_:%d check disabled\n\n", listener.BackendPort)
 			continue
 		}
 		for backendIndex, backend := range backends {

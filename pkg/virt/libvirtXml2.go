@@ -92,7 +92,7 @@ func NewLibVirtEp(url string) (*LibVirtEp, error) {
 }
 
 func (lve *LibVirtEp) Close() {
-	lve.Com.Close()
+	_, _ = lve.Com.Close()
 }
 
 // libvirt XMLを生成する関数
@@ -413,7 +413,9 @@ func (l *LibVirtEp) DefineAndStartVM(domain libvirtxml.Domain) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer dom.Free()
+	defer func() {
+		_ = dom.Free()
+	}()
 
 	// Start VM
 	err = dom.Create()
@@ -709,7 +711,9 @@ func (l *LibVirtEp) HasDomainResourceDrift(vmname string, cpu *int, memoryMB *in
 	if err != nil {
 		return false, err
 	}
-	defer domain.Free()
+	defer func() {
+		_ = domain.Free()
+	}()
 
 	xml, err := domain.GetXMLDesc(0)
 	if err != nil {
@@ -781,7 +785,9 @@ func (l *LibVirtEp) SyncDomainResources(vmname string, cpu *int, memoryMB *int) 
 	if err != nil {
 		return false, err
 	}
-	defer domain.Free()
+	defer func() {
+		_ = domain.Free()
+	}()
 
 	xml, err := domain.GetXMLDesc(0)
 	if err != nil {
