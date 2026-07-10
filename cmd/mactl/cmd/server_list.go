@@ -90,10 +90,10 @@ var serverListCmd = &cobra.Command{
 func formatServerListText(data []api.Server) string {
 	var builder strings.Builder
 
-	builder.WriteString(fmt.Sprintf("  %2s  %1s%-10s  %-20s  %-12s  %-3s  %-8s  %-12s  %-15s  %-15s\n", "NO", "", "SERVER-ID", "SERVER-NAME", "STATUS", "CPU", "RAM(MB)", "NODE", "IP-ADDRESS", "NETWORK"))
+	_, _ = fmt.Fprintf(&builder, "  %2s  %1s%-10s  %-20s  %-12s  %-3s  %-8s  %-12s  %-15s  %-15s\n", "NO", "", "SERVER-ID", "SERVER-NAME", "STATUS", "CPU", "RAM(MB)", "NODE", "IP-ADDRESS", "NETWORK")
 	for i, server := range data {
 		networkLines := serverNetworkLines(server)
-		builder.WriteString(fmt.Sprintf("  %2d  %1s%-10v  %-20v  %-12v  %-3v  %-8v  %-12v  %-15v  %-15v\n",
+		_, _ = fmt.Fprintf(&builder, "  %2d  %1s%-10v  %-20v  %-12v  %-3v  %-8v  %-12v  %-15v  %-15v\n",
 			i+1,
 			deletionMarker(server.Status),
 			api.ServerID(server),
@@ -104,10 +104,10 @@ func formatServerListText(data []api.Server) string {
 			serverNodeName(server),
 			networkLines[0].address,
 			networkLines[0].network,
-		))
+		)
 
 		for _, networkLine := range networkLines[1:] {
-			builder.WriteString(fmt.Sprintf("  %2s  %1s%-10s  %-20s  %-12s  %-3s  %-8s  %-12s  %-15v  %-15v\n",
+			_, _ = fmt.Fprintf(&builder, "  %2s  %1s%-10s  %-20s  %-12s  %-3s  %-8s  %-12s  %-15v  %-15v\n",
 				"",
 				"",
 				"",
@@ -118,7 +118,7 @@ func formatServerListText(data []api.Server) string {
 				"",
 				networkLine.address,
 				networkLine.network,
-			))
+			)
 		}
 	}
 

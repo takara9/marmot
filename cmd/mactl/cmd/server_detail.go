@@ -101,7 +101,7 @@ func printServerDetails(server api.Server) {
 	fmt.Println()
 
 	fmt.Println("Resources")
-	fmt.Printf("  OS Variant:    %s\n", stringValue(&server.Spec, func(s *api.ServerSpec) *string { return s.OsVariant }))
+	fmt.Printf("  OS Image:      %s\n", stringValue(&server.Spec, func(s *api.ServerSpec) *string { return s.MmImage }))
 	fmt.Printf("  OS Level:      %s\n", stringValue(&server.Spec, func(s *api.ServerSpec) *string { return s.OsLv }))
 	fmt.Printf("  CPU:           %s\n", intValue(&server.Spec, func(s *api.ServerSpec) *int { return s.Cpu }, " vCPU"))
 	fmt.Printf("  Memory:        %s\n", intValue(&server.Spec, func(s *api.ServerSpec) *int { return s.Memory }, " MB"))

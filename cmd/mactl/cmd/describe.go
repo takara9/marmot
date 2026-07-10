@@ -135,9 +135,11 @@ func describeServerText(s *api.Server) error {
 		cpu = fmt.Sprintf("%d", *s.Spec.Cpu)
 	}
 	mem := formatMemoryGB(s.Spec.Memory)
-	osVariant := "-"
-	if s.Spec.OsVariant != nil && strings.TrimSpace(*s.Spec.OsVariant) != "" {
-		osVariant = strings.TrimSpace(*s.Spec.OsVariant)
+	serverCopy := s
+	serverCopy.NormalizeMMImageAlias()
+	osImage := "-"
+	if serverCopy.Spec.MmImage != nil && strings.TrimSpace(*serverCopy.Spec.MmImage) != "" {
+		osImage = strings.TrimSpace(*serverCopy.Spec.MmImage)
 	}
 
 	fmt.Println("Metadata:")
@@ -174,7 +176,7 @@ func describeServerText(s *api.Server) error {
 	fmt.Println("\nSpec:")
 	fmt.Printf("  CPU:           %s\n", cpu)
 	fmt.Printf("  Memory:        %s GB\n", mem)
-	fmt.Printf("  OS:            %s\n", osVariant)
+	fmt.Printf("  OS:            %s\n", osImage)
 	fmt.Printf("  IP/CIDR:       %s\n", formatServerIPCIDR(*s))
 
 	fmt.Println("\nNetworkInterfaces:")
