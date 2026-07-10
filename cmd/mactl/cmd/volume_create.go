@@ -32,7 +32,7 @@ var volumeCreateCmd = &cobra.Command{
 		}
 
 		if strings.TrimSpace(conf.Metadata.Name) == "" {
-			return fmt.Errorf("Metadata.name is required in the configuration")
+			return fmt.Errorf("metadata.name is required in the configuration")
 		}
 
 		ApplyVolumeDefaults(&conf)
