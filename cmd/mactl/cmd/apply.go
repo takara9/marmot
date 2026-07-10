@@ -411,7 +411,7 @@ func validateServerApplyForbiddenChanges(existing api.Server, desired api.Server
 	if desired.Spec.OsLv != nil && !reflect.DeepEqual(desired.Spec.OsLv, existing.Spec.OsLv) {
 		forbidden = append(forbidden, "spec.osLv")
 	}
-	if desired.Spec.OsVariant != nil && !reflect.DeepEqual(desired.Spec.OsVariant, existing.Spec.OsVariant) {
+	if desired.Spec.OsVariant != nil && !reflect.DeepEqual(desired.Spec.OsVariant, existing.Spec.OsVariant) { //nolint:staticcheck // compatibility: legacy manifests still use spec.osVariant and must remain immutable on apply
 		forbidden = append(forbidden, "spec.osVariant")
 	}
 	if desired.Spec.OsVg != nil && !reflect.DeepEqual(desired.Spec.OsVg, existing.Spec.OsVg) {

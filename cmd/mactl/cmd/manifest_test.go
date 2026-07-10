@@ -218,8 +218,8 @@ spec:
 
 			ApplyServerDefaults(server)
 
-			Expect(server.Spec.OsVariant).NotTo(BeNil())
-			Expect(*server.Spec.OsVariant).To(Equal("ubuntu24.04"))
+			Expect(server.Spec.OsVariant).NotTo(BeNil())           //nolint:staticcheck // compatibility: verify legacy spec.osVariant is still populated from spec.mmImage
+			Expect(*server.Spec.OsVariant).To(Equal("ubuntu24.04")) //nolint:staticcheck // compatibility: verify legacy spec.osVariant value is preserved for old clients
 		})
 
 		It("keeps spec.mmImage in sync when only spec.osVariant is set", func() {
