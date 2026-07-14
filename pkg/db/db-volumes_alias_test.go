@@ -20,7 +20,7 @@ func TestNormalizeVolumeSpecISCSIAlias_TypeIscsiAlias(t *testing.T) {
 	}
 }
 
-func TestNormalizeVolumeSpecTypeAlias_IscsiFlagWithoutType(t *testing.T) {
+func TestNormalizeVolumeSpecISCSIAlias_IscsiFlagWithoutType(t *testing.T) {
 	spec := api.VolSpec{Iscsi: util.BoolPtr(true)}
 
 	util.NormalizeVolumeSpecISCSIAlias(&spec)
