@@ -7,7 +7,7 @@ import (
 	"github.com/takara9/marmot/pkg/util"
 )
 
-func TestNormalizeVolumeSpecTypeAlias_TypeIscsiAlias(t *testing.T) {
+func TestNormalizeVolumeSpecISCSIAlias_TypeIscsiAlias(t *testing.T) {
 	spec := api.VolSpec{Type: util.StringPtr("iscsi")}
 
 	util.NormalizeVolumeSpecISCSIAlias(&spec)
