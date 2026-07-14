@@ -22,8 +22,12 @@ func NormalizeVolumeSpecISCSIAlias(spec *api.VolSpec) {
 		if spec.Type == nil || strings.TrimSpace(*spec.Type) == "" || strings.EqualFold(strings.TrimSpace(*spec.Type), "lvm") {
 			spec.Type = StringPtr("lvm")
 		}
+		// When iSCSI is enabled, default Kind to "data" and ensure Size has a sane default to avoid nil dereferences downstream.
 		if spec.Kind == nil || strings.TrimSpace(*spec.Kind) == "" || strings.EqualFold(strings.TrimSpace(*spec.Kind), "data") {
 			spec.Kind = StringPtr("data")
+			if spec.Size == nil || *spec.Size <= 0 {
+				spec.Size = IntPtrInt(1) // 1GB
+			}
 		}
 	}
 }
