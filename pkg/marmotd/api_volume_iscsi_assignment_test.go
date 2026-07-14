@@ -74,7 +74,7 @@ func TestNormalizeIncomingVolumeSpecForCompatibility_TypeIscsiAlias(t *testing.T
 		Spec: api.VolSpec{Type: util.StringPtr(" ISCSI ")},
 	}
 
-	normalizeIncomingVolumeSpecForCompatibility(&volume)
+	util.NormalizeVolumeSpecISCSIAlias(&volume.Spec)
 
 	if volume.Spec.Type == nil || *volume.Spec.Type != "lvm" {
 		t.Fatalf("type = %#v, want lvm", volume.Spec.Type)
@@ -92,7 +92,7 @@ func TestNormalizeIncomingVolumeSpecForCompatibility_IscsiFlagWithoutType(t *tes
 		Spec: api.VolSpec{Iscsi: util.BoolPtr(true)},
 	}
 
-	normalizeIncomingVolumeSpecForCompatibility(&volume)
+	util.NormalizeVolumeSpecISCSIAlias(&volume.Spec)
 
 	if volume.Spec.Type == nil || *volume.Spec.Type != "lvm" {
 		t.Fatalf("type = %#v, want lvm", volume.Spec.Type)
