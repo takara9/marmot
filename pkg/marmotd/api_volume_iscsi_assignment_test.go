@@ -69,7 +69,7 @@ func TestFindISCSIServerNodeName_NoActiveHosts(t *testing.T) {
 	}
 }
 
-func TestNormalizeIncomingVolumeSpecForCompatibility_TypeIscsiAlias(t *testing.T) {
+func TestNormalizeVolumeSpecISCSIAlias_TypeIscsiAlias(t *testing.T) {
 	volume := api.Volume{
 		Spec: api.VolSpec{Type: util.StringPtr(" ISCSI ")},
 	}
