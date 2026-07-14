@@ -18,10 +18,11 @@ func NormalizeVolumeSpecISCSIAlias(spec *api.VolSpec) {
 		spec.Iscsi = BoolPtr(true)
 	}
 	if spec.Iscsi != nil && *spec.Iscsi {
-		if spec.Type == nil || strings.TrimSpace(*spec.Type) == "" {
+		// Canonicalize values used by downstream exact-match checks.
+		if spec.Type == nil || strings.TrimSpace(*spec.Type) == "" || strings.EqualFold(strings.TrimSpace(*spec.Type), "lvm") {
 			spec.Type = StringPtr("lvm")
 		}
-		if spec.Kind == nil || strings.TrimSpace(*spec.Kind) == "" {
+		if spec.Kind == nil || strings.TrimSpace(*spec.Kind) == "" || strings.EqualFold(strings.TrimSpace(*spec.Kind), "data") {
 			spec.Kind = StringPtr("data")
 		}
 	}
