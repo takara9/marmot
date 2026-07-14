@@ -77,6 +77,8 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 		volume.Status = &status
 	}
 
+	normalizeVolumeSpecTypeAlias(&volume.Spec)
+
 	api.SetVolumeID(&volume, id)
 	volume.Metadata.Key = util.StringPtr(key)
 	volume.Metadata.Uuid = util.StringPtr(uuidString)
@@ -141,6 +143,22 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 		return nil, err
 	}
 	return &volume, nil
+}
+
+func normalizeVolumeSpecTypeAlias(spec *api.VolSpec) {
+	if spec == nil {
+		return
+	}
+	if spec.Type != nil && strings.EqualFold(strings.TrimSpace(*spec.Type), "iscsi") {
+		spec.Type = util.StringPtr("lvm")
+		spec.Iscsi = util.BoolPtr(true)
+		return
+	}
+	if spec.Iscsi != nil && *spec.Iscsi {
+		if spec.Type == nil || strings.TrimSpace(*spec.Type) == "" {
+			spec.Type = util.StringPtr("lvm")
+		}
+	}
 }
 
 func configureLVMVolumeSpec(spec *api.VolSpec, volumeID string) {

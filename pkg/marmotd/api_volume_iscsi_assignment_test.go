@@ -68,3 +68,30 @@ func TestFindISCSIServerNodeName_NoActiveHosts(t *testing.T) {
 		t.Fatalf("findISCSIServerNodeName() = %q, want empty", node)
 	}
 }
+
+func TestNormalizeIncomingVolumeSpecForCompatibility_TypeIscsiAlias(t *testing.T) {
+	volume := api.Volume{
+		Spec: api.VolSpec{Type: util.StringPtr("iscsi")},
+	}
+
+	normalizeIncomingVolumeSpecForCompatibility(&volume)
+
+	if volume.Spec.Type == nil || *volume.Spec.Type != "lvm" {
+		t.Fatalf("type = %#v, want lvm", volume.Spec.Type)
+	}
+	if volume.Spec.Iscsi == nil || !*volume.Spec.Iscsi {
+		t.Fatalf("iscsi = %#v, want true", volume.Spec.Iscsi)
+	}
+}
+
+func TestNormalizeIncomingVolumeSpecForCompatibility_IscsiFlagWithoutType(t *testing.T) {
+	volume := api.Volume{
+		Spec: api.VolSpec{Iscsi: util.BoolPtr(true)},
+	}
+
+	normalizeIncomingVolumeSpecForCompatibility(&volume)
+
+	if volume.Spec.Type == nil || *volume.Spec.Type != "lvm" {
+		t.Fatalf("type = %#v, want lvm", volume.Spec.Type)
+	}
+}
