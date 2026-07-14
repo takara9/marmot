@@ -1,132 +1,110 @@
 # Ceph 統合の検証
 
-```console
-sudo apt install -y chrony lvm2
-sudo systemctl enable --now chrony
-wget -q -O- 'https://download.ceph.com/keys/release.asc' | sudo tee /etc/apt/trusted.gpg.d/ceph.asc
-echo "deb https://download.ceph.com/debian-tentacle/ $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/ceph.list
-sudo apt update
-sudo apt install -y cephadm ceph-common
-ip a
-sudo mkdir -p /etc/ceph
-sudo cephadm bootstrap --mon-ip  10.1.3.11
+Marmot と Ceph を連携させ、MarmotのAPIを操作することで、Cephのブロックストレージを確保して、
+仮想サーバーに接続した形で起動できるようにする。
+
+## CephとMarmotの責任分界点
+- Marmotは、以下のCeph構成に関与しない。
+  - Ceph 1台構成、3台クラスタなどのクラスタ規模
+  - OSDのレプリカ数など、データ損失を防止するためのレプリカ数とCrushルール
+- Marmotはブロックストレージを要求して、Cephからアクセス権の文字列を取得して、etcdにストアする。
+
+
+### Cephサーバー側の構成
+- Cephは、クラスタだけでなく、シングル構成でも機能する。
+- シングル構成では、marmot サーバーと Cephサーバーは同居させる。これをデフォルト構成とする。
+- インストーラーでは、marmot までをインストールして、別途、手作業でansible で Cephを構成する手順を取る。
+- シングル構成用に ansible playbookを提供する。
+	- OSDのレプリカ数を1として、専用ストレージデバイスは、最小１個から対応する。
+- クラスタ構成用に、ansible playbookを提供する。
+    - OSDのレプリカ数はデフォルトの3として、専用ストレージデバイスは、最小各ホスト１個から対応する。
+
+
+### Marmot側の設定
+インストール後の構成
+- marmotd.json は、初期値は非連携として、Cephをインストールした後、パラメータを変更して再起動することで Ceph連携ができる。
+- Cephクラスタを構成したサーバー群と、連携可能なように、/etc/marmot/marmot.jsonの設定を変更するだけで、Cephクラスタと連携可能にする。
+marmotd.json 
+```json
+　"ceph_user": "admin",
+  "ceph_passwd": "abcdef123",
+  "ceph_mgr": [
+    {
+      "host": "10.1.4.11:8443",
+    },
+    {
+      "host": "10.1.4.12:8443",
+	},
+  ],
+  "ceph_mon": [
+    {
+      "host": "10.1.4.11:6789",
+    },
+    {
+      "host": "10.1.4.12:6789",
+	},
+    {
+      "host": "10.1.4.13:6789",
+	}
+  ],
 ```
 
-```
-	     URL: https://ceph-single:8443/
-	    User: admin
-   	Password: 9h48agi8nn
+## 連携方法
+- REST APIが提供され、Go言語からラッパー関数を作から操作する。
+- Marmot - Ceph は、APIで繋がる粗結合として、MarmotクラスタとCephクラスタは、組み換えができるようにする。
+  - marmotd.json に、Ceph の IPアドレス、ポート番号、adminユーザー、認証パスワードをセットすることで、連携させる。
+
+
+## Cephの事前準備
+- デバイスからOSDが作成されていること。
+- OSDのデフォルトサイズが設定されていること。
+- CRUSHルールが設定されていること。
+
+- ボリュームを作成するときは、以下のステップをとる。
+  1. プールを作成（仮想サーバー、ボリューム生成の単位でプールを作る）
+  2. イメージを作成 (サイズで指定されたイメージサイズを設定する)
+  3. アクセス権を設定（アクセス権は etcd に保存する）
+
+
+## 実装方法
+- pkg/cephを作成して、Cephを操作するための関数は、すべてこの下に集約する。
+- ここに Makefile を置き、`make test` でパッケージのテストが可能にする。
+- 認証はAPIキーで実施
+
+
+## CIテスト時の環境
+- CIテストでは、Cephが設定されたシングル構成サーバーに対してテストする。
+- テストでは、Cephシングル構成サーバーは、排他的に利用できる必要がある。
+- 現状では hv3 に、runner1〜9 以外に、runner-cephを作成して、runnerからアクセス可能にする。
+
+## 認証
+- CephでAPIキーを発行しておき、それを GitHubのシークレットにセットする方法を取る。
+- スタブ相当のCephサーバーのアドレス等も、GitHubの環境変数にセットして利用する。
+
+
+## 既存 Marmot API の拡張
+spec.type=cephを選択することで、Cephのブロックストレージを選択できる。
+ファイルストレージは、kind=FileStore にして、別扱いにする。
+hhd, ssd, nvme のストレージクラスから、選択できるようにする。
 
 ```
-
-```console
-sudo ceph orch device ls
-sudo ceph orch daemon add osd $(hostname):/dev/vdb
-sudo ceph orch daemon add osd $(hostname):/dev/vdc
-sudo ceph orch daemon add osd $(hostname):/dev/vdd
+apiVersion: v1
+kind: Volume
+metadata:
+    name: new-vol-1
+spec:
+    type: ceph
+    size: 2
+	class: nvme
 ```
-
-```console
-sudo ceph osd crush rule ls
-sudo ceph osd crush rule create-replicated single-node-rule default osd
-sudo ceph config set global mon_allow_pool_size_one true
-sudo ceph config get mon mon_allow_pool_size_one
-sudo ceph config set global mon_warn_on_pool_no_redundancy false
-sudo ceph config set global osd_pool_default_size 1
-sudo ceph config set global osd_pool_default_min_size 1
-```
+以下の状況であれば、エラーとして処理を中止する。
+	- marmotd.json に、cephサーバーが登録されていない
+	- cephサーバーにログインできない。（出来ていない）
+	- nvmeクラスを指定する CRUSHルールが設定された プールが無い。
+	- イメージ作成するための容量が足りない。
+	- その他、メージの作成失敗した。
 
 
-```console
-sudo ceph osd pool set .mgr size 1 --yes-i-really-mean-it
-sudo ceph osd pool set .mgr min_size 1
-```
-
-```console
-sudo ceph osd pool create mypool 32 32 single-node-rule
-sudo ceph osd pool set mypool size 1 --yes-i-really-mean-it
-sudo ceph osd pool set mypool min_size 1
-sudo ceph osd pool application enable mypool rbd
-```
+(※)その前に、既存のiscsiのインタフェースを改修すること。
 
 
-```console
-sudo ceph orch apply mds cephfs --placement="1"
-sudo ceph fs volume create cephfs
-sudo ceph fs authorize cephfs client.vmuser / rw
-```
-
-```
-[client.vmuser]
-	key = AQB/BFJqdCdiDBAAI35OGjC1OlgRmFtm1eOPMw==
-	caps mds = "allow rw fsname=cephfs"
-	caps mon = "allow r fsname=cephfs"
-	caps osd = "allow rw tag cephfs data=cephfs"
-```
-
-```console
-sudo ceph auth get client.vmuser -o /etc/ceph/ceph.client.vmuser.keyring
-sudo ceph auth print-key client.vmuser
-```
-
-```
-AQB/BFJqdCdiDBAAI35OGjC1OlgRmFtm1eOPMw==
-```
-
-
-```console
-sudo ceph osd pool set cephfs.cephfs.meta crush_rule single-node-rule
-sudo ceph osd pool set cephfs.cephfs.meta size 1 --yes-i-really-mean-it
-sudo ceph osd pool set cephfs.cephfs.meta min_size 1
-sudo ceph osd pool set cephfs.cephfs.data crush_rule single-node-rule
-sudo ceph osd pool set cephfs.cephfs.data size 1 --yes-i-really-mean-it
-sudo ceph osd pool set cephfs.cephfs.data min_size 1
-```
-
-
-
-
-
-
-```console
-sudo ceph status
-sudo ceph fs status
-sudo ceph mds stat
-sudo ceph health detail
-``` 
-
-
----
-
-## CEPH-FS クライアント側
-
-```console
-sudo apt install -y ceph-common
-sudo mkdir -p /mnt/cephfs
-sudo vi /etc/fstab
-sudo cat /etc/fstab |tail -n 1
-10.1.3.11:6789:/ /mnt/cephfs ceph name=vmuser,_netdev 0 2
-```
-
-```console
-sudo vi /etc/ceph/ceph.conf
-cat /etc/ceph/ceph.conf 
-[global]
-mon_host = 10.1.3.11
-```
-
-
-```console
-echo -e "[client.vmuser]\n\tkey = AQCb11FqnufyChAApiSsmvITe3wl19hUs+09bw==" | sudo tee /etc/ceph/ceph.client.vmuser.keyring
-sudo mount /mnt/cephfs
-```
-
----
-
-ubuntu@ceph-single:~$ sudo ceph fs volume create cephfs2
-ubuntu@ceph-single:~$ sudo ceph fs authorize cephfs2 client.vmuser2 / rw
-[client.vmuser2]
-	key = AQAi5FFqoTeZOBAAJE54M7M57D9ozNVd6cEMEQ==
-	caps mds = "allow rw fsname=cephfs2"
-	caps mon = "allow r fsname=cephfs2"
-	caps osd = "allow rw tag cephfs data=cephfs2"
