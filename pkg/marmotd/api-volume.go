@@ -19,18 +19,7 @@ func normalizeIncomingVolumeSpecForCompatibility(volume *api.Volume) {
 	if volume == nil {
 		return
 	}
-	if volume.Spec.Type != nil && strings.EqualFold(strings.TrimSpace(*volume.Spec.Type), "iscsi") {
-		volume.Spec.Type = util.StringPtr("lvm")
-		volume.Spec.Iscsi = util.BoolPtr(true)
-	}
-	if volume.Spec.Iscsi != nil && *volume.Spec.Iscsi {
-		if volume.Spec.Type == nil || strings.TrimSpace(*volume.Spec.Type) == "" {
-			volume.Spec.Type = util.StringPtr("lvm")
-		}
-		if volume.Spec.Kind == nil || strings.TrimSpace(*volume.Spec.Kind) == "" {
-			volume.Spec.Kind = util.StringPtr("data")
-		}
-	}
+	util.NormalizeVolumeSpecISCSIAlias(&volume.Spec)
 }
 
 func isISCSIDataLVMVolume(volume *api.Volume) bool {
