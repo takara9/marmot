@@ -144,7 +144,6 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 	}
 	return &volume, nil
 }
-
 func configureLVMVolumeSpec(spec *api.VolSpec, volumeID string) {
 	if spec == nil {
 		return

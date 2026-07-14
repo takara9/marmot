@@ -8,12 +8,15 @@ import (
 )
 
 func TestNormalizeVolumeSpecISCSIAlias_TypeIscsiAlias(t *testing.T) {
-	spec := api.VolSpec{Type: util.StringPtr("iscsi")}
+	spec := api.VolSpec{Type: util.StringPtr(" ISCSI ")}
 
 	util.NormalizeVolumeSpecISCSIAlias(&spec)
 
 	if spec.Type == nil || *spec.Type != "lvm" {
 		t.Fatalf("type = %#v, want lvm", spec.Type)
+	}
+	if spec.Kind == nil || *spec.Kind != "data" {
+		t.Fatalf("kind = %#v, want data", spec.Kind)
 	}
 	if spec.Iscsi == nil || !*spec.Iscsi {
 		t.Fatalf("iscsi = %#v, want true", spec.Iscsi)
@@ -27,5 +30,8 @@ func TestNormalizeVolumeSpecISCSIAlias_IscsiFlagWithoutType(t *testing.T) {
 
 	if spec.Type == nil || *spec.Type != "lvm" {
 		t.Fatalf("type = %#v, want lvm", spec.Type)
+	}
+	if spec.Kind == nil || *spec.Kind != "data" {
+		t.Fatalf("kind = %#v, want data", spec.Kind)
 	}
 }

@@ -106,3 +106,4 @@ func TestNormalizeVolumeSpecISCSIAlias_IscsiFlagWithoutType(t *testing.T) {
 	if volume.Spec.Size == nil || *volume.Spec.Size != 1 {
 		t.Fatalf("size = %#v, want 1", volume.Spec.Size)
 	}
+}
