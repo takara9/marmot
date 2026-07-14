@@ -8,7 +8,7 @@ import (
 
 // NormalizeVolumeSpecISCSIAlias は iSCSI エイリアス入力を正規化する共通ヘルパーです。
 // spec.Type が "iscsi" の場合は "lvm" に変換して spec.Iscsi を true に設定します。
-// spec.Iscsi が true の場合、Type が未指定なら "lvm" を、Kind が未指定なら "data" を補完します。
+// spec.Iscsi が true の場合、Type/Kind を下流の厳密比較に合わせて正規化し、Kind が data のとき Size が未指定/0以下なら 1GB を補完します。
 func NormalizeVolumeSpecISCSIAlias(spec *api.VolSpec) {
 	if spec == nil {
 		return
