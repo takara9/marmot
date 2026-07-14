@@ -97,4 +97,7 @@ func TestNormalizeIncomingVolumeSpecForCompatibility_IscsiFlagWithoutType(t *tes
 	if volume.Spec.Type == nil || *volume.Spec.Type != "lvm" {
 		t.Fatalf("type = %#v, want lvm", volume.Spec.Type)
 	}
+	if volume.Spec.Kind == nil || *volume.Spec.Kind != "data" {
+		t.Fatalf("kind = %#v, want data", volume.Spec.Kind)
+	}
 }
