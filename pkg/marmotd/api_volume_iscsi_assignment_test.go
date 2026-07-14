@@ -82,6 +82,9 @@ func TestNormalizeVolumeSpecISCSIAlias_TypeIscsiAlias(t *testing.T) {
 	if volume.Spec.Kind == nil || *volume.Spec.Kind != "data" {
 		t.Fatalf("kind = %#v, want data", volume.Spec.Kind)
 	}
+	if volume.Spec.Size == nil || *volume.Spec.Size != 1 {
+		t.Fatalf("size = %#v, want 1", volume.Spec.Size)
+	}
 	if volume.Spec.Iscsi == nil || !*volume.Spec.Iscsi {
 		t.Fatalf("iscsi = %#v, want true", volume.Spec.Iscsi)
 	}
