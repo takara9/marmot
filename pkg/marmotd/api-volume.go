@@ -71,6 +71,7 @@ func (s *Server) ApiCreateVolume(ctx echo.Context) error {
 		slog.Error("ApiCreateVolume()", "err", err, "volume", string(volumeString), "err2", err2)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
+	util.NormalizeVolumeSpecISCSIAlias(&volume.Spec)
 	assignedNode := resolveVolumeCreationNode(s.Ma, &volume)
 	assignNodeNameIfUnset(&volume.Metadata, assignedNode)
 

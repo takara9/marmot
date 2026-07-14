@@ -77,6 +77,8 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 		volume.Status = &status
 	}
 
+	util.NormalizeVolumeSpecISCSIAlias(&volume.Spec)
+
 	api.SetVolumeID(&volume, id)
 	volume.Metadata.Key = util.StringPtr(key)
 	volume.Metadata.Uuid = util.StringPtr(uuidString)
@@ -142,7 +144,6 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 	}
 	return &volume, nil
 }
-
 func configureLVMVolumeSpec(spec *api.VolSpec, volumeID string) {
 	if spec == nil {
 		return

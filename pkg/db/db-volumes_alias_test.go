@@ -1,0 +1,37 @@
+package db
+
+import (
+	"testing"
+
+	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/util"
+)
+
+func TestNormalizeVolumeSpecISCSIAlias_TypeIscsiAlias(t *testing.T) {
+	spec := api.VolSpec{Type: util.StringPtr(" ISCSI ")}
+
+	util.NormalizeVolumeSpecISCSIAlias(&spec)
+
+	if spec.Type == nil || *spec.Type != "lvm" {
+		t.Fatalf("type = %#v, want lvm", spec.Type)
+	}
+	if spec.Kind == nil || *spec.Kind != "data" {
+		t.Fatalf("kind = %#v, want data", spec.Kind)
+	}
+	if spec.Iscsi == nil || !*spec.Iscsi {
+		t.Fatalf("iscsi = %#v, want true", spec.Iscsi)
+	}
+}
+
+func TestNormalizeVolumeSpecISCSIAlias_IscsiFlagWithoutType(t *testing.T) {
+	spec := api.VolSpec{Iscsi: util.BoolPtr(true)}
+
+	util.NormalizeVolumeSpecISCSIAlias(&spec)
+
+	if spec.Type == nil || *spec.Type != "lvm" {
+		t.Fatalf("type = %#v, want lvm", spec.Type)
+	}
+	if spec.Kind == nil || *spec.Kind != "data" {
+		t.Fatalf("kind = %#v, want data", spec.Kind)
+	}
+}
