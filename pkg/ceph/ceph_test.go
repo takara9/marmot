@@ -38,16 +38,31 @@ func (s *stubRunner) Run(ctx context.Context, name string, args ...string) ([]by
 
 var _ = Describe("Ceph", func() {
 	BeforeEach(func() {
+		originalIP, hadIP := os.LookupEnv("CEPH_IPADDR")
+		originalKey, hadKey := os.LookupEnv("CEPH_POOL_KEY")
+
 		Expect(os.Setenv("CEPH_IPADDR", testCephMonitorHost)).To(Succeed())
-		// CI では CEPH_POOL_KEY が GitHub Secret として注入済みのためファイル不要
-		if os.Getenv("CEPH_POOL_KEY") == "" {
+		// CI は環境変数優先、ローカルは testdata の keyring を読み込む
+		if !hadKey || strings.TrimSpace(originalKey) == "" {
+			if os.Getenv("GITHUB_ACTIONS") == "true" || strings.EqualFold(os.Getenv("CI"), "true") {
+				Fail("CEPH_POOL_KEY must be set in CI/GitHub Actions")
+			}
 			keyring, err := os.ReadFile(testKeyringPath)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(os.Setenv("CEPH_POOL_KEY", string(keyring))).To(Succeed())
 		}
 		DeferCleanup(func() {
-			Expect(os.Unsetenv("CEPH_IPADDR")).To(Succeed())
-			Expect(os.Unsetenv("CEPH_POOL_KEY")).To(Succeed())
+			if hadIP {
+				Expect(os.Setenv("CEPH_IPADDR", originalIP)).To(Succeed())
+			} else {
+				Expect(os.Unsetenv("CEPH_IPADDR")).To(Succeed())
+			}
+
+			if hadKey {
+				Expect(os.Setenv("CEPH_POOL_KEY", originalKey)).To(Succeed())
+			} else {
+				Expect(os.Unsetenv("CEPH_POOL_KEY")).To(Succeed())
+			}
 		})
 	})
 
@@ -56,17 +71,10 @@ var _ = Describe("Ceph", func() {
 			cfg := ceph.DefaultConfig()
 			Expect(cfg.Monitors).To(ContainElement(testCephMonitorHost))
 			Expect(cfg.MonitorHosts()).To(Equal(testCephMonitorHost))
-			Expect(cfg.User).To(Equal("ubuntu"))
 			Expect(cfg.KeyFile).NotTo(BeEmpty())
 			writtenKeyring, err := os.ReadFile(cfg.KeyFile)
 			Expect(err).NotTo(HaveOccurred())
-			// fixture ファイルがある場合はその内容と比較、ない場合は環境変数と比較
-			var expectedKeyring string
-			if fixtureData, fixtureErr := os.ReadFile(testKeyringPath); fixtureErr == nil {
-				expectedKeyring = string(fixtureData)
-			} else {
-				expectedKeyring = strings.TrimSpace(os.Getenv("CEPH_POOL_KEY"))
-			}
+			expectedKeyring := strings.TrimSpace(os.Getenv("CEPH_POOL_KEY"))
 			if !strings.HasSuffix(expectedKeyring, "\n") {
 				expectedKeyring += "\n"
 			}

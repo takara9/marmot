@@ -12,7 +12,7 @@ env:
 
 jobs:
   # Label of the job
-  start:
+  lint-check-start:
     runs-on: [ self-hosted, any ]
     steps:
     - uses: actions/checkout@v5
@@ -25,10 +25,10 @@ jobs:
       with:
         args: --new-from-rev=origin/main
 
-  moodule-tests:
+  module-tests:
     runs-on: [ self-hosted, any ]
     needs: 
-      - start
+      - lint-check-start
     if: always() 
     steps:
     #- uses: actions/checkout@v5
@@ -39,7 +39,7 @@ jobs:
   system-tests:
     runs-on: [ self-hosted, any ]
     needs: 
-      - start
+      - lint-check-start
     if: always() 
     steps:
     - name: 時間調整 緩やかに先行させる
@@ -47,86 +47,109 @@ jobs:
         sleep 1
     #- uses: actions/checkout@v5
 
-  packages-run-as-nonroot:
+  package-config:
     runs-on: [ self-hosted, any ]
     needs: 
-      - moodule-tests
+      - module-tests
     if: always() 
     steps:
     - uses: actions/checkout@v5
     - name: コンフィグパッケージ
       run: | 
         cd pkg/config
-        make test
+        sudo -E env "PATH=$PATH" make test
         cd ../..
+
+  package-etcd-access:
+    runs-on: [ self-hosted, any ]
+    needs: 
+      - module-tests
+    if: always() 
+    steps:
+    - uses: actions/checkout@v5
     - name: ETCDのデータアクセス パッケージ
       run: | 
         cd pkg/db
-        make test
+        sudo -E env "PATH=$PATH" make test
         cd ../..
+
+  package-qcow2-manipulation:
+    runs-on: [ self-hosted, any ]
+    needs: 
+      - module-tests
+    if: always() 
+    steps:
+    - uses: actions/checkout@v5
     - name: QCOW2操作 パッケージ
       run: | 
         cd pkg/qcow
-        make test
+        sudo -E env "PATH=$PATH" make test
         cd ../..
 
   package-util:
     runs-on: [ self-hosted, any ]
     needs:
-      - moodule-tests
+      - module-tests
     if: always()
     steps:
     - uses: actions/checkout@v5
-    - name: ユーティリティ パッケージ unitテスト（integration除外）
+    - name: ランナーのセットアップ
       run: |
+        sudo -E env "PATH=$PATH" ./tools/setup.sh
+    - name: ユーティリティ パッケージ テスト
+      run: | 
         cd pkg/util
-        make test-unit
+        sudo -E env "PATH=$PATH" make test
         cd ../..
+    - name: ランナーのセットアップ
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/cleanup.sh 
 
-  mactl-unit-tests:
+  mactl-command-tests:
     runs-on: [ self-hosted, any ]
     needs:
-      - moodule-tests
+      - module-tests
     if: always()
     steps:
     - uses: actions/checkout@v5
-    - name: mactl コマンド ユニットテスト
+    - name: mactl コマンド テスト
       run: |
         cd cmd/mactl
-        make test-unit
+        sudo -E env "PATH=$PATH" make test-unit
         cd ../..
 
-  packages-run-as-root:
+  package-lvm:
     runs-on: [ self-hosted, any ]
     needs: 
-      - moodule-tests
+      - module-tests
     if: always() 
     steps:
     - uses: actions/checkout@v5
     - name: ロジカルボリューム マネージャー 操作パッケージ
       run: | 
         cd pkg/lvm
-        sudo env "PATH=$PATH" make test
+        sudo -E env "PATH=$PATH" make test
         cd ../..
-    - name: ランナーのセットアップ
-      run: |
-        sudo -E env "PATH=$PATH" ./tools/setup.sh
-    - name: ユーティリティ パッケージ 
-      run: | 
-        cd pkg/util
-        sudo env "PATH=$PATH" make test-integration
-        cd ../..
+      
+  package-ceph:
+    runs-on: [ self-hosted, any ]
+    needs: 
+      - module-tests
+    env:
+      CEPH_POOL_KEY: ${{ secrets.CEPH_POOL_KEY }}
+    if: always() 
+    steps:
+    - uses: actions/checkout@v5
     - name: Cephブロックストレージ操作パッケージ
       run: | 
         cd pkg/ceph
-        sudo env "PATH=$PATH" make test
+        sudo -E env "PATH=$PATH" make test
         cd ../..
-      
 
   package-virsh:
     runs-on: [ self-hosted, any ]
     needs: 
-      - moodule-tests
+      - module-tests
     if: always() 
     steps:
     - uses: actions/checkout@v5
@@ -142,7 +165,7 @@ jobs:
     - name: 仮想化操作 パッケージ
       run: | 
         cd pkg/virt
-        sudo env "PATH=$PATH" make test
+        sudo -E env "PATH=$PATH" make test
         cd ../..
     - name: 仮想ネットワーク削除
       if: always()
@@ -152,20 +175,20 @@ jobs:
   package-marmotd-volume:
     runs-on: [ self-hosted, any ]
     needs: 
-      - moodule-tests
+      - module-tests
     if: always()
     steps:
     - uses: actions/checkout@v5
     - name: Test pkg/marmotd ボリューム機能テスト
       run: |
         cd pkg/marmotd
-        sudo env "PATH=$PATH" make test-volume
+        sudo -E env "PATH=$PATH" make test-volume
         cd ../..
 
   package-marmotd-server:
     runs-on: [ self-hosted, any ]
     needs: 
-      - moodule-tests
+      - module-tests
     if: always()
     steps:
     - uses: actions/checkout@v5
@@ -175,7 +198,7 @@ jobs:
     - name: Test pkg/marmotd サーバー機能テスト
       run: |
         cd pkg/marmotd
-        sudo env "PATH=$PATH" make test-server
+        sudo -E env "PATH=$PATH" make test-server
         cd ../..
     - name: 仮想ネットワーク削除
       if: always()
@@ -185,7 +208,7 @@ jobs:
   package-marmotd-etc:
     runs-on: [ self-hosted, any ]
     needs: 
-      - moodule-tests
+      - module-tests
     if: always()
     steps:
     - uses: actions/checkout@v5
@@ -212,7 +235,7 @@ jobs:
   package-marmotd-images:
     runs-on: [ self-hosted, any ]
     needs: 
-      - moodule-tests
+      - module-tests
     if: always()
     steps:
     - uses: actions/checkout@v5
@@ -232,7 +255,7 @@ jobs:
   package-marmotd-osimage:
     runs-on: [ self-hosted, any ]
     needs: 
-      - moodule-tests
+      - module-tests
     if: always()
     steps:
     - uses: actions/checkout@v5
@@ -241,26 +264,6 @@ jobs:
         cd pkg/marmotd
         sudo env "PATH=$PATH" make test-osimage
         cd ../..
-
-  # Label of the job
-  #marmot-daemon:
-  #  runs-on: [ self-hosted, runner1 ]
-  #  steps:
-  #  - uses: actions/checkout@v5
-  #  - name: Install ca-certificates
-  #    run: |
-  #      sudo apt update && sudo apt install -y ca-certificates dnsutils etcd-client
-  #      sudo update-ca-certificates
-  #
-  #  - name: Setup for build
-  #   run: |
-  #      make setup
-  #
-  #  - name: Test pkg/marmotd 全機能テスト
-  #    run: |
-  #      cd pkg/marmotd
-  #      sudo env "PATH=$PATH" make test
-  #       cd ../..
 
   mactl-vm-deploy-basic:
     runs-on: [ self-hosted, any ]
@@ -320,7 +323,7 @@ jobs:
     - name: mactlコマンドのテスト その２
       run: |
         cd cmd/mactl
-        make mactl-test
+        sudo -E env "PATH=$PATH" make mactl-test
         sudo -E env "PATH=$PATH" make test2
         cd ../..
         sudo -E env "PATH=$PATH" ./tools/cleanup.sh
@@ -343,7 +346,7 @@ jobs:
     - name: mactlコマンドのテスト その３
       run: | 
         cd cmd/mactl
-        make mactl-test
+        sudo -E env "PATH=$PATH" make mactl-test
         sudo -E env "PATH=$PATH" make test3
         cd ../..
         sudo -E env "PATH=$PATH" ./tools/cleanup.sh
@@ -362,32 +365,23 @@ jobs:
     #    sudo -E env "PATH=$PATH" make test
     #    sudo rm -fr bin
     #    cd ../..
-
-  #cleanup-runner1:
-  #  runs-on: [ self-hosted, runner1 ]
-  #  needs: 
-  #    - marmot-daemon
-  #  if: always() 
-  #  steps:
-  #    - name: 各ランナーを掃除
-  #      run: |
-  #        pwd
-  #        ls -al
-  #         sudo -E env "PATH=$PATH" ./tools/cleanup.sh
-
+ 
   module-tests-end:
     runs-on: [ self-hosted, any ]
     needs: 
-      - packages-run-as-nonroot
+      - package-qcow2-manipulation
+      - package-config
+      - package-etcd-access
       - package-util
-      - packages-run-as-root
+      - package-lvm
       - package-virsh
+      - package-ceph
       - package-marmotd-volume
       - package-marmotd-server
       - package-marmotd-etc
       - package-marmotd-images
       - package-marmotd-osimage
-      - mactl-unit-tests
+      - mactl-command-tests
     steps:
     - uses: actions/checkout@v5
 
