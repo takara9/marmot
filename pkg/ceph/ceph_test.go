@@ -1,0 +1,194 @@
+package ceph_test
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"strings"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/ceph"
+)
+
+const testCephMonitorHost = "ceph-mon.example"
+const testKeyringPath = "testdata/ceph.client.ubuntu.keyring"
+
+type stubRunner struct {
+	commands []string
+	outputs  map[string][]byte
+	errors   map[string]error
+}
+
+func (s *stubRunner) Run(ctx context.Context, name string, args ...string) ([]byte, error) {
+	command := name
+	for _, arg := range args {
+		command += " " + arg
+	}
+	s.commands = append(s.commands, command)
+	if err, ok := s.errors[command]; ok {
+		return s.outputs[command], ceph.CommandError{Command: command, Output: string(s.outputs[command]), Err: err}
+	}
+	if output, ok := s.outputs[command]; ok {
+		return output, nil
+	}
+	return nil, nil
+}
+
+var _ = Describe("Ceph", func() {
+	BeforeEach(func() {
+		Expect(os.Setenv("CEPH_IPADDR", testCephMonitorHost)).To(Succeed())
+		// CI では CEPH_POOL_KEY が GitHub Secret として注入済みのためファイル不要
+		if os.Getenv("CEPH_POOL_KEY") == "" {
+			keyring, err := os.ReadFile(testKeyringPath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(os.Setenv("CEPH_POOL_KEY", string(keyring))).To(Succeed())
+		}
+		DeferCleanup(func() {
+			Expect(os.Unsetenv("CEPH_IPADDR")).To(Succeed())
+			Expect(os.Unsetenv("CEPH_POOL_KEY")).To(Succeed())
+		})
+	})
+
+	Describe("DefaultConfig", func() {
+		It("uses the requested monitor host by default", func() {
+			cfg := ceph.DefaultConfig()
+			Expect(cfg.Monitors).To(ContainElement(testCephMonitorHost))
+			Expect(cfg.MonitorHosts()).To(Equal(testCephMonitorHost))
+			Expect(cfg.User).To(Equal("ubuntu"))
+			Expect(cfg.KeyFile).NotTo(BeEmpty())
+			writtenKeyring, err := os.ReadFile(cfg.KeyFile)
+			Expect(err).NotTo(HaveOccurred())
+			// fixture ファイルがある場合はその内容と比較、ない場合は環境変数と比較
+			var expectedKeyring string
+			if fixtureData, fixtureErr := os.ReadFile(testKeyringPath); fixtureErr == nil {
+				expectedKeyring = string(fixtureData)
+			} else {
+				expectedKeyring = strings.TrimSpace(os.Getenv("CEPH_POOL_KEY"))
+			}
+			if !strings.HasSuffix(expectedKeyring, "\n") {
+				expectedKeyring += "\n"
+			}
+			Expect(string(writtenKeyring)).To(Equal(expectedKeyring))
+		})
+	})
+
+	Describe("MapVolumeToRequest", func() {
+		It("maps a ceph volume into an RBD create request", func() {
+			cfg := ceph.DefaultConfig()
+			volume := api.Volume{
+				Spec: api.VolSpec{
+					Type:         ptr("ceph"),
+					Kind:         ptr("data"),
+					Size:         intPtr(20),
+					StorageClass: ptr(" ssd "),
+				},
+			}
+			api.SetVolumeID(&volume, "abcde")
+
+			req, err := ceph.MapVolumeToRequest(volume, cfg)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(req.Pool).To(Equal("marmot-ssd"))
+			Expect(req.Image).To(Equal("vol-abcde"))
+			Expect(req.SizeGB).To(Equal(20))
+			Expect(req.ProviderVolumeID()).To(Equal("marmot-ssd/vol-abcde"))
+		})
+
+		It("rejects unsupported storage classes", func() {
+			cfg := ceph.DefaultConfig()
+			volume := api.Volume{Spec: api.VolSpec{Type: ptr("ceph"), Size: intPtr(1), StorageClass: ptr("sas")}}
+			api.SetVolumeID(&volume, "abcde")
+
+			_, err := ceph.MapVolumeToRequest(volume, cfg)
+
+			Expect(err).To(MatchError("storageClass must be one of hdd, ssd, nvme"))
+		})
+	})
+
+	Describe("Keyring", func() {
+		It("loads the moved keyring from testdata", func() {
+			if _, err := os.Stat(testKeyringPath); os.IsNotExist(err) {
+				Skip("keyring fixture not present (CI uses CEPH_POOL_KEY secret directly)")
+			}
+			data, err := os.ReadFile(testKeyringPath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(data).NotTo(BeEmpty())
+		})
+	})
+
+	Describe("Client", func() {
+		var runner *stubRunner
+		var client *ceph.Client
+		var cfg ceph.Config
+
+		BeforeEach(func() {
+			runner = &stubRunner{outputs: map[string][]byte{}, errors: map[string]error{}}
+			cfg = ceph.DefaultConfig()
+			var err error
+			client, err = ceph.NewClient(cfg, runner)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("issues an rbd create command", func() {
+			err := client.CreateVolume(context.Background(), ceph.VolumeRequest{Pool: "marmot-ssd", Image: "vol-abcde", SizeGB: 20})
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(runner.commands).To(ContainElement(fmt.Sprintf("rbd --id %s --keyring %s -m %s create marmot-ssd/vol-abcde --size 20G", cfg.User, cfg.KeyFile, testCephMonitorHost)))
+		})
+
+		It("parses rbd info JSON", func() {
+			command := fmt.Sprintf("rbd --id %s --keyring %s -m %s info marmot-ssd/vol-abcde --format json", cfg.User, cfg.KeyFile, testCephMonitorHost)
+			runner.outputs[command] = []byte(`{"name":"vol-abcde","size":21474836480,"pool":"marmot-ssd"}`)
+
+			info, err := client.StatVolume(context.Background(), "marmot-ssd", "vol-abcde")
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(info.ProviderVolumeID).To(Equal("marmot-ssd/vol-abcde"))
+			Expect(info.SizeBytes).To(Equal(uint64(21474836480)))
+		})
+
+		It("lists images from json output", func() {
+			command := fmt.Sprintf("rbd --id %s --keyring %s -m %s ls marmot-ssd --format json", cfg.User, cfg.KeyFile, testCephMonitorHost)
+			runner.outputs[command] = []byte(`["vol-1","vol-2"]`)
+
+			images, err := client.ListVolumes(context.Background(), "marmot-ssd")
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(images).To(Equal([]string{"vol-1", "vol-2"}))
+		})
+
+		It("propagates command errors with context", func() {
+			command := fmt.Sprintf("rbd --id %s --keyring %s -m %s rm marmot-ssd/vol-abcde", cfg.User, cfg.KeyFile, testCephMonitorHost)
+			runner.errors[command] = fmt.Errorf("exit status 1")
+			runner.outputs[command] = []byte("permission denied")
+
+			err := client.DeleteVolume(context.Background(), "marmot-ssd", "vol-abcde")
+
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("permission denied"))
+		})
+	})
+
+	Describe("FakeClient", func() {
+		It("records operations for higher-level tests", func() {
+			fake := &ceph.FakeClient{}
+
+			Expect(fake.CreateVolume(context.Background(), ceph.VolumeRequest{Pool: "marmot-ssd", Image: "vol-abcde", SizeGB: 1})).To(Succeed())
+			_, err := fake.StatVolume(context.Background(), "marmot-ssd", "vol-abcde")
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(fake.Created).To(HaveLen(1))
+			Expect(fake.Stated).To(Equal([]string{"marmot-ssd/vol-abcde"}))
+		})
+	})
+})
+
+func ptr(value string) *string {
+	return &value
+}
+
+func intPtr(value int) *int {
+	return &value
+}

@@ -106,7 +106,7 @@ jobs:
     - name: ロジカルボリューム マネージャー 操作パッケージ
       run: | 
         cd pkg/lvm
-        sudo -s make test
+        sudo env "PATH=$PATH" make test
         cd ../..
     - name: ランナーのセットアップ
       run: |
@@ -114,8 +114,14 @@ jobs:
     - name: ユーティリティ パッケージ 
       run: | 
         cd pkg/util
-        sudo -s make test-integration
+        sudo env "PATH=$PATH" make test-integration
         cd ../..
+    - name: Cephブロックストレージ操作パッケージ
+      run: | 
+        cd pkg/ceph
+        sudo env "PATH=$PATH" make test
+        cd ../..
+      
 
   package-virsh:
     runs-on: [ self-hosted, any ]
@@ -124,6 +130,9 @@ jobs:
     if: always() 
     steps:
     - uses: actions/checkout@v5
+    - uses: actions/setup-go@v6
+      with:
+        go-version: '1.26.4'
     - name: ランナーのセットアップ
       run: |
         sudo -E env "PATH=$PATH" ./tools/setup.sh
@@ -133,7 +142,7 @@ jobs:
     - name: 仮想化操作 パッケージ
       run: | 
         cd pkg/virt
-        sudo -s make test
+        sudo env "PATH=$PATH" make test
         cd ../..
     - name: 仮想ネットワーク削除
       if: always()
@@ -150,7 +159,7 @@ jobs:
     - name: Test pkg/marmotd ボリューム機能テスト
       run: |
         cd pkg/marmotd
-        sudo -s make test-volume
+        sudo env "PATH=$PATH" make test-volume
         cd ../..
 
   package-marmotd-server:
@@ -166,7 +175,7 @@ jobs:
     - name: Test pkg/marmotd サーバー機能テスト
       run: |
         cd pkg/marmotd
-        sudo -s make test-server
+        sudo env "PATH=$PATH" make test-server
         cd ../..
     - name: 仮想ネットワーク削除
       if: always()
@@ -187,13 +196,13 @@ jobs:
     - name: Test pkg/marmotd ネットワーク機能テスト
       run: |
         cd pkg/marmotd
-        sudo -s make test-vnet
-        sudo -s make test-ipnet
-        sudo -s make test-cloud-init
-        sudo -s make test-timeout
-        sudo -s make test-backing-store
-        sudo -s make test-config
-        sudo -s make test-volume-backing-store 
+        sudo env "PATH=$PATH" make test-vnet
+        sudo env "PATH=$PATH" make test-ipnet
+        sudo env "PATH=$PATH" make test-cloud-init
+        sudo env "PATH=$PATH" make test-timeout
+        sudo env "PATH=$PATH" make test-backing-store
+        sudo env "PATH=$PATH" make test-config
+        sudo env "PATH=$PATH" make test-volume-backing-store 
         cd ../..
     - name: 仮想ネットワーク削除
       if: always()
@@ -213,7 +222,7 @@ jobs:
     - name: Test pkg/marmotd サーバーとイメージ機能テスト
       run: |
         cd pkg/marmotd
-        sudo -s make test-server-image
+        sudo env "PATH=$PATH" make test-server-image
         cd ../..
     - name: 仮想ネットワーク削除
       if: always()
@@ -230,7 +239,7 @@ jobs:
     - name: Test pkg/marmotd OSイメージ機能テスト
       run: |
         cd pkg/marmotd
-        sudo -s make test-osimage
+        sudo env "PATH=$PATH" make test-osimage
         cd ../..
 
   # Label of the job
@@ -250,7 +259,7 @@ jobs:
   #  - name: Test pkg/marmotd 全機能テスト
   #    run: |
   #      cd pkg/marmotd
-  #      sudo -s make test
+  #      sudo env "PATH=$PATH" make test
   #       cd ../..
 
   mactl-vm-deploy-basic:

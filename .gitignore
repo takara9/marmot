@@ -14,6 +14,7 @@
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+*.keyring
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
@@ -29,4 +30,3 @@ tools/lv_to_remove.txt
 tools/lxc_domain_list.txt
 dist/
 memories/
-
