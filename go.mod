@@ -1,6 +1,6 @@
 module github.com/takara9/marmot
 
-go 1.26.4
+go 1.26.2
 
 require (
 	github.com/google/uuid v1.6.0
