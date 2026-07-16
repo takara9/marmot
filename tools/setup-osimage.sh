@@ -14,13 +14,11 @@ fi
 cd ${QCOW2POOL}
 
 echo "http://hmc/${IMAGE} にアクセスしてダウンロードの成否を確認する"
-curl -I http://hmc/${IMAGE} |tee  download.log
-if grep -q "200 OK" download.log; then
+if curl -fsSI "http://hmc/${IMAGE}" >/dev/null; then
   echo "ダウンロード可能: http://hmc/${IMAGE}"
-  curl -OL http://hmc/${IMAGE}
+  curl -fSL -O "http://hmc/${IMAGE}"
 else
   echo "ダウンロード不可: http://hmc/${IMAGE}。インターネットからcloud imageをダウンロードします。"
-  curl -OL https://cloud-images.ubuntu.com/releases/noble/release/${IMAGE}
+  curl -fSL -O "https://cloud-images.ubuntu.com/releases/noble/release/${IMAGE}"
 fi
-rm -f download.log
 
