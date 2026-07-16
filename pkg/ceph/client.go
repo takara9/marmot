@@ -102,6 +102,9 @@ func NewClient(cfg Config, runner Runner) (*Client, error) {
 	if normalized.MonitorHosts() == "" {
 		return nil, fmt.Errorf("ceph monitors are required")
 	}
+	if strings.TrimSpace(os.Getenv("CEPH_POOL_KEY")) != "" && strings.TrimSpace(normalized.KeyFile) == "" {
+		return nil, fmt.Errorf("failed to create keyring file from CEPH_POOL_KEY")
+	}
 	if runner == nil {
 		runner = ExecRunner{}
 	}
