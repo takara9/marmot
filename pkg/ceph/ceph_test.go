@@ -73,7 +73,7 @@ var _ = Describe("Ceph", func() {
 
 	Describe("DefaultConfig", func() {
 		It("uses the requested monitor host by default", func() {
-			cfg := ceph.DefaultConfig()
+			cfg := defaultConfigWithCleanup()
 			Expect(cfg.Monitors).To(ContainElement(testCephMonitorHost))
 			Expect(cfg.MonitorHosts()).To(Equal(testCephMonitorHost))
 			Expect(cfg.KeyFile).NotTo(BeEmpty())
@@ -85,11 +85,23 @@ var _ = Describe("Ceph", func() {
 			}
 			Expect(string(writtenKeyring)).To(Equal(expectedKeyring))
 		})
+
+		It("cleans up the generated keyring on demand", func() {
+			cfg := ceph.DefaultConfig()
+			Expect(cfg.KeyFile).NotTo(BeEmpty())
+			_, err := os.Stat(cfg.KeyFile)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(cfg.Cleanup()).To(Succeed())
+			Expect(cfg.Cleanup()).To(Succeed())
+			_, err = os.Stat(cfg.KeyFile)
+			Expect(os.IsNotExist(err)).To(BeTrue())
+		})
 	})
 
 	Describe("MapVolumeToRequest", func() {
 		It("maps a ceph volume into an RBD create request", func() {
-			cfg := ceph.DefaultConfig()
+			cfg := defaultConfigWithCleanup()
 			volume := api.Volume{
 				Spec: api.VolSpec{
 					Type:         ptr("ceph"),
@@ -110,7 +122,7 @@ var _ = Describe("Ceph", func() {
 		})
 
 		It("rejects unsupported storage classes", func() {
-			cfg := ceph.DefaultConfig()
+			cfg := defaultConfigWithCleanup()
 			volume := api.Volume{Spec: api.VolSpec{Type: ptr("ceph"), Size: intPtr(1), StorageClass: ptr("sas")}}
 			api.SetVolumeID(&volume, "abcde")
 
@@ -138,10 +150,13 @@ var _ = Describe("Ceph", func() {
 
 		BeforeEach(func() {
 			runner = &stubRunner{outputs: map[string][]byte{}, errors: map[string]error{}}
-			cfg = ceph.DefaultConfig()
+			cfg = defaultConfigWithCleanup()
 			var err error
 			client, err = ceph.NewClient(cfg, runner)
 			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(func() {
+				Expect(client.Cleanup()).To(Succeed())
+			})
 		})
 
 		It("issues an rbd create command", func() {
@@ -204,6 +219,14 @@ func ptr(value string) *string {
 
 func intPtr(value int) *int {
 	return &value
+}
+
+func defaultConfigWithCleanup() ceph.Config {
+	cfg := ceph.DefaultConfig()
+	DeferCleanup(func() {
+		Expect(cfg.Cleanup()).To(Succeed())
+	})
+	return cfg
 }
 
 func expectedRBDCommand(cfg ceph.Config, monitor string, args ...string) string {
