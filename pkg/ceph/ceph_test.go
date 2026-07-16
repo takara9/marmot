@@ -68,6 +68,18 @@ var _ = Describe("Ceph", func() {
 			} else {
 				Expect(os.Unsetenv("CEPH_POOL_KEY")).To(Succeed())
 			}
+
+			// Remove any temp keyring files created from CEPH_POOL_KEY during tests.
+			tempDir := os.TempDir()
+			entries, err := os.ReadDir(tempDir)
+			if err == nil {
+				for _, entry := range entries {
+					name := entry.Name()
+					if strings.HasPrefix(name, "marmot-ceph-pool-") && strings.HasSuffix(name, ".keyring") {
+						_ = os.Remove(tempDir + string(os.PathSeparator) + name)
+					}
+				}
+			}
 		})
 	})
 
