@@ -143,11 +143,11 @@ var _ = Describe("Ceph", func() {
 			err := client.CreateVolume(context.Background(), ceph.VolumeRequest{Pool: "marmot-ssd", Image: "vol-abcde", SizeGB: 20})
 
 			Expect(err).NotTo(HaveOccurred())
-			Expect(runner.commands).To(ContainElement(fmt.Sprintf("rbd --id %s --keyring %s -m %s create marmot-ssd/vol-abcde --size 20G", cfg.User, cfg.KeyFile, testCephMonitorHost)))
+			Expect(runner.commands).To(ContainElement(expectedRBDCommand(cfg, testCephMonitorHost, "create", "marmot-ssd/vol-abcde", "--size", "20G")))
 		})
 
 		It("parses rbd info JSON", func() {
-			command := fmt.Sprintf("rbd --id %s --keyring %s -m %s info marmot-ssd/vol-abcde --format json", cfg.User, cfg.KeyFile, testCephMonitorHost)
+			command := expectedRBDCommand(cfg, testCephMonitorHost, "info", "marmot-ssd/vol-abcde", "--format", "json")
 			runner.outputs[command] = []byte(`{"name":"vol-abcde","size":21474836480,"pool":"marmot-ssd"}`)
 
 			info, err := client.StatVolume(context.Background(), "marmot-ssd", "vol-abcde")
@@ -158,7 +158,7 @@ var _ = Describe("Ceph", func() {
 		})
 
 		It("lists images from json output", func() {
-			command := fmt.Sprintf("rbd --id %s --keyring %s -m %s ls marmot-ssd --format json", cfg.User, cfg.KeyFile, testCephMonitorHost)
+			command := expectedRBDCommand(cfg, testCephMonitorHost, "ls", "marmot-ssd", "--format", "json")
 			runner.outputs[command] = []byte(`["vol-1","vol-2"]`)
 
 			images, err := client.ListVolumes(context.Background(), "marmot-ssd")
@@ -168,7 +168,7 @@ var _ = Describe("Ceph", func() {
 		})
 
 		It("propagates command errors with context", func() {
-			command := fmt.Sprintf("rbd --id %s --keyring %s -m %s rm marmot-ssd/vol-abcde", cfg.User, cfg.KeyFile, testCephMonitorHost)
+			command := expectedRBDCommand(cfg, testCephMonitorHost, "rm", "marmot-ssd/vol-abcde")
 			runner.errors[command] = fmt.Errorf("exit status 1")
 			runner.outputs[command] = []byte("permission denied")
 
@@ -199,4 +199,17 @@ func ptr(value string) *string {
 
 func intPtr(value int) *int {
 	return &value
+}
+
+func expectedRBDCommand(cfg ceph.Config, monitor string, args ...string) string {
+	parts := []string{"rbd"}
+	if user := strings.TrimSpace(cfg.User); user != "" {
+		parts = append(parts, "--id", user)
+	}
+	if keyFile := strings.TrimSpace(cfg.KeyFile); keyFile != "" {
+		parts = append(parts, "--keyring", keyFile)
+	}
+	parts = append(parts, "-m", monitor)
+	parts = append(parts, args...)
+	return strings.Join(parts, " ")
 }
