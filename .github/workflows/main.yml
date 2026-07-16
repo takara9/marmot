@@ -20,7 +20,7 @@ jobs:
         fetch-depth: 0
     - uses: actions/setup-go@v6
       with:
-        go-version: '1.26.4'
+        go-version: '1.26.2'
     - uses: golangci/golangci-lint-action@v9
       with:
         args: --new-from-rev=origin/main
@@ -54,6 +54,9 @@ jobs:
     if: always() 
     steps:
     - uses: actions/checkout@v5
+    - uses: actions/setup-go@v6
+      with:
+        go-version: '1.26.2'
     - name: コンフィグパッケージ
       run: | 
         cd pkg/config
@@ -67,6 +70,9 @@ jobs:
     if: always() 
     steps:
     - uses: actions/checkout@v5
+    - uses: actions/setup-go@v6
+      with:
+        go-version: '1.26.2'
     - name: ETCDのデータアクセス パッケージ
       run: | 
         cd pkg/db
@@ -80,6 +86,9 @@ jobs:
     if: always() 
     steps:
     - uses: actions/checkout@v5
+    - uses: actions/setup-go@v6
+      with:
+        go-version: '1.26.2'
     - name: QCOW2操作 パッケージ
       run: | 
         cd pkg/qcow
@@ -93,6 +102,9 @@ jobs:
     if: always()
     steps:
     - uses: actions/checkout@v5
+    - uses: actions/setup-go@v6
+      with:
+        go-version: '1.26.2'
     - name: ランナーのセットアップ
       run: |
         sudo -E env "PATH=$PATH" ./tools/setup.sh
@@ -112,6 +124,9 @@ jobs:
     if: always()
     steps:
     - uses: actions/checkout@v5
+    - uses: actions/setup-go@v6
+      with:
+        go-version: '1.26.2'
     - name: mactl コマンド テスト
       run: |
         cd cmd/mactl
@@ -125,6 +140,9 @@ jobs:
     if: always() 
     steps:
     - uses: actions/checkout@v5
+    - uses: actions/setup-go@v6
+      with:
+        go-version: '1.26.2'
     - name: ロジカルボリューム マネージャー 操作パッケージ
       run: | 
         cd pkg/lvm
@@ -140,6 +158,9 @@ jobs:
     if: always() 
     steps:
     - uses: actions/checkout@v5
+    - uses: actions/setup-go@v6
+      with:
+        go-version: '1.26.2'
     - name: Cephブロックストレージ操作パッケージ
       run: | 
         cd pkg/ceph
@@ -155,7 +176,7 @@ jobs:
     - uses: actions/checkout@v5
     - uses: actions/setup-go@v6
       with:
-        go-version: '1.26.4'
+        go-version: '1.26.2'
     - name: ランナーのセットアップ
       run: |
         sudo -E env "PATH=$PATH" ./tools/setup.sh
@@ -179,6 +200,9 @@ jobs:
     if: always()
     steps:
     - uses: actions/checkout@v5
+    - uses: actions/setup-go@v6
+      with:
+        go-version: '1.26.2'
     - name: Test pkg/marmotd ボリューム機能テスト
       run: |
         cd pkg/marmotd
@@ -192,6 +216,9 @@ jobs:
     if: always()
     steps:
     - uses: actions/checkout@v5
+    - uses: actions/setup-go@v6
+      with:
+        go-version: '1.26.2'
     - name: 仮想ネットワーク作成
       run: | 
         sudo -E env "PATH=$PATH" ./tools/setup-libvirt-networks.sh
@@ -212,6 +239,9 @@ jobs:
     if: always()
     steps:
     - uses: actions/checkout@v5
+    - uses: actions/setup-go@v6
+      with:
+        go-version: '1.26.2'
     - name: 仮想ネットワーク削除
       if: always()
       run: |
@@ -239,6 +269,9 @@ jobs:
     if: always()
     steps:
     - uses: actions/checkout@v5
+    - uses: actions/setup-go@v6
+      with:
+        go-version: '1.26.2'
     - name: 仮想ネットワーク作成
       run: | 
         sudo -E env "PATH=$PATH" ./tools/setup-libvirt-networks.sh
@@ -259,6 +292,9 @@ jobs:
     if: always()
     steps:
     - uses: actions/checkout@v5
+    - uses: actions/setup-go@v6
+      with:
+        go-version: '1.26.2'
     - name: Test pkg/marmotd OSイメージ機能テスト
       run: |
         cd pkg/marmotd
@@ -272,6 +308,9 @@ jobs:
     if: always()
     steps:
     - uses: actions/checkout@v5
+    - uses: actions/setup-go@v6
+      with:
+        go-version: '1.26.2'
     - name: 仮想ネットワーク作成
       run: |
         sudo -E env "PATH=$PATH" ./tools/setup-libvirt-networks.sh
@@ -294,6 +333,9 @@ jobs:
     if: always()
     steps:
     - uses: actions/checkout@v5
+    - uses: actions/setup-go@v6
+      with:
+        go-version: '1.26.2'
     - name: 仮想ネットワーク作成
       run: |
         sudo -E env "PATH=$PATH" ./tools/setup-libvirt-networks.sh
@@ -316,6 +358,9 @@ jobs:
     if: always()
     steps:
     - uses: actions/checkout@v5
+    - uses: actions/setup-go@v6
+      with:
+        go-version: '1.26.2'
     - name: 仮想ネットワーク削除
       if: always()
       run: |
@@ -339,6 +384,9 @@ jobs:
     if: always()
     steps:
     - uses: actions/checkout@v5
+    - uses: actions/setup-go@v6
+      with:
+        go-version: '1.26.2'
     - name: 仮想ネットワーク削除
       if: always()
       run: | 
