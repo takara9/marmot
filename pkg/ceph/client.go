@@ -135,6 +135,9 @@ func NewClient(cfg Config, runner Runner) (*Client, error) {
 }
 
 func (c Config) Cleanup() error {
+	if c.cleanup == nil {
+		return nil
+	}
 	return c.cleanup.Cleanup()
 }
 
