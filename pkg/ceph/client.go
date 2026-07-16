@@ -19,8 +19,22 @@ func defaultCephAuth() (string, string) {
 	}
 
 	user := parseKeyringUser(secret)
-	keyFile := filepath.Join(os.TempDir(), "marmot-ceph-pool.keyring")
-	if writeErr := os.WriteFile(keyFile, []byte(ensureTrailingNewline(secret)), 0o600); writeErr != nil {
+	f, err := os.CreateTemp("", "marmot-ceph-pool-*.keyring")
+	if err != nil {
+		return user, ""
+	}
+	keyFile := f.Name()
+	if _, writeErr := f.WriteString(ensureTrailingNewline(secret)); writeErr != nil {
+		_ = f.Close()
+		_ = os.Remove(keyFile)
+		return user, ""
+	}
+	if closeErr := f.Close(); closeErr != nil {
+		_ = os.Remove(keyFile)
+		return user, ""
+	}
+	if chmodErr := os.Chmod(keyFile, 0o600); chmodErr != nil {
+		_ = os.Remove(keyFile)
 		return user, ""
 	}
 	return user, keyFile
