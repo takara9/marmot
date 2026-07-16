@@ -48,7 +48,12 @@ var _ = Describe("Ceph", func() {
 				Fail("CEPH_POOL_KEY must be set in CI/GitHub Actions")
 			}
 			keyring, err := os.ReadFile(testKeyringPath)
-			Expect(err).NotTo(HaveOccurred())
+			if err != nil {
+				if !os.IsNotExist(err) {
+					Expect(err).NotTo(HaveOccurred())
+				}
+				keyring = []byte("[client.ubuntu]\n\tkey = dummy\n")
+			}
 			Expect(os.Setenv("CEPH_POOL_KEY", string(keyring))).To(Succeed())
 		}
 		DeferCleanup(func() {
