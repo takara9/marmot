@@ -157,7 +157,7 @@ var _ = Describe("VolumeGroupConfig", func() {
 		It("Ceph user と key_file の設定値を読み込む", func() {
 			dir := GinkgoT().TempDir()
 			path := filepath.Join(dir, "marmotd.json")
-			content := []byte(`{"ceph_user":"client.marmot","ceph_key_file":"/etc/ceph/marmot.client.key"}`)
+			content := []byte(`{"ceph_user":" client.marmot ","ceph_key_file":" /etc/ceph/marmot.client.key "}`)
 
 			err := os.WriteFile(path, content, 0o644)
 			Expect(err).NotTo(HaveOccurred())
