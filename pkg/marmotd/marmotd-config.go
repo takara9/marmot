@@ -2,6 +2,7 @@ package marmotd
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"os"
 	"sort"
@@ -142,6 +143,36 @@ type MarmotdConfig struct {
 	// 例: "/etc/marmot/certs/server.key"
 	// 空の場合は HTTP を使用する。
 	TLSKeyFile string `json:"tls_key_file"`
+
+	// Ceph 連携の有効/無効フラグ。
+	// true の場合、Ceph をバックエンドストレージとして利用可能にする。
+	// false（省略時）の場合、Ceph 機能は無効化される。
+	CephEnabled bool `json:"ceph_enabled"`
+
+	// Ceph Monitor のアドレスリスト。
+	// 例: ["10.1.4.11:6789", "10.1.4.12:6789", "10.1.4.13:6789"]
+	// ceph_enabled=true の場合、最低1つ必須。
+	CephMonitors []string `json:"ceph_monitors"`
+
+	// Ceph クラスタに接続するユーザー名。
+	// 例: "client.marmot"
+	// ceph_enabled=true の場合、最小権限ユーザーの指定が推奨。
+	CephUser string `json:"ceph_user"`
+
+	// Ceph 認証キーファイルのパス。
+	// 例: "/etc/ceph/marmot.client.key"
+	// ceph_enabled=true の場合、ファイル存在確認と読み取り権限チェックが行われる。
+	CephKeyFile string `json:"ceph_key_file"`
+
+	// storageClass から Ceph CRUSH rule への対応マップ。
+	// キーは storageClass (hdd, ssd, nvme など)、値は CRUSH rule 名。
+	// 例: {"hdd": "rule-hdd", "ssd": "rule-ssd", "nvme": "rule-nvme"}
+	CephCrushRuleByClass map[string]string `json:"ceph_crush_rule_by_class"`
+
+	// storageClass から Ceph pool への対応マップ。
+	// キーは storageClass (hdd, ssd, nvme など)、値は pool 名。
+	// 例: {"hdd": "marmot-hdd", "ssd": "marmot-ssd", "nvme": "marmot-nvme"}
+	CephPoolByClass map[string]string `json:"ceph_pool_by_class"`
 }
 
 var runtimeConfigState = struct {
@@ -178,6 +209,12 @@ func defaultConfig() *MarmotdConfig {
 		LokiPushURL:                      "",
 		TLSCertFile:                      "",
 		TLSKeyFile:                       "",
+		CephEnabled:                      false,
+		CephMonitors:                     nil,
+		CephUser:                         "",
+		CephKeyFile:                      "",
+		CephCrushRuleByClass:             make(map[string]string),
+		CephPoolByClass:                  make(map[string]string),
 	}
 }
 
@@ -262,6 +299,24 @@ func normalizeConfig(cfg *MarmotdConfig) *MarmotdConfig {
 	normalized.LokiPushURL = strings.TrimSpace(normalized.LokiPushURL)
 	normalized.TLSCertFile = strings.TrimSpace(normalized.TLSCertFile)
 	normalized.TLSKeyFile = strings.TrimSpace(normalized.TLSKeyFile)
+
+	// Ceph パラメーターの正規化
+	normalized.CephMonitors = trimNonEmptyStrings(normalized.CephMonitors)
+	normalized.CephUser = strings.TrimSpace(normalized.CephUser)
+	normalized.CephKeyFile = strings.TrimSpace(normalized.CephKeyFile)
+
+	// Ceph マップのキーと値をトリミング
+	if normalized.CephCrushRuleByClass == nil {
+		normalized.CephCrushRuleByClass = make(map[string]string)
+	} else {
+		normalized.CephCrushRuleByClass = trimMapStringString(normalized.CephCrushRuleByClass)
+	}
+	if normalized.CephPoolByClass == nil {
+		normalized.CephPoolByClass = make(map[string]string)
+	} else {
+		normalized.CephPoolByClass = trimMapStringString(normalized.CephPoolByClass)
+	}
+
 	return normalized
 }
 
@@ -333,6 +388,21 @@ func trimNonEmptyStrings(values []string) []string {
 	return trimmed
 }
 
+func trimMapStringString(m map[string]string) map[string]string {
+	if len(m) == 0 {
+		return m
+	}
+	trimmed := make(map[string]string)
+	for k, v := range m {
+		k = strings.TrimSpace(k)
+		v = strings.TrimSpace(v)
+		if k != "" && v != "" {
+			trimmed[k] = v
+		}
+	}
+	return trimmed
+}
+
 func (c *MarmotdConfig) ImageCreateFromVMTimeout() time.Duration {
 	return time.Duration(c.ImageCreateFromVMTimeoutSeconds) * time.Second
 }
@@ -395,5 +465,38 @@ func LoadConfig(path string) (*MarmotdConfig, error) {
 		return nil, err
 	}
 
-	return normalizeConfig(cfg), nil
+	normalized := normalizeConfig(cfg)
+	if err := validateCephConfig(normalized); err != nil {
+		return nil, err
+	}
+	return normalized, nil
+}
+
+// validateCephConfig は ceph_enabled=true の場合に必須項目を検証します。
+func validateCephConfig(cfg *MarmotdConfig) error {
+	if !cfg.CephEnabled {
+		return nil
+	}
+	if len(cfg.CephMonitors) == 0 {
+		return fmt.Errorf("ceph_monitors: ceph_enabled=true の場合、最低1つ必須です")
+	}
+	if cfg.CephKeyFile == "" {
+		return fmt.Errorf("ceph_key_file: ceph_enabled=true の場合、必須です")
+	}
+	fi, err := os.Stat(cfg.CephKeyFile)
+	if err != nil {
+		return fmt.Errorf("ceph_key_file: %w", err)
+	}
+	if fi.IsDir() {
+		return fmt.Errorf("ceph_key_file: ディレクトリは指定できません")
+	}
+	if !fi.Mode().IsRegular() {
+		return fmt.Errorf("ceph_key_file: 通常ファイルを指定してください")
+	}
+	f, err := os.Open(cfg.CephKeyFile)
+	if err != nil {
+		return fmt.Errorf("ceph_key_file: %w", err)
+	}
+	_ = f.Close()
+	return nil
 }
