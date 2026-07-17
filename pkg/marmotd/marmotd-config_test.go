@@ -128,6 +128,33 @@ var _ = Describe("VolumeGroupConfig", func() {
 			Expect(err.Error()).To(ContainSubstring("ceph_monitors"))
 		})
 
+		It("ceph_enabled=true かつ ceph_key_file 未指定の場合はエラーになる", func() {
+			dir := GinkgoT().TempDir()
+			path := filepath.Join(dir, "marmotd.json")
+			content := []byte(`{"ceph_enabled":true,"ceph_monitors":["10.1.4.11:6789"]}`)
+
+			err := os.WriteFile(path, content, 0o644)
+			Expect(err).NotTo(HaveOccurred())
+
+			_, err = marmotd.LoadConfig(path)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("ceph_key_file"))
+		})
+
+		It("ceph_key_file にディレクトリを指定した場合はエラーになる", func() {
+			dir := GinkgoT().TempDir()
+			keyDir := GinkgoT().TempDir()
+			path := filepath.Join(dir, "marmotd.json")
+			content := []byte(`{"ceph_enabled":true,"ceph_monitors":["10.1.4.11:6789"],"ceph_key_file":"` + keyDir + `"}`)
+
+			err := os.WriteFile(path, content, 0o644)
+			Expect(err).NotTo(HaveOccurred())
+
+			_, err = marmotd.LoadConfig(path)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("ceph_key_file"))
+		})
+
 		It("ceph_enabled が未指定の場合は false (既定値)", func() {
 			dir := GinkgoT().TempDir()
 			path := filepath.Join(dir, "marmotd.json")
