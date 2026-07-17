@@ -483,17 +483,20 @@ func validateCephConfig(cfg *MarmotdConfig) error {
 	if cfg.CephKeyFile == "" {
 		return fmt.Errorf("ceph_key_file: ceph_enabled=true の場合、必須です")
 	}
-	f, err := os.Open(cfg.CephKeyFile)
-	if err != nil {
-		return fmt.Errorf("ceph_key_file: %w", err)
-	}
-	defer func() { _ = f.Close() }()
-	fi, err := f.Stat()
+	fi, err := os.Stat(cfg.CephKeyFile)
 	if err != nil {
 		return fmt.Errorf("ceph_key_file: %w", err)
 	}
 	if fi.IsDir() {
 		return fmt.Errorf("ceph_key_file: ディレクトリは指定できません")
 	}
+	if !fi.Mode().IsRegular() {
+		return fmt.Errorf("ceph_key_file: 通常ファイルを指定してください")
+	}
+	f, err := os.Open(cfg.CephKeyFile)
+	if err != nil {
+		return fmt.Errorf("ceph_key_file: %w", err)
+	}
+	_ = f.Close()
 	return nil
 }
