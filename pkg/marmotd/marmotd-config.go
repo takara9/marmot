@@ -488,5 +488,12 @@ func validateCephConfig(cfg *MarmotdConfig) error {
 		return fmt.Errorf("ceph_key_file: %w", err)
 	}
 	defer func() { _ = f.Close() }()
+	fi, err := f.Stat()
+	if err != nil {
+		return fmt.Errorf("ceph_key_file: %w", err)
+	}
+	if fi.IsDir() {
+		return fmt.Errorf("ceph_key_file: ディレクトリは指定できません")
+	}
 	return nil
 }
