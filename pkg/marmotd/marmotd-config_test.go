@@ -123,9 +123,9 @@ var _ = Describe("VolumeGroupConfig", func() {
 			err := os.WriteFile(path, content, 0o644)
 			Expect(err).NotTo(HaveOccurred())
 
-			cfg, err := marmotd.LoadConfig(path)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(cfg.CephEnabled).To(BeTrue())
+			_, err = marmotd.LoadConfig(path)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("ceph_monitors"))
 		})
 
 		It("ceph_enabled が未指定の場合は false (既定値)", func() {
@@ -218,17 +218,21 @@ var _ = Describe("VolumeGroupConfig", func() {
 
 		It("Ceph 全パラメーターを一度に読み込む", func() {
 			dir := GinkgoT().TempDir()
+			keyFile := filepath.Join(dir, "marmot.client.key")
+			err := os.WriteFile(keyFile, []byte("dummykey"), 0o600)
+			Expect(err).NotTo(HaveOccurred())
+
 			path := filepath.Join(dir, "marmotd.json")
 			content := []byte(`{
 				"ceph_enabled": true,
 				"ceph_monitors": ["10.1.4.11:6789", "10.1.4.12:6789"],
 				"ceph_user": "client.marmot",
-				"ceph_key_file": "/etc/ceph/marmot.client.key",
+				"ceph_key_file": "` + keyFile + `",
 				"ceph_crush_rule_by_class": {"hdd": "rule-hdd", "ssd": "rule-ssd"},
 				"ceph_pool_by_class": {"hdd": "marmot-hdd", "ssd": "marmot-ssd"}
 			}`)
 
-			err := os.WriteFile(path, content, 0o644)
+			err = os.WriteFile(path, content, 0o644)
 			Expect(err).NotTo(HaveOccurred())
 
 			cfg, err := marmotd.LoadConfig(path)
@@ -236,7 +240,7 @@ var _ = Describe("VolumeGroupConfig", func() {
 			Expect(cfg.CephEnabled).To(BeTrue())
 			Expect(cfg.CephMonitors).To(Equal([]string{"10.1.4.11:6789", "10.1.4.12:6789"}))
 			Expect(cfg.CephUser).To(Equal("client.marmot"))
-			Expect(cfg.CephKeyFile).To(Equal("/etc/ceph/marmot.client.key"))
+			Expect(cfg.CephKeyFile).To(Equal(keyFile))
 			Expect(cfg.CephCrushRuleByClass).To(Equal(map[string]string{"hdd": "rule-hdd", "ssd": "rule-ssd"}))
 			Expect(cfg.CephPoolByClass).To(Equal(map[string]string{"hdd": "marmot-hdd", "ssd": "marmot-ssd"}))
 		})

@@ -2,6 +2,7 @@ package marmotd
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"os"
 	"sort"
@@ -464,5 +465,28 @@ func LoadConfig(path string) (*MarmotdConfig, error) {
 		return nil, err
 	}
 
-	return normalizeConfig(cfg), nil
+	normalized := normalizeConfig(cfg)
+	if err := validateCephConfig(normalized); err != nil {
+		return nil, err
+	}
+	return normalized, nil
+}
+
+// validateCephConfig は ceph_enabled=true の場合に必須項目を検証します。
+func validateCephConfig(cfg *MarmotdConfig) error {
+	if !cfg.CephEnabled {
+		return nil
+	}
+	if len(cfg.CephMonitors) == 0 {
+		return fmt.Errorf("ceph_monitors: ceph_enabled=true の場合、最低1つ必須です")
+	}
+	if cfg.CephKeyFile == "" {
+		return fmt.Errorf("ceph_key_file: ceph_enabled=true の場合、必須です")
+	}
+	f, err := os.Open(cfg.CephKeyFile)
+	if err != nil {
+		return fmt.Errorf("ceph_key_file: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+	return nil
 }
