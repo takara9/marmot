@@ -494,13 +494,21 @@ type Servers = []Server
 
 // Status defines model for Status.
 type Status struct {
+	// AttachProtocol Attach protocol used by backend, e.g. rbd for ceph.
+	AttachProtocol      *string    `json:"attachProtocol,omitempty" yaml:"attachProtocol,omitempty"`
 	Console             *string    `json:"console,omitempty" yaml:"console,omitempty"`
 	CreationTimeStamp   *time.Time `json:"creationTimeStamp,omitempty" yaml:"creationTimeStamp,omitempty"`
 	DeletionTimeStamp   *time.Time `json:"deletionTimeStamp,omitempty" yaml:"deletionTimeStamp,omitempty"`
 	LastUpdateTimeStamp *time.Time `json:"lastUpdateTimeStamp,omitempty" yaml:"lastUpdateTimeStamp,omitempty"`
 	Message             *string    `json:"message,omitempty" yaml:"message,omitempty"`
-	Status              *string    `json:"status,omitempty" yaml:"status,omitempty"`
-	StatusCode          int        `json:"statusCode" yaml:"statusCode"`
+
+	// Provider Backend provider identifier, e.g. ceph.
+	Provider *string `json:"provider,omitempty" yaml:"provider,omitempty"`
+
+	// ProviderVolumeId Backend volume identifier, e.g. <pool>/<image> for ceph.
+	ProviderVolumeId *string `json:"providerVolumeId,omitempty" yaml:"providerVolumeId,omitempty"`
+	Status           *string `json:"status,omitempty" yaml:"status,omitempty"`
+	StatusCode       int     `json:"statusCode" yaml:"statusCode"`
 }
 
 // Success defines model for Success.
@@ -602,9 +610,13 @@ type VolSpec struct {
 	Path           *string `json:"path,omitempty" yaml:"path,omitempty"`
 	Persistent     *bool   `json:"persistent,omitempty" yaml:"persistent,omitempty"`
 	Size           *int    `json:"size,omitempty" yaml:"size,omitempty"`
-	StorageClass   *string `json:"storageClass,omitempty" yaml:"storageClass,omitempty"`
-	Type           *string `json:"type,omitempty" yaml:"type,omitempty"`
-	VolumeGroup    *string `json:"volumeGroup,omitempty" yaml:"volumeGroup,omitempty"`
+
+	// StorageClass Storage classification key. Used for ceph pool selection.
+	StorageClass *string `json:"storageClass,omitempty" yaml:"storageClass,omitempty"`
+
+	// Type Volume backend type. Supports qcow2, lvm, ceph.
+	Type        *string `json:"type,omitempty" yaml:"type,omitempty"`
+	VolumeGroup *string `json:"volumeGroup,omitempty" yaml:"volumeGroup,omitempty"`
 }
 
 // Volume defines model for Volume.
