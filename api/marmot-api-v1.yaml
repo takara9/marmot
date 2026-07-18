@@ -1852,6 +1852,7 @@ components:
       properties:
         apiVersion:
           type: string
+          description: This resource must remain compatible with both JSON API payloads and YAML manifests. Keep generated Go models dual-tagged for json and yaml.
         kind:
           type: string          
         metadata:
@@ -1865,8 +1866,10 @@ components:
       properties:
         type:
           type: string
+          description: Volume backend type. Supports qcow2, lvm, ceph.
         storageClass:
           type: string
+          description: Storage classification key. Used for ceph pool selection.
         kind:
           type: string
         iscsi:
@@ -1968,6 +1971,7 @@ components:
       properties:
         apiVersion:
           type: string
+          description: This resource must remain compatible with both JSON API payloads and YAML manifests. Keep generated Go models dual-tagged for json and yaml.
         kind:
           type: string
         metadata:
@@ -1997,6 +2001,15 @@ components:
           format: date-time
         message:
           type: string
+        provider:
+          type: string
+          description: Backend provider identifier, e.g. ceph.
+        providerVolumeId:
+          type: string
+          description: Backend volume identifier, e.g. `{pool}/{image}` for ceph.
+        attachProtocol:
+          type: string
+          description: Attach protocol used by backend, e.g. rbd for ceph.
         console:
           type: string
     Metadata:
