@@ -1132,11 +1132,25 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 
 				var server api.Server
 				err = json.Unmarshal(stdoutStderr, &server)
-				Expect(err).NotTo(HaveOccurred())
+				g.Expect(err).NotTo(HaveOccurred())
 				GinkgoWriter.Printf("  - %s (%s)\n", server.Metadata.Name, api.ServerID(server))
-				g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_RUNNING)))
+				g.Expect(server.Status.StatusCode).To(BeElementOf(int(db.SERVER_RUNNING), int(db.SERVER_ERROR)))
 				expectServerBootVolumeNodeName(g, server)
 			}, 120*time.Second, 5*time.Second).Should(Succeed())
+
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "detail", serverId_1, "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+
+			var server api.Server
+			err = json.Unmarshal(stdoutStderr, &server)
+			Expect(err).NotTo(HaveOccurred())
+
+			message := ""
+			if server.Status.Message != nil {
+				message = *server.Status.Message
+			}
+			Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_RUNNING)), "server %s entered non-running state: code=%d, message=%s", serverId_1, server.Status.StatusCode, message)
 		})
 
 		It("仮想サーバーの削除 test-08", func() {
