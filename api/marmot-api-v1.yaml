@@ -2004,7 +2004,7 @@ components:
           description: Backend provider identifier, e.g. ceph.
         providerVolumeId:
           type: string
-          description: Backend volume identifier, e.g. <pool>/<image> for ceph.
+          description: Backend volume identifier, e.g. `{pool}/{image}` for ceph.
         attachProtocol:
           type: string
           description: Attach protocol used by backend, e.g. rbd for ceph.
