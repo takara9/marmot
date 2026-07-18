@@ -459,6 +459,7 @@ type Route struct {
 
 // Server defines model for Server.
 type Server struct {
+	// ApiVersion This resource must remain compatible with both JSON API payloads and YAML manifests. Keep generated Go models dual-tagged for json and yaml.
 	ApiVersion string     `json:"apiVersion" yaml:"apiVersion"`
 	Kind       string     `json:"kind" yaml:"kind"`
 	Metadata   Metadata   `json:"metadata" yaml:"metadata"`
@@ -621,6 +622,7 @@ type VolSpec struct {
 
 // Volume defines model for Volume.
 type Volume struct {
+	// ApiVersion This resource must remain compatible with both JSON API payloads and YAML manifests. Keep generated Go models dual-tagged for json and yaml.
 	ApiVersion string   `json:"apiVersion" yaml:"apiVersion"`
 	Kind       string   `json:"kind" yaml:"kind"`
 	Metadata   Metadata `json:"metadata" yaml:"metadata"`

@@ -1852,6 +1852,7 @@ components:
       properties:
         apiVersion:
           type: string
+          description: This resource must remain compatible with both JSON API payloads and YAML manifests. Keep generated Go models dual-tagged for json and yaml.
         kind:
           type: string          
         metadata:
@@ -1970,6 +1971,7 @@ components:
       properties:
         apiVersion:
           type: string
+          description: This resource must remain compatible with both JSON API payloads and YAML manifests. Keep generated Go models dual-tagged for json and yaml.
         kind:
           type: string
         metadata:
