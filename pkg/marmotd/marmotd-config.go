@@ -50,6 +50,11 @@ type HostBridgeDefaultConfig struct {
 	Routes      []HostBridgeRouteConfig      `json:"routes"`
 }
 
+type cephPoolByClassEntry struct {
+	StorageClass string `json:"storageClass"`
+	Pool         string `json:"pool"`
+}
+
 // MarmotdConfig は /etc/marmot/marmotd.json で設定可能なパラメータを保持します。
 type MarmotdConfig struct {
 	// ハイパーバイザーのノード名
@@ -170,9 +175,47 @@ type MarmotdConfig struct {
 	CephCrushRuleByClass map[string]string `json:"ceph_crush_rule_by_class"`
 
 	// storageClass から Ceph pool への対応マップ。
-	// キーは storageClass (hdd, ssd, nvme など)、値は pool 名。
-	// 例: {"hdd": "marmot-hdd", "ssd": "marmot-ssd", "nvme": "marmot-nvme"}
+	// marmotd.json では配列形式で指定する:
+	// 例: [{"storageClass":"hdd","pool":"marmot-hdd"},{"storageClass":"ssd","pool":"marmot-ssd"}]
+	// 旧 map 形式はサポートしない。
 	CephPoolByClass map[string]string `json:"ceph_pool_by_class"`
+}
+
+func (c *MarmotdConfig) UnmarshalJSON(data []byte) error {
+	type alias MarmotdConfig
+	aux := struct {
+		*alias
+		CephPoolByClass json.RawMessage `json:"ceph_pool_by_class"`
+	}{
+		alias: (*alias)(c),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	raw := strings.TrimSpace(string(aux.CephPoolByClass))
+	if raw == "" || raw == "null" {
+		return nil
+	}
+
+	var entries []cephPoolByClassEntry
+	if err := json.Unmarshal(aux.CephPoolByClass, &entries); err != nil {
+		return fmt.Errorf("ceph_pool_by_class: must be an array of objects with storageClass and pool")
+	}
+
+	parsed := make(map[string]string, len(entries))
+	for _, entry := range entries {
+		storageClass := strings.TrimSpace(entry.StorageClass)
+		pool := strings.TrimSpace(entry.Pool)
+		if storageClass == "" || pool == "" {
+			continue
+		}
+		parsed[storageClass] = pool
+	}
+	c.CephPoolByClass = parsed
+
+	return nil
 }
 
 var runtimeConfigState = struct {
