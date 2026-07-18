@@ -195,12 +195,16 @@ var _ = Describe("VolumeGroupConfig", func() {
 			Expect(cfg.CephKeyFile).To(Equal("/etc/ceph/marmot.client.key"))
 		})
 
-		It("Ceph CRUSH rule と pool のマップを読み込む", func() {
+		It("Ceph CRUSH rule と pool の設定を読み込む", func() {
 			dir := GinkgoT().TempDir()
 			path := filepath.Join(dir, "marmotd.json")
 			content := []byte(`{
 				"ceph_crush_rule_by_class": {"hdd":"rule-hdd","ssd":"rule-ssd"},
-				"ceph_pool_by_class": {"hdd":"marmot-hdd","ssd":"marmot-ssd","nvme":"marmot-nvme"}
+				"ceph_pool_by_class": [
+					{"storageClass":"hdd","pool":"marmot-hdd"},
+					{"storageClass":"ssd","pool":"marmot-ssd"},
+					{"storageClass":"nvme","pool":"marmot-nvme"}
+				]
 			}`)
 
 			err := os.WriteFile(path, content, 0o644)
@@ -212,11 +216,16 @@ var _ = Describe("VolumeGroupConfig", func() {
 			Expect(cfg.CephPoolByClass).To(Equal(map[string]string{"hdd": "marmot-hdd", "ssd": "marmot-ssd", "nvme": "marmot-nvme"}))
 		})
 
-		It("Ceph マップの空キーと空値は除外される", func() {
+		It("Ceph pool 設定の空キーと空値は除外される", func() {
 			dir := GinkgoT().TempDir()
 			path := filepath.Join(dir, "marmotd.json")
 			content := []byte(`{
-				"ceph_pool_by_class": {" hdd ":"marmot-hdd","ssd":" ","":"should-be-excluded"," ":"also-excluded"}
+				"ceph_pool_by_class": [
+					{"storageClass":" hdd ","pool":"marmot-hdd"},
+					{"storageClass":"ssd","pool":" "},
+					{"storageClass":"","pool":"should-be-excluded"},
+					{"storageClass":" ","pool":"also-excluded"}
+				]
 			}`)
 
 			err := os.WriteFile(path, content, 0o644)
@@ -225,6 +234,21 @@ var _ = Describe("VolumeGroupConfig", func() {
 			cfg, err := marmotd.LoadConfig(path)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(cfg.CephPoolByClass).To(Equal(map[string]string{"hdd": "marmot-hdd"}))
+		})
+
+		It("Ceph pool 設定に旧 map 形式を指定した場合はエラーになる", func() {
+			dir := GinkgoT().TempDir()
+			path := filepath.Join(dir, "marmotd.json")
+			content := []byte(`{
+				"ceph_pool_by_class": {"hdd":"marmot-hdd"}
+			}`)
+
+			err := os.WriteFile(path, content, 0o644)
+			Expect(err).NotTo(HaveOccurred())
+
+			_, err = marmotd.LoadConfig(path)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("ceph_pool_by_class"))
 		})
 
 		It("Ceph マップが未指定の場合は空マップになる", func() {
@@ -256,7 +280,10 @@ var _ = Describe("VolumeGroupConfig", func() {
 				"ceph_user": "client.marmot",
 				"ceph_key_file": "` + keyFile + `",
 				"ceph_crush_rule_by_class": {"hdd": "rule-hdd", "ssd": "rule-ssd"},
-				"ceph_pool_by_class": {"hdd": "marmot-hdd", "ssd": "marmot-ssd"}
+				"ceph_pool_by_class": [
+					{"storageClass":"hdd","pool":"marmot-hdd"},
+					{"storageClass":"ssd","pool":"marmot-ssd"}
+				]
 			}`)
 
 			err = os.WriteFile(path, content, 0o644)
