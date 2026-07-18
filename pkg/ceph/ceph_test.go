@@ -133,6 +133,19 @@ var _ = Describe("Ceph", func() {
 			Expect(req.ProviderVolumeID()).To(Equal("marmot-ssd/vol-abcde"))
 		})
 
+		It("defaults ceph size and storage class when omitted", func() {
+			cfg := defaultConfigWithCleanup()
+			volume := api.Volume{Spec: api.VolSpec{Type: ptr("ceph")}}
+			api.SetVolumeID(&volume, "abcde")
+
+			req, err := ceph.MapVolumeToRequest(volume, cfg)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(req.Pool).To(Equal("marmot-ssd"))
+			Expect(req.SizeGB).To(Equal(1))
+			Expect(req.StorageClass).To(Equal("ssd"))
+		})
+
 		It("rejects unsupported storage classes", func() {
 			cfg := defaultConfigWithCleanup()
 			volume := api.Volume{Spec: api.VolSpec{Type: ptr("ceph"), Size: intPtr(1), StorageClass: ptr("sas")}}

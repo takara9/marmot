@@ -3,6 +3,7 @@ package virt
 import (
 	"fmt"
 	"log/slog"
+	"net"
 	"os/exec"
 	"strings"
 	"time"
@@ -26,6 +27,9 @@ type DiskSpec struct {
 	Src            string
 	Bus            uint
 	Type           string
+	CephMonitors   []string
+	CephUser       string
+	CephSecretUUID string
 	ISCSITarget    string
 	ISCSIHost      string
 	ISCSIPort      string
@@ -192,6 +196,38 @@ func CreateDomainXML(vs ServerSpec) *libvirtxml.Domain {
 					},
 					Initiator: &libvirtxml.DomainDiskSourceNetworkInitiator{
 						IQN: &libvirtxml.DomainDiskSourceNetworkIQN{Name: d.ISCSIInitiator},
+					},
+				},
+			}
+			dom.Devices.Disks = append(dom.Devices.Disks, disk)
+
+		case "rbd":
+			disk.Driver.Type = "raw"
+			hosts := make([]libvirtxml.DomainDiskSourceHost, 0, len(d.CephMonitors))
+			for _, monitor := range d.CephMonitors {
+				monitor = strings.TrimSpace(monitor)
+				if monitor == "" {
+					continue
+				}
+				hostName := monitor
+				port := ""
+				if h, p, err := net.SplitHostPort(monitor); err == nil {
+					hostName = h
+					port = p
+				}
+				hosts = append(hosts, libvirtxml.DomainDiskSourceHost{Name: hostName, Port: port})
+			}
+			disk.Source = &libvirtxml.DomainDiskSource{
+				Network: &libvirtxml.DomainDiskSourceNetwork{
+					Protocol: "rbd",
+					Name:     d.Src,
+					Hosts:    hosts,
+					Auth: &libvirtxml.DomainDiskAuth{
+						Username: d.CephUser,
+						Secret: &libvirtxml.DomainDiskSecret{
+							Type: "ceph",
+							UUID: d.CephSecretUUID,
+						},
 					},
 				},
 			}

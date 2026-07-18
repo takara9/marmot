@@ -126,6 +126,9 @@ type MarmotdConfig struct {
 	// イメージ削除処理のタイムアウト秒数
 	ImageDeleteTimeoutSeconds int `json:"image_delete_timeout_seconds"`
 
+	// Ceph ボリューム作成・削除処理のタイムアウト秒数
+	CephVolumeOperationTimeoutSeconds int `json:"ceph_volume_operation_timeout_seconds"`
+
 	// このホストが iSCSI ターゲットサーバーを担当するかどうか
 	// true の場合、このホストの volumeコントローラーが iSCSI ターゲットを管理する。
 	// false（省略時）の場合、クラスタ内で HostId が最小のホストが自動的に担当する。
@@ -249,6 +252,7 @@ func defaultConfig() *MarmotdConfig {
 		ImageDownloadTimeoutSeconds:      1800,
 		ImageResizeTimeoutSeconds:        600,
 		ImageDeleteTimeoutSeconds:        120,
+		CephVolumeOperationTimeoutSeconds: 120,
 		LokiPushURL:                      "",
 		TLSCertFile:                      "",
 		TLSKeyFile:                       "",
@@ -338,6 +342,9 @@ func normalizeConfig(cfg *MarmotdConfig) *MarmotdConfig {
 	}
 	if normalized.ImageDeleteTimeoutSeconds <= 0 {
 		normalized.ImageDeleteTimeoutSeconds = defaults.ImageDeleteTimeoutSeconds
+	}
+	if normalized.CephVolumeOperationTimeoutSeconds <= 0 {
+		normalized.CephVolumeOperationTimeoutSeconds = defaults.CephVolumeOperationTimeoutSeconds
 	}
 	normalized.LokiPushURL = strings.TrimSpace(normalized.LokiPushURL)
 	normalized.TLSCertFile = strings.TrimSpace(normalized.TLSCertFile)
@@ -464,6 +471,10 @@ func (c *MarmotdConfig) ImageResizeTimeout() time.Duration {
 
 func (c *MarmotdConfig) ImageDeleteTimeout() time.Duration {
 	return time.Duration(c.ImageDeleteTimeoutSeconds) * time.Second
+}
+
+func (c *MarmotdConfig) CephVolumeOperationTimeout() time.Duration {
+	return time.Duration(c.CephVolumeOperationTimeoutSeconds) * time.Second
 }
 
 func SetRuntimeConfig(cfg *MarmotdConfig) {

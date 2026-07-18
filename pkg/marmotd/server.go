@@ -82,8 +82,19 @@ func normalizeNewStorageVolumeRequest(disk api.Volume, index int) (api.Volume, e
 		volType = "qcow2"
 	}
 
-	if volType != "qcow2" && volType != "lvm" {
-		return api.Volume{}, fmt.Errorf("storage[%d].spec.type must be qcow2 or lvm", index)
+	if volType != "qcow2" && volType != "lvm" && volType != "ceph" {
+		return api.Volume{}, fmt.Errorf("storage[%d].spec.type must be qcow2, lvm, or ceph", index)
+	}
+	if volType == "ceph" {
+		if disk.Spec.Kind == nil || strings.TrimSpace(*disk.Spec.Kind) == "" {
+			disk.Spec.Kind = util.StringPtr("data")
+		}
+		if disk.Spec.Size == nil {
+			disk.Spec.Size = util.IntPtrInt(1)
+		}
+		if disk.Spec.StorageClass == nil || strings.TrimSpace(*disk.Spec.StorageClass) == "" {
+			disk.Spec.StorageClass = util.StringPtr("ssd")
+		}
 	}
 
 	if volumeKindOrDefault(disk.Spec) == "data" && (disk.Spec.Size == nil || *disk.Spec.Size <= 0) {
@@ -141,7 +152,6 @@ func (m *Marmot) findPreCreatedStorageVolume(disk api.Volume) (*api.Volume, erro
 		}
 		return vol, nil
 	}
-
 	name := strings.TrimSpace(disk.Metadata.Name)
 	if name == "" {
 		return nil, nil
@@ -166,6 +176,9 @@ func nodeNameFromResolvedVolumes(vols []*api.Volume) (string, error) {
 		}
 
 		// iSCSI ターゲット IQN がセットされているボリュームは配置制約の対象外。
+		if isCephVolume(*vol) {
+			continue
+		}
 		if vol.Spec.IscsiTargetIqn != nil && strings.TrimSpace(*vol.Spec.IscsiTargetIqn) != "" {
 			continue
 		}
@@ -982,6 +995,12 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 					ds.Type = "raw"
 				}
 				virtSpec.DiskSpecs = append(virtSpec.DiskSpecs, ds)
+			case *disk.Spec.Type == "ceph":
+				ds, err := buildCephDiskSpec(disk, api.ServerID(serverConfig), fmt.Sprintf("vd%c", 'b'+i), uint(11+i))
+				if err != nil {
+					return "", err
+				}
+				virtSpec.DiskSpecs = append(virtSpec.DiskSpecs, ds)
 			}
 		}
 	}
@@ -1030,6 +1049,15 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	}
 	defer l.Close()
 
+	cephSecretPrepared := false
+	if hasCephStorage(serverConfig.Spec.Storage) {
+		if err := prepareCephSecretForServer(l, api.ServerID(serverConfig)); err != nil {
+			slog.Error("prepareCephSecretForServer()", "err", err)
+			return "", err
+		}
+		cephSecretPrepared = true
+	}
+
 	slog.Debug("仮想マシンの定義と起動")
 
 	consolePath, err := l.DefineAndStartVM(*dom)
@@ -1073,6 +1101,11 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		}
 	}
 	if err != nil {
+		if cephSecretPrepared {
+			if cleanupErr := removeCephSecretForServer(l, api.ServerID(serverConfig)); cleanupErr != nil {
+				slog.Warn("removeCephSecretForServer() after failed DefineAndStartVM", "err", cleanupErr)
+			}
+		}
 		slog.Error("DefineAndStartVM()", "err", err) // ここで No such file or directory エラーになる
 		return "", err
 	}
@@ -1695,6 +1728,11 @@ func (m *Marmot) DeleteServerByIdManage(id string) error {
 			//}
 			slog.Debug("DeleteServerById()", "server is in PROVISIONING state, skipping domain deletion", serverName)
 			// return nil 戻さず、削除処理を続行する
+		}
+		if hasCephStorage(sv.Spec.Storage) {
+			if err := removeCephSecretForServer(l, id); err != nil {
+				slog.Warn("removeCephSecretForServer()", "err", err, "serverId", id)
+			}
 		}
 	}
 

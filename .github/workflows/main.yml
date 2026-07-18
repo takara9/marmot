@@ -207,6 +207,7 @@ jobs:
       run: |
         cd pkg/marmotd
         sudo -E env "PATH=$PATH" make test-volume
+        sudo -E env "PATH=$PATH" make test-ceph
         cd ../..
 
   package-marmotd-server:

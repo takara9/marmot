@@ -29,51 +29,55 @@ download-image:
 
 .PHONY: test
 test:
-	$(GO) test . -run TestMarmotd -v -race -count=1 -timeout 20m -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+	$(GO) test . -run '^TestMarmotd$$' -v -race -count=1 -timeout 20m -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
 .PHONY: test-volume
 test-volume:
-	$(GO) test -run TestMarmotd -ginkgo.focus-file volume_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+	$(GO) test -run '^TestMarmotd$$' -ginkgo.focus-file volume_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+
+.PHONY: test-ceph
+test-ceph:
+	$(GO) test -run '^TestMarmotdCeph$$' -ginkgo.focus-file 'ceph_.*_test.go' -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
 .PHONY: test-server
 test-server:
-	$(GO) test -run TestMarmotd -ginkgo.focus-file server_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+	$(GO) test -run '^TestMarmotd$$' -ginkgo.focus-file server_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
 .PHONY: test-vnet
 test-vnet:
-	$(GO) test -run TestMarmotd -ginkgo.focus-file network_vnet_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+	$(GO) test -run '^TestMarmotd$$' -ginkgo.focus-file network_vnet_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
 .PHONY: test-ipnet
 test-ipnet:
-	$(GO) test -run TestMarmotd -ginkgo.focus-file network_ipnet_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+	$(GO) test -run '^TestMarmotd$$' -ginkgo.focus-file network_ipnet_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
 .PHONY: test-server-image
 test-server-image:
-	$(GO) test -run TestMarmotd -ginkgo.focus-file server-image_test.go -timeout 60m -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+	$(GO) test -run '^TestMarmotd$$' -ginkgo.focus-file server-image_test.go -timeout 60m -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
 .PHONY: test-osimage
 test-osimage:
-	$(GO) test -run TestMarmotd -ginkgo.focus-file osimage_test.go -timeout 60m -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+	$(GO) test -run '^TestMarmotd$$' -ginkgo.focus-file osimage_test.go -timeout 60m -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
 .PHONY: test-cloud-init
 test-cloud-init:
-	$(GO) test -run TestMarmotd -ginkgo.focus-file cloud-init_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+	$(GO) test -run '^TestMarmotd$$' -ginkgo.focus-file cloud-init_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
 .PHONY: test-timeout
 test-timeout:
-	$(GO) test -run TestMarmotd -ginkgo.focus-file image-timeout_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+	$(GO) test -run '^TestMarmotd$$' -ginkgo.focus-file image-timeout_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
 .PHONY: test-backing-store
 test-backing-store:
-	$(GO) test -run TestMarmotd -ginkgo.focus-file image_backing_store_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+	$(GO) test -run '^TestMarmotd$$' -ginkgo.focus-file image_backing_store_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
 .PHONY: test-config
 test-config:
-	$(GO) test -run TestMarmotd -ginkgo.focus-file marmotd-config_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+	$(GO) test -run '^TestMarmotd$$' -ginkgo.focus-file marmotd-config_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
 .PHONY: test-volume-backing-store
 test-volume-backing-store:
-	$(GO) test -run TestMarmotd -ginkgo.focus-file volume_backing_store_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+	$(GO) test -run '^TestMarmotd$$' -ginkgo.focus-file volume_backing_store_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
 
 .PHONY: test-hostid-internal
 test-hostid-internal:

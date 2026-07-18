@@ -162,6 +162,38 @@ var _ = Describe("VirtualServers", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
+		It("Ceph RBD ディスクのXMLを生成する", func() {
+			secretUUID := uuid.New().String()
+			vs := virt.ServerSpec{
+				UUID:      uuid.New().String(),
+				Name:      "vm-ceph",
+				RAM:       1024 * 1024,
+				CountVCPU: 1,
+				Machine:   "pc-q35-4.2",
+				DiskSpecs: []virt.DiskSpec{
+					{
+						Dev:            "vdb",
+						Bus:            11,
+						Type:           "rbd",
+						Src:            "marmot-ssd/vol-abcde",
+						CephMonitors:   []string{"10.1.4.11:6789", "10.1.4.12:6789"},
+						CephUser:       "client.marmot",
+						CephSecretUUID: secretUUID,
+					},
+				},
+			}
+
+			dom := virt.CreateDomainXML(vs)
+			xml, err := dom.Marshal()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(xml).To(ContainSubstring("protocol=\"rbd\""))
+			Expect(xml).To(ContainSubstring("marmot-ssd/vol-abcde"))
+			Expect(xml).To(ContainSubstring("10.1.4.11"))
+			Expect(xml).To(ContainSubstring("10.1.4.12"))
+			Expect(xml).To(ContainSubstring("client.marmot"))
+			Expect(xml).To(ContainSubstring(secretUUID))
+		})
+
 		It("時間待ち", func() {
 			time.Sleep(3 * time.Second)
 		})

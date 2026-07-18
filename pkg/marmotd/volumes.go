@@ -3,6 +3,7 @@ package marmotd
 // ボリュームの情報管理の関数群
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/ceph"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/lvm"
 	"github.com/takara9/marmot/pkg/qcow"
@@ -310,6 +312,10 @@ func (m *Marmot) waitForVolumeAvailable(volumeID string) (api.Volume, error) {
 	}
 }
 
+func newCephVolumeOperationContext() (context.Context, context.CancelFunc) {
+	return newTimeoutContext(context.Background(), CurrentConfig().CephVolumeOperationTimeout())
+}
+
 func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 	volSpec, err := m.Db.GetVolumeById(id)
 	if err != nil {
@@ -481,6 +487,65 @@ func (m *Marmot) CreateNewVolume(id string) (*api.Volume, error) {
 			m.Db.UpdateVolumeStatusMessage(volumeID, db.VOLUME_ERROR, "unsupported volume kind")
 			return nil, errors.New("unsupported volume kind")
 		}
+	case "ceph":
+		if volSpec.Spec.Kind != nil && strings.TrimSpace(*volSpec.Spec.Kind) != "" && !strings.EqualFold(strings.TrimSpace(*volSpec.Spec.Kind), "data") {
+			err := errors.New("ceph volume kind must be data")
+			m.Db.UpdateVolumeStatusMessage(volumeID, db.VOLUME_ERROR, err.Error())
+			return nil, err
+		}
+
+		cfg := runtimeCephConfig()
+		if !CurrentConfig().CephEnabled {
+			err := errors.New("ceph is disabled")
+			m.Db.UpdateVolumeStatusMessage(volumeID, db.VOLUME_ERROR, err.Error())
+			return nil, err
+		}
+
+		client, err := newCephVolumeClient(cfg)
+		if err != nil {
+			m.Db.UpdateVolumeStatusMessage(volumeID, db.VOLUME_ERROR, err.Error())
+			return nil, err
+		}
+		defer func() {
+			if cleanupErr := client.Cleanup(); cleanupErr != nil {
+				slog.Warn("ceph client cleanup failed", "err", cleanupErr, "volume", volumeID)
+			}
+		}()
+
+		req, err := ceph.MapVolumeToRequest(volSpec, cfg)
+		if err != nil {
+			m.Db.UpdateVolumeStatusMessage(volumeID, db.VOLUME_ERROR, err.Error())
+			return nil, err
+		}
+
+		timeout := CurrentConfig().CephVolumeOperationTimeout()
+		ctx, cancel := newCephVolumeOperationContext()
+		defer cancel()
+		if err := client.CreateVolume(ctx, req); err != nil {
+			err = wrapDeadlineExceeded(err, "Ceph ボリューム作成", timeout)
+			slog.Error("ceph.CreateVolume()", "err", err, "volume", volumeID)
+			m.Db.UpdateVolumeStatusMessage(volumeID, db.VOLUME_ERROR, err.Error())
+			return nil, err
+		}
+
+		volSpec.Spec.Size = util.IntPtrInt(req.SizeGB)
+		volSpec.Spec.StorageClass = util.StringPtr(req.StorageClass)
+		if volSpec.Status == nil {
+			volSpec.Status = &api.Status{}
+		}
+		volSpec.Status.Provider = util.StringPtr("ceph")
+		volSpec.Status.ProviderVolumeId = util.StringPtr(req.ProviderVolumeID())
+		volSpec.Status.AttachProtocol = util.StringPtr("rbd")
+		volSpec.Status.Message = nil
+		volSpec.Status.StatusCode = db.VOLUME_AVAILABLE
+		volSpec.Status.Status = util.StringPtr(db.VolStatus[db.VOLUME_AVAILABLE])
+		volSpec.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+		if err := m.Db.UpdateVolume(volumeID, volSpec); err != nil {
+			m.Db.UpdateVolumeStatusMessage(volumeID, db.VOLUME_ERROR, err.Error())
+			return nil, err
+		}
+		slog.Debug("Cephボリュームの情報更新 成功", "volId", volumeID, "providerVolumeId", req.ProviderVolumeID())
+		return &volSpec, nil
 	case "raw":
 		m.Db.UpdateVolumeStatusMessage(volumeID, db.VOLUME_ERROR, "unsupported volume type: raw")
 		return nil, errors.New("unsupported volume type")
@@ -498,10 +563,13 @@ func (m *Marmot) RemoveVolume(id string) error {
 		return err
 	}
 
-	slog.Debug("RemoveVolume()", "volId", id, "volType", *vol.Spec.Type, "volKind", *vol.Spec.Kind)
+	volType := strings.TrimSpace(util.OrDefault(vol.Spec.Type, ""))
+	volKind := strings.TrimSpace(util.OrDefault(vol.Spec.Kind, ""))
+	slog.Debug("RemoveVolume()", "volId", id, "volType", volType, "volKind", volKind)
 
 	// LV と qcow2ファイルの判断
-	if *vol.Spec.Type == "lvm" {
+	switch volType {
+	case "lvm":
 		slog.Debug("Removing Logical volume", "id", id)
 
 		// 物理的なボリュームの削除
@@ -514,7 +582,34 @@ func (m *Marmot) RemoveVolume(id string) error {
 				// そのため、論理ボリュームを削除する前に、仮想マシンからデタッチする必要があります。
 			}
 		}
-	} else if *vol.Spec.Type == "qcow2" {
+	case "ceph":
+		cfg := runtimeCephConfig()
+		if !CurrentConfig().CephEnabled {
+			return fmt.Errorf("ceph is disabled")
+		}
+		client, err := newCephVolumeClient(cfg)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if cleanupErr := client.Cleanup(); cleanupErr != nil {
+				slog.Warn("ceph client cleanup failed", "err", cleanupErr, "volume", id)
+			}
+		}()
+
+		pool, image, err := resolveCephDeleteTarget(vol, cfg)
+		if err != nil {
+			return err
+		}
+		timeout := CurrentConfig().CephVolumeOperationTimeout()
+		ctx, cancel := newCephVolumeOperationContext()
+		defer cancel()
+		if err := client.DeleteVolume(ctx, pool, image); err != nil {
+			err = wrapDeadlineExceeded(err, "Ceph ボリューム削除", timeout)
+			slog.Error("ceph.DeleteVolume()", "err", err, "pool", pool, "image", image)
+			return err
+		}
+	case "qcow2":
 		// qcow2ファイルの削除
 		if vol.Spec.Path != nil {
 			// 物理的なボリュームの削除
@@ -522,7 +617,7 @@ func (m *Marmot) RemoveVolume(id string) error {
 				slog.Error("qcow.RemoveQcow()", "err", err)
 			}
 		}
-	} else {
+	default:
 		// 未知のタイプの場合データベースからのみ削除する
 		slog.Error("Unknown volume type", "id", id)
 	}
