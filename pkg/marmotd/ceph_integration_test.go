@@ -1,7 +1,13 @@
 package marmotd
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -21,7 +27,7 @@ var _ = Describe("Ceph integration helpers", Ordered, func() {
 		keyFile, err := os.CreateTemp("", "marmot-ceph-key-*.key")
 		Expect(err).NotTo(HaveOccurred())
 		keyFilePath = keyFile.Name()
-		_, err = keyFile.WriteString("[client.marmot]\n\tkey = dGVzdA==\n")
+		_, err = keyFile.WriteString("[client.ubuntu]\n\tkey = AQCAD1dq4k4jARAAq7ckh5t6aouhEGokyef0Fg==\n")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(keyFile.Close()).To(Succeed())
 
@@ -29,8 +35,8 @@ var _ = Describe("Ceph integration helpers", Ordered, func() {
 			NodeName:     "hv1",
 			EtcdURL:      "http://127.0.0.1:2379",
 			CephEnabled:  true,
-			CephMonitors: []string{"10.1.4.11:6789", "10.1.4.12:6789"},
-			CephUser:     "client.marmot",
+			CephMonitors: []string{"10.1.3.11:6789"},
+			CephUser:     "client.ubuntu",
 			CephKeyFile:  keyFilePath,
 			CephPoolByClass: map[string]string{
 				"ssd": "marmot-ssd",
@@ -59,8 +65,8 @@ var _ = Describe("Ceph integration helpers", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(disk.Type).To(Equal("rbd"))
 		Expect(disk.Src).To(Equal("marmot-ssd/vol-abcde"))
-		Expect(disk.CephUser).To(Equal("client.marmot"))
-		Expect(disk.CephMonitors).To(ContainElements("10.1.4.11:6789", "10.1.4.12:6789"))
+		Expect(disk.CephUser).To(Equal("client.ubuntu"))
+		Expect(disk.CephMonitors).To(ContainElements("10.1.3.11:6789"))
 		Expect(disk.CephSecretUUID).To(Equal(cephSecretUUIDForServer("server-123")))
 	})
 
@@ -177,5 +183,50 @@ var _ = Describe("Ceph integration helpers", Ordered, func() {
 		err := prepareCephSecretForServer(nil, "\t")
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("server id is required"))
+	})
+
+	It("optionally verifies ceph volume create/delete via mactl command", func() {
+		if strings.TrimSpace(os.Getenv("MARMOT_CEPH_MACTL_SMOKE")) != "1" {
+			Skip("set MARMOT_CEPH_MACTL_SMOKE=1 to enable")
+		}
+
+		apiConfig := strings.TrimSpace(os.Getenv("MARMOT_MACTL_API_CONFIG"))
+		if apiConfig == "" {
+			Skip("set MARMOT_MACTL_API_CONFIG to a logged-in mactl api config file")
+		}
+
+		storageClass := strings.TrimSpace(os.Getenv("MARMOT_CEPH_STORAGE_CLASS"))
+		if storageClass == "" {
+			storageClass = "ssd"
+		}
+
+		tempDir := GinkgoT().TempDir()
+		mactlBin := filepath.Join(tempDir, "mactl-smoke")
+		buildCmd := exec.Command("go", "build", "-o", mactlBin, "../../cmd/mactl")
+		buildOut, buildErr := buildCmd.CombinedOutput()
+		Expect(buildErr).NotTo(HaveOccurred(), "build mactl failed: %s", string(buildOut))
+
+		volumeName := fmt.Sprintf("ceph-smoke-%d", time.Now().UnixNano())
+		volumeYAML := filepath.Join(tempDir, "ceph-volume.yaml")
+		yamlContent := fmt.Sprintf("apiVersion: v1\nkind: Volume\nmetadata:\n  name: %s\nspec:\n  kind: data\n  type: ceph\n  size: 1\n  storageClass: %s\n", volumeName, storageClass)
+		Expect(os.WriteFile(volumeYAML, []byte(yamlContent), 0o600)).To(Succeed())
+
+		createCmd := exec.Command(mactlBin, "--api", apiConfig, "volume", "create", "-f", volumeYAML, "--output", "json")
+		createOut, createErr := createCmd.CombinedOutput()
+		Expect(createErr).NotTo(HaveOccurred(), "mactl volume create failed: %s", string(createOut))
+
+		var created api.Volume
+		Expect(json.Unmarshal(createOut, &created)).To(Succeed(), "unexpected create output: %s", string(createOut))
+		Expect(created.Spec.Type).NotTo(BeNil())
+		Expect(strings.ToLower(strings.TrimSpace(*created.Spec.Type))).To(Equal("ceph"))
+
+		createdID := api.VolumeID(created)
+		Expect(strings.TrimSpace(createdID)).NotTo(BeEmpty())
+
+		DeferCleanup(func() {
+			deleteCmd := exec.Command(mactlBin, "--api", apiConfig, "volume", "delete", createdID, "--output", "json")
+			deleteOut, deleteErr := deleteCmd.CombinedOutput()
+			Expect(deleteErr).NotTo(HaveOccurred(), "mactl volume delete failed: %s", string(deleteOut))
+		})
 	})
 })
