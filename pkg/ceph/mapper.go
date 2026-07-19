@@ -14,14 +14,21 @@ func MapVolumeToRequest(volume api.Volume, cfg Config) (VolumeRequest, error) {
 	if volume.Spec.Kind != nil && !strings.EqualFold(strings.TrimSpace(*volume.Spec.Kind), "data") {
 		return VolumeRequest{}, fmt.Errorf("ceph volume kind must be data in phase 1")
 	}
-	if volume.Spec.Size == nil || *volume.Spec.Size < 1 {
-		return VolumeRequest{}, fmt.Errorf("ceph volume size must be at least 1GB")
-	}
 	if api.VolumeID(volume) == "" {
 		return VolumeRequest{}, fmt.Errorf("volume id is required")
 	}
 
+	sizeGB := 1
+	if volume.Spec.Size != nil {
+ 		if *volume.Spec.Size < 1 {
+ 			return VolumeRequest{}, fmt.Errorf("ceph volume size must be at least 1GB")
+ 		}
+ 		sizeGB = *volume.Spec.Size
+ 	}
 	storageClass := normalizeStorageClass(ptrString(volume.Spec.StorageClass))
+	if storageClass == "" {
+		storageClass = "ssd"
+	}
 	if err := ValidateStorageClass(storageClass); err != nil {
 		return VolumeRequest{}, err
 	}
@@ -33,7 +40,7 @@ func MapVolumeToRequest(volume api.Volume, cfg Config) (VolumeRequest, error) {
 	return VolumeRequest{
 		Pool:         pool,
 		Image:        imageNameFromVolumeID(api.VolumeID(volume)),
-		SizeGB:       *volume.Spec.Size,
+		SizeGB:       sizeGB,
 		StorageClass: storageClass,
 	}, nil
 }

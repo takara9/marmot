@@ -45,3 +45,7 @@ func (f *FakeClient) ListVolumes(ctx context.Context, pool string) ([]string, er
 	}
 	return []string{}, nil
 }
+
+func (f *FakeClient) Cleanup() error {
+	return nil
+}
