@@ -102,6 +102,22 @@ var _ = Describe("Ceph integration helpers", Ordered, func() {
 		Expect(err.Error()).To(ContainSubstring("ceph monitors are required"))
 	})
 
+	It("rejects empty server id when building ceph disk spec", func() {
+		volume := api.Volume{
+			Spec: api.VolSpec{
+				Type:         util.StringPtr("ceph"),
+				Kind:         util.StringPtr("data"),
+				Size:         util.IntPtrInt(1),
+				StorageClass: util.StringPtr("ssd"),
+			},
+		}
+		api.SetVolumeID(&volume, "abcde")
+
+		_, err := buildCephDiskSpec(volume, "   ", "vdb", 11)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("server id is required"))
+	})
+
 	It("marks ceph storage as node-independent", func() {
 		storage := []api.Volume{
 			{
@@ -155,5 +171,11 @@ var _ = Describe("Ceph integration helpers", Ordered, func() {
 		Expect(removeCephSecretForServer(l, serverID)).To(Succeed())
 		_, err = l.Com.LookupSecretByUUIDString(secretUUID)
 		Expect(err).To(HaveOccurred())
+	})
+
+	It("rejects empty server id when preparing ceph secret", func() {
+		err := prepareCephSecretForServer(nil, "\t")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("server id is required"))
 	})
 })
