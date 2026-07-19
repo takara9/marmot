@@ -47,6 +47,14 @@ func cephSecretUUIDForServer(serverID string) string {
 	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(seed)).String()
 }
 
+func normalizeCephServerID(serverID string) (string, error) {
+	trimmed := strings.TrimSpace(serverID)
+	if trimmed == "" {
+		return "", fmt.Errorf("server id is required")
+	}
+	return trimmed, nil
+}
+
 func isCephVolume(volume api.Volume) bool {
 	return volume.Spec.Type != nil && strings.EqualFold(strings.TrimSpace(*volume.Spec.Type), "ceph")
 }
@@ -75,6 +83,10 @@ func buildCephDiskSpec(volume api.Volume, serverID string, dev string, bus uint)
 	if !CurrentConfig().CephEnabled {
 		return virt.DiskSpec{}, fmt.Errorf("ceph is disabled")
 	}
+	resolvedServerID, err := normalizeCephServerID(serverID)
+	if err != nil {
+		return virt.DiskSpec{}, err
+	}
 	if len(cfg.Monitors) == 0 {
 		return virt.DiskSpec{}, fmt.Errorf("ceph monitors are required")
 	}
@@ -99,7 +111,7 @@ func buildCephDiskSpec(volume api.Volume, serverID string, dev string, bus uint)
 		return virt.DiskSpec{}, fmt.Errorf("ceph monitors are required")
 	}
 
-	secretUUID := cephSecretUUIDForServer(serverID)
+	secretUUID := cephSecretUUIDForServer(resolvedServerID)
 	return virt.DiskSpec{
 		Dev:            dev,
 		Bus:            bus,
@@ -130,16 +142,20 @@ func resolveCephDeleteTarget(volume api.Volume, cfg ceph.Config) (pool, image st
 	return req.Pool, req.Image, nil
 }
 
-func cephSecretSpecForServer(serverID string) libvirtxml.Secret {
-	secretUUID := cephSecretUUIDForServer(serverID)
-	usageName := "marmot-ceph-" + strings.TrimSpace(serverID)
+func cephSecretSpecForServer(serverID string) (libvirtxml.Secret, error) {
+	resolvedServerID, err := normalizeCephServerID(serverID)
+	if err != nil {
+		return libvirtxml.Secret{}, err
+	}
+	secretUUID := cephSecretUUIDForServer(resolvedServerID)
+	usageName := "marmot-ceph-" + resolvedServerID
 	return libvirtxml.Secret{
 		UUID: secretUUID,
 		Usage: &libvirtxml.SecretUsage{
 			Type: "ceph",
 			Name: usageName,
 		},
-	}
+	}, nil
 }
 
 func hasCephStorage(storage *[]api.Volume) bool {
@@ -159,18 +175,29 @@ func prepareCephSecretForServer(l *virt.LibVirtEp, serverID string) error {
 	if !cfg.CephEnabled {
 		return nil
 	}
+	if _, err := normalizeCephServerID(serverID); err != nil {
+		return err
+	}
 	if l == nil {
 		return fmt.Errorf("libvirt endpoint is nil")
 	}
 	if strings.TrimSpace(cfg.CephKeyFile) == "" {
 		return fmt.Errorf("ceph key file is required")
 	}
-	return l.EnsureCephSecret(cephSecretSpecForServer(serverID), cfg.CephKeyFile)
+	secretSpec, err := cephSecretSpecForServer(serverID)
+	if err != nil {
+		return err
+	}
+	return l.EnsureCephSecret(secretSpec, cfg.CephKeyFile)
 }
 
 func removeCephSecretForServer(l *virt.LibVirtEp, serverID string) error {
 	if l == nil {
 		return nil
 	}
-	return l.RemoveCephSecretByUUID(cephSecretUUIDForServer(serverID))
+	resolvedServerID, err := normalizeCephServerID(serverID)
+	if err != nil {
+		return err
+	}
+	return l.RemoveCephSecretByUUID(cephSecretUUIDForServer(resolvedServerID))
 }
