@@ -29,12 +29,12 @@ var _ = Describe("Ceph volume backed VM lifecycle", Ordered, func() {
 	BeforeAll(func(specCtx SpecContext) {
 		cephMonitor := strings.TrimSpace(os.Getenv("CEPH_IPADDR"))
 		if cephMonitor == "" {
-			Skip("set CEPH_IPADDR and CEPH_POOL_KEY to enable the Ceph lifecycle smoke test")
+			Skip("set CEPH_IPADDR to enable the Ceph lifecycle smoke test")
 		}
 
 		cephKey := strings.TrimSpace(os.Getenv("CEPH_POOL_KEY"))
 		if cephKey == "" {
-			Skip("set CEPH_IPADDR and CEPH_POOL_KEY to enable the Ceph lifecycle smoke test")
+			Skip("set CEPH_POOL_KEY to enable the Ceph lifecycle smoke test")
 		}
 
 		opts := &slog.HandlerOptions{AddSource: true}
