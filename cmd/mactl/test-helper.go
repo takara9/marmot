@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -104,9 +105,18 @@ func startMockServer(etcdEp string, configPath string) (*mockServerHandle, error
 	}
 
 	nodeName := "hvc"
+	resolvedConfigPath, err := resolvePathForMockServer(configPath)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	if err := prepareCephConfigEnvForMockServer(resolvedConfigPath); err != nil {
+		cancel()
+		return nil, err
+	}
 	cfg := marmotd.CurrentConfig()
 	if strings.TrimSpace(configPath) != "" {
-		loadedCfg, err := marmotd.LoadConfig(configPath)
+		loadedCfg, err := marmotd.LoadConfig(resolvedConfigPath)
 		if err != nil {
 			cancel()
 			return nil, fmt.Errorf("failed to load marmotd config: %w", err)
@@ -252,6 +262,74 @@ func startMockServer(etcdEp string, configPath string) (*mockServerHandle, error
 	}
 
 	return h, nil
+}
+
+func prepareCephConfigEnvForMockServer(configPath string) error {
+	cephConfPath, err := resolveMockServerCephPathFromConfigDir(configPath, "ceph.conf")
+	if err != nil {
+		return err
+	}
+	if err := os.Setenv("MARMOT_CEPH_CONF_FILE", cephConfPath); err != nil {
+		return fmt.Errorf("failed to set MARMOT_CEPH_CONF_FILE: %w", err)
+	}
+
+	cephKeyringPath, err := resolveMockServerCephPathFromConfigDir(configPath, "ceph.client.admin.keyring")
+	if err != nil {
+		return err
+	}
+	if err := os.Setenv("MARMOT_CEPH_KEYRING_FILE", cephKeyringPath); err != nil {
+		return fmt.Errorf("failed to set MARMOT_CEPH_KEYRING_FILE: %w", err)
+	}
+
+	return nil
+}
+
+func resolveMockServerCephPathFromConfigDir(configPath, filename string) (string, error) {
+	baseDir := strings.TrimSpace(filepath.Dir(configPath))
+	if baseDir == "" || baseDir == "." {
+		return "", fmt.Errorf("mock server ceph %s path resolve failed: invalid config path %q", filename, configPath)
+	}
+
+	candidate := filepath.Join(baseDir, filename)
+	if _, err := os.Stat(candidate); err != nil {
+		return "", fmt.Errorf("mock server ceph %s not found: %s", filename, candidate)
+	}
+
+	resolved, err := filepath.Abs(candidate)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve %s: %w", candidate, err)
+	}
+	return resolved, nil
+}
+
+func resolvePathForMockServer(path string) (string, error) {
+	trimmed := strings.TrimSpace(path)
+	if trimmed == "" {
+		return "", nil
+	}
+	if filepath.IsAbs(trimmed) {
+		return trimmed, nil
+	}
+
+	candidates := []string{
+		trimmed,
+		filepath.Join("cmd", "mactl", trimmed),
+	}
+	for _, c := range candidates {
+		if _, err := os.Stat(c); err == nil {
+			resolved, err := filepath.Abs(c)
+			if err != nil {
+				return "", fmt.Errorf("failed to resolve absolute path for %s: %w", c, err)
+			}
+			return resolved, nil
+		}
+	}
+
+	resolved, err := filepath.Abs(trimmed)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve config path %s: %w", trimmed, err)
+	}
+	return resolved, nil
 }
 
 func (h *mockServerHandle) Stop() {

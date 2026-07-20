@@ -15,6 +15,24 @@ import (
 	"github.com/takara9/marmot/pkg/util"
 )
 
+func normalizeIncomingVolumeSpecForCompatibility(volume *api.Volume) {
+	if volume == nil {
+		return
+	}
+	if volume.Spec.Type != nil && strings.EqualFold(strings.TrimSpace(*volume.Spec.Type), "iscsi") {
+		volume.Spec.Type = util.StringPtr("lvm")
+		volume.Spec.Iscsi = util.BoolPtr(true)
+	}
+	if volume.Spec.Iscsi != nil && *volume.Spec.Iscsi {
+		if volume.Spec.Type == nil || strings.TrimSpace(*volume.Spec.Type) == "" {
+			volume.Spec.Type = util.StringPtr("lvm")
+		}
+		if volume.Spec.Kind == nil || strings.TrimSpace(*volume.Spec.Kind) == "" {
+			volume.Spec.Kind = util.StringPtr("data")
+		}
+	}
+}
+
 func isISCSIDataLVMVolume(volume *api.Volume) bool {
 	if volume == nil {
 		return false
@@ -71,7 +89,7 @@ func (s *Server) ApiCreateVolume(ctx echo.Context) error {
 		slog.Error("ApiCreateVolume()", "err", err, "volume", string(volumeString), "err2", err2)
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-	util.NormalizeVolumeSpecISCSIAlias(&volume.Spec)
+	normalizeIncomingVolumeSpecForCompatibility(&volume)
 	assignedNode := resolveVolumeCreationNode(s.Ma, &volume)
 	assignNodeNameIfUnset(&volume.Metadata, assignedNode)
 

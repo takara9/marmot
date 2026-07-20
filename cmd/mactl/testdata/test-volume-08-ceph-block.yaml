@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Volume
+metadata:
+    name: vol-08
+spec:
+    type: ceph
+    storageClass: ssd
+    size: 1
+    persistent: true

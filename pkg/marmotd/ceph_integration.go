@@ -35,9 +35,8 @@ func runtimeCephConfig() ceph.Config {
 		poolByClass[class] = pool
 	}
 	return ceph.Config{
-		Monitors:    append([]string(nil), cfg.CephMonitors...),
-		User:        cfg.CephUser,
-		KeyFile:     cfg.CephKeyFile,
+		ConfFile:    effectiveCephConfPath(),
+		KeyringFile: effectiveCephKeyringPath(),
 		PoolByClass: poolByClass,
 	}
 }
@@ -87,28 +86,15 @@ func buildCephDiskSpec(volume api.Volume, serverID string, dev string, bus uint)
 	if err != nil {
 		return virt.DiskSpec{}, err
 	}
-	if len(cfg.Monitors) == 0 {
-		return virt.DiskSpec{}, fmt.Errorf("ceph monitors are required")
-	}
-	if strings.TrimSpace(cfg.User) == "" {
-		return virt.DiskSpec{}, fmt.Errorf("ceph user is required")
+
+	monitors, user, err := ceph.ParseConnectionFromConf(cfg.ConfFile, cfg.KeyringFile)
+	if err != nil {
+		return virt.DiskSpec{}, err
 	}
 
 	providerVolumeID, err := resolveCephProviderVolumeIDForAttach(volume, cfg)
 	if err != nil {
 		return virt.DiskSpec{}, err
-	}
-
-	monitors := make([]string, 0, len(cfg.Monitors))
-	for _, monitor := range cfg.Monitors {
-		monitor = strings.TrimSpace(monitor)
-		if monitor == "" {
-			continue
-		}
-		monitors = append(monitors, monitor)
-	}
-	if len(monitors) == 0 {
-		return virt.DiskSpec{}, fmt.Errorf("ceph monitors are required")
 	}
 
 	secretUUID := cephSecretUUIDForServer(resolvedServerID)
@@ -118,7 +104,7 @@ func buildCephDiskSpec(volume api.Volume, serverID string, dev string, bus uint)
 		Type:           "rbd",
 		Src:            providerVolumeID,
 		CephMonitors:   monitors,
-		CephUser:       cfg.User,
+		CephUser:       user,
 		CephSecretUUID: secretUUID,
 	}, nil
 }
@@ -135,11 +121,38 @@ func resolveCephDeleteTarget(volume api.Volume, cfg ceph.Config) (pool, image st
 		}
 	}
 
+	// Deletion should proceed even if storageClass is missing on errored ceph volumes.
+	if volume.Spec.StorageClass == nil || strings.TrimSpace(*volume.Spec.StorageClass) == "" {
+		image = "vol-" + strings.TrimSpace(api.VolumeID(volume))
+		if strings.TrimSpace(image) == "vol-" {
+			return "", "", fmt.Errorf("volume id is required")
+		}
+		pool, err = normalizeConfigForDelete(cfg).PoolForStorageClass("hdd")
+		if err != nil {
+			return "", "", err
+		}
+		return pool, image, nil
+	}
+
 	req, err := ceph.MapVolumeToRequest(volume, cfg)
 	if err != nil {
 		return "", "", err
 	}
 	return req.Pool, req.Image, nil
+}
+
+func normalizeConfigForDelete(cfg ceph.Config) ceph.Config {
+	normalized := cfg
+	if len(normalized.PoolByClass) == 0 {
+		normalized = ceph.DefaultConfig()
+	}
+	if _, ok := normalized.PoolByClass["hdd"]; !ok || strings.TrimSpace(normalized.PoolByClass["hdd"]) == "" {
+		if normalized.PoolByClass == nil {
+			normalized.PoolByClass = map[string]string{}
+		}
+		normalized.PoolByClass["hdd"] = ceph.DefaultConfig().PoolByClass["hdd"]
+	}
+	return normalized
 }
 
 func cephSecretSpecForServer(serverID string) (libvirtxml.Secret, error) {
@@ -171,24 +184,25 @@ func hasCephStorage(storage *[]api.Volume) bool {
 }
 
 func prepareCephSecretForServer(l *virt.LibVirtEp, serverID string) error {
-	cfg := CurrentConfig()
-	if !cfg.CephEnabled {
+	runtimeCfg := CurrentConfig()
+	if !runtimeCfg.CephEnabled {
 		return nil
 	}
+	cephCfg := runtimeCephConfig()
 	if _, err := normalizeCephServerID(serverID); err != nil {
 		return err
 	}
 	if l == nil {
 		return fmt.Errorf("libvirt endpoint is nil")
 	}
-	if strings.TrimSpace(cfg.CephKeyFile) == "" {
-		return fmt.Errorf("ceph key file is required")
+	if strings.TrimSpace(cephCfg.KeyringFile) == "" {
+		return fmt.Errorf("ceph keyring file is required")
 	}
 	secretSpec, err := cephSecretSpecForServer(serverID)
 	if err != nil {
 		return err
 	}
-	return l.EnsureCephSecret(secretSpec, cfg.CephKeyFile)
+	return l.EnsureCephSecret(secretSpec, cephCfg.KeyringFile)
 }
 
 func removeCephSecretForServer(l *virt.LibVirtEp, serverID string) error {

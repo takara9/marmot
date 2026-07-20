@@ -40,5 +40,20 @@
           "via": "192.168.1.1"
         }
       ]
+    },
+  "ceph_enabled": true,
+  "ceph_pool_by_class": [
+    {
+      "storageClass": "ssd",
+      "pool": "marmot-ssd"
+    },
+    {
+      "storageClass": "hdd",
+      "pool": "marmot-hdd"
+    },
+    {
+      "storageClass": "nvme",
+      "pool": "marmot-nvme"
     }
+  ]
 }

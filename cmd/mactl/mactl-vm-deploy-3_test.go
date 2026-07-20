@@ -828,5 +828,79 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 				g.Expect(len(servers)).To(Equal(0))
 			}, 120*time.Second, 5*time.Second).Should(Succeed())
 		})
+
+		It("CEPH VOLUMEを設定したサーバー作成 test-40", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "create", "--configfile", "testdata/test-server-40-ceph-block.yaml", "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Println(string(stdoutStderr))
+
+			var reply api.Success
+			err = json.Unmarshal(stdoutStderr, &reply)
+			Expect(err).NotTo(HaveOccurred())
+			serverId_1 = reply.Id
+		})
+
+		It("CEPH VOLUMEを設定した仮想サーバーの状態確認 test-40", func() {
+			Eventually(func(g Gomega) {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "detail", serverId_1, "--output", "json")
+				stdoutStderr, err := cmd.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+				fmt.Println(string(stdoutStderr))
+
+				var server api.Server
+				err = json.Unmarshal(stdoutStderr, &server)
+				Expect(err).NotTo(HaveOccurred())
+				g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_RUNNING)))
+			}, 120*time.Second, 5*time.Second).Should(Succeed())
+		})
+
+		It("CEPH VOLUMEを設定した仮想サーバーの削除 test-40", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "delete", serverId_1, "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Println(string(stdoutStderr))
+		})
+
+		It("CEPH VOLUMEを設定した仮想サーバーの削除状態確認 test-40", func() {
+			Eventually(func(g Gomega) {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "detail", serverId_1, "--output", "json")
+				stdoutStderr, err := cmd.CombinedOutput()
+				fmt.Println(string(stdoutStderr))
+
+				if err != nil {
+					// Accept not found as terminal state when deletion finishes before polling.
+					if strings.Contains(strings.ToLower(string(stdoutStderr)), "not found") {
+						return
+					}
+				}
+				Expect(err).NotTo(HaveOccurred())
+
+				var server api.Server
+				err = json.Unmarshal(stdoutStderr, &server)
+				Expect(err).NotTo(HaveOccurred())
+				g.Expect(server.Status.StatusCode).To(Equal(int(db.SERVER_DELETING)))
+			}, 120*time.Second, 5*time.Second).Should(Succeed())
+		})
+
+		It("CEPH VOLUMEを設定した仮想サーバーで削除を確認 test-40", func() {
+			By("仮想サーバーのリスト")
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "list", "--output", "text")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Println(string(stdoutStderr))
+
+			By("仮想サーバーのリスト JSON形式")
+			Eventually(func(g Gomega) {
+				cmd = exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "server", "list", "--output", "json")
+				stdoutStderr, err = cmd.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+				var servers []api.Server
+				err = json.Unmarshal(stdoutStderr, &servers)
+				Expect(err).NotTo(HaveOccurred())
+				g.Expect(len(servers)).To(Equal(0))
+			}, 120*time.Second, 5*time.Second).Should(Succeed())
+		})
+
 	})
 })

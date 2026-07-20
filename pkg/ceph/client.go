@@ -5,78 +5,25 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 )
 
-func defaultMonitorHost() string {
-	return strings.TrimSpace(os.Getenv("CEPH_IPADDR"))
+const (
+	DefaultCephConfFile    = "/etc/ceph/ceph.conf"
+	DefaultCephKeyringFile = "/etc/ceph/ceph.client.admin.keyring"
+)
+
+func defaultCephConfFile() string {
+	if path := strings.TrimSpace(os.Getenv("MARMOT_CEPH_CONF_FILE")); path != "" {
+		return path
+	}
+	return DefaultCephConfFile
 }
 
-type tempKeyring struct {
-	path string
-	once sync.Once
-}
-
-func (t *tempKeyring) Cleanup() error {
-	if t == nil || t.path == "" {
-		return nil
+func defaultCephKeyringFile() string {
+	if path := strings.TrimSpace(os.Getenv("MARMOT_CEPH_KEYRING_FILE")); path != "" {
+		return path
 	}
-
-	var err error
-	t.once.Do(func() {
-		err = os.Remove(t.path)
-		if err != nil && os.IsNotExist(err) {
-			err = nil
-		}
-	})
-	return err
-}
-
-func defaultCephAuth() (string, string, *tempKeyring) {
-	secret := strings.TrimSpace(os.Getenv("CEPH_POOL_KEY"))
-	if secret == "" {
-		return "", "", nil
-	}
-
-	user := parseKeyringUser(secret)
-	f, err := os.CreateTemp("", "marmot-ceph-pool-*.keyring")
-	if err != nil {
-		return user, "", nil
-	}
-	keyFile := f.Name()
-	if _, writeErr := f.WriteString(ensureTrailingNewline(secret)); writeErr != nil {
-		_ = f.Close()
-		_ = os.Remove(keyFile)
-		return user, "", nil
-	}
-	if closeErr := f.Close(); closeErr != nil {
-		_ = os.Remove(keyFile)
-		return user, "", nil
-	}
-	if chmodErr := os.Chmod(keyFile, 0o600); chmodErr != nil {
-		_ = os.Remove(keyFile)
-		return user, "", nil
-	}
-	return user, keyFile, &tempKeyring{path: keyFile}
-}
-
-func parseKeyringUser(secret string) string {
-	for _, line := range strings.Split(secret, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if !strings.HasPrefix(trimmed, "[") || !strings.HasSuffix(trimmed, "]") {
-			continue
-		}
-		section := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(trimmed, "["), "]"))
-		return strings.TrimPrefix(section, "client.")
-	}
-	return ""
-}
-
-func ensureTrailingNewline(value string) string {
-	if strings.HasSuffix(value, "\n") {
-		return value
-	}
-	return value + "\n"
+	return DefaultCephKeyringFile
 }
 
 var defaultPoolByClass = map[string]string{
@@ -93,11 +40,9 @@ type VolumeClient interface {
 }
 
 type Config struct {
-	Monitors    []string
-	User        string
-	KeyFile     string
+	ConfFile    string
+	KeyringFile string
 	PoolByClass map[string]string
-	cleanup     *tempKeyring
 }
 
 type Client struct {
@@ -106,27 +51,24 @@ type Client struct {
 }
 
 func DefaultConfig() Config {
-	user, keyFile, cleanup := defaultCephAuth()
 	return Config{
-		Monitors: []string{defaultMonitorHost()},
-		User:     user,
-		KeyFile:  keyFile,
+		ConfFile:    defaultCephConfFile(),
+		KeyringFile: defaultCephKeyringFile(),
 		PoolByClass: map[string]string{
 			"hdd":  defaultPoolByClass["hdd"],
 			"ssd":  defaultPoolByClass["ssd"],
 			"nvme": defaultPoolByClass["nvme"],
 		},
-		cleanup: cleanup,
 	}
 }
 
 func NewClient(cfg Config, runner Runner) (*Client, error) {
 	normalized := normalizeConfig(cfg)
-	if normalized.MonitorHosts() == "" {
-		return nil, fmt.Errorf("ceph monitors are required")
+	if strings.TrimSpace(normalized.ConfFile) == "" {
+		return nil, fmt.Errorf("ceph conf file is required")
 	}
-	if strings.TrimSpace(os.Getenv("CEPH_POOL_KEY")) != "" && strings.TrimSpace(normalized.KeyFile) == "" {
-		return nil, fmt.Errorf("failed to create keyring file from CEPH_POOL_KEY")
+	if strings.TrimSpace(normalized.KeyringFile) == "" {
+		return nil, fmt.Errorf("ceph keyring file is required")
 	}
 	if runner == nil {
 		runner = ExecRunner{}
@@ -135,10 +77,7 @@ func NewClient(cfg Config, runner Runner) (*Client, error) {
 }
 
 func (c Config) Cleanup() error {
-	if c.cleanup == nil {
-		return nil
-	}
-	return c.cleanup.Cleanup()
+	return nil
 }
 
 func (c *Client) Cleanup() error {
@@ -146,18 +85,6 @@ func (c *Client) Cleanup() error {
 		return nil
 	}
 	return c.cfg.Cleanup()
-}
-
-func (c Config) MonitorHosts() string {
-	monitors := make([]string, 0, len(c.Monitors))
-	for _, monitor := range c.Monitors {
-		trimmed := strings.TrimSpace(monitor)
-		if trimmed == "" {
-			continue
-		}
-		monitors = append(monitors, trimmed)
-	}
-	return strings.Join(monitors, ",")
 }
 
 func (c Config) PoolForStorageClass(storageClass string) (string, error) {
@@ -173,16 +100,11 @@ func (c Config) PoolForStorageClass(storageClass string) (string, error) {
 }
 
 func normalizeConfig(cfg Config) Config {
-	if len(cfg.Monitors) == 0 {
-		cfg.Monitors = []string{defaultMonitorHost()}
+	if strings.TrimSpace(cfg.ConfFile) == "" {
+		cfg.ConfFile = defaultCephConfFile()
 	}
-	if strings.TrimSpace(cfg.KeyFile) == "" {
-		user, keyFile, cleanup := defaultCephAuth()
-		if strings.TrimSpace(cfg.User) == "" {
-			cfg.User = user
-		}
-		cfg.KeyFile = keyFile
-		cfg.cleanup = cleanup
+	if strings.TrimSpace(cfg.KeyringFile) == "" {
+		cfg.KeyringFile = defaultCephKeyringFile()
 	}
 	if len(cfg.PoolByClass) == 0 {
 		cfg.PoolByClass = map[string]string{

@@ -446,6 +446,55 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println(string(stdoutStderr))
 		})
+
+		It("ボリュームの作成  ceph block storage 1G", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "volume", "create", "-f", "testdata/test-volume-08-ceph-block.yaml", "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+
+			var volume api.Volume
+			err = json.Unmarshal(stdoutStderr, &volume)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(volume.Metadata.Name).To(Equal("vol-08"))
+			Expect(*volume.Spec.Size).To(Equal(int(1)))
+			volumeID = api.VolumeID(volume)
+			fmt.Println("Volume ID:", volumeID)
+		})
+
+		It("ボリュームの個別詳細取得", func() {
+			Eventually(func(g Gomega) {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "volume", "detail", volumeID, "--output", "json")
+				stdoutStderr, err := cmd.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+				GinkgoWriter.Println(string(stdoutStderr))
+				var volume api.Volume
+				err = json.Unmarshal(stdoutStderr, &volume)
+				Expect(err).NotTo(HaveOccurred())
+				g.Expect(volume.Status.StatusCode).To(Equal(db.VOLUME_AVAILABLE))
+			}, 60*time.Second, 3*time.Second).Should(Succeed())
+		})
+
+		It("ボリュームの削除", func() {
+			cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "volume", "delete", volumeID, "--output", "json")
+			stdoutStderr, err := cmd.CombinedOutput()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println(string(stdoutStderr))
+
+			By("削除したボリュームの状態を確認")
+			Eventually(func(g Gomega) {
+				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "volume", "detail", volumeID, "--output", "json")
+				stdoutStderr, err := cmd.CombinedOutput()
+				Expect(err).NotTo(HaveOccurred())
+				var volume api.Volume
+				err = json.Unmarshal(stdoutStderr, &volume)
+				Expect(err).NotTo(HaveOccurred())
+				g.Expect(volume.Status.StatusCode).To(Equal(db.VOLUME_DELETING))
+			}, 60*time.Second, 3*time.Second).Should(Succeed())
+		})
+
+
 	})
 
 	Context("OSイメージの準備", func() {

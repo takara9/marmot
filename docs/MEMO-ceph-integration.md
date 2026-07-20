@@ -9,60 +9,83 @@ Marmot の Volume 管理を拡張し、Ceph RBD をバックエンドとして�
 - Ceph インストール自動化の完全実装は本設計の主目的ではない（必要最小限の手順提供にとどめる）。
 - 既存 LVM/qcow2 実装の置換は行わない。共存を前提とする。
 
+## 2.1 前提条件
+- Ceph CLI を利用するため、Marmot サーバー OS に ceph-common がインストールされていること。
+- Marmot サーバー OS 上で ceph コマンドおよび rbd コマンドが実行可能であること（例: ceph --version, rbd --version で確認）。
+
 ## 3. 責任分界点
 ### Marmot の責務
 - Volume API の受理、バリデーション、状態遷移管理。
 - Ceph CLI を通じた RBD の作成、削除、情報取得。
-- Ceph 接続情報の読み込み（marmotd.json）と、必要な識別子の DB 保存。
+- Ceph 接続先/認証情報の読み込み（/etc/ceph/ceph.conf, ceph.client.admin.keyring）と、必要な識別子の DB 保存。
 - VM アタッチに必要な接続情報の生成と引き渡し。
 
 ### Ceph 側の責務
 - OSD/MON/MGR クラスタ運用。
 - プール、CRUSH ルール、容量設計、耐障害性。
-- 認証ユーザー管理（最小権限の Ceph ユーザー発行）。
+- 認証ユーザー管理（Marmot が利用する管理者権限ユーザー/キーリングを事前作成・配布）。
 - storageClass に対応する pool / CRUSH ルールの事前作成。
 
 ## 3.1 インストーラーの関与境界
-- インストーラーは「Marmot が Ceph を利用できる状態の確認」までを責務とし、Ceph クラスタ自体の構築と運用には関与しない。
-- marmot 実行ノードへ ceph-common を導入する。
+インストーラーは「Marmot が Ceph を利用できる状態の確認」までを責務とし、
+Ceph クラスタ自体の構築と運用には関与しない。
 
-### Marmotの実施する事項
-- marmotd.json への Ceph 連携設定反映（ceph_enabled、接続先、認証情報、class→pool 対応）。
+### 必須関与（実施する）
+- marmotd.json への Ceph 連携設定反映（ceph_enabled、class→CRUSH rule/pool 対応）。
 - Ceph 連携の有効/無効の明示切り替え。
+- ceph_enabled=true の場合、Ceph CLI 主経路を前提に、marmot 実行ノードへ ceph-common を導入する。
 - ceph_enabled=true の場合、ceph コマンドと rbd コマンドの存在確認（例: ceph --version, rbd --version）を事前チェックする。
-- ceph_enabled=true の場合、ceph_key_file の存在、参照権限、読み取り可否を事前チェックする。
+- ceph_enabled=true の場合、/etc/ceph/ceph.conf と ceph.client.admin.keyring の存在、参照権限、読み取り可否を事前チェックする。
 - インストール時の接続検証:
   - MON 到達性
   - 認証可否
+  - ceph_crush_rule_by_class に定義された CRUSH rule の存在確認
   - ceph_pool_by_class に定義された pool の存在確認
 - 検証失敗時のエラーレポート（修正対象と次アクションを提示）。
 
-### Marmotが実施しない事項
+### 任意関与（オプション）
+- 検証/開発用途の単一ノード Ceph ブートストラップ補助。
+- ただし本体インストールフローと分離し、明示フラグ（例: --with-ceph-bootstrap）時のみ実行する。
+- パッケージ導入をスキップする明示フラグ（例: --skip-ceph-common-install）を提供してもよい。
+
+### 非関与（実施しない）
 - 本番向け Ceph クラスタ構築（OSD 配置、CRUSH、レプリカ設計）。
 - 容量計画、性能設計、障害対応運用。
 - Ceph 自体のアップグレードとライフサイクル管理。
 
+### MVP の既定動作
+- 既定は「Ceph 非関与 + 接続検証のみ」。
+- Ceph 未導入でも Marmot の通常インストールは完了できる。
+- Ceph 有効時に検証が失敗した場合は非0で終了し、原因と修正手順を表示する。
+
 ## 4. 導入方針（段階導入）
-### 本Phase: ボリューム管理 + サーバーアタッチ連携
+### Phase 1: ボリューム管理のみ
 - 対象: Volume の Create/Get/List/Delete。
+- サーバーアタッチは対象外。
+- 目的: Ceph 連携の接続性、永続化、異常系の安定化。
+
+### Phase 2: サーバーアタッチ連携
 - 対象: Server 作成時/更新時の Ceph Volume アタッチ。
-- 方針: iSCSI/LVM/QCOW2 と同様に、VM 作成時の libvirt XML に Ceph ディスク定義を含める。
-- 目的: Ceph 連携の接続性、永続化、異常系の安定化、および VM 起動パスへの統合。
+- 目的: VM 起動パスに Ceph バックエンドを統合。
+
+この順序により、既存 iSCSI 経路の改修を先行しなくても、まずは Ceph ボリューム管理の機能価値を早期に提供できる。
 
 ## 5. API 拡張方針
 既存の Volume Spec に対して、後方互換を維持しつつ最小拡張する。
 
-### 5.1 既存仕様
+### 5.1 既存仕様（現状）
 - type: qcow2 / lvm
 - kind: os / data
 - iscsi, iscsiTargetIqn など
-- size GB単位
 
-### 5.2 追加仕様
+### 5.2 追加仕様（案）
 - type に ceph を追加。
 - Ceph 連携で API から指定する追加フィールドは storageClass のみとする。
-- storageClass は、marmotd.json の ceph_pool_by_class[].storageClassに登録があれば受け付ける。
-- storageClass は Ceph の pool を選択する分類子として扱う。
+- storageClass は以下の値を受け付ける。
+  - hdd
+  - ssd
+  - nvme
+- storageClass は Ceph の CRUSH rule に対応する分類子として扱う。
 - API は Ceph の pool 名、image 名、cluster 名、feature 名を受け取らない。
 
 ### 5.3 API リクエスト例
@@ -80,39 +103,39 @@ spec:
 
 ### 5.4 バリデーション
 - type=ceph の場合:
-  - size 省略時は 1GBをセットする。
-  - storageClass 省略時は、ssd をセットする。
-  - /etc/marmot/marmotd.jsonのceph_pool_by_class[].storageClass に登録が無い場合はエラーとする。
-  - kind=os のときは、本Phaseでは拒否（将来フェーズで検討）、kind 省略時は、dataとする。
+  - size 必須（1GB 以上）
+  - storageClass 必須
+  - storageClass は hdd / ssd / nvme のいずれか
+  - kind=os のときは、Phase 1 では拒否（Phase 2 以降で検討）
 - type!=ceph の場合:
-  - storageClass は無視する。
-- type省略時は qcow2 をセットする。
+  - storageClass は無視または拒否（方針を統一する）
 
 ## 6. 設定設計（marmotd.json）
-Ceph 接続設定を追加し、未設定時は Ceph 機能を無効化する。
+Ceph 連携の有効化フラグと class マッピングを追加し、未設定時は Ceph 機能を無効化する。
+接続先/認証情報は marmotd.json ではなく、OS 標準の Ceph 設定ファイルを利用する。
 
 ```json
 {
   "ceph_enabled": true,
-  "ceph_monitors": ["10.1.4.11:6789", "10.1.4.12:6789", "10.1.4.13:6789"],
-  "ceph_user": "client.marmot",
-  "ceph_key_file": "/etc/marmot/ceph/client.key",
+  "ceph_crush_rule_by_class": {
+    "hdd": "rule-hdd",
+    "ssd": "rule-ssd",
+    "nvme": "rule-nvme"
+  },
   "ceph_pool_by_class": [
-    { "storageClass": "hdd", "pool": "marmot-hdd" },
-    { "storageClass": "ssd", "pool": "marmot-ssd" },
-    { "storageClass": "nvme", "pool": "marmot-nvme" }
+    {"storageClass": "hdd", "pool": "marmot-hdd"},
+    {"storageClass": "ssd", "pool": "marmot-ssd"},
+    {"storageClass": "nvme", "pool": "marmot-nvme"}
   ]
 }
 ```
 
 注意:
-- 生パスワードではなく Ceph ユーザーキーを利用する。
-- キー本体は設定ファイルに直接埋め込まず、ceph_key_file を libvirt secret 登録元ファイルとして扱う。
-- ceph_key_file の参照元は /etc/marmot/marmotd.json の設定値とし、実ファイルから鍵を取得する。
-- ceph_user / ceph_key_file は、Marmot が固定で利用する Ceph 認証情報と、その libvirt secret 登録元として扱う。
+- 認証情報は OS 標準の Ceph 設定ファイル（/etc/ceph/ceph.conf）とキーリング（ceph.client.admin.keyring）を利用する。
+- ceph.client.admin.keyring は初期ブートストラップ専用ではなく、通常運用時も継続して利用する。
 - 認証情報はログに出さない（マスク）。
 - Ceph 操作は REST ではなく Ceph CLI を利用する前提とする。
-- Ceph 側で pool を事前作成し、Marmot は ceph_pool_by_class の対応を参照して利用する。
+- Ceph 側で pool / CRUSH rule を事前作成し、Marmot は ceph_crush_rule_by_class / ceph_pool_by_class の対応を参照して利用する。
 
 ## 7. 内部データモデル
 Volume オブジェクトの spec/status に Ceph 情報を保持する。
@@ -123,7 +146,7 @@ Volume オブジェクトの spec/status に Ceph 情報を保持する。
 ### status（実測）
 - provider: "ceph"
 - providerVolumeId: "<pool>/<image>"
-- attachProtocol: "rbd"（本Phaseで利用）
+- attachProtocol: "rbd"（Phase 2 で利用）
 - message: エラー詳細
 
 ## 8. コンポーネント設計
@@ -144,66 +167,28 @@ Volume オブジェクトの spec/status に Ceph 情報を保持する。
 - Volume 削除フローに ceph 実体削除を追加。
 - コントローラーの状態遷移（PENDING -> PROVISIONING -> AVAILABLE/ERROR）は既存パターンに合わせる。
 
-### 8.2.1 VM 作成時の libvirt XML への Ceph 専用ディスク定義（本Phase）
-本Phaseでは、type=ceph の data volume をサーバーへアタッチする際、
-libvirt の domain XML に RBD 用の network disk 定義を追加する。
-
-想定する XML 要素:
-- disk type='network' device='disk'
-- driver name='qemu' type='raw'
-- source protocol='rbd' name='<pool>/<image>'
-- source host (monitor 一覧)
-- auth username='<ceph_user>'
-- secret type='ceph' usage='<libvirt secret usage>'
-- target dev='vdX' bus='virtio'
-
-XML 例:
-```xml
-<disk type='network' device='disk'>
-  <driver name='qemu' type='raw' cache='none' io='native'/>
-  <source protocol='rbd' name='marmot-ssd/vol-abcde'>
-    <host name='10.1.4.11' port='6789'/>
-    <host name='10.1.4.12' port='6789'/>
-    <host name='10.1.4.13' port='6789'/>
-  </source>
-  <auth username='client.marmot'>
-    <secret type='ceph' usage='marmot-ceph-client'/>
-  </auth>
-  <target dev='vdb' bus='virtio'/>
-</disk>
-```
-
-実装上の取り扱い:
-- source の name は status.providerVolumeId（<pool>/<image>）を利用する。
-- host は ceph_monitors を展開して複数指定できるようにする。
-- auth username は marmotd.json の ceph_user を使用する。
-- 認証キー本体は XML へ埋め込まず、libvirt secret 参照で渡す。
-- Ceph ディスク追加時も既存の vdX 採番規則と競合しないことを保証する。
-- XML 生成失敗時は Server 作成を中断し、status.message に原因を格納する。
-
 ### 8.3 Ceph 側の作成単位
-- storageClass に対応する pool の対応関係（marmotd.json の ceph_pool_by_class）を参照する。
-- Ceph 側で storageClass に対応する pool を事前に作成する。
-- ceph_user に対して、ceph_pool_by_class で利用する対象 pool 群へのアクセス権を1回でまとめて定義しておく。
+- storageClass に対応する CRUSH rule / pool の対応関係（marmotd.json の ceph_crush_rule_by_class / ceph_pool_by_class）を参照する。
+- Ceph 側で storageClass に対応する CRUSH rule と pool を事前に作成する。
 - Marmot は storageClass から既定の pool 名を決定し、その pool に対して Volume ID で一意な image を作成する。
 - image 名は Volume ID を基準にして衝突しない形で固定する。
 - その結果として得られる接続情報を用い、仮想サーバーからアタッチ可能にする。
 
-### 8.4 storageClass と pool の対応表
-Marmot は storageClass を Ceph の pool 選択に変換し、
-pool 名のひも付けは marmotd.json で設定可能とする。
+### 8.4 storageClass と CRUSH rule の対応表
+Marmot は storageClass を Ceph の配置方針に変換するだけにとどめ、
+実際の CRUSH rule 名と pool 名のひも付けは marmotd.json で設定可能とする。
 
-| storageClass | 想定するディスク種別 | pool 名の例 |
-| --- | --- | --- |
-| hdd | 回転ディスク | marmot-hdd |
-| ssd | SSD | marmot-ssd |
-| nvme | NVMe | marmot-nvme |
+| storageClass | 想定するディスク種別 | CRUSH rule の例 | pool 名の例 |
+| --- | --- | --- | --- |
+| hdd | 回転ディスク | rule-hdd | marmot-hdd |
+| ssd | SSD | rule-ssd | marmot-ssd |
+| nvme | NVMe | rule-nvme | marmot-nvme |
 
 運用上の注意:
-- storageClass の追加・変更は、Ceph 側の pool 準備を先に完了してから行う。
+- storageClass の追加・変更は、Ceph 側の CRUSH rule と pool の準備を先に完了してから行う。
 - Marmot 側では、未対応の storageClass を受理せずエラーにする。
-- pool 名は marmotd.json の ceph_pool_by_class で管理し、storageClass との対応関係自体は曖昧にしない。
-- Marmot は pool を新規作成しない。
+- CRUSH rule 名と pool 名は marmotd.json の ceph_crush_rule_by_class / ceph_pool_by_class で管理し、storageClass との対応関係自体は曖昧にしない。
+- Marmot は pool や CRUSH rule を新規作成しない。
 
 ## 9. 処理フロー
 ### 9.1 Create(type=ceph)
@@ -212,91 +197,39 @@ pool 名のひも付けは marmotd.json で設定可能とする。
 3. コントローラーが PROVISIONING へ更新。
 4. storageClass に対応する事前作成済み pool を選択する。
 5. Ceph CLI を用いて、Ceph に Volume ID ベースの RBD イメージを作成する。
-6. marmotd.json の ceph_user に、選択した pool へのアクセス権が付与されていることを利用する。
-7. Server 側のアタッチ処理で利用するため、ceph_key_file を参照可能な状態で保持する。
-8. 成功時に status.provider 情報を反映し AVAILABLE。
-9. 失敗時は ERROR とし、message に原因を格納。
+6. 成功時に status.provider 情報を反映し AVAILABLE。
+7. 失敗時は ERROR とし、message に原因を格納。
 
-### 9.2 Server Create/Update 時の Ceph アタッチ
-1. Server spec の storage に type=ceph の volume が含まれることを判定する。
-2. 各 volume の status.providerVolumeId から <pool>/<image> を取得する。
-3. ceph_monitors を展開し、libvirt XML の source host を組み立てる。
-4. 仮想マシンのコントローラーが、/etc/marmot/marmotd.json で指定された ceph_key_file の内容から、当該 VM 用の libvirt secret を作成する。
-5. ceph_user と作成した libvirt secret を参照して auth 要素を組み立てる。
-6. iSCSI/LVM/QCOW2 と同様に、対象ディスクの XML 定義を domain XML の disks に追加する。
-7. 生成した XML を libvirt に渡して define/start し、失敗時はエラー内容を status.message に格納する。
-
-### 9.3 Delete(type=ceph)
+### 9.2 Delete(type=ceph)
 1. DELETING へ遷移。
-2. 固定ユーザー前提のため、対象 image 削除時に pool 権限や ceph_key_file 自体は削除しない。
-3. Volume ID ベースの RBD イメージを削除する。
-4. 成功または not found の場合、DB レコード削除。
-5. その他は ERROR。
+2. Volume ID ベースの RBD イメージを削除する。
+3. 成功または not found の場合、DB レコード削除。
+4. その他は ERROR。
 
-### 9.3.1 Server Delete 時の libvirt secret 削除
-1. 仮想マシンのコントローラーが、VM 削除時に当該 VM に対応する libvirt secret を削除する。
-2. ceph_key_file の元ファイルは削除しない。
-
-## 9.4 Ceph CLI コマンド列（実装ガイド）
+## 9.3 Ceph CLI コマンド列（実装ガイド）
 この節は、Marmot が Ceph CLI を利用する場合の最小実装手順を示す。
-前提として、pool は Ceph 側で事前作成済みであること。
+前提として、pool / CRUSH rule は Ceph 側で事前作成済みであること。
 
 ### 入力パラメータ
 - POOL: ceph_pool_by_class から選択した pool 名
 - IMAGE: Volume ID ベースの image 名（例: vol-abcde）
 - SIZE_GB: ボリュームサイズ（GB）
-- CEPH_USER: marmotd.json の ceph_user に設定した固定 Ceph ユーザー名
-- KEY_FILE: marmotd.json の ceph_key_file に設定した libvirt secret 登録元ファイル
-- MON_HOSTS: Ceph monitor の接続先
+- CEPH_CONF: /etc/ceph/ceph.conf
+- CEPH_KEYRING: ceph.client.admin.keyring
 
 ### 1. RBD image 作成
 ```bash
-rbd -m "${MON_HOSTS}" create "${POOL}/${IMAGE}" --size "${SIZE_GB}G"
+rbd --conf "${CEPH_CONF}" --keyring "${CEPH_KEYRING}" create "${POOL}/${IMAGE}" --size "${SIZE_GB}G"
 ```
 
-### 2. 対象 pool 群アクセス権限の一括付与
-CephX の OSD capability は、固定ユーザーに対して ceph_pool_by_class で利用する対象 pool 群をまとめて1回で定義する。
-
+### 2. Delete 時の image 削除
 ```bash
-ceph -m "${MON_HOSTS}" auth get-or-create "${CEPH_USER}" \
-  mon 'allow r' \
-  osd "allow rwx pool=${POOL_HDD}, allow rwx pool=${POOL_SSD}, allow rwx pool=${POOL_NVME}"
+rbd --conf "${CEPH_CONF}" --keyring "${CEPH_KEYRING}" rm "${POOL}/${IMAGE}"
 ```
 
-運用メモ:
-- 対象 pool 群（hdd/ssd/nvme）の capability は1回で定義し、pool 名変更時のみ再定義する。
-- ceph_key_file は固定ユーザー鍵の保管ファイルであり、libvirt secret 登録元として最小権限で管理する。
-
-### 3. 接続情報取得
-固定ユーザーの認証情報は ceph_key_file に保持し、その内容を libvirt secret へ登録する。
-
+### 3. 冪等性を考慮した補助確認
 ```bash
-virsh secret-set-value --secret "${LIBVIRT_SECRET_UUID}" --base64 "$(base64 -w0 "${KEY_FILE}")"
-```
-
-### 4. Delete 時の権限削除
-固定ユーザー前提のため、Volume 削除時に pool 権限は削除しない。
-
-```bash
-# no-op
-```
-
-### 4.1 VM 削除時の libvirt secret 削除
-VM 削除時に、VM に対応する libvirt secret を削除する。
-
-```bash
-virsh secret-undefine "${LIBVIRT_SECRET_UUID}"
-```
-
-### 5. Delete 時の image 削除
-```bash
-rbd -m "${MON_HOSTS}" rm "${POOL}/${IMAGE}"
-```
-
-### 6. 冪等性を考慮した補助確認
-```bash
-rbd -m "${MON_HOSTS}" info "${POOL}/${IMAGE}"
-ceph -m "${MON_HOSTS}" auth get "${CEPH_USER}"
+rbd --conf "${CEPH_CONF}" --keyring "${CEPH_KEYRING}" info "${POOL}/${IMAGE}"
 ```
 
 実装メモ:
@@ -307,10 +240,9 @@ ceph -m "${MON_HOSTS}" auth get "${CEPH_USER}"
 以下を最低限の判定対象とする。
 - Ceph 無効設定（ceph_enabled=false）。
 - Ceph 接続失敗（MON 到達不可、認証失敗）。
-- storageClass に対応する pool が存在しない。
+- storageClass に対応する CRUSH rule / pool が存在しない。
 - 空き容量不足。
 - 同名イメージ衝突。
-- 固定ユーザーの認証情報不備、libvirt secret 作成/削除不備、または対象 pool 群（hdd/ssd/nvme）一括権限設定不備。
 
 実装ルール:
 - API レイヤー: 入力不正は 4xx。
@@ -318,13 +250,11 @@ ceph -m "${MON_HOSTS}" auth get "${CEPH_USER}"
 - not found 削除: 冪等扱いで成功寄りに処理。
 
 ## 11. セキュリティ
-- Ceph 認証は最小権限ユーザーを前提。
+- Ceph 認証は ceph.client.admin.keyring を利用し、Marmot が管理者権限で操作する前提とする。
 - 秘密情報は設定ファイル権限を 600 相当に制限。
 - ログに認証情報を出力しない。
 - CI は GitHub Secrets を使用し、ログマスクを必須化。
-- ceph_user / ceph_key_file で指定した固定ユーザーは、ceph_pool_by_class で参照される対象 pool のみにアクセスできる最小権限設定とする。
-- XML に記述する鍵は libvirt secret に保存し、仮想マシンのコントローラーが作成し、VM 削除時に削除する。VM ごとの keyring は作成しない。
-- 他の仮想サーバーからの利用は、明示的に共有用途として設計しない限り許可しない。
+- 認証ユーザー/キーリングの作成と配布は Ceph 運用チームが事前に実施し、Marmot は動的な発行/削除を行わない。
 
 ## 12. テスト戦略
 ### 12.1 単体テスト
@@ -340,9 +270,8 @@ ceph -m "${MON_HOSTS}" auth get "${CEPH_USER}"
 - シークレット注入で接続情報を設定。
 
 ## 13. 受け入れ基準
-- type=ceph の Volume が Create でき、AVAILABLE になる。
-- type=ceph の Volume が Delete でき、実体も削除される。
-- type=ceph の Volume をアタッチした仮想マシンから、当該ディスクを認識できる。
+- type=ceph の Volume が作成可能で AVAILABLE になる。
+- type=ceph の Volume が削除可能で実体も削除される。
 - 主要異常系で ERROR へ遷移し、原因文字列を確認できる。
 - 既存 type=qcow2/lvm の挙動が回帰しない。
 
@@ -352,18 +281,15 @@ ceph -m "${MON_HOSTS}" auth get "${CEPH_USER}"
 3. marmotd config に Ceph 設定追加。
 4. pkg/ceph 実装。
 5. Volume 作成/削除フローに ceph 分岐追加。
-6. Server Create/Update フローに ceph アタッチ分岐を追加。
-7. libvirt XML 生成で RBD 用 disk(type='network', protocol='rbd') 定義を追加。
-8. libvirt secret の運用実装（参照名規約、作成/更新/削除、エラー時ハンドリング）を追加。
-9. 単体テスト、結合テスト追加（Volume + Server アタッチ経路）。
-10. ドキュメントと運用手順更新。
+6. 単体テスト、結合テスト追加。
+7. ドキュメントと運用手順更新。
 
 ## 15. 未決事項
 - なし
 
 ## 16. 決定事項
-- kind=os を Ceph で許可する時期は将来フェーズとする。
+- kind=os を Ceph で許可する時期は Phase 2 以降とする。
 - その具体化は、ライブマイグレーション実装と同時に検討・推進する。
-- Ceph の OSD capability は、ceph_pool_by_class の hdd/ssd/nvme の3固定 pool 群をまとめて1回で定義する。
+- Ceph のアクセス権限は、当面 pool 単位での付与を許容する。
 
 

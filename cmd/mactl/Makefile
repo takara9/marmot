@@ -1,6 +1,8 @@
 GO ?= /usr/local/go/bin/go
 PROGRAM	= mactl
 GINKGO = /root/go/bin/ginkgo
+export CEPH_IPADDR=10.1.3.11
+export CEPH_POOL_KEY=AQCAD1dq4k4jARAAq7ckh5t6aouhEGokyef0Fg==
 
 .PHONY: all $(PROGRAM)
 
@@ -50,3 +52,11 @@ test3:
 .PHONY: test-unit
 test-unit:
 	$(GO) test ./cmd -v -ginkgo.v -timeout=5m
+
+.PHONY:test-ceph
+test-ceph:
+	echo $$CEPH_IPADDR
+	echo $$CEPH_POOL_KEY
+	$(GO) test . -ginkgo.focus="Ceph volume backed VM lifecycle" -count=1
+	#$(GO) test -v . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus-file mactl-ceph-lifecycle_test.go -timeout=10m -coverprofile cover.out
+
