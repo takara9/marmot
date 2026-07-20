@@ -39,6 +39,10 @@ test0: mactl-test
 test1:
 	$(GO) test -v . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus-file mactl-vm-deploy-1_test.go -timeout=20m -coverprofile cover.out
 
+.PHONY:test1-ceph
+test1-ceph:
+	$(GO) test -v . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus-file mactl-ceph-lifecycle_test.go -timeout=10m -coverprofile cover.out
+
 .PHONY:test2
 test2:
 	$(GO) test -v . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus-file mactl-vm-deploy-2_test.go -timeout=20m -coverprofile cover.out
