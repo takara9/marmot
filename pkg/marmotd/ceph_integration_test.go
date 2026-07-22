@@ -38,8 +38,8 @@ var _ = Describe("Ceph integration helpers", Ordered, func() {
 		_, err = keyFile.WriteString("[client.ubuntu]\n\tkey = AQCAD1dq4k4jARAAq7ckh5t6aouhEGokyef0Fg==\n")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(keyFile.Close()).To(Succeed())
-		Expect(os.Setenv("MARMOT_CEPH_CONF_FILE", confFilePath)).To(Succeed())
-		Expect(os.Setenv("MARMOT_CEPH_KEYRING_FILE", keyFilePath)).To(Succeed())
+		cephConfPathForRuntime = confFilePath
+		cephKeyringPathForRuntime = keyFilePath
 
 		cephTestConfig = &MarmotdConfig{
 			NodeName:    "hv1",
@@ -54,8 +54,8 @@ var _ = Describe("Ceph integration helpers", Ordered, func() {
 
 	AfterAll(func() {
 		SetRuntimeConfig(originalConfig)
-		Expect(os.Unsetenv("MARMOT_CEPH_CONF_FILE")).To(Succeed())
-		Expect(os.Unsetenv("MARMOT_CEPH_KEYRING_FILE")).To(Succeed())
+		cephConfPathForRuntime = DefaultCephConfPath
+		cephKeyringPathForRuntime = DefaultCephKeyringPath
 		_ = os.Remove(confFilePath)
 		_ = os.Remove(keyFilePath)
 	})
@@ -169,26 +169,7 @@ var _ = Describe("Ceph integration helpers", Ordered, func() {
 		Expect(image).To(Equal("stored-image"))
 	})
 
-	It("resolves ceph delete target without storageClass using default fallback", func() {
-		vol := api.Volume{
-			Spec: api.VolSpec{
-				Type: util.StringPtr("ceph"),
-				Kind: util.StringPtr("data"),
-				Size: util.IntPtrInt(1),
-			},
-		}
-		api.SetVolumeID(&vol, "4bb6d")
-
-		cfg := runtimeCephConfig()
-		cfg.PoolByClass = map[string]string{"ssd": "runtime-ssd"}
-
-		pool, image, err := resolveCephDeleteTarget(vol, cfg)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(pool).To(Equal("marmot-hdd"))
-		Expect(image).To(Equal("vol-4bb6d"))
-	})
-
-	It("returns an error when ceph delete fallback has no volume id", func() {
+	It("returns an error when providerVolumeId is missing for ceph delete target", func() {
 		vol := api.Volume{
 			Spec: api.VolSpec{
 				Type: util.StringPtr("ceph"),
@@ -201,7 +182,24 @@ var _ = Describe("Ceph integration helpers", Ordered, func() {
 
 		_, _, err := resolveCephDeleteTarget(vol, cfg)
 		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("volume id is required"))
+		Expect(err.Error()).To(ContainSubstring("ceph providerVolumeId is required for delete"))
+	})
+
+	It("returns an error when ceph providerVolumeId is invalid", func() {
+		vol := api.Volume{
+			Spec: api.VolSpec{
+				Type: util.StringPtr("ceph"),
+				Kind: util.StringPtr("data"),
+				Size: util.IntPtrInt(1),
+			},
+			Status: &api.Status{ProviderVolumeId: util.StringPtr("invalid-format")},
+		}
+
+		cfg := runtimeCephConfig()
+
+		_, _, err := resolveCephDeleteTarget(vol, cfg)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("invalid ceph providerVolumeId"))
 	})
 
 	It("creates and removes the libvirt ceph secret", func() {

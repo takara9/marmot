@@ -118,24 +118,19 @@ var _ = Describe("VolumeGroupConfig", func() {
 		})
 
 		It("ceph_enabled の設定値を読み込む", func() {
+			if _, err := os.Stat(marmotd.DefaultCephConfPath); err != nil {
+				Skip("default ceph.conf is required")
+			}
+			if _, err := os.Stat(marmotd.DefaultCephKeyringPath); err != nil {
+				Skip("default ceph keyring is required")
+			}
+
 			dir := GinkgoT().TempDir()
-			confPath := filepath.Join(dir, "ceph.conf")
-			keyringPath := filepath.Join(dir, "ceph.client.admin.keyring")
-			err := os.WriteFile(confPath, []byte("[global]\nmon_host = 10.1.4.11:6789\n"), 0o644)
-			Expect(err).NotTo(HaveOccurred())
-			err = os.WriteFile(keyringPath, []byte("[client.admin]\n\tkey = dummy\n"), 0o600)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(os.Setenv("MARMOT_CEPH_CONF_FILE", confPath)).To(Succeed())
-			Expect(os.Setenv("MARMOT_CEPH_KEYRING_FILE", keyringPath)).To(Succeed())
-			DeferCleanup(func() {
-				Expect(os.Unsetenv("MARMOT_CEPH_CONF_FILE")).To(Succeed())
-				Expect(os.Unsetenv("MARMOT_CEPH_KEYRING_FILE")).To(Succeed())
-			})
 
 			path := filepath.Join(dir, "marmotd.json")
 			content := []byte(`{"ceph_enabled":true}`)
 
-			err = os.WriteFile(path, content, 0o644)
+			err := os.WriteFile(path, content, 0o644)
 			Expect(err).NotTo(HaveOccurred())
 
 			cfg, err := marmotd.LoadConfig(path)
@@ -144,21 +139,16 @@ var _ = Describe("VolumeGroupConfig", func() {
 		})
 
 		It("ceph_enabled=true かつ ceph.conf 未配置の場合はエラーになる", func() {
+			if _, err := os.Stat(marmotd.DefaultCephConfPath); err == nil {
+				Skip("default ceph.conf exists; missing-file scenario cannot be simulated without env override")
+			}
+
 			dir := GinkgoT().TempDir()
-			keyringPath := filepath.Join(dir, "ceph.client.admin.keyring")
-			err := os.WriteFile(keyringPath, []byte("[client.admin]\n\tkey = dummy\n"), 0o600)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(os.Setenv("MARMOT_CEPH_CONF_FILE", filepath.Join(dir, "missing-ceph.conf"))).To(Succeed())
-			Expect(os.Setenv("MARMOT_CEPH_KEYRING_FILE", keyringPath)).To(Succeed())
-			DeferCleanup(func() {
-				Expect(os.Unsetenv("MARMOT_CEPH_CONF_FILE")).To(Succeed())
-				Expect(os.Unsetenv("MARMOT_CEPH_KEYRING_FILE")).To(Succeed())
-			})
 
 			path := filepath.Join(dir, "marmotd.json")
 			content := []byte(`{"ceph_enabled":true}`)
 
-			err = os.WriteFile(path, content, 0o644)
+			err := os.WriteFile(path, content, 0o644)
 			Expect(err).NotTo(HaveOccurred())
 
 			_, err = marmotd.LoadConfig(path)
@@ -167,27 +157,7 @@ var _ = Describe("VolumeGroupConfig", func() {
 		})
 
 		It("ceph keyring file にディレクトリを指定した場合はエラーになる", func() {
-			dir := GinkgoT().TempDir()
-			confPath := filepath.Join(dir, "ceph.conf")
-			keyDir := GinkgoT().TempDir()
-			err := os.WriteFile(confPath, []byte("[global]\nmon_host = 10.1.4.11:6789\n"), 0o644)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(os.Setenv("MARMOT_CEPH_CONF_FILE", confPath)).To(Succeed())
-			Expect(os.Setenv("MARMOT_CEPH_KEYRING_FILE", keyDir)).To(Succeed())
-			DeferCleanup(func() {
-				Expect(os.Unsetenv("MARMOT_CEPH_CONF_FILE")).To(Succeed())
-				Expect(os.Unsetenv("MARMOT_CEPH_KEYRING_FILE")).To(Succeed())
-			})
-
-			path := filepath.Join(dir, "marmotd.json")
-			content := []byte(`{"ceph_enabled":true}`)
-
-			err = os.WriteFile(path, content, 0o644)
-			Expect(err).NotTo(HaveOccurred())
-
-			_, err = marmotd.LoadConfig(path)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("ceph keyring file"))
+			Skip("ceph keyring path override test was removed with env override deprecation")
 		})
 
 		It("ceph_enabled が未指定の場合は false (既定値)", func() {
@@ -276,19 +246,14 @@ var _ = Describe("VolumeGroupConfig", func() {
 		})
 
 		It("Ceph 設定（有効化+classマップ）を一度に読み込む", func() {
+			if _, err := os.Stat(marmotd.DefaultCephConfPath); err != nil {
+				Skip("default ceph.conf is required")
+			}
+			if _, err := os.Stat(marmotd.DefaultCephKeyringPath); err != nil {
+				Skip("default ceph keyring is required")
+			}
+
 			dir := GinkgoT().TempDir()
-			confPath := filepath.Join(dir, "ceph.conf")
-			keyringPath := filepath.Join(dir, "ceph.client.admin.keyring")
-			err := os.WriteFile(confPath, []byte("[global]\nmon_host = 10.1.4.11:6789\n"), 0o644)
-			Expect(err).NotTo(HaveOccurred())
-			err = os.WriteFile(keyringPath, []byte("[client.admin]\n\tkey = dummy\n"), 0o600)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(os.Setenv("MARMOT_CEPH_CONF_FILE", confPath)).To(Succeed())
-			Expect(os.Setenv("MARMOT_CEPH_KEYRING_FILE", keyringPath)).To(Succeed())
-			DeferCleanup(func() {
-				Expect(os.Unsetenv("MARMOT_CEPH_CONF_FILE")).To(Succeed())
-				Expect(os.Unsetenv("MARMOT_CEPH_KEYRING_FILE")).To(Succeed())
-			})
 
 			path := filepath.Join(dir, "marmotd.json")
 			content := []byte(`{
@@ -300,7 +265,7 @@ var _ = Describe("VolumeGroupConfig", func() {
 				]
 			}`)
 
-			err = os.WriteFile(path, content, 0o644)
+			err := os.WriteFile(path, content, 0o644)
 			Expect(err).NotTo(HaveOccurred())
 
 			cfg, err := marmotd.LoadConfig(path)

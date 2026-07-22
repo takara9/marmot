@@ -29,35 +29,11 @@ var _ = Describe("Ceph volume backed VM lifecycle", Ordered, func() {
 	const defaultCephKeyringPath = "/etc/ceph/ceph.client.admin.keyring"
 
 	BeforeAll(func(specCtx SpecContext) {
-		isCI := strings.EqualFold(strings.TrimSpace(os.Getenv("GITHUB_ACTIONS")), "true") || strings.EqualFold(strings.TrimSpace(os.Getenv("CI")), "true")
-		originalConf, hadConf := os.LookupEnv("MARMOT_CEPH_CONF_FILE")
-		originalKeyring, hadKeyring := os.LookupEnv("MARMOT_CEPH_KEYRING_FILE")
-		DeferCleanup(func() {
-			if hadConf {
-				Expect(os.Setenv("MARMOT_CEPH_CONF_FILE", originalConf)).To(Succeed())
-			} else {
-				Expect(os.Unsetenv("MARMOT_CEPH_CONF_FILE")).To(Succeed())
-			}
-			if hadKeyring {
-				Expect(os.Setenv("MARMOT_CEPH_KEYRING_FILE", originalKeyring)).To(Succeed())
-			} else {
-				Expect(os.Unsetenv("MARMOT_CEPH_KEYRING_FILE")).To(Succeed())
-			}
-		})
-
-		if isCI {
-			Expect(os.Setenv("MARMOT_CEPH_CONF_FILE", filepath.Join("testdata", "ceph.conf"))).To(Succeed())
-			Expect(os.Setenv("MARMOT_CEPH_KEYRING_FILE", filepath.Join("testdata", "ceph.client.admin.keyring"))).To(Succeed())
-		} else {
-			// In non-CI environments, exercise the runtime default paths under /etc/ceph.
-			Expect(os.Unsetenv("MARMOT_CEPH_CONF_FILE")).To(Succeed())
-			Expect(os.Unsetenv("MARMOT_CEPH_KEYRING_FILE")).To(Succeed())
-			if _, err := os.Stat(defaultCephConfPath); err != nil {
-				Skip(fmt.Sprintf("%s is required for non-CI Ceph lifecycle test: %v", defaultCephConfPath, err))
-			}
-			if _, err := os.Stat(defaultCephKeyringPath); err != nil {
-				Skip(fmt.Sprintf("%s is required for non-CI Ceph lifecycle test: %v", defaultCephKeyringPath, err))
-			}
+		if _, err := os.Stat(defaultCephConfPath); err != nil {
+			Skip(fmt.Sprintf("%s is required for Ceph lifecycle test: %v", defaultCephConfPath, err))
+		}
+		if _, err := os.Stat(defaultCephKeyringPath); err != nil {
+			Skip(fmt.Sprintf("%s is required for Ceph lifecycle test: %v", defaultCephKeyringPath, err))
 		}
 
 		opts := &slog.HandlerOptions{AddSource: true}

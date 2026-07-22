@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -36,52 +35,17 @@ func (s *stubRunner) Run(ctx context.Context, name string, args ...string) ([]by
 }
 
 var _ = Describe("Ceph", func() {
-	BeforeEach(func() {
-		originalConf, hadConf := os.LookupEnv("MARMOT_CEPH_CONF_FILE")
-		originalKeyring, hadKeyring := os.LookupEnv("MARMOT_CEPH_KEYRING_FILE")
-
-		dir := GinkgoT().TempDir()
-		confPath := filepath.Join(dir, "ceph.conf")
-		keyringPath := filepath.Join(dir, "ceph.client.admin.keyring")
-		Expect(os.WriteFile(confPath, []byte("[global]\nmon_host = 10.1.4.11:6789\nname = client.admin\n"), 0o644)).To(Succeed())
-		Expect(os.WriteFile(keyringPath, []byte("[client.admin]\n\tkey = dummy\n"), 0o600)).To(Succeed())
-		Expect(os.Setenv("MARMOT_CEPH_CONF_FILE", confPath)).To(Succeed())
-		Expect(os.Setenv("MARMOT_CEPH_KEYRING_FILE", keyringPath)).To(Succeed())
-
-		DeferCleanup(func() {
-			if hadConf {
-				Expect(os.Setenv("MARMOT_CEPH_CONF_FILE", originalConf)).To(Succeed())
-			} else {
-				Expect(os.Unsetenv("MARMOT_CEPH_CONF_FILE")).To(Succeed())
-			}
-
-			if hadKeyring {
-				Expect(os.Setenv("MARMOT_CEPH_KEYRING_FILE", originalKeyring)).To(Succeed())
-			} else {
-				Expect(os.Unsetenv("MARMOT_CEPH_KEYRING_FILE")).To(Succeed())
-			}
-		})
-	})
-
 	Describe("DefaultConfig", func() {
 		It("uses ceph conf and keyring files by default", func() {
 			cfg := defaultConfigWithCleanup()
-			Expect(cfg.ConfFile).NotTo(BeEmpty())
-			Expect(cfg.KeyringFile).NotTo(BeEmpty())
-			_, err := os.Stat(cfg.ConfFile)
-			Expect(err).NotTo(HaveOccurred())
-			_, err = os.Stat(cfg.KeyringFile)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(cfg.ConfFile).To(Equal(ceph.DefaultCephConfFile))
+			Expect(cfg.KeyringFile).To(Equal(ceph.DefaultCephKeyringFile))
 		})
 
 		It("cleanup is a no-op", func() {
 			cfg := ceph.DefaultConfig()
-			_, err := os.Stat(cfg.KeyringFile)
-			Expect(err).NotTo(HaveOccurred())
 			Expect(cfg.Cleanup()).To(Succeed())
 			Expect(cfg.Cleanup()).To(Succeed())
-			_, err = os.Stat(cfg.KeyringFile)
-			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 

@@ -20,15 +20,18 @@ const (
 	DefaultCephKeyringPath = "/etc/ceph/ceph.client.admin.keyring"
 )
 
+var cephConfPathForRuntime = DefaultCephConfPath
+var cephKeyringPathForRuntime = DefaultCephKeyringPath
+
 func effectiveCephConfPath() string {
-	if path := strings.TrimSpace(os.Getenv("MARMOT_CEPH_CONF_FILE")); path != "" {
+	if path := strings.TrimSpace(cephConfPathForRuntime); path != "" {
 		return path
 	}
 	return DefaultCephConfPath
 }
 
 func effectiveCephKeyringPath() string {
-	if path := strings.TrimSpace(os.Getenv("MARMOT_CEPH_KEYRING_FILE")); path != "" {
+	if path := strings.TrimSpace(cephKeyringPathForRuntime); path != "" {
 		return path
 	}
 	return DefaultCephKeyringPath

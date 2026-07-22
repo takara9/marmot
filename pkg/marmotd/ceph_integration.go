@@ -120,39 +120,8 @@ func resolveCephDeleteTarget(volume api.Volume, cfg ceph.Config) (pool, image st
 			return strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]), nil
 		}
 	}
-
-	// Deletion should proceed even if storageClass is missing on errored ceph volumes.
-	if volume.Spec.StorageClass == nil || strings.TrimSpace(*volume.Spec.StorageClass) == "" {
-		image = "vol-" + strings.TrimSpace(api.VolumeID(volume))
-		if strings.TrimSpace(image) == "vol-" {
-			return "", "", fmt.Errorf("volume id is required")
-		}
-		pool, err = normalizeConfigForDelete(cfg).PoolForStorageClass("hdd")
-		if err != nil {
-			return "", "", err
-		}
-		return pool, image, nil
-	}
-
-	req, err := ceph.MapVolumeToRequest(volume, cfg)
-	if err != nil {
-		return "", "", err
-	}
-	return req.Pool, req.Image, nil
-}
-
-func normalizeConfigForDelete(cfg ceph.Config) ceph.Config {
-	normalized := cfg
-	if len(normalized.PoolByClass) == 0 {
-		normalized = ceph.DefaultConfig()
-	}
-	if _, ok := normalized.PoolByClass["hdd"]; !ok || strings.TrimSpace(normalized.PoolByClass["hdd"]) == "" {
-		if normalized.PoolByClass == nil {
-			normalized.PoolByClass = map[string]string{}
-		}
-		normalized.PoolByClass["hdd"] = ceph.DefaultConfig().PoolByClass["hdd"]
-	}
-	return normalized
+	_ = cfg
+	return "", "", fmt.Errorf("ceph providerVolumeId is required for delete")
 }
 
 func cephSecretSpecForServer(serverID string) (libvirtxml.Secret, error) {

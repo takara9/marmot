@@ -3,7 +3,6 @@ package ceph
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 )
 
@@ -13,16 +12,10 @@ const (
 )
 
 func defaultCephConfFile() string {
-	if path := strings.TrimSpace(os.Getenv("MARMOT_CEPH_CONF_FILE")); path != "" {
-		return path
-	}
 	return DefaultCephConfFile
 }
 
 func defaultCephKeyringFile() string {
-	if path := strings.TrimSpace(os.Getenv("MARMOT_CEPH_KEYRING_FILE")); path != "" {
-		return path
-	}
 	return DefaultCephKeyringFile
 }
 
