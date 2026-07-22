@@ -17,5 +17,5 @@ spec:
           spec:
             type: ceph
             storageClass: ssd
-            size: 1
+            size: 2
             persistent: false
