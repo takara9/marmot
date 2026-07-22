@@ -62,6 +62,10 @@ func volumeKindOrDefault(spec api.VolSpec) string {
 	return "data"
 }
 
+func shouldSkipVolumeDeletion(vol api.Volume) bool {
+	return vol.Spec.Persistent != nil && *vol.Spec.Persistent
+}
+
 func shouldResolvePreCreatedStorageVolume(disk api.Volume) bool {
 	if strings.TrimSpace(api.VolumeID(disk)) != "" {
 		return true
@@ -810,10 +814,6 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 				}
 				if diskVol != nil {
 					slog.Debug("既存ボリュームを使用", "disk index", i, "volume id", api.VolumeID(*diskVol))
-
-					// 永続フラグを立てる
-					var persistent bool = true
-					diskVol.Spec.Persistent = &persistent
 
 					slog.Debug("既存ボリュームの情報取得成功", "disk index", i, "volume id", api.VolumeID(*diskVol), "path", diskVol.Spec.Path, "status", diskVol.Status.Status)
 					(*serverConfig.Spec.Storage)[i] = *diskVol
@@ -1749,7 +1749,7 @@ func (m *Marmot) DeleteServerByIdManage(id string) error {
 		for i, vol := range *sv.Spec.Storage {
 			volID := api.VolumeID(vol)
 			slog.Debug("DeleteServerById()", "index", i, "deleting volume id", volID)
-			if vol.Spec.Persistent != nil && *vol.Spec.Persistent {
+			if shouldSkipVolumeDeletion(vol) {
 				slog.Debug("DeleteServerById()", "skipping persistent volume", volID)
 				continue
 			}
