@@ -1,8 +1,6 @@
 GO ?= /usr/local/go/bin/go
 PROGRAM	= mactl
 GINKGO = /root/go/bin/ginkgo
-export CEPH_IPADDR=10.1.3.11
-export CEPH_POOL_KEY=AQCAD1dq4k4jARAAq7ckh5t6aouhEGokyef0Fg==
 
 .PHONY: all $(PROGRAM)
 
