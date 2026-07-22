@@ -53,8 +53,6 @@ test-unit:
 
 .PHONY:test-ceph
 test-ceph:
-	echo $$CEPH_IPADDR
-	echo $$CEPH_POOL_KEY
 	$(GO) test . -ginkgo.focus="Ceph volume backed VM lifecycle" -count=1
 	#$(GO) test -v . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus-file mactl-ceph-lifecycle_test.go -timeout=10m -coverprofile cover.out
 
