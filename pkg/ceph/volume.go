@@ -22,14 +22,7 @@ type VolumeInfo struct {
 }
 
 func (c *Client) authArgs() []string {
-	args := make([]string, 0, 4)
-	if confFile := strings.TrimSpace(c.cfg.ConfFile); confFile != "" {
-		args = append(args, "--conf", confFile)
-	}
-	if keyringFile := strings.TrimSpace(c.cfg.KeyringFile); keyringFile != "" {
-		args = append(args, "--keyring", keyringFile)
-	}
-	return args
+	return nil
 }
 
 func (c *Client) runCommand(ctx context.Context, name string, args ...string) ([]byte, error) {

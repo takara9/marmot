@@ -110,10 +110,6 @@ func startMockServer(etcdEp string, configPath string) (*mockServerHandle, error
 		cancel()
 		return nil, err
 	}
-	if err := prepareCephConfigEnvForMockServer(resolvedConfigPath); err != nil {
-		cancel()
-		return nil, err
-	}
 	cfg := marmotd.CurrentConfig()
 	if strings.TrimSpace(configPath) != "" {
 		loadedCfg, err := marmotd.LoadConfig(resolvedConfigPath)
@@ -262,44 +258,6 @@ func startMockServer(etcdEp string, configPath string) (*mockServerHandle, error
 	}
 
 	return h, nil
-}
-
-func prepareCephConfigEnvForMockServer(configPath string) error {
-	cephConfPath, err := resolveMockServerCephPathFromConfigDir(configPath, "ceph.conf")
-	if err != nil {
-		return err
-	}
-	if err := os.Setenv("MARMOT_CEPH_CONF_FILE", cephConfPath); err != nil {
-		return fmt.Errorf("failed to set MARMOT_CEPH_CONF_FILE: %w", err)
-	}
-
-	cephKeyringPath, err := resolveMockServerCephPathFromConfigDir(configPath, "ceph.client.admin.keyring")
-	if err != nil {
-		return err
-	}
-	if err := os.Setenv("MARMOT_CEPH_KEYRING_FILE", cephKeyringPath); err != nil {
-		return fmt.Errorf("failed to set MARMOT_CEPH_KEYRING_FILE: %w", err)
-	}
-
-	return nil
-}
-
-func resolveMockServerCephPathFromConfigDir(configPath, filename string) (string, error) {
-	baseDir := strings.TrimSpace(filepath.Dir(configPath))
-	if baseDir == "" || baseDir == "." {
-		return "", fmt.Errorf("mock server ceph %s path resolve failed: invalid config path %q", filename, configPath)
-	}
-
-	candidate := filepath.Join(baseDir, filename)
-	if _, err := os.Stat(candidate); err != nil {
-		return "", fmt.Errorf("mock server ceph %s not found: %s", filename, candidate)
-	}
-
-	resolved, err := filepath.Abs(candidate)
-	if err != nil {
-		return "", fmt.Errorf("failed to resolve %s: %w", candidate, err)
-	}
-	return resolved, nil
 }
 
 func resolvePathForMockServer(path string) (string, error) {

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -173,11 +172,11 @@ var _ = Describe("Ceph", func() {
 			err := client.CreateVolume(context.Background(), ceph.VolumeRequest{Pool: "marmot-ssd", Image: "vol-abcde", SizeGB: 20})
 
 			Expect(err).NotTo(HaveOccurred())
-			Expect(runner.commands).To(ContainElement(expectedRBDCommand(cfg, "create", "marmot-ssd/vol-abcde", "--size", "20G")))
+			Expect(runner.commands).To(ContainElement(expectedRBDCommand("create", "marmot-ssd/vol-abcde", "--size", "20G")))
 		})
 
 		It("parses rbd info JSON", func() {
-			command := expectedRBDCommand(cfg, "info", "marmot-ssd/vol-abcde", "--format", "json")
+			command := expectedRBDCommand("info", "marmot-ssd/vol-abcde", "--format", "json")
 			runner.outputs[command] = []byte(`{"name":"vol-abcde","size":21474836480,"pool":"marmot-ssd"}`)
 
 			info, err := client.StatVolume(context.Background(), "marmot-ssd", "vol-abcde")
@@ -188,7 +187,7 @@ var _ = Describe("Ceph", func() {
 		})
 
 		It("lists images from json output", func() {
-			command := expectedRBDCommand(cfg, "ls", "marmot-ssd", "--format", "json")
+			command := expectedRBDCommand("ls", "marmot-ssd", "--format", "json")
 			runner.outputs[command] = []byte(`["vol-1","vol-2"]`)
 
 			images, err := client.ListVolumes(context.Background(), "marmot-ssd")
@@ -198,7 +197,7 @@ var _ = Describe("Ceph", func() {
 		})
 
 		It("propagates command errors with context", func() {
-			command := expectedRBDCommand(cfg, "rm", "marmot-ssd/vol-abcde")
+			command := expectedRBDCommand("rm", "marmot-ssd/vol-abcde")
 			runner.errors[command] = fmt.Errorf("exit status 1")
 			runner.outputs[command] = []byte("permission denied")
 
@@ -239,14 +238,10 @@ func defaultConfigWithCleanup() ceph.Config {
 	return cfg
 }
 
-func expectedRBDCommand(cfg ceph.Config, args ...string) string {
-	parts := []string{"rbd"}
-	if confFile := strings.TrimSpace(cfg.ConfFile); confFile != "" {
-		parts = append(parts, "--conf", confFile)
+func expectedRBDCommand(args ...string) string {
+	command := "rbd"
+	for _, arg := range args {
+		command += " " + arg
 	}
-	if keyringFile := strings.TrimSpace(cfg.KeyringFile); keyringFile != "" {
-		parts = append(parts, "--keyring", keyringFile)
-	}
-	parts = append(parts, args...)
-	return strings.Join(parts, " ")
+	return command
 }
