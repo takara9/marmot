@@ -36,6 +36,7 @@ Marmotは、プライベートクラウド運用をよりシンプルにし、In
 - **Cloud Image による仮想マシン** — Ubuntuなどが提供するCloud Imageを利用して、OSインストールの手間なく仮想マシンを即座に作成できます。
 - **iSCSI ネットワークブロックストレージ** — LVM ボリュームを iSCSI ターゲットとして VM にアタッチ可能
 - **ローカルブロックストレージ** — LVM / QCOW2 を利用した高速にアクセスできるストレージをVM にアタッチ可能
+- **Ceph RBD ブロックストレージ** — Ceph プールをバックエンドにした Volume を作成し、VM にアタッチ可能
 - **仮想ネットワーク管理** — ホストブリッジ、OVN/OVS/Geneve オーバーレイ・ネットワークをサポート
 - **マルチホーム対応** — 1 台の VM に複数の仮想ネットワークを割り当て可能
 - **ノードセレクター** — marmotクラスタ環境では、複数のMarmotノードから指定ノードへVMを 配置制御可能
@@ -150,6 +151,36 @@ $ mactl delete server server-20
 mactl [mactlのフラグ] ssh [USER@]SERVER-NAME -- [SSH-ARGS...]
 
 
+### Ceph ボリュームの作成（オプション）
+
+Marmot は `type: ceph` の Volume をサポートしています。`storageClass`（`hdd` / `ssd` / `nvme`）に応じて、`marmotd` が Ceph プールを選択します。
+
+```yaml
+apiVersion: v1
+kind: Volume
+metadata:
+    name: data-ceph-01
+spec:
+    kind: data
+    type: ceph
+    size: 20
+    storageClass: ssd
+```
+
+```console
+# 作成
+$ mactl create -f volume-ceph.yaml
+
+# 確認
+$ mactl get volume
+
+# 削除
+$ mactl delete volume data-ceph-01
+```
+
+注: `type: ceph` を利用する場合、`marmotd` 側で `ceph_enabled` と `ceph_pool_by_class` の設定が必要です（後述）。
+
+
 
 ## インストール
 
@@ -157,6 +188,26 @@ mactl [mactlのフラグ] ssh [USER@]SERVER-NAME -- [SSH-ARGS...]
 - Ubuntu Linux 24.04 がインストールされていること。
 - ルート`/`ファイルシステムが、3G程度空いていること。 marmotが依存モジュール 1.2GBほどが、インストールされます。
 - `/var/lib/marmot` が、30GB程度の空きがあること。（OSイメージ取得で約2GB、１台の仮想マシン起動で16GBを消費します。
+
+### Ceph 連携を使う場合の追加要件（オプション）
+- `marmotd` を実行するホストに `ceph-common` がインストールされ、`ceph` / `rbd` コマンドが利用可能であること。
+- `/etc/ceph/ceph.conf` と `/etc/ceph/ceph.client.admin.keyring` が配置済みで、`marmotd` 実行ユーザーから読み取り可能であること。
+- Ceph 側に利用する pool を事前作成しておくこと。
+
+`/etc/marmot/marmotd.json` の設定例:
+
+```json
+{
+    "ceph_enabled": true,
+    "ceph_pool_by_class": [
+        { "storageClass": "hdd",  "pool": "marmot-hdd" },
+        { "storageClass": "ssd",  "pool": "marmot-ssd" },
+        { "storageClass": "nvme", "pool": "marmot-nvme" }
+    ]
+}
+```
+
+`ceph_pool_by_class` は配列形式で指定します。`storageClass` と pool の対応が未設定の場合、Ceph Volume 作成は失敗します。
 
 
 ### deb パッケージのインストール
@@ -220,6 +271,7 @@ Client version = 0.25.1
 - [etcd](https://etcd.io/) — 分散 KV ストア（クラスター状態管理）
 - [LVM](https://sourceware.org/lvm2/) — 論理ボリューム管理
 - [open-iscsi / targetcli](https://github.com/open-iscsi/open-iscsi) — iSCSI ネットワークブロックストレージ
+- [Ceph](https://ceph.io/) — RBD を利用した分散ブロックストレージ
 - [OpenTelemetry](https://opentelemetry.io/ja/) — 可観測性のためのメトリックス公開、ログ送信のために使用
 - [Geneve protocl](https://www.redhat.com/ja/blog/what-geneve) — marmotdをクラスタ構成に使用するオーバーレイ・ネットワークに使用します。
 - [OpenVPN](https://openvpn.net/) — marmotd が管理するプライベートネットワークにセキュアに接続するために使用します。 
