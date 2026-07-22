@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -12,7 +11,6 @@ import (
 	"github.com/takara9/marmot/pkg/ceph"
 )
 
-const testCephMonitorHost = "ceph-mon.example"
 const testKeyringPath = "testdata/ceph.client.ubuntu.keyring"
 
 type stubRunner struct {
@@ -37,77 +35,17 @@ func (s *stubRunner) Run(ctx context.Context, name string, args ...string) ([]by
 }
 
 var _ = Describe("Ceph", func() {
-	BeforeEach(func() {
-		originalIP, hadIP := os.LookupEnv("CEPH_IPADDR")
-		originalKey, hadKey := os.LookupEnv("CEPH_POOL_KEY")
-
-		Expect(os.Setenv("CEPH_IPADDR", testCephMonitorHost)).To(Succeed())
-		// CI は環境変数優先、ローカルは testdata の keyring を読み込む
-		if !hadKey || strings.TrimSpace(originalKey) == "" {
-			if os.Getenv("GITHUB_ACTIONS") == "true" || strings.EqualFold(os.Getenv("CI"), "true") {
-				Fail("CEPH_POOL_KEY must be set in CI/GitHub Actions")
-			}
-			keyring, err := os.ReadFile(testKeyringPath)
-			if err != nil {
-				if !os.IsNotExist(err) {
-					Expect(err).NotTo(HaveOccurred())
-				}
-				keyring = []byte("[client.ubuntu]\n\tkey = dummy\n")
-			}
-			Expect(os.Setenv("CEPH_POOL_KEY", string(keyring))).To(Succeed())
-		}
-		DeferCleanup(func() {
-			if hadIP {
-				Expect(os.Setenv("CEPH_IPADDR", originalIP)).To(Succeed())
-			} else {
-				Expect(os.Unsetenv("CEPH_IPADDR")).To(Succeed())
-			}
-
-			if hadKey {
-				Expect(os.Setenv("CEPH_POOL_KEY", originalKey)).To(Succeed())
-			} else {
-				Expect(os.Unsetenv("CEPH_POOL_KEY")).To(Succeed())
-			}
-
-			// Remove any temp keyring files created from CEPH_POOL_KEY during tests.
-			tempDir := os.TempDir()
-			entries, err := os.ReadDir(tempDir)
-			if err == nil {
-				for _, entry := range entries {
-					name := entry.Name()
-					if strings.HasPrefix(name, "marmot-ceph-pool-") && strings.HasSuffix(name, ".keyring") {
-						_ = os.Remove(tempDir + string(os.PathSeparator) + name)
-					}
-				}
-			}
-		})
-	})
-
 	Describe("DefaultConfig", func() {
-		It("uses the requested monitor host by default", func() {
+		It("uses ceph conf and keyring files by default", func() {
 			cfg := defaultConfigWithCleanup()
-			Expect(cfg.Monitors).To(ContainElement(testCephMonitorHost))
-			Expect(cfg.MonitorHosts()).To(Equal(testCephMonitorHost))
-			Expect(cfg.KeyFile).NotTo(BeEmpty())
-			writtenKeyring, err := os.ReadFile(cfg.KeyFile)
-			Expect(err).NotTo(HaveOccurred())
-			expectedKeyring := strings.TrimSpace(os.Getenv("CEPH_POOL_KEY"))
-			if !strings.HasSuffix(expectedKeyring, "\n") {
-				expectedKeyring += "\n"
-			}
-			Expect(string(writtenKeyring)).To(Equal(expectedKeyring))
+			Expect(cfg.ConfFile).To(Equal(ceph.DefaultCephConfFile))
+			Expect(cfg.KeyringFile).To(Equal(ceph.DefaultCephKeyringFile))
 		})
 
-		It("cleans up the generated keyring on demand", func() {
+		It("cleanup is a no-op", func() {
 			cfg := ceph.DefaultConfig()
-			Expect(cfg.KeyFile).NotTo(BeEmpty())
-			_, err := os.Stat(cfg.KeyFile)
-			Expect(err).NotTo(HaveOccurred())
-
 			Expect(cfg.Cleanup()).To(Succeed())
 			Expect(cfg.Cleanup()).To(Succeed())
-			_, err = os.Stat(cfg.KeyFile)
-			Expect(os.IsNotExist(err)).To(BeTrue())
 		})
 	})
 
@@ -133,9 +71,9 @@ var _ = Describe("Ceph", func() {
 			Expect(req.ProviderVolumeID()).To(Equal("marmot-ssd/vol-abcde"))
 		})
 
-		It("defaults ceph size and storage class when omitted", func() {
+		It("defaults ceph size when omitted", func() {
 			cfg := defaultConfigWithCleanup()
-			volume := api.Volume{Spec: api.VolSpec{Type: ptr("ceph")}}
+			volume := api.Volume{Spec: api.VolSpec{Type: ptr("ceph"), StorageClass: ptr("ssd")}}
 			api.SetVolumeID(&volume, "abcde")
 
 			req, err := ceph.MapVolumeToRequest(volume, cfg)
@@ -144,6 +82,16 @@ var _ = Describe("Ceph", func() {
 			Expect(req.Pool).To(Equal("marmot-ssd"))
 			Expect(req.SizeGB).To(Equal(1))
 			Expect(req.StorageClass).To(Equal("ssd"))
+		})
+
+		It("requires storageClass for ceph volumes", func() {
+			cfg := defaultConfigWithCleanup()
+			volume := api.Volume{Spec: api.VolSpec{Type: ptr("ceph"), Size: intPtr(1)}}
+			api.SetVolumeID(&volume, "abcde")
+
+			_, err := ceph.MapVolumeToRequest(volume, cfg)
+
+			Expect(err).To(MatchError("storageClass is required for ceph volumes"))
 		})
 
 		It("rejects unsupported storage classes", func() {
@@ -188,11 +136,11 @@ var _ = Describe("Ceph", func() {
 			err := client.CreateVolume(context.Background(), ceph.VolumeRequest{Pool: "marmot-ssd", Image: "vol-abcde", SizeGB: 20})
 
 			Expect(err).NotTo(HaveOccurred())
-			Expect(runner.commands).To(ContainElement(expectedRBDCommand(cfg, testCephMonitorHost, "create", "marmot-ssd/vol-abcde", "--size", "20G")))
+			Expect(runner.commands).To(ContainElement(expectedRBDCommand("create", "marmot-ssd/vol-abcde", "--size", "20G")))
 		})
 
 		It("parses rbd info JSON", func() {
-			command := expectedRBDCommand(cfg, testCephMonitorHost, "info", "marmot-ssd/vol-abcde", "--format", "json")
+			command := expectedRBDCommand("info", "marmot-ssd/vol-abcde", "--format", "json")
 			runner.outputs[command] = []byte(`{"name":"vol-abcde","size":21474836480,"pool":"marmot-ssd"}`)
 
 			info, err := client.StatVolume(context.Background(), "marmot-ssd", "vol-abcde")
@@ -203,7 +151,7 @@ var _ = Describe("Ceph", func() {
 		})
 
 		It("lists images from json output", func() {
-			command := expectedRBDCommand(cfg, testCephMonitorHost, "ls", "marmot-ssd", "--format", "json")
+			command := expectedRBDCommand("ls", "marmot-ssd", "--format", "json")
 			runner.outputs[command] = []byte(`["vol-1","vol-2"]`)
 
 			images, err := client.ListVolumes(context.Background(), "marmot-ssd")
@@ -213,7 +161,7 @@ var _ = Describe("Ceph", func() {
 		})
 
 		It("propagates command errors with context", func() {
-			command := expectedRBDCommand(cfg, testCephMonitorHost, "rm", "marmot-ssd/vol-abcde")
+			command := expectedRBDCommand("rm", "marmot-ssd/vol-abcde")
 			runner.errors[command] = fmt.Errorf("exit status 1")
 			runner.outputs[command] = []byte("permission denied")
 
@@ -254,15 +202,10 @@ func defaultConfigWithCleanup() ceph.Config {
 	return cfg
 }
 
-func expectedRBDCommand(cfg ceph.Config, monitor string, args ...string) string {
-	parts := []string{"rbd"}
-	if user := strings.TrimSpace(cfg.User); user != "" {
-		parts = append(parts, "--id", user)
+func expectedRBDCommand(args ...string) string {
+	command := "rbd"
+	for _, arg := range args {
+		command += " " + arg
 	}
-	if keyFile := strings.TrimSpace(cfg.KeyFile); keyFile != "" {
-		parts = append(parts, "--keyring", keyFile)
-	}
-	parts = append(parts, "-m", monitor)
-	parts = append(parts, args...)
-	return strings.Join(parts, " ")
+	return command
 }

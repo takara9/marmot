@@ -22,14 +22,7 @@ type VolumeInfo struct {
 }
 
 func (c *Client) authArgs() []string {
-	args := make([]string, 0, 4)
-	if user := strings.TrimSpace(c.cfg.User); user != "" {
-		args = append(args, "--id", user)
-	}
-	if keyFile := strings.TrimSpace(c.cfg.KeyFile); keyFile != "" {
-		args = append(args, "--keyring", keyFile)
-	}
-	return args
+	return nil
 }
 
 func (c *Client) runCommand(ctx context.Context, name string, args ...string) ([]byte, error) {
@@ -52,7 +45,7 @@ func (c *Client) CreateVolume(ctx context.Context, req VolumeRequest) error {
 		return fmt.Errorf("size must be at least 1GB")
 	}
 
-	_, err := c.runCommand(ctx, "rbd", "-m", c.cfg.MonitorHosts(), "create", req.ProviderVolumeID(), "--size", fmt.Sprintf("%dG", req.SizeGB))
+	_, err := c.runCommand(ctx, "rbd", "create", req.ProviderVolumeID(), "--size", fmt.Sprintf("%dG", req.SizeGB))
 	return err
 }
 
@@ -63,7 +56,7 @@ func (c *Client) DeleteVolume(ctx context.Context, pool, image string) error {
 	if strings.TrimSpace(image) == "" {
 		return fmt.Errorf("image is required")
 	}
-	_, err := c.runCommand(ctx, "rbd", "-m", c.cfg.MonitorHosts(), "rm", fmt.Sprintf("%s/%s", strings.TrimSpace(pool), strings.TrimSpace(image)))
+	_, err := c.runCommand(ctx, "rbd", "rm", fmt.Sprintf("%s/%s", strings.TrimSpace(pool), strings.TrimSpace(image)))
 	return err
 }
 
@@ -75,7 +68,7 @@ func (c *Client) StatVolume(ctx context.Context, pool, image string) (VolumeInfo
 		return VolumeInfo{}, fmt.Errorf("image is required")
 	}
 
-	output, err := c.runCommand(ctx, "rbd", "-m", c.cfg.MonitorHosts(), "info", fmt.Sprintf("%s/%s", strings.TrimSpace(pool), strings.TrimSpace(image)), "--format", "json")
+	output, err := c.runCommand(ctx, "rbd", "info", fmt.Sprintf("%s/%s", strings.TrimSpace(pool), strings.TrimSpace(image)), "--format", "json")
 	if err != nil {
 		return VolumeInfo{}, err
 	}
@@ -108,7 +101,7 @@ func (c *Client) ListVolumes(ctx context.Context, pool string) ([]string, error)
 		return nil, fmt.Errorf("pool is required")
 	}
 
-	output, err := c.runCommand(ctx, "rbd", "-m", c.cfg.MonitorHosts(), "ls", strings.TrimSpace(pool), "--format", "json")
+	output, err := c.runCommand(ctx, "rbd", "ls", strings.TrimSpace(pool), "--format", "json")
 	if err != nil {
 		return nil, err
 	}

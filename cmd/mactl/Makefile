@@ -50,3 +50,9 @@ test3:
 .PHONY: test-unit
 test-unit:
 	$(GO) test ./cmd -v -ginkgo.v -timeout=5m
+
+.PHONY:test-ceph
+test-ceph:
+	$(GO) test . -ginkgo.focus="Ceph volume backed VM lifecycle" -count=1
+	#$(GO) test -v . -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -ginkgo.focus-file mactl-ceph-lifecycle_test.go -timeout=10m -coverprofile cover.out
+

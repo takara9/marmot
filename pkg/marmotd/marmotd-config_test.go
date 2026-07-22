@@ -118,7 +118,33 @@ var _ = Describe("VolumeGroupConfig", func() {
 		})
 
 		It("ceph_enabled の設定値を読み込む", func() {
+			if _, err := os.Stat(marmotd.DefaultCephConfPath); err != nil {
+				Skip("default ceph.conf is required")
+			}
+			if _, err := os.Stat(marmotd.DefaultCephKeyringPath); err != nil {
+				Skip("default ceph keyring is required")
+			}
+
 			dir := GinkgoT().TempDir()
+
+			path := filepath.Join(dir, "marmotd.json")
+			content := []byte(`{"ceph_enabled":true}`)
+
+			err := os.WriteFile(path, content, 0o644)
+			Expect(err).NotTo(HaveOccurred())
+
+			cfg, err := marmotd.LoadConfig(path)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cfg.CephEnabled).To(BeTrue())
+		})
+
+		It("ceph_enabled=true かつ ceph.conf 未配置の場合はエラーになる", func() {
+			if _, err := os.Stat(marmotd.DefaultCephConfPath); err == nil {
+				Skip("default ceph.conf exists; missing-file scenario cannot be simulated without env override")
+			}
+
+			dir := GinkgoT().TempDir()
+
 			path := filepath.Join(dir, "marmotd.json")
 			content := []byte(`{"ceph_enabled":true}`)
 
@@ -127,34 +153,11 @@ var _ = Describe("VolumeGroupConfig", func() {
 
 			_, err = marmotd.LoadConfig(path)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("ceph_monitors"))
+			Expect(err.Error()).To(ContainSubstring("ceph conf file"))
 		})
 
-		It("ceph_enabled=true かつ ceph_key_file 未指定の場合はエラーになる", func() {
-			dir := GinkgoT().TempDir()
-			path := filepath.Join(dir, "marmotd.json")
-			content := []byte(`{"ceph_enabled":true,"ceph_monitors":["10.1.4.11:6789"]}`)
-
-			err := os.WriteFile(path, content, 0o644)
-			Expect(err).NotTo(HaveOccurred())
-
-			_, err = marmotd.LoadConfig(path)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("ceph_key_file"))
-		})
-
-		It("ceph_key_file にディレクトリを指定した場合はエラーになる", func() {
-			dir := GinkgoT().TempDir()
-			keyDir := GinkgoT().TempDir()
-			path := filepath.Join(dir, "marmotd.json")
-			content := []byte(`{"ceph_enabled":true,"ceph_monitors":["10.1.4.11:6789"],"ceph_key_file":"` + keyDir + `"}`)
-
-			err := os.WriteFile(path, content, 0o644)
-			Expect(err).NotTo(HaveOccurred())
-
-			_, err = marmotd.LoadConfig(path)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("ceph_key_file"))
+		It("ceph keyring file にディレクトリを指定した場合はエラーになる", func() {
+			Skip("ceph keyring path override test was removed with env override deprecation")
 		})
 
 		It("ceph_enabled が未指定の場合は false (既定値)", func() {
@@ -168,33 +171,6 @@ var _ = Describe("VolumeGroupConfig", func() {
 			cfg, err := marmotd.LoadConfig(path)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(cfg.CephEnabled).To(BeFalse())
-		})
-
-		It("Ceph monitors の設定値を読み込む", func() {
-			dir := GinkgoT().TempDir()
-			path := filepath.Join(dir, "marmotd.json")
-			content := []byte(`{"ceph_monitors":["10.1.4.11:6789","10.1.4.12:6789"," 10.1.4.13:6789 "]}`)
-
-			err := os.WriteFile(path, content, 0o644)
-			Expect(err).NotTo(HaveOccurred())
-
-			cfg, err := marmotd.LoadConfig(path)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(cfg.CephMonitors).To(Equal([]string{"10.1.4.11:6789", "10.1.4.12:6789", "10.1.4.13:6789"}))
-		})
-
-		It("Ceph user と key_file の設定値を読み込む", func() {
-			dir := GinkgoT().TempDir()
-			path := filepath.Join(dir, "marmotd.json")
-			content := []byte(`{"ceph_user":" client.marmot ","ceph_key_file":" /etc/ceph/marmot.client.key "}`)
-
-			err := os.WriteFile(path, content, 0o644)
-			Expect(err).NotTo(HaveOccurred())
-
-			cfg, err := marmotd.LoadConfig(path)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(cfg.CephUser).To(Equal("client.marmot"))
-			Expect(cfg.CephKeyFile).To(Equal("/etc/ceph/marmot.client.key"))
 		})
 
 		It("Ceph CRUSH rule と pool の設定を読み込む", func() {
@@ -269,18 +245,19 @@ var _ = Describe("VolumeGroupConfig", func() {
 			Expect(cfg.CephPoolByClass).To(HaveLen(0))
 		})
 
-		It("Ceph 全パラメーターを一度に読み込む", func() {
+		It("Ceph 設定（有効化+classマップ）を一度に読み込む", func() {
+			if _, err := os.Stat(marmotd.DefaultCephConfPath); err != nil {
+				Skip("default ceph.conf is required")
+			}
+			if _, err := os.Stat(marmotd.DefaultCephKeyringPath); err != nil {
+				Skip("default ceph keyring is required")
+			}
+
 			dir := GinkgoT().TempDir()
-			keyFile := filepath.Join(dir, "marmot.client.key")
-			err := os.WriteFile(keyFile, []byte("dummykey"), 0o600)
-			Expect(err).NotTo(HaveOccurred())
 
 			path := filepath.Join(dir, "marmotd.json")
 			content := []byte(`{
 				"ceph_enabled": true,
-				"ceph_monitors": ["10.1.4.11:6789", "10.1.4.12:6789"],
-				"ceph_user": "client.marmot",
-				"ceph_key_file": "` + keyFile + `",
 				"ceph_crush_rule_by_class": {"hdd": "rule-hdd", "ssd": "rule-ssd"},
 				"ceph_pool_by_class": [
 					{"storageClass":"hdd","pool":"marmot-hdd"},
@@ -288,15 +265,12 @@ var _ = Describe("VolumeGroupConfig", func() {
 				]
 			}`)
 
-			err = os.WriteFile(path, content, 0o644)
+			err := os.WriteFile(path, content, 0o644)
 			Expect(err).NotTo(HaveOccurred())
 
 			cfg, err := marmotd.LoadConfig(path)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(cfg.CephEnabled).To(BeTrue())
-			Expect(cfg.CephMonitors).To(Equal([]string{"10.1.4.11:6789", "10.1.4.12:6789"}))
-			Expect(cfg.CephUser).To(Equal("client.marmot"))
-			Expect(cfg.CephKeyFile).To(Equal(keyFile))
 			Expect(cfg.CephCrushRuleByClass).To(Equal(map[string]string{"hdd": "rule-hdd", "ssd": "rule-ssd"}))
 			Expect(cfg.CephPoolByClass).To(Equal(map[string]string{"hdd": "marmot-hdd", "ssd": "marmot-ssd"}))
 		})

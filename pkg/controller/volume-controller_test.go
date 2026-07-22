@@ -141,3 +141,19 @@ func TestShouldFailVolumeForMissingAssignedNode(t *testing.T) {
 		})
 	}
 }
+
+func TestDeletingVolumeIsNotSkippedByNodeAssignmentCheck(t *testing.T) {
+	ws1 := util.StringPtr("ws1")
+	statuses := []api.HostStatus{{NodeName: util.StringPtr("hvc")}}
+	vol := api.Volume{
+		Metadata: api.Metadata{NodeName: ws1},
+		Status:   &api.Status{StatusCode: db.VOLUME_DELETING},
+	}
+
+	if shouldFail, _ := shouldFailVolumeForMissingAssignedNode(vol, statuses); shouldFail {
+		t.Fatal("shouldFailVolumeForMissingAssignedNode() = true, want false for deleting volume")
+	}
+	if shouldDelete, reason := shouldDeleteVolumeForMissingAssignedNode(vol, statuses); !shouldDelete || reason != "assigned_node_not_found" {
+		t.Fatalf("shouldDeleteVolumeForMissingAssignedNode() = (%v, %q), want (true, \"assigned_node_not_found\")", shouldDelete, reason)
+	}
+}

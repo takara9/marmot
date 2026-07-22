@@ -69,41 +69,35 @@ func TestFindISCSIServerNodeName_NoActiveHosts(t *testing.T) {
 	}
 }
 
-func TestNormalizeVolumeSpecISCSIAlias_TypeIscsiAlias(t *testing.T) {
+func TestNormalizeIncomingVolumeSpecForCompatibility_TypeIscsiAlias(t *testing.T) {
 	volume := api.Volume{
 		Spec: api.VolSpec{Type: util.StringPtr(" ISCSI ")},
 	}
 
-	util.NormalizeVolumeSpecISCSIAlias(&volume.Spec)
+	normalizeIncomingVolumeSpecForCompatibility(&volume)
 
 	if volume.Spec.Type == nil || *volume.Spec.Type != "lvm" {
 		t.Fatalf("type = %#v, want lvm", volume.Spec.Type)
 	}
 	if volume.Spec.Kind == nil || *volume.Spec.Kind != "data" {
 		t.Fatalf("kind = %#v, want data", volume.Spec.Kind)
-	}
-	if volume.Spec.Size == nil || *volume.Spec.Size != 1 {
-		t.Fatalf("size = %#v, want 1", volume.Spec.Size)
 	}
 	if volume.Spec.Iscsi == nil || !*volume.Spec.Iscsi {
 		t.Fatalf("iscsi = %#v, want true", volume.Spec.Iscsi)
 	}
 }
 
-func TestNormalizeVolumeSpecISCSIAlias_IscsiFlagWithoutType(t *testing.T) {
+func TestNormalizeIncomingVolumeSpecForCompatibility_IscsiFlagWithoutType(t *testing.T) {
 	volume := api.Volume{
 		Spec: api.VolSpec{Iscsi: util.BoolPtr(true)},
 	}
 
-	util.NormalizeVolumeSpecISCSIAlias(&volume.Spec)
+	normalizeIncomingVolumeSpecForCompatibility(&volume)
 
 	if volume.Spec.Type == nil || *volume.Spec.Type != "lvm" {
 		t.Fatalf("type = %#v, want lvm", volume.Spec.Type)
 	}
 	if volume.Spec.Kind == nil || *volume.Spec.Kind != "data" {
 		t.Fatalf("kind = %#v, want data", volume.Spec.Kind)
-	}
-	if volume.Spec.Size == nil || *volume.Spec.Size != 1 {
-		t.Fatalf("size = %#v, want 1", volume.Spec.Size)
 	}
 }

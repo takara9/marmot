@@ -7,10 +7,10 @@ import (
 	"github.com/takara9/marmot/pkg/util"
 )
 
-func TestNormalizeVolumeSpecISCSIAlias_TypeIscsiAlias(t *testing.T) {
+func TestNormalizeVolumeSpecTypeAlias_TypeIscsiAlias(t *testing.T) {
 	spec := api.VolSpec{Type: util.StringPtr(" ISCSI ")}
 
-	util.NormalizeVolumeSpecISCSIAlias(&spec)
+	normalizeVolumeSpecTypeAlias(&spec)
 
 	if spec.Type == nil || *spec.Type != "lvm" {
 		t.Fatalf("type = %#v, want lvm", spec.Type)
@@ -23,10 +23,10 @@ func TestNormalizeVolumeSpecISCSIAlias_TypeIscsiAlias(t *testing.T) {
 	}
 }
 
-func TestNormalizeVolumeSpecISCSIAlias_IscsiFlagWithoutType(t *testing.T) {
+func TestNormalizeVolumeSpecTypeAlias_IscsiFlagWithoutType(t *testing.T) {
 	spec := api.VolSpec{Iscsi: util.BoolPtr(true)}
 
-	util.NormalizeVolumeSpecISCSIAlias(&spec)
+	normalizeVolumeSpecTypeAlias(&spec)
 
 	if spec.Type == nil || *spec.Type != "lvm" {
 		t.Fatalf("type = %#v, want lvm", spec.Type)

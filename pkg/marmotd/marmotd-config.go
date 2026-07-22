@@ -15,6 +15,28 @@ import (
 
 const DefaultConfigPath = "/etc/marmot/marmotd.json"
 
+const (
+	DefaultCephConfPath    = "/etc/ceph/ceph.conf"
+	DefaultCephKeyringPath = "/etc/ceph/ceph.client.admin.keyring"
+)
+
+var cephConfPathForRuntime = DefaultCephConfPath
+var cephKeyringPathForRuntime = DefaultCephKeyringPath
+
+func effectiveCephConfPath() string {
+	if path := strings.TrimSpace(cephConfPathForRuntime); path != "" {
+		return path
+	}
+	return DefaultCephConfPath
+}
+
+func effectiveCephKeyringPath() string {
+	if path := strings.TrimSpace(cephKeyringPathForRuntime); path != "" {
+		return path
+	}
+	return DefaultCephKeyringPath
+}
+
 // OSImage represents an OS image configuration to be automatically provisioned
 type OSImage struct {
 	// イメージの名前
@@ -157,21 +179,6 @@ type MarmotdConfig struct {
 	// false（省略時）の場合、Ceph 機能は無効化される。
 	CephEnabled bool `json:"ceph_enabled"`
 
-	// Ceph Monitor のアドレスリスト。
-	// 例: ["10.1.4.11:6789", "10.1.4.12:6789", "10.1.4.13:6789"]
-	// ceph_enabled=true の場合、最低1つ必須。
-	CephMonitors []string `json:"ceph_monitors"`
-
-	// Ceph クラスタに接続するユーザー名。
-	// 例: "client.marmot"
-	// ceph_enabled=true の場合、最小権限ユーザーの指定が推奨。
-	CephUser string `json:"ceph_user"`
-
-	// Ceph 認証キーファイルのパス。
-	// 例: "/etc/ceph/marmot.client.key"
-	// ceph_enabled=true の場合、ファイル存在確認と読み取り権限チェックが行われる。
-	CephKeyFile string `json:"ceph_key_file"`
-
 	// storageClass から Ceph CRUSH rule への対応マップ。
 	// キーは storageClass (hdd, ssd, nvme など)、値は CRUSH rule 名。
 	// 例: {"hdd": "rule-hdd", "ssd": "rule-ssd", "nvme": "rule-nvme"}
@@ -257,9 +264,6 @@ func defaultConfig() *MarmotdConfig {
 		TLSCertFile:                      "",
 		TLSKeyFile:                       "",
 		CephEnabled:                      false,
-		CephMonitors:                     nil,
-		CephUser:                         "",
-		CephKeyFile:                      "",
 		CephCrushRuleByClass:             make(map[string]string),
 		CephPoolByClass:                  make(map[string]string),
 	}
@@ -349,11 +353,6 @@ func normalizeConfig(cfg *MarmotdConfig) *MarmotdConfig {
 	normalized.LokiPushURL = strings.TrimSpace(normalized.LokiPushURL)
 	normalized.TLSCertFile = strings.TrimSpace(normalized.TLSCertFile)
 	normalized.TLSKeyFile = strings.TrimSpace(normalized.TLSKeyFile)
-
-	// Ceph パラメーターの正規化
-	normalized.CephMonitors = trimNonEmptyStrings(normalized.CephMonitors)
-	normalized.CephUser = strings.TrimSpace(normalized.CephUser)
-	normalized.CephKeyFile = strings.TrimSpace(normalized.CephKeyFile)
 
 	// Ceph マップのキーと値をトリミング
 	if normalized.CephCrushRuleByClass == nil {
@@ -531,25 +530,38 @@ func validateCephConfig(cfg *MarmotdConfig) error {
 	if !cfg.CephEnabled {
 		return nil
 	}
-	if len(cfg.CephMonitors) == 0 {
-		return fmt.Errorf("ceph_monitors: ceph_enabled=true の場合、最低1つ必須です")
-	}
-	if cfg.CephKeyFile == "" {
-		return fmt.Errorf("ceph_key_file: ceph_enabled=true の場合、必須です")
-	}
-	fi, err := os.Stat(cfg.CephKeyFile)
+	cephConfPath := effectiveCephConfPath()
+	cephKeyringPath := effectiveCephKeyringPath()
+
+	fi, err := os.Stat(cephConfPath)
 	if err != nil {
-		return fmt.Errorf("ceph_key_file: %w", err)
+		return fmt.Errorf("ceph conf file: %w", err)
 	}
 	if fi.IsDir() {
-		return fmt.Errorf("ceph_key_file: ディレクトリは指定できません")
+		return fmt.Errorf("ceph conf file: ディレクトリは指定できません")
 	}
 	if !fi.Mode().IsRegular() {
-		return fmt.Errorf("ceph_key_file: 通常ファイルを指定してください")
+		return fmt.Errorf("ceph conf file: 通常ファイルを指定してください")
 	}
-	f, err := os.Open(cfg.CephKeyFile)
+	f, err := os.Open(cephConfPath)
 	if err != nil {
-		return fmt.Errorf("ceph_key_file: %w", err)
+		return fmt.Errorf("ceph conf file: %w", err)
+	}
+	_ = f.Close()
+
+	fi, err = os.Stat(cephKeyringPath)
+	if err != nil {
+		return fmt.Errorf("ceph keyring file: %w", err)
+	}
+	if fi.IsDir() {
+		return fmt.Errorf("ceph keyring file: ディレクトリは指定できません")
+	}
+	if !fi.Mode().IsRegular() {
+		return fmt.Errorf("ceph keyring file: 通常ファイルを指定してください")
+	}
+	f, err = os.Open(cephKeyringPath)
+	if err != nil {
+		return fmt.Errorf("ceph keyring file: %w", err)
 	}
 	_ = f.Close()
 	return nil

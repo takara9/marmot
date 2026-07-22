@@ -26,9 +26,6 @@ func MapVolumeToRequest(volume api.Volume, cfg Config) (VolumeRequest, error) {
  		sizeGB = *volume.Spec.Size
  	}
 	storageClass := normalizeStorageClass(ptrString(volume.Spec.StorageClass))
-	if storageClass == "" {
-		storageClass = "ssd"
-	}
 	if err := ValidateStorageClass(storageClass); err != nil {
 		return VolumeRequest{}, err
 	}

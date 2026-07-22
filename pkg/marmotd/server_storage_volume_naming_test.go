@@ -137,3 +137,28 @@ func TestNormalizeNewStorageVolumeRequest(t *testing.T) {
 		}
 	})
 }
+
+func TestShouldSkipVolumeDeletion(t *testing.T) {
+	t.Run("returns false when persistent is nil", func(t *testing.T) {
+		vol := api.Volume{}
+		if shouldSkipVolumeDeletion(vol) {
+			t.Fatal("shouldSkipVolumeDeletion() = true, want false")
+		}
+	})
+
+	t.Run("returns false when persistent is false", func(t *testing.T) {
+		persistent := false
+		vol := api.Volume{Spec: api.VolSpec{Persistent: &persistent}}
+		if shouldSkipVolumeDeletion(vol) {
+			t.Fatal("shouldSkipVolumeDeletion() = true, want false")
+		}
+	})
+
+	t.Run("returns true when persistent is true", func(t *testing.T) {
+		persistent := true
+		vol := api.Volume{Spec: api.VolSpec{Persistent: &persistent}}
+		if !shouldSkipVolumeDeletion(vol) {
+			t.Fatal("shouldSkipVolumeDeletion() = false, want true")
+		}
+	})
+}

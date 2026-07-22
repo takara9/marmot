@@ -210,3 +210,22 @@ $ systemctl status marmot
 Aug 24 06:27:03 hvc systemd[1]: Started marmot - vm cluster service.
 Aug 24 06:27:03 hvc sh[16473]: node =  hvc
 ```
+
+
+## Cephクライアントの導入
+
+```console
+curl -sOL https://download.ceph.com/keys/release.asc | sudo tee /etc/apt/trusted.gpg.d/ceph.asc
+echo "deb https://download.ceph.com/debian-tentacle/ $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/ceph.list
+sudo apt update
+sudo apt install -y ceph-common
+```
+
+## Ceph認証情報とアクセス先のセット
+
+```console
+scp /etc/ceph/ceph.conf root@runner1:/etc/ceph
+scp /etc/ceph/ceph.client.admin.keyring root@runner1:/etc/ceph
+```
+
+

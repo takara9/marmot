@@ -121,6 +121,42 @@ func (c *controller) volumeControllerLoop() {
 		//}
 
 		// 削除タイムスタンプが設定されて一定時間経過したボリュームのステータスをDELETINGに更新する
+
+		if vol.Status != nil && vol.Status.StatusCode == db.VOLUME_DELETING {
+			slog.Debug("削除中のボリュームを処理", "volId", volID)
+			shouldCleanupISCSI := vol.Spec.Type != nil && *vol.Spec.Type == "lvm" &&
+				vol.Spec.Kind != nil && *vol.Spec.Kind == "data" &&
+				((vol.Spec.Iscsi != nil && *vol.Spec.Iscsi) ||
+					(vol.Spec.IscsiTargetIqn != nil && strings.TrimSpace(*vol.Spec.IscsiTargetIqn) != ""))
+			if shouldCleanupISCSI {
+				if err := c.marmot.CleanupISCSIForVolumeByID(volID); err != nil {
+					errMsg := strings.ToLower(err.Error())
+					if strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "no such") || strings.Contains(errMsg, "does not exist") {
+						slog.Warn("iSCSI公開解除対象が見つからないため処理を継続", "volId", volID, "err", err)
+					} else {
+						slog.Error("CleanupISCSIForVolumeByID()", "err", err, "volId", volID)
+						c.db.UpdateVolumeStatusMessage(volID, db.VOLUME_ERROR, err.Error())
+						continue
+					}
+				}
+			}
+
+			if err := c.marmot.RemoveVolume(volID); err != nil {
+				errMsg := strings.ToLower(err.Error())
+				if strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "no such") || strings.Contains(errMsg, "does not exist") {
+					slog.Warn("削除対象の実体が見つからないためオブジェクト削除を継続", "volId", volID, "err", err)
+				} else {
+					slog.Error("RemoveVolume()", "err", err)
+					c.db.UpdateVolumeStatusMessage(volID, db.VOLUME_ERROR, err.Error())
+					continue
+				}
+			}
+			if err := c.db.DeleteVolume(volID); err != nil {
+				slog.Error("DeleteVolume()", "err", err, "volId", volID)
+			}
+			slog.Debug("ボリュームの削除成功", "volId", volID)
+			continue
+		}
 		if vol.Status != nil && vol.Status.DeletionTimeStamp != nil {
 			deletionTime := *vol.Status.DeletionTimeStamp
 			if time.Since(deletionTime) > c.deletionDelay {
@@ -169,40 +205,6 @@ func (c *controller) volumeControllerLoop() {
 			c.db.UpdateVolumeStatus(volID, db.VOLUME_AVAILABLE)
 		case db.VOLUME_PROVISIONING:
 			slog.Debug("プロビジョニング中のボリュームを処理", "volId", volID)
-
-		case db.VOLUME_DELETING:
-			slog.Debug("削除中のボリュームを処理", "volId", volID)
-			shouldCleanupISCSI := vol.Spec.Type != nil && *vol.Spec.Type == "lvm" &&
-				vol.Spec.Kind != nil && *vol.Spec.Kind == "data" &&
-				((vol.Spec.Iscsi != nil && *vol.Spec.Iscsi) ||
-					(vol.Spec.IscsiTargetIqn != nil && strings.TrimSpace(*vol.Spec.IscsiTargetIqn) != ""))
-			if shouldCleanupISCSI {
-				if err := c.marmot.CleanupISCSIForVolumeByID(volID); err != nil {
-					errMsg := strings.ToLower(err.Error())
-					if strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "no such") || strings.Contains(errMsg, "does not exist") {
-						slog.Warn("iSCSI公開解除対象が見つからないため処理を継続", "volId", volID, "err", err)
-					} else {
-						slog.Error("CleanupISCSIForVolumeByID()", "err", err, "volId", volID)
-						c.db.UpdateVolumeStatusMessage(volID, db.VOLUME_ERROR, err.Error())
-						continue
-					}
-				}
-			}
-
-			if err := c.marmot.RemoveVolume(volID); err != nil {
-				errMsg := strings.ToLower(err.Error())
-				if strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "no such") || strings.Contains(errMsg, "does not exist") {
-					slog.Warn("削除対象の実体が見つからないためオブジェクト削除を継続", "volId", volID, "err", err)
-				} else {
-					slog.Error("RemoveVolume()", "err", err)
-					c.db.UpdateVolumeStatusMessage(volID, db.VOLUME_ERROR, err.Error())
-					continue
-				}
-			}
-			if err := c.db.DeleteVolume(volID); err != nil {
-				slog.Error("DeleteVolume()", "err", err, "volId", volID)
-			}
-			slog.Debug("ボリュームの削除成功", "volId", volID)
 
 		case db.VOLUME_ERROR:
 			slog.Debug("エラー状態のボリュームを処理", "volId", volID)
