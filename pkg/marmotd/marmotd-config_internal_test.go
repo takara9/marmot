@@ -2,7 +2,12 @@ package marmotd
 
 import (
 	"net"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
+
+	"github.com/takara9/marmot/pkg/db"
 )
 
 func TestResolveDNSListenAddrFromInterfaces_UsesFirstIPv4AfterLo(t *testing.T) {
@@ -83,4 +88,99 @@ func TestNormalizeConfig_DNSListenAddrEmpty_UsesInterfaceIPv4(t *testing.T) {
 	if cfg.DNSListenAddr != "10.10.0.5:53" {
 		t.Fatalf("expected interface-based dns listen addr, got: %s", cfg.DNSListenAddr)
 	}
+}
+
+func TestParseSessionIdleTimeout(t *testing.T) {
+	tests := []struct {
+		name    string
+		in      string
+		want    time.Duration
+		wantErr bool
+	}{
+		{name: "minutes", in: "30m", want: 30 * time.Minute},
+		{name: "hours", in: "24h", want: 24 * time.Hour},
+		{name: "days", in: "3d", want: 72 * time.Hour},
+		{name: "trim and uppercase", in: " 2H ", want: 2 * time.Hour},
+		{name: "invalid unit", in: "10w", wantErr: true},
+		{name: "missing unit", in: "10", wantErr: true},
+		{name: "zero", in: "0h", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseSessionIdleTimeout(tt.in)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error for input %q", tt.in)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error for input %q: %v", tt.in, err)
+			}
+			if got != tt.want {
+				t.Fatalf("unexpected duration for input %q: got %s want %s", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSetRuntimeConfig_AppliesSessionIdleTimeout(t *testing.T) {
+	origCfg := CurrentConfig()
+	origTimeout := db.GetAuthSessionIdleTimeout()
+	t.Cleanup(func() {
+		SetRuntimeConfig(origCfg)
+		_ = db.SetAuthSessionIdleTimeout(origTimeout)
+	})
+
+	cfg := *origCfg
+	cfg.SessionIdleTimeout = "2h"
+	SetRuntimeConfig(&cfg)
+
+	if got := db.GetAuthSessionIdleTimeout(); got != 2*time.Hour {
+		t.Fatalf("unexpected auth idle timeout: got %s want %s", got, 2*time.Hour)
+	}
+}
+
+func TestLoadConfig_SessionIdleTimeout(t *testing.T) {
+	t.Run("defaults to 1h when omitted", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, "marmotd.json")
+		if err := os.WriteFile(path, []byte(`{"node_name":"hv1"}`), 0o644); err != nil {
+			t.Fatalf("failed to write config file: %v", err)
+		}
+		cfg, err := LoadConfig(path)
+		if err != nil {
+			t.Fatalf("unexpected error loading config: %v", err)
+		}
+		if cfg.SessionIdleTimeout != "1h" {
+			t.Fatalf("unexpected default session_idle_timeout: got %q want %q", cfg.SessionIdleTimeout, "1h")
+		}
+	})
+
+	t.Run("accepts d unit", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, "marmotd.json")
+		if err := os.WriteFile(path, []byte(`{"session_idle_timeout":"3d"}`), 0o644); err != nil {
+			t.Fatalf("failed to write config file: %v", err)
+		}
+		cfg, err := LoadConfig(path)
+		if err != nil {
+			t.Fatalf("unexpected error loading config: %v", err)
+		}
+		if cfg.SessionIdleTimeout != "3d" {
+			t.Fatalf("unexpected session_idle_timeout: got %q want %q", cfg.SessionIdleTimeout, "3d")
+		}
+	})
+
+	t.Run("rejects invalid unit", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, "marmotd.json")
+		if err := os.WriteFile(path, []byte(`{"session_idle_timeout":"30x"}`), 0o644); err != nil {
+			t.Fatalf("failed to write config file: %v", err)
+		}
+		if _, err := LoadConfig(path); err == nil {
+			t.Fatalf("expected error for invalid session_idle_timeout")
+		}
+	})
 }

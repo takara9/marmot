@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,21 +19,35 @@ import (
 )
 
 const (
-	BootstrapAdminUserID       = "admin"
-	BootstrapAdminPassword     = "passw0rd"
-	BootstrapAdminRoleName     = "Administrator"
-	BootstrapAdminComment      = "bootstrap administrator"
+	BootstrapAdminUserID   = "admin"
+	BootstrapAdminPassword = "passw0rd"
+	BootstrapAdminRoleName = "Administrator"
+	BootstrapAdminComment  = "bootstrap administrator"
 )
 
 const (
-	AuthUserPrefix          = "/marmot/user"
-	AuthRolePrefix          = "/marmot/role"
-	AuthUserApiKeyPrefix    = "/marmot/user-apikey"
-	AuthApiKeyIndexPrefix   = "/marmot/apikey-index"
-	AuthApiKeyTokenPrefixLen = 8
-	AuthSessionIdleTimeout  = 30 * time.Minute
-	ApiKeySessionTypeLogin  = "login"
+	AuthUserPrefix                = "/marmot/user"
+	AuthRolePrefix                = "/marmot/role"
+	AuthUserApiKeyPrefix          = "/marmot/user-apikey"
+	AuthApiKeyIndexPrefix         = "/marmot/apikey-index"
+	AuthApiKeyTokenPrefixLen      = 8
+	DefaultAuthSessionIdleTimeout = 1 * time.Hour
+	ApiKeySessionTypeLogin        = "login"
 )
+
+var authSessionIdleTimeoutNanos int64 = int64(DefaultAuthSessionIdleTimeout)
+
+func GetAuthSessionIdleTimeout() time.Duration {
+	return time.Duration(atomic.LoadInt64(&authSessionIdleTimeoutNanos))
+}
+
+func SetAuthSessionIdleTimeout(timeout time.Duration) error {
+	if timeout <= 0 {
+		return fmt.Errorf("auth session idle timeout must be greater than zero: %s", timeout)
+	}
+	atomic.StoreInt64(&authSessionIdleTimeoutNanos, int64(timeout))
+	return nil
+}
 
 var ErrInvalidCredentials = errors.New("invalid credentials")
 var ErrUserLocked = errors.New("user is locked")
@@ -1159,7 +1174,7 @@ func (d *Database) AuthenticateApiKey(token string) (api.User, api.ApiKey, error
 	} else if apiKey.Spec.IssuedAt != nil {
 		lastActivityAt = *apiKey.Spec.IssuedAt
 	}
-	if now.Sub(lastActivityAt) >= AuthSessionIdleTimeout {
+	if now.Sub(lastActivityAt) >= GetAuthSessionIdleTimeout() {
 		return api.User{}, api.ApiKey{}, ErrInvalidCredentials
 	}
 	if apiKey.Status == nil {

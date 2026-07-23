@@ -220,7 +220,7 @@ var _ = Describe("Auth", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("invalidates login session API key after 30 minutes of inactivity", func() {
+		It("invalidates login session API key after configured inactivity timeout", func() {
 			idleUserID := "idle-timeout-user"
 			if _, err := d.GetUserById(idleUserID); err != nil {
 				hash, hashErr := bcrypt.GenerateFromPassword([]byte("passw0rd"), bcrypt.DefaultCost)
@@ -228,7 +228,7 @@ var _ = Describe("Auth", Ordered, func() {
 				_, createErr := d.CreateUser(api.User{
 					ApiVersion: "v1",
 					Kind:       "User",
-					Metadata: api.Metadata{Id: idleUserID, Name: idleUserID},
+					Metadata:   api.Metadata{Id: idleUserID, Name: idleUserID},
 					Spec: api.UserSpec{
 						Enabled:      true,
 						PasswordHash: util.StringPtr(string(hash)),
@@ -248,7 +248,8 @@ var _ = Describe("Auth", Ordered, func() {
 			if rec.Status == nil {
 				rec.Status = &api.ApiKeyStatus{}
 			}
-			rec.Status.LastUsedAt = util.TimePtr(time.Now().Add(-31 * time.Minute))
+			idleTimeout := db.GetAuthSessionIdleTimeout()
+			rec.Status.LastUsedAt = util.TimePtr(time.Now().Add(-(idleTimeout + time.Minute)))
 			err = d.PutJSONCAS(storageKey, resp.Kvs[0].ModRevision, rec)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -263,7 +264,7 @@ var _ = Describe("Auth", Ordered, func() {
 			Expect(after.Status).NotTo(BeNil())
 			Expect(after.Status.RevokedAt).To(BeNil())
 
-			revoked, err := d.RevokeIdleLoginSessionsOlderThan(db.AuthSessionIdleTimeout)
+			revoked, err := d.RevokeIdleLoginSessionsOlderThan(db.GetAuthSessionIdleTimeout())
 			Expect(err).NotTo(HaveOccurred())
 			Expect(revoked).To(BeNumerically(">=", 1))
 
@@ -275,7 +276,7 @@ var _ = Describe("Auth", Ordered, func() {
 			Expect(after.Status.RevokedAt).NotTo(BeNil())
 		})
 
-		It("keeps login session API key valid before 30 minutes of inactivity", func() {
+		It("keeps login session API key valid before configured inactivity timeout", func() {
 			activeUserID := "idle-timeout-user-active"
 			if _, err := d.GetUserById(activeUserID); err != nil {
 				hash, hashErr := bcrypt.GenerateFromPassword([]byte("passw0rd"), bcrypt.DefaultCost)
@@ -283,7 +284,7 @@ var _ = Describe("Auth", Ordered, func() {
 				_, createErr := d.CreateUser(api.User{
 					ApiVersion: "v1",
 					Kind:       "User",
-					Metadata: api.Metadata{Id: activeUserID, Name: activeUserID},
+					Metadata:   api.Metadata{Id: activeUserID, Name: activeUserID},
 					Spec: api.UserSpec{
 						Enabled:      true,
 						PasswordHash: util.StringPtr(string(hash)),
@@ -303,7 +304,8 @@ var _ = Describe("Auth", Ordered, func() {
 			if rec.Status == nil {
 				rec.Status = &api.ApiKeyStatus{}
 			}
-			rec.Status.LastUsedAt = util.TimePtr(time.Now().Add(-29 * time.Minute))
+			idleTimeout := db.GetAuthSessionIdleTimeout()
+			rec.Status.LastUsedAt = util.TimePtr(time.Now().Add(-(idleTimeout / 2)))
 			err = d.PutJSONCAS(storageKey, resp.Kvs[0].ModRevision, rec)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -327,7 +329,7 @@ var _ = Describe("Auth", Ordered, func() {
 				_, createErr := d.CreateUser(api.User{
 					ApiVersion: "v1",
 					Kind:       "User",
-					Metadata: api.Metadata{Id: persistentUserID, Name: persistentUserID},
+					Metadata:   api.Metadata{Id: persistentUserID, Name: persistentUserID},
 					Spec: api.UserSpec{
 						Enabled:      true,
 						PasswordHash: util.StringPtr(string(hash)),
@@ -353,7 +355,7 @@ var _ = Describe("Auth", Ordered, func() {
 			_, _, err = d.AuthenticateApiKey(raw)
 			Expect(err).NotTo(HaveOccurred())
 
-			revoked, err := d.RevokeIdleLoginSessionsOlderThan(db.AuthSessionIdleTimeout)
+			revoked, err := d.RevokeIdleLoginSessionsOlderThan(db.GetAuthSessionIdleTimeout())
 			Expect(err).NotTo(HaveOccurred())
 			Expect(revoked).To(BeZero())
 
@@ -488,7 +490,7 @@ var _ = Describe("Auth", Ordered, func() {
 			_, err = d.CreateUser(api.User{
 				ApiVersion: "v1",
 				Kind:       "User",
-				Metadata: api.Metadata{Id: "bob", Name: "bob"},
+				Metadata:   api.Metadata{Id: "bob", Name: "bob"},
 				Spec: api.UserSpec{
 					Enabled:      true,
 					PasswordHash: util.StringPtr(string(customHash)),

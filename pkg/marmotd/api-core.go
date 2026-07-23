@@ -43,7 +43,7 @@ type Server struct {
 
 const (
 	idleLoginSessionRevokeInterval   = 1 * time.Minute
-	revokedAPIKeyCleanupInterval    = 1 * time.Minute
+	revokedAPIKeyCleanupInterval     = 1 * time.Minute
 	revokedAPIKeyPhysicalDeleteAfter = 1 * time.Minute
 )
 
@@ -255,7 +255,7 @@ func (s *Server) startRevokedAPIKeyCleanupWorker() {
 			case <-ctx.Done():
 				return
 			case <-revokeTicker.C:
-				revoked, err := s.Ma.Db.RevokeIdleLoginSessionsOlderThan(db.AuthSessionIdleTimeout)
+				revoked, err := s.Ma.Db.RevokeIdleLoginSessionsOlderThan(db.GetAuthSessionIdleTimeout())
 				if err != nil {
 					slog.Warn("Idle login session revocation failed", "err", err, "revoked", revoked)
 					continue

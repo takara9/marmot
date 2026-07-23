@@ -118,7 +118,7 @@ func (s *Server) ApiAuthLogin(ctx echo.Context) error {
 	if user.Spec.MustChangePassword != nil {
 		resp.MustChangePassword = user.Spec.MustChangePassword
 	}
-	idleExpiresIn := int64(db.AuthSessionIdleTimeout.Seconds())
+	idleExpiresIn := int64(db.GetAuthSessionIdleTimeout().Seconds())
 	if apiKey.Spec.ExpiresAt != nil {
 		remaining := int64(time.Until(*apiKey.Spec.ExpiresAt).Seconds())
 		if remaining > 0 && remaining < idleExpiresIn {
