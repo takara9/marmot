@@ -139,18 +139,24 @@ var _ = Describe("Auth", Ordered, func() {
 		})
 
 		It("creates, resolves, and revokes API keys", func() {
+			fromIP := "192.0.2.10"
 			apiKey, token, err := d.CreateUserApiKey(userID, api.ApiKeyCreateRequest{
 				Comment: util.StringPtr("cli access"),
+				FromIP:  &fromIP,
 			})
 			Expect(err).NotTo(HaveOccurred())
 			rawToken = token
 			Expect(apiKey.Metadata.Id).NotTo(BeEmpty())
+			Expect(apiKey.Spec.FromIP).NotTo(BeNil())
+			Expect(*apiKey.Spec.FromIP).To(Equal(fromIP))
 
 			keys, err := d.ListUserApiKeys(userID)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(keys).To(HaveLen(1))
 			Expect(keys[0].Spec.Comment).NotTo(BeNil())
 			Expect(*keys[0].Spec.Comment).To(Equal("cli access"))
+			Expect(keys[0].Spec.FromIP).NotTo(BeNil())
+			Expect(*keys[0].Spec.FromIP).To(Equal(fromIP))
 
 			resolvedUser, resolvedKey, err := d.AuthenticateApiKey(rawToken)
 			Expect(err).NotTo(HaveOccurred())

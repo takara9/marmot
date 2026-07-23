@@ -2756,6 +2756,8 @@ components:
       properties:
         comment:
           type: string
+        fromIP:
+          type: string
         expiresAt:
           type: string
           format: date-time
@@ -2766,6 +2768,8 @@ components:
       type: object
       properties:
         comment:
+          type: string
+        fromIP:
           type: string
         tokenPrefix:
           type: string

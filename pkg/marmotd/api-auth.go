@@ -3,6 +3,7 @@ package marmotd
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -60,6 +61,22 @@ func bearerTokenFromAuthzHeader(authz string) (string, bool) {
 	return token, true
 }
 
+func sourceIPFromContext(ctx echo.Context) string {
+	ip := strings.TrimSpace(ctx.RealIP())
+	if ip != "" {
+		return ip
+	}
+	remoteAddr := strings.TrimSpace(ctx.Request().RemoteAddr)
+	if remoteAddr == "" {
+		return ""
+	}
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err == nil {
+		return strings.TrimSpace(host)
+	}
+	return remoteAddr
+}
+
 func validatePasswordPolicy(password string) error {
 	p := strings.TrimSpace(password)
 	if len(p) < 8 {
@@ -102,7 +119,11 @@ func (s *Server) ApiAuthLogin(ctx echo.Context) error {
 		return mapLoginError(ctx, err)
 	}
 	sessionType := db.ApiKeySessionTypeLogin
-	apiKey, rawToken, err := s.Ma.Db.CreateUserApiKey(userID, api.ApiKeyCreateRequest{Comment: util.StringPtr("login-session"), SessionType: &sessionType})
+	createReq := api.ApiKeyCreateRequest{Comment: util.StringPtr("login-session"), SessionType: &sessionType}
+	if fromIP := sourceIPFromContext(ctx); fromIP != "" {
+		createReq.FromIP = &fromIP
+	}
+	apiKey, rawToken, err := s.Ma.Db.CreateUserApiKey(userID, createReq)
 	if err != nil {
 		return mapAuthDBError(ctx, err)
 	}
