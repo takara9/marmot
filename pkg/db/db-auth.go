@@ -745,6 +745,7 @@ func (d *Database) CreateUserApiKey(userID string, req api.ApiKeyCreateRequest) 
 		},
 		Spec: api.ApiKeySpec{
 			Comment:     req.Comment,
+			FromIP:      req.FromIP,
 			ExpiresAt:   req.ExpiresAt,
 			IssuedAt:    util.TimePtr(time.Now()),
 			Revoked:     util.BoolPtr(false),

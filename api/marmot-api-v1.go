@@ -68,6 +68,7 @@ type ApiKey struct {
 type ApiKeyCreateRequest struct {
 	Comment   *string    `json:"comment,omitempty" yaml:"comment,omitempty"`
 	ExpiresAt *time.Time `json:"expiresAt,omitempty" yaml:"expiresAt,omitempty"`
+	FromIP    *string    `json:"fromIP,omitempty" yaml:"fromIP,omitempty"`
 
 	// SessionType Session scope for the API key. Login sessions may be revoked automatically after inactivity; generated keys remain persistent until explicitly deleted.
 	SessionType *string `json:"sessionType,omitempty" yaml:"sessionType,omitempty"`
@@ -77,6 +78,7 @@ type ApiKeyCreateRequest struct {
 type ApiKeySpec struct {
 	Comment   *string    `json:"comment,omitempty" yaml:"comment,omitempty"`
 	ExpiresAt *time.Time `json:"expiresAt,omitempty" yaml:"expiresAt,omitempty"`
+	FromIP    *string    `json:"fromIP,omitempty" yaml:"fromIP,omitempty"`
 	IssuedAt  *time.Time `json:"issuedAt,omitempty" yaml:"issuedAt,omitempty"`
 	Revoked   *bool      `json:"revoked,omitempty" yaml:"revoked,omitempty"`
 

@@ -135,6 +135,36 @@ var _ = Describe("Auth API handlers", Ordered, func() {
 		Expect(badPassRec.Code).To(Equal(http.StatusUnauthorized), badPassRec.Body.String())
 	})
 
+	It("stores client source IP in login session", func() {
+		req := httptest.NewRequest(http.MethodPost, "/auth/login", strings.NewReader(`{"userId":"admin","password":"passw0rd"}`))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		req.Header.Set("X-Forwarded-For", "203.0.113.8, 10.0.0.1")
+		rec := httptest.NewRecorder()
+		ctx := e.NewContext(req, rec)
+
+		err := s.ApiAuthLogin(ctx)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(rec.Code).To(Equal(http.StatusOK), rec.Body.String())
+
+		apiKeyID := strings.TrimSpace(rec.Header().Get("X-Marmot-ApiKey-Id"))
+		Expect(apiKeyID).NotTo(BeEmpty())
+
+		keys, err := d.ListUserApiKeys("admin")
+		Expect(err).NotTo(HaveOccurred())
+
+		found := false
+		for _, k := range keys {
+			if strings.TrimSpace(k.Metadata.Id) != apiKeyID {
+				continue
+			}
+			Expect(k.Spec.FromIP).NotTo(BeNil())
+			Expect(*k.Spec.FromIP).To(Equal("203.0.113.8"))
+			found = true
+			break
+		}
+		Expect(found).To(BeTrue())
+	})
+
 	It("supports user CRUD, role assignment, and password policy", func() {
 		token := login("admin", "passw0rd").AccessToken
 

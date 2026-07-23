@@ -18,6 +18,7 @@ type sessionRow struct {
 	UserID     string `json:"userId" yaml:"userId"`
 	SessionID  string `json:"sessionId" yaml:"sessionId"`
 	Status     string `json:"status" yaml:"status"`
+	From       string `json:"from" yaml:"from"`
 	Comment    string `json:"comment" yaml:"comment"`
 	IssuedAt   string `json:"issuedAt" yaml:"issuedAt"`
 	LastUsedAt string `json:"lastUsedAt" yaml:"lastUsedAt"`
@@ -129,6 +130,7 @@ func collectUserSessionRows(m *client.MarmotEndpoint, userID string) ([]sessionR
 			UserID:     userID,
 			SessionID:  apiKeyIdentifier(key),
 			Status:     sessionStatusText(key),
+			From:       sessionFromIPText(key),
 			Comment:    sessionCommentText(key),
 			IssuedAt:   formatTimeText(key.Spec.IssuedAt),
 			LastUsedAt: formatTimeText(sessionLastUsedAt(key)),
@@ -175,6 +177,17 @@ func sessionCommentText(apiKey api.ApiKey) string {
 		return "-"
 	}
 	return comment
+}
+
+func sessionFromIPText(apiKey api.ApiKey) string {
+	if apiKey.Spec.FromIP == nil {
+		return "-"
+	}
+	from := strings.TrimSpace(*apiKey.Spec.FromIP)
+	if from == "" {
+		return "-"
+	}
+	return from
 }
 
 func sessionStatusText(apiKey api.ApiKey) string {
@@ -225,10 +238,18 @@ func timeSinceText(t *time.Time) string {
 }
 
 func printSessionRowsText(rows []sessionRow) {
-	fmt.Printf("%-24s  %-36s  %-8s  %-25s  %-8s  %-20s\n", "USER-ID", "SESSION-ID", "STATUS", "LAST-USED", "AGE", "COMMENT")
+	fmt.Printf("%-24s  %-8s  %-8s  %-39s  %-25s  %-8s  %-20s\n", "USER-ID", "SESSION-ID", "STATUS", "FROM", "LAST-USED", "AGE", "COMMENT")
 	for _, row := range rows {
-		fmt.Printf("%-24s  %-36s  %-8s  %-25s  %-8s  %-20s\n", row.UserID, row.SessionID, row.Status, row.LastUsedAt, row.Age, row.Comment)
+		fmt.Printf("%-24s  %-8s  %-8s  %-39s  %-25s  %-8s  %-20s\n", row.UserID, shortSessionID(row.SessionID), row.Status, row.From, row.LastUsedAt, row.Age, row.Comment)
 	}
+}
+
+func shortSessionID(sessionID string) string {
+	id := strings.TrimSpace(sessionID)
+	if len(id) <= 8 {
+		return id
+	}
+	return id[:8]
 }
 
 func printSessionRowsJSON(rows []sessionRow) {
