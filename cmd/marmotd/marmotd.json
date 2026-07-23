@@ -9,6 +9,7 @@
   "os_volume_group": "",
   "data_volume_group": "",
   "deletion_delay_seconds": 10,
+  "session_idle_timeout": "1h",
   "image_create_from_vm_timeout_seconds": 600,
   "image_create_from_url_timeout_seconds": 1800,
   "image_download_timeout_seconds": 1800,

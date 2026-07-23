@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -67,9 +68,9 @@ type HostBridgeNameserversConfig struct {
 }
 
 type HostBridgeDefaultConfig struct {
-	Netmasklen  int                          `json:"netmasklen"`
-	Nameservers HostBridgeNameserversConfig  `json:"nameservers"`
-	Routes      []HostBridgeRouteConfig      `json:"routes"`
+	Netmasklen  int                         `json:"netmasklen"`
+	Nameservers HostBridgeNameserversConfig `json:"nameservers"`
+	Routes      []HostBridgeRouteConfig     `json:"routes"`
 }
 
 type cephPoolByClassEntry struct {
@@ -132,6 +133,11 @@ type MarmotdConfig struct {
 	// コントローラーが DeletionTimestamp を検知してから実際に削除処理を
 	// 開始するまでの待機秒数
 	DeletionDelaySeconds int `json:"deletion_delay_seconds"`
+
+	// ログインセッションをアイドル判定で失効させるまでの時間。
+	// "<数値><単位>" 形式で指定し、単位は m / h / d を利用可能。
+	// 例: "30m", "24h", "3d"
+	SessionIdleTimeout string `json:"session_idle_timeout"`
 
 	// 実行中 VM からイメージを作成する際の既定タイムアウト秒数
 	ImageCreateFromVMTimeoutSeconds int `json:"image_create_from_vm_timeout_seconds"`
@@ -244,28 +250,29 @@ var listInterfaceAddrs = func(iface net.Interface) ([]net.Addr, error) {
 // 指定されていない場合に使用されるデフォルト値を返します。
 func defaultConfig() *MarmotdConfig {
 	return &MarmotdConfig{
-		NodeName:                         "hv1",
-		EtcdURL:                          "http://127.0.0.1:2379",
-		APIListenAddr:                    "0.0.0.0:8750",
-		DNSListenAddr:                    "0.0.0.0:53",
-		DNSUpstream:                      "8.8.8.8:53",
-		DNSUpstreamAllowCIDRs:            nil,
-		DefaultUnderlayInterface:         "",
-		OSVolumeGroup:                    db.DefaultOSVolumeGroup,
-		DataVolumeGroup:                  db.DefaultDataVolumeGroup,
-		DeletionDelaySeconds:             10,
-		ImageCreateFromVMTimeoutSeconds:  600,
-		ImageCreateFromURLTimeoutSeconds: 1800,
-		ImageDownloadTimeoutSeconds:      1800,
-		ImageResizeTimeoutSeconds:        600,
-		ImageDeleteTimeoutSeconds:        120,
+		NodeName:                          "hv1",
+		EtcdURL:                           "http://127.0.0.1:2379",
+		APIListenAddr:                     "0.0.0.0:8750",
+		DNSListenAddr:                     "0.0.0.0:53",
+		DNSUpstream:                       "8.8.8.8:53",
+		DNSUpstreamAllowCIDRs:             nil,
+		DefaultUnderlayInterface:          "",
+		OSVolumeGroup:                     db.DefaultOSVolumeGroup,
+		DataVolumeGroup:                   db.DefaultDataVolumeGroup,
+		DeletionDelaySeconds:              10,
+		SessionIdleTimeout:                "1h",
+		ImageCreateFromVMTimeoutSeconds:   600,
+		ImageCreateFromURLTimeoutSeconds:  1800,
+		ImageDownloadTimeoutSeconds:       1800,
+		ImageResizeTimeoutSeconds:         600,
+		ImageDeleteTimeoutSeconds:         120,
 		CephVolumeOperationTimeoutSeconds: 120,
-		LokiPushURL:                      "",
-		TLSCertFile:                      "",
-		TLSKeyFile:                       "",
-		CephEnabled:                      false,
-		CephCrushRuleByClass:             make(map[string]string),
-		CephPoolByClass:                  make(map[string]string),
+		LokiPushURL:                       "",
+		TLSCertFile:                       "",
+		TLSKeyFile:                        "",
+		CephEnabled:                       false,
+		CephCrushRuleByClass:              make(map[string]string),
+		CephPoolByClass:                   make(map[string]string),
 	}
 }
 
@@ -331,6 +338,10 @@ func normalizeConfig(cfg *MarmotdConfig) *MarmotdConfig {
 	}
 	if normalized.DeletionDelaySeconds <= 0 {
 		normalized.DeletionDelaySeconds = defaults.DeletionDelaySeconds
+	}
+	normalized.SessionIdleTimeout = strings.TrimSpace(normalized.SessionIdleTimeout)
+	if normalized.SessionIdleTimeout == "" {
+		normalized.SessionIdleTimeout = defaults.SessionIdleTimeout
 	}
 	if normalized.ImageCreateFromVMTimeoutSeconds <= 0 {
 		normalized.ImageCreateFromVMTimeoutSeconds = defaults.ImageCreateFromVMTimeoutSeconds
@@ -478,6 +489,13 @@ func (c *MarmotdConfig) CephVolumeOperationTimeout() time.Duration {
 
 func SetRuntimeConfig(cfg *MarmotdConfig) {
 	normalized := normalizeConfig(cfg)
+	sessionIdleTimeout, err := parseSessionIdleTimeout(normalized.SessionIdleTimeout)
+	if err != nil {
+		panic(fmt.Sprintf("invalid runtime session_idle_timeout: %v", err))
+	}
+	if err := db.SetAuthSessionIdleTimeout(sessionIdleTimeout); err != nil {
+		panic(fmt.Sprintf("failed to set auth session idle timeout: %v", err))
+	}
 
 	runtimeConfigState.mu.Lock()
 	runtimeConfigState.cfg = normalized
@@ -519,10 +537,45 @@ func LoadConfig(path string) (*MarmotdConfig, error) {
 	}
 
 	normalized := normalizeConfig(cfg)
+	if _, err := parseSessionIdleTimeout(normalized.SessionIdleTimeout); err != nil {
+		return nil, err
+	}
 	if err := validateCephConfig(normalized); err != nil {
 		return nil, err
 	}
 	return normalized, nil
+}
+
+func parseSessionIdleTimeout(value string) (time.Duration, error) {
+	trimmed := strings.TrimSpace(strings.ToLower(value))
+	if trimmed == "" {
+		return 0, fmt.Errorf("session_idle_timeout is required")
+	}
+	if len(trimmed) < 2 {
+		return 0, fmt.Errorf("session_idle_timeout must be in <number><unit> format (unit: m/h/d): %q", value)
+	}
+	unit := trimmed[len(trimmed)-1]
+	numberPart := trimmed[:len(trimmed)-1]
+	count, err := strconv.Atoi(numberPart)
+	if err != nil || count <= 0 {
+		return 0, fmt.Errorf("session_idle_timeout must use a positive integer before unit: %q", value)
+	}
+
+	var duration time.Duration
+	switch unit {
+	case 'm':
+		duration = time.Duration(count) * time.Minute
+	case 'h':
+		duration = time.Duration(count) * time.Hour
+	case 'd':
+		duration = time.Duration(count) * 24 * time.Hour
+	default:
+		return 0, fmt.Errorf("session_idle_timeout unit must be one of m/h/d: %q", value)
+	}
+	if duration <= 0 {
+		return 0, fmt.Errorf("session_idle_timeout overflow or non-positive value: %q", value)
+	}
+	return duration, nil
 }
 
 // validateCephConfig は ceph_enabled=true の場合に必須項目を検証します。

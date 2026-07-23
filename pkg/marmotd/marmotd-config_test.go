@@ -31,6 +31,7 @@ var _ = Describe("VolumeGroupConfig", func() {
 			Expect(cfg.ImageDeleteTimeoutSeconds).To(Equal(120))
 			Expect(cfg.CephVolumeOperationTimeoutSeconds).To(Equal(120))
 			Expect(cfg.DefaultUnderlayInterface).To(Equal(""))
+			Expect(cfg.SessionIdleTimeout).To(Equal("1h"))
 		})
 
 		It("os_volume_group と data_volume_group の設定値を読み込む", func() {
@@ -76,6 +77,32 @@ var _ = Describe("VolumeGroupConfig", func() {
 			cfg, err := marmotd.LoadConfig(path)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(cfg.DefaultUnderlayInterface).To(Equal("enp2s0"))
+		})
+
+		It("session_idle_timeout の設定値を読み込む", func() {
+			dir := GinkgoT().TempDir()
+			path := filepath.Join(dir, "marmotd.json")
+			content := []byte(`{"session_idle_timeout":"3d"}`)
+
+			err := os.WriteFile(path, content, 0o644)
+			Expect(err).NotTo(HaveOccurred())
+
+			cfg, err := marmotd.LoadConfig(path)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cfg.SessionIdleTimeout).To(Equal("3d"))
+		})
+
+		It("session_idle_timeout が不正な単位の場合はエラーになる", func() {
+			dir := GinkgoT().TempDir()
+			path := filepath.Join(dir, "marmotd.json")
+			content := []byte(`{"session_idle_timeout":"30x"}`)
+
+			err := os.WriteFile(path, content, 0o644)
+			Expect(err).NotTo(HaveOccurred())
+
+			_, err = marmotd.LoadConfig(path)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("session_idle_timeout unit"))
 		})
 
 		It("iscsi_server: true を読み込む", func() {

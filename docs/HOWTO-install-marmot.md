@@ -49,6 +49,7 @@ sudo vi /etc/marmot/marmotd.json
 | `dns_listen_addr` | 内部 DNS のリッスンアドレス | `127.0.0.1:53` |
 | `dns_upstream` | 上位 DNS | `8.8.8.8:53` |
 | `dns_upstream_allow_cidrs` | upstream DNS への転送を許可する送信元 CIDR 一覧 | `[]` |
+| `session_idle_timeout` | ログインセッションのアイドルタイムアウト（`m`/`h`/`d`） | `1h` |
 | `os_volume_group` | OS ボリューム用 LVM VG 名 | `vg1` |
 | `data_volume_group` | データボリューム用 LVM VG 名 | `vg2` |
 | `default_underlay_interface` | アンダーレイ NIC 名（Geneve/VXLAN 等で使用） | `""` |
@@ -70,6 +71,7 @@ sudo vi /etc/marmot/marmotd.json
   "dns_upstream_allow_cidrs": [
     "192.168.1.0/24"
   ],
+  "session_idle_timeout": "1h",
   "default_underlay_interface": "enp4s0f0",
   "os_volume_group": "vg1",
   "data_volume_group": "vg2",
@@ -84,6 +86,7 @@ sudo vi /etc/marmot/marmotd.json
 - `dns_listen_addr` は単一ノードでローカル利用する場合 `127.0.0.1:53` のままで構いません。
 - VM からホスト DNS を直接参照させる構成や、複数ノード構成では、各ノードの到達可能な IP アドレスに変更してください。
 - `dns_upstream_allow_cidrs` は、外部 DNS へのフォワードを許可する送信元ネットワークを明示する用途です。空の場合は upstream 転送を制限します。
+- `session_idle_timeout` は、未操作状態が続いたときにログインセッションを失効させるまでの時間です。`30m`、`24h`、`3d` のように指定します。
 - HTTPS を使う場合は `tls_cert_file` と `tls_key_file` の両方を設定し、`api_listen_addr` は証明書のホスト名と整合するアドレスで待ち受けてください。
 - `os_images` は marmotd 起動時に利用準備するイメージ一覧です。`name`、`url`、`osName`、`osVersion` を揃えて記述してください。
 - `loki_push_url` は OpenTelemetry ログの送信先です。例: `http://192.168.1.9:3100/loki/api/v1/push`。
