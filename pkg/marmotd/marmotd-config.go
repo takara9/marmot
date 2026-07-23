@@ -552,39 +552,48 @@ const (
 	SessionIdleTimeoutMaxMinutes = 10080
 )
 
-func parseSessionIdleTimeout(value string) (time.Duration, error) {
-	trimmed := strings.TrimSpace(strings.ToLower(value))
-	if trimmed == "" {
-		return 0, fmt.Errorf("session_idle_timeout is required")
-	}
-	if len(trimmed) < 2 {
-		return 0, fmt.Errorf("session_idle_timeout must be in <number><unit> format (unit: m/h/d): %q", value)
-	}
-	unit := trimmed[len(trimmed)-1]
-	numberPart := trimmed[:len(trimmed)-1]
-	count, err := strconv.Atoi(numberPart)
-	if err != nil || count <= 0 {
-		return 0, fmt.Errorf("session_idle_timeout must use a positive integer before unit: %q", value)
-	}
+func parseSessionIdleTimeout(v string) (time.Duration, error) {
+    s := strings.TrimSpace(v)
+    if s == "" {
+        return 0, nil
+    }
+    if len(s) < 2 {
+        return 0, fmt.Errorf("session_idle_timeout format is invalid: %q", v)
+    }
 
-	// 単位変換前に最大分数を超えないかチェック（オーバーフロー防止）
-	var totalMinutes int
-	switch unit {
-	case 'm':
-		totalMinutes = count
-	case 'h':
-		totalMinutes = count * 60
-	case 'd':
-		totalMinutes = count * 60 * 24
-	default:
-		return 0, fmt.Errorf("session_idle_timeout unit must be one of m/h/d: %q", value)
-	}
-	if totalMinutes > SessionIdleTimeoutMaxMinutes {
-		return 0, fmt.Errorf("session_idle_timeout exceeds maximum of %d minutes (7 days): %q", SessionIdleTimeoutMaxMinutes, value)
-	}
+    // 末尾単位を大小文字非依存で扱う（" 2H " などを許容）
+    unit := strings.ToLower(s[len(s)-1:])[0]
+    num := s[:len(s)-1]
 
-	duration := time.Duration(totalMinutes) * time.Minute
-	return duration, nil
+    count, err := strconv.ParseInt(num, 10, 64)
+    if err != nil || count <= 0 {
+        return 0, fmt.Errorf("session_idle_timeout format is invalid: %q", v)
+    }
+
+    const maxMinutes int64 = 7 * 24 * 60
+
+    var minutes int64
+    switch unit {
+    case 'm':
+        if count > maxMinutes {
+            return 0, fmt.Errorf("session_idle_timeout must be <= 7d: %q", v)
+        }
+        minutes = count
+    case 'h':
+        if count > 7*24 {
+            return 0, fmt.Errorf("session_idle_timeout must be <= 7d: %q", v)
+        }
+        minutes = count * 60
+    case 'd':
+        if count > 7 {
+            return 0, fmt.Errorf("session_idle_timeout must be <= 7d: %q", v)
+        }
+        minutes = count * 24 * 60
+    default:
+        return 0, fmt.Errorf("session_idle_timeout unit is invalid: %q", v)
+    }
+
+    return time.Duration(minutes) * time.Minute, nil
 }
 
 // validateCephConfig は ceph_enabled=true の場合に必須項目を検証します。

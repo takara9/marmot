@@ -93,33 +93,33 @@ func TestNormalizeConfig_DNSListenAddrEmpty_UsesInterfaceIPv4(t *testing.T) {
 func TestParseSessionIdleTimeout(t *testing.T) {
 	tests := []struct {
 		name    string
-		input   string
+		in      string
 		want    time.Duration
 		wantErr bool
 	}{
-		{name: "minutes", input: "30m", want: 30 * time.Minute},
-		{name: "hours", input: "24h", want: 24 * time.Hour},
-		{name: "days", input: "3d", want: 72 * time.Hour},
-		{name: "trim and uppercase", input: " 2H ", want: 2 * time.Hour},
-		{name: "invalid unit", input: "10w", wantErr: true},
-		{name: "missing unit", input: "10", wantErr: true},
-		{name: "zero", input: "0h", wantErr: true},
+		{name: "minutes", in: "30m", want: 30 * time.Minute},
+		{name: "hours", in: "24h", want: 24 * time.Hour},
+		{name: "days", in: "3d", want: 72 * time.Hour},
+		{name: "trim and uppercase", in: " 2H ", want: 2 * time.Hour},
+		{name: "invalid unit", in: "10w", wantErr: true},
+		{name: "missing unit", in: "10", wantErr: true},
+		{name: "zero", in: "0h", wantErr: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := parseSessionIdleTimeout(tt.input)
+			got, err := parseSessionIdleTimeout(tt.in)
 			if tt.wantErr {
 				if err == nil {
-					t.Fatalf("expected error for input %q", tt.input)
+					t.Fatalf("expected error for input %q", tt.in)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("unexpected error for input %q: %v", tt.input, err)
+				t.Fatalf("unexpected error for input %q: %v", tt.in, err)
 			}
 			if got != tt.want {
-				t.Fatalf("unexpected duration for input %q: got %s want %s", tt.input, got, tt.want)
+				t.Fatalf("unexpected duration for input %q: got %s want %s", tt.in, got, tt.want)
 			}
 		})
 	}

@@ -302,4 +302,32 @@ var _ = Describe("VolumeGroupConfig", func() {
 			Expect(cfg.CephPoolByClass).To(Equal(map[string]string{"hdd": "marmot-hdd", "ssd": "marmot-ssd"}))
 		})
 	})
+
+	Describe("session_idle_timeout overflow guard", func() {
+		It("rejects extremely large hours", func() {
+			dir := GinkgoT().TempDir()
+			path := filepath.Join(dir, "marmotd.json")
+			content := []byte(`{"session_idle_timeout":"9223372036854775807h"}`)
+
+			err := os.WriteFile(path, content, 0o644)
+			Expect(err).NotTo(HaveOccurred())
+
+			_, err = marmotd.LoadConfig(path)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("<= 7d"))
+		})
+
+		It("rejects extremely large days", func() {
+			dir := GinkgoT().TempDir()
+			path := filepath.Join(dir, "marmotd.json")
+			content := []byte(`{"session_idle_timeout":"9223372036854775807d"}`)
+
+			err := os.WriteFile(path, content, 0o644)
+			Expect(err).NotTo(HaveOccurred())
+
+			_, err = marmotd.LoadConfig(path)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("<= 7d"))
+		})
+	})
 })
