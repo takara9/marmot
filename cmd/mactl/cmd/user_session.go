@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -14,14 +15,22 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type sessionRow struct {
-	UserID     string `json:"userId" yaml:"userId"`
-	SessionID  string `json:"sessionId" yaml:"sessionId"`
-	Status     string `json:"status" yaml:"status"`
-	Comment    string `json:"comment" yaml:"comment"`
-	IssuedAt   string `json:"issuedAt" yaml:"issuedAt"`
-	LastUsedAt string `json:"lastUsedAt" yaml:"lastUsedAt"`
-	Age        string `json:"age" yaml:"age"`
+type userSessionRow struct {
+	UserID    string     `json:"user_id" yaml:"user_id"`
+	SessionID string     `json:"session_id" yaml:"session_id"`
+	Status    string     `json:"status" yaml:"status"`
+	LastUsed  string     `json:"last_used" yaml:"last_used"`
+	Age       string     `json:"age" yaml:"age"`
+	From      string     `json:"from" yaml:"from"`
+	Comment   string     `json:"comment" yaml:"comment"`
+	IssuedAt  *time.Time `json:"-" yaml:"-"`
+}
+
+func shortSessionID(id string) string {
+	if len(id) > 8 {
+		return id[:8]
+	}
+	return id
 }
 
 var userSessionCmd = &cobra.Command{
@@ -81,20 +90,20 @@ var userSessionCmd = &cobra.Command{
 	},
 }
 
-func buildSessionRows(m *client.MarmotEndpoint, me *api.AuthMe) ([]sessionRow, error) {
+func buildSessionRows(m *client.MarmotEndpoint, me *api.AuthMe) ([]userSessionRow, error) {
 	if isAdministratorAuthMe(me) {
 		return collectAllUserSessionRows(m)
 	}
 	return collectUserSessionRows(m, strings.TrimSpace(me.UserId))
 }
 
-func collectAllUserSessionRows(m *client.MarmotEndpoint) ([]sessionRow, error) {
+func collectAllUserSessionRows(m *client.MarmotEndpoint) ([]userSessionRow, error) {
 	users, err := m.ListUsers()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list users: %w", err)
 	}
 
-	rows := make([]sessionRow, 0)
+	rows := make([]userSessionRow, 0)
 	for _, user := range users {
 		userID := strings.TrimSpace(user.Metadata.Id)
 		if userID == "" {
@@ -114,29 +123,62 @@ func collectAllUserSessionRows(m *client.MarmotEndpoint) ([]sessionRow, error) {
 	return rows, nil
 }
 
-func collectUserSessionRows(m *client.MarmotEndpoint, userID string) ([]sessionRow, error) {
+func collectUserSessionRows(m *client.MarmotEndpoint, userID string) ([]userSessionRow, error) {
 	keys, err := m.ListUserApiKeys(userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list session API keys for user '%s': %w", userID, err)
 	}
 
-	rows := make([]sessionRow, 0, len(keys))
+	rows := make([]userSessionRow, 0, len(keys))
 	for _, key := range keys {
 		if !isLoginSessionApiKey(key) {
 			continue
 		}
-		rows = append(rows, sessionRow{
-			UserID:     userID,
-			SessionID:  apiKeyIdentifier(key),
-			Status:     sessionStatusText(key),
-			Comment:    sessionCommentText(key),
-			IssuedAt:   formatTimeText(key.Spec.IssuedAt),
-			LastUsedAt: formatTimeText(sessionLastUsedAt(key)),
-			Age:        timeSinceText(key.Spec.IssuedAt),
-		})
+		sessionID := shortSessionID(apiKeyIdentifier(key))
+		from := sessionFromIP(key)
+
+		row := userSessionRow{
+			UserID:    userID,
+			SessionID: sessionID,
+			Status:    sessionStatusText(key),
+			LastUsed:  formatTimeText(sessionLastUsedAt(key)),
+			Age:       timeSinceText(key.Spec.IssuedAt),
+			From:      from,
+			Comment:   sessionCommentText(key),
+			IssuedAt:  key.Spec.IssuedAt,
+		}
+		rows = append(rows, row)
 	}
 
 	return rows, nil
+}
+
+func sessionFromIP(apiKey api.ApiKey) string {
+	v := reflect.ValueOf(apiKey.Spec)
+	f := v.FieldByName("FromIp")
+	if !f.IsValid() {
+		return "-"
+	}
+
+	switch f.Kind() {
+	case reflect.Ptr:
+		if f.IsNil() {
+			return "-"
+		}
+		if s, ok := f.Interface().(*string); ok && s != nil {
+			ip := strings.TrimSpace(*s)
+			if ip != "" {
+				return ip
+			}
+		}
+	case reflect.String:
+		ip := strings.TrimSpace(f.String())
+		if ip != "" {
+			return ip
+		}
+	}
+
+	return "-"
 }
 
 func isAdministratorAuthMe(me *api.AuthMe) bool {
@@ -224,19 +266,21 @@ func timeSinceText(t *time.Time) string {
 	return fmt.Sprintf("%ds", int(elapsed/time.Second))
 }
 
-func printSessionRowsText(rows []sessionRow) {
-	fmt.Printf("%-24s  %-36s  %-8s  %-25s  %-8s  %-20s\n", "USER-ID", "SESSION-ID", "STATUS", "LAST-USED", "AGE", "COMMENT")
+func printSessionRowsText(rows []userSessionRow) {
+	fmt.Fprintf(os.Stdout, "%-24s %-10s %-8s %-20s %-8s %-39s %s\n",
+		"USER-ID", "SESSION-ID", "STATUS", "LAST-USED", "AGE", "FROM", "COMMENT")
 	for _, row := range rows {
-		fmt.Printf("%-24s  %-36s  %-8s  %-25s  %-8s  %-20s\n", row.UserID, row.SessionID, row.Status, row.LastUsedAt, row.Age, row.Comment)
+		fmt.Fprintf(os.Stdout, "%-24s %-10s %-8s %-20s %-8s %-39s %s\n",
+			row.UserID, row.SessionID, row.Status, row.LastUsed, row.Age, row.From, row.Comment)
 	}
 }
 
-func printSessionRowsJSON(rows []sessionRow) {
+func printSessionRowsJSON(rows []userSessionRow) {
 	jsonBytes, _ := json.MarshalIndent(rows, "", "  ")
 	fmt.Println(string(jsonBytes))
 }
 
-func printSessionRowsYAML(rows []sessionRow) {
+func printSessionRowsYAML(rows []userSessionRow) {
 	yamlBytes, _ := yaml.Marshal(rows)
 	fmt.Println(string(yamlBytes))
 }

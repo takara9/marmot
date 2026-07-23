@@ -3,6 +3,7 @@ package marmotd
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -413,4 +414,26 @@ func (s *Server) ApiUnlockUserById(ctx echo.Context, userId string) error {
 		return mapAuthDBError(ctx, err)
 	}
 	return ctx.NoContent(http.StatusNoContent)
+}
+
+func resolveClientIP(c echo.Context) string {
+	xff := strings.TrimSpace(c.Request().Header.Get(echo.HeaderXForwardedFor))
+	if xff != "" {
+		first := strings.TrimSpace(strings.Split(xff, ",")[0])
+		if ip := net.ParseIP(first); ip != nil {
+			return ip.String()
+		}
+	}
+
+	if ip := net.ParseIP(strings.TrimSpace(c.RealIP())); ip != nil {
+		return ip.String()
+	}
+
+	host, _, err := net.SplitHostPort(strings.TrimSpace(c.Request().RemoteAddr))
+	if err == nil {
+		if ip := net.ParseIP(host); ip != nil {
+			return ip.String()
+		}
+	}
+	return ""
 }

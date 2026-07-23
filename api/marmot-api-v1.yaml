@@ -2780,6 +2780,9 @@ components:
         sessionType:
           type: string
           description: Session scope for the API key. login marks a bearer token created by POST /auth/login; other values are treated as persistent user-generated keys.
+        from_ip:
+          type: string
+          description: Source IP address of login session (IPv4/IPv6).
     ApiKeyStatus:
       type: object
       properties:
