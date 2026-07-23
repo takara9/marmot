@@ -546,6 +546,12 @@ func LoadConfig(path string) (*MarmotdConfig, error) {
 	return normalized, nil
 }
 
+const (
+	// SessionIdleTimeoutMaxMinutes は session_idle_timeout に指定できる最大値（分）です。
+	// 7日間 = 10080分 を上限とします。
+	SessionIdleTimeoutMaxMinutes = 10080
+)
+
 func parseSessionIdleTimeout(value string) (time.Duration, error) {
 	trimmed := strings.TrimSpace(strings.ToLower(value))
 	if trimmed == "" {
@@ -561,20 +567,23 @@ func parseSessionIdleTimeout(value string) (time.Duration, error) {
 		return 0, fmt.Errorf("session_idle_timeout must use a positive integer before unit: %q", value)
 	}
 
-	var duration time.Duration
+	// 単位変換前に最大分数を超えないかチェック（オーバーフロー防止）
+	var totalMinutes int
 	switch unit {
 	case 'm':
-		duration = time.Duration(count) * time.Minute
+		totalMinutes = count
 	case 'h':
-		duration = time.Duration(count) * time.Hour
+		totalMinutes = count * 60
 	case 'd':
-		duration = time.Duration(count) * 24 * time.Hour
+		totalMinutes = count * 60 * 24
 	default:
 		return 0, fmt.Errorf("session_idle_timeout unit must be one of m/h/d: %q", value)
 	}
-	if duration <= 0 {
-		return 0, fmt.Errorf("session_idle_timeout overflow or non-positive value: %q", value)
+	if totalMinutes > SessionIdleTimeoutMaxMinutes {
+		return 0, fmt.Errorf("session_idle_timeout exceeds maximum of %d minutes (7 days): %q", SessionIdleTimeoutMaxMinutes, value)
 	}
+
+	duration := time.Duration(totalMinutes) * time.Minute
 	return duration, nil
 }
 
