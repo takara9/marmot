@@ -35,6 +35,11 @@ func maybeApplyServerAnsiblePlaybook(m *client.MarmotEndpoint, server api.Server
 		return err
 	}
 
+	if isServerAnsibleOnBootEnabled(server.Spec.Ansible) {
+		// onBoot モードは cloud-init 側で実行するため、mactl からは適用しない。
+		return nil
+	}
+
 	serverID, err := extractSuccessID(createResponse)
 	if err != nil {
 		return fmt.Errorf("failed to parse create response id for ansible apply: %w", err)
@@ -50,11 +55,11 @@ func maybeApplyServerAnsiblePlaybook(m *client.MarmotEndpoint, server api.Server
 		return err
 	}
 
-	playbookPath, err := resolveServerAnsiblePlaybookPath(server.Spec.Ansible.Playbook)
+	playbookPath, err := resolveServerAnsiblePlaybookPath(optionalTrimmedString(server.Spec.Ansible.Playbook))
 	if err != nil {
 		return err
 	}
-	inventoryPath, err := resolveServerAnsibleInventoryPath(server.Spec.Ansible.Inventory)
+	inventoryPath, err := resolveServerAnsibleInventoryPath(optionalTrimmedString(server.Spec.Ansible.Inventory))
 	if err != nil {
 		return err
 	}
@@ -78,10 +83,41 @@ func validateServerAnsibleSpec(server api.Server) error {
 	if server.Spec.Ansible == nil {
 		return nil
 	}
-	if strings.TrimSpace(server.Spec.Ansible.Playbook) == "" {
+	playbook := optionalTrimmedString(server.Spec.Ansible.Playbook)
+	inventory := optionalTrimmedString(server.Spec.Ansible.Inventory)
+	remotePlaybook := ""
+	if server.Spec.Ansible.RemotePlaybook != nil {
+		remotePlaybook = strings.TrimSpace(*server.Spec.Ansible.RemotePlaybook)
+	}
+	pullURL := ""
+	if server.Spec.Ansible.Pull != nil && server.Spec.Ansible.Pull.Url != nil {
+		pullURL = strings.TrimSpace(*server.Spec.Ansible.Pull.Url)
+	}
+
+	if isServerAnsibleOnBootEnabled(server.Spec.Ansible) {
+		if remotePlaybook == "" && pullURL == "" {
+			return fmt.Errorf("spec.ansible.remotePlaybook or spec.ansible.pull.url is required when spec.ansible.onBoot is true")
+		}
+		if remotePlaybook != "" && pullURL != "" {
+			return fmt.Errorf("spec.ansible.remotePlaybook cannot be combined with spec.ansible.pull.url")
+		}
+		if playbook != "" || inventory != "" {
+			return fmt.Errorf("spec.ansible.onBoot=true cannot be combined with spec.ansible.playbook or spec.ansible.inventory")
+		}
+		return nil
+	}
+
+	if remotePlaybook != "" {
+		return fmt.Errorf("spec.ansible.remotePlaybook requires spec.ansible.onBoot=true")
+	}
+	if pullURL != "" {
+		return fmt.Errorf("spec.ansible.pull.url requires spec.ansible.onBoot=true")
+	}
+
+	if playbook == "" {
 		return fmt.Errorf("spec.ansible.playbook is required when spec.ansible is set")
 	}
-	if strings.TrimSpace(server.Spec.Ansible.Inventory) == "" {
+	if inventory == "" {
 		return fmt.Errorf("spec.ansible.inventory is required when spec.ansible is set")
 	}
 	if server.Spec.NetworkInterface == nil || len(*server.Spec.NetworkInterface) == 0 {
@@ -94,6 +130,17 @@ func validateServerAnsibleSpec(server api.Server) error {
 		return nil
 	}
 	return fmt.Errorf("spec.ansible can be used only when host-bridge is specified in spec.networkInterface")
+}
+
+func isServerAnsibleOnBootEnabled(ansible *api.ServerAnsible) bool {
+	return ansible != nil && ansible.OnBoot != nil && *ansible.OnBoot
+}
+
+func optionalTrimmedString(v *string) string {
+	if v == nil {
+		return ""
+	}
+	return strings.TrimSpace(*v)
 }
 
 func waitServerHostBridgeAddress(m *client.MarmotEndpoint, serverID string, timeout, interval time.Duration) (string, error) {

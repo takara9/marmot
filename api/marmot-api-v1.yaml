@@ -2039,16 +2039,35 @@ components:
           example:
             key1: "value1"
             key2: "value2"
+    ServerAnsiblePull:
+      type: object
+      properties:
+        url:
+          type: string
+          description: Git repository URL used by cloud-init ansible pull mode.
+        playbook_yaml:
+          type: string
+          description: Playbook file name inside the ansible pull repository. Defaults to site.yml.
     ServerAnsible:
       type: object
-      required:
-        - playbook
-        - inventory
       properties:
+        onBoot:
+          type: boolean
+          description: |
+            When true, apply ansible configuration during server boot via cloud-init.
+            Use either remotePlaybook (single playbook URL) or pull.url (ansible pull repository mode).
+            This mode is intended for private-network-only servers.
+        pull:
+          $ref: "#/components/schemas/ServerAnsiblePull"
+        remotePlaybook:
+          type: string
+          description: Remote playbook URL used when onBoot is true.
         playbook:
           type: string
+          description: Local playbook path used by mactl post-create ansible apply.
         inventory:
           type: string
+          description: Local inventory path used by mactl post-create ansible apply.
         extra-args:
           type: array
           items:
