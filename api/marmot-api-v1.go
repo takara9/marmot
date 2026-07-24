@@ -472,8 +472,30 @@ type Server struct {
 // ServerAnsible defines model for ServerAnsible.
 type ServerAnsible struct {
 	ExtraArgs *[]string `json:"extra-args,omitempty" yaml:"extra-args,omitempty"`
-	Inventory string    `json:"inventory" yaml:"inventory"`
-	Playbook  string    `json:"playbook" yaml:"playbook"`
+
+	// Inventory Local inventory path used by mactl post-create ansible apply.
+	Inventory *string `json:"inventory,omitempty" yaml:"inventory,omitempty"`
+
+	// OnBoot When true, apply ansible configuration during server boot via cloud-init.
+	// Use either remotePlaybook (single playbook URL) or pull.url (ansible pull repository mode).
+	// This mode is intended for private-network-only servers.
+	OnBoot *bool `json:"onBoot,omitempty" yaml:"onBoot,omitempty"`
+
+	// Playbook Local playbook path used by mactl post-create ansible apply.
+	Playbook *string            `json:"playbook,omitempty" yaml:"playbook,omitempty"`
+	Pull     *ServerAnsiblePull `json:"pull,omitempty" yaml:"pull,omitempty"`
+
+	// RemotePlaybook Remote playbook URL used when onBoot is true.
+	RemotePlaybook *string `json:"remotePlaybook,omitempty" yaml:"remotePlaybook,omitempty"`
+}
+
+// ServerAnsiblePull defines model for ServerAnsiblePull.
+type ServerAnsiblePull struct {
+	// PlaybookYaml Playbook file name inside the ansible pull repository. Defaults to site.yml.
+	PlaybookYaml *string `json:"playbook_yaml,omitempty" yaml:"playbook_yaml,omitempty"`
+
+	// Url Git repository URL used by cloud-init ansible pull mode.
+	Url *string `json:"url,omitempty" yaml:"url,omitempty"`
 }
 
 // ServerSpec defines model for ServerSpec.

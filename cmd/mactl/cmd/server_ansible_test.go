@@ -28,8 +28,8 @@ func TestValidateServerAnsibleSpec(t *testing.T) {
 			name: "ansible with host-bridge without address is accepted",
 			server: api.Server{Spec: api.ServerSpec{
 				Ansible: &api.ServerAnsible{
-					Playbook:  playbook,
-					Inventory: inventory,
+					Playbook:  strRef(playbook),
+					Inventory: strRef(inventory),
 				},
 				NetworkInterface: &[]api.NetworkInterface{{
 					Networkname: "host-bridge",
@@ -40,8 +40,8 @@ func TestValidateServerAnsibleSpec(t *testing.T) {
 			name: "missing network interface",
 			server: api.Server{Spec: api.ServerSpec{
 				Ansible: &api.ServerAnsible{
-					Playbook:  playbook,
-					Inventory: inventory,
+					Playbook:  strRef(playbook),
+					Inventory: strRef(inventory),
 				},
 			}},
 			wantErr: "requires spec.networkInterface with host-bridge",
@@ -50,7 +50,7 @@ func TestValidateServerAnsibleSpec(t *testing.T) {
 			name: "missing playbook",
 			server: api.Server{Spec: api.ServerSpec{
 				Ansible: &api.ServerAnsible{
-					Inventory: inventory,
+					Inventory: strRef(inventory),
 				},
 			}},
 			wantErr: "spec.ansible.playbook is required",
@@ -59,7 +59,7 @@ func TestValidateServerAnsibleSpec(t *testing.T) {
 			name: "missing inventory",
 			server: api.Server{Spec: api.ServerSpec{
 				Ansible: &api.ServerAnsible{
-					Playbook: playbook,
+					Playbook: strRef(playbook),
 				},
 			}},
 			wantErr: "spec.ansible.inventory is required",
@@ -68,14 +68,89 @@ func TestValidateServerAnsibleSpec(t *testing.T) {
 			name: "host-bridge missing",
 			server: api.Server{Spec: api.ServerSpec{
 				Ansible: &api.ServerAnsible{
-					Playbook:  playbook,
-					Inventory: inventory,
+					Playbook:  strRef(playbook),
+					Inventory: strRef(inventory),
 				},
 				NetworkInterface: &[]api.NetworkInterface{{
 					Networkname: "default",
 				}},
 			}},
 			wantErr: "only when host-bridge is specified",
+		},
+		{
+			name: "onBoot with remotePlaybook is accepted",
+			server: api.Server{Spec: api.ServerSpec{
+				Ansible: &api.ServerAnsible{
+					OnBoot:         boolPtr(true),
+					RemotePlaybook: strRef("https://example.com/playbook.yaml"),
+				},
+			}},
+		},
+		{
+			name: "onBoot with ansible pull is accepted",
+			server: api.Server{Spec: api.ServerSpec{
+				Ansible: &api.ServerAnsible{
+					OnBoot: boolPtr(true),
+					Pull: &api.ServerAnsiblePull{
+						Url:          strRef("https://github.com/example/repo.git"),
+						PlaybookYaml: strRef("site.yml"),
+					},
+				},
+			}},
+		},
+		{
+			name: "onBoot requires remotePlaybook or pull url",
+			server: api.Server{Spec: api.ServerSpec{
+				Ansible: &api.ServerAnsible{
+					OnBoot: boolPtr(true),
+				},
+			}},
+			wantErr: "remotePlaybook or spec.ansible.pull.url is required",
+		},
+		{
+			name: "remotePlaybook requires onBoot",
+			server: api.Server{Spec: api.ServerSpec{
+				Ansible: &api.ServerAnsible{
+					RemotePlaybook: strRef("https://example.com/playbook.yaml"),
+				},
+			}},
+			wantErr: "requires spec.ansible.onBoot=true",
+		},
+		{
+			name: "pull url requires onBoot",
+			server: api.Server{Spec: api.ServerSpec{
+				Ansible: &api.ServerAnsible{
+					Pull: &api.ServerAnsiblePull{
+						Url: strRef("https://github.com/example/repo.git"),
+					},
+				},
+			}},
+			wantErr: "spec.ansible.pull.url requires spec.ansible.onBoot=true",
+		},
+		{
+			name: "onBoot cannot combine remotePlaybook and pull url",
+			server: api.Server{Spec: api.ServerSpec{
+				Ansible: &api.ServerAnsible{
+					OnBoot:         boolPtr(true),
+					RemotePlaybook: strRef("https://example.com/playbook.yaml"),
+					Pull: &api.ServerAnsiblePull{
+						Url: strRef("https://github.com/example/repo.git"),
+					},
+				},
+			}},
+			wantErr: "cannot be combined",
+		},
+		{
+			name: "onBoot cannot be combined with local playbook/inventory",
+			server: api.Server{Spec: api.ServerSpec{
+				Ansible: &api.ServerAnsible{
+					OnBoot:         boolPtr(true),
+					RemotePlaybook: strRef("https://example.com/playbook.yaml"),
+					Playbook:       strRef(playbook),
+					Inventory:      strRef(inventory),
+				},
+			}},
+			wantErr: "cannot be combined",
 		},
 	}
 
@@ -96,6 +171,14 @@ func TestValidateServerAnsibleSpec(t *testing.T) {
 			}
 		})
 	}
+}
+
+func boolPtr(v bool) *bool {
+	return &v
+}
+
+func strRef(v string) *string {
+	return &v
 }
 
 func TestExtractSuccessID(t *testing.T) {
@@ -244,8 +327,8 @@ func TestValidateServerAnsibleSpecUsesStrings(t *testing.T) {
 	inventory := "hosts"
 	server := api.Server{Spec: api.ServerSpec{
 		Ansible: &api.ServerAnsible{
-			Playbook:  playbook,
-			Inventory: inventory,
+			Playbook:  strRef(playbook),
+			Inventory: strRef(inventory),
 		},
 		NetworkInterface: &[]api.NetworkInterface{{
 			Networkname: "host-bridge",

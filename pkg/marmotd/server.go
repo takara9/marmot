@@ -900,7 +900,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		return "", err
 	}
 
-	isoPath, err := imageModule.GenerateCloudInitISO(path, password, sshKey, usernames)
+	isoPath, err := imageModule.GenerateCloudInitISO(path, password, sshKey, usernames, serverConfig.Spec.Ansible)
 	if err != nil {
 		slog.Error("GenerateCloudInitISO()", "module", imageModule.Key(), "err", err)
 		return "", err
