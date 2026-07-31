@@ -143,7 +143,15 @@ ubuntu@server-20:~$ exit
 
 # サーバーの削除
 $ mactl delete server server-20
+
+# サーバー名をカンマ区切りで複数削除
+$ mactl delete server biz,rest1,rest2,rest3,db
 ```
+
+内部DNSは `server-name.network-name` 形式に加えて、`marmotd` ごとのサブドメイン付きFQDNにも対応しています。
+
+- 例1: `server1.host-bridge`
+- 例2: `server1.host-bridge.marmot1.labo.local`
 
 
 ## インストール

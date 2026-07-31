@@ -112,6 +112,8 @@ API キー:
 - mactl create [RESOURCE]
 - mactl apply [RESOURCE]
 - mactl del [RESOURCE NAME]
+  - 例: `mactl delete server biz,rest1,rest2,rest3,db`
+  - `server`/`srv` 指定時は NAME をカンマ区切りで複数指定可能
 - mactl console SERVER-NAME
 - mactl [mactlのフラグ] ssh [USER@]SERVER-NAME -- [SSH引数...]
   - Marmot が管理する SERVER-NAME の host-bridge IP を解決し、USER 指定時は USER@IP で ssh 接続
