@@ -63,7 +63,10 @@ var _ = Describe("MactlDeleteServerMultiE2E", Ordered, func() {
 		names := []string{"biz", "rest1", "rest2", "rest3", "db"}
 		tempDir, err := os.MkdirTemp("", "mactl-issue603-")
 		Expect(err).NotTo(HaveOccurred())
-		defer os.RemoveAll(tempDir)
+		defer func() {
+			err := os.RemoveAll(tempDir)
+			Expect(err).NotTo(HaveOccurred())
+		}()
 
 		createdIDs := make(map[string]string, len(names))
 		for _, name := range names {
