@@ -28,3 +28,29 @@ func TestRootHasKubectlLikeServerLifecycleCommands(t *testing.T) {
 		}
 	}
 }
+
+func TestPrintLifecycleResultTextUsesResponseID(t *testing.T) {
+	withOutputStyle("text", t, func() {
+		out := captureStdoutForIDTest(t, func() {
+			if err := printLifecycleResult([]byte(`{"id":"srv-123","metadata":{"id":"meta-999"}}`), "MSG"); err != nil {
+				t.Fatalf("printLifecycleResult() unexpected err: %v", err)
+			}
+		})
+
+		if !contains(out, "MSG meta-999") {
+			t.Fatalf("stdout = %q, want contains %q", out, "MSG meta-999")
+		}
+	})
+}
+
+func contains(haystack, needle string) bool {
+	if needle == "" {
+		return true
+	}
+	for i := 0; i+len(needle) <= len(haystack); i++ {
+		if haystack[i:i+len(needle)] == needle {
+			return true
+		}
+	}
+	return false
+}
