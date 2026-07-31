@@ -47,7 +47,7 @@ var delCmd = &cobra.Command{
 			return nil
 		}
 
-		if len(args) != 2 {
+		if len(args) < 2 {
 			return fmt.Errorf("del requires RESOURCE and NAME unless -f is specified")
 		}
 
