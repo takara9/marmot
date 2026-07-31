@@ -104,6 +104,39 @@ func TestDomainToMarmotPath(t *testing.T) {
 	}
 }
 
+func TestDomainToMarmotPaths(t *testing.T) {
+	tests := []struct {
+		domain string
+		want   []string
+	}{
+		{
+			domain: "vm1.test-net-1.",
+			want:   []string{"/marmot/dns/test-net-1/vm1"},
+		},
+		{
+			domain: "server1.host-bridge.marmot1.labo.local",
+			want: []string{
+				"/marmot/dns/local/labo/marmot1/host-bridge/server1",
+				"/marmot/dns/host-bridge/server1",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.domain, func(t *testing.T) {
+			got := DomainToMarmotPaths(tt.domain)
+			if len(got) != len(tt.want) {
+				t.Fatalf("candidate count mismatch: want=%d got=%d (%v)", len(tt.want), len(got), got)
+			}
+			for i := range tt.want {
+				if got[i] != tt.want[i] {
+					t.Fatalf("candidate mismatch at %d: want=%q got=%q", i, tt.want[i], got[i])
+				}
+			}
+		})
+	}
+}
+
 func TestShouldForwardUpstream(t *testing.T) {
 	tests := []struct {
 		name string

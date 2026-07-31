@@ -122,21 +122,24 @@ func (c *controller) handleRequest(w dns.ResponseWriter, r *dns.Msg) {
 	}
 
 	q := r.Question[0]
-	// 末尾のドットを除去してetcdのキーを作成 (example.com. -> /dns/example.com)
-	etcdKey := DomainToMarmotPath(q.Name)
+	lookupKeys := DomainToMarmotPaths(q.Name)
 
 	// etcd から IP アドレスを取得
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	resp, err := c.db.Cli.Get(ctx, etcdKey)
-	if err != nil {
-		slog.Error("検索の失敗 Failed to query etcd", "err", err)
-		dns.HandleFailed(w, r)
-		return
-	}
+	for _, etcdKey := range lookupKeys {
+		resp, err := c.db.Cli.Get(ctx, etcdKey)
+		if err != nil {
+			slog.Error("検索の失敗 Failed to query etcd", "err", err)
+			dns.HandleFailed(w, r)
+			return
+		}
 
-	if len(resp.Kvs) > 0 {
+		if len(resp.Kvs) == 0 {
+			continue
+		}
+
 		ip, ipStr, err := decodeDNSRecordIP(resp.Kvs[0].Value)
 		if err != nil {
 			slog.Error("Failed to decode DNS record", "err", err, "key", etcdKey)
@@ -234,9 +237,7 @@ func shouldForwardUpstream(remoteAddr net.Addr, allowedCIDRs []netip.Prefix) boo
 
 // DomainToMarmotPath はドメイン名を /marmot/dns/ 形式のパスに変換します
 func DomainToMarmotPath(domain string) string {
-	// 末尾のドットを削除し、ドットで分割
-	domain = strings.TrimSuffix(domain, ".")
-	parts := strings.Split(domain, ".")
+	parts := splitDomainLabels(domain)
 
 	// スライスの要素を逆順に入れ替え
 	for i, j := 0, len(parts)-1; i < j; i, j = i+1, j-1 {
@@ -245,4 +246,38 @@ func DomainToMarmotPath(domain string) string {
 
 	// プレフィックス を先頭につけて結合
 	return db.InternalDNSPrefix + "/" + strings.Join(parts, "/")
+}
+
+// DomainToMarmotPaths は問い合わせドメインから探索候補キーを返す。
+// 1) 完全修飾名を逆順化したキー
+// 2) host.network 形式へのフォールバックキー
+func DomainToMarmotPaths(domain string) []string {
+	full := DomainToMarmotPath(domain)
+	parts := splitDomainLabels(domain)
+
+	paths := []string{full}
+	if len(parts) >= 2 {
+		fallback := db.InternalDNSPrefix + "/" + parts[1] + "/" + parts[0]
+		if fallback != full {
+			paths = append(paths, fallback)
+		}
+	}
+
+	return paths
+}
+
+func splitDomainLabels(domain string) []string {
+	domain = strings.TrimSuffix(domain, ".")
+	parts := strings.Split(domain, ".")
+
+	filtered := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		filtered = append(filtered, p)
+	}
+
+	return filtered
 }
