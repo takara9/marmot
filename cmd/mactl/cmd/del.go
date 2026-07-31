@@ -47,15 +47,67 @@ var delCmd = &cobra.Command{
 			return nil
 		}
 
-		if len(args) != 2 {
+		if len(args) < 2 {
 			return fmt.Errorf("del requires RESOURCE and NAME unless -f is specified")
 		}
 
 		resourceName := normalizeResourceName(args[0])
+
+		if strings.EqualFold(resourceName, "server") {
+			objectNames, err := parseCommaSeparatedNames(args[1:])
+			if err != nil {
+				return err
+			}
+
+			for _, objectName := range objectNames {
+				if err := deleteResourceByTypeAndName(resourceName, objectName); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+
+		if len(args) != 2 {
+			return fmt.Errorf("del requires exactly one NAME for resource %q", resourceName)
+		}
+
 		objectName := args[1]
 
 		return deleteResourceByTypeAndName(resourceName, objectName)
 	},
+}
+
+func parseCommaSeparatedNames(rawNames []string) ([]string, error) {
+	if len(rawNames) == 0 {
+		return nil, fmt.Errorf("server name is required")
+	}
+
+	// Require commas between every adjacent argument to avoid allowing space-separated deletes,
+	// e.g. "del server a b".
+	if len(rawNames) > 1 {
+		for i := 0; i < len(rawNames)-1; i++ {
+			left := strings.TrimSpace(rawNames[i])
+			right := strings.TrimSpace(rawNames[i+1])
+			if strings.HasSuffix(left, ",") || strings.HasPrefix(right, ",") {
+				continue
+			}
+			return nil, fmt.Errorf("multiple server names must be comma-separated")
+		}
+	}
+
+	joined := strings.Join(rawNames, " ")
+	parts := strings.Split(joined, ",")
+
+	names := make([]string, 0, len(parts))
+	for _, part := range parts {
+		name := strings.TrimSpace(part)
+		if name == "" {
+			return nil, fmt.Errorf("server name must not be empty")
+		}
+		names = append(names, name)
+	}
+
+	return names, nil
 }
 
 
