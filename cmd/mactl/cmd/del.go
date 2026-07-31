@@ -95,19 +95,16 @@ func parseCommaSeparatedNames(rawNames []string) ([]string, error) {
 		}
 	}
 
-	names := make([]string, 0, len(rawNames))
-	for _, raw := range rawNames {
-		for _, part := range strings.Split(raw, ",") {
-			name := strings.TrimSpace(part)
-			if name == "" {
-				continue
-			}
-			names = append(names, name)
-		}
-	}
+	joined := strings.Join(rawNames, " ")
+	parts := strings.Split(joined, ",")
 
-	if len(names) == 0 {
-		return nil, fmt.Errorf("server name is required")
+	names := make([]string, 0, len(parts))
+	for _, part := range parts {
+		name := strings.TrimSpace(part)
+		if name == "" {
+			return nil, fmt.Errorf("server name must not be empty")
+		}
+		names = append(names, name)
 	}
 
 	return names, nil
