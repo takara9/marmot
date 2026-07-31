@@ -129,11 +129,15 @@ func resolveServerIDByName(m *client.MarmotEndpoint, name string) (string, strin
 func printLifecycleResult(byteBody []byte, textMessage string) error {
 	switch outputStyle {
 	case "text":
-		var data interface{}
-		if err := json.Unmarshal(byteBody, &data); err != nil {
-			return err
+		id, err := extractResponseID(byteBody)
+		if err != nil {
+			return fmt.Errorf("failed to parse response: %w", err)
 		}
-		fmt.Println(textMessage, data.(map[string]interface{})["id"])
+		displayID := id
+		if displayID == "" {
+			displayID = "<nil>"
+		}
+		fmt.Println(textMessage, displayID)
 		return nil
 	case "json":
 		fmt.Println(string(byteBody))
