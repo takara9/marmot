@@ -78,7 +78,24 @@ var delCmd = &cobra.Command{
 }
 
 func parseCommaSeparatedNames(rawNames []string) ([]string, error) {
-	names := make([]string, 0)
+	if len(rawNames) == 0 {
+		return nil, fmt.Errorf("server name is required")
+	}
+
+	// Require commas between every adjacent argument to avoid allowing space-separated deletes,
+	// e.g. "del server a b".
+	if len(rawNames) > 1 {
+		for i := 0; i < len(rawNames)-1; i++ {
+			left := strings.TrimSpace(rawNames[i])
+			right := strings.TrimSpace(rawNames[i+1])
+			if strings.HasSuffix(left, ",") || strings.HasPrefix(right, ",") {
+				continue
+			}
+			return nil, fmt.Errorf("multiple server names must be comma-separated")
+		}
+	}
+
+	names := make([]string, 0, len(rawNames))
 	for _, raw := range rawNames {
 		for _, part := range strings.Split(raw, ",") {
 			name := strings.TrimSpace(part)
