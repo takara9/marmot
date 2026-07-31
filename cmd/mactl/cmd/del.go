@@ -52,10 +52,48 @@ var delCmd = &cobra.Command{
 		}
 
 		resourceName := normalizeResourceName(args[0])
+
+		if strings.EqualFold(resourceName, "server") {
+			objectNames, err := parseCommaSeparatedNames(args[1:])
+			if err != nil {
+				return err
+			}
+
+			for _, objectName := range objectNames {
+				if err := deleteResourceByTypeAndName(resourceName, objectName); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+
+		if len(args) != 2 {
+			return fmt.Errorf("del requires exactly one NAME for resource %q", resourceName)
+		}
+
 		objectName := args[1]
 
 		return deleteResourceByTypeAndName(resourceName, objectName)
 	},
+}
+
+func parseCommaSeparatedNames(rawNames []string) ([]string, error) {
+	names := make([]string, 0)
+	for _, raw := range rawNames {
+		for _, part := range strings.Split(raw, ",") {
+			name := strings.TrimSpace(part)
+			if name == "" {
+				continue
+			}
+			names = append(names, name)
+		}
+	}
+
+	if len(names) == 0 {
+		return nil, fmt.Errorf("server name is required")
+	}
+
+	return names, nil
 }
 
 
