@@ -74,6 +74,7 @@ echo "バイナリをコピー中..."
 install -m 0755 "${BINDIR}/marmotd" "${PKG_DIR}/usr/local/marmot/marmotd"
 install -m 0755 "${BINDIR}/marmot-lb-agent" "${PKG_DIR}/usr/local/marmot/marmot-lb-agent"
 install -m 0755 "${BINDIR}/mactl"   "${PKG_DIR}/usr/local/bin/mactl"
+ln -s mactl "${PKG_DIR}/usr/local/bin/mactl-ssh"
 install -m 0755 "${BINDIR}/maadm"   "${PKG_DIR}/usr/local/bin/maadm"
 install -m 0644 "${ROOT_DIR}/pkg/controller/gateway-playbooks/gateway-iptables.yaml.tmpl" \
     "${PKG_DIR}/usr/local/marmot/gateway-playbooks/gateway-iptables.yaml.tmpl"

@@ -3,6 +3,8 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -23,6 +25,14 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute() {
+	normalizedArgs := normalizeInvocationArgs(os.Args)
+	if len(normalizedArgs) > 1 {
+		rootCmd.SetArgs(normalizedArgs[1:])
+	} else {
+		rootCmd.SetArgs([]string{})
+	}
+	defer rootCmd.SetArgs(nil)
+
 	//var err error
 	//m, err = getClientConfig()
 	//if err != nil {
@@ -35,6 +45,25 @@ func Execute() {
 		os.Exit(1)
 	}
 	os.Exit(0)
+}
+
+func normalizeInvocationArgs(args []string) []string {
+	if len(args) == 0 {
+		return args
+	}
+
+	if strings.TrimSpace(filepath.Base(args[0])) != "mactl-ssh" {
+		return args
+	}
+
+	if len(args) > 1 && strings.TrimSpace(args[1]) == "ssh" {
+		return args
+	}
+
+	normalized := make([]string, 0, len(args)+1)
+	normalized = append(normalized, args[0], "ssh")
+	normalized = append(normalized, args[1:]...)
+	return normalized
 }
 
 func init() {
