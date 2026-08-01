@@ -4,6 +4,7 @@ BINDIR=.
 DISTDIR=/usr/local/marmot
 SERVER_EXE=marmotd
 CLIENT_CMD=mactl
+CLIENT_SSH_ALIAS=mactl-ssh
 CLIENT_CONFIG=config_marmot
 ADMIN_CMD=maadm
 
@@ -18,6 +19,8 @@ install -m 0644 ${BINDIR}/marmot.service /etc/systemd/system
 
 rm -f /usr/local/bin/${CLIENT_CMD}
 install -m 0755 ${BINDIR}/${CLIENT_CMD} /usr/local/bin
+rm -f /usr/local/bin/${CLIENT_SSH_ALIAS}
+ln -s /usr/local/bin/${CLIENT_CMD} /usr/local/bin/${CLIENT_SSH_ALIAS}
 rm -f /usr/local/bin/${ADMIN_CMD}
 install -m 0755 ${BINDIR}/${ADMIN_CMD} /usr/local/bin
 install -m 0644 ${BINDIR}/${CLIENT_CONFIG} ${HOME}/.${CLIENT_CONFIG}
