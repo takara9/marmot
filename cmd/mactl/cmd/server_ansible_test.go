@@ -241,6 +241,9 @@ func TestServerAnsibleCommandEnvWithoutConfig(t *testing.T) {
 	if !containsPrefix(env, "ANSIBLE_HOST_KEY_CHECKING=False") {
 		t.Fatalf("serverAnsibleCommandEnv() should include ANSIBLE_HOST_KEY_CHECKING when ansible.cfg is absent")
 	}
+	if !containsPrefix(env, "ANSIBLE_REMOTE_TEMP=/tmp") {
+		t.Fatalf("serverAnsibleCommandEnv() should include ANSIBLE_REMOTE_TEMP=/tmp when ansible.cfg is absent")
+	}
 }
 
 func TestServerAnsibleCommandEnvWithConfig(t *testing.T) {
@@ -259,6 +262,9 @@ func TestServerAnsibleCommandEnvWithConfig(t *testing.T) {
 	env := serverAnsibleCommandEnv()
 	if containsPrefix(env, "ANSIBLE_HOST_KEY_CHECKING=False") {
 		t.Fatalf("serverAnsibleCommandEnv() must not inject ansible env vars when ansible.cfg exists")
+	}
+	if containsPrefix(env, "ANSIBLE_REMOTE_TEMP=/tmp") {
+		t.Fatalf("serverAnsibleCommandEnv() must not inject ANSIBLE_REMOTE_TEMP when ansible.cfg exists")
 	}
 }
 
