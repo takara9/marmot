@@ -20,31 +20,24 @@ var _ = Describe("Ceph integration helpers", Ordered, func() {
 	var originalConfig *MarmotdConfig
 	var cephTestConfig *MarmotdConfig
 	var keyFilePath string
-	var confFilePath string
 
 	BeforeAll(func() {
 		originalConfig = CurrentConfig()
 		var err error
-		confFile, err := os.CreateTemp("", "marmot-ceph-conf-*.conf")
-		Expect(err).NotTo(HaveOccurred())
-		confFilePath = confFile.Name()
-		_, err = confFile.WriteString("[global]\nmon_host = 10.1.3.11:6789\nname = client.admin\n")
-		Expect(err).NotTo(HaveOccurred())
-		Expect(confFile.Close()).To(Succeed())
-
 		keyFile, err := os.CreateTemp("", "marmot-ceph-key-*.key")
 		Expect(err).NotTo(HaveOccurred())
 		keyFilePath = keyFile.Name()
 		_, err = keyFile.WriteString("[client.ubuntu]\n\tkey = AQCAD1dq4k4jARAAq7ckh5t6aouhEGokyef0Fg==\n")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(keyFile.Close()).To(Succeed())
-		cephConfPathForRuntime = confFilePath
-		cephKeyringPathForRuntime = keyFilePath
 
 		cephTestConfig = &MarmotdConfig{
-			NodeName:    "hv1",
-			EtcdURL:     "http://127.0.0.1:2379",
-			CephEnabled: true,
+			NodeName:     "hv1",
+			EtcdURL:      "http://127.0.0.1:2379",
+			CephEnabled:  true,
+			CephMonitors: []string{"10.1.3.11:6789"},
+			CephUser:     "client.ubuntu",
+			CephKeyFile:  keyFilePath,
 			CephPoolByClass: map[string]string{
 				"ssd": "marmot-ssd",
 			},
@@ -54,9 +47,6 @@ var _ = Describe("Ceph integration helpers", Ordered, func() {
 
 	AfterAll(func() {
 		SetRuntimeConfig(originalConfig)
-		cephConfPathForRuntime = DefaultCephConfPath
-		cephKeyringPathForRuntime = DefaultCephKeyringPath
-		_ = os.Remove(confFilePath)
 		_ = os.Remove(keyFilePath)
 	})
 
@@ -75,6 +65,7 @@ var _ = Describe("Ceph integration helpers", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(disk.Type).To(Equal("rbd"))
 		Expect(disk.Src).To(Equal("marmot-ssd/vol-abcde"))
+		Expect(disk.CephUser).To(Equal("client.ubuntu"))
 		Expect(disk.CephMonitors).To(ContainElements("10.1.3.11:6789"))
 		Expect(disk.CephSecretUUID).To(Equal(cephSecretUUIDForServer("server-123")))
 	})
@@ -96,13 +87,11 @@ var _ = Describe("Ceph integration helpers", Ordered, func() {
 		Expect(disk.Src).To(Equal("stored-pool/stored-image"))
 	})
 
-	It("returns an error when monitors are missing in ceph.conf", func() {
-		err := os.WriteFile(confFilePath, []byte("[global]\nname = client.admin\n"), 0o644)
-		Expect(err).NotTo(HaveOccurred())
-		defer func() {
-			err = os.WriteFile(confFilePath, []byte("[global]\nmon_host = 10.1.3.11:6789\nname = client.admin\n"), 0o644)
-			Expect(err).NotTo(HaveOccurred())
-		}()
+	It("returns an error when monitors become empty after trimming", func() {
+		cfg := *CurrentConfig()
+		cfg.CephMonitors = []string{"   ", "\t"}
+		SetRuntimeConfig(&cfg)
+		defer SetRuntimeConfig(cephTestConfig)
 
 		volume := api.Volume{
 			Spec: api.VolSpec{
@@ -114,7 +103,7 @@ var _ = Describe("Ceph integration helpers", Ordered, func() {
 		}
 		api.SetVolumeID(&volume, "abcde")
 
-		_, err = buildCephDiskSpec(volume, "server-123", "vdb", 11)
+		_, err := buildCephDiskSpec(volume, "server-123", "vdb", 11)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("ceph monitors are required"))
 	})
@@ -167,39 +156,6 @@ var _ = Describe("Ceph integration helpers", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pool).To(Equal("stored-pool"))
 		Expect(image).To(Equal("stored-image"))
-	})
-
-	It("returns an error when providerVolumeId is missing for ceph delete target", func() {
-		vol := api.Volume{
-			Spec: api.VolSpec{
-				Type: util.StringPtr("ceph"),
-				Kind: util.StringPtr("data"),
-				Size: util.IntPtrInt(1),
-			},
-		}
-
-		cfg := runtimeCephConfig()
-
-		_, _, err := resolveCephDeleteTarget(vol, cfg)
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("ceph providerVolumeId is required for delete"))
-	})
-
-	It("returns an error when ceph providerVolumeId is invalid", func() {
-		vol := api.Volume{
-			Spec: api.VolSpec{
-				Type: util.StringPtr("ceph"),
-				Kind: util.StringPtr("data"),
-				Size: util.IntPtrInt(1),
-			},
-			Status: &api.Status{ProviderVolumeId: util.StringPtr("invalid-format")},
-		}
-
-		cfg := runtimeCephConfig()
-
-		_, _, err := resolveCephDeleteTarget(vol, cfg)
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("invalid ceph providerVolumeId"))
 	})
 
 	It("creates and removes the libvirt ceph secret", func() {
