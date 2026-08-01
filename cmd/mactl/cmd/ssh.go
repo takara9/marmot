@@ -78,6 +78,30 @@ func findServerByName(servers []api.Server, name string) (*api.Server, error) {
 }
 
 func rewriteSSHArgsForMarmot(servers []api.Server, sshArgs []string) ([]string, error) {
+	// Backward-compatible support for mactl syntax:
+	//   mactl ssh SERVER -- [SSH-ARGS...]
+	// and for SERVER followed by ssh options without `--`.
+	if len(sshArgs) >= 2 && !strings.HasPrefix(sshArgs[0], "-") && (sshArgs[1] == "--" || strings.HasPrefix(sshArgs[1], "-")) {
+		target := sshArgs[0]
+		extra := sshArgs[1:]
+		if extra[0] == "--" {
+			extra = extra[1:]
+		}
+
+		sep := -1
+		for i, arg := range extra {
+			if arg == "--" {
+				sep = i
+				break
+			}
+		}
+		if sep >= 0 {
+			sshArgs = append(append(extra[:sep], target), extra[sep+1:]...)
+		} else {
+			sshArgs = append(extra, target)
+		}
+	}
+
 	connectIdx, err := findSSHConnectTargetIndex(sshArgs)
 	if err != nil {
 		return nil, err
@@ -87,7 +111,6 @@ func rewriteSSHArgsForMarmot(servers []api.Server, sshArgs []string) ([]string, 
 	if connectArg == "" {
 		return nil, fmt.Errorf("ssh target is required")
 	}
-
 	sshUser, serverName, err := parseSSHLoginTarget(connectArg)
 	if err != nil {
 		if strings.HasPrefix(connectArg, "-") {
