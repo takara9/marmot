@@ -130,7 +130,94 @@ func rewriteSSHArgsForMarmot(servers []api.Server, sshArgs []string) ([]string, 
 	}
 
 	sshArgs[connectIdx] = buildSSHTargetAddress(sshUser, targetAddress)
-	return sshArgs, nil
+	return normalizeSSHArgsForExecution(sshArgs, connectIdx), nil
+}
+
+func normalizeSSHArgsForExecution(sshArgs []string, targetIdx int) []string {
+	separatorIdx := -1
+	for i, arg := range sshArgs {
+		if arg == "--" {
+			separatorIdx = i
+			break
+		}
+	}
+	if separatorIdx < 0 {
+		return sshArgs
+	}
+
+	normalized := make([]string, 0, len(sshArgs)-1)
+	normalized = append(normalized, sshArgs[:separatorIdx]...)
+	normalized = append(normalized, sshArgs[separatorIdx+1:]...)
+	if targetIdx > separatorIdx {
+		targetIdx--
+	}
+	if targetIdx < 0 || targetIdx >= len(normalized) {
+		return normalized
+	}
+
+	beforeTarget := append([]string{}, normalized[:targetIdx]...)
+	target := normalized[targetIdx]
+	optionTail, commandTail := splitSSHOptionPrefix(normalized[targetIdx+1:])
+
+	result := make([]string, 0, len(normalized)-1)
+	result = append(result, beforeTarget...)
+	result = append(result, optionTail...)
+	result = append(result, target)
+	result = append(result, commandTail...)
+	return result
+}
+
+func splitSSHOptionPrefix(args []string) ([]string, []string) {
+	if len(args) == 0 {
+		return nil, nil
+	}
+
+	consumesNext := map[string]bool{
+		"-b": true,
+		"-c": true,
+		"-D": true,
+		"-E": true,
+		"-F": true,
+		"-I": true,
+		"-i": true,
+		"-J": true,
+		"-L": true,
+		"-l": true,
+		"-m": true,
+		"-O": true,
+		"-o": true,
+		"-p": true,
+		"-Q": true,
+		"-R": true,
+		"-S": true,
+		"-W": true,
+		"-w": true,
+	}
+
+	optionArgs := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--" {
+			return optionArgs, append([]string{}, args[i+1:]...)
+		}
+		if !strings.HasPrefix(arg, "-") {
+			return optionArgs, append([]string{}, args[i:]...)
+		}
+
+		optionArgs = append(optionArgs, arg)
+		if len(arg) > 2 && (strings.HasPrefix(arg, "-o") || strings.HasPrefix(arg, "-i") || strings.HasPrefix(arg, "-l") || strings.HasPrefix(arg, "-p") || strings.HasPrefix(arg, "-J") || strings.HasPrefix(arg, "-W") || strings.HasPrefix(arg, "-L") || strings.HasPrefix(arg, "-R") || strings.HasPrefix(arg, "-S") || strings.HasPrefix(arg, "-b") || strings.HasPrefix(arg, "-c") || strings.HasPrefix(arg, "-D") || strings.HasPrefix(arg, "-E") || strings.HasPrefix(arg, "-F") || strings.HasPrefix(arg, "-I") || strings.HasPrefix(arg, "-m") || strings.HasPrefix(arg, "-Q") || strings.HasPrefix(arg, "-w")) {
+			continue
+		}
+		if consumesNext[arg] {
+			i++
+			if i >= len(args) {
+				return optionArgs, nil
+			}
+			optionArgs = append(optionArgs, args[i])
+		}
+	}
+
+	return optionArgs, nil
 }
 
 func parseSSHLoginTarget(value string) (string, string, error) {

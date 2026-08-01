@@ -158,6 +158,20 @@ var _ = Describe("ssh helper functions", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(args).To(Equal([]string{"-tt", "192.168.10.50", "hostname"}))
 		})
+
+		It("moves ssh options before the destination when -- is used", func() {
+			servers := []api.Server{{
+				Metadata: api.Metadata{Name: "server-20"},
+				Spec: api.ServerSpec{NetworkInterface: &[]api.NetworkInterface{{
+					Networkname: "host-bridge",
+					Address:     util.StringPtr("192.168.10.50"),
+				}}},
+			}}
+
+			args, err := rewriteSSHArgsForMarmot(servers, []string{"server-20", "--", "-i", "vmkey"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(args).To(Equal([]string{"-i", "vmkey", "192.168.10.50"}))
+		})
 	})
 
 	Describe("ssh command configuration", func() {
