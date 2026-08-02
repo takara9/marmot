@@ -6,7 +6,7 @@
   "api_listen_addr": "0.0.0.0:8750",
   "dns_listen_addr": "127.0.0.1:53",
   "dns_upstream": "8.8.8.8:53",
-  "dns_upstream_allow_cidrs": [
+  "dns_client_allow_cidrs": [
     "127.0.0.1/32",
     "192.168.1.0/24"
   ],

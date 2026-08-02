@@ -83,7 +83,7 @@ func main() {
 		"api_listen_addr", cfg.APIListenAddr,
 		"dns_listen_addr", cfg.DNSListenAddr,
 		"dns_upstream", cfg.DNSUpstream,
-		"dns_upstream_allow_cidrs", cfg.DNSUpstreamAllowCIDRs,
+		"dns_client_allow_cidrs", cfg.DNSUpstreamAllowCIDRs,
 		"os_volume_group", cfg.OSVolumeGroup,
 		"data_volume_group", cfg.DataVolumeGroup,
 		"deletion_delay_seconds", cfg.DeletionDelaySeconds,
