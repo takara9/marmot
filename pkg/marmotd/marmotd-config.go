@@ -209,7 +209,6 @@ func (c *MarmotdConfig) UnmarshalJSON(data []byte) error {
 		DNSUpstreamAllowCIDRsLegacy *[]string `json:"dns_upstream_allow_cidrs"`
 		// Keep accepting issue-title typo for compatibility.
 		DNSClientAllowCIDERSTypo *[]string `json:"dns_client_allow_ciders"`
-		DNSClientAllowCIDRs     *[]string `json:"dns_client_allow_cidrs"`
 	}{
 		alias: (*alias)(c),
 	}
@@ -218,9 +217,18 @@ func (c *MarmotdConfig) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	probe := struct {
+		DNSClientAllowCIDRsPresent *json.RawMessage `json:"dns_client_allow_cidrs"`
+	}{
+		DNSClientAllowCIDRsPresent: nil,
+	}
+	if err := json.Unmarshal(data, &probe); err != nil {
+		return err
+	}
+
 	// Prefer the canonical key, then typo compatibility key, then legacy key.
-	if aux.DNSClientAllowCIDRs != nil {
-		c.DNSUpstreamAllowCIDRs = *aux.DNSClientAllowCIDRs
+	if probe.DNSClientAllowCIDRsPresent != nil {
+		// Canonical key is already decoded via alias and has highest priority.
 	} else if aux.DNSClientAllowCIDERSTypo != nil {
 		c.DNSUpstreamAllowCIDRs = *aux.DNSClientAllowCIDERSTypo
 	} else if aux.DNSUpstreamAllowCIDRsLegacy != nil {

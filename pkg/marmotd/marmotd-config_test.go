@@ -170,6 +170,39 @@ var _ = Describe("VolumeGroupConfig", func() {
 			Expect(cfg.DNSUpstreamAllowCIDRs).To(Equal([]string{"192.168.3.0/24"}))
 		})
 
+		It("複数キー同時指定時は正規キーを優先する", func() {
+			dir := GinkgoT().TempDir()
+			path := filepath.Join(dir, "marmotd.json")
+			content := []byte(`{
+				"dns_client_allow_cidrs":["10.0.0.0/24"],
+				"dns_client_allow_ciders":["10.1.0.0/24"],
+				"dns_upstream_allow_cidrs":["10.2.0.0/24"]
+			}`)
+
+			err := os.WriteFile(path, content, 0o644)
+			Expect(err).NotTo(HaveOccurred())
+
+			cfg, err := marmotd.LoadConfig(path)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cfg.DNSUpstreamAllowCIDRs).To(Equal([]string{"10.0.0.0/24"}))
+		})
+
+		It("正規キーがない場合は誤記キーを旧キーより優先する", func() {
+			dir := GinkgoT().TempDir()
+			path := filepath.Join(dir, "marmotd.json")
+			content := []byte(`{
+				"dns_client_allow_ciders":["10.1.0.0/24"],
+				"dns_upstream_allow_cidrs":["10.2.0.0/24"]
+			}`)
+
+			err := os.WriteFile(path, content, 0o644)
+			Expect(err).NotTo(HaveOccurred())
+
+			cfg, err := marmotd.LoadConfig(path)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cfg.DNSUpstreamAllowCIDRs).To(Equal([]string{"10.1.0.0/24"}))
+		})
+
 		It("ceph_enabled の設定値を読み込む", func() {
 			if _, err := os.Stat(marmotd.DefaultCephConfPath); err != nil {
 				Skip("default ceph.conf is required")
