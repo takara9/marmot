@@ -201,6 +201,9 @@ func (c *MarmotdConfig) UnmarshalJSON(data []byte) error {
 	type alias MarmotdConfig
 	aux := struct {
 		*alias
+		// Prevent alias.DNSUpstreamAllowCIDRs (dns_client_allow_cidrs) from competing with the
+		// canonical/legacy pointer fields below; c.DNSUpstreamAllowCIDRs is set explicitly.
+		DNSUpstreamAllowCIDRs []string `json:"-"`
 		CephPoolByClass json.RawMessage `json:"ceph_pool_by_class"`
 		// Backward compatibility for renamed DNS allow-list key.
 		DNSUpstreamAllowCIDRsLegacy *[]string `json:"dns_upstream_allow_cidrs"`
