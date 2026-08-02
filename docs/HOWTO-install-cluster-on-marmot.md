@@ -125,7 +125,7 @@ root@marmot1:/etc/marmot# head marmotd.json
   "api_listen_addr": "0.0.0.0:8750",
   "dns_listen_addr": "192.168.1.201:53",
   "dns_upstream": "192.168.1.9:53",
-  "dns_upstream_allow_cidrs": [
+  "dns_client_allow_cidrs": [
     "192.168.1.0/24"
   ],
   "default_underlay_interface": "",
@@ -178,7 +178,7 @@ root@marmot2:/tmp# head /etc/marmot/marmotd.json
   "api_listen_addr": "0.0.0.0:8750",
   "dns_listen_addr": "192.168.1.202:53",
   "dns_upstream": "192.168.1.9:53",
-  "dns_upstream_allow_cidrs": [
+  "dns_client_allow_cidrs": [
     "192.168.1.0/24"
   ],
   "default_underlay_interface": "",

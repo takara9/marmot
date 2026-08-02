@@ -102,7 +102,7 @@ type MarmotdConfig struct {
 
 	// upstream DNS 転送を許可する送信元 CIDR の一覧
 	// 例: ["192.168.1.0/24", "fd00::/64"]
-	DNSUpstreamAllowCIDRs []string `json:"dns_upstream_allow_cidrs"`
+	DNSUpstreamAllowCIDRs []string `json:"dns_client_allow_cidrs"`
 
 	// VXLAN 利用時に underlayInterface が省略された場合の既定インターフェース名
 	DefaultUnderlayInterface string `json:"default_underlay_interface"`
@@ -201,13 +201,38 @@ func (c *MarmotdConfig) UnmarshalJSON(data []byte) error {
 	type alias MarmotdConfig
 	aux := struct {
 		*alias
+		// Prevent alias.DNSUpstreamAllowCIDRs (dns_client_allow_cidrs) from competing with the
+		// canonical/legacy pointer fields below; c.DNSUpstreamAllowCIDRs is set explicitly.
+		DNSUpstreamAllowCIDRs []string `json:"-"`
 		CephPoolByClass json.RawMessage `json:"ceph_pool_by_class"`
+		// Backward compatibility for renamed DNS allow-list key.
+		DNSUpstreamAllowCIDRsLegacy *[]string `json:"dns_upstream_allow_cidrs"`
+		// Keep accepting issue-title typo for compatibility.
+		DNSClientAllowCIDERSTypo *[]string `json:"dns_client_allow_ciders"`
 	}{
 		alias: (*alias)(c),
 	}
 
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
+	}
+
+	probe := struct {
+		DNSClientAllowCIDRsPresent *json.RawMessage `json:"dns_client_allow_cidrs"`
+	}{
+		DNSClientAllowCIDRsPresent: nil,
+	}
+	if err := json.Unmarshal(data, &probe); err != nil {
+		return err
+	}
+
+	// Prefer the canonical key, then typo compatibility key, then legacy key.
+	if probe.DNSClientAllowCIDRsPresent != nil {
+		// Canonical key is already decoded via alias and has highest priority.
+	} else if aux.DNSClientAllowCIDERSTypo != nil {
+		c.DNSUpstreamAllowCIDRs = *aux.DNSClientAllowCIDERSTypo
+	} else if aux.DNSUpstreamAllowCIDRsLegacy != nil {
+		c.DNSUpstreamAllowCIDRs = *aux.DNSUpstreamAllowCIDRsLegacy
 	}
 
 	raw := strings.TrimSpace(string(aux.CephPoolByClass))
