@@ -96,20 +96,101 @@ var _ = Describe("ssh helper functions", func() {
 		})
 	})
 
-	Describe("composeSSHArgs", func() {
-		It("appends target when no extra args", func() {
-			args := composeSSHArgs("192.168.10.50", nil)
-			Expect(args).To(Equal([]string{"192.168.10.50"}))
+	Describe("findSSHConnectTargetIndex", func() {
+		It("finds the first positional host after ssh options", func() {
+			idx, err := findSSHConnectTargetIndex([]string{"-i", "~/.ssh/id_ed25519", "-o", "StrictHostKeyChecking=no", "server-20", "hostname"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(idx).To(Equal(4))
 		})
 
-		It("places target after options", func() {
-			args := composeSSHArgs("192.168.10.50", []string{"-i", "~/.ssh/id_ed25519", "-o", "StrictHostKeyChecking=no"})
-			Expect(args).To(Equal([]string{"-i", "~/.ssh/id_ed25519", "-o", "StrictHostKeyChecking=no", "192.168.10.50"}))
+		It("accepts repeated tty shorthand option -tt", func() {
+			idx, err := findSSHConnectTargetIndex([]string{"-tt", "server-20", "hostname"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(idx).To(Equal(1))
 		})
 
-		It("supports remote command with -- separator", func() {
-			args := composeSSHArgs("192.168.10.50", []string{"-i", "~/.ssh/id_ed25519", "--", "uname", "-a"})
-			Expect(args).To(Equal([]string{"-i", "~/.ssh/id_ed25519", "192.168.10.50", "uname", "-a"}))
+		It("finds host after -l user option", func() {
+			idx, err := findSSHConnectTargetIndex([]string{"-l", "ubuntu", "server-20", "hostname"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(idx).To(Equal(2))
+		})
+	})
+
+	Describe("rewriteSSHArgsForMarmot", func() {
+		It("rewrites direct server target to host-bridge IP", func() {
+			servers := []api.Server{{
+				Metadata: api.Metadata{Name: "server-20"},
+				Spec: api.ServerSpec{NetworkInterface: &[]api.NetworkInterface{{
+					Networkname: "host-bridge",
+					Address:     util.StringPtr("192.168.10.50"),
+				}}},
+			}}
+
+			args, err := rewriteSSHArgsForMarmot(servers, []string{"server-20", "hostname"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(args).To(Equal([]string{"192.168.10.50", "hostname"}))
+		})
+
+		It("rewrites ssh-style args while preserving options", func() {
+			servers := []api.Server{{
+				Metadata: api.Metadata{Name: "server-20"},
+				Spec: api.ServerSpec{NetworkInterface: &[]api.NetworkInterface{{
+					Networkname: "host-bridge",
+					Address:     util.StringPtr("192.168.10.50"),
+				}}},
+			}}
+
+			args, err := rewriteSSHArgsForMarmot(servers, []string{"-i", "~/.ssh/id_ed25519", "-o", "StrictHostKeyChecking=no", "server-20", "hostname"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(args).To(Equal([]string{"-i", "~/.ssh/id_ed25519", "-o", "StrictHostKeyChecking=no", "192.168.10.50", "hostname"}))
+		})
+
+		It("keeps -tt and rewrites only destination", func() {
+			servers := []api.Server{{
+				Metadata: api.Metadata{Name: "server-20"},
+				Spec: api.ServerSpec{NetworkInterface: &[]api.NetworkInterface{{
+					Networkname: "host-bridge",
+					Address:     util.StringPtr("192.168.10.50"),
+				}}},
+			}}
+
+			args, err := rewriteSSHArgsForMarmot(servers, []string{"-tt", "server-20", "hostname"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(args).To(Equal([]string{"-tt", "192.168.10.50", "hostname"}))
+		})
+
+		It("moves ssh options before the destination when -- is used", func() {
+			servers := []api.Server{{
+				Metadata: api.Metadata{Name: "server-20"},
+				Spec: api.ServerSpec{NetworkInterface: &[]api.NetworkInterface{{
+					Networkname: "host-bridge",
+					Address:     util.StringPtr("192.168.10.50"),
+				}}},
+			}}
+
+			args, err := rewriteSSHArgsForMarmot(servers, []string{"server-20", "--", "-i", "vmkey"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(args).To(Equal([]string{"-i", "vmkey", "192.168.10.50"}))
+		})
+
+		It("keeps the README example compatible when a user is specified", func() {
+			servers := []api.Server{{
+				Metadata: api.Metadata{Name: "server-20"},
+				Spec: api.ServerSpec{NetworkInterface: &[]api.NetworkInterface{{
+					Networkname: "host-bridge",
+					Address:     util.StringPtr("192.168.10.50"),
+				}}},
+			}}
+
+			args, err := rewriteSSHArgsForMarmot(servers, []string{"ubuntu@server-20", "--", "-i", "vmkey"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(args).To(Equal([]string{"-i", "vmkey", "ubuntu@192.168.10.50"}))
+		})
+	})
+
+	Describe("ssh command configuration", func() {
+		It("disables cobra flag parsing for ssh passthrough", func() {
+			Expect(sshCmd.DisableFlagParsing).To(BeTrue())
 		})
 	})
 })

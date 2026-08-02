@@ -450,6 +450,7 @@ func serverAnsibleCommandEnv() []string {
 	return append(env,
 		"ANSIBLE_HOST_KEY_CHECKING=False",
 		"ANSIBLE_DEPRECATION_WARNINGS=False",
+		"ANSIBLE_REMOTE_TEMP=/tmp",
 		"ANSIBLE_SSH_ARGS=-o ControlMaster=auto -o ControlPersist=60s -o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes",
 	)
 }

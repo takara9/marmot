@@ -16,6 +16,8 @@ var sshExecCommand = exec.Command
 var sshCmd = &cobra.Command{
 	Use:   "ssh [USER@]SERVER-NAME -- [SSH-ARGS...]",
 	Short: "Connect to a server via SSH using host-bridge IP",
+	// Treat all ssh-style flags as positional args so options like -tt pass through unchanged.
+	DisableFlagParsing: true,
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cmd.SilenceUsage = true
@@ -25,9 +27,12 @@ var sshCmd = &cobra.Command{
 			return fmt.Errorf("failed to get API client config: %w", err)
 		}
 
-		sshUser, serverName, err := parseSSHLoginTarget(args[0])
-		if err != nil {
-			return err
+		sshArgs := args
+		if len(sshArgs) > 0 && strings.TrimSpace(sshArgs[0]) == "ssh" {
+			sshArgs = sshArgs[1:]
+		}
+		if len(sshArgs) == 0 {
+			return fmt.Errorf("ssh target is required")
 		}
 
 		list, _, err := m.GetServers()
@@ -40,18 +45,11 @@ var sshCmd = &cobra.Command{
 			return fmt.Errorf("failed to parse servers: %w", err)
 		}
 
-		server, err := findServerByName(servers, serverName)
+		sshArgs, err = rewriteSSHArgsForMarmot(servers, sshArgs)
 		if err != nil {
 			return err
 		}
 
-		targetAddress, err := resolveHostBridgeAddress(*server)
-		if err != nil {
-			return fmt.Errorf("server %q %w", serverName, err)
-		}
-		sshTarget := buildSSHTargetAddress(sshUser, targetAddress)
-
-		sshArgs := composeSSHArgs(sshTarget, args[1:])
 		sshCommand := sshExecCommand("ssh", sshArgs...)
 		sshCommand.Stdin = os.Stdin
 		sshCommand.Stdout = os.Stdout
@@ -62,6 +60,164 @@ var sshCmd = &cobra.Command{
 		}
 		return nil
 	},
+}
+
+func findServerByName(servers []api.Server, name string) (*api.Server, error) {
+	trimmedName := strings.TrimSpace(name)
+	if trimmedName == "" {
+		return nil, fmt.Errorf("server name is required")
+	}
+
+	for i := range servers {
+		if strings.TrimSpace(servers[i].Metadata.Name) == trimmedName {
+			return &servers[i], nil
+		}
+	}
+
+	return nil, fmt.Errorf("server %q not found", trimmedName)
+}
+
+func rewriteSSHArgsForMarmot(servers []api.Server, sshArgs []string) ([]string, error) {
+	// Backward-compatible support for mactl syntax:
+	//   mactl ssh SERVER -- [SSH-ARGS...]
+	// and for SERVER followed by ssh options without `--`.
+	if len(sshArgs) >= 2 && !strings.HasPrefix(sshArgs[0], "-") && (sshArgs[1] == "--" || strings.HasPrefix(sshArgs[1], "-")) {
+		target := sshArgs[0]
+		extra := sshArgs[1:]
+		if extra[0] == "--" {
+			extra = extra[1:]
+		}
+
+		sep := -1
+		for i, arg := range extra {
+			if arg == "--" {
+				sep = i
+				break
+			}
+		}
+		if sep >= 0 {
+			sshArgs = append(append(extra[:sep], target), extra[sep+1:]...)
+		} else {
+			sshArgs = append(extra, target)
+		}
+	}
+
+	connectIdx, err := findSSHConnectTargetIndex(sshArgs)
+	if err != nil {
+		return nil, err
+	}
+
+	connectArg := strings.TrimSpace(sshArgs[connectIdx])
+	if connectArg == "" {
+		return nil, fmt.Errorf("ssh target is required")
+	}
+	sshUser, serverName, err := parseSSHLoginTarget(connectArg)
+	if err != nil {
+		if strings.HasPrefix(connectArg, "-") {
+			return nil, fmt.Errorf("ssh target is required")
+		}
+		return nil, err
+	}
+
+	server, err := findServerByName(servers, serverName)
+	if err != nil {
+		return nil, err
+	}
+
+	targetAddress, err := resolveHostBridgeAddress(*server)
+	if err != nil {
+		return nil, fmt.Errorf("server %q %w", serverName, err)
+	}
+
+	sshArgs[connectIdx] = buildSSHTargetAddress(sshUser, targetAddress)
+	return normalizeSSHArgsForExecution(sshArgs, connectIdx), nil
+}
+
+func normalizeSSHArgsForExecution(sshArgs []string, targetIdx int) []string {
+	separatorIdx := -1
+	for i, arg := range sshArgs {
+		if arg == "--" {
+			separatorIdx = i
+			break
+		}
+	}
+	if separatorIdx < 0 {
+		return sshArgs
+	}
+
+	normalized := make([]string, 0, len(sshArgs)-1)
+	normalized = append(normalized, sshArgs[:separatorIdx]...)
+	normalized = append(normalized, sshArgs[separatorIdx+1:]...)
+	if targetIdx > separatorIdx {
+		targetIdx--
+	}
+	if targetIdx < 0 || targetIdx >= len(normalized) {
+		return normalized
+	}
+
+	beforeTarget := append([]string{}, normalized[:targetIdx]...)
+	target := normalized[targetIdx]
+	optionTail, commandTail := splitSSHOptionPrefix(normalized[targetIdx+1:])
+
+	result := make([]string, 0, len(normalized)-1)
+	result = append(result, beforeTarget...)
+	result = append(result, optionTail...)
+	result = append(result, target)
+	result = append(result, commandTail...)
+	return result
+}
+
+func splitSSHOptionPrefix(args []string) ([]string, []string) {
+	if len(args) == 0 {
+		return nil, nil
+	}
+
+	consumesNext := map[string]bool{
+		"-b": true,
+		"-c": true,
+		"-D": true,
+		"-E": true,
+		"-F": true,
+		"-I": true,
+		"-i": true,
+		"-J": true,
+		"-L": true,
+		"-l": true,
+		"-m": true,
+		"-O": true,
+		"-o": true,
+		"-p": true,
+		"-Q": true,
+		"-R": true,
+		"-S": true,
+		"-W": true,
+		"-w": true,
+	}
+
+	optionArgs := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--" {
+			return optionArgs, append([]string{}, args[i+1:]...)
+		}
+		if !strings.HasPrefix(arg, "-") {
+			return optionArgs, append([]string{}, args[i:]...)
+		}
+
+		optionArgs = append(optionArgs, arg)
+		if len(arg) > 2 && (strings.HasPrefix(arg, "-o") || strings.HasPrefix(arg, "-i") || strings.HasPrefix(arg, "-l") || strings.HasPrefix(arg, "-p") || strings.HasPrefix(arg, "-J") || strings.HasPrefix(arg, "-W") || strings.HasPrefix(arg, "-L") || strings.HasPrefix(arg, "-R") || strings.HasPrefix(arg, "-S") || strings.HasPrefix(arg, "-b") || strings.HasPrefix(arg, "-c") || strings.HasPrefix(arg, "-D") || strings.HasPrefix(arg, "-E") || strings.HasPrefix(arg, "-F") || strings.HasPrefix(arg, "-I") || strings.HasPrefix(arg, "-m") || strings.HasPrefix(arg, "-Q") || strings.HasPrefix(arg, "-w")) {
+			continue
+		}
+		if consumesNext[arg] {
+			i++
+			if i >= len(args) {
+				return optionArgs, nil
+			}
+			optionArgs = append(optionArgs, args[i])
+		}
+	}
+
+	return optionArgs, nil
 }
 
 func parseSSHLoginTarget(value string) (string, string, error) {
@@ -89,21 +245,6 @@ func buildSSHTargetAddress(user, ipAddress string) string {
 	return strings.TrimSpace(user) + "@" + strings.TrimSpace(ipAddress)
 }
 
-func findServerByName(servers []api.Server, name string) (*api.Server, error) {
-	trimmedName := strings.TrimSpace(name)
-	if trimmedName == "" {
-		return nil, fmt.Errorf("server name is required")
-	}
-
-	for i := range servers {
-		if strings.TrimSpace(servers[i].Metadata.Name) == trimmedName {
-			return &servers[i], nil
-		}
-	}
-
-	return nil, fmt.Errorf("server %q not found", trimmedName)
-}
-
 func resolveHostBridgeAddress(server api.Server) (string, error) {
 	if server.Spec.NetworkInterface == nil || len(*server.Spec.NetworkInterface) == 0 {
 		return "", fmt.Errorf("is not connected to host-bridge")
@@ -122,26 +263,60 @@ func resolveHostBridgeAddress(server api.Server) (string, error) {
 	return "", fmt.Errorf("is not connected to host-bridge")
 }
 
-func composeSSHArgs(targetAddress string, extraArgs []string) []string {
-	args := make([]string, 0, len(extraArgs)+1)
-	separator := -1
-	for i, arg := range extraArgs {
+func findSSHConnectTargetIndex(args []string) (int, error) {
+	if len(args) == 0 {
+		return -1, fmt.Errorf("ssh target is required")
+	}
+
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		return 0, nil
+	}
+
+	consumesNext := map[string]bool{
+		"-b": true,
+		"-c": true,
+		"-D": true,
+		"-E": true,
+		"-F": true,
+		"-I": true,
+		"-i": true,
+		"-J": true,
+		"-L": true,
+		"-l": true,
+		"-m": true,
+		"-O": true,
+		"-o": true,
+		"-p": true,
+		"-Q": true,
+		"-R": true,
+		"-S": true,
+		"-W": true,
+		"-w": true,
+	}
+
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
 		if arg == "--" {
-			separator = i
-			break
+			if i+1 >= len(args) {
+				return -1, fmt.Errorf("ssh target is required")
+			}
+			return i + 1, nil
+		}
+		if !strings.HasPrefix(arg, "-") {
+			return i, nil
+		}
+		if len(arg) > 2 && (strings.HasPrefix(arg, "-o") || strings.HasPrefix(arg, "-i") || strings.HasPrefix(arg, "-l") || strings.HasPrefix(arg, "-p") || strings.HasPrefix(arg, "-J") || strings.HasPrefix(arg, "-W") || strings.HasPrefix(arg, "-L") || strings.HasPrefix(arg, "-R") || strings.HasPrefix(arg, "-S") || strings.HasPrefix(arg, "-b") || strings.HasPrefix(arg, "-c") || strings.HasPrefix(arg, "-D") || strings.HasPrefix(arg, "-E") || strings.HasPrefix(arg, "-F") || strings.HasPrefix(arg, "-I") || strings.HasPrefix(arg, "-m") || strings.HasPrefix(arg, "-Q") || strings.HasPrefix(arg, "-w")) {
+			continue
+		}
+		if consumesNext[arg] {
+			i++
+			if i >= len(args) {
+				return -1, fmt.Errorf("ssh target is required")
+			}
 		}
 	}
 
-	if separator >= 0 {
-		args = append(args, extraArgs[:separator]...)
-		args = append(args, targetAddress)
-		args = append(args, extraArgs[separator+1:]...)
-		return args
-	}
-
-	args = append(args, extraArgs...)
-	args = append(args, targetAddress)
-	return args
+	return -1, fmt.Errorf("ssh target is required")
 }
 
 func init() {
