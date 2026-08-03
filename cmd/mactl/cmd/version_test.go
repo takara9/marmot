@@ -13,7 +13,11 @@ func TestVersionPrintsClientVersionWhenServerUnreachable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateTemp() failed: %v", err)
 	}
-	defer os.Remove(tmp.Name())
+	defer func() {
+		if err := os.Remove(tmp.Name()); err != nil && !os.IsNotExist(err) {
+			t.Errorf("Remove() failed: %v", err)
+		}
+	}()
 
 	if _, err := tmp.WriteString("current: 0\nendpoints:\n  - http://127.0.0.1:1\n"); err != nil {
 		t.Fatalf("WriteString() failed: %v", err)
