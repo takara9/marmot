@@ -102,8 +102,8 @@ API キー:
 
 ## クラスタ状態
 
-- mactl marmot status
-- mactl marmot cluster
+- mactl status
+- mactl cluster
 
 ## 汎用操作
 

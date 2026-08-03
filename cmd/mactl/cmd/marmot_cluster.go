@@ -144,5 +144,5 @@ func timeVal(v *time.Time) string {
 }
 
 func init() {
-	marmotCmd.AddCommand(marmotClusterCmd)
+	rootCmd.AddCommand(marmotClusterCmd)
 }

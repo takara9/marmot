@@ -160,5 +160,5 @@ func printHostStatus(status api.HostStatus) {
 }
 
 func init() {
-	marmotCmd.AddCommand(marmotStatusCmd)
+	rootCmd.AddCommand(marmotStatusCmd)
 }
