@@ -121,10 +121,10 @@ $ sudo systemctl restart marmot
 
 ## クラスタ構成の確認
 
-`mactl marmot cluster` コマンドで、クラスタメンバーを表示することができます。
+`mactl cluster` コマンドで、クラスタメンバーを表示することができます。
 
 ```console
-ubuntu@ws1:~$ mactl marmot cluster
+ubuntu@ws1:~$ mactl cluster
 NODE             HOSTID     IP              CAP_CPU CAP_MEM(MB)  TOTAL RUNNING STOPPED     VCPU  MEM(MB)    VNETS UPDATED
 marmot1          61e3eba0   172.16.0.201          8      15991      0       0       0        0        0        6 2026-06-30 11:06:31
 marmot2          9bffb5e3   172.16.0.202          8      15991      0       0       0        0        0        6 2026-06-30 11:06:31
