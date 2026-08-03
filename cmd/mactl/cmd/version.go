@@ -27,22 +27,23 @@ var versionCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		cv := strings.TrimSpace(version)
+		ver := api.Version{ClientVersion: cv}
+
 		JsonVersion, err := m.GetVersion()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to get server version: %v\n", err)
-			return err
-		}
-		sv := strings.TrimSpace(string(*JsonVersion.ServerVersion))
-		cv := strings.TrimSpace(version)
-		ver := api.Version{
-			ClientVersion: cv,
-			ServerVersion: &sv,
+		} else if JsonVersion != nil && JsonVersion.ServerVersion != nil {
+			sv := strings.TrimSpace(*JsonVersion.ServerVersion)
+			ver.ServerVersion = &sv
 		}
 
 		switch outputStyle {
 		case "text":
-			fmt.Println("Getting server Information...")
-			fmt.Println("Server version =", sv)
+			if ver.ServerVersion != nil {
+				fmt.Println("Getting server Information...")
+				fmt.Println("Server version =", *ver.ServerVersion)
+			}
 			fmt.Println("Client version =", cv)
 			return nil
 		case "json":
