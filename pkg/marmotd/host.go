@@ -114,6 +114,7 @@ func (m *Marmot) CollectHostStatus() (api.HostStatus, error) {
 		return status, err
 	}
 	status.Capacity = capacity
+	applyHostVolumeCapacity(capacity, nodeName, m)
 
 	// 割当情報を収集
 	allocation, err := m.collectHostAllocation()
@@ -124,6 +125,44 @@ func (m *Marmot) CollectHostStatus() (api.HostStatus, error) {
 	status.Allocation = allocation
 
 	return status, nil
+}
+
+func applyHostVolumeCapacity(capacity *api.HostCapacity, nodeName string, m *Marmot) {
+	if capacity == nil || m == nil || m.Db == nil {
+		return
+	}
+
+	volumes, err := m.Db.GetVolumes()
+	if err != nil {
+		slog.Warn("GetVolumes() failed while collecting host volume capacity", "err", err, "nodeName", nodeName)
+		return
+	}
+
+	diskCount, diskCapacityGB := aggregateHostVolumeCapacityByNode(volumes, nodeName)
+	capacity.DiskCount = util.IntPtrInt(diskCount)
+	capacity.DiskCapacityGB = util.IntPtrInt(diskCapacityGB)
+}
+
+func aggregateHostVolumeCapacityByNode(volumes []api.Volume, nodeName string) (int, int) {
+	targetNode := strings.TrimSpace(nodeName)
+	if targetNode == "" {
+		return 0, 0
+	}
+
+	diskCount := 0
+	diskCapacityGB := 0
+	for _, vol := range volumes {
+		if vol.Metadata.NodeName == nil || strings.TrimSpace(*vol.Metadata.NodeName) != targetNode {
+			continue
+		}
+
+		diskCount++
+		if vol.Spec.Size != nil && *vol.Spec.Size > 0 {
+			diskCapacityGB += *vol.Spec.Size
+		}
+	}
+
+	return diskCount, diskCapacityGB
 }
 
 // 指定インターフェースのIPv4アドレスを取得する。
