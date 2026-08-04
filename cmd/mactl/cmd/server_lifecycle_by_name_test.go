@@ -43,6 +43,47 @@ func TestPrintLifecycleResultTextUsesResponseID(t *testing.T) {
 	})
 }
 
+func TestServerLifecycleNoopStatusHelpers(t *testing.T) {
+	tests := []struct {
+		name       string
+		statusCode int
+		wantStart  bool
+		wantStop   bool
+	}{
+		{name: "running", statusCode: 2, wantStart: true, wantStop: false},
+		{name: "starting", statusCode: 7, wantStart: true, wantStop: false},
+		{name: "stopped", statusCode: 3, wantStart: false, wantStop: true},
+		{name: "stopping", statusCode: 6, wantStart: false, wantStop: true},
+		{name: "other", statusCode: 1, wantStart: false, wantStop: false},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			if got := isStartNoopStatus(tc.statusCode); got != tc.wantStart {
+				t.Fatalf("isStartNoopStatus(%d) = %v, want %v", tc.statusCode, got, tc.wantStart)
+			}
+			if got := isStopNoopStatus(tc.statusCode); got != tc.wantStop {
+				t.Fatalf("isStopNoopStatus(%d) = %v, want %v", tc.statusCode, got, tc.wantStop)
+			}
+		})
+	}
+}
+
+func TestPrintLifecycleResultFromIDUsesProvidedID(t *testing.T) {
+	withOutputStyle("text", t, func() {
+		out := captureStdoutForIDTest(t, func() {
+			if err := printLifecycleResultFromID("srv-456", "MSG"); err != nil {
+				t.Fatalf("printLifecycleResultFromID() unexpected err: %v", err)
+			}
+		})
+
+		if !contains(out, "MSG srv-456") {
+			t.Fatalf("stdout = %q, want contains %q", out, "MSG srv-456")
+		}
+	})
+}
+
 func contains(haystack, needle string) bool {
 	if needle == "" {
 		return true

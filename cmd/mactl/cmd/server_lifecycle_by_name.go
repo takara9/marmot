@@ -4,11 +4,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/client"
+	"github.com/takara9/marmot/pkg/db"
 	"go.yaml.in/yaml/v3"
+)
+
+const (
+	serverLifecycleWaitTimeout      = 10 * time.Minute
+	serverLifecycleWaitPollInterval = 5 * time.Second
 )
 
 var startCmd = &cobra.Command{
@@ -29,6 +36,14 @@ var startServerCmd = &cobra.Command{
 		serverID, serverName, err := resolveServerIDByName(m, args[0])
 		if err != nil {
 			return err
+		}
+
+		statusCode, err := getServerStatusCode(m, serverID)
+		if err != nil {
+			return err
+		}
+		if isStartNoopStatus(statusCode) {
+			return printLifecycleResultFromID(serverID, "サーバーが起動されました。ID:")
 		}
 
 		byteBody, _, err := m.StartServerById(serverID)
@@ -58,6 +73,14 @@ var stopServerCmd = &cobra.Command{
 		serverID, serverName, err := resolveServerIDByName(m, args[0])
 		if err != nil {
 			return err
+		}
+
+		statusCode, err := getServerStatusCode(m, serverID)
+		if err != nil {
+			return err
+		}
+		if isStopNoopStatus(statusCode) {
+			return printLifecycleResultFromID(serverID, "サーバーが停止されました。ID:")
 		}
 
 		byteBody, _, err := m.StopServerById(serverID)
@@ -93,6 +116,10 @@ var restartServerCmd = &cobra.Command{
 			return fmt.Errorf("failed to stop server %q for restart: %w", serverName, err)
 		}
 
+		if err := waitForServerStatus(m, serverID, db.SERVER_STOPPED, serverLifecycleWaitTimeout, serverLifecycleWaitPollInterval); err != nil {
+			return fmt.Errorf("failed to wait for server %q to stop for restart: %w", serverName, err)
+		}
+
 		byteBody, _, err := m.StartServerById(serverID)
 		if err != nil {
 			return fmt.Errorf("failed to start server %q for restart: %w", serverName, err)
@@ -124,6 +151,70 @@ func resolveServerIDByName(m *client.MarmotEndpoint, name string) (string, strin
 	}
 
 	return string(api.ServerID(*server)), trimmedName, nil
+}
+
+func getServerStatusCode(m *client.MarmotEndpoint, serverID string) (int, error) {
+	body, _, err := m.GetServerById(serverID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get server %s: %w", serverID, err)
+	}
+
+	var server api.Server
+	if err := json.Unmarshal(body, &server); err != nil {
+		return 0, fmt.Errorf("failed to parse server %s: %w", serverID, err)
+	}
+	if server.Status == nil {
+		return 0, nil
+	}
+
+	return server.Status.StatusCode, nil
+}
+
+func isStartNoopStatus(statusCode int) bool {
+	return statusCode == db.SERVER_RUNNING || statusCode == db.SERVER_STARTING
+}
+
+func isStopNoopStatus(statusCode int) bool {
+	return statusCode == db.SERVER_STOPPED || statusCode == db.SERVER_STOPPING
+}
+
+func waitForServerStatus(m *client.MarmotEndpoint, serverID string, expectedStatus int, timeout, interval time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	var lastErr error
+	for {
+		body, _, err := m.GetServerById(serverID)
+		if err != nil {
+			lastErr = err
+		} else {
+			var server api.Server
+			if err := json.Unmarshal(body, &server); err != nil {
+				lastErr = fmt.Errorf("failed to parse server %s while waiting for %s: %w", serverID, db.ServerStatus[expectedStatus], err)
+			} else if server.Status != nil {
+				if server.Status.StatusCode == expectedStatus {
+					return nil
+				}
+				if server.Status.StatusCode == db.SERVER_ERROR {
+					message := "server status became ERROR"
+					if server.Status.Message != nil && strings.TrimSpace(*server.Status.Message) != "" {
+						message = strings.TrimSpace(*server.Status.Message)
+					}
+					return fmt.Errorf("server %s is ERROR while waiting for %s: %s", serverID, db.ServerStatus[expectedStatus], message)
+				}
+			}
+		}
+
+		if time.Now().After(deadline) {
+			if lastErr != nil {
+				return fmt.Errorf("timeout waiting for server %s to become %s: last error: %w", serverID, db.ServerStatus[expectedStatus], lastErr)
+			}
+			return fmt.Errorf("timeout waiting for server %s to become %s", serverID, db.ServerStatus[expectedStatus])
+		}
+		time.Sleep(interval)
+	}
+}
+
+func printLifecycleResultFromID(serverID string, textMessage string) error {
+	return printLifecycleResult([]byte(fmt.Sprintf(`{"id":%q}`, serverID)), textMessage)
 }
 
 func printLifecycleResult(byteBody []byte, textMessage string) error {
