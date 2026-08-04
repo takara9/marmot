@@ -134,7 +134,6 @@ func applyHostVolumeCapacity(capacity *api.HostCapacity, nodeName string, m *Mar
 
 	volumes, err := m.Db.GetVolumes()
 	if err != nil {
-		slog.Warn("GetVolumes() failed while collecting host volume capacity", "err", err, "nodeName", nodeName)
 		return
 	}
 
