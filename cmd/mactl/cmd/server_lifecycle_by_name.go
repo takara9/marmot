@@ -112,8 +112,15 @@ var restartServerCmd = &cobra.Command{
 			return err
 		}
 
-		if _, _, err := m.StopServerById(serverID); err != nil {
-			return fmt.Errorf("failed to stop server %q for restart: %w", serverName, err)
+		statusCode, err := getServerStatusCode(m, serverID)
+		if err != nil {
+			return err
+		}
+
+		if !isStopNoopStatus(statusCode) {
+			if _, _, err := m.StopServerById(serverID); err != nil {
+				return fmt.Errorf("failed to stop server %q for restart: %w", serverName, err)
+			}
 		}
 
 		if err := waitForServerStatus(m, serverID, db.SERVER_STOPPED, serverLifecycleWaitTimeout, serverLifecycleWaitPollInterval); err != nil {

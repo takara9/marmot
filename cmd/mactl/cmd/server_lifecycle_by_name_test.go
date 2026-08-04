@@ -70,6 +70,14 @@ func TestServerLifecycleNoopStatusHelpers(t *testing.T) {
 	}
 }
 
+func TestRestartStopNoopStatuses(t *testing.T) {
+	for _, status := range []int{3, 6} {
+		if !isStopNoopStatus(status) {
+			t.Fatalf("isStopNoopStatus(%d) = false, want true", status)
+		}
+	}
+}
+
 func TestPrintLifecycleResultFromIDUsesProvidedID(t *testing.T) {
 	withOutputStyle("text", t, func() {
 		out := captureStdoutForIDTest(t, func() {
