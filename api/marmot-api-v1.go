@@ -255,14 +255,15 @@ type HostCapacity struct {
 
 // HostStatus defines model for HostStatus.
 type HostStatus struct {
-	Allocation  *HostAllocation `json:"allocation,omitempty" yaml:"allocation,omitempty"`
-	Capacity    *HostCapacity   `json:"capacity,omitempty" yaml:"capacity,omitempty"`
-	HostId      *string         `json:"hostId,omitempty" yaml:"hostId,omitempty"`
-	InitiatorId *string         `json:"initiatorId,omitempty" yaml:"initiatorId,omitempty"`
-	IpAddress   *string         `json:"ipAddress,omitempty" yaml:"ipAddress,omitempty"`
-	IscsiServer *bool           `json:"iscsiServer,omitempty" yaml:"iscsiServer,omitempty"`
-	LastUpdated *time.Time      `json:"lastUpdated,omitempty" yaml:"lastUpdated,omitempty"`
-	NodeName    *string         `json:"nodeName,omitempty" yaml:"nodeName,omitempty"`
+	Allocation        *HostAllocation `json:"allocation,omitempty" yaml:"allocation,omitempty"`
+	Capacity          *HostCapacity   `json:"capacity,omitempty" yaml:"capacity,omitempty"`
+	CreationTimeStamp *time.Time      `json:"creationTimeStamp,omitempty" yaml:"creationTimeStamp,omitempty"`
+	HostId            *string         `json:"hostId,omitempty" yaml:"hostId,omitempty"`
+	InitiatorId       *string         `json:"initiatorId,omitempty" yaml:"initiatorId,omitempty"`
+	IpAddress         *string         `json:"ipAddress,omitempty" yaml:"ipAddress,omitempty"`
+	IscsiServer       *bool           `json:"iscsiServer,omitempty" yaml:"iscsiServer,omitempty"`
+	LastUpdated       *time.Time      `json:"lastUpdated,omitempty" yaml:"lastUpdated,omitempty"`
+	NodeName          *string         `json:"nodeName,omitempty" yaml:"nodeName,omitempty"`
 }
 
 // IPAddress defines model for IPAddress.

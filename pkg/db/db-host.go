@@ -3,6 +3,7 @@ package db
 import (
 	"encoding/json"
 	"log/slog"
+	"time"
 
 	"github.com/takara9/marmot/api"
 	etcd "go.etcd.io/etcd/client/v3"
@@ -12,11 +13,35 @@ const (
 	HostStatusPrefix = "/marmot/hoststatus"
 )
 
+func resolveHostStatusCreationTimestamp(incoming api.HostStatus, existing *api.HostStatus, now time.Time) *time.Time {
+	if incoming.CreationTimeStamp != nil {
+		return incoming.CreationTimeStamp
+	}
+	if existing != nil {
+		if existing.CreationTimeStamp != nil {
+			return existing.CreationTimeStamp
+		}
+		if existing.LastUpdated != nil {
+			return existing.LastUpdated
+		}
+	}
+	return &now
+}
+
 // HostStatusをetcdに保存する
 func (d *Database) PutHostStatus(status api.HostStatus) error {
 	if status.NodeName == nil {
 		return nil
 	}
+	var existing *api.HostStatus
+	stored, err := d.GetHostStatus(*status.NodeName)
+	if err == nil {
+		existing = &stored
+	} else if err != ErrNotFound {
+		return err
+	}
+	now := time.Now()
+	status.CreationTimeStamp = resolveHostStatusCreationTimestamp(status, existing, now)
 	key := HostStatusPrefix + "/" + *status.NodeName
 	return d.PutJSON(key, status)
 }

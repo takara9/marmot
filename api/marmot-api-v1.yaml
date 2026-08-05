@@ -2845,6 +2845,9 @@ components:
     HostStatus:
       type: object
       properties:
+        creationTimeStamp:
+          type: string
+          format: date-time
         nodeName:
           type: string
         hostId:

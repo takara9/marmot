@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
@@ -86,7 +85,7 @@ func printHostCluster(statuses []api.HostStatus) {
 	})
 
 	fmt.Printf("%-16s %-10s %-15s %7s %10s %6s %7s %7s %8s %8s %8s %s\n",
-		"NODE", "HOSTID", "IP", "CAP_CPU", "CAP_MEM(MB)", "TOTAL", "RUNNING", "STOPPED", "VCPU", "MEM(MB)", "VNETS", "UPDATED")
+		"NODE", "HOSTID", "IP", "CAP_CPU", "CAP_MEM(MB)", "TOTAL", "RUNNING", "STOPPED", "VCPU", "MEM(MB)", "VNETS", "AGE")
 	for _, s := range statuses {
 		a := s.Allocation
 		c := s.Capacity
@@ -102,7 +101,7 @@ func printHostCluster(statuses []api.HostStatus) {
 			intVal(a, func(x *api.HostAllocation) *int { return x.AllocatedCpuCores }),
 			intVal(a, func(x *api.HostAllocation) *int { return x.AllocatedMemoryMB }),
 			intVal(a, func(x *api.HostAllocation) *int { return x.VirtualNetworks }),
-			timeVal(s.LastUpdated),
+			timeSinceText(s.CreationTimeStamp),
 		)
 	}
 }
@@ -134,13 +133,6 @@ func capacityIntVal(c *api.HostCapacity, f func(*api.HostCapacity) *int) int {
 		return 0
 	}
 	return *v
-}
-
-func timeVal(v *time.Time) string {
-	if v == nil {
-		return "N/A"
-	}
-	return v.Format("2006-01-02 15:04:05")
 }
 
 func init() {
