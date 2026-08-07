@@ -18,6 +18,11 @@ const (
 	KUBERNETES_ENGINE_RUNNING      = 2
 	KUBERNETES_ENGINE_DELETING     = 3
 	KUBERNETES_ENGINE_FAILED       = 4
+
+	// KubernetesEngine が専用作成するノード間通信ネットワークの所有者ラベル
+	KubernetesEngineNetworkLabelOwner          = "kubernetesEngineId"
+	KubernetesEngineNetworkLabelManagedBy      = "managedBy"
+	KubernetesEngineNetworkLabelManagedByValue = "kubernetes-engine-controller"
 )
 
 var KubernetesEngineStatus = map[int]string{

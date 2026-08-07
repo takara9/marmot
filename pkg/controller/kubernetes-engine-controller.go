@@ -1,7 +1,9 @@
 package controller
 
 import (
+	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -13,6 +15,10 @@ import (
 const (
 	KUBERNETES_ENGINE_CONTROLLER_INTERVAL = 10 * time.Second
 	KUBERNETES_ENGINE_DELETION_DELAY      = 15 * time.Second
+
+	// kubernetesEngineNetworkNamePrefix はクラスタ専用のノード間通信ネットワーク名の接頭辞。
+	// クラスタ名を含めることで他のネットワークと判別しやすくする。
+	kubernetesEngineNetworkNamePrefix = "mke-"
 )
 
 // kubernetesEngineController は MKE (Marmot Kubernetes Engine) コントローラーです。
@@ -140,10 +146,14 @@ func (c *kubernetesEngineController) kubernetesEngineControllerLoop() {
 	}
 }
 
-// reconcileKubernetesEnginePending は新規作成を検知したクラスタを PROVISIONING に進める。
+// reconcileKubernetesEnginePending はクラスタ専用ネットワークを作成した上で PROVISIONING に進める。
 // TODO: 次フェーズでノード用サーバーの作成を開始する。
 func (c *kubernetesEngineController) reconcileKubernetesEnginePending(ke api.KubernetesEngine) {
 	id := api.KubernetesEngineID(ke)
+	if err := c.ensureKubernetesEngineNetwork(ke); err != nil {
+		slog.Warn("ensureKubernetesEngineNetwork() failed", "id", id, "err", err)
+		return
+	}
 	if err := c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_PROVISIONING, "cluster provisioning started"); err != nil {
 		slog.Warn("UpdateKubernetesEngineStatusWithMessage() failed", "id", id, "err", err)
 	}
@@ -163,15 +173,77 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineRunning(ke api.Kub
 	slog.Debug("KubernetesEngineはRUNNING状態です（ヘルスチェックは未実装）", "id", id, "name", ke.Metadata.Name)
 }
 
-// reconcileKubernetesEngineDeleting は猶予期間経過後に呼び出され、etcdから実削除する。
+// reconcileKubernetesEngineDeleting は猶予期間経過後に呼び出され、専用ネットワークの削除要求を行い、
+// ネットワークの削除完了を確認してからetcdから実削除する。
 // TODO: 次フェーズでノード(Server)等の関連リソース削除を先行させる。
 func (c *kubernetesEngineController) reconcileKubernetesEngineDeleting(ke api.KubernetesEngine) {
 	id := api.KubernetesEngineID(ke)
+
+	networkName := kubernetesEngineNetworkName(ke)
+	if networkName != "" {
+		network, err := c.db.GetVirtualNetworkByName(networkName)
+		if err == nil {
+			if network.Status == nil || network.Status.StatusCode != db.NETWORK_DELETING {
+				if delErr := c.db.SetDeleteTimestampVirtualNetwork(api.VirtualNetworkID(network)); delErr != nil {
+					slog.Warn("SetDeleteTimestampVirtualNetwork() failed", "id", id, "network", networkName, "err", delErr)
+				}
+			}
+			// ネットワークの削除完了を待ってからクラスタ本体を削除する。
+			return
+		}
+		if err != db.ErrNotFound {
+			slog.Warn("GetVirtualNetworkByName() failed", "id", id, "network", networkName, "err", err)
+			return
+		}
+	}
+
 	if err := c.db.DeleteKubernetesEngineById(id); err != nil {
 		slog.Warn("DeleteKubernetesEngineById() failed", "id", id, "err", err)
 		return
 	}
 	slog.Debug("kubernetes engine deleted", "id", id)
+}
+
+// kubernetesEngineNetworkName はクラスタ専用のノード間通信ネットワーク名を返す。
+// クラスタ名が未設定の場合は空文字を返す。
+func kubernetesEngineNetworkName(ke api.KubernetesEngine) string {
+	name := strings.TrimSpace(ke.Metadata.Name)
+	if name == "" {
+		return ""
+	}
+	return kubernetesEngineNetworkNamePrefix + name
+}
+
+// ensureKubernetesEngineNetwork はクラスタ専用のノード間通信ネットワークを作成する（既に存在すれば何もしない）。
+func (c *kubernetesEngineController) ensureKubernetesEngineNetwork(ke api.KubernetesEngine) error {
+	networkName := kubernetesEngineNetworkName(ke)
+	if networkName == "" {
+		return fmt.Errorf("kubernetes engine metadata.name is empty")
+	}
+
+	if _, err := c.db.GetVirtualNetworkByName(networkName); err == nil {
+		return nil
+	} else if err != db.ErrNotFound {
+		return err
+	}
+
+	labels := map[string]interface{}{
+		db.KubernetesEngineNetworkLabelOwner:     api.KubernetesEngineID(ke),
+		db.KubernetesEngineNetworkLabelManagedBy: db.KubernetesEngineNetworkLabelManagedByValue,
+	}
+	network := api.VirtualNetwork{
+		ApiVersion: "v1",
+		Kind:       "VirtualNetwork",
+		Metadata:   api.Metadata{Name: networkName, Labels: &labels},
+	}
+	if err := marmotd.ApplyVirtualNetworkDefaults(&network, marmotd.CurrentConfig(), c.db); err != nil {
+		return err
+	}
+	if _, err := c.db.CreateVirtualNetwork(network); err != nil {
+		return err
+	}
+	slog.Debug("KubernetesEngine用ネットワークを作成しました", "id", api.KubernetesEngineID(ke), "network", networkName)
+	return nil
 }
 
 // isKubernetesEngineInGracePeriod は DeletionTimeStamp が設定されたレコードが

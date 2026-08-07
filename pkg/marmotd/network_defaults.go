@@ -12,6 +12,13 @@ import (
 const maxVNI = 16777215
 const minAutoVNI = 100
 
+// ApplyVirtualNetworkDefaults は applyVirtualNetworkDefaults を他パッケージから利用するための公開版。
+// コントローラーが専用ネットワークをAPIハンドラーを経由せず直接作成する場合に、
+// overlayMode/VNI割当等の既定値ロジックを再利用するために使用する。
+func ApplyVirtualNetworkDefaults(network *api.VirtualNetwork, cfg *MarmotdConfig, database *db.Database) error {
+	return applyVirtualNetworkDefaults(network, cfg, database)
+}
+
 func applyVirtualNetworkDefaults(network *api.VirtualNetwork, cfg *MarmotdConfig, database *db.Database) error {
 	if network == nil {
 		return nil
