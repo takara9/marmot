@@ -142,7 +142,15 @@ func IssueKubernetesEngineCertificate(pkiDir, clusterName string, req Kubernetes
 	if reqName == "" {
 		return "", "", fmt.Errorf("certificate request name is empty")
 	}
-
+	if reqName != filepath.Base(reqName) || reqName == "." || reqName == ".." || strings.Contains(reqName, "\\") {
+		return "", "", fmt.Errorf("certificate request name is invalid: %q", req.Name)
+	}
+	for _, r := range reqName {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.' {
+			continue
+		}
+		return "", "", fmt.Errorf("certificate request name contains invalid character %q", r)
+	}
 	certPath, keyPath = KubernetesEngineCertPaths(pkiDir, name, reqName)
 	if certFileExists(certPath) && certFileExists(keyPath) {
 		return certPath, keyPath, nil
