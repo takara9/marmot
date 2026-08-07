@@ -116,14 +116,35 @@ func StopKubernetesEngineEtcdUnit(clusterName string) error {
 // ユニットファイルを削除し、daemon-reloadする。ユニットファイルが既に存在しない場合も
 // エラーにはしない。
 func DeleteKubernetesEngineEtcdUnit(clusterName string) error {
-	unit := KubernetesEngineEtcdUnitName(clusterName)
-	if err := systemdStopUnit(unit); err != nil {
+	name := strings.TrimSpace(clusterName)
+	if name == "" {
+		return fmt.Errorf("cluster name is empty")
+	}
+	if name == "." || name == ".." {
+		return fmt.Errorf("cluster name is invalid: %q", clusterName)
+	}
+	for _, r := range name {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.' {
+			continue
+		}
+		return fmt.Errorf("cluster name contains invalid character %q", r)
+	}
+
+	unitPath := kubernetesEngineEtcdUnitPath(name)
+	_, statErr := os.Stat(unitPath)
+	unitFileMissing := os.IsNotExist(statErr)
+	if statErr != nil && !unitFileMissing {
+		return fmt.Errorf("failed to stat etcd unit file: %w", statErr)
+	}
+
+	unit := KubernetesEngineEtcdUnitName(name)
+	if err := systemdStopUnit(unit); err != nil && !unitFileMissing {
 		return fmt.Errorf("systemctl stop %s failed: %w", unit, err)
 	}
-	if err := systemdDisableUnit(unit); err != nil {
+	if err := systemdDisableUnit(unit); err != nil && !unitFileMissing {
 		return fmt.Errorf("systemctl disable %s failed: %w", unit, err)
 	}
-	if err := os.Remove(kubernetesEngineEtcdUnitPath(clusterName)); err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(unitPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove etcd unit file: %w", err)
 	}
 	if err := systemdDaemonReload(); err != nil {
