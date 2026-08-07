@@ -1,0 +1,8 @@
+{
+    "kubernetes_version": "v1.36.2",
+    "containerd_version": "2.3.1",
+    "etcd_version": "3.6.8",
+    "cni_version": "0.4.0",
+    "default_cni_type": "bridge",
+    "runc_version": "1.4.0"
+}
