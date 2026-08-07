@@ -23,7 +23,7 @@ var getManifestFile string
 var getCmd = &cobra.Command{
 	Use:   "get [RESOURCE [NAME]]",
 	Short: "Get resource(s) of a specific type",
-	Long:  `Get resource(s) (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw, applicationloadbalancer/alb, networkloadbalancer/nlb). If NAME is provided, show only that resource. Otherwise, list all resources. RESOURCE supports comma-separated values such as "srv,net". With -f, process manifest(s) and query by metadata.name for each document.`,
+	Long:  `Get resource(s) (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw, applicationloadbalancer/alb, networkloadbalancer/nlb, kubernetesengine/mke). If NAME is provided, show only that resource. Otherwise, list all resources. RESOURCE supports comma-separated values such as "srv,net". With -f, process manifest(s) and query by metadata.name for each document.`,
 	Args:  cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if strings.TrimSpace(getManifestFile) != "" {
@@ -122,6 +122,8 @@ func getResourceByTypeAndName(resourceName string, resourceSpec string) error {
 		return getLoadBalancerResources(resourceSpec)
 	case "networkloadbalancer":
 		return getNetworkLoadBalancerResources(resourceSpec)
+	case "kubernetesengine":
+		return getKubernetesEngineResources(resourceSpec)
 	default:
 		return fmt.Errorf("unknown resource type: %s", resourceName)
 	}
@@ -264,6 +266,72 @@ func getNetworkLoadBalancerResources(name string) error {
 			data, err := yaml.Marshal(items)
 			if err != nil {
 				return fmt.Errorf("failed to marshal network load balancers to YAML: %w", err)
+			}
+			fmt.Print(string(data))
+			return nil
+		default:
+			return fmt.Errorf("output style must be text/json/yaml")
+		}
+	}
+
+	return runList(listFn)
+}
+
+func getKubernetesEngineResources(name string) error {
+	listFn := func() error {
+		m, err := getClientConfig()
+		if err != nil {
+			return fmt.Errorf("failed to get client config: %w", err)
+		}
+
+		list, _, err := m.GetKubernetesEngines()
+		if err != nil {
+			return fmt.Errorf("failed to list kubernetes engines: %w", err)
+		}
+
+		var items []api.KubernetesEngine
+		if err := json.Unmarshal(list, &items); err != nil {
+			return fmt.Errorf("failed to parse kubernetes engines: %w", err)
+		}
+
+		if name != "" {
+			filtered := make([]api.KubernetesEngine, 0)
+			for _, item := range items {
+				if item.Metadata.Name == name {
+					filtered = append(filtered, item)
+				}
+			}
+			items = filtered
+			if len(items) == 0 {
+				fmt.Printf("no kubernetes engine found with name %q\n", name)
+				return nil
+			}
+		}
+
+		sort.SliceStable(items, func(i, j int) bool {
+			return creationTime(items[i].Status).Before(creationTime(items[j].Status))
+		})
+
+		switch outputStyle {
+		case "text":
+			fmt.Printf("%-16s  %-8s  %-6s  %-12s  %-8s\n", "NAME", "VERSION", "NODES", "STATUS", "AGE")
+			fmt.Printf("%-16s  %-8s  %-6s  %-12s  %-8s\n", "----", "-------", "-----", "------", "---")
+			for _, item := range items {
+				status := "-"
+				if item.Status != nil && item.Status.Status != nil && strings.TrimSpace(*item.Status.Status) != "" {
+					status = strings.TrimSpace(*item.Status.Status)
+				}
+				fmt.Printf("%-16s  %-8s  %-6d  %-12s  %-8s\n", item.Metadata.Name, item.Spec.Version, item.Spec.Nodes, status, formatServerAge(item.Status))
+			}
+			return nil
+		case "json":
+			data, _ := json.Marshal(items)
+			fmt.Println(string(data))
+			return nil
+		case "yaml":
+			data, err := yaml.Marshal(items)
+			if err != nil {
+				return fmt.Errorf("failed to marshal kubernetes engines to YAML: %w", err)
 			}
 			fmt.Print(string(data))
 			return nil

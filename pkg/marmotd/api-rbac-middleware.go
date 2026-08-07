@@ -9,10 +9,10 @@ import (
 )
 
 type operationRBACRule struct {
-	Resource  string
-	Verb      string
-	AllowSelf bool
-	SelfParam string
+	Resource      string
+	Verb          string
+	AllowSelf     bool
+	SelfParam     string
 	RequiredRoles []string
 }
 
@@ -22,21 +22,21 @@ func rbacOperationMiddlewares(s *Server) map[string][]echo.MiddlewareFunc {
 		"apiAuthMe":     {Resource: "", Verb: ""},
 		"apiAuthzCheck": {Resource: "", Verb: ""},
 
-		"apiListRoles":    {Resource: "", Verb: ""},
+		"apiListRoles":     {Resource: "", Verb: ""},
 		"apiGetRoleByName": {Resource: "", Verb: ""},
 
 		"apiGetMarmotStatus":  {Resource: "Cluster", Verb: "read"},
 		"apiGetMarmotCluster": {Resource: "Cluster", Verb: "read"},
 
-		"apiGetServers":                    {Resource: "Server", Verb: "read"},
-		"apiCreateServer":                  {Resource: "Server", Verb: "create"},
-		"apiGetServerById":                 {Resource: "Server", Verb: "read"},
-		"apiUpdateServerById":              {Resource: "Server", Verb: "update"},
-		"apiDeleteServerById":              {Resource: "Server", Verb: "delete"},
-		"apiStartServerById":               {Resource: "Server", Verb: "update"},
-		"apiStopServerById":                {Resource: "Server", Verb: "update"},
+		"apiGetServers":                      {Resource: "Server", Verb: "read"},
+		"apiCreateServer":                    {Resource: "Server", Verb: "create"},
+		"apiGetServerById":                   {Resource: "Server", Verb: "read"},
+		"apiUpdateServerById":                {Resource: "Server", Verb: "update"},
+		"apiDeleteServerById":                {Resource: "Server", Verb: "delete"},
+		"apiStartServerById":                 {Resource: "Server", Verb: "update"},
+		"apiStopServerById":                  {Resource: "Server", Verb: "update"},
 		"apiMakeImageEntryFromRunningVMById": {Resource: "Server", Verb: "update"},
-		"apiConsoleServerById":             {Resource: "Server", Verb: "read"},
+		"apiConsoleServerById":               {Resource: "Server", Verb: "read"},
 
 		"apiListVolumes":      {Resource: "Volume", Verb: "read"},
 		"apiCreateVolume":     {Resource: "Volume", Verb: "create"},
@@ -44,14 +44,14 @@ func rbacOperationMiddlewares(s *Server) map[string][]echo.MiddlewareFunc {
 		"apiUpdateVolumeById": {Resource: "Volume", Verb: "update"},
 		"apiDeleteVolumeById": {Resource: "Volume", Verb: "delete"},
 
-		"apiGetNetworks":          {Resource: "Network", Verb: "read"},
-		"apiCreateNetwork":        {Resource: "Network", Verb: "create"},
-		"apiGetNetworkById":       {Resource: "Network", Verb: "read"},
-		"apiUpdateNetworkById":    {Resource: "Network", Verb: "update"},
-		"apiDeleteNetworkById":    {Resource: "Network", Verb: "delete"},
-		"apiListIpNetworks":       {Resource: "Network", Verb: "read"},
+		"apiGetNetworks":             {Resource: "Network", Verb: "read"},
+		"apiCreateNetwork":           {Resource: "Network", Verb: "create"},
+		"apiGetNetworkById":          {Resource: "Network", Verb: "read"},
+		"apiUpdateNetworkById":       {Resource: "Network", Verb: "update"},
+		"apiDeleteNetworkById":       {Resource: "Network", Verb: "delete"},
+		"apiListIpNetworks":          {Resource: "Network", Verb: "read"},
 		"apiGetIpAddressesByNetwork": {Resource: "Network", Verb: "read"},
-		"apiGetNetworkIpNetworks": {Resource: "Network", Verb: "read"},
+		"apiGetNetworkIpNetworks":    {Resource: "Network", Verb: "read"},
 
 		"apiGetGateways":        {Resource: "ServerGateway", Verb: "read"},
 		"apiCreateGateway":      {Resource: "ServerGateway", Verb: "create"},
@@ -67,33 +67,38 @@ func rbacOperationMiddlewares(s *Server) map[string][]echo.MiddlewareFunc {
 		"apiDeleteVpnGatewayById":  {Resource: "VpnGateway", Verb: "delete"},
 		"apiGetVpnGatewayCertById": {Resource: "VpnGateway", Verb: "read"},
 
-		"apiGetNetworkLoadBalancers":      {Resource: "NetworkLoadBalancer", Verb: "read"},
-		"apiCreateNetworkLoadBalancer":    {Resource: "NetworkLoadBalancer", Verb: "create"},
-		"apiGetNetworkLoadBalancerById":   {Resource: "NetworkLoadBalancer", Verb: "read"},
+		"apiGetKubernetesEngines":       {Resource: "KubernetesEngine", Verb: "read"},
+		"apiCreateKubernetesEngine":     {Resource: "KubernetesEngine", Verb: "create"},
+		"apiGetKubernetesEngineById":    {Resource: "KubernetesEngine", Verb: "read"},
+		"apiDeleteKubernetesEngineById": {Resource: "KubernetesEngine", Verb: "delete"},
+
+		"apiGetNetworkLoadBalancers":       {Resource: "NetworkLoadBalancer", Verb: "read"},
+		"apiCreateNetworkLoadBalancer":     {Resource: "NetworkLoadBalancer", Verb: "create"},
+		"apiGetNetworkLoadBalancerById":    {Resource: "NetworkLoadBalancer", Verb: "read"},
 		"apiUpdateNetworkLoadBalancerById": {Resource: "NetworkLoadBalancer", Verb: "update"},
 		"apiDeleteNetworkLoadBalancerById": {Resource: "NetworkLoadBalancer", Verb: "delete"},
 
-		"apiGetLoadBalancers":      {Resource: "ApplicationLoadBalancer", Verb: "read"},
-		"apiCreateLoadBalancer":    {Resource: "ApplicationLoadBalancer", Verb: "create"},
-		"apiGetLoadBalancerById":   {Resource: "ApplicationLoadBalancer", Verb: "read"},
+		"apiGetLoadBalancers":       {Resource: "ApplicationLoadBalancer", Verb: "read"},
+		"apiCreateLoadBalancer":     {Resource: "ApplicationLoadBalancer", Verb: "create"},
+		"apiGetLoadBalancerById":    {Resource: "ApplicationLoadBalancer", Verb: "read"},
 		"apiUpdateLoadBalancerById": {Resource: "ApplicationLoadBalancer", Verb: "update"},
 		"apiDeleteLoadBalancerById": {Resource: "ApplicationLoadBalancer", Verb: "delete"},
 
-		"apiGetImages":            {Resource: "Server", Verb: "read"},
-		"apiCreateImage":          {Resource: "Server", Verb: "create"},
-		"apiGetImageById":         {Resource: "Server", Verb: "read"},
-		"apiUpdateImageById":      {Resource: "Server", Verb: "update"},
-		"apiDeleteImageById":      {Resource: "Server", Verb: "delete"},
+		"apiGetImages":              {Resource: "Server", Verb: "read"},
+		"apiCreateImage":            {Resource: "Server", Verb: "create"},
+		"apiGetImageById":           {Resource: "Server", Verb: "read"},
+		"apiUpdateImageById":        {Resource: "Server", Verb: "update"},
+		"apiDeleteImageById":        {Resource: "Server", Verb: "delete"},
 		"apiDownloadImageQcow2ById": {Resource: "Server", Verb: "read"},
-		"apiImportImageArchive":   {Resource: "Server", Verb: "create"},
+		"apiImportImageArchive":     {Resource: "Server", Verb: "create"},
 
-		"apiListUsers":       {Resource: "User", Verb: "read", RequiredRoles: []string{"Administrator"}},
-		"apiCreateUser":      {Resource: "User", Verb: "create"},
-		"apiGetUserById":     {Resource: "User", Verb: "read", AllowSelf: true, SelfParam: "userId"},
-		"apiUpdateUserById":  {Resource: "User", Verb: "update"},
-		"apiDeleteUserById":  {Resource: "User", Verb: "delete"},
-		"apiLockUserById":    {Resource: "User", Verb: "update"},
-		"apiUnlockUserById":  {Resource: "User", Verb: "update"},
+		"apiListUsers":          {Resource: "User", Verb: "read", RequiredRoles: []string{"Administrator"}},
+		"apiCreateUser":         {Resource: "User", Verb: "create"},
+		"apiGetUserById":        {Resource: "User", Verb: "read", AllowSelf: true, SelfParam: "userId"},
+		"apiUpdateUserById":     {Resource: "User", Verb: "update"},
+		"apiDeleteUserById":     {Resource: "User", Verb: "delete"},
+		"apiLockUserById":       {Resource: "User", Verb: "update"},
+		"apiUnlockUserById":     {Resource: "User", Verb: "update"},
 		"apiChangeUserPassword": {Resource: "User", Verb: "update", AllowSelf: true, SelfParam: "userId"},
 		"apiListUserRoles":      {Resource: "User", Verb: "read", AllowSelf: true, SelfParam: "userId"},
 		"apiAddUserRole":        {Resource: "User", Verb: "update"},
