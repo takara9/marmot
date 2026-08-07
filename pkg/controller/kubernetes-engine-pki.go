@@ -220,7 +220,30 @@ func newCertificateSerialNumber() (*big.Int, error) {
 
 func writePemFile(path, blockType string, der []byte, mode os.FileMode) error {
 	block := &pem.Block{Type: blockType, Bytes: der}
-	return os.WriteFile(path, pem.EncodeToMemory(block), mode)
+	dir := filepath.Dir(path)
+
+	tmp, err := os.CreateTemp(dir, ".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer func() { _ = os.Remove(tmpName) }()
+
+	if err := tmp.Chmod(mode); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if _, err := tmp.Write(pem.EncodeToMemory(block)); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		return err
+	}
+	return nil
 }
 
 func loadKubernetesEngineCA(certPath, keyPath string) (*x509.Certificate, *rsa.PrivateKey, error) {
