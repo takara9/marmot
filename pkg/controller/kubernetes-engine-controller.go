@@ -113,11 +113,14 @@ func (c *kubernetesEngineController) kubernetesEngineControllerLoop() {
 			continue
 		}
 
-		if item.Status.DeletionTimeStamp != nil &&
-			time.Since(*item.Status.DeletionTimeStamp) > KUBERNETES_ENGINE_DELETION_DELAY &&
-			item.Status.StatusCode != db.KUBERNETES_ENGINE_DELETING {
-			_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_DELETING, "")
-			continue
+		if item.Status.DeletionTimeStamp != nil {
+			if time.Since(*item.Status.DeletionTimeStamp) <= KUBERNETES_ENGINE_DELETION_DELAY {
+				continue
+			}
+			if item.Status.StatusCode != db.KUBERNETES_ENGINE_DELETING {
+				_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_DELETING, "")
+				continue
+			}
 		}
 
 		switch item.Status.StatusCode {
