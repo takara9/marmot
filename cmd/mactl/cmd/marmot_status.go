@@ -145,12 +145,22 @@ func printHostStatus(status api.HostStatus) {
 		if a.VirtualNetworks != nil {
 			vnets = *a.VirtualNetworks
 		}
+		allocDiskCount := 0
+		if a.DiskCount != nil {
+			allocDiskCount = *a.DiskCount
+		}
+		allocDiskCap := 0
+		if a.DiskCapacityGB != nil {
+			allocDiskCap = *a.DiskCapacityGB
+		}
 		fmt.Printf("\n割当数:\n")
 		fmt.Printf("  VM数（合計）:       %d\n", totalVMs)
 		fmt.Printf("  VM数（稼働中）:     %d\n", runningVMs)
 		fmt.Printf("  VM数（停止中）:     %d\n", stoppedVMs)
 		fmt.Printf("  vCPU割当数:         %d vCPU（稼働中のみ）\n", allocCPU)
 		fmt.Printf("  メモリ割当量:       %d MB（稼働中のみ）\n", allocMem)
+		fmt.Printf("  ディスク本数:       %d\n", allocDiskCount)
+		fmt.Printf("  ディスク容量:       %d GB\n", allocDiskCap)
 		fmt.Printf("  仮想ネットワーク数: %d\n", vnets)
 	}
 

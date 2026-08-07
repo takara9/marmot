@@ -1751,9 +1751,9 @@ paths:
       summary: "Get Marmot Host Status"
       description: |
         Retrieve the status of the marmot host node, including resource capacity and current allocation.
-        Capacity includes CPU cores, memory, disk count and capacity, and network interfaces.
+        Capacity includes CPU cores, memory, physical disk count and capacity (detected via lsblk), and network interfaces.
         Allocation includes running/stopped VM counts, allocated CPU cores and memory (excluding stopped VMs),
-        and virtual network count.
+        allocated disk count and capacity, and virtual network count.
       operationId: apiGetMarmotStatus
       tags:
         - marmot
@@ -2900,6 +2900,12 @@ components:
           type: integer
           format: int
         allocatedMemoryMB:
+          type: integer
+          format: int
+        diskCount:
+          type: integer
+          format: int
+        diskCapacityGB:
           type: integer
           format: int
         virtualNetworks:
