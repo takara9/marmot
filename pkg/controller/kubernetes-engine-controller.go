@@ -10,6 +10,7 @@ import (
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
+	"github.com/takara9/marmot/pkg/util"
 )
 
 const (
@@ -182,7 +183,13 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineDeleting(ke api.Ku
 	network, err := c.findKubernetesEngineNetwork(ke)
 	if err == nil {
 		networkID := api.VirtualNetworkID(network)
-		if network.Status == nil || network.Status.StatusCode != db.NETWORK_DELETING {
+		if network.Status == nil {
+			// CreateVirtualNetwork()は必ずStatusを設定するため通常は到達しないが、
+			// nilのままSetDeleteTimestampVirtualNetwork()を呼ぶとDB層でパニックするため回避する。
+			slog.Warn("network status is nil, skip delete timestamp update", "id", id, "networkId", networkID)
+			return
+		}
+		if network.Status.DeletionTimeStamp == nil {
 			if delErr := c.db.SetDeleteTimestampVirtualNetwork(networkID); delErr != nil {
 				slog.Warn("SetDeleteTimestampVirtualNetwork() failed", "id", id, "networkId", networkID, "err", delErr)
 			}
@@ -212,13 +219,20 @@ func kubernetesEngineNetworkName(ke api.KubernetesEngine) string {
 	return kubernetesEngineNetworkNamePrefix + name
 }
 
-// isKubernetesEngineOwnedNetwork はネットワークの所有者ラベルが指定のKubernetesEngine IDと一致するか判定する。
+// isKubernetesEngineOwnedNetwork はネットワークの所有者ラベルが指定のKubernetesEngine IDと一致し、
+// かつmanagedByラベルがこのコントローラーの値であるかを判定する。ラベルは呼び出し元が自由に設定できる
+// ため、両方一致した場合のみ「このコントローラーが管理するネットワーク」とみなす。
 func isKubernetesEngineOwnedNetwork(network api.VirtualNetwork, kubernetesEngineID string) bool {
 	if network.Metadata.Labels == nil {
 		return false
 	}
-	owner, ok := (*network.Metadata.Labels)[db.KubernetesEngineNetworkLabelOwner].(string)
-	return ok && owner == kubernetesEngineID
+	labels := *network.Metadata.Labels
+	owner, ok := labels[db.KubernetesEngineNetworkLabelOwner].(string)
+	if !ok || owner != kubernetesEngineID {
+		return false
+	}
+	managedBy, ok := labels[db.KubernetesEngineNetworkLabelManagedBy].(string)
+	return ok && managedBy == db.KubernetesEngineNetworkLabelManagedByValue
 }
 
 // findKubernetesEngineNetwork は名前で検索した上で所有者ラベル(KubernetesEngine ID)を照合し、
@@ -274,10 +288,16 @@ func (c *kubernetesEngineController) ensureKubernetesEngineNetwork(ke api.Kubern
 		db.KubernetesEngineNetworkLabelOwner:     id,
 		db.KubernetesEngineNetworkLabelManagedBy: db.KubernetesEngineNetworkLabelManagedByValue,
 	}
+	// ネットワークAPI(ApiCreateNetwork)と同様に、nodeNameとヘッドノード同期ラベルを設定する。
+	// これらが無いとevaluateNodeAssignment()に弾かれ、ブリッジ/OVNが作成されないまま放置される。
+	db.SetNetworkSyncLabels(labels, "head", "", c.node)
 	network := api.VirtualNetwork{
 		ApiVersion: "v1",
 		Kind:       "VirtualNetwork",
 		Metadata:   api.Metadata{Name: networkName, Labels: &labels},
+	}
+	if strings.TrimSpace(c.node) != "" {
+		network.Metadata.NodeName = util.StringPtr(c.node)
 	}
 	if err := marmotd.ApplyVirtualNetworkDefaults(&network, marmotd.CurrentConfig(), c.db); err != nil {
 		return err
