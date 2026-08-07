@@ -573,7 +573,15 @@ func (d *Database) MakeFollowerVirtualNetworkEntry(headNetwork api.VirtualNetwor
 		return "", err
 	}
 
+	// ヘッドネットワークが持つ所有者ラベル等(例: kubernetesEngineId, managedBy)を
+	// フォロワーにも引き継ぐ。これにより、ヘッド削除後もフォロワーエントリから
+	// 所有関係を判定できるようになる。同期用ラベルはこの後で上書きする。
 	labels := map[string]interface{}{}
+	if headNetwork.Metadata.Labels != nil {
+		for k, v := range *headNetwork.Metadata.Labels {
+			labels[k] = v
+		}
+	}
 	SetNetworkSyncLabels(labels, "follower", headNetworkID, headNodeName)
 
 	spec, copyErr := util.DeepCopy(headNetwork.Spec)

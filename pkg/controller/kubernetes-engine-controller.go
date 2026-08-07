@@ -180,25 +180,29 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineRunning(ke api.Kub
 func (c *kubernetesEngineController) reconcileKubernetesEngineDeleting(ke api.KubernetesEngine) {
 	id := api.KubernetesEngineID(ke)
 
-	network, err := c.findKubernetesEngineNetwork(ke)
-	if err == nil {
-		networkID := api.VirtualNetworkID(network)
-		if network.Status == nil {
-			// CreateVirtualNetwork()は必ずStatusを設定するため通常は到達しないが、
-			// nilのままSetDeleteTimestampVirtualNetwork()を呼ぶとDB層でパニックするため回避する。
-			slog.Warn("network status is nil, skip delete timestamp update", "id", id, "networkId", networkID)
-			return
-		}
-		if network.Status.DeletionTimeStamp == nil {
-			if delErr := c.db.SetDeleteTimestampVirtualNetwork(networkID); delErr != nil {
-				slog.Warn("SetDeleteTimestampVirtualNetwork() failed", "id", id, "networkId", networkID, "err", delErr)
+	networks, err := c.findKubernetesEngineNetworks(ke)
+	if err != nil {
+		slog.Warn("findKubernetesEngineNetworks() failed", "id", id, "err", err)
+		return
+	}
+	if len(networks) > 0 {
+		// ヘッド/フォロワーを問わず、このクラスタが所有する全てのネットワークエントリに
+		// 削除要求を出し、それら全てが消えるまでクラスタ本体の削除を待つ。
+		for _, network := range networks {
+			networkID := api.VirtualNetworkID(network)
+			if network.Status == nil {
+				// CreateVirtualNetwork()は必ずStatusを設定するため通常は到達しないが、
+				// nilのままSetDeleteTimestampVirtualNetwork()を呼ぶとDB層でパニックするため回避する。
+				slog.Warn("network status is nil, skip delete timestamp update", "id", id, "networkId", networkID)
+				continue
+			}
+			if network.Status.DeletionTimeStamp == nil {
+				if delErr := c.db.SetDeleteTimestampVirtualNetwork(networkID); delErr != nil {
+					slog.Warn("SetDeleteTimestampVirtualNetwork() failed", "id", id, "networkId", networkID, "err", delErr)
+				}
 			}
 		}
 		// ネットワークの削除完了を待ってからクラスタ本体を削除する。
-		return
-	}
-	if err != db.ErrNotFound {
-		slog.Warn("findKubernetesEngineNetwork() failed", "id", id, "err", err)
 		return
 	}
 
@@ -235,21 +239,22 @@ func isKubernetesEngineOwnedNetwork(network api.VirtualNetwork, kubernetesEngine
 	return ok && managedBy == db.KubernetesEngineNetworkLabelManagedByValue
 }
 
-// findKubernetesEngineNetwork は名前で検索した上で所有者ラベル(KubernetesEngine ID)を照合し、
-// このクラスタが所有する専用ネットワークだけを返す。名前が一致しても所有者が異なる場合はdb.ErrNotFoundを返す。
-func (c *kubernetesEngineController) findKubernetesEngineNetwork(ke api.KubernetesEngine) (api.VirtualNetwork, error) {
-	networkName := kubernetesEngineNetworkName(ke)
-	if networkName == "" {
-		return api.VirtualNetwork{}, db.ErrNotFound
-	}
-	network, err := c.db.GetVirtualNetworkByName(networkName)
+// findKubernetesEngineNetworks はこのクラスタが所有する専用ネットワークのエントリを全て返す
+// (ヘッドエントリおよびフォロワーエントリを含む)。所有者ラベル(KubernetesEngine ID)が一致する
+// もののみを対象とする。1件も見つからない場合は空スライスを返す(エラーではない)。
+func (c *kubernetesEngineController) findKubernetesEngineNetworks(ke api.KubernetesEngine) ([]api.VirtualNetwork, error) {
+	id := api.KubernetesEngineID(ke)
+	networks, err := c.db.GetVirtualNetworks()
 	if err != nil {
-		return api.VirtualNetwork{}, err
+		return nil, err
 	}
-	if !isKubernetesEngineOwnedNetwork(network, api.KubernetesEngineID(ke)) {
-		return api.VirtualNetwork{}, db.ErrNotFound
+	var owned []api.VirtualNetwork
+	for _, n := range networks {
+		if isKubernetesEngineOwnedNetwork(n, id) {
+			owned = append(owned, n)
+		}
 	}
-	return network, nil
+	return owned, nil
 }
 
 // ensureKubernetesEngineNetwork はクラスタ専用のノード間通信ネットワークを作成する。

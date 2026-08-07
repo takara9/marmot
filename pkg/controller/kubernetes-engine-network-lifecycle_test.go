@@ -158,3 +158,76 @@ func TestReconcileKubernetesEngineDeletingWaitsForNetworkRemoval(t *testing.T) {
 		t.Fatalf("GetKubernetesEngineById() after network removal = %v, want ErrNotFound", err)
 	}
 }
+
+// Deleting: フォロワーエントリはヘッドの所有者ラベルを引き継ぐため、ヘッド削除後もフォロワーが
+// 残っている間はクラスタ本体が削除されず、フォロワーも削除されて初めて実削除されることを確認する。
+func TestReconcileKubernetesEngineDeletingWaitsForFollowerNetworkRemoval(t *testing.T) {
+	database := newGatewayTestDatabase(t)
+	ctrl := &kubernetesEngineController{db: database, node: "node-a"}
+
+	ke := newTestKubernetesEngine(t, database, "teardown-follower")
+	id := api.KubernetesEngineID(ke)
+	networkName := kubernetesEngineNetworkName(ke)
+
+	ctrl.reconcileKubernetesEnginePending(ke)
+	ke, err := database.GetKubernetesEngineById(id)
+	if err != nil {
+		t.Fatalf("GetKubernetesEngineById() failed: %v", err)
+	}
+
+	head, err := database.GetVirtualNetworkByName(networkName)
+	if err != nil {
+		t.Fatalf("GetVirtualNetworkByName(%q) failed: %v", networkName, err)
+	}
+	headID := api.VirtualNetworkID(head)
+
+	followerID, err := database.MakeFollowerVirtualNetworkEntry(head, "node-b", headID)
+	if err != nil {
+		t.Fatalf("MakeFollowerVirtualNetworkEntry() failed: %v", err)
+	}
+
+	follower, err := database.GetVirtualNetworkById(followerID)
+	if err != nil {
+		t.Fatalf("GetVirtualNetworkById(%q) failed: %v", followerID, err)
+	}
+	if follower.Metadata.Labels == nil {
+		t.Fatalf("follower labels are nil")
+	}
+	followerLabels := *follower.Metadata.Labels
+	if owner, _ := followerLabels[db.KubernetesEngineNetworkLabelOwner].(string); owner != id {
+		t.Fatalf("follower owner label = %v, want %v", owner, id)
+	}
+	if managedBy, _ := followerLabels[db.KubernetesEngineNetworkLabelManagedBy].(string); managedBy != db.KubernetesEngineNetworkLabelManagedByValue {
+		t.Fatalf("follower managedBy label = %v, want %v", managedBy, db.KubernetesEngineNetworkLabelManagedByValue)
+	}
+
+	// ヘッドネットワークを先に削除し、フォロワーのみが残っている状態を再現する。
+	if err := database.DeleteVirtualNetworkById(headID); err != nil {
+		t.Fatalf("DeleteVirtualNetworkById(head) failed: %v", err)
+	}
+
+	ctrl.reconcileKubernetesEngineDeleting(ke)
+
+	if _, err := database.GetKubernetesEngineById(id); err != nil {
+		t.Fatalf("kubernetes engine was deleted while follower network still exists: %v", err)
+	}
+
+	follower, err = database.GetVirtualNetworkById(followerID)
+	if err != nil {
+		t.Fatalf("GetVirtualNetworkById(%q) failed: %v", followerID, err)
+	}
+	if follower.Status == nil || follower.Status.DeletionTimeStamp == nil {
+		t.Fatalf("follower DeletionTimeStamp not set after Deleting reconcile")
+	}
+
+	// フォロワーの実削除完了を模擬する。
+	if err := database.DeleteVirtualNetworkById(followerID); err != nil {
+		t.Fatalf("DeleteVirtualNetworkById(follower) failed: %v", err)
+	}
+
+	ctrl.reconcileKubernetesEngineDeleting(ke)
+
+	if _, err := database.GetKubernetesEngineById(id); err != db.ErrNotFound {
+		t.Fatalf("GetKubernetesEngineById() after follower removal = %v, want ErrNotFound", err)
+	}
+}
