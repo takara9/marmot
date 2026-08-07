@@ -114,7 +114,7 @@ func (c *kubernetesEngineController) kubernetesEngineControllerLoop() {
 		}
 
 		if item.Status.DeletionTimeStamp != nil {
-			if time.Since(*item.Status.DeletionTimeStamp) <= KUBERNETES_ENGINE_DELETION_DELAY {
+			if isKubernetesEngineInGracePeriod(item) {
 				continue
 			}
 			if item.Status.StatusCode != db.KUBERNETES_ENGINE_DELETING {
@@ -172,4 +172,13 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineDeleting(ke api.Ku
 		return
 	}
 	slog.Debug("kubernetes engine deleted", "id", id)
+}
+
+// isKubernetesEngineInGracePeriod は DeletionTimeStamp が設定されたレコードが
+// まだ猶予期間内かどうかを返す。期間内は true を返し、ループはそのレコードをスキップする。
+func isKubernetesEngineInGracePeriod(ke api.KubernetesEngine) bool {
+	if ke.Status == nil || ke.Status.DeletionTimeStamp == nil {
+		return false
+	}
+	return time.Since(*ke.Status.DeletionTimeStamp) <= KUBERNETES_ENGINE_DELETION_DELAY
 }
