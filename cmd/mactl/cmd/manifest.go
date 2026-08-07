@@ -20,15 +20,16 @@ import (
 type ManifestType string
 
 const (
-	ManifestTypeServer     ManifestType = "Server"
-	ManifestTypeImage      ManifestType = "Image"
-	ManifestTypeVolume     ManifestType = "Volume"
-	ManifestTypeNetwork    ManifestType = "VirtualNetwork"
-	ManifestTypeGateway    ManifestType = "Gateway"
-	ManifestTypeVpnGateway ManifestType = "VpnGateway"
-	ManifestTypeLoadBalancer ManifestType = "ApplicationLoadBalancer"
+	ManifestTypeServer              ManifestType = "Server"
+	ManifestTypeImage               ManifestType = "Image"
+	ManifestTypeVolume              ManifestType = "Volume"
+	ManifestTypeNetwork             ManifestType = "VirtualNetwork"
+	ManifestTypeGateway             ManifestType = "Gateway"
+	ManifestTypeVpnGateway          ManifestType = "VpnGateway"
+	ManifestTypeLoadBalancer        ManifestType = "ApplicationLoadBalancer"
 	ManifestTypeNetworkLoadBalancer ManifestType = "NetworkLoadBalancer"
-	ManifestTypeUnknown    ManifestType = "Unknown"
+	ManifestTypeKubernetesEngine    ManifestType = "KubernetesEngine"
+	ManifestTypeUnknown             ManifestType = "Unknown"
 )
 
 // Manifest マニフェストベース構造
@@ -129,6 +130,8 @@ func normalizeResourceName(resource string) string {
 		return "applicationloadbalancer"
 	case "network-load-balancer", "network-load-balancers", "networkloadbalancer", "networkloadbalancers", "nlb":
 		return "networkloadbalancer"
+	case "kubernetes-engine", "kubernetes-engines", "kubernetesengine", "kubernetesengines", "mke":
+		return "kubernetesengine"
 	default:
 		return strings.ToLower(resource)
 	}
@@ -153,6 +156,8 @@ func GetManifestType(kind string) ManifestType {
 		return ManifestTypeLoadBalancer
 	case "networkloadbalancer":
 		return ManifestTypeNetworkLoadBalancer
+	case "kubernetesengine":
+		return ManifestTypeKubernetesEngine
 	default:
 		return ManifestTypeUnknown
 	}
@@ -178,6 +183,8 @@ func GetKindFromResourceName(resource string) string {
 		return "ApplicationLoadBalancer"
 	case "networkloadbalancer":
 		return "NetworkLoadBalancer"
+	case "kubernetesengine":
+		return "KubernetesEngine"
 	default:
 		return ""
 	}
@@ -211,6 +218,8 @@ func ResolveResourceNameForManifest(manifest map[string]interface{}, args []stri
 			resourceName = "applicationloadbalancer"
 		case ManifestTypeNetworkLoadBalancer:
 			resourceName = "networkloadbalancer"
+		case ManifestTypeKubernetesEngine:
+			resourceName = "kubernetesengine"
 		default:
 			return "", fmt.Errorf("failed to infer resource type from kind %q", kind)
 		}
@@ -381,6 +390,21 @@ func ManifestToNetworkLoadBalancer(manifest map[string]interface{}) (*api.Networ
 	}
 
 	return &loadBalancer, nil
+}
+
+// ManifestToKubernetesEngine マニフェストを KubernetesEngine 構造体に変換
+func ManifestToKubernetesEngine(manifest map[string]interface{}) (*api.KubernetesEngine, error) {
+	data, err := json.Marshal(manifest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal manifest: %w", err)
+	}
+
+	var kubernetesEngine api.KubernetesEngine
+	if err := json.Unmarshal(data, &kubernetesEngine); err != nil {
+		return nil, fmt.Errorf("failed to parse as KubernetesEngine: %w", err)
+	}
+
+	return &kubernetesEngine, nil
 }
 
 // ExtractMetadataName マニフェストからメタデータ名を抽出

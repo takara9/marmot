@@ -15,7 +15,7 @@ var delCmd = &cobra.Command{
 	Use:     "del [RESOURCE NAME]",
 	Aliases: []string{"delete"},
 	Short:   "Delete a resource",
-	Long:    `Delete a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw, applicationloadbalancer/alb, networkloadbalancer/nlb) with NAME specified. With -f, process manifest(s) and delete by metadata.name for each document.`,
+	Long:    `Delete a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw, applicationloadbalancer/alb, networkloadbalancer/nlb, kubernetesengine/mke) with NAME specified. With -f, process manifest(s) and delete by metadata.name for each document.`,
 	Args:    cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if strings.TrimSpace(delManifestFile) != "" {
@@ -110,7 +110,6 @@ func parseCommaSeparatedNames(rawNames []string) ([]string, error) {
 	return names, nil
 }
 
-
 func deleteResourceByTypeAndName(resourceName string, objectName string) error {
 	// リソースタイプに応じて処理を分岐
 	switch strings.ToLower(resourceName) {
@@ -130,6 +129,8 @@ func deleteResourceByTypeAndName(resourceName string, objectName string) error {
 		return deleteLoadBalancer(objectName)
 	case "networkloadbalancer":
 		return deleteNetworkLoadBalancer(objectName)
+	case "kubernetesengine":
+		return deleteKubernetesEngine(objectName)
 	default:
 		return fmt.Errorf("unknown resource type: %s", resourceName)
 	}
@@ -444,6 +445,45 @@ func deleteNetworkLoadBalancer(name string) error {
 	}
 
 	fmt.Printf("network load balancer %q deletion requested (accepted)\n", name)
+	return nil
+}
+
+func deleteKubernetesEngine(name string) error {
+	m, err := getClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	list, _, err := m.GetKubernetesEngines()
+	if err != nil {
+		return fmt.Errorf("failed to list kubernetes engines: %w", err)
+	}
+
+	var items []api.KubernetesEngine
+	if err := json.Unmarshal(list, &items); err != nil {
+		return fmt.Errorf("failed to parse kubernetes engines: %w", err)
+	}
+
+	matches := make([]api.KubernetesEngine, 0)
+	for _, item := range items {
+		if item.Metadata.Name == name {
+			matches = append(matches, item)
+		}
+	}
+
+	if len(matches) == 0 {
+		return fmt.Errorf("kubernetes engine %q not found", name)
+	}
+	if len(matches) > 1 {
+		return fmt.Errorf("multiple kubernetes engines found with name %q; please delete by id via API", name)
+	}
+
+	_, _, err = m.DeleteKubernetesEngineById(api.KubernetesEngineID(matches[0]))
+	if err != nil {
+		return fmt.Errorf("failed to delete kubernetes engine: %w", err)
+	}
+
+	fmt.Printf("kubernetes engine %q deletion requested (accepted)\n", name)
 	return nil
 }
 

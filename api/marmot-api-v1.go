@@ -332,6 +332,42 @@ type JobSpec struct {
 	StartTime   *time.Time `json:"startTime,omitempty" yaml:"startTime,omitempty"`
 }
 
+// KubernetesEngine defines model for KubernetesEngine.
+type KubernetesEngine struct {
+	ApiVersion string               `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string               `json:"kind" yaml:"kind"`
+	Metadata   Metadata             `json:"metadata" yaml:"metadata"`
+	Spec       KubernetesEngineSpec `json:"spec" yaml:"spec"`
+	Status     *Status              `json:"status,omitempty" yaml:"status,omitempty"`
+}
+
+// KubernetesEngineNodeNetwork defines model for KubernetesEngineNodeNetwork.
+type KubernetesEngineNodeNetwork struct {
+	// External 外部アクセス用ネットワーク。default または host-bridge。
+	External *string `json:"external,omitempty" yaml:"external,omitempty"`
+
+	// Kind ノード間通信用ネットワークの種類。none(既定)またはcilium。
+	Kind *string `json:"kind,omitempty" yaml:"kind,omitempty"`
+}
+
+// KubernetesEngineNodeSpec defines model for KubernetesEngineNodeSpec.
+type KubernetesEngineNodeSpec struct {
+	Cpu     *int                         `json:"cpu,omitempty" yaml:"cpu,omitempty"`
+	Memory  *int                         `json:"memory,omitempty" yaml:"memory,omitempty"`
+	Network *KubernetesEngineNodeNetwork `json:"network,omitempty" yaml:"network,omitempty"`
+}
+
+// KubernetesEngineSpec defines model for KubernetesEngineSpec.
+type KubernetesEngineSpec struct {
+	NodeSpec *KubernetesEngineNodeSpec `json:"nodeSpec,omitempty" yaml:"nodeSpec,omitempty"`
+
+	// Nodes ワーカーを含むノード数
+	Nodes int `json:"nodes" yaml:"nodes"`
+
+	// Version デプロイするKubernetesのバージョン。例: "1.36"
+	Version string `json:"version" yaml:"version"`
+}
+
 // Metadata defines model for Metadata.
 type Metadata struct {
 	Comment      *string                 `json:"comment,omitempty" yaml:"comment,omitempty"`
@@ -705,6 +741,9 @@ type ApiCreateImageJSONRequestBody = Image
 // ApiUpdateImageByIdJSONRequestBody defines body for ApiUpdateImageById for application/json ContentType.
 type ApiUpdateImageByIdJSONRequestBody = Image
 
+// ApiCreateKubernetesEngineJSONRequestBody defines body for ApiCreateKubernetesEngine for application/json ContentType.
+type ApiCreateKubernetesEngineJSONRequestBody = KubernetesEngine
+
 // ApiCreateNetworkJSONRequestBody defines body for ApiCreateNetwork for application/json ContentType.
 type ApiCreateNetworkJSONRequestBody = VirtualNetwork
 
@@ -821,6 +860,18 @@ type ServerInterface interface {
 	// Get assigned IP addresses for a specific IP network
 	// (GET /ipnetwork/{id}/addresses)
 	ApiGetIpAddressesByNetwork(ctx echo.Context, id string) error
+	// List KubernetesEngines
+	// (GET /kubernetes-engine)
+	ApiGetKubernetesEngines(ctx echo.Context) error
+	// Create KubernetesEngine
+	// (POST /kubernetes-engine)
+	ApiCreateKubernetesEngine(ctx echo.Context) error
+	// Delete KubernetesEngine
+	// (DELETE /kubernetes-engine/{id})
+	ApiDeleteKubernetesEngineById(ctx echo.Context, id string) error
+	// Info for a specific KubernetesEngine
+	// (GET /kubernetes-engine/{id})
+	ApiGetKubernetesEngineById(ctx echo.Context, id string) error
 	// Get Marmot Cluster Status
 	// (GET /marmot/cluster)
 	ApiGetMarmotCluster(ctx echo.Context) error
@@ -1259,6 +1310,56 @@ func (w *ServerInterfaceWrapper) ApiGetIpAddressesByNetwork(ctx echo.Context) er
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.ApiGetIpAddressesByNetwork(ctx, id)
+	return err
+}
+
+// ApiGetKubernetesEngines converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiGetKubernetesEngines(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiGetKubernetesEngines(ctx)
+	return err
+}
+
+// ApiCreateKubernetesEngine converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiCreateKubernetesEngine(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiCreateKubernetesEngine(ctx)
+	return err
+}
+
+// ApiDeleteKubernetesEngineById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiDeleteKubernetesEngineById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiDeleteKubernetesEngineById(ctx, id)
+	return err
+}
+
+// ApiGetKubernetesEngineById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiGetKubernetesEngineById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiGetKubernetesEngineById(ctx, id)
 	return err
 }
 
@@ -2076,6 +2177,10 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.PUT(options.BaseURL+"/image/:id", wrapper.ApiUpdateImageById, options.OperationMiddlewares["apiUpdateImageById"]...)
 	router.GET(options.BaseURL+"/ipnetwork", wrapper.ApiListIpNetworks, options.OperationMiddlewares["apiListIpNetworks"]...)
 	router.GET(options.BaseURL+"/ipnetwork/:id/addresses", wrapper.ApiGetIpAddressesByNetwork, options.OperationMiddlewares["apiGetIpAddressesByNetwork"]...)
+	router.GET(options.BaseURL+"/kubernetes-engine", wrapper.ApiGetKubernetesEngines, options.OperationMiddlewares["apiGetKubernetesEngines"]...)
+	router.POST(options.BaseURL+"/kubernetes-engine", wrapper.ApiCreateKubernetesEngine, options.OperationMiddlewares["apiCreateKubernetesEngine"]...)
+	router.DELETE(options.BaseURL+"/kubernetes-engine/:id", wrapper.ApiDeleteKubernetesEngineById, options.OperationMiddlewares["apiDeleteKubernetesEngineById"]...)
+	router.GET(options.BaseURL+"/kubernetes-engine/:id", wrapper.ApiGetKubernetesEngineById, options.OperationMiddlewares["apiGetKubernetesEngineById"]...)
 	router.GET(options.BaseURL+"/marmot/cluster", wrapper.ApiGetMarmotCluster, options.OperationMiddlewares["apiGetMarmotCluster"]...)
 	router.GET(options.BaseURL+"/marmot/status", wrapper.ApiGetMarmotStatus, options.OperationMiddlewares["apiGetMarmotStatus"]...)
 	router.GET(options.BaseURL+"/network", wrapper.ApiGetNetworks, options.OperationMiddlewares["apiGetNetworks"]...)

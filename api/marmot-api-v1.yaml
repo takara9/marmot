@@ -1794,6 +1794,95 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /kubernetes-engine:
+    post:
+      summary: "Create KubernetesEngine"
+      operationId: apiCreateKubernetesEngine
+      tags:
+        - kubernetes-engine
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KubernetesEngine"
+      responses:
+        "201":
+          description: Created the KubernetesEngine
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KubernetesEngine"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      summary: "List KubernetesEngines"
+      operationId: apiGetKubernetesEngines
+      tags:
+        - kubernetes-engine
+      responses:
+        "200":
+          description: List of KubernetesEngines
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KubernetesEngine"
+  /kubernetes-engine/{id}:
+    get:
+      summary: "Info for a specific KubernetesEngine"
+      operationId: apiGetKubernetesEngineById
+      tags:
+        - kubernetes-engine
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the KubernetesEngine to retrieve
+          schema:
+            type: string
+      responses:
+        "200":
+          description: KubernetesEngine details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KubernetesEngine"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: "Delete KubernetesEngine"
+      operationId: apiDeleteKubernetesEngineById
+      tags:
+        - kubernetes-engine
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the KubernetesEngine to delete
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Accepted the request to delete the KubernetesEngine
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Success"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
 components:
   schemas:
@@ -2257,6 +2346,59 @@ components:
           description: Source CIDR list allowed to access vpn gateway. Empty means allow all.
           items:
             type: string
+    KubernetesEngine:
+      type: object
+      required:
+        - apiVersion
+        - kind
+        - metadata
+        - spec
+      properties:
+        apiVersion:
+          type: string
+        kind:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+        spec:
+          $ref: "#/components/schemas/KubernetesEngineSpec"
+        status:
+          $ref: "#/components/schemas/Status"
+    KubernetesEngineSpec:
+      type: object
+      required:
+        - version
+        - nodes
+      properties:
+        version:
+          type: string
+          description: "デプロイするKubernetesのバージョン。例: \"1.36\""
+        nodes:
+          type: integer
+          format: int
+          description: ワーカーを含むノード数
+        nodeSpec:
+          $ref: "#/components/schemas/KubernetesEngineNodeSpec"
+    KubernetesEngineNodeSpec:
+      type: object
+      properties:
+        cpu:
+          type: integer
+          format: int
+        memory:
+          type: integer
+          format: int
+        network:
+          $ref: "#/components/schemas/KubernetesEngineNodeNetwork"
+    KubernetesEngineNodeNetwork:
+      type: object
+      properties:
+        kind:
+          type: string
+          description: "ノード間通信用ネットワークの種類。none(既定)またはcilium。"
+        external:
+          type: string
+          description: "外部アクセス用ネットワーク。default または host-bridge。"
     ApplicationLoadBalancer:
       type: object
       required:

@@ -38,6 +38,7 @@ var _ = Describe("manifest", func() {
 			Expect(normalizeResourceName("vpngw")).To(Equal("vpngateway"))
 			Expect(normalizeResourceName("alb")).To(Equal("applicationloadbalancer"))
 			Expect(normalizeResourceName("nlb")).To(Equal("networkloadbalancer"))
+			Expect(normalizeResourceName("mke")).To(Equal("kubernetesengine"))
 		})
 
 		It("returns lowercase for unknown names", func() {
@@ -85,6 +86,11 @@ var _ = Describe("manifest", func() {
 		It("detects network load balancer kind", func() {
 			result := GetManifestType("NetworkLoadBalancer")
 			Expect(result).To(Equal(ManifestTypeNetworkLoadBalancer))
+		})
+
+		It("detects kubernetes engine kind", func() {
+			result := GetManifestType("KubernetesEngine")
+			Expect(result).To(Equal(ManifestTypeKubernetesEngine))
 		})
 
 		It("returns Unknown for missing kind", func() {
@@ -218,7 +224,7 @@ spec:
 
 			ApplyServerDefaults(server)
 
-			Expect(server.Spec.OsVariant).NotTo(BeNil())           //nolint:staticcheck // compatibility: verify legacy spec.osVariant is still populated from spec.mmImage
+			Expect(server.Spec.OsVariant).NotTo(BeNil())            //nolint:staticcheck // compatibility: verify legacy spec.osVariant is still populated from spec.mmImage
 			Expect(*server.Spec.OsVariant).To(Equal("ubuntu24.04")) //nolint:staticcheck // compatibility: verify legacy spec.osVariant value is preserved for old clients
 		})
 

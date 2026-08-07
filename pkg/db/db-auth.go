@@ -71,6 +71,7 @@ func builtinRoles() map[string]api.Role {
 			permission("VpnGateway", "create", "read", "update", "delete"),
 			permission("NetworkLoadBalancer", "create", "read", "update", "delete"),
 			permission("ApplicationLoadBalancer", "create", "read", "update", "delete"),
+			permission("KubernetesEngine", "create", "read", "delete"),
 			permission("User", "create", "read", "update", "delete"),
 		}),
 		"Network-Administrator": roleTemplate("Network-Administrator", "Network administration access", []api.Permission{
@@ -82,6 +83,7 @@ func builtinRoles() map[string]api.Role {
 			permission("VpnGateway", "create", "read", "update", "delete"),
 			permission("NetworkLoadBalancer", "create", "read", "update", "delete"),
 			permission("ApplicationLoadBalancer", "create", "read", "update", "delete"),
+			permission("KubernetesEngine", "read"),
 			permission("User", "read"),
 		}),
 		"Compute-Operator": roleTemplate("Compute-Operator", "Compute operations access", []api.Permission{
@@ -93,6 +95,7 @@ func builtinRoles() map[string]api.Role {
 			permission("VpnGateway", "read"),
 			permission("NetworkLoadBalancer", "read"),
 			permission("ApplicationLoadBalancer", "read"),
+			permission("KubernetesEngine", "create", "read", "delete"),
 			permission("User", "read"),
 		}),
 		"Viewer": roleTemplate("Viewer", "Read-only access", []api.Permission{
@@ -104,6 +107,7 @@ func builtinRoles() map[string]api.Role {
 			permission("VpnGateway", "read"),
 			permission("NetworkLoadBalancer", "read"),
 			permission("ApplicationLoadBalancer", "read"),
+			permission("KubernetesEngine", "read"),
 			permission("User", "read"),
 		}),
 	}

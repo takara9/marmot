@@ -15,7 +15,7 @@ var manifestFile string
 var createCmd = &cobra.Command{
 	Use:   "create [RESOURCE]",
 	Short: "Create a resource from a file or stdin",
-	Long:  `Create a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw, applicationloadbalancer/alb, networkloadbalancer/nlb) from a manifest file or stdin. If RESOURCE is omitted, it is inferred from manifest kind.`,
+	Long:  `Create a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw, applicationloadbalancer/alb, networkloadbalancer/nlb, kubernetesengine/mke) from a manifest file or stdin. If RESOURCE is omitted, it is inferred from manifest kind.`,
 	Args:  cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// マニフェストファイルが指定されていない場合はエラー
@@ -66,6 +66,10 @@ var createCmd = &cobra.Command{
 				}
 			case "networkloadbalancer":
 				if err := createNetworkLoadBalancer(manifest); err != nil {
+					return fmt.Errorf("manifest %d: %w", index+1, err)
+				}
+			case "kubernetesengine":
+				if err := createKubernetesEngine(manifest); err != nil {
 					return fmt.Errorf("manifest %d: %w", index+1, err)
 				}
 			default:
@@ -455,6 +459,54 @@ func createNetworkLoadBalancer(manifest map[string]interface{}) error {
 	byteBody, _, err := m.CreateNetworkLoadBalancer(*nlb)
 	if err != nil {
 		return fmt.Errorf("failed to create network load balancer: %w", err)
+	}
+
+	return processCreateResponse(byteBody)
+}
+
+func createKubernetesEngine(manifest map[string]interface{}) error {
+	m, err := getClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	kubernetesEngine, err := ManifestToKubernetesEngine(manifest)
+	if err != nil {
+		return fmt.Errorf("failed to convert manifest to kubernetes engine: %w", err)
+	}
+
+	if kubernetesEngine.ApiVersion == "" {
+		return fmt.Errorf("apiVersion is required")
+	}
+	if kubernetesEngine.Kind == "" {
+		return fmt.Errorf("kind is required")
+	}
+	if strings.TrimSpace(kubernetesEngine.Metadata.Name) == "" {
+		return fmt.Errorf("metadata.name is required")
+	}
+	if strings.TrimSpace(kubernetesEngine.Spec.Version) == "" {
+		return fmt.Errorf("spec.version is required")
+	}
+	if kubernetesEngine.Spec.Nodes <= 0 {
+		return fmt.Errorf("spec.nodes must be greater than zero")
+	}
+
+	list, _, err := m.GetKubernetesEngines()
+	if err == nil {
+		var items []api.KubernetesEngine
+		if err := json.Unmarshal(list, &items); err != nil {
+			return fmt.Errorf("failed to decode kubernetes engine list: %w", err)
+		}
+		for _, item := range items {
+			if item.Metadata.Name == kubernetesEngine.Metadata.Name {
+				return fmt.Errorf("kubernetes engine %q already exists", kubernetesEngine.Metadata.Name)
+			}
+		}
+	}
+
+	byteBody, _, err := m.CreateKubernetesEngine(*kubernetesEngine)
+	if err != nil {
+		return fmt.Errorf("failed to create kubernetes engine: %w", err)
 	}
 
 	return processCreateResponse(byteBody)
