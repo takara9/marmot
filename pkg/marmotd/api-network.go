@@ -28,6 +28,11 @@ func (s *Server) ApiCreateNetwork(ctx echo.Context) error {
 		labels := map[string]interface{}{}
 		spec.Metadata.Labels = &labels
 	}
+	// コントローラー予約ラベルはクライアントが自由に設定できないよう、APIエントリポイントで削除する。
+	// これを行わないと、悪意あるクライアントが kubernetesEngineId / managedBy を偽造し、
+	// コントローラーに別クラスタの専用ネットワークとして認識させることができる。
+	delete(*spec.Metadata.Labels, db.KubernetesEngineNetworkLabelOwner)
+	delete(*spec.Metadata.Labels, db.KubernetesEngineNetworkLabelManagedBy)
 	db.SetNetworkSyncLabels(*spec.Metadata.Labels, "head", "", s.Ma.NodeName)
 
 	if err := applyVirtualNetworkDefaults(&spec, CurrentConfig(), s.Ma.Db); err != nil {

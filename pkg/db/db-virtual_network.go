@@ -109,7 +109,7 @@ func (d *Database) CreateVirtualNetwork(spec api.VirtualNetwork) (api.VirtualNet
 	}
 	defer d.UnlockKey(mutex)
 
-	// 同一ネットワーク名のネットワークが存在しないか確認
+	// 同一ネットワーク名・同一VNIのネットワークが存在しないか確認（ロック保持中に再検証する）
 	networks, err := d.GetVirtualNetworks()
 	if err != nil {
 		slog.Error("CreateVirtualNetwork() GetVirtualNetworks() failed", "err", err)
@@ -118,6 +118,13 @@ func (d *Database) CreateVirtualNetwork(spec api.VirtualNetwork) (api.VirtualNet
 	for _, n := range networks {
 		if n.Metadata.Name == spec.Metadata.Name {
 			err := fmt.Errorf("network with the same name already exists: %s", spec.Metadata.Name)
+			slog.Error("CreateVirtualNetwork()", "err", err)
+			return api.VirtualNetwork{}, err
+		}
+		// VNIの重複チェック: ロック取得後に再検証することで、複数のmarmotdインスタンスが
+		// 同一VNIを割り当てるレースコンディションを防止する。
+		if spec.Spec.Vni != nil && n.Spec.Vni != nil && *spec.Spec.Vni == *n.Spec.Vni {
+			err := fmt.Errorf("vni %d is already in use by network %s", *spec.Spec.Vni, n.Metadata.Name)
 			slog.Error("CreateVirtualNetwork()", "err", err)
 			return api.VirtualNetwork{}, err
 		}
@@ -566,7 +573,15 @@ func (d *Database) MakeFollowerVirtualNetworkEntry(headNetwork api.VirtualNetwor
 		return "", err
 	}
 
+	// ヘッドネットワークが持つ所有者ラベル等(例: kubernetesEngineId, managedBy)を
+	// フォロワーにも引き継ぐ。これにより、ヘッド削除後もフォロワーエントリから
+	// 所有関係を判定できるようになる。同期用ラベルはこの後で上書きする。
 	labels := map[string]interface{}{}
+	if headNetwork.Metadata.Labels != nil {
+		for k, v := range *headNetwork.Metadata.Labels {
+			labels[k] = v
+		}
+	}
 	SetNetworkSyncLabels(labels, "follower", headNetworkID, headNodeName)
 
 	spec, copyErr := util.DeepCopy(headNetwork.Spec)
