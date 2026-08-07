@@ -131,6 +131,20 @@ func TestIssueKubernetesEngineCertificateRequiresExistingCA(t *testing.T) {
 	}
 }
 
+func TestIssueKubernetesEngineCertificateRejectsInvalidRequestName(t *testing.T) {
+	pkiDir := t.TempDir()
+	if _, _, err := EnsureKubernetesEngineCA(pkiDir, "demo"); err != nil {
+		t.Fatalf("EnsureKubernetesEngineCA() failed: %v", err)
+	}
+	if _, _, err := IssueKubernetesEngineCertificate(pkiDir, "demo", KubernetesEngineCertRequest{
+		Name:       "../evil",
+		CommonName: "evil",
+		Usage:      KubernetesEngineCertUsageServer,
+	}); err == nil {
+		t.Fatalf("expected error for invalid certificate request name, got nil")
+	}
+}
+
 func assertCertVerifiesAgainstCA(t *testing.T, caPool *x509.CertPool, certPath string, usage x509.ExtKeyUsage) {
 	t.Helper()
 	certPEM, err := os.ReadFile(certPath)
