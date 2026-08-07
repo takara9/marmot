@@ -80,9 +80,20 @@ WantedBy=multi-user.target
 // CreateKubernetesEngineEtcdUnit はクラスタ専用etcdのsystemdユニットファイルを生成・配置し、
 // daemon-reload後に有効化・起動する。データディレクトリが存在しなければ作成する。
 func CreateKubernetesEngineEtcdUnit(cfg KubernetesEngineEtcdUnitConfig) error {
-	if strings.TrimSpace(cfg.ClusterName) == "" {
+	name := strings.TrimSpace(cfg.ClusterName)
+	if name == "" {
 		return fmt.Errorf("cluster name is empty")
 	}
+	if name == "." || name == ".." {
+		return fmt.Errorf("cluster name is invalid: %q", cfg.ClusterName)
+	}
+	for _, r := range name {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.' {
+			continue
+		}
+		return fmt.Errorf("cluster name contains invalid character %q", r)
+	}
+	cfg.ClusterName = name
 	if err := os.MkdirAll(cfg.DataDir, 0o700); err != nil {
 		return fmt.Errorf("failed to create etcd data dir: %w", err)
 	}
