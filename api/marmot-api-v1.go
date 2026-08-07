@@ -238,6 +238,8 @@ type GatewaySpec struct {
 type HostAllocation struct {
 	AllocatedCpuCores *int `json:"allocatedCpuCores,omitempty" yaml:"allocatedCpuCores,omitempty"`
 	AllocatedMemoryMB *int `json:"allocatedMemoryMB,omitempty" yaml:"allocatedMemoryMB,omitempty"`
+	DiskCapacityGB    *int `json:"diskCapacityGB,omitempty" yaml:"diskCapacityGB,omitempty"`
+	DiskCount         *int `json:"diskCount,omitempty" yaml:"diskCount,omitempty"`
 	RunningVMs        *int `json:"runningVMs,omitempty" yaml:"runningVMs,omitempty"`
 	StoppedVMs        *int `json:"stoppedVMs,omitempty" yaml:"stoppedVMs,omitempty"`
 	TotalVMs          *int `json:"totalVMs,omitempty" yaml:"totalVMs,omitempty"`

@@ -1,6 +1,7 @@
 package marmotd
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
@@ -33,6 +34,10 @@ var systemctlRestartIscsid = func() error {
 	return exec.Command("systemctl", "restart", "iscsid").Run()
 }
 
+var lsblkScsiCommandOutput = func() ([]byte, error) {
+	return exec.Command("lsblk", "-S", "-J", "-b").Output()
+}
+
 func runningInTestBinary() bool {
 	return strings.HasSuffix(filepath.Base(os.Args[0]), ".test")
 }
@@ -45,6 +50,9 @@ func init() {
 		}
 		systemctlRestartIscsid = func() error {
 			return nil
+		}
+		lsblkScsiCommandOutput = func() ([]byte, error) {
+			return []byte(`{"blockdevices": []}`), nil
 		}
 	}
 }
@@ -107,28 +115,28 @@ func (m *Marmot) CollectHostStatus() (api.HostStatus, error) {
 		status.IscsiServer = util.BoolPtr(true)
 	}
 
-	// キャパシティ情報を収集
+	// キャパシティ情報を収集（資源搭載量＝ホストの物理ディスク等）
 	capacity, err := collectHostCapacity()
 	if err != nil {
 		slog.Error("collectHostCapacity()", "err", err)
 		return status, err
 	}
 	status.Capacity = capacity
-	applyHostVolumeCapacity(capacity, nodeName, m)
 
-	// 割当情報を収集
+	// 割当情報を収集（割当数＝VMに割り当てられたディスク等）
 	allocation, err := m.collectHostAllocation()
 	if err != nil {
 		slog.Error("collectHostAllocation()", "err", err)
 		return status, err
 	}
+	applyHostVolumeCapacity(allocation, nodeName, m)
 	status.Allocation = allocation
 
 	return status, nil
 }
 
-func applyHostVolumeCapacity(capacity *api.HostCapacity, nodeName string, m *Marmot) {
-	if capacity == nil || m == nil || m.Db == nil {
+func applyHostVolumeCapacity(allocation *api.HostAllocation, nodeName string, m *Marmot) {
+	if allocation == nil || m == nil || m.Db == nil {
 		return
 	}
 
@@ -139,8 +147,8 @@ func applyHostVolumeCapacity(capacity *api.HostCapacity, nodeName string, m *Mar
 	}
 
 	diskCount, diskCapacityGB := aggregateHostVolumeCapacityByNode(volumes, nodeName)
-	capacity.DiskCount = util.IntPtrInt(diskCount)
-	capacity.DiskCapacityGB = util.IntPtrInt(diskCapacityGB)
+	allocation.DiskCount = util.IntPtrInt(diskCount)
+	allocation.DiskCapacityGB = util.IntPtrInt(diskCapacityGB)
 }
 
 func aggregateHostVolumeCapacityByNode(volumes []api.Volume, nodeName string) (int, int) {
@@ -342,6 +350,11 @@ func collectHostCapacity() (*api.HostCapacity, error) {
 		capacity.MemoryMB = util.IntPtrInt(totalMemMB)
 	}
 
+	// 物理ディスク本数・容量を取得（lsblk -S -J -b で得られる物理ディスク一覧）
+	diskCount, diskCapacityGB := collectPhysicalDiskCapacity()
+	capacity.DiskCount = util.IntPtrInt(diskCount)
+	capacity.DiskCapacityGB = util.IntPtrInt(diskCapacityGB)
+
 	// ネットワークインターフェースを取得
 	ifaces, err := net.Interfaces()
 	if err != nil {
@@ -359,6 +372,49 @@ func collectHostCapacity() (*api.HostCapacity, error) {
 	}
 
 	return &capacity, nil
+}
+
+// lsblk -S -J -b の出力から、物理ディスクの本数と合計容量(GB)を取得する
+func collectPhysicalDiskCapacity() (int, int) {
+	out, err := lsblkScsiCommandOutput()
+	if err != nil {
+		slog.Warn("lsblk command failed", "err", err)
+		return 0, 0
+	}
+
+	var parsed struct {
+		BlockDevices []struct {
+			Size lsblkSizeBytes `json:"size"`
+		} `json:"blockdevices"`
+	}
+	if err := json.Unmarshal(out, &parsed); err != nil {
+		slog.Warn("failed to parse lsblk output", "err", err, "output", strings.TrimSpace(string(out)))
+		return 0, 0
+	}
+
+	var totalBytes int64
+	for _, dev := range parsed.BlockDevices {
+		totalBytes += int64(dev.Size)
+	}
+
+	return len(parsed.BlockDevices), int(totalBytes / (1024 * 1024 * 1024))
+}
+
+// lsblkのバージョンによって数値が文字列/数値どちらでも出力されるため、両方受け付ける
+type lsblkSizeBytes int64
+
+func (s *lsblkSizeBytes) UnmarshalJSON(data []byte) error {
+	text := strings.Trim(strings.TrimSpace(string(data)), `"`)
+	if text == "" || text == "null" {
+		*s = 0
+		return nil
+	}
+	v, err := strconv.ParseInt(text, 10, 64)
+	if err != nil {
+		return err
+	}
+	*s = lsblkSizeBytes(v)
+	return nil
 }
 
 // ホストの割当情報を収集する（etcdのデータから）
