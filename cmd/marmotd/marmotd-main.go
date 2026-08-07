@@ -175,6 +175,13 @@ func main() {
 		return
 	}
 
+	// KubernetesEngineコントローラー（MKE）
+	_, err = controller.StartKubernetesEngineController(cfg.NodeName, cfg.EtcdURL, "")
+	if err != nil {
+		slog.Error("Failed to start kubernetes engine controller", "err", err)
+		return
+	}
+
 	// DNSサーバーコントローラー
 	_, err = internaldns.StartInternalDNSServer(context.Background(), cfg.NodeName, cfg.EtcdURL, cfg) // DNSサーバーコントローラーの開始
 	if err != nil {

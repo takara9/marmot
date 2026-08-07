@@ -51,7 +51,8 @@ func (s *Server) ApiDeleteKubernetesEngineById(ctx echo.Context, id string) erro
 		}
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
-	if err := s.Ma.Db.DeleteKubernetesEngineById(id); err != nil {
+	// 実削除はコントローラーが DELETING 状態を検知し、猶予期間経過後に行う。
+	if err := s.Ma.Db.SetDeleteTimestampKubernetesEngine(id); err != nil {
 		if errors.Is(err, db.ErrNotFound) {
 			return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "IDが存在しません"})
 		}
