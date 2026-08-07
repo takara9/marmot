@@ -52,3 +52,20 @@ func TestCollectPhysicalDiskCapacityCommandError(t *testing.T) {
 		t.Fatalf("expected zero values on command error, got diskCount=%d diskCapacityGB=%d", diskCount, diskCapacityGB)
 	}
 }
+
+func TestCollectPhysicalDiskCapacityExcludesCdrom(t *testing.T) {
+	orig := lsblkScsiCommandOutput
+	defer func() { lsblkScsiCommandOutput = orig }()
+
+	lsblkScsiCommandOutput = func() ([]byte, error) {
+		return []byte(`{"blockdevices": [{"name":"sda","size":1000000000000},{"name":"sr0","size":1073741824}]}`), nil
+	}
+
+	diskCount, diskCapacityGB := collectPhysicalDiskCapacity()
+	if diskCount != 1 {
+		t.Fatalf("diskCount=%d, want 1", diskCount)
+	}
+	if diskCapacityGB != 931 {
+		t.Fatalf("diskCapacityGB=%d, want 931", diskCapacityGB)
+	}
+}

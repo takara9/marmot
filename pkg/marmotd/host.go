@@ -35,7 +35,8 @@ var systemctlRestartIscsid = func() error {
 }
 
 var lsblkScsiCommandOutput = func() ([]byte, error) {
-	return exec.Command("lsblk", "-S", "-J", "-b").Output()
+	// -S のデフォルト列にはSIZEが含まれないため、-o で明示的に指定する
+	return exec.Command("lsblk", "-S", "-J", "-b", "-o", "NAME,SIZE").Output()
 }
 
 func runningInTestBinary() bool {
@@ -384,6 +385,7 @@ func collectPhysicalDiskCapacity() (int, int) {
 
 	var parsed struct {
 		BlockDevices []struct {
+			Name string         `json:"name"`
 			Size lsblkSizeBytes `json:"size"`
 		} `json:"blockdevices"`
 	}
@@ -392,12 +394,18 @@ func collectPhysicalDiskCapacity() (int, int) {
 		return 0, 0
 	}
 
+	var count int
 	var totalBytes int64
 	for _, dev := range parsed.BlockDevices {
+		// sr0 等のCD/DVD/BRドライブは物理ディスクではないため除外
+		if strings.HasPrefix(dev.Name, "sr") {
+			continue
+		}
+		count++
 		totalBytes += int64(dev.Size)
 	}
 
-	return len(parsed.BlockDevices), int(totalBytes / (1024 * 1024 * 1024))
+	return count, int(totalBytes / (1024 * 1024 * 1024))
 }
 
 // lsblkのバージョンによって数値が文字列/数値どちらでも出力されるため、両方受け付ける
