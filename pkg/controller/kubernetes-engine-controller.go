@@ -179,22 +179,20 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineRunning(ke api.Kub
 func (c *kubernetesEngineController) reconcileKubernetesEngineDeleting(ke api.KubernetesEngine) {
 	id := api.KubernetesEngineID(ke)
 
-	networkName := kubernetesEngineNetworkName(ke)
-	if networkName != "" {
-		network, err := c.db.GetVirtualNetworkByName(networkName)
-		if err == nil {
-			if network.Status == nil || network.Status.StatusCode != db.NETWORK_DELETING {
-				if delErr := c.db.SetDeleteTimestampVirtualNetwork(api.VirtualNetworkID(network)); delErr != nil {
-					slog.Warn("SetDeleteTimestampVirtualNetwork() failed", "id", id, "network", networkName, "err", delErr)
-				}
+	network, err := c.findKubernetesEngineNetwork(ke)
+	if err == nil {
+		networkID := api.VirtualNetworkID(network)
+		if network.Status == nil || network.Status.StatusCode != db.NETWORK_DELETING {
+			if delErr := c.db.SetDeleteTimestampVirtualNetwork(networkID); delErr != nil {
+				slog.Warn("SetDeleteTimestampVirtualNetwork() failed", "id", id, "networkId", networkID, "err", delErr)
 			}
-			// ネットワークの削除完了を待ってからクラスタ本体を削除する。
-			return
 		}
-		if err != db.ErrNotFound {
-			slog.Warn("GetVirtualNetworkByName() failed", "id", id, "network", networkName, "err", err)
-			return
-		}
+		// ネットワークの削除完了を待ってからクラスタ本体を削除する。
+		return
+	}
+	if err != db.ErrNotFound {
+		slog.Warn("findKubernetesEngineNetwork() failed", "id", id, "err", err)
+		return
 	}
 
 	if err := c.db.DeleteKubernetesEngineById(id); err != nil {
@@ -214,21 +212,66 @@ func kubernetesEngineNetworkName(ke api.KubernetesEngine) string {
 	return kubernetesEngineNetworkNamePrefix + name
 }
 
-// ensureKubernetesEngineNetwork はクラスタ専用のノード間通信ネットワークを作成する（既に存在すれば何もしない）。
+// isKubernetesEngineOwnedNetwork はネットワークの所有者ラベルが指定のKubernetesEngine IDと一致するか判定する。
+func isKubernetesEngineOwnedNetwork(network api.VirtualNetwork, kubernetesEngineID string) bool {
+	if network.Metadata.Labels == nil {
+		return false
+	}
+	owner, ok := (*network.Metadata.Labels)[db.KubernetesEngineNetworkLabelOwner].(string)
+	return ok && owner == kubernetesEngineID
+}
+
+// findKubernetesEngineNetwork は名前で検索した上で所有者ラベル(KubernetesEngine ID)を照合し、
+// このクラスタが所有する専用ネットワークだけを返す。名前が一致しても所有者が異なる場合はdb.ErrNotFoundを返す。
+func (c *kubernetesEngineController) findKubernetesEngineNetwork(ke api.KubernetesEngine) (api.VirtualNetwork, error) {
+	networkName := kubernetesEngineNetworkName(ke)
+	if networkName == "" {
+		return api.VirtualNetwork{}, db.ErrNotFound
+	}
+	network, err := c.db.GetVirtualNetworkByName(networkName)
+	if err != nil {
+		return api.VirtualNetwork{}, err
+	}
+	if !isKubernetesEngineOwnedNetwork(network, api.KubernetesEngineID(ke)) {
+		return api.VirtualNetwork{}, db.ErrNotFound
+	}
+	return network, nil
+}
+
+// ensureKubernetesEngineNetwork はクラスタ専用のノード間通信ネットワークを作成する。
+// 既にこのクラスタが所有する同名ネットワークが存在すれば何もしない。名前が別クラスタ(または
+// 無関係)のネットワークに使われている場合や、このクラスタが既に別名でネットワークを保有している
+// 場合はエラーを返し、作成を行わない（ID・名前の両方で重複を検出する）。
 func (c *kubernetesEngineController) ensureKubernetesEngineNetwork(ke api.KubernetesEngine) error {
 	networkName := kubernetesEngineNetworkName(ke)
 	if networkName == "" {
 		return fmt.Errorf("kubernetes engine metadata.name is empty")
 	}
+	id := api.KubernetesEngineID(ke)
 
-	if _, err := c.db.GetVirtualNetworkByName(networkName); err == nil {
-		return nil
+	// 名前の重複チェック: 同名のネットワークが既に存在する場合、所有者がこのクラスタかどうかを確認する。
+	if existing, err := c.db.GetVirtualNetworkByName(networkName); err == nil {
+		if isKubernetesEngineOwnedNetwork(existing, id) {
+			return nil
+		}
+		return fmt.Errorf("network name %q already used by another network (id=%s)", networkName, api.VirtualNetworkID(existing))
 	} else if err != db.ErrNotFound {
 		return err
 	}
 
+	// IDの重複チェック: このクラスタが既に別名義でネットワークを保有していないか確認する。
+	networks, err := c.db.GetVirtualNetworks()
+	if err != nil {
+		return err
+	}
+	for _, n := range networks {
+		if isKubernetesEngineOwnedNetwork(n, id) {
+			return fmt.Errorf("kubernetes engine %s already owns network %s", id, api.VirtualNetworkID(n))
+		}
+	}
+
 	labels := map[string]interface{}{
-		db.KubernetesEngineNetworkLabelOwner:     api.KubernetesEngineID(ke),
+		db.KubernetesEngineNetworkLabelOwner:     id,
 		db.KubernetesEngineNetworkLabelManagedBy: db.KubernetesEngineNetworkLabelManagedByValue,
 	}
 	network := api.VirtualNetwork{
