@@ -189,6 +189,30 @@ func (d *Database) UpdateKubernetesEngineStatusWithMessage(id string, status int
 	}
 }
 
+// UpdateKubernetesEngineEtcdPorts はクラスタ専用etcdのクライアントポート・ピアポートを
+// Statusに記録する。KubernetesEngineコントローラーがクラスタ作成時に採番したポートを
+// 保存し、他クラスタとの衝突判定や再起動時の再利用に使用する。
+func (d *Database) UpdateKubernetesEngineEtcdPorts(id string, clientPort, peerPort int) error {
+	for {
+		rec, err := d.GetKubernetesEngineById(id)
+		if err != nil {
+			return err
+		}
+		if rec.Status == nil {
+			rec.Status = &api.Status{}
+		}
+		rec.Status.EtcdClientPort = util.IntPtrInt(clientPort)
+		rec.Status.EtcdPeerPort = util.IntPtrInt(peerPort)
+		rec.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+
+		err = d.putKubernetesEngineById(rec)
+		if err == ErrUpdateConflict {
+			continue
+		}
+		return err
+	}
+}
+
 func (d *Database) putKubernetesEngineById(rec api.KubernetesEngine) error {
 	id := api.KubernetesEngineID(rec)
 	if strings.TrimSpace(id) == "" {

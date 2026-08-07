@@ -2101,6 +2101,14 @@ components:
           description: Attach protocol used by backend, e.g. rbd for ceph.
         console:
           type: string
+        etcdClientPort:
+          type: integer
+          format: int
+          description: クラスタ専用etcd(KubernetesEngine)のクライアントポート番号。
+        etcdPeerPort:
+          type: integer
+          format: int
+          description: クラスタ専用etcd(KubernetesEngine)のピアポート番号。
     Metadata:
       type: object
       required:
