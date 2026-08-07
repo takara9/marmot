@@ -160,6 +160,22 @@ func TestDeleteKubernetesEngineEtcdUnitIgnoresUnitMissingErrors(t *testing.T) {
 	}
 }
 
+// StopKubernetesEngineEtcdUnit はCreate/Deleteと同様に不正なクラスタ名を拒否し、
+// systemctlを呼び出さないことを検証する。
+func TestStopKubernetesEngineEtcdUnitRejectsInvalidClusterName(t *testing.T) {
+	rec := installFakeSystemd(t)
+
+	if err := StopKubernetesEngineEtcdUnit(" "); err == nil {
+		t.Fatalf("expected error for empty cluster name, got nil")
+	}
+	if err := StopKubernetesEngineEtcdUnit("demo/../etc"); err == nil {
+		t.Fatalf("expected error for invalid cluster name, got nil")
+	}
+	if len(rec.calls) != 0 {
+		t.Fatalf("systemctl should not be called for invalid cluster name, calls = %v", rec.calls)
+	}
+}
+
 func assertCallsEqual(t *testing.T, got, want []string) {
 	t.Helper()
 	if len(got) != len(want) {

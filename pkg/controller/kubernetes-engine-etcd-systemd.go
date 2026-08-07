@@ -93,6 +93,25 @@ func kubernetesEngineEtcdUnitPath(clusterName string) string {
 	return filepath.Join(etcdSystemdUnitDir, KubernetesEngineEtcdUnitName(clusterName))
 }
 
+// validateKubernetesEngineEtcdClusterName はクラスタ名がユニット名/パスの構成要素として
+// 安全であることを検証し、前後の空白を除いた名前を返す。
+func validateKubernetesEngineEtcdClusterName(clusterName string) (string, error) {
+	name := strings.TrimSpace(clusterName)
+	if name == "" {
+		return "", fmt.Errorf("cluster name is empty")
+	}
+	if name == "." || name == ".." {
+		return "", fmt.Errorf("cluster name is invalid: %q", clusterName)
+	}
+	for _, r := range name {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.' {
+			continue
+		}
+		return "", fmt.Errorf("cluster name contains invalid character %q", r)
+	}
+	return name, nil
+}
+
 // renderKubernetesEngineEtcdUnit はsystemdユニットファイルの内容を生成する。
 func renderKubernetesEngineEtcdUnit(cfg KubernetesEngineEtcdUnitConfig) string {
 	memberName := "mke-" + cfg.ClusterName
@@ -122,18 +141,9 @@ WantedBy=multi-user.target
 // CreateKubernetesEngineEtcdUnit はクラスタ専用etcdのsystemdユニットファイルを生成・配置し、
 // daemon-reload後に有効化・起動する。データディレクトリが存在しなければ作成する。
 func CreateKubernetesEngineEtcdUnit(cfg KubernetesEngineEtcdUnitConfig) error {
-	name := strings.TrimSpace(cfg.ClusterName)
-	if name == "" {
-		return fmt.Errorf("cluster name is empty")
-	}
-	if name == "." || name == ".." {
-		return fmt.Errorf("cluster name is invalid: %q", cfg.ClusterName)
-	}
-	for _, r := range name {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.' {
-			continue
-		}
-		return fmt.Errorf("cluster name contains invalid character %q", r)
+	name, err := validateKubernetesEngineEtcdClusterName(cfg.ClusterName)
+	if err != nil {
+		return err
 	}
 	cfg.ClusterName = name
 	if err := os.MkdirAll(cfg.DataDir, 0o700); err != nil {
@@ -158,7 +168,11 @@ func CreateKubernetesEngineEtcdUnit(cfg KubernetesEngineEtcdUnitConfig) error {
 
 // StopKubernetesEngineEtcdUnit はクラスタ専用etcdのユニットを停止する。
 func StopKubernetesEngineEtcdUnit(clusterName string) error {
-	unit := KubernetesEngineEtcdUnitName(clusterName)
+	name, err := validateKubernetesEngineEtcdClusterName(clusterName)
+	if err != nil {
+		return err
+	}
+	unit := KubernetesEngineEtcdUnitName(name)
 	if err := systemdStopUnit(unit); err != nil {
 		return fmt.Errorf("systemctl stop %s failed: %w", unit, err)
 	}
@@ -169,18 +183,9 @@ func StopKubernetesEngineEtcdUnit(clusterName string) error {
 // ユニットファイルを削除し、daemon-reloadする。ユニット不在に起因するstop/disableの
 // 失敗は無視するが、それ以外の失敗(権限不足等)は冪等性の対象外としてエラーを返す。
 func DeleteKubernetesEngineEtcdUnit(clusterName string) error {
-	name := strings.TrimSpace(clusterName)
-	if name == "" {
-		return fmt.Errorf("cluster name is empty")
-	}
-	if name == "." || name == ".." {
-		return fmt.Errorf("cluster name is invalid: %q", clusterName)
-	}
-	for _, r := range name {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.' {
-			continue
-		}
-		return fmt.Errorf("cluster name contains invalid character %q", r)
+	name, err := validateKubernetesEngineEtcdClusterName(clusterName)
+	if err != nil {
+		return err
 	}
 
 	unit := KubernetesEngineEtcdUnitName(name)

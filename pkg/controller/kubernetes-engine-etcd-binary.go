@@ -142,9 +142,25 @@ func EnsureEtcdBinary(cacheDir, version string) (string, error) {
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return "", err
 	}
-	tmpPath := binPath + ".tmp"
+	// 並行呼び出し時にtmpファイルが衝突しないよう、destDir配下に一意な一時ファイルを作る
+	tmpFile, err := os.CreateTemp(destDir, filepath.Base(binPath)+".tmp-*")
+	if err != nil {
+		return "", err
+	}
+	tmpPath := tmpFile.Name()
+	_, writeErr := tmpFile.Write(extractedBinary)
+	closeErr := tmpFile.Close()
+	if writeErr != nil {
+		_ = os.Remove(tmpPath)
+		return "", writeErr
+	}
+	if closeErr != nil {
+		_ = os.Remove(tmpPath)
+		return "", closeErr
+	}
 	// etcdは実行バイナリのため実行権限(0755)を付与する
-	if err := os.WriteFile(tmpPath, extractedBinary, 0o755); err != nil {
+	if err := os.Chmod(tmpPath, 0o755); err != nil {
+		_ = os.Remove(tmpPath)
 		return "", err
 	}
 	if err := os.Rename(tmpPath, binPath); err != nil {
