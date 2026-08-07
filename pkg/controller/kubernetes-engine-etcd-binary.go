@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 )
 
 const (
@@ -21,12 +22,22 @@ const (
 
 	// DefaultEtcdBinaryCacheDir はダウンロードしたetcdバイナリのキャッシュ先ディレクトリ。
 	DefaultEtcdBinaryCacheDir = "/var/lib/marmot/mke/etcd"
+
+	// etcdDownloadTimeout はetcdリリースアセット取得1回あたりのタイムアウト。
+	etcdDownloadTimeout = 2 * time.Minute
+
+	// etcdDownloadMaxBytes はダウンロード時に許容する最大サイズ(想定外に大きい
+	// レスポンスによるメモリ消費を防ぐための上限)。
+	etcdDownloadMaxBytes = 200 * 1024 * 1024
 )
+
+var etcdHTTPClient = &http.Client{Timeout: etcdDownloadTimeout}
 
 // etcdDownload は指定URLの内容をバイト列で取得する。テストから差し替え可能にするため
 // パッケージ変数として保持する(実ネットワークに依存しないテストを可能にする)。
+// ハングや想定外に大きいレスポンスを避けるため、タイムアウトとサイズ上限を設ける。
 var etcdDownload = func(rawURL string) ([]byte, error) {
-	resp, err := http.Get(rawURL)
+	resp, err := etcdHTTPClient.Get(rawURL)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +47,15 @@ var etcdDownload = func(rawURL string) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status %d for %s", resp.StatusCode, rawURL)
 	}
-	return io.ReadAll(resp.Body)
+	limited := io.LimitReader(resp.Body, etcdDownloadMaxBytes+1)
+	data, err := io.ReadAll(limited)
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > etcdDownloadMaxBytes {
+		return nil, fmt.Errorf("response for %s exceeds max allowed size (%d bytes)", rawURL, etcdDownloadMaxBytes)
+	}
+	return data, nil
 }
 
 // normalizeEtcdVersionTag は "3.6.8" や "v3.6.8" を受け取り "v3.6.8" 形式の

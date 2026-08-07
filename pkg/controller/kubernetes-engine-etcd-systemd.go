@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -29,13 +30,54 @@ type KubernetesEngineEtcdUnitConfig struct {
 }
 
 // systemctl呼び出しをテストから差し替え可能にするためのパッケージ変数群。
+// stop/disableは、ユニット不在による失敗かどうかを呼び出し元が判別できるよう
+// systemdUnitMissingError でラップする(runSystemctlUnitCommand参照)。
 var (
 	systemdDaemonReload = func() error { return exec.Command("systemctl", "daemon-reload").Run() }
 	systemdEnableUnit   = func(unit string) error { return exec.Command("systemctl", "enable", unit).Run() }
-	systemdDisableUnit  = func(unit string) error { return exec.Command("systemctl", "disable", unit).Run() }
+	systemdDisableUnit  = func(unit string) error { return runSystemctlUnitCommand("disable", unit) }
 	systemdStartUnit    = func(unit string) error { return exec.Command("systemctl", "start", unit).Run() }
-	systemdStopUnit     = func(unit string) error { return exec.Command("systemctl", "stop", unit).Run() }
+	systemdStopUnit     = func(unit string) error { return runSystemctlUnitCommand("stop", unit) }
 )
+
+// systemdUnitMissingError はsystemctlがユニット不在を理由に失敗したことを表す。
+type systemdUnitMissingError struct{ err error }
+
+func (e *systemdUnitMissingError) Error() string { return e.err.Error() }
+func (e *systemdUnitMissingError) Unwrap() error { return e.err }
+
+// isSystemdUnitMissingError はerrがユニット不在に起因するものかを判定する。
+func isSystemdUnitMissingError(err error) bool {
+	var missing *systemdUnitMissingError
+	return errors.As(err, &missing)
+}
+
+// unitNotFoundOutputPatterns はsystemctlの出力に含まれる「ユニット不在」を示す
+// 代表的な文字列。systemdのバージョンによって文言が異なるため複数パターンを見る。
+var unitNotFoundOutputPatterns = []string{
+	"not loaded",
+	"not-found",
+	"no such file or directory",
+	"does not exist",
+	"no such unit",
+}
+
+// runSystemctlUnitCommand は `systemctl <action> <unit>` を実行し、失敗時に出力内容から
+// ユニット不在による失敗かどうかを判定してエラーをラップする。
+func runSystemctlUnitCommand(action, unit string) error {
+	out, err := exec.Command("systemctl", action, unit).CombinedOutput()
+	if err == nil {
+		return nil
+	}
+	wrapped := fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
+	lower := strings.ToLower(string(out))
+	for _, pattern := range unitNotFoundOutputPatterns {
+		if strings.Contains(lower, pattern) {
+			return &systemdUnitMissingError{err: wrapped}
+		}
+	}
+	return wrapped
+}
 
 // etcdSystemdUnitDir はユニットファイルの配置先ディレクトリ。テストから上書き可能にするため
 // パッケージ変数として保持する(既定値は DefaultEtcdSystemdUnitDir)。
@@ -124,8 +166,8 @@ func StopKubernetesEngineEtcdUnit(clusterName string) error {
 }
 
 // DeleteKubernetesEngineEtcdUnit はクラスタ専用etcdのユニットを停止・無効化した上で
-// ユニットファイルを削除し、daemon-reloadする。ユニットファイルが既に存在しない場合も
-// エラーにはしない。
+// ユニットファイルを削除し、daemon-reloadする。ユニット不在に起因するstop/disableの
+// 失敗は無視するが、それ以外の失敗(権限不足等)は冪等性の対象外としてエラーを返す。
 func DeleteKubernetesEngineEtcdUnit(clusterName string) error {
 	name := strings.TrimSpace(clusterName)
 	if name == "" {
@@ -141,21 +183,14 @@ func DeleteKubernetesEngineEtcdUnit(clusterName string) error {
 		return fmt.Errorf("cluster name contains invalid character %q", r)
 	}
 
-	unitPath := kubernetesEngineEtcdUnitPath(name)
-	_, statErr := os.Stat(unitPath)
-	unitFileMissing := os.IsNotExist(statErr)
-	if statErr != nil && !unitFileMissing {
-		return fmt.Errorf("failed to stat etcd unit file: %w", statErr)
-	}
-
 	unit := KubernetesEngineEtcdUnitName(name)
-	if err := systemdStopUnit(unit); err != nil && !unitFileMissing {
+	if err := systemdStopUnit(unit); err != nil && !isSystemdUnitMissingError(err) {
 		return fmt.Errorf("systemctl stop %s failed: %w", unit, err)
 	}
-	if err := systemdDisableUnit(unit); err != nil && !unitFileMissing {
+	if err := systemdDisableUnit(unit); err != nil && !isSystemdUnitMissingError(err) {
 		return fmt.Errorf("systemctl disable %s failed: %w", unit, err)
 	}
-	if err := os.Remove(unitPath); err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(kubernetesEngineEtcdUnitPath(name)); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove etcd unit file: %w", err)
 	}
 	if err := systemdDaemonReload(); err != nil {
