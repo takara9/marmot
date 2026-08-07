@@ -151,7 +151,29 @@ func (c *kubernetesEngineController) kubernetesEngineControllerLoop() {
 // TODO: 次フェーズでノード用サーバーの作成を開始する。
 func (c *kubernetesEngineController) reconcileKubernetesEnginePending(ke api.KubernetesEngine) {
 	id := api.KubernetesEngineID(ke)
-	if err := c.ensureKubernetesEngineNetwork(ke); err != nil {
+
+	// ネットワーク作成とエンジン状態遷移をシリアライズするため、エンジンごとのロックを取得する。
+	// 同一エンジンに対する DELETING パス（ネットワーク不在確認→ハードデリート）との競合を防ぐ。
+	lockKey := "/lock/kubernetes-engine/reconcile/" + id
+	mutex, err := c.db.LockKey(lockKey)
+	if err != nil {
+		slog.Warn("reconcileKubernetesEnginePending: failed to acquire lock", "id", id, "err", err)
+		return
+	}
+	defer c.db.UnlockKey(mutex)
+
+	// ロック取得後にエンジンの最新状態を再読み込みして、まだ PENDING であることを確認する。
+	// 別インスタンスが先に処理を完了・削除していた場合はスキップする。
+	current, err := c.db.GetKubernetesEngineById(id)
+	if err != nil {
+		slog.Warn("reconcileKubernetesEnginePending: GetKubernetesEngineById() failed", "id", id, "err", err)
+		return
+	}
+	if current.Status == nil || current.Status.StatusCode != db.KUBERNETES_ENGINE_PENDING {
+		return
+	}
+
+	if err := c.ensureKubernetesEngineNetwork(current); err != nil {
 		slog.Warn("ensureKubernetesEngineNetwork() failed", "id", id, "err", err)
 		return
 	}
@@ -180,7 +202,31 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineRunning(ke api.Kub
 func (c *kubernetesEngineController) reconcileKubernetesEngineDeleting(ke api.KubernetesEngine) {
 	id := api.KubernetesEngineID(ke)
 
-	networks, err := c.findKubernetesEngineNetworks(ke)
+	// ネットワーク不在確認とハードデリートをシリアライズするため、エンジンごとのロックを取得する。
+	// 同一エンジンに対する PENDING パス（ネットワーク作成→状態遷移）との競合を防ぐ。
+	lockKey := "/lock/kubernetes-engine/reconcile/" + id
+	mutex, err := c.db.LockKey(lockKey)
+	if err != nil {
+		slog.Warn("reconcileKubernetesEngineDeleting: failed to acquire lock", "id", id, "err", err)
+		return
+	}
+	defer c.db.UnlockKey(mutex)
+
+	// ロック取得後にエンジンの最新状態を再読み込みして、まだ DELETING であることを確認する。
+	// 別インスタンスが先に削除を完了していた場合はスキップする。
+	current, err := c.db.GetKubernetesEngineById(id)
+	if err != nil {
+		if err == db.ErrNotFound {
+			return
+		}
+		slog.Warn("reconcileKubernetesEngineDeleting: GetKubernetesEngineById() failed", "id", id, "err", err)
+		return
+	}
+	if current.Status == nil || current.Status.StatusCode != db.KUBERNETES_ENGINE_DELETING {
+		return
+	}
+
+	networks, err := c.findKubernetesEngineNetworks(current)
 	if err != nil {
 		slog.Warn("findKubernetesEngineNetworks() failed", "id", id, "err", err)
 		return
