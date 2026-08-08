@@ -116,9 +116,10 @@ func validateKubernetesEngineEtcdClusterName(clusterName string) (string, error)
 // renderKubernetesEngineEtcdUnit はsystemdユニットファイルの内容を生成する。
 func renderKubernetesEngineEtcdUnit(cfg KubernetesEngineEtcdUnitConfig) string {
 	memberName := "mke-" + cfg.ClusterName
+	ns := strings.TrimSpace(cfg.NetworkNamespace)
 	networkNamespace := ""
-	if cfg.NetworkNamespace != "" {
-		networkNamespace = fmt.Sprintf("NetworkNamespacePath=/run/netns/%s\n", cfg.NetworkNamespace)
+	if ns != "" && !strings.ContainsAny(ns, "/\n\r\t ") {
+		networkNamespace = fmt.Sprintf("NetworkNamespacePath=/run/netns/%s\n", ns)
 	}
 	return fmt.Sprintf(`[Unit]
 Description=Marmot Kubernetes Engine dedicated etcd for cluster %s
