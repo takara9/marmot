@@ -97,7 +97,14 @@ func SetupKubernetesEngineControlPlaneNetwork(cfg KubernetesEngineControlPlaneNe
 		return err
 	}
 	if controlPlaneNamespaceExists(cfg.Namespace) {
-		return nil
+		// If the namespace exists, treat it as ready only when the expected host veth exists.
+		if _, err := netlink.LinkByName(cfg.HostVethName); err == nil {
+			return nil
+		}
+		_ = controlPlaneDeleteOVSPort(cfg.BridgeName, cfg.HostVethName)
+		if err := controlPlaneDeleteNamespace(cfg.Namespace); err != nil {
+			return fmt.Errorf("failed to delete stale network namespace %s: %w", cfg.Namespace, err)
+		}
 	}
 	if err := controlPlaneCreateNamespace(cfg.Namespace); err != nil {
 		return fmt.Errorf("failed to create network namespace %s: %w", cfg.Namespace, err)
