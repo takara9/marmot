@@ -53,6 +53,20 @@ func TestKubernetesEngineEtcdUnitName(t *testing.T) {
 	}
 }
 
+func TestRenderKubernetesEngineEtcdUnitWithNetworkNamespace(t *testing.T) {
+	content := renderKubernetesEngineEtcdUnit(KubernetesEngineEtcdUnitConfig{
+		ClusterName:      "demo",
+		EtcdBinaryPath:   "/bin/etcd",
+		DataDir:          "/var/lib/etcd",
+		NetworkNamespace: "mke-demo",
+		ClientPort:       23790,
+		PeerPort:         23791,
+	})
+	if !strings.Contains(content, "NetworkNamespacePath=/run/netns/mke-demo") {
+		t.Fatalf("unit does not contain network namespace: %s", content)
+	}
+}
+
 // クラスタ専用etcdユニットの「作成→起動→停止→削除」の一連のライフサイクルを検証する。
 func TestKubernetesEngineEtcdUnitLifecycle(t *testing.T) {
 	rec := installFakeSystemd(t)

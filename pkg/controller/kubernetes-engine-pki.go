@@ -38,11 +38,12 @@ const (
 // KubernetesEngineCertRequest は証明書発行に必要なパラメータ。
 type KubernetesEngineCertRequest struct {
 	// Name はファイル名の基点(例: "kube-apiserver", "kubelet-node1")。
-	Name        string
-	CommonName  string
-	Usage       KubernetesEngineCertUsage
-	DNSNames    []string
-	IPAddresses []net.IP
+	Name          string
+	CommonName    string
+	Organizations []string
+	Usage         KubernetesEngineCertUsage
+	DNSNames      []string
+	IPAddresses   []net.IP
 }
 
 func kubernetesEngineClusterPkiDir(pkiDir, clusterName string) string {
@@ -59,6 +60,11 @@ func KubernetesEngineCAPaths(pkiDir, clusterName string) (certPath, keyPath stri
 func KubernetesEngineCertPaths(pkiDir, clusterName, name string) (certPath, keyPath string) {
 	dir := kubernetesEngineClusterPkiDir(pkiDir, clusterName)
 	return filepath.Join(dir, name+".crt"), filepath.Join(dir, name+".key")
+}
+
+func KubernetesEngineServiceAccountKeyPaths(pkiDir, clusterName string) (publicKeyPath, privateKeyPath string) {
+	dir := kubernetesEngineClusterPkiDir(pkiDir, clusterName)
+	return filepath.Join(dir, "service-account.pub"), filepath.Join(dir, "service-account.key")
 }
 
 // validateKubernetesEnginePkiClusterName はクラスタ名がディレクトリ/ファイル名として
@@ -191,11 +197,15 @@ func IssueKubernetesEngineCertificate(pkiDir, clusterName string, req Kubernetes
 			return err
 		}
 		now := time.Now()
+		organizations := req.Organizations
+		if len(organizations) == 0 {
+			organizations = []string{"marmot"}
+		}
 		leafTemplate := &x509.Certificate{
 			SerialNumber: serial,
 			Subject: pkix.Name{
 				CommonName:   req.CommonName,
-				Organization: []string{"marmot"},
+				Organization: organizations,
 			},
 			NotBefore:   now.Add(-time.Hour),
 			NotAfter:    now.Add(kubernetesEngineCertValidity),
@@ -221,6 +231,43 @@ func IssueKubernetesEngineCertificate(pkiDir, clusterName string, req Kubernetes
 		return "", "", err
 	}
 	return certPath, keyPath, nil
+}
+
+func EnsureKubernetesEngineServiceAccountKey(pkiDir, clusterName string) (publicKeyPath, privateKeyPath string, err error) {
+	name, err := validateKubernetesEnginePkiClusterName(clusterName)
+	if err != nil {
+		return "", "", err
+	}
+	dir := kubernetesEngineClusterPkiDir(pkiDir, name)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", "", err
+	}
+	publicKeyPath, privateKeyPath = KubernetesEngineServiceAccountKeyPaths(pkiDir, name)
+	err = withKubernetesEnginePkiLock(filepath.Join(dir, ".service-account.lock"), func() error {
+		if certFileExists(publicKeyPath) && certFileExists(privateKeyPath) {
+			return nil
+		}
+		key, err := rsa.GenerateKey(rand.Reader, kubernetesEngineCertKeyBits)
+		if err != nil {
+			return err
+		}
+		publicDER, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
+		if err != nil {
+			return err
+		}
+		if err := writePemFile(publicKeyPath, "PUBLIC KEY", publicDER, 0o644); err != nil {
+			return err
+		}
+		if err := writePemFile(privateKeyPath, "RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(key), 0o600); err != nil {
+			_ = os.Remove(publicKeyPath)
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return "", "", err
+	}
+	return publicKeyPath, privateKeyPath, nil
 }
 
 func newCertificateSerialNumber() (*big.Int, error) {

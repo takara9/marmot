@@ -1,0 +1,203 @@
+package controller
+
+import (
+	"crypto/sha256"
+	"fmt"
+	"net"
+	"os/exec"
+	"runtime"
+	"strings"
+
+	"github.com/vishvananda/netlink"
+	"github.com/vishvananda/netns"
+)
+
+const controlPlaneInterfaceName = "eth0"
+
+type KubernetesEngineControlPlaneNetworkConfig struct {
+	ClusterName  string
+	Namespace    string
+	HostVethName string
+	PeerVethName string
+	BridgeName   string
+	Interface    string
+	CIDR         string
+}
+
+var (
+	controlPlaneNamespaceExists = func(name string) bool {
+		handle, err := netns.GetFromName(name)
+		if err != nil {
+			return false
+		}
+		_ = handle.Close()
+		return true
+	}
+	controlPlaneCreateNamespace = createControlPlaneNamespace
+	controlPlaneDeleteNamespace = netns.DeleteNamed
+	controlPlaneCreateVeth      = createControlPlaneVeth
+	controlPlaneAddOVSPort      = func(bridge, port string) error {
+		output, err := exec.Command("ovs-vsctl", "--may-exist", "add-port", bridge, port).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("ovs-vsctl add-port failed: %w (output=%s)", err, strings.TrimSpace(string(output)))
+		}
+		return nil
+	}
+	controlPlaneDeleteOVSPort = func(bridge, port string) error {
+		output, err := exec.Command("ovs-vsctl", "--if-exists", "del-port", bridge, port).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("ovs-vsctl del-port failed: %w (output=%s)", err, strings.TrimSpace(string(output)))
+		}
+		return nil
+	}
+	controlPlaneSetHostVethUp = func(name string) error {
+		link, err := netlink.LinkByName(name)
+		if err != nil {
+			return err
+		}
+		return netlink.LinkSetUp(link)
+	}
+	controlPlaneConfigurePeer = configureControlPlanePeer
+)
+
+func KubernetesEngineControlPlaneNetworkNames(clusterName string) (namespace, hostVeth, peerVeth string, err error) {
+	name, err := validateKubernetesEngineEtcdClusterName(clusterName)
+	if err != nil {
+		return "", "", "", err
+	}
+	sum := sha256.Sum256([]byte(name))
+	suffix := fmt.Sprintf("%x", sum[:5])
+	return "mke-" + name, "mkoh-" + suffix, "mken-" + suffix, nil
+}
+
+func NewKubernetesEngineControlPlaneNetworkConfig(clusterName, bridgeName, cidr string) (KubernetesEngineControlPlaneNetworkConfig, error) {
+	namespace, hostVeth, peerVeth, err := KubernetesEngineControlPlaneNetworkNames(clusterName)
+	if err != nil {
+		return KubernetesEngineControlPlaneNetworkConfig{}, err
+	}
+	if strings.TrimSpace(bridgeName) == "" {
+		return KubernetesEngineControlPlaneNetworkConfig{}, fmt.Errorf("bridge name is empty")
+	}
+	if _, _, err := net.ParseCIDR(strings.TrimSpace(cidr)); err != nil {
+		return KubernetesEngineControlPlaneNetworkConfig{}, fmt.Errorf("invalid control plane CIDR %q: %w", cidr, err)
+	}
+	return KubernetesEngineControlPlaneNetworkConfig{
+		ClusterName:  strings.TrimSpace(clusterName),
+		Namespace:    namespace,
+		HostVethName: hostVeth,
+		PeerVethName: peerVeth,
+		BridgeName:   strings.TrimSpace(bridgeName),
+		Interface:    controlPlaneInterfaceName,
+		CIDR:         strings.TrimSpace(cidr),
+	}, nil
+}
+
+func SetupKubernetesEngineControlPlaneNetwork(cfg KubernetesEngineControlPlaneNetworkConfig) (err error) {
+	if _, err := NewKubernetesEngineControlPlaneNetworkConfig(cfg.ClusterName, cfg.BridgeName, cfg.CIDR); err != nil {
+		return err
+	}
+	if controlPlaneNamespaceExists(cfg.Namespace) {
+		return nil
+	}
+	if err := controlPlaneCreateNamespace(cfg.Namespace); err != nil {
+		return fmt.Errorf("failed to create network namespace %s: %w", cfg.Namespace, err)
+	}
+	defer func() {
+		if err != nil {
+			_ = controlPlaneDeleteOVSPort(cfg.BridgeName, cfg.HostVethName)
+			_ = controlPlaneDeleteNamespace(cfg.Namespace)
+		}
+	}()
+	if err = controlPlaneCreateVeth(cfg.HostVethName, cfg.PeerVethName); err != nil {
+		return fmt.Errorf("failed to create veth pair: %w", err)
+	}
+	if err = controlPlaneAddOVSPort(cfg.BridgeName, cfg.HostVethName); err != nil {
+		return err
+	}
+	if err = controlPlaneSetHostVethUp(cfg.HostVethName); err != nil {
+		return fmt.Errorf("failed to bring host veth up: %w", err)
+	}
+	if err = controlPlaneConfigurePeer(cfg.Namespace, cfg.PeerVethName, cfg.Interface, cfg.CIDR); err != nil {
+		return fmt.Errorf("failed to configure network namespace: %w", err)
+	}
+	return nil
+}
+
+func TeardownKubernetesEngineControlPlaneNetwork(cfg KubernetesEngineControlPlaneNetworkConfig) error {
+	if err := controlPlaneDeleteOVSPort(cfg.BridgeName, cfg.HostVethName); err != nil {
+		return err
+	}
+	if err := controlPlaneDeleteNamespace(cfg.Namespace); err != nil {
+		return fmt.Errorf("failed to delete network namespace %s: %w", cfg.Namespace, err)
+	}
+	return nil
+}
+
+func createControlPlaneNamespace(name string) error {
+	handle, err := netns.NewNamed(name)
+	if err != nil {
+		return err
+	}
+	return handle.Close()
+}
+
+func createControlPlaneVeth(hostName, peerName string) error {
+	return netlink.LinkAdd(&netlink.Veth{
+		LinkAttrs: netlink.LinkAttrs{Name: hostName},
+		PeerName:  peerName,
+	})
+}
+
+func configureControlPlanePeer(namespace, peerName, interfaceName, cidr string) error {
+	peer, err := netlink.LinkByName(peerName)
+	if err != nil {
+		return err
+	}
+	target, err := netns.GetFromName(namespace)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = target.Close() }()
+	if err := netlink.LinkSetNsFd(peer, int(target)); err != nil {
+		return err
+	}
+
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	original, err := netns.Get()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = original.Close() }()
+	if err := netns.Set(target); err != nil {
+		return err
+	}
+	defer func() { _ = netns.Set(original) }()
+
+	link, err := netlink.LinkByName(peerName)
+	if err != nil {
+		return err
+	}
+	if err := netlink.LinkSetName(link, interfaceName); err != nil {
+		return err
+	}
+	link, err = netlink.LinkByName(interfaceName)
+	if err != nil {
+		return err
+	}
+	address, err := netlink.ParseAddr(cidr)
+	if err != nil {
+		return err
+	}
+	if err := netlink.AddrAdd(link, address); err != nil {
+		return err
+	}
+	if err := netlink.LinkSetUp(link); err != nil {
+		return err
+	}
+	loopback, err := netlink.LinkByName("lo")
+	if err != nil {
+		return err
+	}
+	return netlink.LinkSetUp(loopback)
+}
