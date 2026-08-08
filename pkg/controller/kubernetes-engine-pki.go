@@ -228,12 +228,16 @@ func newCertificateSerialNumber() (*big.Int, error) {
 	return rand.Int(rand.Reader, limit)
 }
 
-func withKubernetesEnginePkiLock(lockPath string, fn func() error) error {
+func withKubernetesEnginePkiLock(lockPath string, fn func() error) (retErr error) {
 	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return err
 	}
-	defer lockFile.Close()
+	defer func() {
+		if closeErr := lockFile.Close(); retErr == nil {
+			retErr = closeErr
+		}
+	}()
 
 	if err := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX); err != nil {
 		return err
