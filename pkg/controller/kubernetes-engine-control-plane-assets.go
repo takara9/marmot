@@ -61,6 +61,11 @@ type controlPlaneUserConfig struct {
 }
 
 func EnsureKubernetesEngineControlPlaneAssets(pkiDir, configDir, clusterName, apiServerIP string, apiServerPort int) (KubernetesEngineControlPlaneAssets, error) {
+	name, err := validateKubernetesEnginePkiClusterName(clusterName)
+	if err != nil {
+		return KubernetesEngineControlPlaneAssets{}, err
+	}
+	clusterName = name
 	if net.ParseIP(apiServerIP) == nil {
 		return KubernetesEngineControlPlaneAssets{}, fmt.Errorf("invalid API server IP address %q", apiServerIP)
 	}
