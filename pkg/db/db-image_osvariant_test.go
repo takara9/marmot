@@ -4,16 +4,16 @@ import "testing"
 
 func TestDeriveImageOSFromVariant(t *testing.T) {
 	tests := []struct {
-		name       string
-		variant    string
-		wantName   string
-		wantVer    string
+		name     string
+		variant  string
+		wantName string
+		wantVer  string
 	}{
 		{
-			name:     "ubuntu 22.04",
-			variant:  "ubuntu22.04",
+			name:     "ubuntu 24.04",
+			variant:  "ubuntu24.04",
 			wantName: "ubuntu",
-			wantVer:  "22.04",
+			wantVer:  "24.04",
 		},
 		{
 			name:     "ubuntu 24.04 with suffix",

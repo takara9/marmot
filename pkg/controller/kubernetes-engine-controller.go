@@ -22,12 +22,18 @@ const (
 	kubernetesEngineNetworkNamePrefix = "mke-"
 )
 
+var (
+	provisionKubernetesEngineControlPlane = ProvisionKubernetesEngineControlPlane
+	provisionKubernetesEngineNodes        = ProvisionKubernetesEngineNodes
+)
+
 // kubernetesEngineController は MKE (Marmot Kubernetes Engine) コントローラーです。
 // mke.json の読み込みに加えて、/marmot/kubernetes-engine 配下を定期的にポーリングし、
 // KubernetesEngine リソースのライフサイクル状態（Pending→Provisioning→Running→Deleting）を
 // etcd に書き込みます。実際のクラスタ構築（VM作成・kubeadm等）は今後実装します。
 type kubernetesEngineController struct {
 	node     string
+	etcdURL  string
 	mkeConf  *marmotd.MKEConfig
 	marmot   *marmotd.Marmot
 	db       *db.Database
@@ -42,6 +48,7 @@ func StartKubernetesEngineController(node string, etcdUrl string, mkeConfigPath 
 	var c kubernetesEngineController
 	var err error
 	c.node = node
+	c.etcdURL = etcdUrl
 
 	if mkeConfigPath == "" {
 		mkeConfigPath = marmotd.DefaultMKEConfigPath
@@ -182,11 +189,50 @@ func (c *kubernetesEngineController) reconcileKubernetesEnginePending(ke api.Kub
 	}
 }
 
-// reconcileKubernetesEngineProvisioning はノード起動状況を確認して RUNNING に進める処理の差し込み口。
-// TODO: 次フェーズでノード(Server)の起動完了を確認し、全ノード Running になった時点で RUNNING に遷移させる。
+// reconcileKubernetesEngineProvisioning はコントロールプレーンとノードを冪等に構成し、
+// 全ノードがKubernetes API上でReadyになった時点でRUNNINGに進める。
 func (c *kubernetesEngineController) reconcileKubernetesEngineProvisioning(ke api.KubernetesEngine) {
 	id := api.KubernetesEngineID(ke)
-	slog.Debug("KubernetesEngineはPROVISIONING状態です（ノード起動確認は未実装）", "id", id, "name", ke.Metadata.Name)
+	lockKey := "/lock/kubernetes-engine/reconcile/" + id
+	mutex, err := c.db.LockKey(lockKey)
+	if err != nil {
+		slog.Warn("reconcileKubernetesEngineProvisioning: failed to acquire lock", "id", id, "err", err)
+		return
+	}
+	defer c.db.UnlockKey(mutex)
+
+	current, err := c.db.GetKubernetesEngineById(id)
+	if err != nil {
+		slog.Warn("reconcileKubernetesEngineProvisioning: GetKubernetesEngineById() failed", "id", id, "err", err)
+		return
+	}
+	if current.Status == nil || current.Status.StatusCode != db.KUBERNETES_ENGINE_PROVISIONING {
+		return
+	}
+	if err := provisionKubernetesEngineControlPlane(c.db, c.mkeConf, c.etcdURL, current); err != nil {
+		message := fmt.Sprintf("control plane provisioning failed: %v", err)
+		_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_PROVISIONING, message)
+		return
+	}
+
+	current, err = c.db.GetKubernetesEngineById(id)
+	if err != nil {
+		slog.Warn("reconcileKubernetesEngineProvisioning: failed to reload control plane status", "id", id, "err", err)
+		return
+	}
+	ready, err := provisionKubernetesEngineNodes(c.db, c.mkeConf, current)
+	if err != nil {
+		message := fmt.Sprintf("node provisioning failed: %v", err)
+		_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_PROVISIONING, message)
+		return
+	}
+	if !ready {
+		_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_PROVISIONING, "waiting for Kubernetes nodes to become Ready")
+		return
+	}
+	if err := c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, ""); err != nil {
+		slog.Warn("UpdateKubernetesEngineStatusWithMessage() failed", "id", id, "err", err)
+	}
 }
 
 // reconcileKubernetesEngineRunning はRUNNING状態のヘルスチェック用の差し込み口。

@@ -97,10 +97,10 @@ var _ = Describe("pickExportableImageByName", func() {
 var _ = Describe("writeImageArchive / extractFromTGZ round-trip", func() {
 	It("preserves osName and osVersion in the archive", func() {
 		image := api.Image{
-			Metadata: api.Metadata{Name: "ubuntu22.04"},
+			Metadata: api.Metadata{Name: "ubuntu24.04"},
 			Spec: api.ImageSpec{
 				OsName:    util.StringPtr("ubuntu"),
-				OsVersion: util.StringPtr("22.04"),
+				OsVersion: util.StringPtr("24.04"),
 			},
 		}
 		qcow2Data := []byte("fake-qcow2-data")
@@ -141,6 +141,6 @@ var _ = Describe("writeImageArchive / extractFromTGZ round-trip", func() {
 		}
 		Expect(foundMeta).To(BeTrue())
 		Expect(meta.OsName).To(Equal("ubuntu"))
-		Expect(meta.OsVersion).To(Equal("22.04"))
+		Expect(meta.OsVersion).To(Equal("24.04"))
 	})
 })

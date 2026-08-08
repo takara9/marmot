@@ -59,7 +59,7 @@ var _ = Describe("Image", Ordered, func() {
 			})
 
 			It("イメージの作成 #1", func() {
-				url := "http://hmc/ubuntu-22.04-server-cloudimg-amd64.img"
+				url := "http://hmc/ubuntu-24.04-server-cloudimg-amd64.img"
 				id, err = v.MakeImageEntryFromURLWithNode("test-image-1", url, "hv-test-01")
 				Expect(err).NotTo(HaveOccurred())
 				fmt.Println("Created image with ID:", id)

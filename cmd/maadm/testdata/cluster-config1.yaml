@@ -1,5 +1,5 @@
 domain: labo.local
-os_variant:  ubuntu22.04
+os_variant:  ubuntu24.04
 cluster_name: test
 vm_spec:
   - name: "srv1"

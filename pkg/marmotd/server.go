@@ -372,6 +372,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		slog.Error("GetServerById()", "err", err)
 		return "", err
 	}
+	normalizeServerImageDefault(&serverConfig)
 	if err := validateServerAuthSpec(serverConfig.Spec.Auth); err != nil {
 		return "", err
 	}
@@ -389,12 +390,6 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	}
 	assignNodeNameIfUnset(&serverConfig.Metadata, assignedNodeName)
 
-	slog.Debug("OS指定がなければ、OSバリアントのデフォルトを設定")
-	if serverConfig.Spec.OsVariant == nil {
-		bootVol.Spec.OsVariant = util.StringPtr("ubuntu22.04")
-		serverConfig.Spec.OsVariant = util.StringPtr("ubuntu22.04")
-	}
-
 	slog.Debug("ブートボリュームの生成と設定")
 	bootVol.Metadata.Name = "boot-" + api.ServerID(serverConfig)
 	// サーバー割当ノードをブートボリュームのメタデータに付与する。
@@ -402,11 +397,6 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	bootVol.Spec.Kind = util.StringPtr("os")
 	bootVol.Spec.Path = util.StringPtr("")
 	bootVol.Spec.Size = util.IntPtrInt(0)
-
-	slog.Debug("** OSの種類が指定されていなければ、デフォルトを設定 ** ", "os_variant", serverConfig.Spec.OsVariant)
-	if serverConfig.Spec.OsVariant == nil {
-		serverConfig.Spec.OsVariant = util.StringPtr("ubuntu22.04")
-	}
 
 	slog.Debug("ボリュームタイプの指定がなければ、デフォルトqcow2を設定", "boot volume type", serverConfig.Spec.BootVolume)
 	if serverConfig.Spec.BootVolume == nil || serverConfig.Spec.BootVolume.Spec.Type == nil {
@@ -430,7 +420,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 
 	slog.Debug("ブートディスクにOSの指定がなければ、デフォルトのOSを設定")
 	if serverConfig.Spec.OsVariant == nil {
-		bootVol.Spec.OsVariant = util.StringPtr("ubuntu22.04") // デフォルトをコンフィグに持たせるべき？
+		bootVol.Spec.OsVariant = util.StringPtr("ubuntu24.04") // デフォルトをコンフィグに持たせるべき？
 	} else {
 		bootVol.Spec.OsVariant = serverConfig.Spec.OsVariant
 	}

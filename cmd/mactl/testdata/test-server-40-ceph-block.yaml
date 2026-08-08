@@ -6,7 +6,7 @@ metadata:
 spec:
     cpu: 1
     memory: 1048
-    mmImage: ubuntu22.04
+    mmImage: ubuntu24.04
     auth:
         url: https://github.com/takara9.keys
     networkInterface:

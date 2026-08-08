@@ -125,7 +125,7 @@ var _ = Describe("関数テスト", Ordered, func() {
 			var meta api.Metadata
 			volume.Metadata = meta
 
-					   volume.Metadata.Name = "test-volume-001"
+			volume.Metadata.Name = "test-volume-001"
 			volume.Spec.Type = util.StringPtr("qcow2")
 			volume.Spec.Kind = util.StringPtr("data")
 			volume.Spec.Size = util.IntPtrInt(100)
@@ -175,10 +175,10 @@ var _ = Describe("関数テスト", Ordered, func() {
 			var spec api.VolSpec
 			vol.Spec = spec
 
-					   vol.Metadata.Name = "test-volume-002"
+			vol.Metadata.Name = "test-volume-002"
 			vol.Spec.Type = util.StringPtr("qcow2")
 			vol.Spec.Kind = util.StringPtr("os")
-			vol.Spec.OsVariant = util.StringPtr("ubuntu22.04")
+			vol.Spec.OsVariant = util.StringPtr("ubuntu24.04")
 
 			body, url, err := marmotClient.CreateVolume(vol)
 			Expect(err).NotTo(HaveOccurred())
@@ -231,10 +231,10 @@ var _ = Describe("関数テスト", Ordered, func() {
 			var meta api.Metadata
 			volume.Metadata = meta
 
-					   volume.Metadata.Name = "test-volume-002"
+			volume.Metadata.Name = "test-volume-002"
 			volume.Spec.Type = util.StringPtr("lvm")
 			volume.Spec.Kind = util.StringPtr("os")
-			volume.Spec.OsVariant = util.StringPtr("ubuntu22.04")
+			volume.Spec.OsVariant = util.StringPtr("ubuntu24.04")
 			body, url, err := marmotClient.CreateVolume(volume)
 			Expect(err).NotTo(HaveOccurred())
 			err = json.Unmarshal(body, &replyVolume)
@@ -292,7 +292,7 @@ var _ = Describe("関数テスト", Ordered, func() {
 			var meta api.Metadata
 			volume.Metadata = meta
 
-					   volume.Metadata.Name = "test-volume-002"
+			volume.Metadata.Name = "test-volume-002"
 			volume.Spec.Type = util.StringPtr("lvm")
 			volume.Spec.Kind = util.StringPtr("data")
 			volume.Spec.Size = util.IntPtrInt(1)
@@ -332,7 +332,7 @@ var _ = Describe("関数テスト", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("ShowVolumeById Id  =", api.VolumeID(vol))
 			GinkgoWriter.Println("ShowVolumeById Key =", *vol.Metadata.Key)
-					   GinkgoWriter.Println("ShowVolumeById VolumeName =", vol.Metadata.Name)
+			GinkgoWriter.Println("ShowVolumeById VolumeName =", vol.Metadata.Name)
 			Expect(url).To(BeNil())
 		})
 
@@ -340,7 +340,7 @@ var _ = Describe("関数テスト", Ordered, func() {
 			var vol api.Volume
 			var meta api.Metadata
 			vol.Metadata = meta
-					   vol.Metadata.Name = "updated-volume-name"
+			vol.Metadata.Name = "updated-volume-name"
 			body, url, err := marmotClient.UpdateVolumeById(api.VolumeID(replyVolume), vol)
 			GinkgoWriter.Println("UpdateVolumeById err =", err)
 			Expect(err).NotTo(HaveOccurred())
@@ -355,8 +355,8 @@ var _ = Describe("関数テスト", Ordered, func() {
 			err = json.Unmarshal(body, &vol)
 			GinkgoWriter.Println("ShowVolumeById Id  =", api.VolumeID(vol))
 			//GinkgoWriter.Println("ShowVolumeById Key =", *vol.Metadata.Key)
-					   GinkgoWriter.Println("ShowVolumeById VolumeName =", vol.Metadata.Name)
-					   Expect(vol.Metadata.Name).To(Equal("updated-volume-name"))
+			GinkgoWriter.Println("ShowVolumeById VolumeName =", vol.Metadata.Name)
+			Expect(vol.Metadata.Name).To(Equal("updated-volume-name"))
 			Expect(url).To(BeNil())
 		})
 

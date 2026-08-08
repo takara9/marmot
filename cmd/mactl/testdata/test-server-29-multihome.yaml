@@ -6,7 +6,7 @@ metadata:
 spec:
     cpu: 1
     memory: 1024
-    osVariant: ubuntu22.04
+    osVariant: ubuntu24.04
     networkInterface:
         - networkname: "test-net-2"
         - networkname: "test-net-1"

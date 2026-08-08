@@ -25,7 +25,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		etcdctlExe = "/usr/bin/etcdctl"
 		nodeName   = "hvc"
 		etcdImage  = "ghcr.io/takara9/etcd:3.6.5"
-		osImage    = "ubuntu-22.04-server-cloudimg-amd64.img"
+		osImage    = "ubuntu-24.04-server-cloudimg-amd64.img"
 		osImageURL = "http://hmc/" + osImage
 	)
 	var (
@@ -74,7 +74,7 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		if waitServerDone != nil {
 			waitServerDone() // goroutine の終了を待つ
 		}
-		// /var/lib/marmot/images/9e24c/ubuntu-22.04-server-cloudimg-amd64.img のようなファイルを削除する
+		// /var/lib/marmot/images/9e24c/ubuntu-24.04-server-cloudimg-amd64.img のようなファイルを削除する
 
 		// 以下の後処理は、本来、それぞれの削除関数の中で実施するべきもの
 		// OS論理ボリューム vg1/boot-9e24c のようなものができるはずなので、削除する
@@ -166,12 +166,12 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 		It("URLを指定してイメージのIDを取得", func() {
 			var err error
 			GinkgoWriter.Println("URLを指定してイメージのIDを取得")
-			osImageid, err = marmotServer.Ma.Db.MakeImageEntryFromURLWithNode("ubuntu22.04", osImageURL, nodeName)
+			osImageid, err = marmotServer.Ma.Db.MakeImageEntryFromURLWithNode("ubuntu24.04", osImageURL, nodeName)
 			Expect(err).NotTo(HaveOccurred())
 			img, err := marmotServer.Ma.Db.GetImage(osImageid)
 			Expect(err).NotTo(HaveOccurred())
 			img.Spec.OsName = util.StringPtr("ubuntu")
-			img.Spec.OsVersion = util.StringPtr("22.04")
+			img.Spec.OsVersion = util.StringPtr("24.04")
 			err = marmotServer.Ma.Db.UpdateImage(osImageid, img)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("取得したイメージID: ", osImageid)

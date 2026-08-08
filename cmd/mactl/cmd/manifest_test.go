@@ -231,14 +231,14 @@ spec:
 		It("keeps spec.mmImage in sync when only spec.osVariant is set", func() {
 			server := &api.Server{
 				Spec: api.ServerSpec{
-					OsVariant: util.StringPtr("ubuntu22.04"),
+					OsVariant: util.StringPtr("ubuntu24.04"),
 				},
 			}
 
 			ApplyServerDefaults(server)
 
 			Expect(server.Spec.MmImage).NotTo(BeNil())
-			Expect(*server.Spec.MmImage).To(Equal("ubuntu22.04"))
+			Expect(*server.Spec.MmImage).To(Equal("ubuntu24.04"))
 		})
 
 		Describe("ManifestToImage", func() {
