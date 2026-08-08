@@ -2109,6 +2109,16 @@ components:
           type: integer
           format: int
           description: クラスタ専用etcd(KubernetesEngine)のピアポート番号。
+        apiServerPort:
+          type: integer
+          format: int
+          description: クラスタ専用kube-apiserverのセキュアポート番号。
+        controlPlaneIpAddress:
+          type: string
+          description: クラスタ専用ネットワーク名前空間に割り当てたIPアドレス。
+        resolvedKubernetesVersion:
+          type: string
+          description: mke.jsonの指定から解決したKubernetesのパッチバージョン。
     Metadata:
       type: object
       required:

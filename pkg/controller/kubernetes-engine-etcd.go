@@ -19,6 +19,10 @@ func ProvisionKubernetesEngineEtcd(database *db.Database, mkeConf *marmotd.MKECo
 	if clusterName == "" {
 		return 0, 0, fmt.Errorf("kubernetes engine metadata.name is empty")
 	}
+	networkNamespace, _, _, err := KubernetesEngineControlPlaneNetworkNames(clusterName)
+	if err != nil {
+		return 0, 0, err
+	}
 
 	if ke.Status != nil && ke.Status.EtcdClientPort != nil && ke.Status.EtcdPeerPort != nil {
 		clientPort, peerPort = *ke.Status.EtcdClientPort, *ke.Status.EtcdPeerPort
@@ -43,11 +47,12 @@ func ProvisionKubernetesEngineEtcd(database *db.Database, mkeConf *marmotd.MKECo
 	}
 
 	cfg := KubernetesEngineEtcdUnitConfig{
-		ClusterName:    clusterName,
-		EtcdBinaryPath: binPath,
-		DataDir:        filepath.Join(DefaultEtcdDataDir, clusterName),
-		ClientPort:     clientPort,
-		PeerPort:       peerPort,
+		ClusterName:      clusterName,
+		EtcdBinaryPath:   binPath,
+		DataDir:          filepath.Join(DefaultEtcdDataDir, clusterName),
+		NetworkNamespace: networkNamespace,
+		ClientPort:       clientPort,
+		PeerPort:         peerPort,
 	}
 	if err := CreateKubernetesEngineEtcdUnit(cfg); err != nil {
 		return 0, 0, err

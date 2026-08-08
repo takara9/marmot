@@ -560,11 +560,17 @@ type Servers = []Server
 
 // Status defines model for Status.
 type Status struct {
+	// ApiServerPort クラスタ専用kube-apiserverのセキュアポート番号。
+	ApiServerPort *int `json:"apiServerPort,omitempty" yaml:"apiServerPort,omitempty"`
+
 	// AttachProtocol Attach protocol used by backend, e.g. rbd for ceph.
-	AttachProtocol    *string    `json:"attachProtocol,omitempty" yaml:"attachProtocol,omitempty"`
-	Console           *string    `json:"console,omitempty" yaml:"console,omitempty"`
-	CreationTimeStamp *time.Time `json:"creationTimeStamp,omitempty" yaml:"creationTimeStamp,omitempty"`
-	DeletionTimeStamp *time.Time `json:"deletionTimeStamp,omitempty" yaml:"deletionTimeStamp,omitempty"`
+	AttachProtocol *string `json:"attachProtocol,omitempty" yaml:"attachProtocol,omitempty"`
+	Console        *string `json:"console,omitempty" yaml:"console,omitempty"`
+
+	// ControlPlaneIpAddress クラスタ専用ネットワーク名前空間に割り当てたIPアドレス。
+	ControlPlaneIpAddress *string    `json:"controlPlaneIpAddress,omitempty" yaml:"controlPlaneIpAddress,omitempty"`
+	CreationTimeStamp     *time.Time `json:"creationTimeStamp,omitempty" yaml:"creationTimeStamp,omitempty"`
+	DeletionTimeStamp     *time.Time `json:"deletionTimeStamp,omitempty" yaml:"deletionTimeStamp,omitempty"`
 
 	// EtcdClientPort クラスタ専用etcd(KubernetesEngine)のクライアントポート番号。
 	EtcdClientPort *int `json:"etcdClientPort,omitempty" yaml:"etcdClientPort,omitempty"`
@@ -579,8 +585,11 @@ type Status struct {
 
 	// ProviderVolumeId Backend volume identifier, e.g. `{pool}/{image}` for ceph.
 	ProviderVolumeId *string `json:"providerVolumeId,omitempty" yaml:"providerVolumeId,omitempty"`
-	Status           *string `json:"status,omitempty" yaml:"status,omitempty"`
-	StatusCode       int     `json:"statusCode" yaml:"statusCode"`
+
+	// ResolvedKubernetesVersion mke.jsonの指定から解決したKubernetesのパッチバージョン。
+	ResolvedKubernetesVersion *string `json:"resolvedKubernetesVersion,omitempty" yaml:"resolvedKubernetesVersion,omitempty"`
+	Status                    *string `json:"status,omitempty" yaml:"status,omitempty"`
+	StatusCode                int     `json:"statusCode" yaml:"statusCode"`
 }
 
 // Success defines model for Success.

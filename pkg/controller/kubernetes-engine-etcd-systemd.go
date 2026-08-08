@@ -22,11 +22,12 @@ const (
 
 // KubernetesEngineEtcdUnitConfig はクラスタ専用etcdのsystemdユニット生成に必要なパラメータ。
 type KubernetesEngineEtcdUnitConfig struct {
-	ClusterName    string
-	EtcdBinaryPath string
-	DataDir        string
-	ClientPort     int
-	PeerPort       int
+	ClusterName      string
+	EtcdBinaryPath   string
+	DataDir          string
+	NetworkNamespace string
+	ClientPort       int
+	PeerPort         int
 }
 
 // systemctl呼び出しをテストから差し替え可能にするためのパッケージ変数群。
@@ -115,13 +116,18 @@ func validateKubernetesEngineEtcdClusterName(clusterName string) (string, error)
 // renderKubernetesEngineEtcdUnit はsystemdユニットファイルの内容を生成する。
 func renderKubernetesEngineEtcdUnit(cfg KubernetesEngineEtcdUnitConfig) string {
 	memberName := "mke-" + cfg.ClusterName
+	ns := strings.TrimSpace(cfg.NetworkNamespace)
+	networkNamespace := ""
+	if ns != "" && !strings.ContainsAny(ns, "/\n\r\t ") {
+		networkNamespace = fmt.Sprintf("NetworkNamespacePath=/run/netns/%s\n", ns)
+	}
 	return fmt.Sprintf(`[Unit]
 Description=Marmot Kubernetes Engine dedicated etcd for cluster %s
 After=network.target
 
 [Service]
 Type=notify
-ExecStart=%s --name %s --data-dir %s --listen-client-urls http://127.0.0.1:%d --advertise-client-urls http://127.0.0.1:%d --listen-peer-urls http://127.0.0.1:%d --initial-advertise-peer-urls http://127.0.0.1:%d --initial-cluster %s=http://127.0.0.1:%d --initial-cluster-token mke-%s --initial-cluster-state new
+%sExecStart=%s --name %s --data-dir %s --listen-client-urls http://127.0.0.1:%d --advertise-client-urls http://127.0.0.1:%d --listen-peer-urls http://127.0.0.1:%d --initial-advertise-peer-urls http://127.0.0.1:%d --initial-cluster %s=http://127.0.0.1:%d --initial-cluster-token mke-%s --initial-cluster-state new
 Restart=on-failure
 RestartSec=5
 User=root
@@ -130,6 +136,7 @@ User=root
 WantedBy=multi-user.target
 `,
 		cfg.ClusterName,
+		networkNamespace,
 		cfg.EtcdBinaryPath, memberName, cfg.DataDir,
 		cfg.ClientPort, cfg.ClientPort,
 		cfg.PeerPort, cfg.PeerPort,
