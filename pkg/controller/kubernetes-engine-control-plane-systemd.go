@@ -110,7 +110,8 @@ func CreateKubernetesEngineControlPlaneUnits(cfg KubernetesEngineControlPlaneUni
 		return err
 	}
 	cfg.ClusterName = name
-	if cfg.NetworkNamespace == "" || strings.Contains(cfg.NetworkNamespace, "/") {
+	cfg.NetworkNamespace = strings.TrimSpace(cfg.NetworkNamespace)
+	if cfg.NetworkNamespace == "" || strings.ContainsAny(cfg.NetworkNamespace, "/\n\r\t ") {
 		return fmt.Errorf("invalid network namespace %q", cfg.NetworkNamespace)
 	}
 	if cfg.APIServerPort <= 0 || cfg.EtcdClientPort <= 0 {
