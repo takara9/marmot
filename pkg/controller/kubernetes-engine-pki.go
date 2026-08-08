@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -87,45 +88,49 @@ func EnsureKubernetesEngineCA(pkiDir, clusterName string) (certPath, keyPath str
 		return "", "", err
 	}
 	certPath, keyPath = KubernetesEngineCAPaths(pkiDir, name)
-	if certFileExists(certPath) && certFileExists(keyPath) {
-		return certPath, keyPath, nil
-	}
-
 	dir := kubernetesEngineClusterPkiDir(pkiDir, name)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", "", fmt.Errorf("failed to create pki dir: %w", err)
 	}
+	if err := withKubernetesEnginePkiLock(filepath.Join(dir, ".ca.lock"), func() error {
+		if certFileExists(certPath) && certFileExists(keyPath) {
+			return nil
+		}
 
-	caKey, err := rsa.GenerateKey(rand.Reader, kubernetesEngineCAKeyBits)
-	if err != nil {
-		return "", "", err
-	}
-	serial, err := newCertificateSerialNumber()
-	if err != nil {
-		return "", "", err
-	}
-	now := time.Now()
-	caTemplate := &x509.Certificate{
-		SerialNumber: serial,
-		Subject: pkix.Name{
-			CommonName:   fmt.Sprintf("mke-%s-ca", name),
-			Organization: []string{"marmot"},
-		},
-		NotBefore:             now.Add(-time.Hour),
-		NotAfter:              now.Add(kubernetesEngineCAValidity),
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign | x509.KeyUsageDigitalSignature,
-		BasicConstraintsValid: true,
-		IsCA:                  true,
-	}
-	caDER, err := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
-	if err != nil {
-		return "", "", err
-	}
-	if err := writePemFile(certPath, "CERTIFICATE", caDER, 0o644); err != nil {
-		return "", "", err
-	}
-	if err := writePemFile(keyPath, "RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(caKey), 0o600); err != nil {
-		_ = os.Remove(certPath)
+		caKey, err := rsa.GenerateKey(rand.Reader, kubernetesEngineCAKeyBits)
+		if err != nil {
+			return err
+		}
+		serial, err := newCertificateSerialNumber()
+		if err != nil {
+			return err
+		}
+		now := time.Now()
+		caTemplate := &x509.Certificate{
+			SerialNumber: serial,
+			Subject: pkix.Name{
+				CommonName:   fmt.Sprintf("mke-%s-ca", name),
+				Organization: []string{"marmot"},
+			},
+			NotBefore:             now.Add(-time.Hour),
+			NotAfter:              now.Add(kubernetesEngineCAValidity),
+			KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign | x509.KeyUsageDigitalSignature,
+			BasicConstraintsValid: true,
+			IsCA:                  true,
+		}
+		caDER, err := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
+		if err != nil {
+			return err
+		}
+		if err := writePemFile(certPath, "CERTIFICATE", caDER, 0o644); err != nil {
+			return err
+		}
+		if err := writePemFile(keyPath, "RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(caKey), 0o600); err != nil {
+			_ = os.Remove(certPath)
+			return err
+		}
+		return nil
+	}); err != nil {
 		return "", "", err
 	}
 	return certPath, keyPath, nil
@@ -152,62 +157,67 @@ func IssueKubernetesEngineCertificate(pkiDir, clusterName string, req Kubernetes
 		return "", "", fmt.Errorf("certificate request name contains invalid character %q", r)
 	}
 	certPath, keyPath = KubernetesEngineCertPaths(pkiDir, name, reqName)
-	if certFileExists(certPath) && certFileExists(keyPath) {
-		return certPath, keyPath, nil
-	}
-
-	caCertPath, caKeyPath := KubernetesEngineCAPaths(pkiDir, name)
-	caCert, caKey, err := loadKubernetesEngineCA(caCertPath, caKeyPath)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to load cluster CA: %w", err)
-	}
-
-	var extKeyUsage []x509.ExtKeyUsage
-	switch req.Usage {
-	case KubernetesEngineCertUsageServer:
-		extKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
-	case KubernetesEngineCertUsageClient:
-		extKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
-	default:
-		return "", "", fmt.Errorf("unknown certificate usage: %v", req.Usage)
-	}
-
-	leafKey, err := rsa.GenerateKey(rand.Reader, kubernetesEngineCertKeyBits)
-	if err != nil {
-		return "", "", err
-	}
-	serial, err := newCertificateSerialNumber()
-	if err != nil {
-		return "", "", err
-	}
-	now := time.Now()
-	leafTemplate := &x509.Certificate{
-		SerialNumber: serial,
-		Subject: pkix.Name{
-			CommonName:   req.CommonName,
-			Organization: []string{"marmot"},
-		},
-		NotBefore:   now.Add(-time.Hour),
-		NotAfter:    now.Add(kubernetesEngineCertValidity),
-		KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-		ExtKeyUsage: extKeyUsage,
-		DNSNames:    req.DNSNames,
-		IPAddresses: req.IPAddresses,
-	}
-	leafDER, err := x509.CreateCertificate(rand.Reader, leafTemplate, caCert, &leafKey.PublicKey, caKey)
-	if err != nil {
-		return "", "", err
-	}
-
 	dir := kubernetesEngineClusterPkiDir(pkiDir, name)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", "", err
 	}
-	if err := writePemFile(certPath, "CERTIFICATE", leafDER, 0o644); err != nil {
-		return "", "", err
-	}
-	if err := writePemFile(keyPath, "RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(leafKey), 0o600); err != nil {
-		_ = os.Remove(certPath)
+	if err := withKubernetesEnginePkiLock(filepath.Join(dir, "."+reqName+".lock"), func() error {
+		if certFileExists(certPath) && certFileExists(keyPath) {
+			return nil
+		}
+
+		caCertPath, caKeyPath := KubernetesEngineCAPaths(pkiDir, name)
+		caCert, caKey, err := loadKubernetesEngineCA(caCertPath, caKeyPath)
+		if err != nil {
+			return fmt.Errorf("failed to load cluster CA: %w", err)
+		}
+
+		var extKeyUsage []x509.ExtKeyUsage
+		switch req.Usage {
+		case KubernetesEngineCertUsageServer:
+			extKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
+		case KubernetesEngineCertUsageClient:
+			extKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
+		default:
+			return fmt.Errorf("unknown certificate usage: %v", req.Usage)
+		}
+
+		leafKey, err := rsa.GenerateKey(rand.Reader, kubernetesEngineCertKeyBits)
+		if err != nil {
+			return err
+		}
+		serial, err := newCertificateSerialNumber()
+		if err != nil {
+			return err
+		}
+		now := time.Now()
+		leafTemplate := &x509.Certificate{
+			SerialNumber: serial,
+			Subject: pkix.Name{
+				CommonName:   req.CommonName,
+				Organization: []string{"marmot"},
+			},
+			NotBefore:   now.Add(-time.Hour),
+			NotAfter:    now.Add(kubernetesEngineCertValidity),
+			KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+			ExtKeyUsage: extKeyUsage,
+			DNSNames:    req.DNSNames,
+			IPAddresses: req.IPAddresses,
+		}
+		leafDER, err := x509.CreateCertificate(rand.Reader, leafTemplate, caCert, &leafKey.PublicKey, caKey)
+		if err != nil {
+			return err
+		}
+
+		if err := writePemFile(certPath, "CERTIFICATE", leafDER, 0o644); err != nil {
+			return err
+		}
+		if err := writePemFile(keyPath, "RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(leafKey), 0o600); err != nil {
+			_ = os.Remove(certPath)
+			return err
+		}
+		return nil
+	}); err != nil {
 		return "", "", err
 	}
 	return certPath, keyPath, nil
@@ -216,6 +226,23 @@ func IssueKubernetesEngineCertificate(pkiDir, clusterName string, req Kubernetes
 func newCertificateSerialNumber() (*big.Int, error) {
 	limit := new(big.Int).Lsh(big.NewInt(1), 128)
 	return rand.Int(rand.Reader, limit)
+}
+
+func withKubernetesEnginePkiLock(lockPath string, fn func() error) error {
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return err
+	}
+	defer lockFile.Close()
+
+	if err := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX); err != nil {
+		return err
+	}
+	defer func() {
+		_ = syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN)
+	}()
+
+	return fn()
 }
 
 func writePemFile(path, blockType string, der []byte, mode os.FileMode) error {

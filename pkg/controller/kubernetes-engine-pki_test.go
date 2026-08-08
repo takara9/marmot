@@ -6,7 +6,9 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
+	"time"
 )
 
 func TestEnsureKubernetesEngineCACreatesAndIsIdempotent(t *testing.T) {
@@ -142,6 +144,55 @@ func TestIssueKubernetesEngineCertificateRejectsInvalidRequestName(t *testing.T)
 		Usage:      KubernetesEngineCertUsageServer,
 	}); err == nil {
 		t.Fatalf("expected error for invalid certificate request name, got nil")
+	}
+}
+
+func TestWithKubernetesEnginePkiLockSerializesCallers(t *testing.T) {
+	lockPath := filepath.Join(t.TempDir(), ".test.lock")
+	started := make(chan struct{})
+	release := make(chan struct{})
+	acquired := make(chan struct{})
+	errCh := make(chan error, 2)
+
+	go func() {
+		errCh <- withKubernetesEnginePkiLock(lockPath, func() error {
+			close(started)
+			<-release
+			return nil
+		})
+	}()
+
+	<-started
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		errCh <- withKubernetesEnginePkiLock(lockPath, func() error {
+			close(acquired)
+			return nil
+		})
+	}()
+
+	select {
+	case <-acquired:
+		t.Fatalf("second caller acquired lock before first caller released it")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	close(release)
+	wg.Wait()
+
+	select {
+	case <-acquired:
+	case <-time.After(time.Second):
+		t.Fatalf("second caller did not acquire lock after release")
+	}
+
+	for i := 0; i < 2; i++ {
+		if err := <-errCh; err != nil {
+			t.Fatalf("withKubernetesEnginePkiLock() failed: %v", err)
+		}
 	}
 }
 
