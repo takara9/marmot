@@ -75,11 +75,19 @@ func ProvisionKubernetesEngineControlPlane(database *db.Database, mkeConf *marmo
 	if err != nil {
 		return err
 	}
+	// Only rollback network resources if we created them in this call.
+	hadNamespace := controlPlaneNamespaceExists(networkCfg.Namespace)
 	if err = SetupKubernetesEngineControlPlaneNetwork(networkCfg); err != nil {
 		return err
 	}
+	if !hadNamespace {
+		defer func() {
+			if err != nil {
+				_ = TeardownKubernetesEngineControlPlaneNetwork(networkCfg)
+			}
+		}()
+	}
 	if _, _, err = ProvisionKubernetesEngineEtcd(database, mkeConf, ownEtcdURL, ke); err != nil {
-		_ = TeardownKubernetesEngineControlPlaneNetwork(networkCfg)
 		return err
 	}
 	assets, err := EnsureKubernetesEngineControlPlaneAssets(DefaultKubernetesEnginePkiDir, DefaultKubernetesControlPlaneConfigDir, clusterName, ipAddress, apiServerPort)
