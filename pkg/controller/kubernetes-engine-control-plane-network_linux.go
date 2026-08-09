@@ -172,7 +172,7 @@ func configureControlPlanePeer(namespace, peerName, interfaceName, cidr string) 
 	if err != nil {
 		return err
 	}
-	defer handle.Delete()
+	defer handle.Close()
 
 	link, err := handle.LinkByName(peerName)
 	if err != nil {
