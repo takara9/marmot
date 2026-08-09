@@ -22,6 +22,25 @@ func TestKubernetesEngineControlPlaneNetworkNames(t *testing.T) {
 	}
 }
 
+func TestCreateControlPlaneNamespaceUsesIPSubprocess(t *testing.T) {
+	originalRunIP := controlPlaneRunIP
+	t.Cleanup(func() { controlPlaneRunIP = originalRunIP })
+
+	var got []string
+	controlPlaneRunIP = func(args ...string) ([]byte, error) {
+		got = append([]string(nil), args...)
+		return nil, nil
+	}
+
+	if err := createControlPlaneNamespace("mke-demo"); err != nil {
+		t.Fatalf("createControlPlaneNamespace() failed: %v", err)
+	}
+	want := []string{"netns", "add", "mke-demo"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ip args = %v, want %v", got, want)
+	}
+}
+
 func TestSetupKubernetesEngineControlPlaneNetworkLifecycle(t *testing.T) {
 	var calls []string
 	installFakeControlPlaneNetworkOps(t, &calls)

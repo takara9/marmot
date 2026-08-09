@@ -34,6 +34,9 @@ var (
 	}
 	controlPlaneCreateNamespace = createControlPlaneNamespace
 	controlPlaneDeleteNamespace = netns.DeleteNamed
+	controlPlaneRunIP           = func(args ...string) ([]byte, error) {
+		return exec.Command("ip", args...).CombinedOutput()
+	}
 	controlPlaneCreateVeth      = createControlPlaneVeth
 	controlPlaneAddOVSPort      = func(bridge, port string) error {
 		output, err := exec.Command("ovs-vsctl", "--may-exist", "add-port", bridge, port).CombinedOutput()
@@ -140,11 +143,11 @@ func TeardownKubernetesEngineControlPlaneNetwork(cfg KubernetesEngineControlPlan
 }
 
 func createControlPlaneNamespace(name string) error {
-	handle, err := netns.NewNamed(name)
+	output, err := controlPlaneRunIP("netns", "add", name)
 	if err != nil {
-		return err
+		return fmt.Errorf("ip netns add failed: %w (output=%s)", err, strings.TrimSpace(string(output)))
 	}
-	return handle.Close()
+	return nil
 }
 
 func createControlPlaneVeth(hostName, peerName string) error {
