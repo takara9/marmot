@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -67,6 +68,31 @@ func sanitizeLogToken(value, fallback string) string {
 	return clean
 }
 
+// ansiblePlaybookLineLogger は ansible-playbook の標準出力/標準エラーを1行ずつ slog.Info へ流し、
+// 長時間実行中もCIログ等でリアルタイムに進捗を確認できるようにする。
+type ansiblePlaybookLineLogger struct {
+	resourceName string
+	resourceID   string
+	pending      []byte
+}
+
+func (l *ansiblePlaybookLineLogger) Write(p []byte) (int, error) {
+	l.pending = append(l.pending, p...)
+	for {
+		idx := bytes.IndexByte(l.pending, '\n')
+		if idx < 0 {
+			break
+		}
+		line := strings.TrimRight(string(l.pending[:idx]), "\r")
+		l.pending = l.pending[idx+1:]
+		if line == "" {
+			continue
+		}
+		slog.Info("ansible-playbook progress", "resource", l.resourceName, "id", l.resourceID, "line", line)
+	}
+	return len(p), nil
+}
+
 func runAnsiblePlaybookWithLogging(args []string, resourceName, resourceID string) error {
 	logPath, err := ansiblePlaybookLogPath(resourceName, resourceID)
 	if err != nil {
@@ -84,9 +110,13 @@ func runAnsiblePlaybookWithLogging(args []string, resourceName, resourceID strin
 	_, _ = fmt.Fprintf(logFile, "\n=== %s ansible-playbook %s ===\n", time.Now().UTC().Format(time.RFC3339), strings.Join(args, " "))
 
 	var buf bytes.Buffer
-	mw := io.MultiWriter(&buf, logFile)
+	lineLogger := &ansiblePlaybookLineLogger{resourceName: resourceName, resourceID: resourceID}
+	mw := io.MultiWriter(&buf, logFile, lineLogger)
 
 	cmd := exec.Command("ansible-playbook", args...)
+	// PYTHONUNBUFFERED を指定しないと、パイプ接続時に ansible-playbook (Python) の出力がブロック単位で
+	// バッファされ、実行完了までラインロガーへ何も流れない。
+	cmd.Env = append(os.Environ(), "PYTHONUNBUFFERED=1")
 	cmd.Stdout = mw
 	cmd.Stderr = mw
 	if err := cmd.Run(); err != nil {

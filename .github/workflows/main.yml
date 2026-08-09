@@ -318,7 +318,7 @@ jobs:
     - name: mactlコマンドのテスト その１
       run: |
         cd cmd/mactl
-        make mactl-test
+        sudo -E env "PATH=$PATH" make mactl-test
         sudo -E env "PATH=$PATH" make test0
         cd ../..
         sudo -E env "PATH=$PATH" ./tools/cleanup.sh
@@ -343,7 +343,7 @@ jobs:
     - name: mactlコマンドのテスト その１
       run: |
         cd cmd/mactl
-        make mactl-test
+        sudo -E env "PATH=$PATH" make mactl-test
         sudo -E env "PATH=$PATH" make test1
         cd ../..
         sudo -E env "PATH=$PATH" ./tools/cleanup.sh

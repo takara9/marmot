@@ -88,7 +88,7 @@ const kubernetesEngineNodePlaybookTemplate = `---
 
     - name: Select release architecture
       ansible.builtin.set_fact:
-        release_arch: {{ "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}" }}
+        release_arch: {{ "\"{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}\"" }}
 
     - name: Create Kubernetes directories
       ansible.builtin.file:
@@ -120,7 +120,7 @@ const kubernetesEngineNodePlaybookTemplate = `---
     - name: Install Kubernetes node binaries
       ansible.builtin.get_url:
         url: {{ "https://dl.k8s.io/release/{{ kubernetes_version }}/bin/linux/{{ release_arch }}/{{ item }}" }}
-        dest: {{ "'/usr/local/bin/' + item" }}
+        dest: {{ "\"{{ '/usr/local/bin/' + item }}\"" }}
         mode: "0755"
       loop:
         - kubelet
@@ -227,7 +227,7 @@ const kubernetesEngineNodePlaybookTemplate = `---
       ansible.builtin.systemd:
         name: {{ "{{ item }}" }}
         enabled: true
-				state: started
+        state: started
         daemon_reload: true
       loop:
         - containerd

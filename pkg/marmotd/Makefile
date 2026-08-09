@@ -85,4 +85,4 @@ test-hostid-internal:
 
 .PHONY: test-mke-vm-e2e
 test-mke-vm-e2e:
-	MARMOT_RUN_MKE_VM_E2E=1 $(GO) test ../controller -run '^TestKubernetesEngineVMEndToEnd$$' -v -count=1 -timeout 50m
+	MARMOT_RUN_MKE_VM_E2E=1 $(GO) test ../controller -run '^TestController$$' -ginkgo.focus-file kubernetes-engine-vm-e2e_test.go -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events -count=1 -timeout 50m
