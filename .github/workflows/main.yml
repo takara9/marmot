@@ -444,11 +444,33 @@ jobs:
     steps:
     - uses: actions/checkout@v5
 
+  mke-vm-e2e:
+    runs-on: [ self-hosted, any ]
+    needs:
+      - module-tests-end
+      - system-tests-end
+    if: always()
+    steps:
+    - uses: actions/checkout@v5
+    - name: 仮想ネットワーク作成
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/setup-libvirt-networks.sh
+    - name: MKEノード実VM E2Eテスト
+      run: |
+        cd pkg/marmotd
+        sudo -E env "PATH=$PATH" make test-mke-vm-e2e
+        cd ../..
+    - name: 仮想ネットワーク削除
+      if: always()
+      run: |
+        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
+
   final-cleanup:
     runs-on: [ self-hosted, any ]
     needs: 
       - module-tests-end
       - system-tests-end
+      - mke-vm-e2e
     steps:
     - uses: actions/checkout@v5
     - name: 最終クリーンアップ

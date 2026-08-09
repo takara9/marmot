@@ -82,3 +82,7 @@ test-volume-backing-store:
 .PHONY: test-hostid-internal
 test-hostid-internal:
 	$(GO) test -run TestHostIDInternal -ginkgo.v -ginkgo.fail-fast -ginkgo.show-node-events
+
+.PHONY: test-mke-vm-e2e
+test-mke-vm-e2e:
+	MARMOT_RUN_MKE_VM_E2E=1 $(GO) test ../controller -run '^TestKubernetesEngineVMEndToEnd$$' -v -count=1 -timeout 50m
