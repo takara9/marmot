@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
-	"runtime"
 	"strings"
 
 	"github.com/vishvananda/netlink"
@@ -169,26 +168,20 @@ func configureControlPlanePeer(namespace, peerName, interfaceName, cidr string) 
 		return err
 	}
 
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-	original, err := netns.Get()
+	handle, err := netlink.NewHandleAt(target)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = original.Close() }()
-	if err := netns.Set(target); err != nil {
-		return err
-	}
-	defer func() { _ = netns.Set(original) }()
+	defer handle.Delete()
 
-	link, err := netlink.LinkByName(peerName)
+	link, err := handle.LinkByName(peerName)
 	if err != nil {
 		return err
 	}
-	if err := netlink.LinkSetName(link, interfaceName); err != nil {
+	if err := handle.LinkSetName(link, interfaceName); err != nil {
 		return err
 	}
-	link, err = netlink.LinkByName(interfaceName)
+	link, err = handle.LinkByName(interfaceName)
 	if err != nil {
 		return err
 	}
@@ -196,15 +189,15 @@ func configureControlPlanePeer(namespace, peerName, interfaceName, cidr string) 
 	if err != nil {
 		return err
 	}
-	if err := netlink.AddrAdd(link, address); err != nil {
+	if err := handle.AddrAdd(link, address); err != nil {
 		return err
 	}
-	if err := netlink.LinkSetUp(link); err != nil {
+	if err := handle.LinkSetUp(link); err != nil {
 		return err
 	}
-	loopback, err := netlink.LinkByName("lo")
+	loopback, err := handle.LinkByName("lo")
 	if err != nil {
 		return err
 	}
-	return netlink.LinkSetUp(loopback)
+	return handle.LinkSetUp(loopback)
 }
