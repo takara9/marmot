@@ -3,7 +3,6 @@
 runner を増やす時は、以下のリポジトリに yamlファイルを追加する。
 https://github.com/takara9/marmot-ci-runner 
 
-
 ## enp8s0となるインタフェースを作成　(VMホスト側の作業)
 VMホスト側の作業として、enp8s0のインタフェースを作成して、子VMへVLANタグを通過させるルートを作る
 
@@ -267,7 +266,7 @@ $ cd /build
 ```
 ubuntu@runner8:/build$ sudo chown ubuntu:ubuntu .
 sudo: unable to resolve host runner8: Name or service not known
-ubuntu@runner8:/build$ sudo vi /etc/host
+ubuntu@runner8:/build$ sudo vi /etc/hosts
 ```
 
 

@@ -584,20 +584,18 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 						return "", ownerErr
 					}
 
-					// default/host-bridge は静的IP再チェック時に自己所有IPの再利用を許可する。
+					// 静的IP再チェック時に自己所有IPの再利用を許可する(ネットワーク種別を問わない)。
 					// ただし残骸レコード(所有サーバーが存在しない)は再取得可能とする。
-					if shouldAllowSelfOwnedIPReuseOnStaticCheck(vnet.Metadata.Name) {
-						if ownerName == "" || ownerName == serverConfig.Metadata.Name {
+					if ownerName == "" || ownerName == serverConfig.Metadata.Name {
+						found = false
+					} else {
+						exists, existsErr := m.serverExistsByName(ownerName)
+						if existsErr != nil {
+							return "", existsErr
+						}
+						if !exists {
+							slog.Warn("Reclaiming stale IP allocation record", "network", reqNic.Networkname, "ip", ipaddr, "staleOwner", ownerName)
 							found = false
-						} else {
-							exists, existsErr := m.serverExistsByName(ownerName)
-							if existsErr != nil {
-								return "", existsErr
-							}
-							if !exists {
-								slog.Warn("Reclaiming stale IP allocation record", "network", reqNic.Networkname, "ip", ipaddr, "staleOwner", ownerName)
-								found = false
-							}
 						}
 					}
 
@@ -1311,10 +1309,6 @@ func isIPAMUnmanagedNetwork(name string) bool {
 
 func isHostBridgeNetwork(name string) bool {
 	return strings.TrimSpace(name) == "host-bridge"
-}
-
-func shouldAllowSelfOwnedIPReuseOnStaticCheck(name string) bool {
-	return isIPAMUnmanagedNetwork(name) || isHostBridgeNetwork(name)
 }
 
 func hostBridgeNameserversFromConfig() *api.Nameservers {

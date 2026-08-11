@@ -73,24 +73,3 @@ func TestEnsureHostBridgeIPNetworkRequiresConfig(t *testing.T) {
 		t.Fatal("ensureHostBridgeIPNetwork() error = nil, want error")
 	}
 }
-
-func TestShouldAllowSelfOwnedIPReuseOnStaticCheck(t *testing.T) {
-	tests := []struct {
-		name    string
-		network string
-		want    bool
-	}{
-		{name: "default network", network: "default", want: true},
-		{name: "host bridge network", network: "host-bridge", want: true},
-		{name: "ovs network", network: "ovs-network", want: false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := shouldAllowSelfOwnedIPReuseOnStaticCheck(tt.network)
-			if got != tt.want {
-				t.Fatalf("shouldAllowSelfOwnedIPReuseOnStaticCheck(%q) = %v, want %v", tt.network, got, tt.want)
-			}
-		})
-	}
-}
