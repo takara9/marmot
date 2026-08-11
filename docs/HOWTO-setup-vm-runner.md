@@ -1,5 +1,7 @@
 # github action runner のセットアップ
 
+runner を増やす時は、以下のリポジトリに yamlファイルを追加する。
+https://github.com/takara9/marmot-ci-runner 
 
 
 ## enp8s0となるインタフェースを作成　(VMホスト側の作業)
