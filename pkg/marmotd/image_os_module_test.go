@@ -18,8 +18,8 @@ func TestResolveImageOSModuleFromSpec(t *testing.T) {
 		wantKey   string
 		wantErr   bool
 	}{
-		{name: "default", osName: "", osVersion: "", wantKey: "ubuntu22.04"},
-		{name: "ubuntu2204", osName: "ubuntu", osVersion: "22.04", wantKey: "ubuntu22.04"},
+		{name: "default", osName: "", osVersion: "", wantKey: "ubuntu24.04"},
+		{name: "ubuntu2204", osName: "ubuntu", osVersion: "24.04", wantKey: "ubuntu24.04"},
 		{name: "ubuntu2404", osName: "ubuntu", osVersion: "24.04", wantKey: "ubuntu24.04"},
 		{name: "ubuntuFallback", osName: "ubuntu", osVersion: "26.04", wantKey: "ubuntu"},
 		{name: "alpine323", osName: "alpine", osVersion: "3.23", wantKey: "alpine3.23"},
@@ -91,7 +91,7 @@ func TestImageModuleCustomizeDelegatesToCommonCustomizer(t *testing.T) {
 	t.Parallel()
 
 	// Empty path should fail in the shared customizer, proving delegation works.
-	mod, err := resolveImageOSModuleFromSpec("ubuntu", "22.04")
+	mod, err := resolveImageOSModuleFromSpec("ubuntu", "24.04")
 	if err != nil {
 		t.Fatalf("resolveImageOSModuleFromSpec() error = %v", err)
 	}

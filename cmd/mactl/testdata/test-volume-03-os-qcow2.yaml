@@ -5,4 +5,4 @@ metadata:
 spec:
     type: qcow2
     kind: os
-    osVariant: ubuntu22.04
+    osVariant: ubuntu24.04

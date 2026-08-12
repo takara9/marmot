@@ -24,7 +24,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 		nodeName          = "hvc"
 		etcdImage         = "ghcr.io/takara9/etcd:3.6.5"
 		etcdContainerName = "etcd-volume"
-		osImage           = "ubuntu-22.04-server-cloudimg-amd64.img"
+		osImage           = "ubuntu-24.04-server-cloudimg-amd64.img"
 		osImageURL        = "http://hmc/" + osImage
 	)
 	var (
@@ -62,7 +62,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 		cancel()         // モックサーバー停止シグナル
 		waitServerDone() // goroutine の終了を待つ
 
-		// /var/lib/marmot/images/9e24c/ubuntu-22.04-server-cloudimg-amd64.img のようなファイルを削除する
+		// /var/lib/marmot/images/9e24c/ubuntu-24.04-server-cloudimg-amd64.img のようなファイルを削除する
 		imagePath := "/var/lib/marmot/images/" + osImageID
 		err = os.RemoveAll(imagePath)
 		Expect(err).NotTo(HaveOccurred())
@@ -96,13 +96,13 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 		It("URLを指定してイメージのIDを取得", func() {
 			var err error
 			GinkgoWriter.Println("URLを指定してイメージのIDを取得")
-			//url := "http://hmc/ubuntu-22.04-server-cloudimg-amd64.img"
-			osImageID, err = marmotServer.Ma.Db.MakeImageEntryFromURLWithNode("ubuntu22.04", osImageURL, nodeName)
+			//url := "http://hmc/ubuntu-24.04-server-cloudimg-amd64.img"
+			osImageID, err = marmotServer.Ma.Db.MakeImageEntryFromURLWithNode("ubuntu24.04", osImageURL, nodeName)
 			Expect(err).NotTo(HaveOccurred())
 			img, err := marmotServer.Ma.Db.GetImage(osImageID)
 			Expect(err).NotTo(HaveOccurred())
 			img.Spec.OsName = ut.StringPtr("ubuntu")
-			img.Spec.OsVersion = ut.StringPtr("22.04")
+			img.Spec.OsVersion = ut.StringPtr("24.04")
 			err = marmotServer.Ma.Db.UpdateImage(osImageID, img)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("取得したイメージID: ", osImageID)
@@ -137,7 +137,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 				Spec: api.VolSpec{
 					Type:      ut.StringPtr("lvm"),
 					Kind:      ut.StringPtr("os"),
-					OsVariant: ut.StringPtr("ubuntu22.04"),
+					OsVariant: ut.StringPtr("ubuntu24.04"),
 				},
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
@@ -207,7 +207,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 				Spec: api.VolSpec{
 					Type:      ut.StringPtr("noexist"),
 					Kind:      ut.StringPtr("os"),
-					OsVariant: ut.StringPtr("ubuntu22.04"),
+					OsVariant: ut.StringPtr("ubuntu24.04"),
 				},
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
@@ -330,7 +330,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 				Spec: api.VolSpec{
 					Type:      ut.StringPtr("lvm"),
 					Kind:      ut.StringPtr("os"),
-					OsVariant: ut.StringPtr("ubuntu22.04"),
+					OsVariant: ut.StringPtr("ubuntu24.04"),
 				},
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
@@ -352,7 +352,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 				Spec: api.VolSpec{
 					Type:      ut.StringPtr("lvm"),
 					Kind:      ut.StringPtr("os"),
-					OsVariant: ut.StringPtr("ubuntu22.04"),
+					OsVariant: ut.StringPtr("ubuntu24.04"),
 				},
 			}
 			GinkgoWriter.Println("Creating OS volume", "volume", v)
@@ -522,7 +522,7 @@ var _ = Describe("ボリュームテスト", Ordered, func() {
 				Spec: api.VolSpec{
 					Type:      ut.StringPtr("qcow2"),
 					Kind:      ut.StringPtr("os"),
-					OsVariant: ut.StringPtr("ubuntu22.04"),
+					OsVariant: ut.StringPtr("ubuntu24.04"),
 				},
 			}
 			GinkgoWriter.Println("Creating qcow2 volume", "volume", v)

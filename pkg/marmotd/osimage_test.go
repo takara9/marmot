@@ -23,7 +23,7 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 		etcdctlExe  = "/usr/bin/etcdctl"
 		nodeName    = "hvc"
 		etcdImage   = "ghcr.io/takara9/etcd:3.6.5"
-		osImage1    = "ubuntu-22.04-server-cloudimg-amd64.img"
+		osImage1    = "ubuntu-24.04-server-cloudimg-amd64.img"
 		osImage1URL = "http://hmc/" + osImage1
 		osImage2    = "ubuntu-24.04-server-cloudimg-amd64.img"
 		osImage2URL = "http://hmc/" + osImage2
@@ -94,12 +94,12 @@ var _ = Describe("ImageManagmentTest", Ordered, func() {
 		It("URLを指定してイメージのIDを取得", func() {
 			var err error
 			GinkgoWriter.Println("URLを指定してイメージのIDを取得")
-			osImageid1, err = marmotServer.Ma.Db.MakeImageEntryFromURLWithNode("ubuntu-22.04", osImage1URL, nodeName)
+			osImageid1, err = marmotServer.Ma.Db.MakeImageEntryFromURLWithNode("ubuntu-24.04", osImage1URL, nodeName)
 			Expect(err).NotTo(HaveOccurred())
 			img, err := marmotServer.Ma.Db.GetImage(osImageid1)
 			Expect(err).NotTo(HaveOccurred())
 			img.Spec.OsName = util.StringPtr("ubuntu")
-			img.Spec.OsVersion = util.StringPtr("22.04")
+			img.Spec.OsVersion = util.StringPtr("24.04")
 			err = marmotServer.Ma.Db.UpdateImage(osImageid1, img)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("取得したイメージID: ", osImageid1)

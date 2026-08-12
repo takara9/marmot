@@ -41,6 +41,14 @@ var (
 	serverImageModuleAlpine323  = commonServerImageModule{key: "alpine3.23", setupBootVolumeFn: util.SetupAlpineLinux}
 )
 
+func normalizeServerImageDefault(server *api.Server) {
+	server.NormalizeMMImageAlias()
+	if server.Spec.MmImage == nil || strings.TrimSpace(*server.Spec.MmImage) == "" {
+		server.Spec.MmImage = util.StringPtr("ubuntu24.04")
+		server.NormalizeMMImageAlias()
+	}
+}
+
 func resolveServerImageModule(m *Marmot, bootVol api.Volume) (serverImageModule, error) {
 	osName, osVersion := "", ""
 	if img, err := resolveImageTemplateByVolumeNode(m, bootVol); err == nil {

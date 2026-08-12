@@ -6,7 +6,7 @@ metadata:
 spec:
     cpu: 4
     memory: 8192
-    osVariant: ubuntu22.04
+    osVariant: ubuntu24.04
     networkInterface:
         - networkname: "host-bridge"
           address: "192.168.1.191"

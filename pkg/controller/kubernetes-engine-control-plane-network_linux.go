@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
@@ -35,6 +36,9 @@ var (
 	}
 	controlPlaneCreateNamespace = createControlPlaneNamespace
 	controlPlaneDeleteNamespace = netns.DeleteNamed
+	controlPlaneRunIP           = func(args ...string) ([]byte, error) {
+		return exec.Command("ip", args...).CombinedOutput()
+	}
 	controlPlaneCreateVeth      = createControlPlaneVeth
 	controlPlaneAddOVSPort      = func(bridge, port string) error {
 		output, err := exec.Command("ovs-vsctl", "--may-exist", "add-port", bridge, port).CombinedOutput()
@@ -141,11 +145,11 @@ func TeardownKubernetesEngineControlPlaneNetwork(cfg KubernetesEngineControlPlan
 }
 
 func createControlPlaneNamespace(name string) error {
-	handle, err := netns.NewNamed(name)
+	output, err := controlPlaneRunIP("netns", "add", name)
 	if err != nil {
-		return err
+		return fmt.Errorf("ip netns add failed: %w (output=%s)", err, strings.TrimSpace(string(output)))
 	}
-	return handle.Close()
+	return nil
 }
 
 func createControlPlaneVeth(hostName, peerName string) error {
@@ -169,26 +173,20 @@ func configureControlPlanePeer(namespace, peerName, interfaceName, cidr string) 
 		return err
 	}
 
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-	original, err := netns.Get()
+	handle, err := netlink.NewHandleAt(target)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = original.Close() }()
-	if err := netns.Set(target); err != nil {
-		return err
-	}
-	defer func() { _ = netns.Set(original) }()
+	defer handle.Close()
 
-	link, err := netlink.LinkByName(peerName)
+	link, err := handle.LinkByName(peerName)
 	if err != nil {
 		return err
 	}
-	if err := netlink.LinkSetName(link, interfaceName); err != nil {
+	if err := handle.LinkSetName(link, interfaceName); err != nil {
 		return err
 	}
-	link, err = netlink.LinkByName(interfaceName)
+	link, err = handle.LinkByName(interfaceName)
 	if err != nil {
 		return err
 	}
@@ -196,15 +194,85 @@ func configureControlPlanePeer(namespace, peerName, interfaceName, cidr string) 
 	if err != nil {
 		return err
 	}
-	if err := netlink.AddrAdd(link, address); err != nil {
+	if err := handle.AddrAdd(link, address); err != nil {
 		return err
 	}
-	if err := netlink.LinkSetUp(link); err != nil {
+	if err := handle.LinkSetUp(link); err != nil {
 		return err
 	}
-	loopback, err := netlink.LinkByName("lo")
+	loopback, err := handle.LinkByName("lo")
 	if err != nil {
 		return err
 	}
-	return netlink.LinkSetUp(loopback)
+	return handle.LinkSetUp(loopback)
+}
+
+var (
+	dialNamespaceGetCurrent = netns.Get
+	dialNamespaceGetByName  = netns.GetFromName
+	dialNamespaceSet        = netns.Set
+	dialNamespaceNetDial    = func(network, address string, timeout time.Duration) (net.Conn, error) {
+		return net.DialTimeout(network, address, timeout)
+	}
+)
+
+type kubernetesEngineNamespaceDialResult struct {
+	conn net.Conn
+	err  error
+}
+
+// DialInKubernetesEngineNetworkNamespace は指定されたネットワーク名前空間の中でTCP接続を確立する。
+// namespaceが空の場合は現在の名前空間からダイヤルする。コントロールプレーン用に作成済みの
+// netns(veth経由でOVSブリッジに接続済み)を再利用し、ノード間通信用ネットワーク上のIPへの
+// 到達性をホスト側プロセスからも得るために使用する。
+func DialInKubernetesEngineNetworkNamespace(namespace, network, address string, timeout time.Duration) (net.Conn, error) {
+	if strings.TrimSpace(namespace) == "" {
+		return dialNamespaceNetDial(network, address, timeout)
+	}
+
+	resultCh := make(chan kubernetesEngineNamespaceDialResult, 1)
+	go func() {
+		// 名前空間の切り替えは呼び出しスレッド全体に影響するため、
+		// 他のgoroutineに影響しないよう専用OSスレッドに固定する。
+		runtime.LockOSThread()
+
+		origNS, err := dialNamespaceGetCurrent()
+		if err != nil {
+			runtime.UnlockOSThread()
+			resultCh <- kubernetesEngineNamespaceDialResult{err: fmt.Errorf("failed to get current network namespace: %w", err)}
+			return
+		}
+		defer func() { _ = origNS.Close() }()
+
+		targetNS, err := dialNamespaceGetByName(namespace)
+		if err != nil {
+			runtime.UnlockOSThread()
+			resultCh <- kubernetesEngineNamespaceDialResult{err: fmt.Errorf("failed to open network namespace %s: %w", namespace, err)}
+			return
+		}
+		defer func() { _ = targetNS.Close() }()
+
+		if err := dialNamespaceSet(targetNS); err != nil {
+			runtime.UnlockOSThread()
+			resultCh <- kubernetesEngineNamespaceDialResult{err: fmt.Errorf("failed to enter network namespace %s: %w", namespace, err)}
+			return
+		}
+
+		conn, dialErr := dialNamespaceNetDial(network, address, timeout)
+
+		if restoreErr := dialNamespaceSet(origNS); restoreErr != nil {
+			// 元の名前空間へ復帰できなかったOSスレッドは再利用させず終了させる(UnlockOSThreadを呼ばない)。
+			if conn != nil {
+				_ = conn.Close()
+			}
+			resultCh <- kubernetesEngineNamespaceDialResult{err: fmt.Errorf("failed to restore original network namespace: %w", restoreErr)}
+			return
+		}
+
+		runtime.UnlockOSThread()
+		resultCh <- kubernetesEngineNamespaceDialResult{conn: conn, err: dialErr}
+	}()
+
+	result := <-resultCh
+	return result.conn, result.err
 }

@@ -157,7 +157,7 @@ metadata:
 spec:
   cpu: 2
   memory: 2048
-  osVariant: ubuntu22.04
+  osVariant: ubuntu24.04
   bootVolume:
     spec:
       type: qcow2
