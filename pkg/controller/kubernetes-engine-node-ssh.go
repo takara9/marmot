@@ -102,10 +102,19 @@ func runKubernetesEngineNodeProvisionSteps(runner kubernetesEngineNodeCommandRun
 
 	for _, bin := range []string{"kubelet", "kube-proxy"} {
 		binURL := fmt.Sprintf("https://dl.k8s.io/release/%s/bin/linux/%s/%s", data.KubernetesVersion, arch, bin)
+		shaURL := binURL + ".sha256"
 		dest := "/usr/local/bin/" + bin
 		if err := runner.step("install "+bin+" binary", func() error {
-			return runner.run(fmt.Sprintf("test -e %s || (curl -fsSL %s -o %s && chmod 0755 %s)",
-				shellQuote(dest), shellQuote(binURL), shellQuote(dest), shellQuote(dest)), nil)
+			return runner.run(fmt.Sprintf(
+				"test -e %s || ("+
+					"tmp=$(mktemp) && "+
+					"curl -fsSL %s -o \"$tmp\" && "+
+					"sha=$(curl -fsSL %s | awk '{print $1}') && "+
+					"echo \"$sha  $tmp\" | sha256sum -c - && "+
+					"install -m 0755 \"$tmp\" %s"+
+				")",
+				shellQuote(dest), shellQuote(binURL), shellQuote(shaURL), shellQuote(dest),
+			), nil)
 		}); err != nil {
 			return err
 		}
