@@ -110,6 +110,11 @@ cleanup_stale_marmot_bridges() {
 
   while IFS= read -r bridge_name; do
     if [[ "${bridge_name}" =~ ^br-[0-9a-f]{5}$ ]]; then
+      ports="$(sudo ovs-vsctl list-ports "${bridge_name}" 2>/dev/null || true)"
+      if [[ -n "${ports}" ]]; then
+        echo "skipping ${bridge_name} because it still has ports attached: ${ports}"
+        continue
+      fi
       echo "deleting stale Marmot OVS bridge ${bridge_name}"
       sudo ovs-vsctl --if-exists del-br "${bridge_name}"
       deleted=$((deleted + 1))
