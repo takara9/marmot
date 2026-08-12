@@ -17,12 +17,13 @@ import (
 )
 
 const (
-	kubernetesEngineNodeLabelOwner    = "kubernetesEngineId"
-	kubernetesEngineNodeLabelRole     = "kubernetesEngineRole"
-	kubernetesEngineNodeRoleValue     = "node"
-	kubernetesEngineNodeLabelIndex    = "kubernetesEngineNodeIndex"
-	defaultKubernetesEngineNodeCPU    = 2
-	defaultKubernetesEngineNodeMemory = 2048
+	kubernetesEngineNodeLabelOwner       = "kubernetesEngineId"
+	kubernetesEngineNodeLabelRole        = "kubernetesEngineRole"
+	kubernetesEngineNodeRoleValue        = "node"
+	kubernetesEngineNodeLabelIndex       = "kubernetesEngineNodeIndex"
+	kubernetesEngineNodeLabelProvisioned = "kubernetesEngineNodeProvisioned"
+	defaultKubernetesEngineNodeCPU       = 2
+	defaultKubernetesEngineNodeMemory    = 2048
 )
 
 var (
@@ -92,8 +93,18 @@ func ProvisionKubernetesEngineNodes(database *db.Database, mkeConf *marmotd.MKEC
 		if err != nil {
 			return false, err
 		}
-		if err := configureKubernetesEngineNode(mkeConf, ke, server.Metadata.Name, nodeIP); err != nil {
-			return false, err
+		labels := make(map[string]interface{})
+		if server.Metadata.Labels != nil {
+			labels = *server.Metadata.Labels
+		}
+		if labels[kubernetesEngineNodeLabelProvisioned] != "true" {
+			if err := configureKubernetesEngineNode(mkeConf, ke, server.Metadata.Name, nodeIP); err != nil {
+				return false, err
+			}
+			labels[kubernetesEngineNodeLabelProvisioned] = "true"
+			if err := database.UpdateServer(server.Metadata.Id, api.Server{Metadata: api.Metadata{Labels: &labels}}); err != nil {
+				return false, fmt.Errorf("failed to mark node %s as provisioned: %w", server.Metadata.Name, err)
+			}
 		}
 		expectedNames = append(expectedNames, server.Metadata.Name)
 	}
