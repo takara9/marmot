@@ -2,15 +2,12 @@ package controller
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"sort"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/takara9/marmot/api"
@@ -26,30 +23,15 @@ const (
 	kubernetesEngineNodeLabelIndex    = "kubernetesEngineNodeIndex"
 	defaultKubernetesEngineNodeCPU    = 2
 	defaultKubernetesEngineNodeMemory = 2048
-	kubernetesEngineNodePlaybookDir   = "/var/lib/marmot/ansible-playbooks"
 )
 
 var (
 	kubernetesEngineNodePrivateKeyPath  = marmotd.GatewayPrivateKeyPath()
 	kubernetesEngineNodePublicKeyPath   = marmotd.GatewayPublicKeyPath()
 	ensureKubernetesEngineNodeSSHAssets = marmotd.EnsureGatewayRuntimeAssets
-	runKubernetesEngineNodePlaybook     = runKubernetesEngineNodePlaybookCommand
+	runKubernetesEngineNodeProvision    = provisionKubernetesEngineNodeSSH
 	queryKubernetesEngineNodes          = queryKubernetesEngineNodesCommand
 )
-
-type kubernetesEngineNodePlaybookData struct {
-	NodeName            string
-	NodeIP              string
-	APIServerEndpoint   string
-	KubernetesVersion   string
-	ContainerdVersion   string
-	RuncVersion         string
-	CACertBase64        string
-	KubeletCertBase64   string
-	KubeletKeyBase64    string
-	KubeProxyCertBase64 string
-	KubeProxyKeyBase64  string
-}
 
 type kubernetesNodeList struct {
 	Items []struct {
@@ -64,176 +46,6 @@ type kubernetesNodeList struct {
 		} `json:"status"`
 	} `json:"items"`
 }
-
-const kubernetesEngineNodePlaybookTemplate = `---
-- name: Configure Marmot Kubernetes node
-  hosts: all
-  become: true
-  gather_facts: true
-  vars:
-    kubernetes_version: {{ printf "%q" .KubernetesVersion }}
-    containerd_version: {{ printf "%q" .ContainerdVersion }}
-    runc_version: {{ printf "%q" .RuncVersion }}
-  tasks:
-    - name: Install runtime dependencies
-      ansible.builtin.apt:
-        name:
-          - ca-certificates
-          - conntrack
-          - curl
-          - iptables
-          - socat
-        state: present
-        update_cache: true
-
-    - name: Select release architecture
-      ansible.builtin.set_fact:
-        release_arch: {{ "\"{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}\"" }}
-
-    - name: Create Kubernetes directories
-      ansible.builtin.file:
-        path: {{ "{{ item }}" }}
-        state: directory
-        owner: root
-        group: root
-        mode: "0755"
-      loop:
-        - /etc/kubernetes
-        - /etc/kubernetes/pki
-        - /etc/kubernetes/kubelet
-        - /etc/kubernetes/kube-proxy
-        - /opt/cni/bin
-
-    - name: Install containerd
-      ansible.builtin.unarchive:
-        src: {{ "https://github.com/containerd/containerd/releases/download/v{{ containerd_version }}/containerd-{{ containerd_version }}-linux-{{ release_arch }}.tar.gz" }}
-        dest: /usr/local
-        remote_src: true
-        creates: /usr/local/bin/containerd
-
-    - name: Install runc
-      ansible.builtin.get_url:
-        url: {{ "https://github.com/opencontainers/runc/releases/download/v{{ runc_version }}/runc.{{ release_arch }}" }}
-        dest: /usr/local/sbin/runc
-        mode: "0755"
-
-    - name: Install Kubernetes node binaries
-      ansible.builtin.get_url:
-        url: {{ "https://dl.k8s.io/release/{{ kubernetes_version }}/bin/linux/{{ release_arch }}/{{ item }}" }}
-        dest: {{ "\"{{ '/usr/local/bin/' + item }}\"" }}
-        mode: "0755"
-      loop:
-        - kubelet
-        - kube-proxy
-
-    - name: Install cluster credentials and configuration
-      ansible.builtin.copy:
-        content: {{ "{{ item.content | b64decode }}" }}
-        dest: {{ "{{ item.path }}" }}
-        owner: root
-        group: root
-        mode: "0600"
-      no_log: true
-      loop:
-        - path: /etc/kubernetes/pki/ca.crt
-          content: {{ printf "%q" .CACertBase64 }}
-        - path: /etc/kubernetes/pki/kubelet.crt
-          content: {{ printf "%q" .KubeletCertBase64 }}
-        - path: /etc/kubernetes/pki/kubelet.key
-          content: {{ printf "%q" .KubeletKeyBase64 }}
-        - path: /etc/kubernetes/pki/kube-proxy.crt
-          content: {{ printf "%q" .KubeProxyCertBase64 }}
-        - path: /etc/kubernetes/pki/kube-proxy.key
-          content: {{ printf "%q" .KubeProxyKeyBase64 }}
-        - path: /etc/kubernetes/kubelet.kubeconfig
-          content: {{ printf "%q" (kubeconfigBase64 .APIServerEndpoint "system:node" "/etc/kubernetes/pki/kubelet.crt" "/etc/kubernetes/pki/kubelet.key") }}
-        - path: /etc/kubernetes/kube-proxy.kubeconfig
-          content: {{ printf "%q" (kubeconfigBase64 .APIServerEndpoint "system:kube-proxy" "/etc/kubernetes/pki/kube-proxy.crt" "/etc/kubernetes/pki/kube-proxy.key") }}
-        - path: /etc/kubernetes/kubelet/config.yaml
-          content: {{ printf "%q" (kubeletConfigBase64) }}
-        - path: /etc/kubernetes/kube-proxy/config.yaml
-          content: {{ printf "%q" (kubeProxyConfigBase64) }}
-
-    - name: Create containerd configuration directory
-      ansible.builtin.file:
-        path: /etc/containerd
-        state: directory
-        mode: "0755"
-
-    - name: Generate containerd configuration
-      ansible.builtin.shell: |
-        set -eu
-        /usr/local/bin/containerd config default > /etc/containerd/config.toml
-        sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
-      args:
-        creates: /etc/containerd/config.toml
-
-    - name: Install containerd systemd unit
-      ansible.builtin.copy:
-        dest: /etc/systemd/system/containerd.service
-        mode: "0644"
-        content: |
-          [Unit]
-          Description=containerd container runtime
-          After=network.target local-fs.target
-
-          [Service]
-          ExecStartPre=-/sbin/modprobe overlay
-          ExecStart=/usr/local/bin/containerd
-          Restart=always
-          Delegate=yes
-          KillMode=process
-
-          [Install]
-          WantedBy=multi-user.target
-
-    - name: Install kubelet systemd unit
-      ansible.builtin.copy:
-        dest: /etc/systemd/system/kubelet.service
-        mode: "0644"
-        content: |
-          [Unit]
-          Description=Kubernetes Kubelet
-          Wants=network-online.target containerd.service
-          After=network-online.target containerd.service
-
-          [Service]
-          ExecStart=/usr/local/bin/kubelet --config=/etc/kubernetes/kubelet/config.yaml --kubeconfig=/etc/kubernetes/kubelet.kubeconfig --hostname-override={{ .NodeName }} --node-ip={{ .NodeIP }}
-          Restart=always
-          RestartSec=5
-
-          [Install]
-          WantedBy=multi-user.target
-
-    - name: Install kube-proxy systemd unit
-      ansible.builtin.copy:
-        dest: /etc/systemd/system/kube-proxy.service
-        mode: "0644"
-        content: |
-          [Unit]
-          Description=Kubernetes Kube Proxy
-          Wants=network-online.target
-          After=network-online.target
-
-          [Service]
-          ExecStart=/usr/local/bin/kube-proxy --config=/etc/kubernetes/kube-proxy/config.yaml
-          Restart=always
-          RestartSec=5
-
-          [Install]
-          WantedBy=multi-user.target
-
-    - name: Enable Kubernetes node services
-      ansible.builtin.systemd:
-        name: {{ "{{ item }}" }}
-        enabled: true
-        state: started
-        daemon_reload: true
-      loop:
-        - containerd
-        - kubelet
-        - kube-proxy
-`
 
 func ProvisionKubernetesEngineNodes(database *db.Database, mkeConf *marmotd.MKEConfig, ke api.KubernetesEngine) (bool, error) {
 	if ke.Spec.Nodes < 1 {
@@ -443,60 +255,33 @@ func configureKubernetesEngineNode(mkeConf *marmotd.MKEConfig, ke api.Kubernetes
 		return err
 	}
 	paths := []string{caPath, kubeletCertPath, kubeletKeyPath, kubeProxyCertPath, kubeProxyKeyPath}
-	encoded := make([]string, len(paths))
+	contents := make([][]byte, len(paths))
 	for index, path := range paths {
-		data, readErr := os.ReadFile(path)
+		content, readErr := os.ReadFile(path)
 		if readErr != nil {
 			return readErr
 		}
-		encoded[index] = base64.StdEncoding.EncodeToString(data)
+		contents[index] = content
 	}
 	endpoint := fmt.Sprintf("https://%s:%d", *ke.Status.ControlPlaneIpAddress, *ke.Status.ApiServerPort)
-	playbookPath := filepath.Join(kubernetesEngineNodePlaybookDir, fmt.Sprintf("mke-node-%s-%s.yaml", api.KubernetesEngineID(ke), nodeName))
-	data := kubernetesEngineNodePlaybookData{
+	data := kubernetesEngineNodeProvisionData{
 		NodeName:            nodeName,
 		NodeIP:              nodeIP,
-		APIServerEndpoint:   endpoint,
 		KubernetesVersion:   strings.TrimSpace(*ke.Status.ResolvedKubernetesVersion),
 		ContainerdVersion:   strings.TrimPrefix(strings.TrimSpace(mkeConf.ContainerdVersion), "v"),
 		RuncVersion:         strings.TrimPrefix(strings.TrimSpace(mkeConf.RuncVersion), "v"),
-		CACertBase64:        encoded[0],
-		KubeletCertBase64:   encoded[1],
-		KubeletKeyBase64:    encoded[2],
-		KubeProxyCertBase64: encoded[3],
-		KubeProxyKeyBase64:  encoded[4],
+		CACert:              contents[0],
+		KubeletCert:         contents[1],
+		KubeletKey:          contents[2],
+		KubeProxyCert:       contents[3],
+		KubeProxyKey:        contents[4],
+		KubeletKubeconfig:   []byte(renderKubernetesEngineNodeKubeconfig(endpoint, "system:node", "/etc/kubernetes/pki/kubelet.crt", "/etc/kubernetes/pki/kubelet.key")),
+		KubeProxyKubeconfig: []byte(renderKubernetesEngineNodeKubeconfig(endpoint, "system:kube-proxy", "/etc/kubernetes/pki/kube-proxy.crt", "/etc/kubernetes/pki/kube-proxy.key")),
+		KubeletConfig:       []byte(renderKubernetesEngineKubeletConfig()),
+		KubeProxyConfig:     []byte(renderKubernetesEngineKubeProxyConfig()),
 	}
-	if err := renderKubernetesEngineNodePlaybook(playbookPath, data); err != nil {
-		return err
-	}
-	return runKubernetesEngineNodePlaybook(playbookPath, nodeIP, kubernetesEngineNodePrivateKeyPath)
-}
-
-func renderKubernetesEngineNodePlaybook(path string, data kubernetesEngineNodePlaybookData) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	functions := template.FuncMap{
-		"kubeconfigBase64": func(endpoint, user, certPath, keyPath string) string {
-			return base64.StdEncoding.EncodeToString([]byte(renderKubernetesEngineNodeKubeconfig(endpoint, user, certPath, keyPath)))
-		},
-		"kubeletConfigBase64": func() string {
-			return base64.StdEncoding.EncodeToString([]byte(renderKubernetesEngineKubeletConfig()))
-		},
-		"kubeProxyConfigBase64": func() string {
-			return base64.StdEncoding.EncodeToString([]byte(renderKubernetesEngineKubeProxyConfig()))
-		},
-	}
-	tmpl, err := template.New("kubernetes-engine-node").Funcs(functions).Parse(kubernetesEngineNodePlaybookTemplate)
-	if err != nil {
-		return err
-	}
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = file.Close() }()
-	return tmpl.Execute(file, data)
+	nodeID := fmt.Sprintf("%s-%s", api.KubernetesEngineID(ke), nodeName)
+	return runKubernetesEngineNodeProvision(nodeIP, kubernetesEngineNodePrivateKeyPath, nodeID, data)
 }
 
 func renderKubernetesEngineNodeKubeconfig(endpoint, user, certPath, keyPath string) string {
@@ -545,23 +330,6 @@ clientConnection:
   kubeconfig: /etc/kubernetes/kube-proxy.kubeconfig
 mode: iptables
 `
-}
-
-func runKubernetesEngineNodePlaybookCommand(playbookPath, address, privateKeyPath string) error {
-	if strings.TrimSpace(address) == "" {
-		return fmt.Errorf("node address is empty")
-	}
-	if _, err := os.Stat(privateKeyPath); err != nil {
-		return fmt.Errorf("private key is not available: %w", err)
-	}
-	args := []string{
-		"-i", strings.TrimSpace(address) + ",",
-		playbookPath,
-		"--private-key", privateKeyPath,
-		"-u", "root",
-		"--ssh-common-args", "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
-	}
-	return runAnsiblePlaybookWithLogging(args, "kubernetes-engine-node", filepath.Base(playbookPath))
 }
 
 func queryKubernetesEngineNodesCommand(ke api.KubernetesEngine, expectedNames []string) (bool, error) {

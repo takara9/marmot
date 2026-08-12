@@ -1,10 +1,6 @@
 package controller
 
 import (
-	"encoding/base64"
-	"os"
-	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/takara9/marmot/api"
@@ -50,52 +46,6 @@ func TestBuildKubernetesEngineNodeServerSpec(t *testing.T) {
 	}
 	if server.Spec.Auth == nil || server.Spec.Auth.PublicKey == nil || *server.Spec.Auth.PublicKey != "ssh-rsa AAAA" {
 		t.Fatalf("server auth = %+v", server.Spec.Auth)
-	}
-}
-
-func TestRenderKubernetesEngineNodePlaybook(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "node.yaml")
-	data := kubernetesEngineNodePlaybookData{
-		NodeName:            "mke-demo-node-1",
-		NodeIP:              "172.16.1.10",
-		APIServerEndpoint:   "https://172.16.1.2:26443",
-		KubernetesVersion:   "v1.36.2",
-		ContainerdVersion:   "2.3.1",
-		RuncVersion:         "1.4.0",
-		CACertBase64:        "Y2E=",
-		KubeletCertBase64:   "a2MtY2VydA==",
-		KubeletKeyBase64:    "a2wta2V5",
-		KubeProxyCertBase64: "a3AtY2VydA==",
-		KubeProxyKeyBase64:  "a3Ata2V5",
-	}
-	if err := renderKubernetesEngineNodePlaybook(path, data); err != nil {
-		t.Fatalf("renderKubernetesEngineNodePlaybook() failed: %v", err)
-	}
-	content, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("ReadFile() failed: %v", err)
-	}
-	text := string(content)
-	for _, want := range []string{
-		"containerd-{{ containerd_version }}-linux-{{ release_arch }}.tar.gz",
-		"/usr/local/bin/kubelet",
-		"/usr/local/bin/kube-proxy",
-		"/etc/kubernetes/pki/kubelet.crt",
-		"--hostname-override=mke-demo-node-1",
-		"--node-ip=172.16.1.10",
-		base64.StdEncoding.EncodeToString([]byte(renderKubernetesEngineNodeKubeconfig(
-			"https://172.16.1.2:26443",
-			"system:node",
-			"/etc/kubernetes/pki/kubelet.crt",
-			"/etc/kubernetes/pki/kubelet.key",
-		))),
-	} {
-		if !strings.Contains(text, want) {
-			t.Fatalf("rendered playbook does not contain %q", want)
-		}
-	}
-	if strings.Contains(text, "kc-cert") || strings.Contains(text, "kl-key") {
-		t.Fatalf("rendered playbook contains unencoded credential material")
 	}
 }
 
