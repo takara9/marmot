@@ -248,7 +248,7 @@ func (s *Server) startRevokedAPIKeyCleanupWorker() {
 		ticker := time.NewTicker(revokedAPIKeyCleanupInterval)
 		defer ticker.Stop()
 
-		slog.Info("Started API key maintenance worker", "revokeInterval", idleLoginSessionRevokeInterval.String(), "cleanupInterval", revokedAPIKeyCleanupInterval.String(), "deleteAfter", revokedAPIKeyPhysicalDeleteAfter.String())
+		slog.Debug("Started API key maintenance worker", "revokeInterval", idleLoginSessionRevokeInterval.String(), "cleanupInterval", revokedAPIKeyCleanupInterval.String(), "deleteAfter", revokedAPIKeyPhysicalDeleteAfter.String())
 
 		for {
 			select {
@@ -261,7 +261,7 @@ func (s *Server) startRevokedAPIKeyCleanupWorker() {
 					continue
 				}
 				if revoked > 0 {
-					slog.Info("Idle login session revocation completed", "revoked", revoked)
+					slog.Debug("Idle login session revocation completed", "revoked", revoked)
 				}
 			case <-ticker.C:
 				deleted, err := s.Ma.Db.CleanupRevokedApiKeysOlderThan(revokedAPIKeyPhysicalDeleteAfter)

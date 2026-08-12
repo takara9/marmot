@@ -68,7 +68,7 @@ func sanitizeLogToken(value, fallback string) string {
 	return clean
 }
 
-// ansiblePlaybookLineLogger は ansible-playbook の標準出力/標準エラーを1行ずつ slog.Info へ流し、
+// ansiblePlaybookLineLogger は ansible-playbook の標準出力/標準エラーを1行ずつ slog.Debug へ流し、
 // 長時間実行中もCIログ等でリアルタイムに進捗を確認できるようにする。
 type ansiblePlaybookLineLogger struct {
 	resourceName string
@@ -88,7 +88,7 @@ func (l *ansiblePlaybookLineLogger) Write(p []byte) (int, error) {
 		if line == "" {
 			continue
 		}
-		slog.Info("ansible-playbook progress", "resource", l.resourceName, "id", l.resourceID, "line", line)
+		slog.Debug("ansible-playbook progress", "resource", l.resourceName, "id", l.resourceID, "line", line)
 	}
 	return len(p), nil
 }

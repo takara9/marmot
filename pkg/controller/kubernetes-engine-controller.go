@@ -60,7 +60,7 @@ func StartKubernetesEngineController(node string, etcdUrl string, mkeConfigPath 
 		return nil, err
 	}
 	c.mkeConf = cfg
-	slog.Info("MKE設定を読み込みました", "path", mkeConfigPath, "kubernetesVersion", cfg.KubernetesVersion)
+	slog.Debug("MKE設定を読み込みました", "path", mkeConfigPath, "kubernetesVersion", cfg.KubernetesVersion)
 
 	c.marmot, err = marmotd.NewMarmot(node, etcdUrl)
 	if err != nil {

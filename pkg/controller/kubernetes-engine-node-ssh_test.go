@@ -1,13 +1,31 @@
 package controller
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io"
+	"net"
+	"os"
+	"path/filepath"
 	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+// writeTestSSHPrivateKey writes a freshly generated RSA private key (PKCS#1 PEM, the
+// format ssh.ParsePrivateKey accepts) to dir and returns its path.
+func writeTestSSHPrivateKey(dir string) string {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	Expect(err).NotTo(HaveOccurred())
+	block := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}
+	path := filepath.Join(dir, "id_rsa")
+	Expect(os.WriteFile(path, pem.EncodeToMemory(block), 0o600)).To(Succeed())
+	return path
+}
 
 // fakeKubernetesEngineNodeCommandRunner records every command/file write issued by
 // runKubernetesEngineNodeProvisionSteps so it can be verified without a real SSH connection.
@@ -45,6 +63,53 @@ func (r *fakeKubernetesEngineNodeCommandRunner) writeFile(path, mode string, con
 	r.files[path] = string(content)
 	return nil
 }
+
+var _ = Describe("dialKubernetesEngineNodeSSH", func() {
+	It("routes the TCP dial through the requested network namespace", func() {
+		origDial := kubernetesEngineNodeDialTCP
+		DeferCleanup(func() { kubernetesEngineNodeDialTCP = origDial })
+
+		clientConn, serverConn := net.Pipe()
+		// サーバー側を即座に閉じることで、本物のSSHサーバーが応答しない状態でも
+		// ハンドシェイクが無限に待たされず速やかに失敗するようにする。
+		Expect(serverConn.Close()).To(Succeed())
+
+		var gotNamespace, gotNetwork, gotAddress string
+		kubernetesEngineNodeDialTCP = func(namespace, network, address string) (net.Conn, error) {
+			gotNamespace, gotNetwork, gotAddress = namespace, network, address
+			return clientConn, nil
+		}
+
+		keyPath := writeTestSSHPrivateKey(GinkgoT().TempDir())
+
+		// 相手側に本物のSSHサーバーが無いためハンドシェイクは失敗するが、
+		// namespace/network/addressがダイヤル層へ正しく伝わることは検証できる。
+		_, err := dialKubernetesEngineNodeSSH("172.16.1.10", keyPath, "mke-demo")
+		Expect(err).To(HaveOccurred())
+		Expect(gotNamespace).To(Equal("mke-demo"))
+		Expect(gotNetwork).To(Equal("tcp"))
+		Expect(gotAddress).To(Equal("172.16.1.10:22"))
+	})
+
+	It("dials directly when no namespace is given", func() {
+		origDial := kubernetesEngineNodeDialTCP
+		DeferCleanup(func() { kubernetesEngineNodeDialTCP = origDial })
+
+		var gotNamespace string
+		called := false
+		kubernetesEngineNodeDialTCP = func(namespace, network, address string) (net.Conn, error) {
+			called = true
+			gotNamespace = namespace
+			return nil, fmt.Errorf("simulated dial failure")
+		}
+
+		keyPath := writeTestSSHPrivateKey(GinkgoT().TempDir())
+		_, err := dialKubernetesEngineNodeSSH("172.16.1.10", keyPath, "")
+		Expect(err).To(HaveOccurred())
+		Expect(called).To(BeTrue())
+		Expect(gotNamespace).To(BeEmpty())
+	})
+})
 
 func newTestKubernetesEngineNodeProvisionData() kubernetesEngineNodeProvisionData {
 	return kubernetesEngineNodeProvisionData{

@@ -228,7 +228,7 @@ func main() {
 
 	// Use TLS if both cert and key are configured, otherwise use HTTP.
 	if cfg.TLSCertFile != "" && cfg.TLSKeyFile != "" {
-		slog.Info("Starting API server with TLS", "addr", cfg.APIListenAddr, "cert", cfg.TLSCertFile, "key", cfg.TLSKeyFile)
+		slog.Debug("Starting API server with TLS", "addr", cfg.APIListenAddr, "cert", cfg.TLSCertFile, "key", cfg.TLSKeyFile)
 		if err := e.StartTLS(cfg.APIListenAddr, cfg.TLSCertFile, cfg.TLSKeyFile); err != nil {
 			slog.Error("API server stopped", "err", err)
 			return

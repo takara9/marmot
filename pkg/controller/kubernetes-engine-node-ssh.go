@@ -48,8 +48,11 @@ type kubernetesEngineNodeCommandRunner interface {
 // provisionKubernetesEngineNodeSSH connects to the node via SSH and runs the same setup
 // steps that were previously encoded as an ansible-playbook (install runtime deps, fetch
 // containerd/runc/kubelet/kube-proxy, place credentials, install systemd units).
-func provisionKubernetesEngineNodeSSH(address, privateKeyPath, nodeID string, data kubernetesEngineNodeProvisionData) error {
-	client, err := dialKubernetesEngineNodeSSH(address, privateKeyPath)
+// namespace は、ノードが接続された「ノード間通信用ネットワーク」に到達するために使用する
+// ネットワーク名前空間(コントロールプレーン用に作成済みのnetnsを再利用する)。空文字の場合は
+// 呼び出し元プロセスの名前空間からそのままダイヤルする。
+func provisionKubernetesEngineNodeSSH(address, privateKeyPath, namespace, nodeID string, data kubernetesEngineNodeProvisionData) error {
+	client, err := dialKubernetesEngineNodeSSH(address, privateKeyPath, namespace)
 	if err != nil {
 		return fmt.Errorf("failed to connect to node %s: %w", data.NodeName, err)
 	}
@@ -227,7 +230,13 @@ WantedBy=multi-user.target
 `
 }
 
-func dialKubernetesEngineNodeSSH(address, privateKeyPath string) (*ssh.Client, error) {
+// kubernetesEngineNodeDialTCP は、必要に応じて指定されたネットワーク名前空間からTCP接続を確立する。
+// テストからモック可能にするための注入ポイント。
+var kubernetesEngineNodeDialTCP = func(namespace, network, address string) (net.Conn, error) {
+	return DialInKubernetesEngineNetworkNamespace(namespace, network, address, kubernetesEngineNodeSSHDialTimeout)
+}
+
+func dialKubernetesEngineNodeSSH(address, privateKeyPath, namespace string) (*ssh.Client, error) {
 	keyData, err := os.ReadFile(privateKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read private key: %w", err)
@@ -248,7 +257,18 @@ func dialKubernetesEngineNodeSSH(address, privateKeyPath string) (*ssh.Client, e
 	if trimmed == "" {
 		return nil, fmt.Errorf("node address is empty")
 	}
-	return ssh.Dial("tcp", net.JoinHostPort(trimmed, fmt.Sprintf("%d", kubernetesEngineNodeSSHPort)), config)
+	targetAddr := net.JoinHostPort(trimmed, fmt.Sprintf("%d", kubernetesEngineNodeSSHPort))
+
+	conn, err := kubernetesEngineNodeDialTCP(namespace, "tcp", targetAddr)
+	if err != nil {
+		return nil, err
+	}
+	clientConn, chans, reqs, err := ssh.NewClientConn(conn, targetAddr, config)
+	if err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	return ssh.NewClient(clientConn, chans, reqs), nil
 }
 
 // kubernetesEngineNodeSSHRunner executes commands on a KubernetesEngine node over SSH,
@@ -259,7 +279,7 @@ type kubernetesEngineNodeSSHRunner struct {
 }
 
 func (r *kubernetesEngineNodeSSHRunner) step(name string, fn func() error) error {
-	slog.Info("kubernetes-engine-node provision step", "id", r.resourceID, "step", name)
+	slog.Debug("kubernetes-engine-node provision step", "id", r.resourceID, "step", name)
 	if err := fn(); err != nil {
 		return fmt.Errorf("%s: %w", name, err)
 	}
@@ -341,7 +361,7 @@ func (l *kubernetesEngineNodeSSHLineLogger) Write(p []byte) (int, error) {
 		if line == "" {
 			continue
 		}
-		slog.Info("kubernetes-engine-node provision progress", "id", l.resourceID, "line", line)
+		slog.Debug("kubernetes-engine-node provision progress", "id", l.resourceID, "line", line)
 	}
 	return len(p), nil
 }

@@ -281,7 +281,14 @@ func configureKubernetesEngineNode(mkeConf *marmotd.MKEConfig, ke api.Kubernetes
 		KubeProxyConfig:     []byte(renderKubernetesEngineKubeProxyConfig()),
 	}
 	nodeID := fmt.Sprintf("%s-%s", api.KubernetesEngineID(ke), nodeName)
-	return runKubernetesEngineNodeProvision(nodeIP, kubernetesEngineNodePrivateKeyPath, nodeID, data)
+	// ノードのIPは「ノード間通信用ネットワーク」上のアドレスであり、ホストのroot netnsからは
+	// 到達できないため、コントロールプレーン用に作成済みのnetns(veth経由でOVSブリッジに接続済み)
+	// を経由してSSH接続する。
+	namespace, _, _, err := KubernetesEngineControlPlaneNetworkNames(clusterName)
+	if err != nil {
+		return err
+	}
+	return runKubernetesEngineNodeProvision(nodeIP, kubernetesEngineNodePrivateKeyPath, namespace, nodeID, data)
 }
 
 func renderKubernetesEngineNodeKubeconfig(endpoint, user, certPath, keyPath string) string {
