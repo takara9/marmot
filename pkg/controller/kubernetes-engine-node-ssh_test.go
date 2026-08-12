@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 // fakeKubernetesEngineNodeCommandRunner records every command/file write issued by
@@ -63,85 +65,71 @@ func newTestKubernetesEngineNodeProvisionData() kubernetesEngineNodeProvisionDat
 	}
 }
 
-func TestRunKubernetesEngineNodeProvisionSteps(t *testing.T) {
-	runner := &fakeKubernetesEngineNodeCommandRunner{outputs: map[string]string{"uname -m": "x86_64"}}
-	data := newTestKubernetesEngineNodeProvisionData()
+var _ = Describe("runKubernetesEngineNodeProvisionSteps", func() {
+	It("installs, configures and enables containerd/kubelet/kube-proxy on x86_64", func() {
+		runner := &fakeKubernetesEngineNodeCommandRunner{outputs: map[string]string{"uname -m": "x86_64"}}
+		data := newTestKubernetesEngineNodeProvisionData()
 
-	if err := runKubernetesEngineNodeProvisionSteps(runner, data); err != nil {
-		t.Fatalf("runKubernetesEngineNodeProvisionSteps() failed: %v", err)
-	}
+		Expect(runKubernetesEngineNodeProvisionSteps(runner, data)).To(Succeed())
 
-	joined := strings.Join(runner.commands, "\n")
-	for _, want := range []string{
-		"apt-get install -y ca-certificates conntrack curl iptables socat",
-		"uname -m",
-		"mkdir -p /etc/kubernetes /etc/kubernetes/pki /etc/kubernetes/kubelet /etc/kubernetes/kube-proxy /opt/cni/bin",
-		"containerd-2.3.1-linux-amd64.tar.gz",
-		"runc.amd64",
-		"/usr/local/bin/kubelet",
-		"/usr/local/bin/kube-proxy",
-		"containerd config default > /etc/containerd/config.toml",
-		"systemctl daemon-reload && systemctl enable --now containerd kubelet kube-proxy",
-	} {
-		if !strings.Contains(joined, want) {
-			t.Fatalf("commands do not contain %q; got: %s", want, joined)
+		joined := strings.Join(runner.commands, "\n")
+		for _, want := range []string{
+			"apt-get install -y ca-certificates conntrack curl iptables socat",
+			"uname -m",
+			"mkdir -p /etc/kubernetes /etc/kubernetes/pki /etc/kubernetes/kubelet /etc/kubernetes/kube-proxy /opt/cni/bin",
+			"containerd-2.3.1-linux-amd64.tar.gz",
+			"runc.amd64",
+			"/usr/local/bin/kubelet",
+			"/usr/local/bin/kube-proxy",
+			"containerd config default > /etc/containerd/config.toml",
+			"systemctl daemon-reload && systemctl enable --now containerd kubelet kube-proxy",
+		} {
+			Expect(joined).To(ContainSubstring(want))
 		}
-	}
 
-	wantFiles := map[string]string{
-		"/etc/kubernetes/pki/ca.crt":             "ca",
-		"/etc/kubernetes/pki/kubelet.crt":        "kubelet-cert",
-		"/etc/kubernetes/pki/kubelet.key":        "kubelet-key",
-		"/etc/kubernetes/pki/kube-proxy.crt":     "kube-proxy-cert",
-		"/etc/kubernetes/pki/kube-proxy.key":     "kube-proxy-key",
-		"/etc/kubernetes/kubelet.kubeconfig":     "kubelet-kubeconfig",
-		"/etc/kubernetes/kube-proxy.kubeconfig":  "kube-proxy-kubeconfig",
-		"/etc/kubernetes/kubelet/config.yaml":    "kubelet-config",
-		"/etc/kubernetes/kube-proxy/config.yaml": "kube-proxy-config",
-		"/etc/systemd/system/containerd.service": "",
-		"/etc/systemd/system/kubelet.service":    "",
-		"/etc/systemd/system/kube-proxy.service": "",
-	}
-	for path, want := range wantFiles {
-		got, ok := runner.files[path]
-		if !ok {
-			t.Fatalf("file %s was not written", path)
+		wantFiles := map[string]string{
+			"/etc/kubernetes/pki/ca.crt":             "ca",
+			"/etc/kubernetes/pki/kubelet.crt":        "kubelet-cert",
+			"/etc/kubernetes/pki/kubelet.key":        "kubelet-key",
+			"/etc/kubernetes/pki/kube-proxy.crt":     "kube-proxy-cert",
+			"/etc/kubernetes/pki/kube-proxy.key":     "kube-proxy-key",
+			"/etc/kubernetes/kubelet.kubeconfig":     "kubelet-kubeconfig",
+			"/etc/kubernetes/kube-proxy.kubeconfig":  "kube-proxy-kubeconfig",
+			"/etc/kubernetes/kubelet/config.yaml":    "kubelet-config",
+			"/etc/kubernetes/kube-proxy/config.yaml": "kube-proxy-config",
+			"/etc/systemd/system/containerd.service": "",
+			"/etc/systemd/system/kubelet.service":    "",
+			"/etc/systemd/system/kube-proxy.service": "",
 		}
-		if want != "" && got != want {
-			t.Fatalf("file %s content = %q, want %q", path, got, want)
+		for path, want := range wantFiles {
+			Expect(runner.files).To(HaveKey(path))
+			if want != "" {
+				Expect(runner.files[path]).To(Equal(want))
+			}
 		}
-	}
-	if !strings.Contains(runner.files["/etc/systemd/system/kubelet.service"], "--hostname-override=mke-demo-node-1 --node-ip=172.16.1.10") {
-		t.Fatalf("kubelet.service does not reference node name/ip: %s", runner.files["/etc/systemd/system/kubelet.service"])
-	}
-}
+		Expect(runner.files["/etc/systemd/system/kubelet.service"]).To(ContainSubstring("--hostname-override=mke-demo-node-1 --node-ip=172.16.1.10"))
+	})
 
-func TestRunKubernetesEngineNodeProvisionSteps_ArmArch(t *testing.T) {
-	runner := &fakeKubernetesEngineNodeCommandRunner{outputs: map[string]string{"uname -m": "aarch64"}}
-	data := newTestKubernetesEngineNodeProvisionData()
+	It("selects arm64 assets when the node reports an aarch64 architecture", func() {
+		runner := &fakeKubernetesEngineNodeCommandRunner{outputs: map[string]string{"uname -m": "aarch64"}}
+		data := newTestKubernetesEngineNodeProvisionData()
 
-	if err := runKubernetesEngineNodeProvisionSteps(runner, data); err != nil {
-		t.Fatalf("runKubernetesEngineNodeProvisionSteps() failed: %v", err)
-	}
+		Expect(runKubernetesEngineNodeProvisionSteps(runner, data)).To(Succeed())
 
-	joined := strings.Join(runner.commands, "\n")
-	if !strings.Contains(joined, "containerd-2.3.1-linux-arm64.tar.gz") || !strings.Contains(joined, "runc.arm64") {
-		t.Fatalf("commands do not reflect arm64 architecture: %s", joined)
-	}
-}
+		joined := strings.Join(runner.commands, "\n")
+		Expect(joined).To(ContainSubstring("containerd-2.3.1-linux-arm64.tar.gz"))
+		Expect(joined).To(ContainSubstring("runc.arm64"))
+	})
 
-func TestRunKubernetesEngineNodeProvisionSteps_StepFailureIsWrapped(t *testing.T) {
-	runner := &fakeKubernetesEngineNodeCommandRunner{
-		outputs: map[string]string{"uname -m": "x86_64"},
-		failCmd: "apt-get install",
-	}
-	data := newTestKubernetesEngineNodeProvisionData()
+	It("wraps a failed step with its step name", func() {
+		runner := &fakeKubernetesEngineNodeCommandRunner{
+			outputs: map[string]string{"uname -m": "x86_64"},
+			failCmd: "apt-get install",
+		}
+		data := newTestKubernetesEngineNodeProvisionData()
 
-	err := runKubernetesEngineNodeProvisionSteps(runner, data)
-	if err == nil {
-		t.Fatalf("runKubernetesEngineNodeProvisionSteps() succeeded, want error")
-	}
-	if !strings.Contains(err.Error(), "install runtime dependencies") {
-		t.Fatalf("error = %v, want it to mention the failed step name", err)
-	}
-}
+		err := runKubernetesEngineNodeProvisionSteps(runner, data)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("install runtime dependencies"))
+	})
+})

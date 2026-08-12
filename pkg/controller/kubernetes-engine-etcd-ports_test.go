@@ -1,81 +1,69 @@
 package controller
 
 import (
-	"testing"
-
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/util"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-func TestParsePortFromEndpoint(t *testing.T) {
-	cases := []struct {
-		name     string
-		endpoint string
-		wantPort int
-		wantOk   bool
-	}{
-		{"http url", "http://127.0.0.1:2379", 2379, true},
-		{"host port", "127.0.0.1:2380", 2380, true},
-		{"empty", "", 0, false},
-		{"no port", "127.0.0.1", 0, false},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			port, ok := parsePortFromEndpoint(c.endpoint)
-			if ok != c.wantOk || port != c.wantPort {
-				t.Fatalf("parsePortFromEndpoint(%q) = (%d, %v), want (%d, %v)", c.endpoint, port, ok, c.wantPort, c.wantOk)
-			}
-		})
-	}
-}
-
-func TestAllocateKubernetesEngineEtcdPortsAvoidsOwnEtcdAndOtherClusters(t *testing.T) {
-	rangeStart, rangeEnd := 40000, 40010
-
-	existing := api.KubernetesEngine{
-		Status: &api.Status{
-			EtcdClientPort: util.IntPtrInt(40000),
-			EtcdPeerPort:   util.IntPtrInt(40001),
+var _ = Describe("parsePortFromEndpoint", func() {
+	DescribeTable("parses the port from an endpoint string",
+		func(endpoint string, wantPort int, wantOk bool) {
+			port, ok := parsePortFromEndpoint(endpoint)
+			Expect(ok).To(Equal(wantOk))
+			Expect(port).To(Equal(wantPort))
 		},
-	}
+		Entry("http url", "http://127.0.0.1:2379", 2379, true),
+		Entry("host port", "127.0.0.1:2380", 2380, true),
+		Entry("empty", "", 0, false),
+		Entry("no port", "127.0.0.1", 0, false),
+	)
+})
 
-	clientPort, peerPort, err := AllocateKubernetesEngineEtcdPorts([]api.KubernetesEngine{existing}, "http://127.0.0.1:40002", rangeStart, rangeEnd)
-	if err != nil {
-		t.Fatalf("AllocateKubernetesEngineEtcdPorts() failed: %v", err)
-	}
-	if clientPort == 40000 || clientPort == 40001 || clientPort == 40002 || peerPort == 40002 {
-		t.Fatalf("allocated ports (%d, %d) collide with reserved ports", clientPort, peerPort)
-	}
-	if peerPort != clientPort+1 {
-		t.Fatalf("peerPort = %d, want clientPort+1 (%d)", peerPort, clientPort+1)
-	}
-}
+var _ = Describe("AllocateKubernetesEngineEtcdPorts", func() {
+	It("avoids its own etcd ports and other clusters' allocated ports", func() {
+		rangeStart, rangeEnd := 40000, 40010
 
-func TestAllocateKubernetesEngineEtcdPortsSkipsPortsNotLocallyFree(t *testing.T) {
-	rangeStart, rangeEnd := 41000, 41010
+		existing := api.KubernetesEngine{
+			Status: &api.Status{
+				EtcdClientPort: util.IntPtrInt(40000),
+				EtcdPeerPort:   util.IntPtrInt(40001),
+			},
+		}
 
-	origProbe := kubernetesEnginePortProbe
-	t.Cleanup(func() { kubernetesEnginePortProbe = origProbe })
-	kubernetesEnginePortProbe = func(port int) bool {
-		// 最初の候補ペアだけ使用中(bind不可)を模擬する。
-		return port != 41000 && port != 41001
-	}
+		clientPort, peerPort, err := AllocateKubernetesEngineEtcdPorts([]api.KubernetesEngine{existing}, "http://127.0.0.1:40002", rangeStart, rangeEnd)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(clientPort).NotTo(Equal(40000))
+		Expect(clientPort).NotTo(Equal(40001))
+		Expect(clientPort).NotTo(Equal(40002))
+		Expect(peerPort).NotTo(Equal(40002))
+		Expect(peerPort).To(Equal(clientPort + 1))
+	})
 
-	clientPort, peerPort, err := AllocateKubernetesEngineEtcdPorts(nil, "", rangeStart, rangeEnd)
-	if err != nil {
-		t.Fatalf("AllocateKubernetesEngineEtcdPorts() failed: %v", err)
-	}
-	if clientPort != 41002 || peerPort != 41003 {
-		t.Fatalf("allocated ports = (%d, %d), want (41002, 41003)", clientPort, peerPort)
-	}
-}
+	It("skips ports that are not locally free", func() {
+		rangeStart, rangeEnd := 41000, 41010
 
-func TestAllocateKubernetesEngineEtcdPortsExhausted(t *testing.T) {
-	origProbe := kubernetesEnginePortProbe
-	t.Cleanup(func() { kubernetesEnginePortProbe = origProbe })
-	kubernetesEnginePortProbe = func(int) bool { return false }
+		origProbe := kubernetesEnginePortProbe
+		DeferCleanup(func() { kubernetesEnginePortProbe = origProbe })
+		kubernetesEnginePortProbe = func(port int) bool {
+			// 最初の候補ペアだけ使用中(bind不可)を模擬する。
+			return port != 41000 && port != 41001
+		}
 
-	if _, _, err := AllocateKubernetesEngineEtcdPorts(nil, "", 42000, 42004); err == nil {
-		t.Fatalf("expected error when no free port pair is available")
-	}
-}
+		clientPort, peerPort, err := AllocateKubernetesEngineEtcdPorts(nil, "", rangeStart, rangeEnd)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(clientPort).To(Equal(41002))
+		Expect(peerPort).To(Equal(41003))
+	})
+
+	It("returns an error when no free port pair is available", func() {
+		origProbe := kubernetesEnginePortProbe
+		DeferCleanup(func() { kubernetesEnginePortProbe = origProbe })
+		kubernetesEnginePortProbe = func(int) bool { return false }
+
+		_, _, err := AllocateKubernetesEngineEtcdPorts(nil, "", 42000, 42004)
+		Expect(err).To(HaveOccurred())
+	})
+})

@@ -1,92 +1,73 @@
 package controller
 
 import (
-	"testing"
-
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/util"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-func TestBuildKubernetesEngineNodeServerSpec(t *testing.T) {
-	external := "host-bridge"
-	cpu := 4
-	memory := 8192
-	ke := api.KubernetesEngine{
-		Metadata: api.Metadata{Name: "demo"},
-		Spec: api.KubernetesEngineSpec{
-			Nodes: 2,
-			NodeSpec: &api.KubernetesEngineNodeSpec{
-				Cpu:     &cpu,
-				Memory:  &memory,
-				Network: &api.KubernetesEngineNodeNetwork{External: &external},
+var _ = Describe("KubernetesEngineNode", func() {
+	It("builds a node server spec with resources, networks and labels", func() {
+		external := "host-bridge"
+		cpu := 4
+		memory := 8192
+		ke := api.KubernetesEngine{
+			Metadata: api.Metadata{Name: "demo"},
+			Spec: api.KubernetesEngineSpec{
+				Nodes: 2,
+				NodeSpec: &api.KubernetesEngineNodeSpec{
+					Cpu:     &cpu,
+					Memory:  &memory,
+					Network: &api.KubernetesEngineNodeNetwork{External: &external},
+				},
 			},
-		},
-	}
-	api.SetKubernetesEngineID(&ke, "ke123")
+		}
+		api.SetKubernetesEngineID(&ke, "ke123")
 
-	server, err := buildKubernetesEngineNodeServerSpec(ke, 1, "ssh-rsa AAAA")
-	if err != nil {
-		t.Fatalf("buildKubernetesEngineNodeServerSpec() failed: %v", err)
-	}
-	if server.Metadata.Name != "mke-demo-node-2" {
-		t.Fatalf("server name = %q, want mke-demo-node-2", server.Metadata.Name)
-	}
-	if server.Spec.Cpu == nil || *server.Spec.Cpu != cpu || server.Spec.Memory == nil || *server.Spec.Memory != memory {
-		t.Fatalf("server resources = cpu:%v memory:%v", server.Spec.Cpu, server.Spec.Memory)
-	}
-	if server.Spec.NetworkInterface == nil || len(*server.Spec.NetworkInterface) != 2 {
-		t.Fatalf("network interfaces = %v, want two", server.Spec.NetworkInterface)
-	}
-	nics := *server.Spec.NetworkInterface
-	if nics[0].Networkname != "host-bridge" || nics[1].Networkname != "mke-demo" {
-		t.Fatalf("network interfaces = %+v", nics)
-	}
-	if server.Metadata.Labels == nil || (*server.Metadata.Labels)[kubernetesEngineNodeLabelOwner] != "ke123" {
-		t.Fatalf("server labels = %v", server.Metadata.Labels)
-	}
-	if server.Spec.Auth == nil || server.Spec.Auth.PublicKey == nil || *server.Spec.Auth.PublicKey != "ssh-rsa AAAA" {
-		t.Fatalf("server auth = %+v", server.Spec.Auth)
-	}
-}
+		server, err := buildKubernetesEngineNodeServerSpec(ke, 1, "ssh-rsa AAAA")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(server.Metadata.Name).To(Equal("mke-demo-node-2"))
+		Expect(server.Spec.Cpu).To(HaveValue(Equal(cpu)))
+		Expect(server.Spec.Memory).To(HaveValue(Equal(memory)))
+		Expect(server.Spec.NetworkInterface).To(HaveValue(HaveLen(2)))
+		nics := *server.Spec.NetworkInterface
+		Expect(nics[0].Networkname).To(Equal("host-bridge"))
+		Expect(nics[1].Networkname).To(Equal("mke-demo"))
+		Expect(server.Metadata.Labels).NotTo(BeNil())
+		Expect((*server.Metadata.Labels)[kubernetesEngineNodeLabelOwner]).To(Equal("ke123"))
+		Expect(server.Spec.Auth).NotTo(BeNil())
+		Expect(server.Spec.Auth.PublicKey).To(HaveValue(Equal("ssh-rsa AAAA")))
+	})
 
-func TestKubernetesEngineNodesReady(t *testing.T) {
-	data := []byte(`{"items":[
-		{"metadata":{"name":"node-1"},"status":{"conditions":[{"type":"Ready","status":"True"}]}},
-		{"metadata":{"name":"node-2"},"status":{"conditions":[{"type":"Ready","status":"False"}]}}
-	]}`)
-	ready, err := kubernetesEngineNodesReady(data, []string{"node-1", "node-2"})
-	if err != nil {
-		t.Fatalf("kubernetesEngineNodesReady() failed: %v", err)
-	}
-	if ready {
-		t.Fatalf("kubernetesEngineNodesReady() = true while node-2 is not Ready")
-	}
+	It("reports nodes ready only when every listed node has a True Ready condition", func() {
+		data := []byte(`{"items":[
+			{"metadata":{"name":"node-1"},"status":{"conditions":[{"type":"Ready","status":"True"}]}},
+			{"metadata":{"name":"node-2"},"status":{"conditions":[{"type":"Ready","status":"False"}]}}
+		]}`)
+		ready, err := kubernetesEngineNodesReady(data, []string{"node-1", "node-2"})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ready).To(BeFalse())
 
-	readyData := []byte(`{"items":[
-		{"metadata":{"name":"node-1"},"status":{"conditions":[{"type":"Ready","status":"True"}]}},
-		{"metadata":{"name":"node-2"},"status":{"conditions":[{"type":"Ready","status":"True"}]}}
-	]}`)
-	ready, err = kubernetesEngineNodesReady(readyData, []string{"node-1", "node-2"})
-	if err != nil {
-		t.Fatalf("kubernetesEngineNodesReady() failed: %v", err)
-	}
-	if !ready {
-		t.Fatalf("kubernetesEngineNodesReady() = false, want true")
-	}
-}
+		readyData := []byte(`{"items":[
+			{"metadata":{"name":"node-1"},"status":{"conditions":[{"type":"Ready","status":"True"}]}},
+			{"metadata":{"name":"node-2"},"status":{"conditions":[{"type":"Ready","status":"True"}]}}
+		]}`)
+		ready, err = kubernetesEngineNodesReady(readyData, []string{"node-1", "node-2"})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ready).To(BeTrue())
+	})
 
-func TestKubernetesEngineNodeInternalIP(t *testing.T) {
-	server := api.Server{Metadata: api.Metadata{Name: "node-1"}, Spec: api.ServerSpec{
-		NetworkInterface: &[]api.NetworkInterface{
-			{Networkname: "default"},
-			{Networkname: "mke-demo", Address: util.StringPtr("172.16.1.10")},
-		},
-	}}
-	address, err := kubernetesEngineNodeInternalIP(server, "mke-demo")
-	if err != nil {
-		t.Fatalf("kubernetesEngineNodeInternalIP() failed: %v", err)
-	}
-	if address != "172.16.1.10" {
-		t.Fatalf("address = %q, want 172.16.1.10", address)
-	}
-}
+	It("resolves a node's internal IP from its network interfaces", func() {
+		server := api.Server{Metadata: api.Metadata{Name: "node-1"}, Spec: api.ServerSpec{
+			NetworkInterface: &[]api.NetworkInterface{
+				{Networkname: "default"},
+				{Networkname: "mke-demo", Address: util.StringPtr("172.16.1.10")},
+			},
+		}}
+		address, err := kubernetesEngineNodeInternalIP(server, "mke-demo")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(address).To(Equal("172.16.1.10"))
+	})
+})

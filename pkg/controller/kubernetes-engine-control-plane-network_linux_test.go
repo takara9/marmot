@@ -2,106 +2,76 @@ package controller
 
 import (
 	"errors"
-	"reflect"
-	"testing"
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/util"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-func TestKubernetesEngineControlPlaneNetworkNames(t *testing.T) {
-	namespace, hostVeth, peerVeth, err := KubernetesEngineControlPlaneNetworkNames("demo")
-	if err != nil {
-		t.Fatalf("KubernetesEngineControlPlaneNetworkNames() failed: %v", err)
-	}
-	if namespace != "mke-demo" {
-		t.Fatalf("namespace = %q, want %q", namespace, "mke-demo")
-	}
-	if len(hostVeth) > 15 || len(peerVeth) > 15 || hostVeth == peerVeth {
-		t.Fatalf("invalid veth names: host=%q peer=%q", hostVeth, peerVeth)
-	}
-}
+var _ = Describe("KubernetesEngineControlPlaneNetwork", func() {
+	It("derives namespace and veth names from the cluster name", func() {
+		namespace, hostVeth, peerVeth, err := KubernetesEngineControlPlaneNetworkNames("demo")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(namespace).To(Equal("mke-demo"))
+		Expect(len(hostVeth)).To(BeNumerically("<=", 15))
+		Expect(len(peerVeth)).To(BeNumerically("<=", 15))
+		Expect(hostVeth).NotTo(Equal(peerVeth))
+	})
 
-func TestCreateControlPlaneNamespaceUsesIPSubprocess(t *testing.T) {
-	originalRunIP := controlPlaneRunIP
-	t.Cleanup(func() { controlPlaneRunIP = originalRunIP })
+	It("creates the control-plane namespace via the ip subprocess", func() {
+		originalRunIP := controlPlaneRunIP
+		DeferCleanup(func() { controlPlaneRunIP = originalRunIP })
 
-	var got []string
-	controlPlaneRunIP = func(args ...string) ([]byte, error) {
-		got = append([]string(nil), args...)
-		return nil, nil
-	}
+		var got []string
+		controlPlaneRunIP = func(args ...string) ([]byte, error) {
+			got = append([]string(nil), args...)
+			return nil, nil
+		}
 
-	if err := createControlPlaneNamespace("mke-demo"); err != nil {
-		t.Fatalf("createControlPlaneNamespace() failed: %v", err)
-	}
-	want := []string{"netns", "add", "mke-demo"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("ip args = %v, want %v", got, want)
-	}
-}
+		Expect(createControlPlaneNamespace("mke-demo")).To(Succeed())
+		Expect(got).To(Equal([]string{"netns", "add", "mke-demo"}))
+	})
 
-func TestSetupKubernetesEngineControlPlaneNetworkLifecycle(t *testing.T) {
-	var calls []string
-	installFakeControlPlaneNetworkOps(t, &calls)
-	cfg, err := NewKubernetesEngineControlPlaneNetworkConfig("demo", "br-demo", "172.16.90.100/24")
-	if err != nil {
-		t.Fatalf("NewKubernetesEngineControlPlaneNetworkConfig() failed: %v", err)
-	}
-	if err := SetupKubernetesEngineControlPlaneNetwork(cfg); err != nil {
-		t.Fatalf("SetupKubernetesEngineControlPlaneNetwork() failed: %v", err)
-	}
-	wantSetup := []string{"netns-add:mke-demo", "veth-add", "ovs-add", "host-up", "peer-configure"}
-	if !reflect.DeepEqual(calls, wantSetup) {
-		t.Fatalf("setup calls = %v, want %v", calls, wantSetup)
-	}
+	It("sets up and tears down the control-plane network in order", func() {
+		var calls []string
+		installFakeControlPlaneNetworkOps(&calls)
+		cfg, err := NewKubernetesEngineControlPlaneNetworkConfig("demo", "br-demo", "172.16.90.100/24")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(SetupKubernetesEngineControlPlaneNetwork(cfg)).To(Succeed())
+		Expect(calls).To(Equal([]string{"netns-add:mke-demo", "veth-add", "ovs-add", "host-up", "peer-configure"}))
 
-	calls = nil
-	if err := TeardownKubernetesEngineControlPlaneNetwork(cfg); err != nil {
-		t.Fatalf("TeardownKubernetesEngineControlPlaneNetwork() failed: %v", err)
-	}
-	wantTeardown := []string{"ovs-delete", "netns-delete:mke-demo"}
-	if !reflect.DeepEqual(calls, wantTeardown) {
-		t.Fatalf("teardown calls = %v, want %v", calls, wantTeardown)
-	}
-}
+		calls = nil
+		Expect(TeardownKubernetesEngineControlPlaneNetwork(cfg)).To(Succeed())
+		Expect(calls).To(Equal([]string{"ovs-delete", "netns-delete:mke-demo"}))
+	})
 
-func TestSetupKubernetesEngineControlPlaneNetworkRollsBack(t *testing.T) {
-	var calls []string
-	installFakeControlPlaneNetworkOps(t, &calls)
-	controlPlaneSetHostVethUp = func(string) error {
-		calls = append(calls, "host-up")
-		return errors.New("link failed")
-	}
-	cfg, err := NewKubernetesEngineControlPlaneNetworkConfig("demo", "br-demo", "172.16.90.100/24")
-	if err != nil {
-		t.Fatalf("NewKubernetesEngineControlPlaneNetworkConfig() failed: %v", err)
-	}
-	if err := SetupKubernetesEngineControlPlaneNetwork(cfg); err == nil {
-		t.Fatalf("expected setup error, got nil")
-	}
-	want := []string{"netns-add:mke-demo", "veth-add", "ovs-add", "host-up", "ovs-delete", "netns-delete:mke-demo"}
-	if !reflect.DeepEqual(calls, want) {
-		t.Fatalf("calls = %v, want %v", calls, want)
-	}
-}
+	It("rolls back already-created resources when a later setup step fails", func() {
+		var calls []string
+		installFakeControlPlaneNetworkOps(&calls)
+		controlPlaneSetHostVethUp = func(string) error {
+			calls = append(calls, "host-up")
+			return errors.New("link failed")
+		}
+		cfg, err := NewKubernetesEngineControlPlaneNetworkConfig("demo", "br-demo", "172.16.90.100/24")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(SetupKubernetesEngineControlPlaneNetwork(cfg)).To(HaveOccurred())
+		Expect(calls).To(Equal([]string{"netns-add:mke-demo", "veth-add", "ovs-add", "host-up", "ovs-delete", "netns-delete:mke-demo"}))
+	})
 
-func TestAllocateKubernetesEngineAPIServerPort(t *testing.T) {
-	origProbe := kubernetesEnginePortProbe
-	t.Cleanup(func() { kubernetesEnginePortProbe = origProbe })
-	kubernetesEnginePortProbe = func(port int) bool { return port != 26444 }
-	engines := []api.KubernetesEngine{{Status: &api.Status{ApiServerPort: util.IntPtrInt(26443)}}}
-	port, err := AllocateKubernetesEngineAPIServerPort(engines, 26443, 26446)
-	if err != nil {
-		t.Fatalf("AllocateKubernetesEngineAPIServerPort() failed: %v", err)
-	}
-	if port != 26445 {
-		t.Fatalf("port = %d, want 26445", port)
-	}
-}
+	It("allocates the next free API server port outside used ranges", func() {
+		origProbe := kubernetesEnginePortProbe
+		DeferCleanup(func() { kubernetesEnginePortProbe = origProbe })
+		kubernetesEnginePortProbe = func(port int) bool { return port != 26444 }
+		engines := []api.KubernetesEngine{{Status: &api.Status{ApiServerPort: util.IntPtrInt(26443)}}}
+		port, err := AllocateKubernetesEngineAPIServerPort(engines, 26443, 26446)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(port).To(Equal(26445))
+	})
+})
 
-func installFakeControlPlaneNetworkOps(t *testing.T, calls *[]string) {
-	t.Helper()
+func installFakeControlPlaneNetworkOps(calls *[]string) {
 	origNamespaceExists := controlPlaneNamespaceExists
 	origCreateNamespace := controlPlaneCreateNamespace
 	origDeleteNamespace := controlPlaneDeleteNamespace
@@ -141,7 +111,7 @@ func installFakeControlPlaneNetworkOps(t *testing.T, calls *[]string) {
 		return nil
 	}
 
-	t.Cleanup(func() {
+	DeferCleanup(func() {
 		controlPlaneNamespaceExists = origNamespaceExists
 		controlPlaneCreateNamespace = origCreateNamespace
 		controlPlaneDeleteNamespace = origDeleteNamespace
