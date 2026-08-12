@@ -60,7 +60,7 @@ jobs:
     - name: コンフィグパッケージ
       run: | 
         cd pkg/config
-        sudo -E env "PATH=$PATH" make test
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make test
         cd ../..
 
   package-etcd-access:
@@ -76,7 +76,7 @@ jobs:
     - name: ETCDのデータアクセス パッケージ
       run: | 
         cd pkg/db
-        sudo -E env "PATH=$PATH" make test
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make test
         cd ../..
 
   package-qcow2-manipulation:
@@ -92,7 +92,7 @@ jobs:
     - name: QCOW2操作 パッケージ
       run: | 
         cd pkg/qcow
-        sudo -E env "PATH=$PATH" make test
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make test
         cd ../..
 
   package-util:
@@ -107,15 +107,15 @@ jobs:
     #    go-version: '1.26.2'
     - name: ランナーのセットアップ
       run: |
-        sudo -E env "PATH=$PATH" ./tools/setup.sh
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/setup.sh
     - name: ユーティリティ パッケージ テスト
       run: | 
         cd pkg/util
-        sudo -E env "PATH=$PATH" make test
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make test
         cd ../..
     - name: ランナーのセットアップ
       run: |
-        sudo -E env "PATH=$PATH" ./tools/cleanup.sh 
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/cleanup.sh 
 
   mactl-command-tests:
     runs-on: [ self-hosted, any ]
@@ -130,7 +130,7 @@ jobs:
     - name: mactl コマンド テスト
       run: |
         cd cmd/mactl
-        sudo -E env "PATH=$PATH" make test-unit
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make test-unit
         cd ../..
 
   package-lvm:
@@ -146,7 +146,7 @@ jobs:
     - name: ロジカルボリューム マネージャー 操作パッケージ
       run: | 
         cd pkg/lvm
-        sudo -E env "PATH=$PATH" make test
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make test
         cd ../..
       
   package-ceph:
@@ -164,7 +164,7 @@ jobs:
     - name: Cephブロックストレージ操作パッケージ
       run: | 
         cd pkg/ceph
-        sudo -E env "PATH=$PATH" make test
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make test
         cd ../..
 
   package-virsh:
@@ -179,19 +179,19 @@ jobs:
     #    go-version: '1.26.2'
     - name: ランナーのセットアップ
       run: |
-        sudo -E env "PATH=$PATH" ./tools/setup.sh
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/setup.sh
     - name: 仮想ネットワーク作成
       run: | 
-        sudo -E env "PATH=$PATH" ./tools/setup-libvirt-networks.sh
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/setup-libvirt-networks.sh
     - name: 仮想化操作 パッケージ
       run: | 
         cd pkg/virt
-        sudo -E env "PATH=$PATH" make test
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make test
         cd ../..
     - name: 仮想ネットワーク削除
       if: always()
       run: |
-        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/teardown-libvirt-networks.sh
 
   package-marmotd-volume:
     runs-on: [ self-hosted, any ]
@@ -206,8 +206,8 @@ jobs:
     - name: Test pkg/marmotd ボリューム機能テスト
       run: |
         cd pkg/marmotd
-        sudo -E env "PATH=$PATH" make test-volume
-        sudo -E env "PATH=$PATH" make test-ceph
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make test-volume
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make test-ceph
         cd ../..
 
   package-marmotd-server:
@@ -222,16 +222,16 @@ jobs:
     #    go-version: '1.26.2'
     - name: 仮想ネットワーク作成
       run: | 
-        sudo -E env "PATH=$PATH" ./tools/setup-libvirt-networks.sh
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/setup-libvirt-networks.sh
     - name: Test pkg/marmotd サーバー機能テスト
       run: |
         cd pkg/marmotd
-        sudo -E env "PATH=$PATH" make test-server
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make test-server
         cd ../..
     - name: 仮想ネットワーク削除
       if: always()
       run: |
-        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/teardown-libvirt-networks.sh
 
   package-marmotd-etc:
     runs-on: [ self-hosted, any ]
@@ -246,7 +246,7 @@ jobs:
     - name: 仮想ネットワーク削除
       if: always()
       run: |
-        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/teardown-libvirt-networks.sh
     - name: Test pkg/marmotd ネットワーク機能テスト
       run: |
         cd pkg/marmotd
@@ -261,7 +261,7 @@ jobs:
     - name: 仮想ネットワーク削除
       if: always()
       run: |
-        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/teardown-libvirt-networks.sh
 
   package-marmotd-images:
     runs-on: [ self-hosted, any ]
@@ -275,7 +275,7 @@ jobs:
     #    go-version: '1.26.2'
     - name: 仮想ネットワーク作成
       run: | 
-        sudo -E env "PATH=$PATH" ./tools/setup-libvirt-networks.sh
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/setup-libvirt-networks.sh
     - name: Test pkg/marmotd サーバーとイメージ機能テスト
       run: |
         cd pkg/marmotd
@@ -284,7 +284,7 @@ jobs:
     - name: 仮想ネットワーク削除
       if: always()
       run: |
-        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/teardown-libvirt-networks.sh
  
   package-marmotd-osimage:
     runs-on: [ self-hosted, any ]
@@ -314,18 +314,18 @@ jobs:
     #    go-version: '1.26.2'
     - name: 仮想ネットワーク作成
       run: |
-        sudo -E env "PATH=$PATH" ./tools/setup-libvirt-networks.sh
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/setup-libvirt-networks.sh
     - name: mactlコマンドのテスト その１
       run: |
         cd cmd/mactl
-        sudo -E env "PATH=$PATH" make mactl-test
-        sudo -E env "PATH=$PATH" make test0
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make mactl-test
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make test0
         cd ../..
-        sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/cleanup.sh
     - name: 仮想ネットワーク削除
       if: always()
       run: |
-        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/teardown-libvirt-networks.sh
 
   mactl-vm-deploy-1:
     runs-on: [ self-hosted, any ]
@@ -339,18 +339,18 @@ jobs:
     #    go-version: '1.26.2'
     - name: 仮想ネットワーク作成
       run: |
-        sudo -E env "PATH=$PATH" ./tools/setup-libvirt-networks.sh
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/setup-libvirt-networks.sh
     - name: mactlコマンドのテスト その１
       run: |
         cd cmd/mactl
-        sudo -E env "PATH=$PATH" make mactl-test
-        sudo -E env "PATH=$PATH" make test1
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make mactl-test
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make test1
         cd ../..
-        sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/cleanup.sh
     - name: 仮想ネットワーク削除
       if: always()
       run: |
-        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/teardown-libvirt-networks.sh
 
   mactl-vm-deploy-2:
     runs-on: [ self-hosted, any ]
@@ -365,18 +365,18 @@ jobs:
     - name: 仮想ネットワーク削除
       if: always()
       run: |
-        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/teardown-libvirt-networks.sh
     - name: mactlコマンドのテスト その２
       run: |
         cd cmd/mactl
-        sudo -E env "PATH=$PATH" make mactl-test
-        sudo -E env "PATH=$PATH" make test2
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make mactl-test
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make test2
         cd ../..
-        sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/cleanup.sh
     - name: 仮想ネットワーク削除
       if: always()
       run: |
-        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/teardown-libvirt-networks.sh
 
   mactl-vm-deploy-3:
     runs-on: [ self-hosted, any ]
@@ -391,18 +391,18 @@ jobs:
     - name: 仮想ネットワーク削除
       if: always()
       run: | 
-        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/teardown-libvirt-networks.sh
     - name: mactlコマンドのテスト その３
       run: | 
         cd cmd/mactl
-        sudo -E env "PATH=$PATH" make mactl-test
-        sudo -E env "PATH=$PATH" make test3
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make mactl-test
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make test3
         cd ../..
-        sudo -E env "PATH=$PATH" ./tools/cleanup.sh
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/cleanup.sh
     - name: 仮想ネットワーク削除
       if: always()
       run: |
-        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/teardown-libvirt-networks.sh
 
 
     #- name: Test cmd/maadm
@@ -411,7 +411,7 @@ jobs:
     #    sudo -s mkdir -p bin
     #    sudo -s chown ubuntu:ubuntu bin
     #    sudo -s chmod 755 bin
-    #    sudo -E env "PATH=$PATH" make test
+    #    sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make test
     #    sudo rm -fr bin
     #    cd ../..
  
@@ -454,16 +454,16 @@ jobs:
     - uses: actions/checkout@v5
     - name: 仮想ネットワーク作成
       run: |
-        sudo -E env "PATH=$PATH" ./tools/setup-libvirt-networks.sh
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/setup-libvirt-networks.sh
     - name: MKEノード実VM E2Eテスト
       run: |
         cd pkg/marmotd
-        sudo -E env "PATH=$PATH" make test-mke-vm-e2e
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make test-mke-vm-e2e
         cd ../..
     - name: 仮想ネットワーク削除
       if: always()
       run: |
-        sudo -E env "PATH=$PATH" ./tools/teardown-libvirt-networks.sh
+        sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/teardown-libvirt-networks.sh
 
   final-cleanup:
     runs-on: [ self-hosted, any ]
