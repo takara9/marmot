@@ -242,7 +242,8 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineRunning(ke api.Kub
 	slog.Debug("KubernetesEngineはRUNNING状態です（ヘルスチェックは未実装）", "id", id, "name", ke.Metadata.Name)
 }
 
-// reconcileKubernetesEngineDeleting は猶予期間経過後に呼び出され、専用ネットワークの削除要求を行い、
+// reconcileKubernetesEngineDeleting は猶予期間経過後に呼び出され、コントロールプレーンの解体
+// （systemdユニット・etcd・netns・専用IPの解放）と専用ネットワークの削除要求を行い、
 // ネットワークの削除完了を確認してからetcdから実削除する。
 // TODO: 次フェーズでノード(Server)等の関連リソース削除を先行させる。
 func (c *kubernetesEngineController) reconcileKubernetesEngineDeleting(ke api.KubernetesEngine) {
@@ -280,6 +281,7 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineDeleting(ke api.Ku
 	if len(networks) > 0 {
 		// ヘッド/フォロワーを問わず、このクラスタが所有する全てのネットワークエントリに
 		// 削除要求を出し、それら全てが消えるまでクラスタ本体の削除を待つ。
+		deprovisionAttempted := false
 		for _, network := range networks {
 			networkID := api.VirtualNetworkID(network)
 			if network.Status == nil {
@@ -287,6 +289,19 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineDeleting(ke api.Ku
 				// nilのままSetDeleteTimestampVirtualNetwork()を呼ぶとDB層でパニックするため回避する。
 				slog.Warn("network status is nil, skip delete timestamp update", "id", id, "networkId", networkID)
 				continue
+			}
+			// このクラスタ自身のノード間通信ネットワークについては、削除要求のタイムスタンプが
+			// 既に設定済み（=以前のreconcileで削除待ちに入った後）でも、コントロールプレーン
+			// （systemdユニット・etcd・netns・専用IP）が未解体ならここで解体する。
+			// 解体しないとコントロールプレーンIPがIPAM上に残り続け、
+			// CheckIPnetInUse()が常にtrueを返してネットワーク削除が永久にブロックされる。
+			if !deprovisionAttempted &&
+				network.Metadata.Name == kubernetesEngineNetworkName(current) &&
+				current.Status != nil && current.Status.ControlPlaneIpAddress != nil {
+				deprovisionAttempted = true
+				if deprovErr := DeprovisionKubernetesEngineControlPlane(c.db, current); deprovErr != nil {
+					slog.Warn("DeprovisionKubernetesEngineControlPlane() failed", "id", id, "err", deprovErr)
+				}
 			}
 			if network.Status.DeletionTimeStamp == nil {
 				if delErr := c.db.SetDeleteTimestampVirtualNetwork(networkID); delErr != nil {
