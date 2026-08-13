@@ -82,6 +82,9 @@ func (m *MarmotEndpoint) GetKubernetesEngineKubeconfigById(id string) ([]byte, *
 		return nil, nil, err
 	}
 	req.Header.Set("Accept", "text/plain")
+	if token := strings.TrimSpace(m.AccessToken); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 
 	status, body, jobURL, err := m.httpRequest(req)
 	if err != nil {

@@ -154,6 +154,11 @@ func DeprovisionKubernetesEngineControlPlane(database *db.Database, mkeConf *mar
 	if err := DeprovisionKubernetesEngineEtcd(clusterName); err != nil {
 		return err
 	}
+	// 同名クラスタが後で再作成された場合に、IPアドレスが変わっているにもかかわらず古い証明書
+	// (SANが古いIPのまま)が再利用されてTLS検証エラーになることを防ぐため、PKI一式を削除する。
+	if err := RemoveKubernetesEngineControlPlaneAssets(DefaultKubernetesEnginePkiDir, DefaultKubernetesControlPlaneConfigDir, clusterName); err != nil {
+		return err
+	}
 	network, err := database.GetVirtualNetworkByName(kubernetesEngineNetworkName(ke))
 	if err != nil {
 		return err

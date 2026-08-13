@@ -61,6 +61,24 @@ type controlPlaneUserConfig struct {
 	ClientKey         string `yaml:"client-key"`
 }
 
+// RemoveKubernetesEngineControlPlaneAssets はクラスタ専用のPKI(CA/証明書)一式と
+// コントロールプレーン設定(kubeconfig等)を削除する。同名クラスタが後で再作成された際に、
+// IPアドレスが変わっているにもかかわらず古い証明書(SANが古いIPのまま)が再利用されて
+// TLS検証エラーになることを防ぐため、クラスタ削除時に呼び出す。
+func RemoveKubernetesEngineControlPlaneAssets(pkiDir, configDir, clusterName string) error {
+	name, err := validateKubernetesEnginePkiClusterName(clusterName)
+	if err != nil {
+		return err
+	}
+	if err := os.RemoveAll(kubernetesEngineClusterPkiDir(pkiDir, name)); err != nil {
+		return fmt.Errorf("failed to remove control plane pki dir: %w", err)
+	}
+	if err := os.RemoveAll(filepath.Join(configDir, name)); err != nil {
+		return fmt.Errorf("failed to remove control plane config dir: %w", err)
+	}
+	return nil
+}
+
 func EnsureKubernetesEngineControlPlaneAssets(pkiDir, configDir, clusterName, apiServerIP string, apiServerPort int, hostBindAddress string) (KubernetesEngineControlPlaneAssets, error) {
 	name, err := validateKubernetesEnginePkiClusterName(clusterName)
 	if err != nil {
