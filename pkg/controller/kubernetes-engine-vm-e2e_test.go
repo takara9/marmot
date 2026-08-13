@@ -69,7 +69,7 @@ var _ = Describe("KubernetesEngine VM E2E", Ordered, func() {
 			stopHostStatus()
 			<-hostStatusDone
 		}
-		cleanupKubernetesEngineVMEndToEnd(ma, vmController, volumeController, networkController, engine, imageID)
+		cleanupKubernetesEngineVMEndToEnd(ma, mkeController, vmController, volumeController, networkController, engine, imageID)
 		if ma != nil {
 			_ = ma.Db.Close()
 		}
@@ -373,7 +373,7 @@ func kubernetesEngineE2ENodeRegistered(engine api.KubernetesEngine, expectedName
 	return false, nil
 }
 
-func cleanupKubernetesEngineVMEndToEnd(ma *marmotd.Marmot, vmController, volumeController, networkController *controller, engine api.KubernetesEngine, imageID string) {
+func cleanupKubernetesEngineVMEndToEnd(ma *marmotd.Marmot, mkeController *kubernetesEngineController, vmController, volumeController, networkController *controller, engine api.KubernetesEngine, imageID string) {
 	var cleanupErrors []error
 	if api.KubernetesEngineID(engine) != "" {
 		if current, err := ma.Db.GetKubernetesEngineById(api.KubernetesEngineID(engine)); err == nil {
@@ -400,7 +400,7 @@ func cleanupKubernetesEngineVMEndToEnd(ma *marmotd.Marmot, vmController, volumeC
 			cleanupErrors = append(cleanupErrors, fmt.Errorf("%d KubernetesEngine node server(s) remain", len(servers)))
 		}
 		if engine.Status != nil && engine.Status.ControlPlaneIpAddress != nil {
-			if err := DeprovisionKubernetesEngineControlPlane(ma.Db, engine); err != nil {
+			if err := DeprovisionKubernetesEngineControlPlane(ma.Db, mkeController.mkeConf, engine); err != nil {
 				cleanupErrors = append(cleanupErrors, fmt.Errorf("failed to deprovision control plane: %w", err))
 			}
 		}

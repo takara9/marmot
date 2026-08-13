@@ -23,6 +23,11 @@ type KubernetesEngineControlPlaneNetworkConfig struct {
 	BridgeName   string
 	Interface    string
 	CIDR         string
+	// HostCIDR は hostVeth (ホスト側/ルートnetns側) に割り当てるIPアドレス(CIDR形式)。
+	// コントロールプレーンnetnsのIPアドレスと同一サブネット内の別アドレスを指定することで、
+	// ルートnetnsからコントロールプレーンnetnsへの経路が確立され、
+	// kube-apiserverへのDNAT転送が可能になる。空の場合は付与しない(後方互換)。
+	HostCIDR string
 }
 
 var (
@@ -39,8 +44,8 @@ var (
 	controlPlaneRunIP           = func(args ...string) ([]byte, error) {
 		return exec.Command("ip", args...).CombinedOutput()
 	}
-	controlPlaneCreateVeth      = createControlPlaneVeth
-	controlPlaneAddOVSPort      = func(bridge, port string) error {
+	controlPlaneCreateVeth = createControlPlaneVeth
+	controlPlaneAddOVSPort = func(bridge, port string) error {
 		output, err := exec.Command("ovs-vsctl", "--may-exist", "add-port", bridge, port).CombinedOutput()
 		if err != nil {
 			return fmt.Errorf("ovs-vsctl add-port failed: %w (output=%s)", err, strings.TrimSpace(string(output)))
@@ -60,6 +65,17 @@ var (
 			return err
 		}
 		return netlink.LinkSetUp(link)
+	}
+	controlPlaneSetHostVethAddress = func(name, cidr string) error {
+		link, err := netlink.LinkByName(name)
+		if err != nil {
+			return err
+		}
+		address, err := netlink.ParseAddr(cidr)
+		if err != nil {
+			return err
+		}
+		return netlink.AddrAdd(link, address)
 	}
 	controlPlaneConfigurePeer = configureControlPlanePeer
 )
@@ -127,6 +143,11 @@ func SetupKubernetesEngineControlPlaneNetwork(cfg KubernetesEngineControlPlaneNe
 	}
 	if err = controlPlaneSetHostVethUp(cfg.HostVethName); err != nil {
 		return fmt.Errorf("failed to bring host veth up: %w", err)
+	}
+	if strings.TrimSpace(cfg.HostCIDR) != "" {
+		if err = controlPlaneSetHostVethAddress(cfg.HostVethName, cfg.HostCIDR); err != nil {
+			return fmt.Errorf("failed to assign host veth address: %w", err)
+		}
 	}
 	if err = controlPlaneConfigurePeer(cfg.Namespace, cfg.PeerVethName, cfg.Interface, cfg.CIDR); err != nil {
 		return fmt.Errorf("failed to configure network namespace: %w", err)

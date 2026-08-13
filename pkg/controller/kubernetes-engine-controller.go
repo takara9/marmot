@@ -299,7 +299,7 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineDeleting(ke api.Ku
 				network.Metadata.Name == kubernetesEngineNetworkName(current) &&
 				current.Status != nil && current.Status.ControlPlaneIpAddress != nil {
 				deprovisionAttempted = true
-				if deprovErr := DeprovisionKubernetesEngineControlPlane(c.db, current); deprovErr != nil {
+				if deprovErr := DeprovisionKubernetesEngineControlPlane(c.db, c.mkeConf, current); deprovErr != nil {
 					slog.Warn("DeprovisionKubernetesEngineControlPlane() failed", "id", id, "err", deprovErr)
 				}
 			}

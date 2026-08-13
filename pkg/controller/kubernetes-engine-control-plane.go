@@ -37,6 +37,13 @@ func ProvisionKubernetesEngineControlPlane(database *db.Database, mkeConf *marmo
 	if err != nil {
 		return err
 	}
+	hostBindAddress := strings.TrimSpace(mkeConf.ControlPlaneBindAddress)
+	if hostBindAddress == "" {
+		return fmt.Errorf("control plane host access requires control_plane_bind_address to be configured in %s", marmotd.DefaultMKEConfigPath)
+	}
+	if net.ParseIP(hostBindAddress) == nil {
+		return fmt.Errorf("control_plane_bind_address %q is not a valid IP address", hostBindAddress)
+	}
 	network, err := database.GetVirtualNetworkByName(kubernetesEngineNetworkName(ke))
 	if err != nil {
 		return fmt.Errorf("failed to get KubernetesEngine network: %w", err)
@@ -66,15 +73,28 @@ func ProvisionKubernetesEngineControlPlane(database *db.Database, mkeConf *marmo
 			}
 		}()
 	}
-	if err = database.UpdateKubernetesEngineControlPlaneStatus(api.KubernetesEngineID(ke), ipAddress, apiServerPort, resolvedVersion); err != nil {
+	hostIPAddress, hostAllocated, err := resolveControlPlaneHostAddress(database, network, ke)
+	if err != nil {
+		return err
+	}
+	if hostAllocated {
+		defer func() {
+			if hostAllocated && err != nil {
+				_ = database.ReleaseIP(api.VirtualNetworkID(network), *network.Spec.IpNetworkId, hostIPAddress)
+			}
+		}()
+	}
+	if err = database.UpdateKubernetesEngineControlPlaneStatus(api.KubernetesEngineID(ke), ipAddress, hostIPAddress, apiServerPort, resolvedVersion); err != nil {
 		return err
 	}
 	allocated = false
+	hostAllocated = false
 
 	networkCfg, err := NewKubernetesEngineControlPlaneNetworkConfig(clusterName, *network.Spec.BridgeName, fmt.Sprintf("%s/%d", ipAddress, maskBits))
 	if err != nil {
 		return err
 	}
+	networkCfg.HostCIDR = fmt.Sprintf("%s/%d", hostIPAddress, maskBits)
 	// Only rollback network resources if we created them in this call.
 	hadNamespace := controlPlaneNamespaceExists(networkCfg.Namespace)
 	if err = SetupKubernetesEngineControlPlaneNetwork(networkCfg); err != nil {
@@ -90,7 +110,7 @@ func ProvisionKubernetesEngineControlPlane(database *db.Database, mkeConf *marmo
 	if _, _, err = ProvisionKubernetesEngineEtcd(database, mkeConf, ownEtcdURL, ke); err != nil {
 		return err
 	}
-	assets, err := EnsureKubernetesEngineControlPlaneAssets(DefaultKubernetesEnginePkiDir, DefaultKubernetesControlPlaneConfigDir, clusterName, ipAddress, apiServerPort)
+	assets, err := EnsureKubernetesEngineControlPlaneAssets(DefaultKubernetesEnginePkiDir, DefaultKubernetesControlPlaneConfigDir, clusterName, ipAddress, apiServerPort, hostBindAddress)
 	if err != nil {
 		return err
 	}
@@ -117,10 +137,13 @@ func ProvisionKubernetesEngineControlPlane(database *db.Database, mkeConf *marmo
 	if err = CreateKubernetesEngineControlPlaneUnits(unitCfg); err != nil {
 		return err
 	}
+	if err = EnsureKubernetesEngineControlPlaneNAT(hostBindAddress, ipAddress, apiServerPort); err != nil {
+		return err
+	}
 	return CheckKubernetesEngineControlPlaneHealth(networkCfg.Namespace, assets.CACertPath, ipAddress, apiServerPort)
 }
 
-func DeprovisionKubernetesEngineControlPlane(database *db.Database, ke api.KubernetesEngine) error {
+func DeprovisionKubernetesEngineControlPlane(database *db.Database, mkeConf *marmotd.MKEConfig, ke api.KubernetesEngine) error {
 	clusterName, err := validateKubernetesEngineEtcdClusterName(ke.Metadata.Name)
 	if err != nil {
 		return err
@@ -138,6 +161,12 @@ func DeprovisionKubernetesEngineControlPlane(database *db.Database, ke api.Kuber
 	if network.Spec.BridgeName == nil || network.Spec.IpNetworkId == nil || ke.Status == nil || ke.Status.ControlPlaneIpAddress == nil {
 		return fmt.Errorf("KubernetesEngine control plane network status is incomplete")
 	}
+	hostBindAddress := strings.TrimSpace(mkeConf.ControlPlaneBindAddress)
+	if hostBindAddress != "" && ke.Status.ApiServerPort != nil {
+		if err := RemoveKubernetesEngineControlPlaneNAT(hostBindAddress, *ke.Status.ControlPlaneIpAddress, *ke.Status.ApiServerPort); err != nil {
+			return err
+		}
+	}
 	networkCfg, err := NewKubernetesEngineControlPlaneNetworkConfig(clusterName, *network.Spec.BridgeName, *ke.Status.ControlPlaneIpAddress+"/32")
 	if err != nil {
 		return err
@@ -145,7 +174,13 @@ func DeprovisionKubernetesEngineControlPlane(database *db.Database, ke api.Kuber
 	if err := TeardownKubernetesEngineControlPlaneNetwork(networkCfg); err != nil {
 		return err
 	}
-	return database.ReleaseIP(api.VirtualNetworkID(network), *network.Spec.IpNetworkId, *ke.Status.ControlPlaneIpAddress)
+	if err := database.ReleaseIP(api.VirtualNetworkID(network), *network.Spec.IpNetworkId, *ke.Status.ControlPlaneIpAddress); err != nil {
+		return err
+	}
+	if ke.Status.ControlPlaneHostIpAddress != nil {
+		return database.ReleaseIP(api.VirtualNetworkID(network), *network.Spec.IpNetworkId, *ke.Status.ControlPlaneHostIpAddress)
+	}
+	return nil
 }
 
 func resolveControlPlaneBinaries(mkeConf *marmotd.MKEConfig, ke api.KubernetesEngine) (string, map[string]string, error) {
@@ -189,4 +224,20 @@ func resolveControlPlaneAddress(database *db.Database, network api.VirtualNetwor
 		return "", 0, 0, false, err
 	}
 	return ipAddress, maskBits, apiServerPort, true, nil
+}
+
+// resolveControlPlaneHostAddress は hostVeth (ルートnetns側) に割り当てるIPアドレスを解決する。
+// 既にStatusに記録済みの場合はそれを再利用し(冪等)、未割り当ての場合は同じサブネットから
+// 新規に採番する。このアドレスは、ルートnetnsからコントロールプレーンnetnsへの経路確立
+// (kube-apiserverへのDNAT転送)専用であり、外部には公開しない。
+func resolveControlPlaneHostAddress(database *db.Database, network api.VirtualNetwork, ke api.KubernetesEngine) (hostIPAddress string, allocated bool, err error) {
+	if ke.Status != nil && ke.Status.ControlPlaneHostIpAddress != nil {
+		return *ke.Status.ControlPlaneHostIpAddress, false, nil
+	}
+	ipNetworkID := strings.TrimSpace(*network.Spec.IpNetworkId)
+	hostIPAddress, _, err = database.AllocateIP(api.VirtualNetworkID(network), ipNetworkID, "mke-control-plane-host-"+api.KubernetesEngineID(ke))
+	if err != nil {
+		return "", false, err
+	}
+	return hostIPAddress, true, nil
 }

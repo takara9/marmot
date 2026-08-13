@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -60,7 +61,7 @@ type controlPlaneUserConfig struct {
 	ClientKey         string `yaml:"client-key"`
 }
 
-func EnsureKubernetesEngineControlPlaneAssets(pkiDir, configDir, clusterName, apiServerIP string, apiServerPort int) (KubernetesEngineControlPlaneAssets, error) {
+func EnsureKubernetesEngineControlPlaneAssets(pkiDir, configDir, clusterName, apiServerIP string, apiServerPort int, hostBindAddress string) (KubernetesEngineControlPlaneAssets, error) {
 	name, err := validateKubernetesEnginePkiClusterName(clusterName)
 	if err != nil {
 		return KubernetesEngineControlPlaneAssets{}, err
@@ -68,6 +69,13 @@ func EnsureKubernetesEngineControlPlaneAssets(pkiDir, configDir, clusterName, ap
 	clusterName = name
 	if net.ParseIP(apiServerIP) == nil {
 		return KubernetesEngineControlPlaneAssets{}, fmt.Errorf("invalid API server IP address %q", apiServerIP)
+	}
+	apiServerIPAddresses := []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP(apiServerIP)}
+	if hostBindAddress = strings.TrimSpace(hostBindAddress); hostBindAddress != "" {
+		if net.ParseIP(hostBindAddress) == nil {
+			return KubernetesEngineControlPlaneAssets{}, fmt.Errorf("invalid host bind address %q", hostBindAddress)
+		}
+		apiServerIPAddresses = append(apiServerIPAddresses, net.ParseIP(hostBindAddress))
 	}
 	caCertPath, _, err := EnsureKubernetesEngineCA(pkiDir, clusterName)
 	if err != nil {
@@ -79,7 +87,7 @@ func EnsureKubernetesEngineControlPlaneAssets(pkiDir, configDir, clusterName, ap
 		Organizations: []string{"kubernetes"},
 		Usage:         KubernetesEngineCertUsageServer,
 		DNSNames:      []string{"localhost", "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster.local"},
-		IPAddresses:   []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP(apiServerIP)},
+		IPAddresses:   apiServerIPAddresses,
 	})
 	if err != nil {
 		return KubernetesEngineControlPlaneAssets{}, err

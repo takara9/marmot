@@ -1883,6 +1883,32 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /kubernetes-engine/{id}/kubeconfig:
+    get:
+      summary: "Download admin kubeconfig for KubernetesEngine"
+      operationId: apiGetKubernetesEngineKubeconfigById
+      tags:
+        - kubernetes-engine
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the KubernetesEngine to retrieve the kubeconfig for
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Admin kubeconfig in kubeconfig YAML format
+          content:
+            text/plain:
+              schema:
+                type: string
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
 components:
   schemas:
@@ -2116,6 +2142,9 @@ components:
         controlPlaneIpAddress:
           type: string
           description: クラスタ専用ネットワーク名前空間に割り当てたIPアドレス。
+        controlPlaneHostIpAddress:
+          type: string
+          description: マルモtdホスト側veth(hostVeth)に割り当てた、コントロールプレーンnetnsへの経路確立用IPアドレス。
         resolvedKubernetesVersion:
           type: string
           description: mke.jsonの指定から解決したKubernetesのパッチバージョン。

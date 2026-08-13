@@ -215,7 +215,7 @@ func (d *Database) UpdateKubernetesEngineEtcdPorts(id string, clientPort, peerPo
 
 // UpdateKubernetesEngineControlPlaneStatus はクラスタ専用コントロールプレーンの
 // 接続情報と解決済みKubernetesバージョンをStatusに記録する。
-func (d *Database) UpdateKubernetesEngineControlPlaneStatus(id, ipAddress string, apiServerPort int, resolvedVersion string) error {
+func (d *Database) UpdateKubernetesEngineControlPlaneStatus(id, ipAddress, hostIPAddress string, apiServerPort int, resolvedVersion string) error {
 	for {
 		rec, err := d.GetKubernetesEngineById(id)
 		if err != nil {
@@ -226,6 +226,7 @@ func (d *Database) UpdateKubernetesEngineControlPlaneStatus(id, ipAddress string
 		}
 		rec.Status.ApiServerPort = util.IntPtrInt(apiServerPort)
 		rec.Status.ControlPlaneIpAddress = util.StringPtr(ipAddress)
+		rec.Status.ControlPlaneHostIpAddress = util.StringPtr(hostIPAddress)
 		rec.Status.ResolvedKubernetesVersion = util.StringPtr(resolvedVersion)
 		rec.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
 
