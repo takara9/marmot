@@ -91,6 +91,13 @@ func EnsureKubernetesEngineCephCSI(mkeConf *marmotd.MKEConfig, ke api.Kubernetes
 	}
 
 	apply := func(manifest []byte) error {
+		// Create cluster-specific resources first so upstream manifests don't create placeholders
+		// that would later prevent these from being created (apply is create-only).
+		for _, doc := range kubernetesEngineCephCSIGeneratedManifests(cephCfg.CephPoolByClass, monitors, user, keyValue, strings.TrimSpace(mkeConf.CephFilesystemName)) {
+			if err := applyKubernetesEngineManifestObject(namespace, caPath, adminCertPath, adminKeyPath, apiEndpointBase, doc); err != nil {
+				return err
+			}
+		}
 		for _, doc := range splitKubernetesEngineYAMLDocuments(manifest) {
 			if err := applyKubernetesEngineManifestObject(namespace, caPath, adminCertPath, adminKeyPath, apiEndpointBase, doc); err != nil {
 				return err
