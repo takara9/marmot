@@ -36,6 +36,10 @@ const (
 
 var kubernetesEngineCephCSIKeyringKeyPattern = regexp.MustCompile(`(?i)^\s*key\s*=\s*(\S+)\s*$`)
 
+// kubernetesEngineCephCSIValidDNSLabelPattern は、Kubernetes リソース名セグメントとして
+// 使用できる文字（小文字英数字とハイフン、先頭・末尾は英数字）のみを許可する。
+var kubernetesEngineCephCSIValidDNSLabelPattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`)
+
 // EnsureKubernetesEngineCephCSI は、marmotd.json の ceph_enabled=true の場合に、
 // Ceph CSI（RBD/ブロックストレージ用、CephFS/ファイルストレージ用の2ドライバー）を
 // コントロールプレーンのAPIサーバーへ適用する。Cephが無効な場合は何もしない（no-op）。
@@ -94,6 +98,12 @@ func EnsureKubernetesEngineCephCSI(mkeConf *marmotd.MKEConfig, ke api.Kubernetes
 	keyValue, err := kubernetesEngineCephCSIKeyFromKeyring(keyringContent)
 	if err != nil {
 		return fmt.Errorf("failed to parse Ceph keyring: %w", err)
+	}
+
+	for class := range cephCfg.CephPoolByClass {
+		if !kubernetesEngineCephCSIValidDNSLabelPattern.MatchString(class) {
+			return fmt.Errorf("ceph_pool_by_class key %q is not a valid Kubernetes resource name segment (must match [a-z0-9]([a-z0-9-]*[a-z0-9])?)", class)
+		}
 	}
 
 	apply := func(manifest []byte) error {
