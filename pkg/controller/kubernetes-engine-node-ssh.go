@@ -46,6 +46,14 @@ type kubernetesEngineNodeProvisionData struct {
 	PodNetworkSupernet string
 	// CNIPluginsVersion は containernetworking/plugins のリリースバージョン。
 	CNIPluginsVersion string
+
+	// CephEnabled は marmotd.json の ceph_enabled が true かどうか。trueの場合、ノードへ
+	// Cephクライアント(ceph-common、カーネルモジュール前提)と/etc/ceph設定を導入する。
+	CephEnabled bool
+	// CephConfContent は /etc/ceph/ceph.conf の内容(marmotdホストのものをそのまま配布する)。
+	CephConfContent []byte
+	// CephKeyringContent は /etc/ceph/ceph.client.admin.keyring の内容。
+	CephKeyringContent []byte
 }
 
 // kubernetesEngineNodeRoute は、Bridge CNI選択時にノードへ追加する、
@@ -131,7 +139,7 @@ func runKubernetesEngineNodeProvisionSteps(runner kubernetesEngineNodeCommandRun
 					"sha=$(curl -fsSL %s | awk '{print $1}') && "+
 					"echo \"$sha  $tmp\" | sha256sum -c - && "+
 					"install -m 0755 \"$tmp\" %s"+
-				")",
+					")",
 				shellQuote(dest), shellQuote(binURL), shellQuote(shaURL), shellQuote(dest),
 			), nil)
 		}); err != nil {
@@ -141,6 +149,12 @@ func runKubernetesEngineNodeProvisionSteps(runner kubernetesEngineNodeCommandRun
 
 	if data.NetworkKind != kubernetesEngineNetworkKindCilium {
 		if err := installKubernetesEngineBridgeCNI(runner, data); err != nil {
+			return err
+		}
+	}
+
+	if data.CephEnabled {
+		if err := installKubernetesEngineCephClient(runner, data); err != nil {
 			return err
 		}
 	}
@@ -243,6 +257,26 @@ func installKubernetesEngineBridgeCNI(runner kubernetesEngineNodeCommandRunner, 
 
 	return runner.step("configure pod network NAT", func() error {
 		return runner.run(kubernetesEnginePodNetworkNATScript(data.PodNetworkSupernet), nil)
+	})
+}
+
+// installKubernetesEngineCephClient は、Ceph連携(ceph_enabled=true)が有効な場合に、ノードへ
+// Cephクライアントパッケージと/etc/ceph配下の設定(ceph.conf/keyring)を導入する。Ceph CSIの
+// node-pluginがホストのカーネルモジュール(rbd/ceph)経由でボリュームをマウントするために必要。
+func installKubernetesEngineCephClient(runner kubernetesEngineNodeCommandRunner, data kubernetesEngineNodeProvisionData) error {
+	if err := runner.step("install Ceph client packages", func() error {
+		return runner.run("DEBIAN_FRONTEND=noninteractive apt-get install -y ceph-common", nil)
+	}); err != nil {
+		return err
+	}
+	return runner.step("configure Ceph client", func() error {
+		if err := runner.run("mkdir -p /etc/ceph", nil); err != nil {
+			return err
+		}
+		if err := runner.writeFile("/etc/ceph/ceph.conf", "0644", data.CephConfContent); err != nil {
+			return err
+		}
+		return runner.writeFile("/etc/ceph/ceph.client.admin.keyring", "0600", data.CephKeyringContent)
 	})
 }
 

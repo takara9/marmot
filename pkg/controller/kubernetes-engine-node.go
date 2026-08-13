@@ -82,6 +82,9 @@ func ProvisionKubernetesEngineNodes(database *db.Database, mkeConf *marmotd.MKEC
 			return false, fmt.Errorf("failed to install Cilium CNI: %w", err)
 		}
 	}
+	if err := EnsureKubernetesEngineCephCSI(mkeConf, ke); err != nil {
+		return false, fmt.Errorf("failed to install Ceph CSI: %w", err)
+	}
 
 	servers, err := findKubernetesEngineNodeServers(database, ke)
 	if err != nil {
@@ -437,6 +440,19 @@ func configureKubernetesEngineNode(mkeConf *marmotd.MKEConfig, ke api.Kubernetes
 		CNIPluginsVersion:   strings.TrimPrefix(strings.TrimSpace(mkeConf.CNIPluginsVersion), "v"),
 	}
 	nodeID := fmt.Sprintf("%s-%s", api.KubernetesEngineID(ke), nodeName)
+	if marmotd.CurrentConfig().CephEnabled {
+		cephConf, readErr := os.ReadFile(marmotd.DefaultCephConfPath)
+		if readErr != nil {
+			return fmt.Errorf("failed to read Ceph conf for node provisioning: %w", readErr)
+		}
+		cephKeyring, readErr := os.ReadFile(marmotd.DefaultCephKeyringPath)
+		if readErr != nil {
+			return fmt.Errorf("failed to read Ceph keyring for node provisioning: %w", readErr)
+		}
+		data.CephEnabled = true
+		data.CephConfContent = cephConf
+		data.CephKeyringContent = cephKeyring
+	}
 	// ノードのIPは「ノード間通信用ネットワーク」上のアドレスであり、ホストのroot netnsからは
 	// 到達できないため、コントロールプレーン用に作成済みのnetns(veth経由でOVSブリッジに接続済み)
 	// を経由してSSH接続する。
