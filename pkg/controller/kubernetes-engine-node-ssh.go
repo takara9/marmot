@@ -228,7 +228,7 @@ func installKubernetesEngineBridgeCNI(runner kubernetesEngineNodeCommandRunner, 
 		data.CNIPluginsVersion, arch, data.CNIPluginsVersion)
 	if err := runner.step("install CNI plugins", func() error {
 		return runner.run(fmt.Sprintf("mkdir -p /opt/cni/bin && "+
-			"test -e /opt/cni/bin/bridge || (curl -fsSL %s | tar -xz -C /opt/cni/bin)",
+			"test -e /opt/cni/bin/bridge || (url=%[1]s; fn=$(basename $url); curl -fsSL $url -o /tmp/$fn && curl -fsSL $url.sha256 -o /tmp/$fn.sha256 && (cd /tmp && sha256sum -c $fn.sha256) && tar -xz -C /opt/cni/bin -f /tmp/$fn && rm -f /tmp/$fn /tmp/$fn.sha256)",
 			shellQuote(cniURL)), nil)
 	}); err != nil {
 		return err
