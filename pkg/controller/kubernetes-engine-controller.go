@@ -281,6 +281,7 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineDeleting(ke api.Ku
 	if len(networks) > 0 {
 		// ヘッド/フォロワーを問わず、このクラスタが所有する全てのネットワークエントリに
 		// 削除要求を出し、それら全てが消えるまでクラスタ本体の削除を待つ。
+		deprovisionAttempted := false
 		for _, network := range networks {
 			networkID := api.VirtualNetworkID(network)
 			if network.Status == nil {
@@ -294,8 +295,10 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineDeleting(ke api.Ku
 			// （systemdユニット・etcd・netns・専用IP）が未解体ならここで解体する。
 			// 解体しないとコントロールプレーンIPがIPAM上に残り続け、
 			// CheckIPnetInUse()が常にtrueを返してネットワーク削除が永久にブロックされる。
-			if network.Metadata.Name == kubernetesEngineNetworkName(current) &&
+			if !deprovisionAttempted &&
+				network.Metadata.Name == kubernetesEngineNetworkName(current) &&
 				current.Status != nil && current.Status.ControlPlaneIpAddress != nil {
+				deprovisionAttempted = true
 				if deprovErr := DeprovisionKubernetesEngineControlPlane(c.db, current); deprovErr != nil {
 					slog.Warn("DeprovisionKubernetesEngineControlPlane() failed", "id", id, "err", deprovErr)
 				}
