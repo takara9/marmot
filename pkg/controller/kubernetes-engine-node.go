@@ -331,7 +331,7 @@ func reconcileKubernetesEngineNodeRoutes(ke api.KubernetesEngine, servers []api.
 		}
 		internalIP, err := kubernetesEngineNodeInternalIP(server, networkName)
 		if err != nil {
-			continue
+			return fmt.Errorf("failed to determine internal IP for node %s: %w", server.Metadata.Name, err)
 		}
 		index, err := kubernetesEngineNodeIndex(server.Metadata.Name)
 		if err != nil {
