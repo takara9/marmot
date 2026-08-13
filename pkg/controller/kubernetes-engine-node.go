@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/ceph"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
 	"github.com/takara9/marmot/pkg/util"
@@ -449,8 +450,13 @@ func configureKubernetesEngineNode(mkeConf *marmotd.MKEConfig, ke api.Kubernetes
 		if readErr != nil {
 			return fmt.Errorf("failed to read Ceph keyring for node provisioning: %w", readErr)
 		}
+		_, cephUser, parseErr := ceph.ParseConnectionFromConf(marmotd.DefaultCephConfPath, marmotd.DefaultCephKeyringPath)
+		if parseErr != nil {
+			return fmt.Errorf("failed to parse Ceph connection info for node provisioning: %w", parseErr)
+		}
 		data.CephEnabled = true
 		data.CephConfContent = cephConf
+		data.CephUser = cephUser
 		data.CephKeyringContent = cephKeyring
 	}
 	// ノードのIPは「ノード間通信用ネットワーク」上のアドレスであり、ホストのroot netnsからは

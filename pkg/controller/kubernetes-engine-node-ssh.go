@@ -52,7 +52,10 @@ type kubernetesEngineNodeProvisionData struct {
 	CephEnabled bool
 	// CephConfContent は /etc/ceph/ceph.conf の内容(marmotdホストのものをそのまま配布する)。
 	CephConfContent []byte
-	// CephKeyringContent は /etc/ceph/ceph.client.admin.keyring の内容。
+	// CephUser は Cephキーリングのユーザー名(例: "admin"、"csi-rbd")。
+	// /etc/ceph/ceph.client.<CephUser>.keyring のファイル名に使用する。
+	CephUser string
+	// CephKeyringContent は /etc/ceph/ceph.client.<CephUser>.keyring の内容。
 	CephKeyringContent []byte
 }
 
@@ -276,7 +279,7 @@ func installKubernetesEngineCephClient(runner kubernetesEngineNodeCommandRunner,
 		if err := runner.writeFile("/etc/ceph/ceph.conf", "0644", data.CephConfContent); err != nil {
 			return err
 		}
-		return runner.writeFile("/etc/ceph/ceph.client.admin.keyring", "0600", data.CephKeyringContent)
+		return runner.writeFile(fmt.Sprintf("/etc/ceph/ceph.client.%s.keyring", data.CephUser), "0600", data.CephKeyringContent)
 	})
 }
 
