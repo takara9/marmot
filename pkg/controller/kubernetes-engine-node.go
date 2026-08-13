@@ -70,10 +70,14 @@ func ProvisionKubernetesEngineNodes(database *db.Database, mkeConf *marmotd.MKEC
 	if ke.Status == nil || ke.Status.ControlPlaneIpAddress == nil || ke.Status.ApiServerPort == nil || ke.Status.ResolvedKubernetesVersion == nil {
 		return false, fmt.Errorf("KubernetesEngine control plane status is incomplete")
 	}
+	networkKind, err := validatedKubernetesEngineNodeNetworkKind(ke)
+	if err != nil {
+		return false, err
+	}
 	if err := ensureKubernetesEngineNodeSSHAssets(); err != nil {
 		return false, fmt.Errorf("failed to prepare KubernetesEngine node SSH assets: %w", err)
 	}
-	if kubernetesEngineNodeNetworkKind(ke) == kubernetesEngineNetworkKindCilium {
+	if networkKind == kubernetesEngineNetworkKindCilium {
 		if err := EnsureKubernetesEngineCiliumCNI(mkeConf, ke); err != nil {
 			return false, fmt.Errorf("failed to install Cilium CNI: %w", err)
 		}
@@ -133,7 +137,7 @@ func ProvisionKubernetesEngineNodes(database *db.Database, mkeConf *marmotd.MKEC
 		expectedNames = append(expectedNames, server.Metadata.Name)
 	}
 
-	if kubernetesEngineNodeNetworkKind(ke) != kubernetesEngineNetworkKindCilium {
+	if networkKind != kubernetesEngineNetworkKindCilium {
 		if err := reconcileKubernetesEngineNodeRoutes(ke, servers); err != nil {
 			return false, fmt.Errorf("failed to configure pod network routes: %w", err)
 		}
@@ -276,6 +280,9 @@ func kubernetesEngineNodeIndex(name string) (int, error) {
 	n, err := strconv.Atoi(matches[1])
 	if err != nil {
 		return 0, fmt.Errorf("cannot determine node index from name %q: %w", name, err)
+	}
+	if n < 1 {
+		return 0, fmt.Errorf("cannot determine node index from name %q: node number must be >= 1", name)
 	}
 	return n - 1, nil
 }
