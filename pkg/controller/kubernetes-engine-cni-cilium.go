@@ -199,11 +199,13 @@ func applyKubernetesEngineManifestObject(namespace, caPath, certPath, keyPath, a
 func kubernetesEngineAPIResourceExists(namespace, caPath, certPath, keyPath, url string) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	output, err := exec.CommandContext(ctx, "ip", "netns", "exec", namespace, "curl",
-		"--silent", "--show-error", "--output", "/dev/null", "--write-out", "%{http_code}",
-		"--cacert", caPath, "--cert", certPath, "--key", keyPath, url).CombinedOutput()
-	if err != nil {
-		return false, fmt.Errorf("failed to check existing resource at %s: %w (output=%s)", url, err, strings.TrimSpace(string(output)))
+	code := strings.TrimSpace(string(output))
+	switch code {
+	case "200":
+		return true, nil
+	case "404":
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status %s when checking existing resource at %s", code, url)
 	}
-	return strings.TrimSpace(string(output)) == "200", nil
 }
