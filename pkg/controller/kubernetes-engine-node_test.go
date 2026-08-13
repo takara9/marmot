@@ -2,6 +2,7 @@ package controller
 
 import (
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/util"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -70,4 +71,97 @@ var _ = Describe("KubernetesEngineNode", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(address).To(Equal("172.16.1.10"))
 	})
+
+	It("rejects an unsupported nodeSpec.network.kind", func() {
+		kind := "flannel"
+		ke := api.KubernetesEngine{
+			Metadata: api.Metadata{Name: "demo"},
+			Spec: api.KubernetesEngineSpec{
+				Nodes:    1,
+				NodeSpec: &api.KubernetesEngineNodeSpec{Network: &api.KubernetesEngineNodeNetwork{Kind: &kind}},
+			},
+		}
+		_, err := buildKubernetesEngineNodeServerSpec(ke, 0, "ssh-rsa AAAA")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("nodeSpec.network.kind"))
+	})
+
+	It("defaults nodeSpec.network.kind to bridge (none) when unset", func() {
+		ke := api.KubernetesEngine{Metadata: api.Metadata{Name: "demo"}}
+		Expect(kubernetesEngineNodeNetworkKind(ke)).To(Equal(kubernetesEngineNetworkKindBridge))
+	})
+
+	It("recognizes cilium as a valid nodeSpec.network.kind", func() {
+		kind := "Cilium"
+		ke := api.KubernetesEngine{
+			Metadata: api.Metadata{Name: "demo"},
+			Spec: api.KubernetesEngineSpec{
+				NodeSpec: &api.KubernetesEngineNodeSpec{Network: &api.KubernetesEngineNodeNetwork{Kind: &kind}},
+			},
+		}
+		Expect(kubernetesEngineNodeNetworkKind(ke)).To(Equal(kubernetesEngineNetworkKindCilium))
+	})
+
+	It("derives the pod CIDR from the node index", func() {
+		Expect(kubernetesEnginePodCIDR(0)).To(Equal("10.244.1.0/24"))
+		Expect(kubernetesEnginePodCIDR(4)).To(Equal("10.244.5.0/24"))
+	})
+
+	It("derives the node index from its name", func() {
+		index, err := kubernetesEngineNodeIndex("mke-demo-node-3")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(index).To(Equal(2))
+
+		_, err = kubernetesEngineNodeIndex("not-a-node-name")
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("reconciles cross-node pod routes for every running node when bridge CNI is used", func() {
+		origRouting := runKubernetesEngineNodeRouting
+		DeferCleanup(func() { runKubernetesEngineNodeRouting = origRouting })
+
+		type call struct {
+			address string
+			nodeID  string
+			routes  []kubernetesEngineNodeRoute
+		}
+		var calls []call
+		runKubernetesEngineNodeRouting = func(address, privateKeyPath, namespace, nodeID string, routes []kubernetesEngineNodeRoute) error {
+			calls = append(calls, call{address: address, nodeID: nodeID, routes: routes})
+			return nil
+		}
+
+		ke := api.KubernetesEngine{Metadata: api.Metadata{Name: "demo"}}
+		api.SetKubernetesEngineID(&ke, "ke123")
+		servers := []api.Server{
+			{
+				Metadata: api.Metadata{Name: "mke-demo-node-1"},
+				Spec: api.ServerSpec{NetworkInterface: &[]api.NetworkInterface{
+					{Networkname: "mke-demo", Address: util.StringPtr("172.16.1.10")},
+				}},
+				Status: &api.Status{StatusCode: db.SERVER_RUNNING},
+			},
+			{
+				Metadata: api.Metadata{Name: "mke-demo-node-2"},
+				Spec: api.ServerSpec{NetworkInterface: &[]api.NetworkInterface{
+					{Networkname: "mke-demo", Address: util.StringPtr("172.16.1.11")},
+				}},
+				Status: &api.Status{StatusCode: db.SERVER_RUNNING},
+			},
+			{
+				Metadata: api.Metadata{Name: "mke-demo-node-3"},
+				Spec: api.ServerSpec{NetworkInterface: &[]api.NetworkInterface{
+					{Networkname: "mke-demo", Address: util.StringPtr("172.16.1.12")},
+				}},
+				Status: &api.Status{StatusCode: db.SERVER_PENDING},
+			},
+		}
+
+		Expect(reconcileKubernetesEngineNodeRoutes(ke, servers)).To(Succeed())
+		Expect(calls).To(HaveLen(2))
+		for _, c := range calls {
+			Expect(c.routes).To(HaveLen(1))
+		}
+	})
 })
+

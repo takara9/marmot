@@ -127,6 +127,10 @@ func newTestKubernetesEngineNodeProvisionData() kubernetesEngineNodeProvisionDat
 		KubeProxyKubeconfig: []byte("kube-proxy-kubeconfig"),
 		KubeletConfig:       []byte("kubelet-config"),
 		KubeProxyConfig:     []byte("kube-proxy-config"),
+		NetworkKind:         kubernetesEngineNetworkKindBridge,
+		PodCIDR:             "10.244.1.0/24",
+		PodNetworkSupernet:  kubernetesEnginePodNetworkSupernet,
+		CNIPluginsVersion:   "1.4.0",
 	}
 }
 
@@ -196,5 +200,51 @@ var _ = Describe("runKubernetesEngineNodeProvisionSteps", func() {
 		err := runKubernetesEngineNodeProvisionSteps(runner, data)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("install runtime dependencies"))
+	})
+
+	It("installs and configures the bridge CNI when network.kind is not cilium", func() {
+		runner := &fakeKubernetesEngineNodeCommandRunner{outputs: map[string]string{"uname -m": "x86_64"}}
+		data := newTestKubernetesEngineNodeProvisionData()
+
+		Expect(runKubernetesEngineNodeProvisionSteps(runner, data)).To(Succeed())
+
+		joined := strings.Join(runner.commands, "\n")
+		Expect(joined).To(ContainSubstring("cni-plugins-linux-amd64-v1.4.0.tgz"))
+		Expect(joined).To(ContainSubstring("iptables -t nat"))
+		Expect(runner.files).To(HaveKey("/etc/cni/net.d/10-bridge.conflist"))
+		Expect(runner.files["/etc/cni/net.d/10-bridge.conflist"]).To(ContainSubstring(`"subnet": "10.244.1.0/24"`))
+	})
+
+	It("skips the bridge CNI installation when network.kind is cilium", func() {
+		runner := &fakeKubernetesEngineNodeCommandRunner{outputs: map[string]string{"uname -m": "x86_64"}}
+		data := newTestKubernetesEngineNodeProvisionData()
+		data.NetworkKind = kubernetesEngineNetworkKindCilium
+
+		Expect(runKubernetesEngineNodeProvisionSteps(runner, data)).To(Succeed())
+
+		joined := strings.Join(runner.commands, "\n")
+		Expect(joined).NotTo(ContainSubstring("cni-plugins-linux"))
+		Expect(runner.files).NotTo(HaveKey("/etc/cni/net.d/10-bridge.conflist"))
+	})
+})
+
+var _ = Describe("kubernetesEnginePodNetworkNATScript", func() {
+	It("exempts pod-to-pod traffic and masquerades traffic leaving the pod network", func() {
+		script := kubernetesEnginePodNetworkNATScript("10.244.0.0/16")
+		Expect(script).To(ContainSubstring("-s 10.244.0.0/16 -d 10.244.0.0/16 -j RETURN"))
+		Expect(script).To(ContainSubstring("-s 10.244.0.0/16 ! -d 10.244.0.0/16 -j MASQUERADE"))
+		Expect(script).To(ContainSubstring("iptables -t nat -C POSTROUTING"))
+	})
+})
+
+var _ = Describe("applyKubernetesEngineNodeRoutes", func() {
+	It("does nothing when there are no routes to apply", func() {
+		Expect(applyKubernetesEngineNodeRoutes("172.16.1.10", "/nonexistent/key", "", "node-1", nil)).To(Succeed())
+	})
+
+	It("fails to dial when the private key cannot be read", func() {
+		routes := []kubernetesEngineNodeRoute{{CIDR: "10.244.2.0/24", Via: "172.16.1.11"}}
+		err := applyKubernetesEngineNodeRoutes("172.16.1.10", "/nonexistent/key", "", "node-1", routes)
+		Expect(err).To(HaveOccurred())
 	})
 })
