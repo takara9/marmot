@@ -71,6 +71,9 @@ func EnsureKubernetesEngineCiliumCNI(mkeConf *marmotd.MKEConfig, ke api.Kubernet
 	if manifestURL == "" {
 		return fmt.Errorf("nodeSpec.network.kind=cilium requires cilium_manifest_url to be configured in %s", marmotd.DefaultMKEConfigPath)
 	}
+	if !strings.HasPrefix(manifestURL, "https://") {
+		return fmt.Errorf("cilium_manifest_url must use https:// (got %q)", manifestURL)
+	}
 	if ke.Status == nil || ke.Status.ControlPlaneIpAddress == nil || ke.Status.ApiServerPort == nil {
 		return fmt.Errorf("KubernetesEngine control plane status is incomplete")
 	}
