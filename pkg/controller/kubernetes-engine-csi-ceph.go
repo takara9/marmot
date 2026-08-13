@@ -52,9 +52,15 @@ func EnsureKubernetesEngineCephCSI(mkeConf *marmotd.MKEConfig, ke api.Kubernetes
 	if rbdManifestURL == "" {
 		return fmt.Errorf("ceph_enabled=true requires ceph_csi_rbd_manifest_url to be configured in %s", marmotd.DefaultMKEConfigPath)
 	}
+	if !strings.HasPrefix(rbdManifestURL, "https://") {
+		return fmt.Errorf("ceph_csi_rbd_manifest_url must use https:// (got %q)", rbdManifestURL)
+	}
 	cephfsManifestURL := strings.TrimSpace(mkeConf.CephCSICephFSManifestURL)
 	if cephfsManifestURL == "" {
 		return fmt.Errorf("ceph_enabled=true requires ceph_csi_cephfs_manifest_url to be configured in %s", marmotd.DefaultMKEConfigPath)
+	}
+	if !strings.HasPrefix(cephfsManifestURL, "https://") {
+		return fmt.Errorf("ceph_csi_cephfs_manifest_url must use https:// (got %q)", cephfsManifestURL)
 	}
 	if ke.Status == nil || ke.Status.ControlPlaneIpAddress == nil || ke.Status.ApiServerPort == nil {
 		return fmt.Errorf("KubernetesEngine control plane status is incomplete")
