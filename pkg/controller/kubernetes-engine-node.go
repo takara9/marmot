@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,7 +26,20 @@ const (
 	kubernetesEngineNodeLabelProvisioned = "kubernetesEngineNodeProvisioned"
 	defaultKubernetesEngineNodeCPU       = 2
 	defaultKubernetesEngineNodeMemory    = 2048
+
+	// kubernetesEngineNetworkKindBridge は、ノード間通信用ネットワーク上でシンプルな
+	// bridge CNIを使用するモード（spec.nodeSpec.network.kindの既定値）。
+	kubernetesEngineNetworkKindBridge = "none"
+	// kubernetesEngineNetworkKindCilium は、CiliumをCNIとしてインストールするモード。
+	kubernetesEngineNetworkKindCilium = "cilium"
+
+	// kubernetesEnginePodNetworkSupernet は、全ノードのPod CIDR(10.244.<index+1>.0/24)を
+	// 包含するスーパーネット。Bridge CNI選択時、この範囲宛の通信はマスカレードせず
+	// 直接ルーティングする。
+	kubernetesEnginePodNetworkSupernet = "10.244.0.0/16"
 )
+
+var kubernetesEngineNodeNamePattern = regexp.MustCompile(`-node-(\d+)$`)
 
 var (
 	kubernetesEngineNodePrivateKeyPath  = marmotd.GatewayPrivateKeyPath()
@@ -57,6 +72,11 @@ func ProvisionKubernetesEngineNodes(database *db.Database, mkeConf *marmotd.MKEC
 	}
 	if err := ensureKubernetesEngineNodeSSHAssets(); err != nil {
 		return false, fmt.Errorf("failed to prepare KubernetesEngine node SSH assets: %w", err)
+	}
+	if kubernetesEngineNodeNetworkKind(ke) == kubernetesEngineNetworkKindCilium {
+		if err := EnsureKubernetesEngineCiliumCNI(mkeConf, ke); err != nil {
+			return false, fmt.Errorf("failed to install Cilium CNI: %w", err)
+		}
 	}
 
 	servers, err := findKubernetesEngineNodeServers(database, ke)
@@ -97,8 +117,12 @@ func ProvisionKubernetesEngineNodes(database *db.Database, mkeConf *marmotd.MKEC
 		if server.Metadata.Labels != nil {
 			labels = *server.Metadata.Labels
 		}
+		nodeIndex, err := kubernetesEngineNodeIndex(server.Metadata.Name)
+		if err != nil {
+			return false, err
+		}
 		if labels[kubernetesEngineNodeLabelProvisioned] != "true" {
-			if err := configureKubernetesEngineNode(mkeConf, ke, server.Metadata.Name, nodeIP); err != nil {
+			if err := configureKubernetesEngineNode(mkeConf, ke, server.Metadata.Name, nodeIP, nodeIndex); err != nil {
 				return false, err
 			}
 			labels[kubernetesEngineNodeLabelProvisioned] = "true"
@@ -107,6 +131,12 @@ func ProvisionKubernetesEngineNodes(database *db.Database, mkeConf *marmotd.MKEC
 			}
 		}
 		expectedNames = append(expectedNames, server.Metadata.Name)
+	}
+
+	if kubernetesEngineNodeNetworkKind(ke) != kubernetesEngineNetworkKindCilium {
+		if err := reconcileKubernetesEngineNodeRoutes(ke, servers); err != nil {
+			return false, fmt.Errorf("failed to configure pod network routes: %w", err)
+		}
 	}
 
 	ready, err := queryKubernetesEngineNodes(ke, expectedNames)
@@ -197,6 +227,9 @@ func buildKubernetesEngineNodeServerSpec(ke api.KubernetesEngine, index int, pub
 	if externalNetwork != "default" && externalNetwork != "host-bridge" {
 		return api.Server{}, fmt.Errorf("nodeSpec.network.external must be default or host-bridge")
 	}
+	if _, err := validatedKubernetesEngineNodeNetworkKind(ke); err != nil {
+		return api.Server{}, err
+	}
 	if strings.TrimSpace(publicKey) == "" {
 		return api.Server{}, fmt.Errorf("KubernetesEngine node public key is empty")
 	}
@@ -233,6 +266,107 @@ func kubernetesEngineNodeName(ke api.KubernetesEngine, index int) string {
 	return fmt.Sprintf("mke-%s-node-%d", strings.TrimSpace(ke.Metadata.Name), index+1)
 }
 
+// kubernetesEngineNodeIndex は "mke-<cluster>-node-<n>" 形式のノード名から、
+// buildKubernetesEngineNodeServerSpecが採番した0始まりのインデックス(n-1)を復元する。
+func kubernetesEngineNodeIndex(name string) (int, error) {
+	matches := kubernetesEngineNodeNamePattern.FindStringSubmatch(name)
+	if matches == nil {
+		return 0, fmt.Errorf("cannot determine node index from name %q", name)
+	}
+	n, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return 0, fmt.Errorf("cannot determine node index from name %q: %w", name, err)
+	}
+	return n - 1, nil
+}
+
+// kubernetesEnginePodCIDR は、ノードindexから固定ベース(10.244.0.0/16)配下の
+// 専用Pod CIDRを採番する。例: index=0 -> 10.244.1.0/24
+func kubernetesEnginePodCIDR(index int) string {
+	return fmt.Sprintf("10.244.%d.0/24", index+1)
+}
+
+// validatedKubernetesEngineNodeNetworkKind は spec.nodeSpec.network.kind を検証したうえで返す。
+func validatedKubernetesEngineNodeNetworkKind(ke api.KubernetesEngine) (string, error) {
+	kind := kubernetesEngineNetworkKindBridge
+	if ke.Spec.NodeSpec != nil && ke.Spec.NodeSpec.Network != nil && ke.Spec.NodeSpec.Network.Kind != nil {
+		trimmed := strings.ToLower(strings.TrimSpace(*ke.Spec.NodeSpec.Network.Kind))
+		if trimmed != "" {
+			kind = trimmed
+		}
+	}
+	if kind != kubernetesEngineNetworkKindBridge && kind != kubernetesEngineNetworkKindCilium {
+		return "", fmt.Errorf("nodeSpec.network.kind must be %s or %s", kubernetesEngineNetworkKindBridge, kubernetesEngineNetworkKindCilium)
+	}
+	return kind, nil
+}
+
+// kubernetesEngineNodeNetworkKind は検証済みのnetwork.kindを返す。呼び出し時点では
+// buildKubernetesEngineNodeServerSpec(または本関数自身の検証)を経由済みである前提のため、
+// 不正な値は既定値(bridge)として扱う。
+func kubernetesEngineNodeNetworkKind(ke api.KubernetesEngine) string {
+	kind, err := validatedKubernetesEngineNodeNetworkKind(ke)
+	if err != nil {
+		return kubernetesEngineNetworkKindBridge
+	}
+	return kind
+}
+
+// kubernetesEngineNodePeer は、Bridge CNI選択時にノード間で交換する経路情報。
+type kubernetesEngineNodePeer struct {
+	name       string
+	internalIP string
+	podCIDR    string
+}
+
+// reconcileKubernetesEngineNodeRoutes は、Bridge CNI選択時に稼働中の全ノードへ、
+// 他ノードのPod CIDR宛の静的経路をSSH経由で設定する。ノードの増減があった場合に
+// 備え、対象ノードが2台以上稼働している間は毎回冪等に再設定する。
+func reconcileKubernetesEngineNodeRoutes(ke api.KubernetesEngine, servers []api.Server) error {
+	networkName := kubernetesEngineNetworkName(ke)
+	peers := make([]kubernetesEngineNodePeer, 0, len(servers))
+	for _, server := range servers {
+		if server.Status == nil || server.Status.StatusCode != db.SERVER_RUNNING {
+			continue
+		}
+		internalIP, err := kubernetesEngineNodeInternalIP(server, networkName)
+		if err != nil {
+			continue
+		}
+		index, err := kubernetesEngineNodeIndex(server.Metadata.Name)
+		if err != nil {
+			return err
+		}
+		peers = append(peers, kubernetesEngineNodePeer{
+			name:       server.Metadata.Name,
+			internalIP: internalIP,
+			podCIDR:    kubernetesEnginePodCIDR(index),
+		})
+	}
+	if len(peers) < 2 {
+		return nil
+	}
+	clusterName := strings.TrimSpace(ke.Metadata.Name)
+	namespace, _, _, err := KubernetesEngineControlPlaneNetworkNames(clusterName)
+	if err != nil {
+		return err
+	}
+	for _, target := range peers {
+		routes := make([]kubernetesEngineNodeRoute, 0, len(peers)-1)
+		for _, peer := range peers {
+			if peer.name == target.name {
+				continue
+			}
+			routes = append(routes, kubernetesEngineNodeRoute{CIDR: peer.podCIDR, Via: peer.internalIP})
+		}
+		nodeID := fmt.Sprintf("%s-%s-routes", api.KubernetesEngineID(ke), target.name)
+		if err := runKubernetesEngineNodeRouting(target.internalIP, kubernetesEngineNodePrivateKeyPath, namespace, nodeID, routes); err != nil {
+			return fmt.Errorf("node %s: %w", target.name, err)
+		}
+	}
+	return nil
+}
+
 func kubernetesEngineNodeInternalIP(server api.Server, networkName string) (string, error) {
 	if server.Spec.NetworkInterface == nil {
 		return "", fmt.Errorf("node %s has no network interfaces", server.Metadata.Name)
@@ -245,7 +379,7 @@ func kubernetesEngineNodeInternalIP(server api.Server, networkName string) (stri
 	return "", fmt.Errorf("node %s has no address on network %s", server.Metadata.Name, networkName)
 }
 
-func configureKubernetesEngineNode(mkeConf *marmotd.MKEConfig, ke api.KubernetesEngine, nodeName, nodeIP string) error {
+func configureKubernetesEngineNode(mkeConf *marmotd.MKEConfig, ke api.KubernetesEngine, nodeName, nodeIP string, nodeIndex int) error {
 	clusterName := strings.TrimSpace(ke.Metadata.Name)
 	caPath, _ := KubernetesEngineCAPaths(DefaultKubernetesEnginePkiDir, clusterName)
 	kubeletCertPath, kubeletKeyPath, err := IssueKubernetesEngineCertificate(DefaultKubernetesEnginePkiDir, clusterName, KubernetesEngineCertRequest{
@@ -290,6 +424,10 @@ func configureKubernetesEngineNode(mkeConf *marmotd.MKEConfig, ke api.Kubernetes
 		KubeProxyKubeconfig: []byte(renderKubernetesEngineNodeKubeconfig(endpoint, "system:kube-proxy", "/etc/kubernetes/pki/kube-proxy.crt", "/etc/kubernetes/pki/kube-proxy.key")),
 		KubeletConfig:       []byte(renderKubernetesEngineKubeletConfig()),
 		KubeProxyConfig:     []byte(renderKubernetesEngineKubeProxyConfig()),
+		NetworkKind:         kubernetesEngineNodeNetworkKind(ke),
+		PodCIDR:             kubernetesEnginePodCIDR(nodeIndex),
+		PodNetworkSupernet:  kubernetesEnginePodNetworkSupernet,
+		CNIPluginsVersion:   strings.TrimPrefix(strings.TrimSpace(mkeConf.CNIPluginsVersion), "v"),
 	}
 	nodeID := fmt.Sprintf("%s-%s", api.KubernetesEngineID(ke), nodeName)
 	// ノードのIPは「ノード間通信用ネットワーク」上のアドレスであり、ホストのroot netnsからは

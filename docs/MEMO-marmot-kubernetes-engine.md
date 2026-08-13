@@ -138,6 +138,7 @@ spec:
 - ここで初めて `kubectl get nodes` が通る状態になる
 
 ## フェーズ8: CNI有効化
+- Bridge選択時は、設定とルーティング設定追加
 - Cilium選択時のインストール・設定
 
 ## フェーズ9: CSI（Ceph）連携

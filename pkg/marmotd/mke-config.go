@@ -32,6 +32,14 @@ type MKEConfig struct {
 	// 例: "bridge"
 	DefaultCNIType string `json:"default_cni_type"`
 
+	// containernetworking/plugins のリリースバージョン（Bridge CNI選択時にダウンロードする）
+	// 例: "1.4.0"
+	CNIPluginsVersion string `json:"cni_plugins_version"`
+
+	// spec.nodeSpec.network.kind=cilium 選択時に適用するインストールマニフェストのURL。
+	// 未設定の場合、Ciliumを選択したクラスタの構成はエラーになる。
+	CiliumManifestURL string `json:"cilium_manifest_url"`
+
 	// runc のバージョン
 	// 例: "1.4.0"
 	RuncVersion string `json:"runc_version"`
@@ -46,6 +54,7 @@ func defaultMKEConfig() *MKEConfig {
 		EtcdVersion:       "3.6.8",
 		CNIVersion:        "0.4.0",
 		DefaultCNIType:    "bridge",
+		CNIPluginsVersion: "1.4.0",
 		RuncVersion:       "1.4.0",
 	}
 }

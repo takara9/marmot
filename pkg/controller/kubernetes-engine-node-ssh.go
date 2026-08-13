@@ -34,6 +34,25 @@ type kubernetesEngineNodeProvisionData struct {
 	KubeProxyKubeconfig []byte
 	KubeletConfig       []byte
 	KubeProxyConfig     []byte
+
+	// NetworkKind は spec.nodeSpec.network.kind ("none"=bridge または "cilium")。
+	// "cilium" の場合、ノード側でのBridge CNIのインストール・設定は行わない
+	// （Ciliumのインストールマニフェスト側がCNI設定を配置する）。
+	NetworkKind string
+	// PodCIDR は、このノード専用のPod CIDR（例: 10.244.1.0/24）。Bridge CNI選択時のみ使用。
+	PodCIDR string
+	// PodNetworkSupernet は、全ノードのPod CIDRを包含するスーパーネット。
+	// Bridge CNI選択時、この範囲宛の通信はマスカレードせず直接ルーティングする。
+	PodNetworkSupernet string
+	// CNIPluginsVersion は containernetworking/plugins のリリースバージョン。
+	CNIPluginsVersion string
+}
+
+// kubernetesEngineNodeRoute は、Bridge CNI選択時にノードへ追加する、
+// 他ノードのPod CIDR宛の静的経路。
+type kubernetesEngineNodeRoute struct {
+	CIDR string
+	Via  string
 }
 
 // kubernetesEngineNodeCommandRunner executes commands on a KubernetesEngine node,
@@ -120,6 +139,12 @@ func runKubernetesEngineNodeProvisionSteps(runner kubernetesEngineNodeCommandRun
 		}
 	}
 
+	if data.NetworkKind != kubernetesEngineNetworkKindCilium {
+		if err := installKubernetesEngineBridgeCNI(runner, data); err != nil {
+			return err
+		}
+	}
+
 	credentialFiles := []struct {
 		path    string
 		content []byte
@@ -188,6 +213,102 @@ func detectKubernetesEngineNodeArch(runner kubernetesEngineNodeCommandRunner) (s
 		return "amd64", nil
 	}
 	return "arm64", nil
+}
+
+// installKubernetesEngineBridgeCNI は、Bridge CNI（既定のnetwork.kind=none）選択時に、
+// CNIプラグインバイナリの導入、ノード専用Pod CIDRを使ったbridge CNI設定の生成、
+// クラスタ外向け通信のみをマスカレードするiptables設定を行う。
+func installKubernetesEngineBridgeCNI(runner kubernetesEngineNodeCommandRunner, data kubernetesEngineNodeProvisionData) error {
+	arch, err := detectKubernetesEngineNodeArch(runner)
+	if err != nil {
+		return fmt.Errorf("failed to detect node architecture: %w", err)
+	}
+
+	cniURL := fmt.Sprintf("https://github.com/containernetworking/plugins/releases/download/v%s/cni-plugins-linux-%s-v%s.tgz",
+		data.CNIPluginsVersion, arch, data.CNIPluginsVersion)
+	if err := runner.step("install CNI plugins", func() error {
+		return runner.run(fmt.Sprintf("mkdir -p /opt/cni/bin && "+
+			"test -e /opt/cni/bin/bridge || (curl -fsSL %s | tar -xz -C /opt/cni/bin)",
+			shellQuote(cniURL)), nil)
+	}); err != nil {
+		return err
+	}
+
+	if err := runner.step("configure bridge CNI", func() error {
+		return runner.writeFile("/etc/cni/net.d/10-bridge.conflist", "0644",
+			[]byte(renderKubernetesEngineBridgeCNIConf(data.PodCIDR)))
+	}); err != nil {
+		return err
+	}
+
+	return runner.step("configure pod network NAT", func() error {
+		return runner.run(kubernetesEnginePodNetworkNATScript(data.PodNetworkSupernet), nil)
+	})
+}
+
+// renderKubernetesEngineBridgeCNIConf は、ノード専用のPod CIDRをhost-local IPAMで
+// 払い出すbridge CNIのconflistを生成する。ノード間のPod間通信は
+// reconcileKubernetesEngineNodeRoutes が設定する静的経路で疎通させるため、
+// ipMasqはfalseとする（クラスタ外向けの通信は別途iptablesでマスカレードする）。
+func renderKubernetesEngineBridgeCNIConf(podCIDR string) string {
+	return fmt.Sprintf(`{
+  "cniVersion": "1.0.0",
+  "name": "mke-bridge",
+  "plugins": [
+    {
+      "type": "bridge",
+      "bridge": "cni0",
+      "isGateway": true,
+      "isDefaultGateway": true,
+      "ipMasq": false,
+      "hairpinMode": true,
+      "ipam": {
+        "type": "host-local",
+        "ranges": [[{ "subnet": "%s" }]],
+        "routes": [{ "dst": "0.0.0.0/0" }]
+      }
+    },
+    { "type": "portmap", "capabilities": { "portMappings": true } }
+  ]
+}
+`, podCIDR)
+}
+
+// kubernetesEnginePodNetworkNATScript は、Podネットワーク（podNetworkSupernet）宛の
+// 通信はマスカレードせず直接ルーティングし、それ以外（クラスタ外）向けの通信のみを
+// マスカレードするiptablesルールを冪等に追加するシェルスクリプトを返す。
+func kubernetesEnginePodNetworkNATScript(podNetworkSupernet string) string {
+	exempt := fmt.Sprintf("-s %s -d %s -j RETURN", podNetworkSupernet, podNetworkSupernet)
+	masquerade := fmt.Sprintf("-s %s ! -d %s -j MASQUERADE", podNetworkSupernet, podNetworkSupernet)
+	return fmt.Sprintf(
+		"iptables -t nat -C POSTROUTING %s 2>/dev/null || iptables -t nat -I POSTROUTING %s\n"+
+			"iptables -t nat -C POSTROUTING %s 2>/dev/null || iptables -t nat -A POSTROUTING %s",
+		exempt, exempt, masquerade, masquerade)
+}
+
+// runKubernetesEngineNodeRouting はテストからモック可能にするための注入ポイント。
+var runKubernetesEngineNodeRouting = applyKubernetesEngineNodeRoutes
+
+// applyKubernetesEngineNodeRoutes は、指定ノードへSSH接続し、routesで示された
+// 他ノードのPod CIDR宛の静的経路を(ip route replaceで冪等に)設定する。
+func applyKubernetesEngineNodeRoutes(address, privateKeyPath, namespace, nodeID string, routes []kubernetesEngineNodeRoute) error {
+	if len(routes) == 0 {
+		return nil
+	}
+	client, err := dialKubernetesEngineNodeSSH(address, privateKeyPath, namespace)
+	if err != nil {
+		return fmt.Errorf("failed to connect to node for routing: %w", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	runner := &kubernetesEngineNodeSSHRunner{client: client, resourceID: nodeID}
+	return runner.step("configure pod network routes", func() error {
+		cmds := make([]string, 0, len(routes))
+		for _, route := range routes {
+			cmds = append(cmds, fmt.Sprintf("ip route replace %s via %s", shellQuote(route.CIDR), shellQuote(route.Via)))
+		}
+		return runner.run(strings.Join(cmds, " && "), nil)
+	})
 }
 
 func kubernetesEngineNodeContainerdUnit() string {
