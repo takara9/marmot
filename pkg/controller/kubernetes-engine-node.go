@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/ceph"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
 	"github.com/takara9/marmot/pkg/util"
@@ -81,6 +82,9 @@ func ProvisionKubernetesEngineNodes(database *db.Database, mkeConf *marmotd.MKEC
 		if err := EnsureKubernetesEngineCiliumCNI(mkeConf, ke); err != nil {
 			return false, fmt.Errorf("failed to install Cilium CNI: %w", err)
 		}
+	}
+	if err := EnsureKubernetesEngineCephCSI(mkeConf, ke); err != nil {
+		return false, fmt.Errorf("failed to install Ceph CSI: %w", err)
 	}
 
 	servers, err := findKubernetesEngineNodeServers(database, ke)
@@ -437,6 +441,24 @@ func configureKubernetesEngineNode(mkeConf *marmotd.MKEConfig, ke api.Kubernetes
 		CNIPluginsVersion:   strings.TrimPrefix(strings.TrimSpace(mkeConf.CNIPluginsVersion), "v"),
 	}
 	nodeID := fmt.Sprintf("%s-%s", api.KubernetesEngineID(ke), nodeName)
+	if marmotd.CurrentConfig().CephEnabled {
+		cephConf, readErr := os.ReadFile(marmotd.DefaultCephConfPath)
+		if readErr != nil {
+			return fmt.Errorf("failed to read Ceph conf for node provisioning: %w", readErr)
+		}
+		cephKeyring, readErr := os.ReadFile(marmotd.DefaultCephKeyringPath)
+		if readErr != nil {
+			return fmt.Errorf("failed to read Ceph keyring for node provisioning: %w", readErr)
+		}
+		_, cephUser, parseErr := ceph.ParseConnectionFromConf(marmotd.DefaultCephConfPath, marmotd.DefaultCephKeyringPath)
+		if parseErr != nil {
+			return fmt.Errorf("failed to parse Ceph connection info for node provisioning: %w", parseErr)
+		}
+		data.CephEnabled = true
+		data.CephConfContent = cephConf
+		data.CephUser = cephUser
+		data.CephKeyringContent = cephKeyring
+	}
 	// ノードのIPは「ノード間通信用ネットワーク」上のアドレスであり、ホストのroot netnsからは
 	// 到達できないため、コントロールプレーン用に作成済みのnetns(veth経由でOVSブリッジに接続済み)
 	// を経由してSSH接続する。

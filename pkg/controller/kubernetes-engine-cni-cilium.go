@@ -33,12 +33,13 @@ var kubernetesEngineManifestResources = map[string]kubernetesEngineManifestResou
 	"v1/Service":         {version: "v1", resource: "services", namespaced: true},
 	"apps/v1/DaemonSet":  {group: "apps", version: "v1", resource: "daemonsets", namespaced: true},
 	"apps/v1/Deployment": {group: "apps", version: "v1", resource: "deployments", namespaced: true},
-	"rbac.authorization.k8s.io/v1/ClusterRole":        {group: "rbac.authorization.k8s.io", version: "v1", resource: "clusterroles", namespaced: false},
-	"rbac.authorization.k8s.io/v1/ClusterRoleBinding": {group: "rbac.authorization.k8s.io", version: "v1", resource: "clusterrolebindings", namespaced: false},
-	"rbac.authorization.k8s.io/v1/Role":               {group: "rbac.authorization.k8s.io", version: "v1", resource: "roles", namespaced: true},
-	"rbac.authorization.k8s.io/v1/RoleBinding":        {group: "rbac.authorization.k8s.io", version: "v1", resource: "rolebindings", namespaced: true},
+	"rbac.authorization.k8s.io/v1/ClusterRole":         {group: "rbac.authorization.k8s.io", version: "v1", resource: "clusterroles", namespaced: false},
+	"rbac.authorization.k8s.io/v1/ClusterRoleBinding":  {group: "rbac.authorization.k8s.io", version: "v1", resource: "clusterrolebindings", namespaced: false},
+	"rbac.authorization.k8s.io/v1/Role":                {group: "rbac.authorization.k8s.io", version: "v1", resource: "roles", namespaced: true},
+	"rbac.authorization.k8s.io/v1/RoleBinding":         {group: "rbac.authorization.k8s.io", version: "v1", resource: "rolebindings", namespaced: true},
 	"apiextensions.k8s.io/v1/CustomResourceDefinition": {group: "apiextensions.k8s.io", version: "v1", resource: "customresourcedefinitions", namespaced: false},
-	"policy/v1/PodDisruptionBudget":                     {group: "policy", version: "v1", resource: "poddisruptionbudgets", namespaced: true},
+	"policy/v1/PodDisruptionBudget":                    {group: "policy", version: "v1", resource: "poddisruptionbudgets", namespaced: true},
+	"storage.k8s.io/v1/StorageClass":                   {group: "storage.k8s.io", version: "v1", resource: "storageclasses", namespaced: false},
 }
 
 // kubernetesEngineManifestObject は、マニフェスト中の1ドキュメントからkind/name/namespaceを
