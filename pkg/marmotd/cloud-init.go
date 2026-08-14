@@ -14,7 +14,9 @@ import (
 
 // GenerateCloudInitISO generates a cloud-init ISO with password and SSH key settings.
 // usernames が空の場合はデフォルトユーザーに設定し、指定がある場合は各ユーザーを作成します。
-func GenerateCloudInitISO(path, password, sshKey string, usernames []string, ansible *api.ServerAnsible) (string, error) {
+// instanceID はVM毎に一意な値を渡すこと。テンプレートqcow2から複製されたVM間で同じ値を
+// 使うと、cloud-initが「処理済みインスタンス」と誤認してuser-dataの適用をスキップする。
+func GenerateCloudInitISO(path, password, sshKey string, usernames []string, ansible *api.ServerAnsible, instanceID string) (string, error) {
 	// Create temporary directory for cloud-init files
 	tempDir, err := os.MkdirTemp("", "cloud-init-")
 	if err != nil {
@@ -38,7 +40,10 @@ func GenerateCloudInitISO(path, password, sshKey string, usernames []string, ans
 	}
 
 	// Generate meta-data (minimal)
-	metaData := "#cloud-config\ninstance-id: iid-local01\n"
+	if strings.TrimSpace(instanceID) == "" {
+		instanceID = "iid-local01"
+	}
+	metaData := fmt.Sprintf("#cloud-config\ninstance-id: %s\n", instanceID)
 	metaDataPath := filepath.Join(tempDir, "meta-data")
 	if err := os.WriteFile(metaDataPath, []byte(metaData), 0644); err != nil {
 		err := fmt.Errorf("failed to write meta-data: %v", err)
