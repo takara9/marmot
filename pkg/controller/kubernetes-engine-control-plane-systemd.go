@@ -88,7 +88,7 @@ After=%s
 [Service]
 Type=simple
 NetworkNamespacePath=/run/netns/%s
-ExecStart=%s --kubeconfig=%s --root-ca-file=%s --service-account-private-key-file=%s
+ExecStart=%s --kubeconfig=%s --root-ca-file=%s --service-account-private-key-file=%s --use-service-account-credentials=true
 Restart=on-failure
 RestartSec=5
 User=root

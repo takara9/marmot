@@ -350,6 +350,7 @@ type KubernetesEngineNodeNetwork struct {
 
 // KubernetesEngineNodeSpec defines model for KubernetesEngineNodeSpec.
 type KubernetesEngineNodeSpec struct {
+	Auth    *Auth                        `json:"auth,omitempty" yaml:"auth,omitempty"`
 	Cpu     *int                         `json:"cpu,omitempty" yaml:"cpu,omitempty"`
 	Memory  *int                         `json:"memory,omitempty" yaml:"memory,omitempty"`
 	Network *KubernetesEngineNodeNetwork `json:"network,omitempty" yaml:"network,omitempty"`

@@ -2437,6 +2437,8 @@ components:
           format: int
         network:
           $ref: "#/components/schemas/KubernetesEngineNodeNetwork"
+        auth:
+          $ref: "#/components/schemas/Auth"
     KubernetesEngineNodeNetwork:
       type: object
       properties:

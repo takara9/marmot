@@ -256,6 +256,14 @@ func buildKubernetesEngineNodeServerSpec(ke api.KubernetesEngine, index int, pub
 		{Networkname: externalNetwork},
 		{Networkname: kubernetesEngineNetworkName(ke)},
 	}
+	var nodeAuth *api.Auth
+	if ke.Spec.NodeSpec != nil {
+		nodeAuth = ke.Spec.NodeSpec.Auth
+	}
+	auth, err := mergeKubernetesEngineNodeAuth(nodeAuth, publicKey)
+	if err != nil {
+		return api.Server{}, err
+	}
 	return api.Server{
 		ApiVersion: "v1",
 		Kind:       "Server",
@@ -265,8 +273,64 @@ func buildKubernetesEngineNodeServerSpec(ke api.KubernetesEngine, index int, pub
 			Memory:           util.IntPtrInt(memory),
 			OsVariant:        util.StringPtr("ubuntu24.04"),
 			NetworkInterface: &nics,
-			Auth:             &api.Auth{PublicKey: util.StringPtr(publicKey), User: util.StringPtr("root")},
+			Auth:             auth,
 		},
+	}, nil
+}
+
+// mergeKubernetesEngineNodeAuth は、MKEコントローラーがノードプロビジョニング(kubelet/containerd等の
+// インストール)に必ず使用するroot用の管理鍵(mkeManagedPublicKey)を維持したまま、
+// spec.nodeSpec.authで指定された追加ユーザー/鍵をノードの仮想サーバーへ反映するためのAuthを組み立てる。
+func mergeKubernetesEngineNodeAuth(nodeAuth *api.Auth, mkeManagedPublicKey string) (*api.Auth, error) {
+	users := []string{"root"}
+	keyParts := []string{mkeManagedPublicKey}
+	var rootPassword *string
+
+	if nodeAuth != nil {
+		if nodeAuth.User != nil && nodeAuth.Users != nil && len(*nodeAuth.Users) > 0 {
+			return nil, fmt.Errorf("spec.nodeSpec.auth.user and spec.nodeSpec.auth.users cannot be used together")
+		}
+		var extraUsers []string
+		if nodeAuth.User != nil {
+			if strings.TrimSpace(*nodeAuth.User) == "" {
+				return nil, fmt.Errorf("spec.nodeSpec.auth.user must not be empty")
+			}
+			extraUsers = append(extraUsers, strings.TrimSpace(*nodeAuth.User))
+		}
+		if nodeAuth.Users != nil {
+			for _, username := range *nodeAuth.Users {
+				if strings.TrimSpace(username) == "" {
+					return nil, fmt.Errorf("spec.nodeSpec.auth.users must not contain empty values")
+				}
+				extraUsers = append(extraUsers, strings.TrimSpace(username))
+			}
+		}
+		for _, username := range extraUsers {
+			if username != "root" {
+				users = append(users, username)
+			}
+		}
+
+		var userKey string
+		if nodeAuth.Url != nil {
+			keys, err := marmotd.FetchPublicKeys(*nodeAuth.Url)
+			if err != nil {
+				return nil, fmt.Errorf("failed to fetch spec.nodeSpec.auth.url public keys: %w", err)
+			}
+			userKey = strings.Join(keys, "\n")
+		} else if nodeAuth.PublicKey != nil {
+			userKey = *nodeAuth.PublicKey
+		}
+		if strings.TrimSpace(userKey) != "" {
+			keyParts = append(keyParts, userKey)
+		}
+		rootPassword = nodeAuth.RootPassword
+	}
+
+	return &api.Auth{
+		PublicKey:    util.StringPtr(strings.Join(keyParts, "\n")),
+		Users:        &users,
+		RootPassword: rootPassword,
 	}, nil
 }
 
