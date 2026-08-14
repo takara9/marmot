@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -143,49 +144,68 @@ func ProvisionKubernetesEngineControlPlane(database *db.Database, mkeConf *marmo
 	return CheckKubernetesEngineControlPlaneHealth(networkCfg.Namespace, assets.CACertPath, ipAddress, apiServerPort)
 }
 
+// DeprovisionKubernetesEngineControlPlane はコントロールプレーンの解体を行う。
+// 各ステップはベストエフォートで実行し、途中のステップが失敗しても後続処理(特にIPAM上の
+// コントロールプレーンIP解放)を継続する。いずれかのIPを解放し損なうと、IPネットワークが
+// 「使用中」のままとなり専用ネットワークの削除が永久にブロックされるため、他の解体ステップの
+// 成否に関わらずIP解放は必ず試行する。発生したエラーはすべて集約して返す(呼び出し元はログ出力・
+// 再試行判断に利用できる)。
 func DeprovisionKubernetesEngineControlPlane(database *db.Database, mkeConf *marmotd.MKEConfig, ke api.KubernetesEngine) error {
 	clusterName, err := validateKubernetesEngineEtcdClusterName(ke.Metadata.Name)
 	if err != nil {
 		return err
 	}
+
+	var errs []error
 	if err := DeleteKubernetesEngineControlPlaneUnits(clusterName); err != nil {
-		return err
+		errs = append(errs, fmt.Errorf("delete control plane units: %w", err))
 	}
 	if err := DeprovisionKubernetesEngineEtcd(clusterName); err != nil {
-		return err
+		errs = append(errs, fmt.Errorf("deprovision etcd: %w", err))
 	}
 	// 同名クラスタが後で再作成された場合に、IPアドレスが変わっているにもかかわらず古い証明書
 	// (SANが古いIPのまま)が再利用されてTLS検証エラーになることを防ぐため、PKI一式を削除する。
 	if err := RemoveKubernetesEngineControlPlaneAssets(DefaultKubernetesEnginePkiDir, DefaultKubernetesControlPlaneConfigDir, clusterName); err != nil {
-		return err
+		errs = append(errs, fmt.Errorf("remove control plane assets: %w", err))
 	}
+
 	network, err := database.GetVirtualNetworkByName(kubernetesEngineNetworkName(ke))
 	if err != nil {
-		return err
+		// ネットワーク自体が見つからない場合はIPAM解放対象も特定できないため、ここまでの
+		// エラーを集約して返す。
+		errs = append(errs, fmt.Errorf("get control plane network: %w", err))
+		return errors.Join(errs...)
 	}
-	if network.Spec.BridgeName == nil || network.Spec.IpNetworkId == nil || ke.Status == nil || ke.Status.ControlPlaneIpAddress == nil {
-		return fmt.Errorf("KubernetesEngine control plane network status is incomplete")
-	}
-	hostBindAddress := strings.TrimSpace(mkeConf.ControlPlaneBindAddress)
-	if hostBindAddress != "" && ke.Status.ApiServerPort != nil {
-		if err := RemoveKubernetesEngineControlPlaneNAT(hostBindAddress, *ke.Status.ControlPlaneIpAddress, *ke.Status.ApiServerPort); err != nil {
-			return err
+
+	if network.Spec.BridgeName != nil && ke.Status != nil && ke.Status.ControlPlaneIpAddress != nil {
+		hostBindAddress := strings.TrimSpace(mkeConf.ControlPlaneBindAddress)
+		if hostBindAddress != "" && ke.Status.ApiServerPort != nil {
+			if err := RemoveKubernetesEngineControlPlaneNAT(hostBindAddress, *ke.Status.ControlPlaneIpAddress, *ke.Status.ApiServerPort); err != nil {
+				errs = append(errs, fmt.Errorf("remove control plane NAT: %w", err))
+			}
+		}
+		if networkCfg, err := NewKubernetesEngineControlPlaneNetworkConfig(clusterName, *network.Spec.BridgeName, *ke.Status.ControlPlaneIpAddress+"/32"); err != nil {
+			errs = append(errs, fmt.Errorf("build control plane network config: %w", err))
+		} else if err := TeardownKubernetesEngineControlPlaneNetwork(networkCfg); err != nil {
+			errs = append(errs, fmt.Errorf("teardown control plane network: %w", err))
 		}
 	}
-	networkCfg, err := NewKubernetesEngineControlPlaneNetworkConfig(clusterName, *network.Spec.BridgeName, *ke.Status.ControlPlaneIpAddress+"/32")
-	if err != nil {
-		return err
+
+	// ここまでのステップの成否に関わらず、IPAM上のコントロールプレーンIPは必ず解放を試みる。
+	if network.Spec.IpNetworkId != nil && ke.Status != nil {
+		if ke.Status.ControlPlaneIpAddress != nil {
+			if err := database.ReleaseIP(api.VirtualNetworkID(network), *network.Spec.IpNetworkId, *ke.Status.ControlPlaneIpAddress); err != nil && !errors.Is(err, db.ErrNotFound) {
+				errs = append(errs, fmt.Errorf("release control plane IP: %w", err))
+			}
+		}
+		if ke.Status.ControlPlaneHostIpAddress != nil {
+			if err := database.ReleaseIP(api.VirtualNetworkID(network), *network.Spec.IpNetworkId, *ke.Status.ControlPlaneHostIpAddress); err != nil && !errors.Is(err, db.ErrNotFound) {
+				errs = append(errs, fmt.Errorf("release control plane host IP: %w", err))
+			}
+		}
 	}
-	if err := TeardownKubernetesEngineControlPlaneNetwork(networkCfg); err != nil {
-		return err
-	}
-	if err := database.ReleaseIP(api.VirtualNetworkID(network), *network.Spec.IpNetworkId, *ke.Status.ControlPlaneIpAddress); err != nil {
-		return err
-	}
-	if ke.Status.ControlPlaneHostIpAddress != nil {
-		return database.ReleaseIP(api.VirtualNetworkID(network), *network.Spec.IpNetworkId, *ke.Status.ControlPlaneHostIpAddress)
-	}
-	return nil
+
+	return errors.Join(errs...)
 }
 
 func resolveControlPlaneBinaries(mkeConf *marmotd.MKEConfig, ke api.KubernetesEngine) (string, map[string]string, error) {

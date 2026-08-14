@@ -236,10 +236,32 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineProvisioning(ke ap
 }
 
 // reconcileKubernetesEngineRunning はRUNNING状態のヘルスチェック用の差し込み口。
+// marmotdホストの再起動等でコントロールプレーン専用ネットワークネームスペース
+// (/run/netns配下はtmpfsのため再起動で消える)が失われると、専用etcd/kube-apiserver等の
+// systemdユニットがNetworkNamespacePath不在で起動失敗し続けるため、ここで検知して復旧する。
 // TODO: 次フェーズでノードの状態監視を行い、異常時はFAILED等へ遷移させる。
 func (c *kubernetesEngineController) reconcileKubernetesEngineRunning(ke api.KubernetesEngine) {
 	id := api.KubernetesEngineID(ke)
-	slog.Debug("KubernetesEngineはRUNNING状態です（ヘルスチェックは未実装）", "id", id, "name", ke.Metadata.Name)
+	slog.Debug("KubernetesEngineはRUNNING状態です", "id", id, "name", ke.Metadata.Name)
+
+	namespace, _, _, err := KubernetesEngineControlPlaneNetworkNames(ke.Metadata.Name)
+	if err != nil {
+		slog.Warn("reconcileKubernetesEngineRunning: failed to resolve control plane namespace name", "id", id, "err", err)
+		return
+	}
+	if controlPlaneNamespaceExists(namespace) {
+		return
+	}
+
+	slog.Warn("コントロールプレーンのネットワークネームスペースが失われています。復旧を試みます", "id", id, "namespace", namespace)
+	if err := provisionKubernetesEngineControlPlane(c.db, c.mkeConf, c.etcdURL, ke); err != nil {
+		message := fmt.Sprintf("control plane network recovery failed: %v", err)
+		_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, message)
+		slog.Warn("reconcileKubernetesEngineRunning: control plane recovery failed", "id", id, "err", err)
+		return
+	}
+	_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, "")
+	slog.Debug("コントロールプレーンのネットワークネームスペースを復旧しました", "id", id, "namespace", namespace)
 }
 
 // reconcileKubernetesEngineDeleting は猶予期間経過後に呼び出され、コントロールプレーンの解体
