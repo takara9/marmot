@@ -144,6 +144,8 @@ var _ = Describe("runKubernetesEngineNodeProvisionSteps", func() {
 		joined := strings.Join(runner.commands, "\n")
 		for _, want := range []string{
 			"apt-get install -y ca-certificates conntrack curl iptables socat",
+			"modprobe br_netfilter",
+			"net.bridge.bridge-nf-call-iptables=1",
 			"uname -m",
 			"mkdir -p /etc/kubernetes /etc/kubernetes/pki /etc/kubernetes/kubelet /etc/kubernetes/kube-proxy /opt/cni/bin",
 			"containerd-2.3.1-linux-amd64.tar.gz",

@@ -585,6 +585,8 @@ kind: KubeProxyConfiguration
 clientConnection:
   kubeconfig: /etc/kubernetes/kube-proxy.kubeconfig
 mode: iptables
+iptables:
+  masqueradeAll: true
 `
 }
 
