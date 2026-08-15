@@ -46,6 +46,9 @@ func controlPlaneUnitPath(component, clusterName string) string {
 func renderKubernetesEngineControlPlaneUnits(cfg KubernetesEngineControlPlaneUnitConfig) map[string]string {
 	apiServerUnit := KubernetesEngineControlPlaneUnitName("kube-apiserver", cfg.ClusterName)
 	etcdUnit := KubernetesEngineEtcdUnitName(cfg.ClusterName)
+	// --kubelet-preferred-address-types=InternalIP: コントロールプレーンnetnsからはホストのDNSに
+	// 到達できないため、kubectl exec/logs等でノードのHostnameアドレスをDNS解決させず、
+	// 到達可能なInternalIP(node-ip)へ直接接続させる。
 	apiServer := fmt.Sprintf(`[Unit]
 Description=Marmot Kubernetes API server for cluster %s
 Requires=%s
@@ -54,14 +57,14 @@ After=%s
 [Service]
 Type=simple
 NetworkNamespacePath=/run/netns/%s
-ExecStart=%s --advertise-address=%s --bind-address=0.0.0.0 --secure-port=%d --etcd-servers=http://127.0.0.1:%d --client-ca-file=%s --tls-cert-file=%s --tls-private-key-file=%s --service-account-key-file=%s --service-account-signing-key-file=%s --service-account-issuer=https://kubernetes.default.svc.cluster.local --service-cluster-ip-range=%s --authorization-mode=Node,RBAC --allow-privileged=true
+ExecStart=%s --advertise-address=%s --bind-address=0.0.0.0 --secure-port=%d --etcd-servers=http://127.0.0.1:%d --client-ca-file=%s --tls-cert-file=%s --tls-private-key-file=%s --service-account-key-file=%s --service-account-signing-key-file=%s --service-account-issuer=https://kubernetes.default.svc.cluster.local --service-cluster-ip-range=%s --authorization-mode=Node,RBAC --allow-privileged=true --kubelet-preferred-address-types=InternalIP --kubelet-client-certificate=%s --kubelet-client-key=%s
 Restart=on-failure
 RestartSec=5
 User=root
 
 [Install]
 WantedBy=multi-user.target
-`, cfg.ClusterName, etcdUnit, etcdUnit, cfg.NetworkNamespace, cfg.Binaries["kube-apiserver"], cfg.APIServerIP, cfg.APIServerPort, cfg.EtcdClientPort, cfg.Assets.CACertPath, cfg.Assets.APIServerCertPath, cfg.Assets.APIServerKeyPath, cfg.Assets.ServiceAccountPublicKeyPath, cfg.Assets.ServiceAccountPrivateKeyPath, cfg.ServiceClusterCIDR)
+`, cfg.ClusterName, etcdUnit, etcdUnit, cfg.NetworkNamespace, cfg.Binaries["kube-apiserver"], cfg.APIServerIP, cfg.APIServerPort, cfg.EtcdClientPort, cfg.Assets.CACertPath, cfg.Assets.APIServerCertPath, cfg.Assets.APIServerKeyPath, cfg.Assets.ServiceAccountPublicKeyPath, cfg.Assets.ServiceAccountPrivateKeyPath, cfg.ServiceClusterCIDR, cfg.Assets.KubeletClientCertPath, cfg.Assets.KubeletClientKeyPath)
 
 	scheduler := fmt.Sprintf(`[Unit]
 Description=Marmot Kubernetes scheduler for cluster %s

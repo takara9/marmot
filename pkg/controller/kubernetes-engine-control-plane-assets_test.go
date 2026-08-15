@@ -33,6 +33,15 @@ var _ = Describe("EnsureKubernetesEngineControlPlaneAssets", func() {
 		}
 		Expect(certFileExists(assets.ServiceAccountPublicKeyPath)).To(BeTrue())
 		Expect(certFileExists(assets.ServiceAccountPrivateKeyPath)).To(BeTrue())
+
+		kubeletClientCertPEM, err := os.ReadFile(assets.KubeletClientCertPath)
+		Expect(err).NotTo(HaveOccurred())
+		block, _ = pem.Decode(kubeletClientCertPEM)
+		Expect(block).NotTo(BeNil())
+		kubeletClientCert, err := x509.ParseCertificate(block.Bytes)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(kubeletClientCert.Subject.Organization).To(ContainElement("system:masters"))
+		Expect(certFileExists(assets.KubeletClientKeyPath)).To(BeTrue())
 	})
 })
 

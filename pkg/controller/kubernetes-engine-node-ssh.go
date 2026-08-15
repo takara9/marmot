@@ -287,6 +287,9 @@ func installKubernetesEngineCephClient(runner kubernetesEngineNodeCommandRunner,
 // 払い出すbridge CNIのconflistを生成する。ノード間のPod間通信は
 // reconcileKubernetesEngineNodeRoutes が設定する静的経路で疎通させるため、
 // ipMasqはfalseとする（クラスタ外向けの通信は別途iptablesでマスカレードする）。
+// isDefaultGateway:true がゲートウェイ経由のデフォルトルートを自動追加するため、
+// ipam.routesに同じ0.0.0.0/0を重複指定しない（重複指定すると"file exists"で
+// サンドボックス作成に失敗する）。
 func renderKubernetesEngineBridgeCNIConf(podCIDR string) string {
 	return fmt.Sprintf(`{
   "cniVersion": "1.0.0",
@@ -301,8 +304,7 @@ func renderKubernetesEngineBridgeCNIConf(podCIDR string) string {
       "hairpinMode": true,
       "ipam": {
         "type": "host-local",
-        "ranges": [[{ "subnet": "%s" }]],
-        "routes": [{ "dst": "0.0.0.0/0" }]
+        "ranges": [[{ "subnet": "%s" }]]
       }
     },
     { "type": "portmap", "capabilities": { "portMappings": true } }

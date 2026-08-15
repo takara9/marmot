@@ -16,6 +16,8 @@ type KubernetesEngineControlPlaneAssets struct {
 	CACertPath                   string
 	APIServerCertPath            string
 	APIServerKeyPath             string
+	KubeletClientCertPath        string
+	KubeletClientKeyPath         string
 	SchedulerKubeconfigPath      string
 	ControllerManagerConfigPath  string
 	ServiceAccountPublicKeyPath  string
@@ -110,6 +112,17 @@ func EnsureKubernetesEngineControlPlaneAssets(pkiDir, configDir, clusterName, ap
 	if err != nil {
 		return KubernetesEngineControlPlaneAssets{}, err
 	}
+	// kube-apiserverがkubeletへexec/logs等でダイヤルする際にx509クライアント証明書として提示する。
+	// O=system:masters とすることで、kubelet側のWebhook認可(SubjectAccessReview)を無条件に通過させる。
+	kubeletClientCertPath, kubeletClientKeyPath, err := IssueKubernetesEngineCertificate(pkiDir, clusterName, KubernetesEngineCertRequest{
+		Name:          "kube-apiserver-kubelet-client",
+		CommonName:    "kube-apiserver-kubelet-client",
+		Organizations: []string{"system:masters"},
+		Usage:         KubernetesEngineCertUsageClient,
+	})
+	if err != nil {
+		return KubernetesEngineControlPlaneAssets{}, err
+	}
 	schedulerCertPath, schedulerKeyPath, err := IssueKubernetesEngineCertificate(pkiDir, clusterName, KubernetesEngineCertRequest{
 		Name:          "kube-scheduler",
 		CommonName:    "system:kube-scheduler",
@@ -150,6 +163,8 @@ func EnsureKubernetesEngineControlPlaneAssets(pkiDir, configDir, clusterName, ap
 		CACertPath:                   caCertPath,
 		APIServerCertPath:            apiServerCertPath,
 		APIServerKeyPath:             apiServerKeyPath,
+		KubeletClientCertPath:        kubeletClientCertPath,
+		KubeletClientKeyPath:         kubeletClientKeyPath,
 		SchedulerKubeconfigPath:      schedulerKubeconfigPath,
 		ControllerManagerConfigPath:  controllerManagerConfigPath,
 		ServiceAccountPublicKeyPath:  serviceAccountPublicKeyPath,
