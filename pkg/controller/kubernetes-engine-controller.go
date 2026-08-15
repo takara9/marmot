@@ -264,10 +264,9 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineRunning(ke api.Kub
 	slog.Debug("コントロールプレーンのネットワークネームスペースを復旧しました", "id", id, "namespace", namespace)
 }
 
-// reconcileKubernetesEngineDeleting は猶予期間経過後に呼び出され、コントロールプレーンの解体
-// （systemdユニット・etcd・netns・専用IPの解放）と専用ネットワークの削除要求を行い、
-// ネットワークの削除完了を確認してからetcdから実削除する。
-// TODO: 次フェーズでノード(Server)等の関連リソース削除を先行させる。
+// reconcileKubernetesEngineDeleting は猶予期間経過後に呼び出され、ノード用仮想サーバーの削除要求、
+// コントロールプレーンの解体（systemdユニット・etcd・netns・専用IPの解放）と専用ネットワークの
+// 削除要求を行い、それらの削除完了を確認してからetcdから実削除する。
 func (c *kubernetesEngineController) reconcileKubernetesEngineDeleting(ke api.KubernetesEngine) {
 	id := api.KubernetesEngineID(ke)
 
@@ -292,6 +291,28 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineDeleting(ke api.Ku
 		return
 	}
 	if current.Status == nil || current.Status.StatusCode != db.KUBERNETES_ENGINE_DELETING {
+		return
+	}
+
+	// ネットワークやコントロールプレーンを解体する前に、このクラスタが所有するノード用仮想サーバーの
+	// 削除を要求し、それら全てが消えるまで待つ。VMがネットワークに接続されたまま専用ネットワークが
+	// 削除されるのを避けるため、サーバー削除を先行させる。
+	nodeServers, err := findKubernetesEngineNodeServers(c.db, current)
+	if err != nil {
+		slog.Warn("findKubernetesEngineNodeServers() failed", "id", id, "err", err)
+		return
+	}
+	if len(nodeServers) > 0 {
+		for _, server := range nodeServers {
+			if server.Status != nil && server.Status.DeletionTimeStamp != nil {
+				continue
+			}
+			serverID := api.ServerID(server)
+			if delErr := c.db.SetDeleteTimestamp(serverID); delErr != nil {
+				slog.Warn("SetDeleteTimestamp() failed", "id", id, "serverId", serverID, "err", delErr)
+			}
+		}
+		// ノード用サーバーの削除完了を待ってからネットワーク・コントロールプレーンの解体に進む。
 		return
 	}
 
