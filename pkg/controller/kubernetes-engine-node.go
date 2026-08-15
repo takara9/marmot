@@ -86,6 +86,9 @@ func ProvisionKubernetesEngineNodes(database *db.Database, mkeConf *marmotd.MKEC
 	if err := EnsureKubernetesEngineCephCSI(mkeConf, ke); err != nil {
 		return false, fmt.Errorf("failed to install Ceph CSI: %w", err)
 	}
+	if err := EnsureKubernetesEngineClusterDNS(ke); err != nil {
+		return false, fmt.Errorf("failed to install cluster DNS: %w", err)
+	}
 
 	servers, err := findKubernetesEngineNodeServers(database, ke)
 	if err != nil {
@@ -569,6 +572,10 @@ clusterDNS:
 clusterDomain: cluster.local
 containerRuntimeEndpoint: unix:///run/containerd/containerd.sock
 failSwapOn: false
+# ノードの/etc/resolv.confはsystemd-resolvedのスタブ(127.0.0.53)を指すため、dnsPolicy: Default
+# のPod(CoreDNS等)にそのままコピーするとPod自身にループしてしまう。実アップストリームDNSが
+# 書かれたsystemd-resolvedの内部ファイルを直接指定する。
+resolvConf: /run/systemd/resolve/resolv.conf
 `
 }
 

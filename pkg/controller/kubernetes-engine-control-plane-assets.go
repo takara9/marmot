@@ -12,6 +12,12 @@ import (
 
 const DefaultKubernetesControlPlaneConfigDir = "/var/lib/marmot/mke/control-plane"
 
+// kubernetesEngineAPIServerServiceIP は、kubernetes.default Serviceの固定ClusterIP
+// (DefaultKubernetesServiceClusterCIDR="10.96.0.0/12"の先頭アドレス)。CoreDNS等の
+// in-clusterクライアントはKUBERNETES_SERVICE_HOST経由でこのIPへ直接TLS接続するため、
+// kube-apiserverのサービス証明書のSANに含めておく必要がある。
+const kubernetesEngineAPIServerServiceIP = "10.96.0.1"
+
 type KubernetesEngineControlPlaneAssets struct {
 	CACertPath                   string
 	APIServerCertPath            string
@@ -90,7 +96,7 @@ func EnsureKubernetesEngineControlPlaneAssets(pkiDir, configDir, clusterName, ap
 	if net.ParseIP(apiServerIP) == nil {
 		return KubernetesEngineControlPlaneAssets{}, fmt.Errorf("invalid API server IP address %q", apiServerIP)
 	}
-	apiServerIPAddresses := []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP(apiServerIP)}
+	apiServerIPAddresses := []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP(apiServerIP), net.ParseIP(kubernetesEngineAPIServerServiceIP)}
 	if hostBindAddress = strings.TrimSpace(hostBindAddress); hostBindAddress != "" {
 		if net.ParseIP(hostBindAddress) == nil {
 			return KubernetesEngineControlPlaneAssets{}, fmt.Errorf("invalid host bind address %q", hostBindAddress)

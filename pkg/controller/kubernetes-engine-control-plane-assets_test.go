@@ -24,6 +24,7 @@ var _ = Describe("EnsureKubernetesEngineControlPlaneAssets", func() {
 		Expect(containsIP(cert.IPAddresses, "172.16.90.100")).To(BeTrue())
 		Expect(containsIP(cert.IPAddresses, "127.0.0.1")).To(BeTrue())
 		Expect(containsIP(cert.IPAddresses, "203.0.113.10")).To(BeTrue())
+		Expect(containsIP(cert.IPAddresses, "10.96.0.1")).To(BeTrue())
 		Expect(containsString(cert.DNSNames, "kubernetes.default.svc")).To(BeTrue())
 
 		for _, path := range []string{assets.SchedulerKubeconfigPath, assets.ControllerManagerConfigPath} {

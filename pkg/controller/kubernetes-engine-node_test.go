@@ -148,6 +148,10 @@ var _ = Describe("KubernetesEngineNode", func() {
 		Expect(kubernetesEnginePodCIDR(4)).To(Equal("10.244.5.0/24"))
 	})
 
+	It("points the kubelet at systemd-resolved's real upstream resolv.conf to avoid a self-loop", func() {
+		Expect(renderKubernetesEngineKubeletConfig()).To(ContainSubstring("resolvConf: /run/systemd/resolve/resolv.conf"))
+	})
+
 	It("derives the node index from its name", func() {
 		index, err := kubernetesEngineNodeIndex("mke-demo-node-3")
 		Expect(err).NotTo(HaveOccurred())
