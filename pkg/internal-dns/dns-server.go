@@ -150,7 +150,7 @@ func (c *controller) handleRequest(w dns.ResponseWriter, r *dns.Msg) {
 
 		foundInEtcd = true
 
-		if ip != nil && q.Qtype == dns.TypeA {
+		if ip != nil && (q.Qtype == dns.TypeA || q.Qtype == dns.TypeANY) {
 			log.Printf("Resolved from etcd: %s -> %s", q.Name[:len(q.Name)-1], ipStr)
 			m := new(dns.Msg)
 			m.SetReply(r)
