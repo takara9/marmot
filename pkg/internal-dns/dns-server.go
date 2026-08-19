@@ -128,6 +128,7 @@ func (c *controller) handleRequest(w dns.ResponseWriter, r *dns.Msg) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
+	foundInEtcd := false
 	for _, etcdKey := range lookupKeys {
 		resp, err := c.db.Cli.Get(ctx, etcdKey)
 		if err != nil {
@@ -147,6 +148,8 @@ func (c *controller) handleRequest(w dns.ResponseWriter, r *dns.Msg) {
 			return
 		}
 
+		foundInEtcd = true
+
 		if ip != nil && q.Qtype == dns.TypeA {
 			log.Printf("Resolved from etcd: %s -> %s", q.Name[:len(q.Name)-1], ipStr)
 			m := new(dns.Msg)
@@ -158,6 +161,15 @@ func (c *controller) handleRequest(w dns.ResponseWriter, r *dns.Msg) {
 			_ = w.WriteMsg(m)
 			return
 		}
+	}
+
+	// marmot管理下のホストだがAレコード以外(AAAA等)の問い合わせはNODATAで即答し、
+	// 上位DNSへ再転送してforwardループになるのを防ぐ
+	if foundInEtcd {
+		m := new(dns.Msg)
+		m.SetReply(r)
+		_ = w.WriteMsg(m)
+		return
 	}
 
 	// etcd にない場合は外部へ転送
