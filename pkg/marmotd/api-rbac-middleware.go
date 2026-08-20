@@ -67,10 +67,11 @@ func rbacOperationMiddlewares(s *Server) map[string][]echo.MiddlewareFunc {
 		"apiDeleteVpnGatewayById":  {Resource: "VpnGateway", Verb: "delete"},
 		"apiGetVpnGatewayCertById": {Resource: "VpnGateway", Verb: "read"},
 
-		"apiGetKubernetesEngines":       {Resource: "KubernetesEngine", Verb: "read"},
-		"apiCreateKubernetesEngine":     {Resource: "KubernetesEngine", Verb: "create"},
-		"apiGetKubernetesEngineById":    {Resource: "KubernetesEngine", Verb: "read"},
-		"apiDeleteKubernetesEngineById": {Resource: "KubernetesEngine", Verb: "delete"},
+		"apiGetKubernetesEngines":              {Resource: "KubernetesEngine", Verb: "read"},
+		"apiCreateKubernetesEngine":            {Resource: "KubernetesEngine", Verb: "create"},
+		"apiGetKubernetesEngineById":           {Resource: "KubernetesEngine", Verb: "read"},
+		"apiDeleteKubernetesEngineById":        {Resource: "KubernetesEngine", Verb: "delete"},
+		"apiGetKubernetesEngineKubeconfigById": {Resource: "KubernetesEngine", Verb: "read"},
 
 		"apiGetNetworkLoadBalancers":       {Resource: "NetworkLoadBalancer", Verb: "read"},
 		"apiCreateNetworkLoadBalancer":     {Resource: "NetworkLoadBalancer", Verb: "create"},

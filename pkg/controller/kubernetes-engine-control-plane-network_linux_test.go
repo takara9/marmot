@@ -43,11 +43,17 @@ var _ = Describe("KubernetesEngineControlPlaneNetwork", func() {
 		cfg, err := NewKubernetesEngineControlPlaneNetworkConfig("demo", "br-demo", "172.16.90.100/24")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(SetupKubernetesEngineControlPlaneNetwork(cfg)).To(Succeed())
-		Expect(calls).To(Equal([]string{"netns-add:mke-demo", "veth-add", "ovs-add", "host-up", "peer-configure"}))
+		Expect(calls).To(Equal([]string{
+			"netns-add:mke-demo",
+			"ovs-add:" + cfg.HostVethName,
+			"ovs-add:" + cfg.PeerVethName,
+			"host-up",
+			"peer-configure",
+		}))
 
 		calls = nil
 		Expect(TeardownKubernetesEngineControlPlaneNetwork(cfg)).To(Succeed())
-		Expect(calls).To(Equal([]string{"ovs-delete", "netns-delete:mke-demo"}))
+		Expect(calls).To(Equal([]string{"ovs-delete:" + cfg.PeerVethName, "ovs-delete:" + cfg.HostVethName, "netns-delete:mke-demo"}))
 	})
 
 	It("rolls back already-created resources when a later setup step fails", func() {
@@ -60,7 +66,15 @@ var _ = Describe("KubernetesEngineControlPlaneNetwork", func() {
 		cfg, err := NewKubernetesEngineControlPlaneNetworkConfig("demo", "br-demo", "172.16.90.100/24")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(SetupKubernetesEngineControlPlaneNetwork(cfg)).To(HaveOccurred())
-		Expect(calls).To(Equal([]string{"netns-add:mke-demo", "veth-add", "ovs-add", "host-up", "ovs-delete", "netns-delete:mke-demo"}))
+		Expect(calls).To(Equal([]string{
+			"netns-add:mke-demo",
+			"ovs-add:" + cfg.HostVethName,
+			"ovs-add:" + cfg.PeerVethName,
+			"host-up",
+			"ovs-delete:" + cfg.PeerVethName,
+			"ovs-delete:" + cfg.HostVethName,
+			"netns-delete:mke-demo",
+		}))
 	})
 
 	It("allocates the next free API server port outside used ranges", func() {
@@ -167,7 +181,6 @@ func installFakeControlPlaneNetworkOps(calls *[]string) {
 	origNamespaceExists := controlPlaneNamespaceExists
 	origCreateNamespace := controlPlaneCreateNamespace
 	origDeleteNamespace := controlPlaneDeleteNamespace
-	origCreateVeth := controlPlaneCreateVeth
 	origAddOVSPort := controlPlaneAddOVSPort
 	origDeleteOVSPort := controlPlaneDeleteOVSPort
 	origSetHostVethUp := controlPlaneSetHostVethUp
@@ -182,16 +195,12 @@ func installFakeControlPlaneNetworkOps(calls *[]string) {
 		*calls = append(*calls, "netns-delete:"+name)
 		return nil
 	}
-	controlPlaneCreateVeth = func(string, string) error {
-		*calls = append(*calls, "veth-add")
+	controlPlaneAddOVSPort = func(bridge, port string) error {
+		*calls = append(*calls, "ovs-add:"+port)
 		return nil
 	}
-	controlPlaneAddOVSPort = func(string, string) error {
-		*calls = append(*calls, "ovs-add")
-		return nil
-	}
-	controlPlaneDeleteOVSPort = func(string, string) error {
-		*calls = append(*calls, "ovs-delete")
+	controlPlaneDeleteOVSPort = func(bridge, port string) error {
+		*calls = append(*calls, "ovs-delete:"+port)
 		return nil
 	}
 	controlPlaneSetHostVethUp = func(string) error {
@@ -207,7 +216,6 @@ func installFakeControlPlaneNetworkOps(calls *[]string) {
 		controlPlaneNamespaceExists = origNamespaceExists
 		controlPlaneCreateNamespace = origCreateNamespace
 		controlPlaneDeleteNamespace = origDeleteNamespace
-		controlPlaneCreateVeth = origCreateVeth
 		controlPlaneAddOVSPort = origAddOVSPort
 		controlPlaneDeleteOVSPort = origDeleteOVSPort
 		controlPlaneSetHostVethUp = origSetHostVethUp

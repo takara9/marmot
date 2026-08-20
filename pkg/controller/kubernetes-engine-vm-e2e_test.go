@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -33,6 +34,7 @@ var _ = Describe("KubernetesEngine VM E2E", Ordered, func() {
 		volumeController  *controller
 		vmController      *controller
 		mkeController     *kubernetesEngineController
+		mkeConfigPath     string
 		stopHostStatus    context.CancelFunc
 		hostStatusDone    chan struct{}
 	)
@@ -59,6 +61,8 @@ var _ = Describe("KubernetesEngine VM E2E", Ordered, func() {
 		ma, err = marmotd.NewMarmot(nodeName, endpoint)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ma.CollectAndUpdateHostStatus()).To(Succeed())
+
+		mkeConfigPath = writeKubernetesEngineE2EMKEConfig()
 	})
 
 	AfterAll(func() {
@@ -69,7 +73,7 @@ var _ = Describe("KubernetesEngine VM E2E", Ordered, func() {
 			stopHostStatus()
 			<-hostStatusDone
 		}
-		cleanupKubernetesEngineVMEndToEnd(ma, vmController, volumeController, networkController, engine, imageID)
+		cleanupKubernetesEngineVMEndToEnd(ma, mkeController, vmController, volumeController, networkController, engine, imageID)
 		if ma != nil {
 			_ = ma.Db.Close()
 		}
@@ -93,7 +97,7 @@ var _ = Describe("KubernetesEngine VM E2E", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred())
 		vmController, err = StartVmController(nodeName, endpoint, 1)
 		Expect(err).NotTo(HaveOccurred())
-		mkeController, err = StartKubernetesEngineController(nodeName, endpoint, "")
+		mkeController, err = StartKubernetesEngineController(nodeName, endpoint, mkeConfigPath)
 		Expect(err).NotTo(HaveOccurred())
 
 		hostStatusContext, cancelHostStatus := context.WithCancel(context.Background())
@@ -200,6 +204,42 @@ var _ = Describe("KubernetesEngine VM E2E", Ordered, func() {
 		}).WithTimeout(25 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 	})
 })
+
+// writeKubernetesEngineE2EMKEConfig は既存の /etc/marmot/mke.json (存在すればその内容) をベースに、
+// control_plane_bind_address を br0 の実IPアドレスで上書きした一時設定ファイルを作成し、そのパスを返す。
+// CIランナー側で control_plane_bind_address を事前設定しなくても、フェーズ10のホストアクセス経路を
+// 検証できるようにするための、E2Eテスト専用の自動検出処理。
+func writeKubernetesEngineE2EMKEConfig() string {
+	const controlPlaneBindInterface = "br0"
+
+	iface, err := net.InterfaceByName(controlPlaneBindInterface)
+	Expect(err).NotTo(HaveOccurred(), "failed to look up interface %q for control_plane_bind_address", controlPlaneBindInterface)
+
+	addrs, err := iface.Addrs()
+	Expect(err).NotTo(HaveOccurred())
+
+	var hostBindAddress string
+	for _, addr := range addrs {
+		ipNet, ok := addr.(*net.IPNet)
+		if !ok || ipNet.IP.IsLoopback() || ipNet.IP.To4() == nil {
+			continue
+		}
+		hostBindAddress = ipNet.IP.String()
+		break
+	}
+	Expect(hostBindAddress).NotTo(BeEmpty(), "interface %q has no usable IPv4 address", controlPlaneBindInterface)
+
+	mkeConf, err := marmotd.LoadMKEConfig(marmotd.DefaultMKEConfigPath)
+	Expect(err).NotTo(HaveOccurred())
+	mkeConf.ControlPlaneBindAddress = hostBindAddress
+
+	configBytes, err := json.Marshal(mkeConf)
+	Expect(err).NotTo(HaveOccurred())
+
+	configPath := filepath.Join(GinkgoT().TempDir(), "mke.json")
+	Expect(os.WriteFile(configPath, configBytes, 0o644)).To(Succeed())
+	return configPath
+}
 
 func startKubernetesEngineE2EEtcdContainer() string {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -373,7 +413,7 @@ func kubernetesEngineE2ENodeRegistered(engine api.KubernetesEngine, expectedName
 	return false, nil
 }
 
-func cleanupKubernetesEngineVMEndToEnd(ma *marmotd.Marmot, vmController, volumeController, networkController *controller, engine api.KubernetesEngine, imageID string) {
+func cleanupKubernetesEngineVMEndToEnd(ma *marmotd.Marmot, mkeController *kubernetesEngineController, vmController, volumeController, networkController *controller, engine api.KubernetesEngine, imageID string) {
 	var cleanupErrors []error
 	if api.KubernetesEngineID(engine) != "" {
 		if current, err := ma.Db.GetKubernetesEngineById(api.KubernetesEngineID(engine)); err == nil {
@@ -400,7 +440,7 @@ func cleanupKubernetesEngineVMEndToEnd(ma *marmotd.Marmot, vmController, volumeC
 			cleanupErrors = append(cleanupErrors, fmt.Errorf("%d KubernetesEngine node server(s) remain", len(servers)))
 		}
 		if engine.Status != nil && engine.Status.ControlPlaneIpAddress != nil {
-			if err := DeprovisionKubernetesEngineControlPlane(ma.Db, engine); err != nil {
+			if err := DeprovisionKubernetesEngineControlPlane(ma.Db, mkeController.mkeConf, engine); err != nil {
 				cleanupErrors = append(cleanupErrors, fmt.Errorf("failed to deprovision control plane: %w", err))
 			}
 		}

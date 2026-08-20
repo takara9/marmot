@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -60,8 +61,14 @@ func ProvisionKubernetesEngineEtcd(database *db.Database, mkeConf *marmotd.MKECo
 	return clientPort, peerPort, nil
 }
 
-// DeprovisionKubernetesEngineEtcd はクラスタ専用etcdのsystemdユニットを停止・削除する。
-// データディレクトリ(過去のetcdデータ)は削除しない。
+// DeprovisionKubernetesEngineEtcd はクラスタ専用etcdのsystemdユニットを停止・削除し、データディレクトリも削除する。
+// 同名クラスタが再作成された際に、古いetcdデータ(Nodeオブジェクト等)が再利用されるのを防ぐため。
 func DeprovisionKubernetesEngineEtcd(clusterName string) error {
-	return DeleteKubernetesEngineEtcdUnit(clusterName)
+	if err := DeleteKubernetesEngineEtcdUnit(clusterName); err != nil {
+		return err
+	}
+	if err := os.RemoveAll(filepath.Join(DefaultEtcdDataDir, clusterName)); err != nil {
+		return fmt.Errorf("failed to remove etcd data dir: %w", err)
+	}
+	return nil
 }

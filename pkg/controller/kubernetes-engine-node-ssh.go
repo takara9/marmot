@@ -101,6 +101,17 @@ func runKubernetesEngineNodeProvisionSteps(runner kubernetesEngineNodeCommandRun
 		return err
 	}
 
+	// br_netfilterが無いと、同一ノード上のPod間通信(cni0ブリッジ経由)がiptables/conntrackを
+	// 素通りし、Service ClusterIP宛通信の応答パケットがun-DNATされずクライアントに破棄される。
+	if err := runner.step("enable bridge netfilter for Service ClusterIP NAT", func() error {
+		return runner.run("modprobe br_netfilter && "+
+			"echo br_netfilter > /etc/modules-load.d/k8s-br-netfilter.conf && "+
+			"printf 'net.bridge.bridge-nf-call-iptables=1\\nnet.bridge.bridge-nf-call-ip6tables=1\\nnet.ipv4.ip_forward=1\\n' > /etc/sysctl.d/99-marmot-mke-node.conf && "+
+			"sysctl --system", nil)
+	}); err != nil {
+		return err
+	}
+
 	arch, err := detectKubernetesEngineNodeArch(runner)
 	if err != nil {
 		return fmt.Errorf("failed to detect node architecture: %w", err)
@@ -287,6 +298,9 @@ func installKubernetesEngineCephClient(runner kubernetesEngineNodeCommandRunner,
 // 払い出すbridge CNIのconflistを生成する。ノード間のPod間通信は
 // reconcileKubernetesEngineNodeRoutes が設定する静的経路で疎通させるため、
 // ipMasqはfalseとする（クラスタ外向けの通信は別途iptablesでマスカレードする）。
+// isDefaultGateway:true がゲートウェイ経由のデフォルトルートを自動追加するため、
+// ipam.routesに同じ0.0.0.0/0を重複指定しない（重複指定すると"file exists"で
+// サンドボックス作成に失敗する）。
 func renderKubernetesEngineBridgeCNIConf(podCIDR string) string {
 	return fmt.Sprintf(`{
   "cniVersion": "1.0.0",
@@ -301,8 +315,7 @@ func renderKubernetesEngineBridgeCNIConf(podCIDR string) string {
       "hairpinMode": true,
       "ipam": {
         "type": "host-local",
-        "ranges": [[{ "subnet": "%s" }]],
-        "routes": [{ "dst": "0.0.0.0/0" }]
+        "ranges": [[{ "subnet": "%s" }]]
       }
     },
     { "type": "portmap", "capabilities": { "portMappings": true } }

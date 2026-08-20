@@ -54,6 +54,11 @@ type MKEConfig struct {
 
 	// CephFS用StorageClassが参照する、事前作成済みのCephFSファイルシステム名。
 	CephFilesystemName string `json:"ceph_filesystem_name"`
+
+	// kube-apiserver等コントロールプレーンプロセスをDNAT経由で外部公開する際に使用する、
+	// marmotdが稼働するホストの実IPアドレス。kubectlアクセス用kubeconfigのserverフィールドや
+	// kube-apiserver証明書のSANにも使用される。未設定の場合、フェーズ10のDNAT設定はエラーになる。
+	ControlPlaneBindAddress string `json:"control_plane_bind_address"`
 }
 
 // defaultMKEConfig はコンフィグファイルが存在しない場合や、一部フィールドが

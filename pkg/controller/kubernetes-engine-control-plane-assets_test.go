@@ -12,7 +12,7 @@ import (
 
 var _ = Describe("EnsureKubernetesEngineControlPlaneAssets", func() {
 	It("issues API server certs and scheduler/controller-manager kubeconfigs", func() {
-		assets, err := EnsureKubernetesEngineControlPlaneAssets(GinkgoT().TempDir(), GinkgoT().TempDir(), "demo", "172.16.90.100", 6443)
+		assets, err := EnsureKubernetesEngineControlPlaneAssets(GinkgoT().TempDir(), GinkgoT().TempDir(), "demo", "172.16.90.100", 6443, "203.0.113.10")
 		Expect(err).NotTo(HaveOccurred())
 
 		certPEM, err := os.ReadFile(assets.APIServerCertPath)
@@ -23,6 +23,8 @@ var _ = Describe("EnsureKubernetesEngineControlPlaneAssets", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(containsIP(cert.IPAddresses, "172.16.90.100")).To(BeTrue())
 		Expect(containsIP(cert.IPAddresses, "127.0.0.1")).To(BeTrue())
+		Expect(containsIP(cert.IPAddresses, "203.0.113.10")).To(BeTrue())
+		Expect(containsIP(cert.IPAddresses, "10.96.0.1")).To(BeTrue())
 		Expect(containsString(cert.DNSNames, "kubernetes.default.svc")).To(BeTrue())
 
 		for _, path := range []string{assets.SchedulerKubeconfigPath, assets.ControllerManagerConfigPath} {
@@ -32,6 +34,15 @@ var _ = Describe("EnsureKubernetesEngineControlPlaneAssets", func() {
 		}
 		Expect(certFileExists(assets.ServiceAccountPublicKeyPath)).To(BeTrue())
 		Expect(certFileExists(assets.ServiceAccountPrivateKeyPath)).To(BeTrue())
+
+		kubeletClientCertPEM, err := os.ReadFile(assets.KubeletClientCertPath)
+		Expect(err).NotTo(HaveOccurred())
+		block, _ = pem.Decode(kubeletClientCertPEM)
+		Expect(block).NotTo(BeNil())
+		kubeletClientCert, err := x509.ParseCertificate(block.Bytes)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(kubeletClientCert.Subject.Organization).To(ContainElement("system:masters"))
+		Expect(certFileExists(assets.KubeletClientKeyPath)).To(BeTrue())
 	})
 })
 

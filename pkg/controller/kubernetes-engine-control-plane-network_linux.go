@@ -23,6 +23,11 @@ type KubernetesEngineControlPlaneNetworkConfig struct {
 	BridgeName   string
 	Interface    string
 	CIDR         string
+	// HostCIDR は hostVeth (ホスト側/ルートnetns側) に割り当てるIPアドレス(CIDR形式)。
+	// コントロールプレーンnetnsのIPアドレスと同一サブネット内の別アドレスを指定することで、
+	// ルートnetnsからコントロールプレーンnetnsへの経路が確立され、
+	// kube-apiserverへのDNAT転送が可能になる。空の場合は付与しない(後方互換)。
+	HostCIDR string
 }
 
 var (
@@ -39,9 +44,14 @@ var (
 	controlPlaneRunIP           = func(args ...string) ([]byte, error) {
 		return exec.Command("ip", args...).CombinedOutput()
 	}
-	controlPlaneCreateVeth      = createControlPlaneVeth
-	controlPlaneAddOVSPort      = func(bridge, port string) error {
-		output, err := exec.Command("ovs-vsctl", "--may-exist", "add-port", bridge, port).CombinedOutput()
+	// hostVeth/peerVeth はいずれも通常のveth pairではなく、type=internalのOVSポートとして作成する。
+	// veth pairの片側をOVSポートとしてenslaveすると、そのインターフェース自身に付与したIPへの
+	// ARP応答がOVSデータパスに横取りされ、カーネルのIPスタックまで届かなくなる
+	// (ARPはtcpdumpで見えるが近隣エントリがFAILEDのまま解決しない)。type=internalのポートは
+	// OVSでスイッチングされつつホスト側IPスタックとも正しく相互作用するため、この問題を回避できる。
+	controlPlaneAddOVSPort = func(bridge, port string) error {
+		output, err := exec.Command("ovs-vsctl", "--may-exist", "add-port", bridge, port,
+			"--", "set", "interface", port, "type=internal").CombinedOutput()
 		if err != nil {
 			return fmt.Errorf("ovs-vsctl add-port failed: %w (output=%s)", err, strings.TrimSpace(string(output)))
 		}
@@ -60,6 +70,17 @@ var (
 			return err
 		}
 		return netlink.LinkSetUp(link)
+	}
+	controlPlaneSetHostVethAddress = func(name, cidr string) error {
+		link, err := netlink.LinkByName(name)
+		if err != nil {
+			return err
+		}
+		address, err := netlink.ParseAddr(cidr)
+		if err != nil {
+			return err
+		}
+		return netlink.AddrAdd(link, address)
 	}
 	controlPlaneConfigurePeer = configureControlPlanePeer
 )
@@ -105,6 +126,7 @@ func SetupKubernetesEngineControlPlaneNetwork(cfg KubernetesEngineControlPlaneNe
 		if _, err := netlink.LinkByName(cfg.HostVethName); err == nil {
 			return nil
 		}
+		_ = controlPlaneDeleteOVSPort(cfg.BridgeName, cfg.PeerVethName)
 		_ = controlPlaneDeleteOVSPort(cfg.BridgeName, cfg.HostVethName)
 		if err := controlPlaneDeleteNamespace(cfg.Namespace); err != nil {
 			return fmt.Errorf("failed to delete stale network namespace %s: %w", cfg.Namespace, err)
@@ -115,18 +137,24 @@ func SetupKubernetesEngineControlPlaneNetwork(cfg KubernetesEngineControlPlaneNe
 	}
 	defer func() {
 		if err != nil {
+			_ = controlPlaneDeleteOVSPort(cfg.BridgeName, cfg.PeerVethName)
 			_ = controlPlaneDeleteOVSPort(cfg.BridgeName, cfg.HostVethName)
 			_ = controlPlaneDeleteNamespace(cfg.Namespace)
 		}
 	}()
-	if err = controlPlaneCreateVeth(cfg.HostVethName, cfg.PeerVethName); err != nil {
-		return fmt.Errorf("failed to create veth pair: %w", err)
-	}
 	if err = controlPlaneAddOVSPort(cfg.BridgeName, cfg.HostVethName); err != nil {
+		return err
+	}
+	if err = controlPlaneAddOVSPort(cfg.BridgeName, cfg.PeerVethName); err != nil {
 		return err
 	}
 	if err = controlPlaneSetHostVethUp(cfg.HostVethName); err != nil {
 		return fmt.Errorf("failed to bring host veth up: %w", err)
+	}
+	if strings.TrimSpace(cfg.HostCIDR) != "" {
+		if err = controlPlaneSetHostVethAddress(cfg.HostVethName, cfg.HostCIDR); err != nil {
+			return fmt.Errorf("failed to assign host veth address: %w", err)
+		}
 	}
 	if err = controlPlaneConfigurePeer(cfg.Namespace, cfg.PeerVethName, cfg.Interface, cfg.CIDR); err != nil {
 		return fmt.Errorf("failed to configure network namespace: %w", err)
@@ -135,6 +163,9 @@ func SetupKubernetesEngineControlPlaneNetwork(cfg KubernetesEngineControlPlaneNe
 }
 
 func TeardownKubernetesEngineControlPlaneNetwork(cfg KubernetesEngineControlPlaneNetworkConfig) error {
+	if err := controlPlaneDeleteOVSPort(cfg.BridgeName, cfg.PeerVethName); err != nil {
+		return err
+	}
 	if err := controlPlaneDeleteOVSPort(cfg.BridgeName, cfg.HostVethName); err != nil {
 		return err
 	}
@@ -152,59 +183,30 @@ func createControlPlaneNamespace(name string) error {
 	return nil
 }
 
-func createControlPlaneVeth(hostName, peerName string) error {
-	return netlink.LinkAdd(&netlink.Veth{
-		LinkAttrs: netlink.LinkAttrs{Name: hostName},
-		PeerName:  peerName,
-	})
-}
-
+// configureControlPlanePeer は peer インターフェースを対象のnetnsへ移動してIPを設定する。
+// netlinkライブラリのns操作(NewHandleAt等)は呼び出しスレッドのns切り替えに依存し、
+// Goランタイムのスレッド移動と絡んで実際にはns移動が反映されないまま成功を返すことが
+// あったため、動作確認済みのipコマンド(ip link set netns / ip netns exec)で実行する。
+// また、OVS type=internal ポートは ovs-vswitchd が名前を管理しているため、
+// ip link set name でのリネームは名前不一致とみなされ非同期に破棄されることがある。
+// interfaceNameでの参照は他コードに存在しないため、rename自体を行わずpeerNameのまま設定する。
 func configureControlPlanePeer(namespace, peerName, interfaceName, cidr string) error {
-	peer, err := netlink.LinkByName(peerName)
-	if err != nil {
+	if _, err := netlink.ParseAddr(cidr); err != nil {
 		return err
 	}
-	target, err := netns.GetFromName(namespace)
-	if err != nil {
-		return err
+	if output, err := controlPlaneRunIP("link", "set", peerName, "netns", namespace); err != nil {
+		return fmt.Errorf("ip link set netns failed: %w (output=%s)", err, strings.TrimSpace(string(output)))
 	}
-	defer func() { _ = target.Close() }()
-	if err := netlink.LinkSetNsFd(peer, int(target)); err != nil {
-		return err
+	if output, err := controlPlaneRunIP("netns", "exec", namespace, "ip", "addr", "add", cidr, "dev", peerName); err != nil {
+		return fmt.Errorf("ip addr add failed: %w (output=%s)", err, strings.TrimSpace(string(output)))
 	}
-
-	handle, err := netlink.NewHandleAt(target)
-	if err != nil {
-		return err
+	if output, err := controlPlaneRunIP("netns", "exec", namespace, "ip", "link", "set", "dev", peerName, "up"); err != nil {
+		return fmt.Errorf("ip link set up failed: %w (output=%s)", err, strings.TrimSpace(string(output)))
 	}
-	defer handle.Close()
-
-	link, err := handle.LinkByName(peerName)
-	if err != nil {
-		return err
+	if output, err := controlPlaneRunIP("netns", "exec", namespace, "ip", "link", "set", "dev", "lo", "up"); err != nil {
+		return fmt.Errorf("ip link set lo up failed: %w (output=%s)", err, strings.TrimSpace(string(output)))
 	}
-	if err := handle.LinkSetName(link, interfaceName); err != nil {
-		return err
-	}
-	link, err = handle.LinkByName(interfaceName)
-	if err != nil {
-		return err
-	}
-	address, err := netlink.ParseAddr(cidr)
-	if err != nil {
-		return err
-	}
-	if err := handle.AddrAdd(link, address); err != nil {
-		return err
-	}
-	if err := handle.LinkSetUp(link); err != nil {
-		return err
-	}
-	loopback, err := handle.LinkByName("lo")
-	if err != nil {
-		return err
-	}
-	return handle.LinkSetUp(loopback)
+	return nil
 }
 
 var (

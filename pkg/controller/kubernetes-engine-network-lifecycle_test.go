@@ -231,3 +231,73 @@ func TestReconcileKubernetesEngineDeletingWaitsForFollowerNetworkRemoval(t *test
 		t.Fatalf("GetKubernetesEngineById() after follower removal = %v, want ErrNotFound", err)
 	}
 }
+
+// Deleting: このクラスタが所有するノード用仮想サーバーは、ネットワーク/コントロールプレーンの解体より
+// 先に削除要求され、サーバーが消えるまでクラスタ本体は削除されないことを確認する。
+func TestReconcileKubernetesEngineDeletingWaitsForNodeServerRemoval(t *testing.T) {
+	database := newGatewayTestDatabase(t)
+	ctrl := &kubernetesEngineController{db: database, node: "node-a"}
+
+	ke := newTestKubernetesEngine(t, database, "teardown-node")
+	id := api.KubernetesEngineID(ke)
+
+	nodeLabels := map[string]interface{}{
+		kubernetesEngineNodeLabelOwner: id,
+		kubernetesEngineNodeLabelRole:  kubernetesEngineNodeRoleValue,
+	}
+	server, err := database.MakeServerEntry(api.Server{
+		Metadata: api.Metadata{Name: "mke-teardown-node-node-1", Labels: &nodeLabels},
+	})
+	if err != nil {
+		t.Fatalf("MakeServerEntry() failed: %v", err)
+	}
+	serverID := api.ServerID(server)
+
+	if err := database.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_DELETING, ""); err != nil {
+		t.Fatalf("failed to set DELETING: %v", err)
+	}
+	ke, err = database.GetKubernetesEngineById(id)
+	if err != nil {
+		t.Fatalf("GetKubernetesEngineById() failed: %v", err)
+	}
+
+	ctrl.reconcileKubernetesEngineDeleting(ke)
+
+	updatedServer, err := database.GetServerById(serverID)
+	if err != nil {
+		t.Fatalf("GetServerById() failed: %v", err)
+	}
+	if updatedServer.Status == nil || updatedServer.Status.DeletionTimeStamp == nil {
+		t.Fatalf("node server DeletionTimeStamp not set after first Deleting reconcile")
+	}
+
+	if _, err := database.GetKubernetesEngineById(id); err != nil {
+		t.Fatalf("kubernetes engine was deleted while node server still exists: %v", err)
+	}
+
+	// 2回目のreconcileでもタイムスタンプがリセットされず(冪等)、クラスタ本体も削除されないことを確認する。
+	ctrl.reconcileKubernetesEngineDeleting(ke)
+	updatedServer, err = database.GetServerById(serverID)
+	if err != nil {
+		t.Fatalf("GetServerById() failed after 2nd reconcile: %v", err)
+	}
+	if updatedServer.Status == nil || updatedServer.Status.DeletionTimeStamp == nil {
+		t.Fatalf("node server DeletionTimeStamp was lost after 2nd reconcile")
+	}
+	if _, err := database.GetKubernetesEngineById(id); err != nil {
+		t.Fatalf("kubernetes engine was deleted while node server still exists (2nd reconcile): %v", err)
+	}
+
+	// ノードコントローラーによる仮想サーバーの実削除完了を模擬する。
+	if err := database.DeleteServerById(serverID); err != nil {
+		t.Fatalf("DeleteServerById() failed: %v", err)
+	}
+
+	ctrl.reconcileKubernetesEngineDeleting(ke)
+
+	// このテストではネットワークを一度も作成していないため、ノードサーバー削除完了後は
+	// ネットワーク待ちに入らずクラスタ本体が直ちに削除される。
+	if _, err := database.GetKubernetesEngineById(id); err != db.ErrNotFound {
+		t.Fatalf("GetKubernetesEngineById() after node server removal = %v, want ErrNotFound", err)
+	}
+}

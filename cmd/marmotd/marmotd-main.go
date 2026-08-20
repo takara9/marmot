@@ -103,6 +103,9 @@ func main() {
 	e := echo.New()
 	slog.Debug("Starting api server #2", "nodeName", cfg.NodeName, "etcdURL", cfg.EtcdURL, "apiListenAddr", cfg.APIListenAddr)
 	Server := marmotd.NewServer(cfg.NodeName, cfg.EtcdURL)
+	Server.KubernetesEngineKubeconfigProvider = func(clusterName, hostBindAddress string, apiServerPort int) ([]byte, error) {
+		return controller.EnsureKubernetesEngineAdminKubeconfig(controller.DefaultKubernetesEnginePkiDir, clusterName, hostBindAddress, apiServerPort)
+	}
 	telemetry, err := marmotd.RegisterOpenTelemetryMetrics(e, Server.Ma.Db)
 	if err != nil {
 		slog.Error("Failed to initialize OpenTelemetry metrics", "err", err)

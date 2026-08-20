@@ -39,6 +39,11 @@ type Server struct {
 	Ma            *Marmot
 	cleanupCancel context.CancelFunc
 	cleanupDone   chan struct{}
+
+	// KubernetesEngineKubeconfigProvider は system:masters 権限の管理者kubeconfigを
+	// 組み立てる関数。pkg/controller から pkg/marmotd への依存(import cycle)を避けるため、
+	// cmd/marmotd の起動時に controller.EnsureKubernetesEngineAdminKubeconfig を注入する。
+	KubernetesEngineKubeconfigProvider func(clusterName, hostBindAddress string, apiServerPort int) ([]byte, error)
 }
 
 const (

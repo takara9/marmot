@@ -403,6 +403,55 @@ var _ = Describe("IPAM", Ordered, func() {
 
 		})
 
+		Context("CreateAnyIpNetworkの他VirtualNetworkとのCIDR重複回避", func() {
+			var err error
+			var vnetA, vnetB api.VirtualNetwork
+
+			It("データベース接続の生成", func() {
+				v, err = db.NewDatabase(url)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("VirtualNetwork Aの作成とCIDR自動採番", func() {
+				vnetA, err = v.CreateVirtualNetwork(api.VirtualNetwork{
+					ApiVersion: "v1",
+					Kind:       "VirtualNetwork",
+					Metadata:   api.Metadata{Name: "test-any-ipnet-a"},
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				_, err = v.CreateAnyIpNetwork(api.VirtualNetworkID(vnetA))
+				Expect(err).NotTo(HaveOccurred())
+
+				nets, err := v.GetIpNetworks(api.VirtualNetworkID(vnetA))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(nets).To(HaveLen(1))
+				Expect(*nets[0].AddressMaskLen).To(Equal("172.16.100.0/24"))
+			})
+
+			It("VirtualNetwork Bの作成時は、Aが使用中のCIDRと重複しないアドレスが採番される", func() {
+				vnetB, err = v.CreateVirtualNetwork(api.VirtualNetwork{
+					ApiVersion: "v1",
+					Kind:       "VirtualNetwork",
+					Metadata:   api.Metadata{Name: "test-any-ipnet-b"},
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				_, err = v.CreateAnyIpNetwork(api.VirtualNetworkID(vnetB))
+				Expect(err).NotTo(HaveOccurred())
+
+				nets, err := v.GetIpNetworks(api.VirtualNetworkID(vnetB))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(nets).To(HaveLen(1))
+				Expect(*nets[0].AddressMaskLen).NotTo(Equal("172.16.100.0/24"))
+				Expect(*nets[0].AddressMaskLen).To(Equal("172.16.101.0/24"))
+			})
+
+			It("データベース接続のクローズ", func() {
+				Expect(v.Close()).NotTo(HaveOccurred())
+			})
+		})
+
 		Context("ネットワークの削除", func() {
 			var err error
 			It("データベース接続の生成", func() {

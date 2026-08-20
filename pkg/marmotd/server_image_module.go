@@ -11,7 +11,7 @@ import (
 type serverImageModule interface {
 	Key() string
 	SetupBootVolume(spec api.Server) error
-	GenerateCloudInitISO(path, password, sshKey string, usernames []string, ansible *api.ServerAnsible) (string, error)
+	GenerateCloudInitISO(path, password, sshKey string, usernames []string, ansible *api.ServerAnsible, instanceID string) (string, error)
 }
 
 type commonServerImageModule struct {
@@ -30,8 +30,8 @@ func (m commonServerImageModule) SetupBootVolume(spec api.Server) error {
 	return util.SetupLinux(spec)
 }
 
-func (m commonServerImageModule) GenerateCloudInitISO(path, password, sshKey string, usernames []string, ansible *api.ServerAnsible) (string, error) {
-	return GenerateCloudInitISO(path, password, sshKey, usernames, ansible)
+func (m commonServerImageModule) GenerateCloudInitISO(path, password, sshKey string, usernames []string, ansible *api.ServerAnsible, instanceID string) (string, error) {
+	return GenerateCloudInitISO(path, password, sshKey, usernames, ansible, instanceID)
 }
 
 var (

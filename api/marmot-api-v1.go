@@ -350,6 +350,7 @@ type KubernetesEngineNodeNetwork struct {
 
 // KubernetesEngineNodeSpec defines model for KubernetesEngineNodeSpec.
 type KubernetesEngineNodeSpec struct {
+	Auth    *Auth                        `json:"auth,omitempty" yaml:"auth,omitempty"`
 	Cpu     *int                         `json:"cpu,omitempty" yaml:"cpu,omitempty"`
 	Memory  *int                         `json:"memory,omitempty" yaml:"memory,omitempty"`
 	Network *KubernetesEngineNodeNetwork `json:"network,omitempty" yaml:"network,omitempty"`
@@ -566,6 +567,9 @@ type Status struct {
 	// AttachProtocol Attach protocol used by backend, e.g. rbd for ceph.
 	AttachProtocol *string `json:"attachProtocol,omitempty" yaml:"attachProtocol,omitempty"`
 	Console        *string `json:"console,omitempty" yaml:"console,omitempty"`
+
+	// ControlPlaneHostIpAddress マルモtdホスト側veth(hostVeth)に割り当てた、コントロールプレーンnetnsへの経路確立用IPアドレス。
+	ControlPlaneHostIpAddress *string `json:"controlPlaneHostIpAddress,omitempty" yaml:"controlPlaneHostIpAddress,omitempty"`
 
 	// ControlPlaneIpAddress クラスタ専用ネットワーク名前空間に割り当てたIPアドレス。
 	ControlPlaneIpAddress *string    `json:"controlPlaneIpAddress,omitempty" yaml:"controlPlaneIpAddress,omitempty"`
@@ -886,6 +890,9 @@ type ServerInterface interface {
 	// ApiGetKubernetesEngineById Info for a specific KubernetesEngine
 	// (GET /kubernetes-engine/{id})
 	ApiGetKubernetesEngineById(ctx echo.Context, id string) error
+	// ApiGetKubernetesEngineKubeconfigById Download admin kubeconfig for KubernetesEngine
+	// (GET /kubernetes-engine/{id}/kubeconfig)
+	ApiGetKubernetesEngineKubeconfigById(ctx echo.Context, id string) error
 	// ApiGetMarmotCluster Get Marmot Cluster Status
 	// (GET /marmot/cluster)
 	ApiGetMarmotCluster(ctx echo.Context) error
@@ -1368,6 +1375,22 @@ func (w *ServerInterfaceWrapper) ApiGetKubernetesEngineById(ctx echo.Context) er
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.ApiGetKubernetesEngineById(ctx, id)
+	return err
+}
+
+// ApiGetKubernetesEngineKubeconfigById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiGetKubernetesEngineKubeconfigById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: ctx.Request().URL.RawPath == ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiGetKubernetesEngineKubeconfigById(ctx, id)
 	return err
 }
 
@@ -2208,5 +2231,6 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.POST(options.BaseURL+"/kubernetes-engine", wrapper.ApiCreateKubernetesEngine, options.OperationMiddlewares["apiCreateKubernetesEngine"]...)
 	router.DELETE(options.BaseURL+"/kubernetes-engine/:id", wrapper.ApiDeleteKubernetesEngineById, options.OperationMiddlewares["apiDeleteKubernetesEngineById"]...)
 	router.GET(options.BaseURL+"/kubernetes-engine/:id", wrapper.ApiGetKubernetesEngineById, options.OperationMiddlewares["apiGetKubernetesEngineById"]...)
+	router.GET(options.BaseURL+"/kubernetes-engine/:id/kubeconfig", wrapper.ApiGetKubernetesEngineKubeconfigById, options.OperationMiddlewares["apiGetKubernetesEngineKubeconfigById"]...)
 
 }

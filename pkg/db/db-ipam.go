@@ -174,10 +174,32 @@ func (d *Database) CreateIpNetwork(vnetid string, spec *api.IPNetwork) (string, 
 
 // IPネットワークアドレスを無指定で、自動生成して永続化する
 // 戻り値は、ネットワークIDなどの識別子
+// CreateIpNetwork()の重複チェックは同一VirtualNetwork内のみが対象のため、
+// ここでは他のVirtualNetworkとのCIDR重複も避けるよう、候補を事前に除外する。
 func (d *Database) CreateAnyIpNetwork(vnetid string) (string, error) {
 	slog.Debug("CreateAnyIpNetwork()", "spec", "")
+	usedPrefixes, err := d.usedIpNetworkPrefixesExcludingVnet(vnetid)
+	if err != nil {
+		slog.Error("CreateAnyIpNetwork()", "err", err)
+		return "", err
+	}
 	for i := 100; i < 200; i++ {
 		netadd := fmt.Sprintf("172.16.%d.0/24", i)
+		candidate, err := netip.ParsePrefix(netadd)
+		if err != nil {
+			continue
+		}
+		candidate = candidate.Masked()
+		overlaps := false
+		for _, used := range usedPrefixes {
+			if candidate.Overlaps(used) {
+				overlaps = true
+				break
+			}
+		}
+		if overlaps {
+			continue
+		}
 		ipNetSpec := &api.IPNetwork{
 			AddressMaskLen: util.StringPtr(netadd),
 		}
@@ -190,6 +212,38 @@ func (d *Database) CreateAnyIpNetwork(vnetid string) (string, error) {
 	}
 	slog.Error("CreateAnyIpNetwork()", "err", "Failed to create any IP network after 100 attempts")
 	return "", fmt.Errorf("failed to create any IP network after 100 attempts")
+}
+
+// usedIpNetworkPrefixesExcludingVnet は、excludeVnetid以外の全VirtualNetworkが
+// 使用中のIPネットワークCIDR一覧を返す。CreateAnyIpNetwork()が他クラスタ/他ネットワークと
+// 重複しないCIDRを自動採番するために使用する。
+func (d *Database) usedIpNetworkPrefixesExcludingVnet(excludeVnetid string) ([]netip.Prefix, error) {
+	var prefixes []netip.Prefix
+	networks, err := d.GetVirtualNetworks()
+	if err != nil {
+		return nil, err
+	}
+	for _, n := range networks {
+		id := api.VirtualNetworkID(n)
+		if id == excludeVnetid {
+			continue
+		}
+		ipNetworks, err := d.GetIpNetworks(id)
+		if err != nil {
+			return nil, err
+		}
+		for _, ipNet := range ipNetworks {
+			if ipNet.AddressMaskLen == nil {
+				continue
+			}
+			prefix, err := netip.ParsePrefix(*ipNet.AddressMaskLen)
+			if err != nil {
+				continue
+			}
+			prefixes = append(prefixes, prefix.Masked())
+		}
+	}
+	return prefixes, nil
 }
 
 func (d *Database) GetIpNetworks(vnetid string) ([]api.IPNetwork, error) {

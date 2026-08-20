@@ -257,6 +257,12 @@ func (m *Marmot) DeployVirtualNetwork(vnet api.VirtualNetwork) error {
 			return err
 		}
 		vnet.Spec.IpNetworkId = util.StringPtr(id)
+		// 自動採番したCIDRを一覧表示(mactl get net)用にSpecへ反映する
+		if ipNetwork, getErr := m.Db.GetIpNetworkById(vnetID, id); getErr == nil {
+			vnet.Spec.IPNetworkAddress = ipNetwork.AddressMaskLen
+		} else {
+			slog.Error("Failed to get created IP network", "err", getErr)
+		}
 	} else {
 		// 指定されたIPネットワーク作成
 		ipNetworkSpec := api.IPNetwork{

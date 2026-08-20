@@ -236,16 +236,37 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineProvisioning(ke ap
 }
 
 // reconcileKubernetesEngineRunning はRUNNING状態のヘルスチェック用の差し込み口。
+// marmotdホストの再起動等でコントロールプレーン専用ネットワークネームスペース
+// (/run/netns配下はtmpfsのため再起動で消える)が失われると、専用etcd/kube-apiserver等の
+// systemdユニットがNetworkNamespacePath不在で起動失敗し続けるため、ここで検知して復旧する。
 // TODO: 次フェーズでノードの状態監視を行い、異常時はFAILED等へ遷移させる。
 func (c *kubernetesEngineController) reconcileKubernetesEngineRunning(ke api.KubernetesEngine) {
 	id := api.KubernetesEngineID(ke)
-	slog.Debug("KubernetesEngineはRUNNING状態です（ヘルスチェックは未実装）", "id", id, "name", ke.Metadata.Name)
+	slog.Debug("KubernetesEngineはRUNNING状態です", "id", id, "name", ke.Metadata.Name)
+
+	namespace, _, _, err := KubernetesEngineControlPlaneNetworkNames(ke.Metadata.Name)
+	if err != nil {
+		slog.Warn("reconcileKubernetesEngineRunning: failed to resolve control plane namespace name", "id", id, "err", err)
+		return
+	}
+	if controlPlaneNamespaceExists(namespace) {
+		return
+	}
+
+	slog.Warn("コントロールプレーンのネットワークネームスペースが失われています。復旧を試みます", "id", id, "namespace", namespace)
+	if err := provisionKubernetesEngineControlPlane(c.db, c.mkeConf, c.etcdURL, ke); err != nil {
+		message := fmt.Sprintf("control plane network recovery failed: %v", err)
+		_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, message)
+		slog.Warn("reconcileKubernetesEngineRunning: control plane recovery failed", "id", id, "err", err)
+		return
+	}
+	_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, "")
+	slog.Debug("コントロールプレーンのネットワークネームスペースを復旧しました", "id", id, "namespace", namespace)
 }
 
-// reconcileKubernetesEngineDeleting は猶予期間経過後に呼び出され、コントロールプレーンの解体
-// （systemdユニット・etcd・netns・専用IPの解放）と専用ネットワークの削除要求を行い、
-// ネットワークの削除完了を確認してからetcdから実削除する。
-// TODO: 次フェーズでノード(Server)等の関連リソース削除を先行させる。
+// reconcileKubernetesEngineDeleting は猶予期間経過後に呼び出され、ノード用仮想サーバーの削除要求、
+// コントロールプレーンの解体（systemdユニット・etcd・netns・専用IPの解放）と専用ネットワークの
+// 削除要求を行い、それらの削除完了を確認してからetcdから実削除する。
 func (c *kubernetesEngineController) reconcileKubernetesEngineDeleting(ke api.KubernetesEngine) {
 	id := api.KubernetesEngineID(ke)
 
@@ -270,6 +291,28 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineDeleting(ke api.Ku
 		return
 	}
 	if current.Status == nil || current.Status.StatusCode != db.KUBERNETES_ENGINE_DELETING {
+		return
+	}
+
+	// ネットワークやコントロールプレーンを解体する前に、このクラスタが所有するノード用仮想サーバーの
+	// 削除を要求し、それら全てが消えるまで待つ。VMがネットワークに接続されたまま専用ネットワークが
+	// 削除されるのを避けるため、サーバー削除を先行させる。
+	nodeServers, err := findKubernetesEngineNodeServers(c.db, current)
+	if err != nil {
+		slog.Warn("findKubernetesEngineNodeServers() failed", "id", id, "err", err)
+		return
+	}
+	if len(nodeServers) > 0 {
+		for _, server := range nodeServers {
+			if server.Status != nil && server.Status.DeletionTimeStamp != nil {
+				continue
+			}
+			serverID := api.ServerID(server)
+			if delErr := c.db.SetDeleteTimestamp(serverID); delErr != nil {
+				slog.Warn("SetDeleteTimestamp() failed", "id", id, "serverId", serverID, "err", delErr)
+			}
+		}
+		// ノード用サーバーの削除完了を待ってからネットワーク・コントロールプレーンの解体に進む。
 		return
 	}
 
@@ -299,7 +342,7 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineDeleting(ke api.Ku
 				network.Metadata.Name == kubernetesEngineNetworkName(current) &&
 				current.Status != nil && current.Status.ControlPlaneIpAddress != nil {
 				deprovisionAttempted = true
-				if deprovErr := DeprovisionKubernetesEngineControlPlane(c.db, current); deprovErr != nil {
+				if deprovErr := DeprovisionKubernetesEngineControlPlane(c.db, c.mkeConf, current); deprovErr != nil {
 					slog.Warn("DeprovisionKubernetesEngineControlPlane() failed", "id", id, "err", deprovErr)
 				}
 			}

@@ -322,6 +322,10 @@ jobs:
         sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make test0
         cd ../..
         sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/cleanup.sh
+    - name: mactl-testバイナリの後始末
+      if: always()
+      run: |
+        sudo rm -fr cmd/mactl/bin
     - name: 仮想ネットワーク削除
       if: always()
       run: |
@@ -347,6 +351,10 @@ jobs:
         sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make test1
         cd ../..
         sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/cleanup.sh
+    - name: mactl-testバイナリの後始末
+      if: always()
+      run: |
+        sudo rm -fr cmd/mactl/bin
     - name: 仮想ネットワーク削除
       if: always()
       run: |
@@ -373,6 +381,10 @@ jobs:
         sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make test2
         cd ../..
         sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/cleanup.sh
+    - name: mactl-testバイナリの後始末
+      if: always()
+      run: |
+        sudo rm -fr cmd/mactl/bin
     - name: 仮想ネットワーク削除
       if: always()
       run: |
@@ -399,6 +411,10 @@ jobs:
         sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin make test3
         cd ../..
         sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/cleanup.sh
+    - name: mactl-testバイナリの後始末
+      if: always()
+      run: |
+        sudo rm -fr cmd/mactl/bin
     - name: 仮想ネットワーク削除
       if: always()
       run: |

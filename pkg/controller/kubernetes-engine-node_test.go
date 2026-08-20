@@ -42,6 +42,47 @@ var _ = Describe("KubernetesEngineNode", func() {
 		Expect(server.Spec.Auth.PublicKey).To(HaveValue(Equal("ssh-rsa AAAA")))
 	})
 
+	It("merges spec.nodeSpec.auth users/key with MKE's own managed root key", func() {
+		ke := api.KubernetesEngine{
+			Metadata: api.Metadata{Name: "demo"},
+			Spec: api.KubernetesEngineSpec{
+				Nodes: 1,
+				NodeSpec: &api.KubernetesEngineNodeSpec{
+					Auth: &api.Auth{
+						Users:     &[]string{"alice", "root"},
+						PublicKey: util.StringPtr("ssh-rsa USERKEY"),
+					},
+				},
+			},
+		}
+		api.SetKubernetesEngineID(&ke, "ke123")
+
+		server, err := buildKubernetesEngineNodeServerSpec(ke, 0, "ssh-rsa MKEKEY")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(server.Spec.Auth).NotTo(BeNil())
+		Expect(server.Spec.Auth.PublicKey).To(HaveValue(Equal("ssh-rsa MKEKEY\nssh-rsa USERKEY")))
+		Expect(server.Spec.Auth.Users).To(HaveValue(Equal([]string{"root", "alice"})))
+	})
+
+	It("rejects spec.nodeSpec.auth with both user and users set", func() {
+		ke := api.KubernetesEngine{
+			Metadata: api.Metadata{Name: "demo"},
+			Spec: api.KubernetesEngineSpec{
+				Nodes: 1,
+				NodeSpec: &api.KubernetesEngineNodeSpec{
+					Auth: &api.Auth{
+						User:  util.StringPtr("alice"),
+						Users: &[]string{"bob"},
+					},
+				},
+			},
+		}
+		api.SetKubernetesEngineID(&ke, "ke123")
+
+		_, err := buildKubernetesEngineNodeServerSpec(ke, 0, "ssh-rsa MKEKEY")
+		Expect(err).To(HaveOccurred())
+	})
+
 	It("reports nodes ready only when every listed node has a True Ready condition", func() {
 		data := []byte(`{"items":[
 			{"metadata":{"name":"node-1"},"status":{"conditions":[{"type":"Ready","status":"True"}]}},
@@ -107,6 +148,10 @@ var _ = Describe("KubernetesEngineNode", func() {
 		Expect(kubernetesEnginePodCIDR(4)).To(Equal("10.244.5.0/24"))
 	})
 
+	It("points the kubelet at systemd-resolved's real upstream resolv.conf to avoid a self-loop", func() {
+		Expect(renderKubernetesEngineKubeletConfig()).To(ContainSubstring("resolvConf: /run/systemd/resolve/resolv.conf"))
+	})
+
 	It("derives the node index from its name", func() {
 		index, err := kubernetesEngineNodeIndex("mke-demo-node-3")
 		Expect(err).NotTo(HaveOccurred())
@@ -164,4 +209,3 @@ var _ = Describe("KubernetesEngineNode", func() {
 		}
 	})
 })
-

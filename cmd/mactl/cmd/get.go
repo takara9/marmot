@@ -17,7 +17,7 @@ import (
 )
 
 var getServerShowAll bool
-var getVpnGatewayDownload bool
+var getResourceDownload bool
 var getManifestFile string
 
 var getCmd = &cobra.Command{
@@ -278,6 +278,10 @@ func getNetworkLoadBalancerResources(name string) error {
 }
 
 func getKubernetesEngineResources(name string) error {
+	if getResourceDownload {
+		return downloadKubernetesEngineKubeconfig(name)
+	}
+
 	listFn := func() error {
 		m, err := getClientConfig()
 		if err != nil {
@@ -569,7 +573,7 @@ func getGatewayResources(name string) error {
 }
 
 func getVpnGatewayResources(name string) error {
-	if getVpnGatewayDownload {
+	if getResourceDownload {
 		return downloadVpnGatewayCert(name)
 	}
 
@@ -694,6 +698,65 @@ func downloadVpnGatewayCert(name string) error {
 		return nil
 	}
 	fmt.Printf("vpn profile downloaded: %s\n", absPath)
+	return nil
+}
+
+func downloadKubernetesEngineKubeconfig(name string) error {
+	trimmedName := strings.TrimSpace(name)
+	if trimmedName == "" {
+		return fmt.Errorf("--download requires NAME: mactl get kubernetesengine <name> --download")
+	}
+
+	m, err := getClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	list, _, err := m.GetKubernetesEngines()
+	if err != nil {
+		return fmt.Errorf("failed to list kubernetes engines: %w", err)
+	}
+
+	var items []api.KubernetesEngine
+	if err := json.Unmarshal(list, &items); err != nil {
+		return fmt.Errorf("failed to parse kubernetes engines: %w", err)
+	}
+
+	matches := make([]api.KubernetesEngine, 0)
+	for _, item := range items {
+		if strings.TrimSpace(item.Metadata.Name) == trimmedName {
+			matches = append(matches, item)
+		}
+	}
+
+	if len(matches) == 0 {
+		return fmt.Errorf("kubernetes engine %q not found", trimmedName)
+	}
+	if len(matches) > 1 {
+		return fmt.Errorf("multiple kubernetes engines found with name %q; please query by id via API", trimmedName)
+	}
+
+	body, _, err := m.GetKubernetesEngineKubeconfigById(api.KubernetesEngineID(matches[0]))
+	if err != nil {
+		return fmt.Errorf("failed to download kubeconfig: %w", err)
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to resolve home directory: %w", err)
+	}
+
+	kubeDir := filepath.Join(homeDir, ".kube")
+	if err := os.MkdirAll(kubeDir, 0700); err != nil {
+		return fmt.Errorf("failed to create %q: %w", kubeDir, err)
+	}
+
+	configPath := filepath.Join(kubeDir, "config")
+	if err := os.WriteFile(configPath, body, 0600); err != nil {
+		return fmt.Errorf("failed to write %q: %w", configPath, err)
+	}
+
+	fmt.Printf("kubeconfig downloaded: %s\n", configPath)
 	return nil
 }
 
@@ -1478,5 +1541,5 @@ func init() {
 	getCmd.Flags().StringVarP(&labelSelector, "selector", "l", "", "Label selector (e.g., key=value)")
 	getCmd.Flags().StringVarP(&getManifestFile, "file", "f", "", "Manifest file, URL, or - for stdin")
 	getCmd.Flags().BoolVarP(&getServerShowAll, "all", "a", false, "server は managedBy を含め、image はノード別一覧、volume は kind フィルターなしで全件表示する")
-	getCmd.Flags().BoolVarP(&getVpnGatewayDownload, "download", "d", false, "vpngateway の VPN クライアント設定ファイル (.ovpn) をダウンロードする")
+	getCmd.Flags().BoolVarP(&getResourceDownload, "download", "d", false, "vpngateway の VPN クライアント設定ファイル (.ovpn) / kubernetesengine の管理者kubeconfig ($HOME/.kube/config) をダウンロードする")
 }

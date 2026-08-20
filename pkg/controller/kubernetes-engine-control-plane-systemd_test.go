@@ -28,7 +28,7 @@ var _ = Describe("KubernetesEngineControlPlaneUnits", func() {
 
 		apiServerUnit, err := os.ReadFile(filepath.Join(controlPlaneSystemdUnitDir, "mke-kube-apiserver-demo.service"))
 		Expect(err).NotTo(HaveOccurred())
-		for _, want := range []string{"NetworkNamespacePath=/run/netns/mke-demo", "--etcd-servers=http://127.0.0.1:23790", "--secure-port=6443", "--advertise-address=172.16.90.100"} {
+		for _, want := range []string{"NetworkNamespacePath=/run/netns/mke-demo", "--etcd-servers=http://127.0.0.1:23790", "--secure-port=6443", "--advertise-address=172.16.90.100", "--kubelet-preferred-address-types=InternalIP", "--kubelet-client-certificate=/pki/kube-apiserver-kubelet-client.crt", "--kubelet-client-key=/pki/kube-apiserver-kubelet-client.key"} {
 			Expect(string(apiServerUnit)).To(ContainSubstring(want))
 		}
 
@@ -75,6 +75,8 @@ func testControlPlaneUnitConfig() KubernetesEngineControlPlaneUnitConfig {
 			CACertPath:                   "/pki/ca.crt",
 			APIServerCertPath:            "/pki/kube-apiserver.crt",
 			APIServerKeyPath:             "/pki/kube-apiserver.key",
+			KubeletClientCertPath:        "/pki/kube-apiserver-kubelet-client.crt",
+			KubeletClientKeyPath:         "/pki/kube-apiserver-kubelet-client.key",
 			SchedulerKubeconfigPath:      "/config/kube-scheduler.kubeconfig",
 			ControllerManagerConfigPath:  "/config/kube-controller-manager.kubeconfig",
 			ServiceAccountPublicKeyPath:  "/pki/service-account.pub",

@@ -145,7 +145,9 @@ spec:
 - Ceph CSIの自動インストールとストレージ用ネットワーク接続
 
 ## フェーズ10: kubectlアクセス経路
+- kube-apiserverなど、コントロールプレーンのKubernetesプロセスは、marmotdが稼働するホストのIPアドレスでアクセス可能にする。
 - クライアント証明書を `/marmot/mke/id/client-cert` 等へ格納し、外部からのアクセス経路を確立
+- kubectl が使用する KUBECONFIGを `$HOME/.kube/config` にセットして、mactl コマンドを実行しているホームディレクトリから kubectl でK8sクラスタにアクセス可能にする。
 
 ## フェーズ11: LoadBalancer連携（mke-controller）
 - Service (`spec.type=LoadBalancer`) イベント監視とロードバランサー起動

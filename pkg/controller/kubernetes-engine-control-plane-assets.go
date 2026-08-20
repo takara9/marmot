@@ -5,16 +5,25 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
 const DefaultKubernetesControlPlaneConfigDir = "/var/lib/marmot/mke/control-plane"
 
+// kubernetesEngineAPIServerServiceIP は、kubernetes.default Serviceの固定ClusterIP
+// (DefaultKubernetesServiceClusterCIDR="10.96.0.0/12"の先頭アドレス)。CoreDNS等の
+// in-clusterクライアントはKUBERNETES_SERVICE_HOST経由でこのIPへ直接TLS接続するため、
+// kube-apiserverのサービス証明書のSANに含めておく必要がある。
+const kubernetesEngineAPIServerServiceIP = "10.96.0.1"
+
 type KubernetesEngineControlPlaneAssets struct {
 	CACertPath                   string
 	APIServerCertPath            string
 	APIServerKeyPath             string
+	KubeletClientCertPath        string
+	KubeletClientKeyPath         string
 	SchedulerKubeconfigPath      string
 	ControllerManagerConfigPath  string
 	ServiceAccountPublicKeyPath  string
@@ -60,7 +69,25 @@ type controlPlaneUserConfig struct {
 	ClientKey         string `yaml:"client-key"`
 }
 
-func EnsureKubernetesEngineControlPlaneAssets(pkiDir, configDir, clusterName, apiServerIP string, apiServerPort int) (KubernetesEngineControlPlaneAssets, error) {
+// RemoveKubernetesEngineControlPlaneAssets はクラスタ専用のPKI(CA/証明書)一式と
+// コントロールプレーン設定(kubeconfig等)を削除する。同名クラスタが後で再作成された際に、
+// IPアドレスが変わっているにもかかわらず古い証明書(SANが古いIPのまま)が再利用されて
+// TLS検証エラーになることを防ぐため、クラスタ削除時に呼び出す。
+func RemoveKubernetesEngineControlPlaneAssets(pkiDir, configDir, clusterName string) error {
+	name, err := validateKubernetesEnginePkiClusterName(clusterName)
+	if err != nil {
+		return err
+	}
+	if err := os.RemoveAll(kubernetesEngineClusterPkiDir(pkiDir, name)); err != nil {
+		return fmt.Errorf("failed to remove control plane pki dir: %w", err)
+	}
+	if err := os.RemoveAll(filepath.Join(configDir, name)); err != nil {
+		return fmt.Errorf("failed to remove control plane config dir: %w", err)
+	}
+	return nil
+}
+
+func EnsureKubernetesEngineControlPlaneAssets(pkiDir, configDir, clusterName, apiServerIP string, apiServerPort int, hostBindAddress string) (KubernetesEngineControlPlaneAssets, error) {
 	name, err := validateKubernetesEnginePkiClusterName(clusterName)
 	if err != nil {
 		return KubernetesEngineControlPlaneAssets{}, err
@@ -68,6 +95,13 @@ func EnsureKubernetesEngineControlPlaneAssets(pkiDir, configDir, clusterName, ap
 	clusterName = name
 	if net.ParseIP(apiServerIP) == nil {
 		return KubernetesEngineControlPlaneAssets{}, fmt.Errorf("invalid API server IP address %q", apiServerIP)
+	}
+	apiServerIPAddresses := []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP(apiServerIP), net.ParseIP(kubernetesEngineAPIServerServiceIP)}
+	if hostBindAddress = strings.TrimSpace(hostBindAddress); hostBindAddress != "" {
+		if net.ParseIP(hostBindAddress) == nil {
+			return KubernetesEngineControlPlaneAssets{}, fmt.Errorf("invalid host bind address %q", hostBindAddress)
+		}
+		apiServerIPAddresses = append(apiServerIPAddresses, net.ParseIP(hostBindAddress))
 	}
 	caCertPath, _, err := EnsureKubernetesEngineCA(pkiDir, clusterName)
 	if err != nil {
@@ -79,7 +113,18 @@ func EnsureKubernetesEngineControlPlaneAssets(pkiDir, configDir, clusterName, ap
 		Organizations: []string{"kubernetes"},
 		Usage:         KubernetesEngineCertUsageServer,
 		DNSNames:      []string{"localhost", "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster.local"},
-		IPAddresses:   []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP(apiServerIP)},
+		IPAddresses:   apiServerIPAddresses,
+	})
+	if err != nil {
+		return KubernetesEngineControlPlaneAssets{}, err
+	}
+	// kube-apiserverがkubeletへexec/logs等でダイヤルする際にx509クライアント証明書として提示する。
+	// O=system:masters とすることで、kubelet側のWebhook認可(SubjectAccessReview)を無条件に通過させる。
+	kubeletClientCertPath, kubeletClientKeyPath, err := IssueKubernetesEngineCertificate(pkiDir, clusterName, KubernetesEngineCertRequest{
+		Name:          "kube-apiserver-kubelet-client",
+		CommonName:    "kube-apiserver-kubelet-client",
+		Organizations: []string{"system:masters"},
+		Usage:         KubernetesEngineCertUsageClient,
 	})
 	if err != nil {
 		return KubernetesEngineControlPlaneAssets{}, err
@@ -124,6 +169,8 @@ func EnsureKubernetesEngineControlPlaneAssets(pkiDir, configDir, clusterName, ap
 		CACertPath:                   caCertPath,
 		APIServerCertPath:            apiServerCertPath,
 		APIServerKeyPath:             apiServerKeyPath,
+		KubeletClientCertPath:        kubeletClientCertPath,
+		KubeletClientKeyPath:         kubeletClientKeyPath,
 		SchedulerKubeconfigPath:      schedulerKubeconfigPath,
 		ControllerManagerConfigPath:  controllerManagerConfigPath,
 		ServiceAccountPublicKeyPath:  serviceAccountPublicKeyPath,

@@ -87,7 +87,7 @@ func TestReconcileKubernetesEngineProvisioningTransitionsWhenNodesReady(t *testi
 		provisionKubernetesEngineNodes = oldNodes
 	})
 	provisionKubernetesEngineControlPlane = func(database *db.Database, _ *marmotd.MKEConfig, _ string, current api.KubernetesEngine) error {
-		return database.UpdateKubernetesEngineControlPlaneStatus(api.KubernetesEngineID(current), "172.16.1.2", 26443, "v1.36.2")
+		return database.UpdateKubernetesEngineControlPlaneStatus(api.KubernetesEngineID(current), "172.16.1.2", "172.16.1.3", 26443, "v1.36.2")
 	}
 	provisionKubernetesEngineNodes = func(_ *db.Database, _ *marmotd.MKEConfig, current api.KubernetesEngine) (bool, error) {
 		if current.Status == nil || current.Status.ControlPlaneIpAddress == nil {

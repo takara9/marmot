@@ -3,6 +3,7 @@ package marmotd
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
@@ -59,4 +60,37 @@ func (s *Server) ApiDeleteKubernetesEngineById(ctx echo.Context, id string) erro
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 	return ctx.JSON(http.StatusOK, api.Success{Id: id, Message: util.StringPtr("Accepted the request to delete the kubernetes engine")})
+}
+
+// ApiGetKubernetesEngineKubeconfigById は system:masters 権限の管理者kubeconfigを
+// text/plain で返す。serverには mke.json の control_plane_bind_address を使用し、
+// DNAT経由でホストの実IPからkube-apiserverへアクセス可能にする(フェーズ10)。
+func (s *Server) ApiGetKubernetesEngineKubeconfigById(ctx echo.Context, id string) error {
+	ke, err := s.Ma.Db.GetKubernetesEngineById(id)
+	if err != nil {
+		if errors.Is(err, db.ErrNotFound) {
+			return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "IDが存在しません"})
+		}
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+	if ke.Status == nil || ke.Status.ApiServerPort == nil {
+		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: "control plane is not provisioned yet"})
+	}
+	if s.KubernetesEngineKubeconfigProvider == nil {
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: "kubeconfig provider is not configured"})
+	}
+	mkeConf, err := LoadMKEConfig(DefaultMKEConfigPath)
+	if err != nil {
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+	hostBindAddress := strings.TrimSpace(mkeConf.ControlPlaneBindAddress)
+	if hostBindAddress == "" {
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: "control_plane_bind_address is not configured in " + DefaultMKEConfigPath})
+	}
+
+	content, err := s.KubernetesEngineKubeconfigProvider(ke.Metadata.Name, hostBindAddress, *ke.Status.ApiServerPort)
+	if err != nil {
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+	return ctx.Blob(http.StatusOK, "text/plain; charset=utf-8", content)
 }
