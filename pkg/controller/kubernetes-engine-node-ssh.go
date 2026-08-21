@@ -276,21 +276,43 @@ func installKubernetesEngineBridgeCNI(runner kubernetesEngineNodeCommandRunner, 
 	}
 
 	return runner.step("persist pod network NAT rules across reboot", func() error {
-		if err := runner.run("mkdir -p /etc/marmot/iptables", nil); err != nil {
-			return err
-		}
-		if err := runner.writeFile(kubernetesEngineNodeIptablesRestoreScriptPath, "0755",
-			[]byte(kubernetesEngineNodeIptablesRestoreScript())); err != nil {
-			return err
-		}
-		if err := runner.writeFile(kubernetesEngineNodeIptablesRestoreUnitPath, "0644",
-			[]byte(kubernetesEngineNodeIptablesRestoreUnit())); err != nil {
-			return err
-		}
-		if err := runner.run("systemctl daemon-reload && systemctl enable marmot-mke-iptables-restore.service", nil); err != nil {
-			return err
-		}
-		return runner.run(kubernetesEngineNodeIptablesRestoreScriptPath+" save", nil)
+		return persistKubernetesEngineNodeIptablesRules(runner)
+	})
+}
+
+// persistKubernetesEngineNodeIptablesRules は、iptablesルールを再起動後も維持するための
+// スクリプトとsystemdユニットをノードへ配置し、現在のルールを保存する。
+// この関数はべき等であり、既存クラスタのマイグレーション時にも安全に呼び出せる。
+func persistKubernetesEngineNodeIptablesRules(runner kubernetesEngineNodeCommandRunner) error {
+	if err := runner.run("mkdir -p /etc/marmot/iptables", nil); err != nil {
+		return err
+	}
+	if err := runner.writeFile(kubernetesEngineNodeIptablesRestoreScriptPath, "0755",
+		[]byte(kubernetesEngineNodeIptablesRestoreScript())); err != nil {
+		return err
+	}
+	if err := runner.writeFile(kubernetesEngineNodeIptablesRestoreUnitPath, "0644",
+		[]byte(kubernetesEngineNodeIptablesRestoreUnit())); err != nil {
+		return err
+	}
+	if err := runner.run("systemctl daemon-reload && systemctl enable marmot-mke-iptables-restore.service", nil); err != nil {
+		return err
+	}
+	return runner.run(kubernetesEngineNodeIptablesRestoreScriptPath+" save", nil)
+}
+
+// reconcileKubernetesEngineNodeIptablesSSH は、既存のBridgeノードに対してiptables永続化を
+// SSH経由でベき等に適用する（marmotdアップグレード後の既存クラスタ向けマイグレーション）。
+func reconcileKubernetesEngineNodeIptablesSSH(address, privateKeyPath, namespace, nodeID string) error {
+	client, err := dialKubernetesEngineNodeSSH(address, privateKeyPath, namespace)
+	if err != nil {
+		return fmt.Errorf("failed to connect to node %s for iptables reconciliation: %w", nodeID, err)
+	}
+	defer func() { _ = client.Close() }()
+
+	runner := &kubernetesEngineNodeSSHRunner{client: client, resourceID: nodeID}
+	return runner.step("persist pod network NAT rules across reboot", func() error {
+		return persistKubernetesEngineNodeIptablesRules(runner)
 	})
 }
 

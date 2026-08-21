@@ -24,7 +24,8 @@ const (
 	kubernetesEngineNodeLabelRole        = "kubernetesEngineRole"
 	kubernetesEngineNodeRoleValue        = "node"
 	kubernetesEngineNodeLabelIndex       = "kubernetesEngineNodeIndex"
-	kubernetesEngineNodeLabelProvisioned = "kubernetesEngineNodeProvisioned"
+	kubernetesEngineNodeLabelProvisioned        = "kubernetesEngineNodeProvisioned"
+	kubernetesEngineNodeLabelIptablesPersisted  = "kubernetesEngineNodeIptablesPersisted"
 	defaultKubernetesEngineNodeCPU       = 2
 	defaultKubernetesEngineNodeMemory    = 2048
 
@@ -43,11 +44,12 @@ const (
 var kubernetesEngineNodeNamePattern = regexp.MustCompile(`-node-(\d+)$`)
 
 var (
-	kubernetesEngineNodePrivateKeyPath  = marmotd.GatewayPrivateKeyPath()
-	kubernetesEngineNodePublicKeyPath   = marmotd.GatewayPublicKeyPath()
-	ensureKubernetesEngineNodeSSHAssets = marmotd.EnsureGatewayRuntimeAssets
-	runKubernetesEngineNodeProvision    = provisionKubernetesEngineNodeSSH
-	queryKubernetesEngineNodes          = queryKubernetesEngineNodesCommand
+	kubernetesEngineNodePrivateKeyPath        = marmotd.GatewayPrivateKeyPath()
+	kubernetesEngineNodePublicKeyPath         = marmotd.GatewayPublicKeyPath()
+	ensureKubernetesEngineNodeSSHAssets       = marmotd.EnsureGatewayRuntimeAssets
+	runKubernetesEngineNodeProvision          = provisionKubernetesEngineNodeSSH
+	runKubernetesEngineNodeIptablesReconcile  = reconcileKubernetesEngineNodeIptablesSSH
+	queryKubernetesEngineNodes                = queryKubernetesEngineNodesCommand
 )
 
 type kubernetesNodeList struct {
@@ -137,8 +139,19 @@ func ProvisionKubernetesEngineNodes(database *db.Database, mkeConf *marmotd.MKEC
 				return false, err
 			}
 			labels[kubernetesEngineNodeLabelProvisioned] = "true"
+			if networkKind != kubernetesEngineNetworkKindCilium {
+				labels[kubernetesEngineNodeLabelIptablesPersisted] = "true"
+			}
 			if err := database.UpdateServer(server.Metadata.Id, api.Server{Metadata: api.Metadata{Labels: &labels}}); err != nil {
 				return false, fmt.Errorf("failed to mark node %s as provisioned: %w", server.Metadata.Name, err)
+			}
+		} else if networkKind != kubernetesEngineNetworkKindCilium && labels[kubernetesEngineNodeLabelIptablesPersisted] != "true" {
+			if err := reconcileIptablesPersistenceForNode(ke, server.Metadata.Name, nodeIP); err != nil {
+				return false, err
+			}
+			labels[kubernetesEngineNodeLabelIptablesPersisted] = "true"
+			if err := database.UpdateServer(server.Metadata.Id, api.Server{Metadata: api.Metadata{Labels: &labels}}); err != nil {
+				return false, fmt.Errorf("failed to mark node %s iptables as persisted: %w", server.Metadata.Name, err)
 			}
 		}
 		expectedNames = append(expectedNames, server.Metadata.Name)
@@ -553,6 +566,18 @@ func configureKubernetesEngineNode(mkeConf *marmotd.MKEConfig, ke api.Kubernetes
 		return err
 	}
 	return runKubernetesEngineNodeProvision(nodeIP, kubernetesEngineNodePrivateKeyPath, namespace, nodeID, data)
+}
+
+// reconcileIptablesPersistenceForNode は、marmotdアップグレード前にプロビジョニング済みの
+// Bridgeノードへ、iptables永続化ユニットをべき等に適用するマイグレーション関数。
+func reconcileIptablesPersistenceForNode(ke api.KubernetesEngine, nodeName, nodeIP string) error {
+	clusterName := strings.TrimSpace(ke.Metadata.Name)
+	namespace, _, _, err := KubernetesEngineControlPlaneNetworkNames(clusterName)
+	if err != nil {
+		return err
+	}
+	nodeID := fmt.Sprintf("%s-%s", api.KubernetesEngineID(ke), nodeName)
+	return runKubernetesEngineNodeIptablesReconcile(nodeIP, kubernetesEngineNodePrivateKeyPath, namespace, nodeID)
 }
 
 func renderKubernetesEngineNodeKubeconfig(endpoint, user, certPath, keyPath string) string {
