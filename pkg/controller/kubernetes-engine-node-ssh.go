@@ -269,9 +269,83 @@ func installKubernetesEngineBridgeCNI(runner kubernetesEngineNodeCommandRunner, 
 		return err
 	}
 
-	return runner.step("configure pod network NAT", func() error {
+	if err := runner.step("configure pod network NAT", func() error {
 		return runner.run(kubernetesEnginePodNetworkNATScript(data.PodNetworkSupernet), nil)
+	}); err != nil {
+		return err
+	}
+
+	return runner.step("persist pod network NAT rules across reboot", func() error {
+		if err := runner.run("mkdir -p /etc/marmot/iptables", nil); err != nil {
+			return err
+		}
+		if err := runner.writeFile(kubernetesEngineNodeIptablesRestoreScriptPath, "0755",
+			[]byte(kubernetesEngineNodeIptablesRestoreScript())); err != nil {
+			return err
+		}
+		if err := runner.writeFile(kubernetesEngineNodeIptablesRestoreUnitPath, "0644",
+			[]byte(kubernetesEngineNodeIptablesRestoreUnit())); err != nil {
+			return err
+		}
+		if err := runner.run("systemctl daemon-reload && systemctl enable marmot-mke-iptables-restore.service", nil); err != nil {
+			return err
+		}
+		return runner.run(kubernetesEngineNodeIptablesRestoreScriptPath+" save", nil)
 	})
+}
+
+// kubernetesEngineNodeIptablesRulesPath は、installKubernetesEngineBridgeCNIが設定した
+// Podネットワークegress用NAT(マスカレード)ルールを保存するファイル。iptablesルールは
+// デフォルトで永続化されないため、ノード再起動でルールが失われ、Pod発の外部向け通信
+// (ping・DNS解決の上流問い合わせ等)が失敗する問題への対応。
+const kubernetesEngineNodeIptablesRulesPath = "/etc/marmot/iptables/mke-node-rules.v4"
+const kubernetesEngineNodeIptablesRestoreScriptPath = "/usr/local/sbin/marmot-mke-iptables-restore.sh"
+const kubernetesEngineNodeIptablesRestoreUnitPath = "/etc/systemd/system/marmot-mke-iptables-restore.service"
+
+// kubernetesEngineNodeIptablesRestoreScript は、Gatewayのiptables永続化(marmot-gateway-iptables-restore.sh)
+// と同様に、引数なしなら保存済みルールを復元し、"save"引数なら現在のルールを保存するスクリプト。
+func kubernetesEngineNodeIptablesRestoreScript() string {
+	return fmt.Sprintf(`#!/usr/bin/env bash
+set -euo pipefail
+
+RULES_FILE="%s"
+if [[ "${1:-}" == "save" ]]; then
+  iptables-save > "${RULES_FILE}"
+  exit 0
+fi
+
+if [[ ! -s "${RULES_FILE}" ]]; then
+  exit 0
+fi
+
+IPTABLES_RESTORE="$(command -v iptables-restore || true)"
+if [[ -z "${IPTABLES_RESTORE}" ]]; then
+  IPTABLES_RESTORE="/sbin/iptables-restore"
+fi
+
+"${IPTABLES_RESTORE}" < "${RULES_FILE}"
+`, kubernetesEngineNodeIptablesRulesPath)
+}
+
+// kubernetesEngineNodeIptablesRestoreUnit は、起動時にルールを復元(ExecStart)し、
+// 停止時に現在のルールを保存(ExecStop)するoneshotサービス。
+func kubernetesEngineNodeIptablesRestoreUnit() string {
+	return fmt.Sprintf(`[Unit]
+Description=Marmot KubernetesEngine node iptables restore
+DefaultDependencies=no
+Wants=network-pre.target
+After=network-pre.target local-fs.target
+Before=network.target
+
+[Service]
+Type=oneshot
+ExecStart=%[1]s
+ExecStop=%[1]s save
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+`, kubernetesEngineNodeIptablesRestoreScriptPath)
 }
 
 // installKubernetesEngineCephClient は、Ceph連携(ceph_enabled=true)が有効な場合に、ノードへ

@@ -445,6 +445,25 @@ func reconcileKubernetesEngineNodeRoutes(ke api.KubernetesEngine, servers []api.
 	return nil
 }
 
+// reconcileKubernetesEngineRunningNodeRoutes は、RUNNING状態のクラスタに対しても毎tick
+// 呼び出される差し込み口。ノードVMの再起動により`ip route replace`で設定した経路が
+// 失われる(永続化していないため)ことでService(NodePort等)の疎通が失われる問題に対応する。
+// Cilium CNI選択時はCilium自身が経路を管理するため何もしない。
+func reconcileKubernetesEngineRunningNodeRoutes(database *db.Database, ke api.KubernetesEngine) error {
+	networkKind, err := validatedKubernetesEngineNodeNetworkKind(ke)
+	if err != nil {
+		return err
+	}
+	if networkKind == kubernetesEngineNetworkKindCilium {
+		return nil
+	}
+	servers, err := findKubernetesEngineNodeServers(database, ke)
+	if err != nil {
+		return err
+	}
+	return reconcileKubernetesEngineNodeRoutes(ke, servers)
+}
+
 func kubernetesEngineNodeInternalIP(server api.Server, networkName string) (string, error) {
 	if server.Spec.NetworkInterface == nil {
 		return "", fmt.Errorf("node %s has no network interfaces", server.Metadata.Name)
