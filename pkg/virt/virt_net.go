@@ -59,15 +59,18 @@ func CreateVirtualNetworkXML(net api.VirtualNetwork) (*libvirtxml.Network, error
 	}
 
 	if net.Spec.Nat == nil || !*net.Spec.Nat {
-		// OVS ブリッジを利用するネットワークは、libvirt へ Open vSwitch virtualport を明示する。
-		// これにより、先行作成済みブリッジを利用し、Linux bridge の新規作成競合を避ける。
 		netxml.Forward = &libvirtxml.NetworkForward{
 			Mode: "bridge",
 		}
-		netxml.VirtualPort = &libvirtxml.NetworkVirtualPort{
-			Params: &libvirtxml.NetworkVirtualPortParams{
-				OpenVSwitch: &libvirtxml.NetworkVirtualPortParamsOpenVSwitch{},
-			},
+		// OVS 管理下のブリッジ(または overlay ネットワーク)の場合のみ、libvirt へ Open vSwitch
+		// virtualport を明示する。host-bridge のような素の Linux bridge に付与すると、
+		// VM の tap が Linux bridge ではなく OVS 側に接続され疎通できなくなるため要判定。
+		if shouldUseOVSVirtualPort(net) {
+			netxml.VirtualPort = &libvirtxml.NetworkVirtualPort{
+				Params: &libvirtxml.NetworkVirtualPortParams{
+					OpenVSwitch: &libvirtxml.NetworkVirtualPortParamsOpenVSwitch{},
+				},
+			}
 		}
 	}
 
@@ -128,6 +131,22 @@ func CreateVirtualNetworkXML(net api.VirtualNetwork) (*libvirtxml.Network, error
 	//fmt.Printf("Generated XML:\n%s\n", xml)
 
 	return netxml, nil
+}
+
+// shouldUseOVSVirtualPort は、libvirt ネットワーク定義に Open vSwitch virtualport を
+// 付与すべきか判定する。overlay(vxlan/geneve) ネットワーク、または BridgeName が実際に
+// OVS ブリッジの場合のみ true を返す。host-bridge 等の素の Linux bridge では false。
+func shouldUseOVSVirtualPort(net api.VirtualNetwork) bool {
+	if net.Spec.OverlayMode != nil {
+		mode := strings.TrimSpace(string(*net.Spec.OverlayMode))
+		if strings.EqualFold(mode, string(api.Vxlan)) || strings.EqualFold(mode, string(api.Geneve)) {
+			return true
+		}
+	}
+	if net.Spec.BridgeName == nil {
+		return false
+	}
+	return util.IsOVSBridge(*net.Spec.BridgeName)
 }
 
 func (l *LibVirtEp) ActivateVirtualNetworks(name string) error {
