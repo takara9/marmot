@@ -4,6 +4,8 @@
 package util
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log/slog"
@@ -108,6 +110,31 @@ func bridgeExists(bridgeName string) bool {
 	cmd := exec.Command("ip", "link", "show", bridgeName)
 	err := cmd.Run()
 	return err == nil
+}
+
+// IsOVSBridge reports whether bridgeName is a bridge managed by Open vSwitch,
+// as opposed to a plain Linux kernel bridge (e.g. host-bridge/br0).
+func IsOVSBridge(bridgeName string) bool {
+	name := strings.TrimSpace(bridgeName)
+	if name == "" {
+		return false
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "ovs-vsctl", "br-exists", name)
+	if err := cmd.Run(); err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			slog.Warn("ovs bridge check skipped: ovs-vsctl not found", "bridge", name, "err", err)
+		} else if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			slog.Warn("ovs bridge check timed out", "bridge", name, "timeout", "2s")
+		} else {
+			slog.Warn("ovs bridge check failed", "bridge", name, "err", err)
+		}
+		return false
+	}
+	return true
 }
 
 // findPrimaryNIC finds the first physical NIC (excluding loopback and WiFi)

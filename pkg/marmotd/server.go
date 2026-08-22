@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -1460,26 +1459,7 @@ func isLibvirtBridgeDeviceMissingError(err error) bool {
 }
 
 func isOVSBridge(bridgeName string) bool {
-	name := strings.TrimSpace(bridgeName)
-	if name == "" {
-		return false
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "ovs-vsctl", "br-exists", name)
-	if err := cmd.Run(); err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			slog.Warn("ovs bridge check skipped: ovs-vsctl not found", "bridge", name, "err", err)
-		} else if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			slog.Warn("ovs bridge check timed out", "bridge", name, "timeout", "2s")
-		} else {
-			slog.Warn("ovs bridge check failed", "bridge", name, "err", err)
-		}
-		return false
-	}
-	return true
+	return util.IsOVSBridge(bridgeName)
 }
 
 func shouldAttachOVSInterfaceID(vnet api.VirtualNetwork, bridgeName string) bool {
