@@ -23,8 +23,9 @@ const (
 )
 
 var (
-	provisionKubernetesEngineControlPlane = ProvisionKubernetesEngineControlPlane
-	provisionKubernetesEngineNodes        = ProvisionKubernetesEngineNodes
+	provisionKubernetesEngineControlPlane  = ProvisionKubernetesEngineControlPlane
+	provisionKubernetesEngineNodes         = ProvisionKubernetesEngineNodes
+	reconcileKubernetesEngineRunningRoutes = reconcileKubernetesEngineRunningNodeRoutes
 )
 
 // kubernetesEngineController は MKE (Marmot Kubernetes Engine) コントローラーです。
@@ -239,6 +240,8 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineProvisioning(ke ap
 // marmotdホストの再起動等でコントロールプレーン専用ネットワークネームスペース
 // (/run/netns配下はtmpfsのため再起動で消える)が失われると、専用etcd/kube-apiserver等の
 // systemdユニットがNetworkNamespacePath不在で起動失敗し続けるため、ここで検知して復旧する。
+// また、ノードVMの再起動で失われたPod CIDR宛の静的経路(`ip route replace`は永続化されない)も
+// 毎tick再設定し、Service(NodePort等)の疎通が失われたままにならないようにする。
 // TODO: 次フェーズでノードの状態監視を行い、異常時はFAILED等へ遷移させる。
 func (c *kubernetesEngineController) reconcileKubernetesEngineRunning(ke api.KubernetesEngine) {
 	id := api.KubernetesEngineID(ke)
@@ -249,19 +252,23 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineRunning(ke api.Kub
 		slog.Warn("reconcileKubernetesEngineRunning: failed to resolve control plane namespace name", "id", id, "err", err)
 		return
 	}
-	if controlPlaneNamespaceExists(namespace) {
-		return
+	if !controlPlaneNamespaceExists(namespace) {
+		slog.Warn("コントロールプレーンのネットワークネームスペースが失われています。復旧を試みます", "id", id, "namespace", namespace)
+		if err := provisionKubernetesEngineControlPlane(c.db, c.mkeConf, c.etcdURL, ke); err != nil {
+			message := fmt.Sprintf("control plane network recovery failed: %v", err)
+			_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, message)
+			slog.Warn("reconcileKubernetesEngineRunning: control plane recovery failed", "id", id, "err", err)
+			return
+		}
+		_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, "")
+		slog.Debug("コントロールプレーンのネットワークネームスペースを復旧しました", "id", id, "namespace", namespace)
 	}
 
-	slog.Warn("コントロールプレーンのネットワークネームスペースが失われています。復旧を試みます", "id", id, "namespace", namespace)
-	if err := provisionKubernetesEngineControlPlane(c.db, c.mkeConf, c.etcdURL, ke); err != nil {
-		message := fmt.Sprintf("control plane network recovery failed: %v", err)
+	if err := reconcileKubernetesEngineRunningRoutes(c.db, ke); err != nil {
+		message := fmt.Sprintf("pod network route reconciliation failed: %v", err)
 		_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, message)
-		slog.Warn("reconcileKubernetesEngineRunning: control plane recovery failed", "id", id, "err", err)
-		return
+		slog.Warn("reconcileKubernetesEngineRunning: node route reconciliation failed", "id", id, "err", err)
 	}
-	_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, "")
-	slog.Debug("コントロールプレーンのネットワークネームスペースを復旧しました", "id", id, "namespace", namespace)
 }
 
 // reconcileKubernetesEngineDeleting は猶予期間経過後に呼び出され、ノード用仮想サーバーの削除要求、

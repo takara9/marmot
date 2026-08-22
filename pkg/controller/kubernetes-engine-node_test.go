@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"errors"
+
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/util"
@@ -207,5 +209,46 @@ var _ = Describe("KubernetesEngineNode", func() {
 		for _, c := range calls {
 			Expect(c.routes).To(HaveLen(1))
 		}
+	})
+
+	Describe("reconcileIptablesPersistenceForNode", func() {
+		var (
+			origReconcile func(address, privateKeyPath, namespace, nodeID string) error
+			calls         []struct{ address, namespace, nodeID string }
+		)
+		BeforeEach(func() {
+			origReconcile = runKubernetesEngineNodeIptablesReconcile
+			calls = nil
+		})
+		AfterEach(func() { runKubernetesEngineNodeIptablesReconcile = origReconcile })
+
+		It("calls the reconcile stub with the correct arguments for a Bridge node", func() {
+			runKubernetesEngineNodeIptablesReconcile = func(address, privateKeyPath, namespace, nodeID string) error {
+				calls = append(calls, struct{ address, namespace, nodeID string }{address, namespace, nodeID})
+				return nil
+			}
+
+			ke := api.KubernetesEngine{Metadata: api.Metadata{Name: "demo"}}
+			api.SetKubernetesEngineID(&ke, "ke123")
+
+			Expect(reconcileIptablesPersistenceForNode(ke, "mke-demo-node-1", "172.16.1.10")).To(Succeed())
+			Expect(calls).To(HaveLen(1))
+			Expect(calls[0].address).To(Equal("172.16.1.10"))
+			Expect(calls[0].namespace).To(Equal("mke-demo"))
+			Expect(calls[0].nodeID).To(Equal("ke123-mke-demo-node-1"))
+		})
+
+		It("propagates errors from the reconcile stub", func() {
+			runKubernetesEngineNodeIptablesReconcile = func(address, privateKeyPath, namespace, nodeID string) error {
+				return errors.New("ssh connection refused")
+			}
+
+			ke := api.KubernetesEngine{Metadata: api.Metadata{Name: "demo"}}
+			api.SetKubernetesEngineID(&ke, "ke123")
+
+			err := reconcileIptablesPersistenceForNode(ke, "mke-demo-node-1", "172.16.1.10")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("ssh connection refused"))
+		})
 	})
 })

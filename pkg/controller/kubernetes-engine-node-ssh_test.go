@@ -217,6 +217,22 @@ var _ = Describe("runKubernetesEngineNodeProvisionSteps", func() {
 		Expect(runner.files["/etc/cni/net.d/10-bridge.conflist"]).To(ContainSubstring(`"subnet": "10.244.1.0/24"`))
 	})
 
+	It("persists the pod network NAT rules so a node reboot does not lose them", func() {
+		runner := &fakeKubernetesEngineNodeCommandRunner{outputs: map[string]string{"uname -m": "x86_64"}}
+		data := newTestKubernetesEngineNodeProvisionData()
+
+		Expect(runKubernetesEngineNodeProvisionSteps(runner, data)).To(Succeed())
+
+		joined := strings.Join(runner.commands, "\n")
+		Expect(joined).To(ContainSubstring("systemctl daemon-reload && systemctl enable marmot-mke-iptables-restore.service"))
+		Expect(joined).To(ContainSubstring("/usr/local/sbin/marmot-mke-iptables-restore.sh save"))
+		Expect(runner.files).To(HaveKey("/usr/local/sbin/marmot-mke-iptables-restore.sh"))
+		Expect(runner.files["/usr/local/sbin/marmot-mke-iptables-restore.sh"]).To(ContainSubstring("iptables-save > \"${RULES_FILE}\""))
+		Expect(runner.files).To(HaveKey("/etc/systemd/system/marmot-mke-iptables-restore.service"))
+		Expect(runner.files["/etc/systemd/system/marmot-mke-iptables-restore.service"]).To(ContainSubstring("ExecStart=/usr/local/sbin/marmot-mke-iptables-restore.sh"))
+		Expect(runner.files["/etc/systemd/system/marmot-mke-iptables-restore.service"]).To(ContainSubstring("ExecStop=/usr/local/sbin/marmot-mke-iptables-restore.sh save"))
+	})
+
 	It("skips the bridge CNI installation when network.kind is cilium", func() {
 		runner := &fakeKubernetesEngineNodeCommandRunner{outputs: map[string]string{"uname -m": "x86_64"}}
 		data := newTestKubernetesEngineNodeProvisionData()
@@ -227,6 +243,7 @@ var _ = Describe("runKubernetesEngineNodeProvisionSteps", func() {
 		joined := strings.Join(runner.commands, "\n")
 		Expect(joined).NotTo(ContainSubstring("cni-plugins-linux"))
 		Expect(runner.files).NotTo(HaveKey("/etc/cni/net.d/10-bridge.conflist"))
+		Expect(runner.files).NotTo(HaveKey("/usr/local/sbin/marmot-mke-iptables-restore.sh"))
 	})
 })
 
