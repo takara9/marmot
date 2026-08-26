@@ -17,6 +17,54 @@ import (
 	"github.com/takara9/marmot/pkg/virt"
 )
 
+// newTestVirtualNetwork はテスト用の最小限の VirtualNetwork を生成するヘルパー。
+func newTestVirtualNetwork(name, bridge string, overlayMode *api.VirtualNetworkSpecOverlayMode) api.VirtualNetwork {
+	return api.VirtualNetwork{
+		Metadata: api.Metadata{
+			Name: name,
+			Uuid: util.StringPtr(uuid.New().String()),
+		},
+		Spec: api.VirtualNetworkSpec{
+			BridgeName:  util.StringPtr(bridge),
+			OverlayMode: overlayMode,
+		},
+	}
+}
+
+var _ = Describe("CreateVirtualNetworkXML VirtualPort 付与条件", func() {
+	overlayMode := func(m api.VirtualNetworkSpecOverlayMode) *api.VirtualNetworkSpecOverlayMode { return &m }
+
+	Context("host-bridge (素の Linux bridge) の場合", func() {
+		It("VirtualPort が nil であること", func() {
+			// "virbr-unit-test" は OVS ブリッジではないため IsOVSBridge が false を返す
+			net := newTestVirtualNetwork("unit-host-bridge", "virbr-unit-test", nil)
+			netxml, err := virt.CreateVirtualNetworkXML(net)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(netxml.VirtualPort).To(BeNil())
+		})
+	})
+
+	Context("overlay ネットワーク (vxlan) の場合", func() {
+		It("VirtualPort が nil でないこと", func() {
+			mode := overlayMode(api.Vxlan)
+			net := newTestVirtualNetwork("unit-vxlan", "br-vxlan", mode)
+			netxml, err := virt.CreateVirtualNetworkXML(net)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(netxml.VirtualPort).NotTo(BeNil())
+		})
+	})
+
+	Context("overlay ネットワーク (geneve) の場合", func() {
+		It("VirtualPort が nil でないこと", func() {
+			mode := overlayMode(api.Geneve)
+			net := newTestVirtualNetwork("unit-geneve", "br-geneve", mode)
+			netxml, err := virt.CreateVirtualNetworkXML(net)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(netxml.VirtualPort).NotTo(BeNil())
+		})
+	})
+})
+
 var _ = Describe("Networks", Ordered, func() {
 	var l *virt.LibVirtEp
 	var vnet []libvirtxml.Network
