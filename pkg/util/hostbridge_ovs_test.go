@@ -41,7 +41,11 @@ func prependPATH(t *testing.T, dir string) {
 	if err := os.Setenv("PATH", dir+":"+old); err != nil {
 		t.Fatalf("failed to set PATH: %v", err)
 	}
-	t.Cleanup(func() { os.Setenv("PATH", old) })
+	t.Cleanup(func() {
+		if err := os.Setenv("PATH", old); err != nil {
+			t.Fatalf("failed to restore PATH: %v", err)
+		}
+	})
 }
 
 func TestIsOVSBridge_EmptyName(t *testing.T) {
