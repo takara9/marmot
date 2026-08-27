@@ -44,16 +44,20 @@ type MKEConfig struct {
 	// 例: "1.4.0"
 	RuncVersion string `json:"runc_version"`
 
-	// marmotd.json の ceph_enabled=true の場合に適用する Ceph CSI (RBD/ブロックストレージ用)
-	// のインストールマニフェストのURL。未設定の場合はエラーになる。
-	CephCSIRBDManifestURL string `json:"ceph_csi_rbd_manifest_url"`
+	// Ceph CSIマニフェスト(/var/lib/marmot/mke-manifests配下)に書き込む clusterID。
+	// marmotd.json の ceph_enabled=true の場合、未設定はエラーになる。
+	CephClusterID string `json:"clusterID"`
 
-	// marmotd.json の ceph_enabled=true の場合に適用する Ceph CSI (CephFS/ファイルストレージ用)
-	// のインストールマニフェストのURL。未設定の場合はエラーになる。
-	CephCSICephFSManifestURL string `json:"ceph_csi_cephfs_manifest_url"`
+	// Ceph CSIマニフェストに書き込む、Cephクラスタのモニターアドレス("IP:PORT")の一覧。
+	CephMonitors []string `json:"monitors"`
 
-	// CephFS用StorageClassが参照する、事前作成済みのCephFSファイルシステム名。
-	CephFilesystemName string `json:"ceph_filesystem_name"`
+	// RBD(ブロックストレージ)用 Ceph CSI の認証情報("client."を除いたユーザー名とキー)。
+	CephRBDUserId  string `json:"rbdUserId"`
+	CephRBDUserKey string `json:"rbdUserKey"`
+
+	// CephFS(ファイルストレージ)用 Ceph CSI の認証情報("client."を除いたユーザー名とキー)。
+	CephFSUserId  string `json:"cephfsUserId"`
+	CephFSUserKey string `json:"cephfsUserKey"`
 
 	// kube-apiserver等コントロールプレーンプロセスをDNAT経由で外部公開する際に使用する、
 	// marmotdが稼働するホストの実IPアドレス。kubectlアクセス用kubeconfigのserverフィールドや
@@ -65,14 +69,13 @@ type MKEConfig struct {
 // 指定されていない場合に使用されるデフォルト値を返します。
 func defaultMKEConfig() *MKEConfig {
 	return &MKEConfig{
-		KubernetesVersion:  "v1.36.2",
-		ContainerdVersion:  "2.3.1",
-		EtcdVersion:        "3.6.8",
-		CNIVersion:         "0.4.0",
-		DefaultCNIType:     "bridge",
-		CNIPluginsVersion:  "1.4.0",
-		RuncVersion:        "1.4.0",
-		CephFilesystemName: "cephfs",
+		KubernetesVersion: "v1.36.2",
+		ContainerdVersion: "2.3.1",
+		EtcdVersion:       "3.6.8",
+		CNIVersion:        "0.4.0",
+		DefaultCNIType:    "bridge",
+		CNIPluginsVersion: "1.4.0",
+		RuncVersion:       "1.4.0",
 	}
 }
 

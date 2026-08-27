@@ -92,6 +92,10 @@ install -m 0644 "${ROOT_DIR}/cmd/marmotd/marmot.service" \
 install -m 0644 "${ROOT_DIR}/cmd/marmotd/marmotd.json" \
     "${PKG_DIR}/etc/marmot/marmotd.json"
 
+echo "Ceph CSI マニフェストテンプレートをコピー中..."
+mkdir -p "${PKG_DIR}/usr/local/marmot/mke-manifests"
+cp -a "${ROOT_DIR}/mke/." "${PKG_DIR}/usr/local/marmot/mke-manifests/"
+
 echo "設定ファイルのサンプルをコピー中..."
 # インストール済みサイズを計算 (KB単位)
 INSTALLED_SIZE=$(du -sk "${PKG_DIR}" | cut -f1)
