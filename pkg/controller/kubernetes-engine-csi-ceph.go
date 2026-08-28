@@ -182,6 +182,10 @@ func kubernetesEngineCephCSIClusterManifestsDir(baseDir, clusterName string) (st
 // (既にコピー済みの場合は何もしない=冪等)、クラスタ固有の値をテンプレートへ書き込む。
 func prepareKubernetesEngineCephCSIManifests(baseDir, clusterDir string, values kubernetesEngineCephCSIValues) error {
 	if _, err := os.Stat(clusterDir); err == nil {
+		// If a previous run failed after creating the directory, don't silently no-op.
+		if _, err := os.Stat(filepath.Join(clusterDir, "csi-config-map.yaml")); err != nil {
+			return fmt.Errorf("Ceph CSI manifests cluster dir exists but looks incomplete; remove %s and retry: %w", clusterDir, err)
+		}
 		return nil
 	} else if !os.IsNotExist(err) {
 		return fmt.Errorf("failed to stat Ceph CSI manifests cluster dir: %w", err)
