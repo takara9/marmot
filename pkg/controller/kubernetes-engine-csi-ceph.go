@@ -184,7 +184,7 @@ func prepareKubernetesEngineCephCSIManifests(baseDir, clusterDir string, values 
 	if _, err := os.Stat(clusterDir); err == nil {
 		// If a previous run failed after creating the directory, don't silently no-op.
 		if _, err := os.Stat(filepath.Join(clusterDir, "csi-config-map.yaml")); err != nil {
-			return fmt.Errorf("Ceph CSI manifests cluster dir exists but looks incomplete; remove %s and retry: %w", clusterDir, err)
+			return fmt.Errorf("ceph CSI manifests cluster dir exists but looks incomplete; remove %s and retry: %w", clusterDir, err)
 		}
 		return nil
 	} else if !os.IsNotExist(err) {
