@@ -168,6 +168,9 @@ func DeprovisionKubernetesEngineControlPlane(database *db.Database, mkeConf *mar
 	if err := RemoveKubernetesEngineControlPlaneAssets(DefaultKubernetesEnginePkiDir, DefaultKubernetesControlPlaneConfigDir, clusterName); err != nil {
 		errs = append(errs, fmt.Errorf("remove control plane assets: %w", err))
 	}
+	if err := RemoveKubernetesEngineCephCSIManifests(clusterName); err != nil {
+		errs = append(errs, fmt.Errorf("remove Ceph CSI manifests: %w", err))
+	}
 
 	network, err := database.GetVirtualNetworkByName(kubernetesEngineNetworkName(ke))
 	if err != nil {

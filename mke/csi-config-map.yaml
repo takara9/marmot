@@ -1,0 +1,21 @@
+---
+apiVersion: v1
+kind: ConfigMap
+data:
+  config.json: |-
+    [
+      {
+        "clusterID": "070aabed-a12a-11f1-8a75-921da53eb49a",
+        "rbd": {
+           "nodePublishSecretRef": {
+             "name": "csi-rbd-secret",
+             "namespace": "kube-system"
+           }
+        },
+        "monitors": [
+          "192.168.1.170:6789"
+        ]
+      }
+    ]
+metadata:
+  name: ceph-csi-config

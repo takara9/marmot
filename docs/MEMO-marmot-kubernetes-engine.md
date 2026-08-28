@@ -143,6 +143,47 @@ spec:
 
 ## フェーズ9: CSI（Ceph）連携
 - Ceph CSIの自動インストールとストレージ用ネットワーク接続
+- mke/ceph-fs, mke/ceph-rbd の下に CEPHのための CSIのYAMLを配置
+- インストール時に、mkeの下のマニフェストを /var/lib/marmot/mke-manifests にコピーする
+- mke.jsonにセットするべき項目（イントール後にユーザーがセットする）
+    - clusterID: 文字列
+    - monitors["IP1:PORT","IP2:PORT","IP3:PORT"]
+    - rbdUserId: 文字列
+    - rbdUserKey: 文字列
+    - cephfsUserId: 文字列
+    - cephfsUserKey: 文字列
+- mkeのインスタンス作成時に、/var/lib/marmot/mke-manifests 以下を /var/lib/marmot/mke-manifests/<MKE-NAME> にコピーする
+- mkeのインスタンス作成時に、mke.jsonから 指定項目をセットする
+    - /var/lib/marmot/mke-manifests/<MKE-NAME>/csi-config-map.yaml に cluseterIDをセット、monitors のIPアドレスとポートをセット
+    - /var/lib/marmot/mke-manifests/<MKE-NAME>/ceph-rbd/csi-rbd-secret.yaml に RBDのユーザーIDとユーザーKeyをセットする
+    - /var/lib/marmot/mke-manifests/<MKE-NAME>/ceph-rbd/rbd-storageclass.yaml に clusterIDをセットする
+    - /var/lib/marmot/mke-manifests/<MKE-NAME>/ceph-fs/csi-cephfs-secret.yaml に CEPHFSのユーザーIDとユーザーKeyをセットする
+    - /var/lib/marmot/mke-manifests/<MKE-NAME>/ceph-fs/cephfs-storeageclass.yaml にclusterIDをセットする
+- mke の K8sが起動後に、/var/lib/marmot/mke-manifestsから、以下の順番で、ネームスペース kube-system に、kubectl apply -f を実施する
+   1. /var/lib/marmot/mke-manifests/<MKE-NAME>/ceph-conf.yaml
+   2. /var/lib/marmot/mke-manifests/<MKE-NAME>/csi-config-map.yaml
+   3. /var/lib/marmot/mke-manifests/<MKE-NAME>/ceph-rbd/csi-provisioner-rbac.yaml
+   4. /var/lib/marmot/mke-manifests/<MKE-NAME>/ceph-rbd/csi-nodeplugin-rbac.yaml
+   5. /var/lib/marmot/mke-manifests/<MKE-NAME>/ceph-rbd/csi-rbdplugin-provisioner.yaml
+   6. /var/lib/marmot/mke-manifests/<MKE-NAME>/ceph-rbd/csi-rbdplugin.yaml
+   7. /var/lib/marmot/mke-manifests/<MKE-NAME>/ceph-rbd/csidriver.yaml
+   8. /var/lib/marmot/mke-manifests/<MKE-NAME>/kms/vault.yaml
+   9. /var/lib/marmot/mke-manifests/<MKE-NAME>/kms/csi-vaulttokenreview-rbac.yaml
+  10. /var/lib/marmot/mke-manifests/<MKE-NAME>/kms/kms-config.yaml
+  11. /var/lib/marmot/mke-manifests/<MKE-NAME>/ceph-rbd/csi-rbd-secret.yaml
+  12. /var/lib/marmot/mke-manifests/<MKE-NAME>/ceph-rbd/rbd-storageclass.yaml
+  13. /var/lib/marmot/mke-manifests/<MKE-NAME>/ceph-fs/csi-provisioner-rbac.yaml
+  14. /var/lib/marmot/mke-manifests/<MKE-NAME>/ceph-fs/csi-nodeplugin-rbac.yaml
+  15. /var/lib/marmot/mke-manifests/<MKE-NAME>/ceph-fs/csi-cephfsplugin-provisioner.yaml
+  16. /var/lib/marmot/mke-manifests/<MKE-NAME>/ceph-fs/csi-cephfsplugin.yaml
+  17. /var/lib/marmot/mke-manifests/<MKE-NAME>/ceph-fs/csidriver.yaml
+  18. /var/lib/marmot/mke-manifests/<MKE-NAME>/ceph-fs/csi-cephfs-secret.yaml
+  19. /var/lib/marmot/mke-manifests/<MKE-NAME>/ceph-fs/cephfs-storageclass.yaml
+
+- mkeのインスタンスを削除するときは、以下を削除する
+    - /var/lib/marmot/mke-manifests/<MKE-NAME>
+
+
 
 ## フェーズ10: kubectlアクセス経路
 - kube-apiserverなど、コントロールプレーンのKubernetesプロセスは、marmotdが稼働するホストのIPアドレスでアクセス可能にする。

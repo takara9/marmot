@@ -1,0 +1,26 @@
+# RBD(ブロックストレージ)用の StorageClass
+# clusterID は csi-config-map.yaml の設定と一致させる
+# pool は事前に `ceph osd pool create` で作成しておいたプール名を指定する（HOWTO-block-storage.md参照）
+# secret は csi-rbd-secret.yaml で作成したものを指定する
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: csi-rbd-sc
+provisioner: rbd.csi.ceph.com
+parameters:
+  clusterID: 070aabed-a12a-11f1-8a75-921da53eb49a
+  pool: rbdpool
+  imageFeatures: layering
+
+  csi.storage.k8s.io/provisioner-secret-name: csi-rbd-secret
+  csi.storage.k8s.io/provisioner-secret-namespace: kube-system
+  csi.storage.k8s.io/controller-expand-secret-name: csi-rbd-secret
+  csi.storage.k8s.io/controller-expand-secret-namespace: kube-system
+  csi.storage.k8s.io/node-stage-secret-name: csi-rbd-secret
+  csi.storage.k8s.io/node-stage-secret-namespace: kube-system
+
+  csi.storage.k8s.io/fstype: ext4
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+mountOptions:
+  - discard
