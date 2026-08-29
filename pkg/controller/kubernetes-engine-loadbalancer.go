@@ -47,6 +47,10 @@ const (
 	// systemdユニットファイルの配置先。
 	kubernetesEngineLoadBalancerControllerSystemdUnitPath = "/etc/systemd/system/mke-lb-controller.service"
 
+	// kubernetesEngineLoadBalancerSysctlPath は、VIPがNICへ割り当てられる前でも
+	// HAProxyがbindできるようにするnet.ipv4.ip_nonlocal_bind設定の配置先。
+	kubernetesEngineLoadBalancerSysctlPath = "/etc/sysctl.d/99-marmot-mke-lb.conf"
+
 	// kubernetesEngineLoadBalancerApiKeyPath は、mke-lb-controllerがmarmotd APIへアクセスする際に
 	// 使用するAPIKeyトークン(生トークン文字列)の配置先。
 	kubernetesEngineLoadBalancerApiKeyPath = "/etc/marmot/mke-lb-apikey"

@@ -216,6 +216,9 @@ func NewServerWithOptions(node string, etcdurl string, skipPreflight bool) *Serv
 		slog.Error("Failed to seed bootstrap admin user", "err", err)
 		os.Exit(1)
 	}
+	// ホスト再起動でlibvirtdがautostartしたドメインのOVSポートアタッチ不整合を復旧する
+	// ベストエフォート処理。失敗してもmarmotd起動自体は継続する。
+	marmotInstance.Virt.ReconcileActiveDomainNetworkAttachments()
 	s := &Server{
 		Ma: marmotInstance,
 	}

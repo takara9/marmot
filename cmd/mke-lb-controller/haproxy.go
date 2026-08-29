@@ -74,8 +74,28 @@ func applyHAProxyConfig(path, content, lastAppliedHash string) (appliedHash stri
 	if err := os.Rename(tmpPath, path); err != nil {
 		return lastAppliedHash, false, fmt.Errorf("failed to activate config: %w", err)
 	}
-	if output, err := exec.Command("systemctl", "reload", "haproxy").CombinedOutput(); err != nil {
-		return lastAppliedHash, false, fmt.Errorf("haproxy reload failed: %w: %s", err, strings.TrimSpace(string(output)))
+	if err := reloadOrRestartHAProxy(); err != nil {
+		return lastAppliedHash, false, err
 	}
 	return newHash, true, nil
+}
+
+// reloadOrRestartHAProxy は、通常はreloadで設定を反映するが、VM/ホスト再起動直後の
+// VIPバインド失敗等でhaproxy.serviceがfailed/inactiveのまま固着している場合、
+// reloadでは復旧できないためrestartにフォールバックする。start-limitに引っかかった
+// 状態も明示的に解除してから再起動する。
+func reloadOrRestartHAProxy() error {
+	activeOutput, _ := exec.Command("systemctl", "is-active", "haproxy").CombinedOutput()
+	if strings.TrimSpace(string(activeOutput)) == "active" {
+		if output, err := exec.Command("systemctl", "reload", "haproxy").CombinedOutput(); err != nil {
+			return fmt.Errorf("haproxy reload failed: %w: %s", err, strings.TrimSpace(string(output)))
+		}
+		return nil
+	}
+
+	_, _ = exec.Command("systemctl", "reset-failed", "haproxy").CombinedOutput()
+	if output, err := exec.Command("systemctl", "restart", "haproxy").CombinedOutput(); err != nil {
+		return fmt.Errorf("haproxy restart failed: %w: %s", err, strings.TrimSpace(string(output)))
+	}
+	return nil
 }

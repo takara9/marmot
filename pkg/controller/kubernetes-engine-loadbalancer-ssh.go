@@ -22,6 +22,20 @@ func provisionKubernetesEngineLoadBalancerSSH(address, privateKeyPath, namespace
 		return err
 	}
 
+	// VM再起動直後、VIPがNICへ割り当てられるより先にHAProxyが起動してbindに失敗し、
+	// systemdの再起動制限でfailed固着することを防ぐ(起動順序に依存しない恒久対策)。
+	if err := runner.step("allow HAProxy to bind the VIP before it is assigned to the NIC", func() error {
+		return runner.writeFile(kubernetesEngineLoadBalancerSysctlPath, "0644",
+			[]byte("net.ipv4.ip_nonlocal_bind = 1\n"))
+	}); err != nil {
+		return err
+	}
+	if err := runner.step("apply non-local bind sysctl", func() error {
+		return runner.run(fmt.Sprintf("sysctl -p %s", kubernetesEngineLoadBalancerSysctlPath), nil)
+	}); err != nil {
+		return err
+	}
+
 	if err := runner.step("write load balancer kubeconfig", func() error {
 		return runner.writeFile(kubernetesEngineLoadBalancerKubeconfigPath, "0600", kubeconfig)
 	}); err != nil {
