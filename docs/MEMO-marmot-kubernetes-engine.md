@@ -36,7 +36,7 @@ spec:
 - ノード上のポッド間は、ノード間通信用ネットワークを利用して、ノード上のポッドと通信可能にする。
 - ノード間通信用ネットワーク用に、Cilliumを選択できる。
 - YAMLの spec.nodes を変更することで、ノードを増減できる。
-- 「外部アクセス用ネットワーク」は、ノードがインターネット上のコンテナリポジトリにアクセスするために必須なので、必ず接続が必要となる。仮想ネットワークは、default と host-bridge のどちらかに接続できる。
+- 「外部アクセス用ネットワーク」は、ノードがインターネット上のコンテナリポジトリにアクセスするために必須なので、必ず接続が必要となる。仮想ネットワークは、default と host-bridge のどちらかに接続できる。default を選択した場合、mke専用ロードバランサーは使用できない。
 - 「ノード間通信用ネットワーク」は、クラスタ毎にノード間通信用ネットワークが作成され接続されるので、指定する必要は無い。
 - Cephへの接続は必須なので、「モニターのIPアドレス」、「ストレージ用ネットワーク」などの設定は、marmotd.json で配置する。
 - spec.versionは、対応可能なバージョンを特に限定しない。 コントローラーから挙がったエラーを返す。
@@ -96,6 +96,7 @@ spec:
     Kubernetesノードには、必要に応じて Cephのクライアントモジュールと /etc/cephの設定を入れる。
 - 「任意バージョンサポート」の運用負荷
     実質的に、使えるのは、K8sがサポートする３バージョンに限られるが、古いもののトラブル検証などに使いたいため、この部分は許容する。
+- mke専用ロードバランサーは、シングル構成とする。将来、可用性の確保を推進する時、KeepAlivedを使いアクティブスタンバイ構成をとる。
 
 
 # 実行の進め方
@@ -183,15 +184,33 @@ spec:
 - mkeのインスタンスを削除するときは、以下を削除する
     - /var/lib/marmot/mke-manifests/<MKE-NAME>
 
-
-
 ## フェーズ10: kubectlアクセス経路
 - kube-apiserverなど、コントロールプレーンのKubernetesプロセスは、marmotdが稼働するホストのIPアドレスでアクセス可能にする。
 - クライアント証明書を `/marmot/mke/id/client-cert` 等へ格納し、外部からのアクセス経路を確立
 - kubectl が使用する KUBECONFIGを `$HOME/.kube/config` にセットして、mactl コマンドを実行しているホームディレクトリから kubectl でK8sクラスタにアクセス可能にする。
 
 ## フェーズ11: LoadBalancer連携（mke-controller）
-- Service (`spec.type=LoadBalancer`) イベント監視とロードバランサー起動
+- KubernetesEngineでは、mkeインスタンス用のmke専用ロードバランサー用の仮想サーバー（1CPUコア, RAM 1G）を起動する。
+- mke専用ロードバランサー用の仮想サーバーは、mkeのノード間通信用仮想ネットワークを通じて、kube-apiserverにアクセスする。
+- MKEコントローラーは、専用ロードバランサーがkube-apiserverへアクセスできるように kubeconfigを作成して、提供する。
+- この仮想サーバーのロードバランサーと、KubernnetsのノードのNodePortは、host-bridgeを経由して、リクエストトラフィックをK8s内部のサービスとポッドへ導く。ロードバランサーとの連携はhost-bridgeで固定として、NATが必要となるdefault を使用しない。
+- mke専用ロードバランサーの仮想サーバーには、「HA-PROXY」と「ロードバランサーコントローラー」を起動する。
+- 「ロードバランサーコントローラー」は、https://github.com/takara9/marmot-servers/blob/main/kubernetes/playbook/loadbalancer_controller/templates/loadbalancer_controller を参考に、Go言語で開発する。
+- 「ロードバランサーコントローラー」は、kube-apiserverのクライアントとして、自身のリコンサイルループで、以下を実行する。
+    - mkeのインスタンス(Kubernetesクラスタ)の全ノードの host-bridge に接続された address を収集する。
+        - mke の kube-apiserverにアクセスして、kind=node の `metadata.lables.kubernetes.io/hostname` からホスト名を取得する
+        - marmotd をアクセスして、`spec.networkInterface[].networkname="host-bridge"` の address を取得する。
+    - mke の kube-apiserverにアクセスして、全てのネームスペースのサービスで、type="LoadBalancer"をサーチする
+        - 処理対象のServiceが見つかったら、`spec.ports[].nodePort` を取得する
+    - HA-Proxyの設定ファイルを変更して、K8s内 Service type="Loadbalancer" で指定された Service の NodePortに対して、受け取ったリクエストを分散転送する。
+    - リクエスト受取用のIPアドレス(VIP)をK8s内 Service type="Loadbalancer" のEXTERNAL-IPにセットする。
+    - 「ノード」、「Type="LoadBalancer"」のサービスが存在しなくなった場合は、HA-PROXYの設定を削除する。
+    - VIPの払い出しは、marmotd.json の host-bridge-ip-addr-start から host-bridge-ip-addr-end で実施する。
+    - VIPを払い出しと伴に、サービス名.ネームスペース名.MKEクラスタ名.HVホスト名.labo.localで、marmotd の内部DNSへ登録する。
+    - サービスが削除される際に、内部DNSに登録したエントリーも削除し、VIPに使用したIPアドレスをIPAMプールへ返却する。
+- MKEのノードコントローラーは、ノードとなる仮想サーバーの host-bridge に接続されたI/FのIPアドレスを、nodeの EXTERNAL-IPに表示されるように IPアドレスをセットする。
+
+
 
 ## フェーズ12: リコンサイルループ本実装
 - `spec.nodes` の増減に追従するノードのスケールイン/アウト

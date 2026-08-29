@@ -16,6 +16,7 @@ func (s *Server) ApiCreateKubernetesEngine(ctx echo.Context) error {
 	if err := ctx.Bind(&rec); err != nil {
 		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: "invalid request body"})
 	}
+	assignNodeNameIfUnset(&rec.Metadata, s.Ma.NodeName)
 	created, err := s.Ma.Db.CreateKubernetesEngine(rec)
 	if err != nil {
 		if errors.Is(err, db.ErrFound) {

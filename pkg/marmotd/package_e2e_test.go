@@ -43,6 +43,7 @@ func TestDebPackageIncludesGatewayAssets(t *testing.T) {
 	listText := string(listOut)
 	for _, want := range []string{
 		"./usr/local/marmot/marmot-lb-agent",
+		"./usr/local/marmot/mke-lb-controller",
 		"./usr/local/marmot/gateway-playbooks/gateway-iptables.yaml.tmpl",
 		"./usr/local/marmot/gateway-playbooks/load-balancer-haproxy.yaml.tmpl",
 		"./usr/local/marmot/gateway-playbooks/network-load-balancer-iptables.yaml.tmpl",

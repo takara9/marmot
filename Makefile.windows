@@ -1,4 +1,4 @@
-PROGRAMS = mactl marmotd maadm marmot-lb-agent
+PROGRAMS = mactl marmotd maadm marmot-lb-agent mke-lb-controller
 .PHONY: all $(PROGRAMS)
 all: $(PROGRAMS)
 

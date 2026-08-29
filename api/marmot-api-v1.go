@@ -339,6 +339,18 @@ type KubernetesEngine struct {
 	Status     *Status              `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
+// KubernetesEngineLoadBalancerVip defines model for KubernetesEngineLoadBalancerVip.
+type KubernetesEngineLoadBalancerVip struct {
+	Fqdn string `json:"fqdn" yaml:"fqdn"`
+	Vip  string `json:"vip" yaml:"vip"`
+}
+
+// KubernetesEngineLoadBalancerVipRequest defines model for KubernetesEngineLoadBalancerVipRequest.
+type KubernetesEngineLoadBalancerVipRequest struct {
+	Namespace   string `json:"namespace" yaml:"namespace"`
+	ServiceName string `json:"serviceName" yaml:"serviceName"`
+}
+
 // KubernetesEngineNodeNetwork defines model for KubernetesEngineNodeNetwork.
 type KubernetesEngineNodeNetwork struct {
 	// External 外部アクセス用ネットワーク。default または host-bridge。
@@ -762,6 +774,9 @@ type ApiUpdateImageByIdJSONRequestBody = Image
 // ApiCreateKubernetesEngineJSONRequestBody defines body for ApiCreateKubernetesEngine for application/json ContentType.
 type ApiCreateKubernetesEngineJSONRequestBody = KubernetesEngine
 
+// ApiCreateKubernetesEngineLoadBalancerVipJSONRequestBody defines body for ApiCreateKubernetesEngineLoadBalancerVip for application/json ContentType.
+type ApiCreateKubernetesEngineLoadBalancerVipJSONRequestBody = KubernetesEngineLoadBalancerVipRequest
+
 // ApiCreateNetworkJSONRequestBody defines body for ApiCreateNetwork for application/json ContentType.
 type ApiCreateNetworkJSONRequestBody = VirtualNetwork
 
@@ -893,6 +908,12 @@ type ServerInterface interface {
 	// ApiGetKubernetesEngineKubeconfigById Download admin kubeconfig for KubernetesEngine
 	// (GET /kubernetes-engine/{id}/kubeconfig)
 	ApiGetKubernetesEngineKubeconfigById(ctx echo.Context, id string) error
+	// ApiCreateKubernetesEngineLoadBalancerVip Allocate a VIP for a Service type=LoadBalancer and register it in the internal DNS
+	// (POST /kubernetes-engine/{id}/loadbalancer/vip)
+	ApiCreateKubernetesEngineLoadBalancerVip(ctx echo.Context, id string) error
+	// ApiDeleteKubernetesEngineLoadBalancerVip Release a VIP for a Service type=LoadBalancer and remove it from the internal DNS
+	// (DELETE /kubernetes-engine/{id}/loadbalancer/vip/{namespace}/{serviceName})
+	ApiDeleteKubernetesEngineLoadBalancerVip(ctx echo.Context, id string, namespace string, serviceName string) error
 	// ApiGetMarmotCluster Get Marmot Cluster Status
 	// (GET /marmot/cluster)
 	ApiGetMarmotCluster(ctx echo.Context) error
@@ -1391,6 +1412,54 @@ func (w *ServerInterfaceWrapper) ApiGetKubernetesEngineKubeconfigById(ctx echo.C
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.ApiGetKubernetesEngineKubeconfigById(ctx, id)
+	return err
+}
+
+// ApiCreateKubernetesEngineLoadBalancerVip converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiCreateKubernetesEngineLoadBalancerVip(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: ctx.Request().URL.RawPath == ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiCreateKubernetesEngineLoadBalancerVip(ctx, id)
+	return err
+}
+
+// ApiDeleteKubernetesEngineLoadBalancerVip converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiDeleteKubernetesEngineLoadBalancerVip(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: ctx.Request().URL.RawPath == ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// ------------- Path parameter "namespace" -------------
+	var namespace string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "namespace", ctx.Param("namespace"), &namespace, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: ctx.Request().URL.RawPath == ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter namespace: %s", err))
+	}
+
+	// ------------- Path parameter "serviceName" -------------
+	var serviceName string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "serviceName", ctx.Param("serviceName"), &serviceName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: ctx.Request().URL.RawPath == ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter serviceName: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiDeleteKubernetesEngineLoadBalancerVip(ctx, id, namespace, serviceName)
 	return err
 }
 
@@ -2232,5 +2301,7 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.DELETE(options.BaseURL+"/kubernetes-engine/:id", wrapper.ApiDeleteKubernetesEngineById, options.OperationMiddlewares["apiDeleteKubernetesEngineById"]...)
 	router.GET(options.BaseURL+"/kubernetes-engine/:id", wrapper.ApiGetKubernetesEngineById, options.OperationMiddlewares["apiGetKubernetesEngineById"]...)
 	router.GET(options.BaseURL+"/kubernetes-engine/:id/kubeconfig", wrapper.ApiGetKubernetesEngineKubeconfigById, options.OperationMiddlewares["apiGetKubernetesEngineKubeconfigById"]...)
+	router.POST(options.BaseURL+"/kubernetes-engine/:id/loadbalancer/vip", wrapper.ApiCreateKubernetesEngineLoadBalancerVip, options.OperationMiddlewares["apiCreateKubernetesEngineLoadBalancerVip"]...)
+	router.DELETE(options.BaseURL+"/kubernetes-engine/:id/loadbalancer/vip/:namespace/:serviceName", wrapper.ApiDeleteKubernetesEngineLoadBalancerVip, options.OperationMiddlewares["apiDeleteKubernetesEngineLoadBalancerVip"]...)
 
 }
