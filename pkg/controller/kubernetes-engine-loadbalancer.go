@@ -134,7 +134,7 @@ func buildKubernetesEngineLoadBalancerServerSpec(ke api.KubernetesEngine, public
 		Spec: api.ServerSpec{
 			Cpu:              util.IntPtrInt(defaultKubernetesEngineLoadBalancerCPU),
 			Memory:           util.IntPtrInt(defaultKubernetesEngineLoadBalancerMemory),
-			OsVariant:        util.StringPtr("ubuntu24.04"),
+			MmImage:          util.StringPtr("ubuntu24.04"),
 			NetworkInterface: &nics,
 			Auth:             auth,
 		},

@@ -22,7 +22,7 @@ func ensureVipAddress(ifaceName, vip string) error {
 		return fmt.Errorf("failed to list addresses on %q: %w", ifaceName, err)
 	}
 	for _, e := range existing {
-		if e.IP.Equal(addr.IPNet.IP) {
+		if e.IP.Equal(addr.IP) {
 			return nil
 		}
 	}
@@ -49,7 +49,7 @@ func removeVipAddress(ifaceName, vip string) error {
 	}
 	found := false
 	for _, e := range existing {
-		if e.IP.Equal(addr.IPNet.IP) {
+		if e.IP.Equal(addr.IP) {
 			found = true
 			break
 		}
