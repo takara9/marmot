@@ -22,7 +22,7 @@ func ensureVipAddress(ifaceName, vip string) error {
 		return fmt.Errorf("failed to list addresses on %q: %w", ifaceName, err)
 	}
 	for _, e := range existing {
-		if e.IPNet != nil && addr.IPNet != nil && e.IPNet.IP.Equal(addr.IPNet.IP) {
+		if e.IPNet != nil && addr.IPNet != nil && e.IP.Equal(addr.IP) {
 			return nil
 		}
 	}
