@@ -285,8 +285,8 @@ type nodeStatusPatch struct {
 
 // SetNodeAddresses は、Node.status.addresses に InternalIP と ExternalIP(host-bridgeアドレス)を
 // セットする(kubectl get node の EXTERNAL-IP に反映される)。
-func (c *kubeClient) SetNodeAddresses(ctx context.Context, name, internalIP, externalIP string) error {
 	var patch nodeStatusPatch
+	patch.Status.Addresses = append(patch.Status.Addresses, nodeAddress{Type: "Hostname", Address: name})
 	if internalIP != "" {
 		patch.Status.Addresses = append(patch.Status.Addresses, nodeAddress{Type: "InternalIP", Address: internalIP})
 	}
