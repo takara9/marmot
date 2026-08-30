@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -21,8 +23,9 @@ type marmotdClient struct {
 	keID       string
 }
 
-// loadMarmotdClient は、apiKeyPath からmarmotd APIKeyトークンを読み込み、クライアントを組み立てる。
-func loadMarmotdClient(baseURL, apiKeyPath, keID string) (*marmotdClient, error) {
+// loadMarmotdClient は、apiKeyPath からmarmotd APIKeyトークンを読み込み、必要に応じて
+// 追加の CA 証明書でHTTPS接続を検証しながらクライアントを組み立てる。
+func loadMarmotdClient(baseURL, apiKeyPath, keID, caFile string) (*marmotdClient, error) {
 	raw, err := os.ReadFile(apiKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read marmotd API key file %q: %w", apiKeyPath, err)
@@ -31,8 +34,22 @@ func loadMarmotdClient(baseURL, apiKeyPath, keID string) (*marmotdClient, error)
 	if apiKey == "" {
 		return nil, fmt.Errorf("marmotd API key file %q is empty", apiKeyPath)
 	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	if strings.TrimSpace(caFile) != "" {
+		pemData, err := os.ReadFile(caFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read marmotd CA file %q: %w", caFile, err)
+		}
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(pemData) {
+			return nil, fmt.Errorf("failed to parse marmotd CA file %q", caFile)
+		}
+		client.Transport = &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool}}
+	}
+
 	return &marmotdClient{
-		httpClient: &http.Client{Timeout: 10 * time.Second},
+		httpClient: client,
 		baseURL:    strings.TrimRight(strings.TrimSpace(baseURL), "/") + "/api/v1",
 		apiKey:     apiKey,
 		keID:       strings.TrimSpace(keID),

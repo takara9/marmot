@@ -1,12 +1,15 @@
 package controller
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // provisionKubernetesEngineLoadBalancerSSH は mke専用ロードバランサー仮想サーバーへSSH接続し、
 // HA-Proxyのインストール、ロードバランサーコントローラー(mke-lb-controller)の配布・起動、
 // kube-apiserverへアクセスするためのkubeconfigの配布を行う。ノードと同様、コントロールプレーン用
 // netns経由で「ノード間通信用ネットワーク」上のアドレスへ到達する。
-func provisionKubernetesEngineLoadBalancerSSH(address, privateKeyPath, namespace, resourceID string, kubeconfig, controllerBinary []byte, apiKeyToken, marmotdURL, kubernetesEngineID string) error {
+func provisionKubernetesEngineLoadBalancerSSH(address, privateKeyPath, namespace, resourceID string, kubeconfig, controllerBinary []byte, apiKeyToken, marmotdURL, marmotdCAFile string, marmotdCACert []byte, kubernetesEngineID string) error {
 	client, err := dialKubernetesEngineNodeSSH(address, privateKeyPath, namespace)
 	if err != nil {
 		return fmt.Errorf("failed to connect to load balancer server: %w", err)
@@ -53,10 +56,17 @@ func provisionKubernetesEngineLoadBalancerSSH(address, privateKeyPath, namespace
 	}); err != nil {
 		return err
 	}
+	if len(marmotdCACert) > 0 {
+		if err := runner.step("write mke-lb-controller marmotd CA bundle", func() error {
+			return runner.writeFile(marmotdCAFile, "0644", marmotdCACert)
+		}); err != nil {
+			return err
+		}
+	}
 
 	if err := runner.step("install mke-lb-controller systemd unit", func() error {
 		return runner.writeFile(kubernetesEngineLoadBalancerControllerSystemdUnitPath, "0644",
-			[]byte(kubernetesEngineLoadBalancerControllerUnit(marmotdURL, kubernetesEngineID)))
+			[]byte(kubernetesEngineLoadBalancerControllerUnit(marmotdURL, marmotdCAFile, kubernetesEngineID)))
 	}); err != nil {
 		return err
 	}
@@ -66,18 +76,22 @@ func provisionKubernetesEngineLoadBalancerSSH(address, privateKeyPath, namespace
 	})
 }
 
-func kubernetesEngineLoadBalancerControllerUnit(marmotdURL, kubernetesEngineID string) string {
+func kubernetesEngineLoadBalancerControllerUnit(marmotdURL, marmotdCAFile, kubernetesEngineID string) string {
+	caArgs := ""
+	if strings.TrimSpace(marmotdCAFile) != "" {
+		caArgs = fmt.Sprintf(" --marmotd-ca-file=%s", marmotdCAFile)
+	}
 	return fmt.Sprintf(`[Unit]
 Description=MKE Load Balancer Controller
 Wants=network-online.target haproxy.service
 After=network-online.target haproxy.service
-
+ 
 [Service]
-ExecStart=%s --kubeconfig=%s --haproxy-config=%s --marmotd-url=%s --marmotd-apikey-file=%s --kubernetes-engine-id=%s --vip-interface=enp1s0
+ExecStart=%s --kubeconfig=%s --haproxy-config=%s --marmotd-url=%s --marmotd-apikey-file=%s%s --kubernetes-engine-id=%s --vip-interface=enp1s0
 Restart=always
 RestartSec=5
-
+ 
 [Install]
 WantedBy=multi-user.target
-`, kubernetesEngineLoadBalancerControllerBinaryDestPath, kubernetesEngineLoadBalancerKubeconfigPath, kubernetesEngineLoadBalancerHAProxyConfigPath, marmotdURL, kubernetesEngineLoadBalancerApiKeyPath, kubernetesEngineID)
+`, kubernetesEngineLoadBalancerControllerBinaryDestPath, kubernetesEngineLoadBalancerKubeconfigPath, kubernetesEngineLoadBalancerHAProxyConfigPath, marmotdURL, kubernetesEngineLoadBalancerApiKeyPath, caArgs, kubernetesEngineID)
 }

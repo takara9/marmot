@@ -49,6 +49,11 @@ var _ = Describe("KubernetesEngineLoadBalancer", func() {
 		Expect(err).To(HaveOccurred())
 	})
 
+	It("includes the custom marmotd CA file when HTTPS is enabled", func() {
+		unit := kubernetesEngineLoadBalancerControllerUnit("https://10.0.0.10:8750", kubernetesEngineLoadBalancerMarmotdCAPath, "ke123")
+		Expect(unit).To(ContainSubstring("--marmotd-ca-file=/etc/marmot/mke-lb-marmotd-ca.pem"))
+	})
+
 	It("skips provisioning entirely when the load balancer is disabled", func() {
 		ke := api.KubernetesEngine{Metadata: api.Metadata{Name: "demo"}}
 		ready, err := ProvisionKubernetesEngineLoadBalancer(nil, nil, ke)

@@ -54,6 +54,9 @@ const (
 	// kubernetesEngineLoadBalancerApiKeyPath は、mke-lb-controllerがmarmotd APIへアクセスする際に
 	// 使用するAPIKeyトークン(生トークン文字列)の配置先。
 	kubernetesEngineLoadBalancerApiKeyPath = "/etc/marmot/mke-lb-apikey"
+	// kubernetesEngineLoadBalancerMarmotdCAPath は、mke-lb-controllerがmarmotd APIへHTTPSアクセス
+	// する際に信頼する証明書群の配置先。
+	kubernetesEngineLoadBalancerMarmotdCAPath = "/etc/marmot/mke-lb-marmotd-ca.pem"
 
 	// kubernetesEngineLoadBalancerApiKeyUserID は、mke-lb-controller用APIKeyの発行対象ユーザー。
 	// 専用システムユーザーは作成せず、bootstrap admin ユーザー配下でAPIKeyを発行する。
@@ -231,12 +234,16 @@ func ProvisionKubernetesEngineLoadBalancer(database *db.Database, mkeConf *marmo
 			slog.Warn("failed to revoke load balancer API key after provisioning error", "apiKeyId", apiKeyID, "err", delErr)
 		}
 	}()
+	marmotdCAFile, marmotdCAData, err := buildKubernetesEngineLoadBalancerMarmotdCA()
+	if err != nil {
+		return false, fmt.Errorf("failed to resolve marmotd CA bundle for load balancer: %w", err)
+	}
 	namespace, _, _, err := KubernetesEngineControlPlaneNetworkNames(clusterName)
 	if err != nil {
 		return false, err
 	}
 	resourceID := fmt.Sprintf("%s-lb", api.KubernetesEngineID(ke))
-	if err := runKubernetesEngineLoadBalancerProvision(nodeIP, kubernetesEngineNodePrivateKeyPath, namespace, resourceID, kubeconfig, controllerBinary, apiKeyToken, marmotdURL, api.KubernetesEngineID(ke)); err != nil {
+	if err := runKubernetesEngineLoadBalancerProvision(nodeIP, kubernetesEngineNodePrivateKeyPath, namespace, resourceID, kubeconfig, controllerBinary, apiKeyToken, marmotdURL, marmotdCAFile, marmotdCAData, api.KubernetesEngineID(ke)); err != nil {
 		return false, fmt.Errorf("failed to provision load balancer: %w", err)
 	}
 
@@ -267,6 +274,18 @@ func buildKubernetesEngineLoadBalancerMarmotdURL() (string, error) {
 		scheme = "https"
 	}
 	return fmt.Sprintf("%s://%s:%s", scheme, host, port), nil
+}
+
+func buildKubernetesEngineLoadBalancerMarmotdCA() (string, []byte, error) {
+	cfg := marmotd.CurrentConfig()
+	if strings.TrimSpace(cfg.TLSCertFile) == "" || strings.TrimSpace(cfg.TLSKeyFile) == "" {
+		return "", nil, nil
+	}
+	certData, err := os.ReadFile(cfg.TLSCertFile)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to read marmotd TLS certificate %q: %w", cfg.TLSCertFile, err)
+	}
+	return kubernetesEngineLoadBalancerMarmotdCAPath, certData, nil
 }
 
 // resourceIDForApiKeyComment は発行するAPIKeyのコメントに残すクラスタ識別子。

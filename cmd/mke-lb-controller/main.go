@@ -20,6 +20,7 @@ func main() {
 	haproxyConfigPath := flag.String("haproxy-config", "/etc/haproxy/haproxy.cfg", "Path to the HAProxy config file to manage")
 	marmotdURL := flag.String("marmotd-url", "", "Base URL of the marmotd REST API (e.g. http://192.168.1.10:8750)")
 	marmotdApiKeyFile := flag.String("marmotd-apikey-file", "/etc/marmot/mke-lb-apikey", "Path to the marmotd API key token file")
+	marmotdCAFile := flag.String("marmotd-ca-file", "", "Path to a PEM-encoded CA bundle used to verify marmotd over HTTPS")
 	kubernetesEngineID := flag.String("kubernetes-engine-id", "", "ID of the KubernetesEngine this load balancer belongs to (required for VIP allocation)")
 	vipInterface := flag.String("vip-interface", "", "Network interface on this load balancer VM to assign VIP addresses to (required for HAProxy to bind to the VIP)")
 	flag.Parse()
@@ -39,7 +40,7 @@ func main() {
 	var mClient *marmotdClient
 	if strings.TrimSpace(*marmotdURL) == "" {
 		log.Printf("marmotd-url is not set, host-bridge address collection and VIP allocation are disabled")
-	} else if mClient, err = loadMarmotdClient(*marmotdURL, *marmotdApiKeyFile, *kubernetesEngineID); err != nil {
+	} else if mClient, err = loadMarmotdClient(*marmotdURL, *marmotdApiKeyFile, *kubernetesEngineID, *marmotdCAFile); err != nil {
 		log.Fatalf("failed to initialize marmotd client: %v", err)
 	}
 
