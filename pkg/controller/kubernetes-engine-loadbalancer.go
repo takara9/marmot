@@ -222,6 +222,15 @@ func ProvisionKubernetesEngineLoadBalancer(database *db.Database, mkeConf *marmo
 	if err != nil {
 		return false, fmt.Errorf("failed to issue load balancer marmotd API key: %w", err)
 	}
+	apiKeyCommitted := false
+	defer func() {
+		if apiKeyCommitted {
+			return
+		}
+		if delErr := database.DeleteUserApiKey(kubernetesEngineLoadBalancerApiKeyUserID, apiKeyID); delErr != nil && delErr != db.ErrNotFound {
+			slog.Warn("failed to revoke load balancer API key after provisioning error", "apiKeyId", apiKeyID, "err", delErr)
+		}
+	}()
 	namespace, _, _, err := KubernetesEngineControlPlaneNetworkNames(clusterName)
 	if err != nil {
 		return false, err
@@ -236,6 +245,7 @@ func ProvisionKubernetesEngineLoadBalancer(database *db.Database, mkeConf *marmo
 	if err := database.UpdateServer(server.Metadata.Id, api.Server{Metadata: api.Metadata{Labels: &labels}}); err != nil {
 		return false, fmt.Errorf("failed to mark load balancer server as provisioned: %w", err)
 	}
+	apiKeyCommitted = true
 	return true, nil
 }
 
