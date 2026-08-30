@@ -6,7 +6,7 @@
 #
 # 前提条件:
 #   - 以下のバイナリが marmot-v<VERSION>/ ディレクトリに存在すること
-#       marmotd, mactl, maadm, marmot-lb-agent
+#       marmotd, mactl, maadm, marmot-lb-agent, mke-lb-controller
 #   - dpkg-deb コマンドが利用可能であること
 #
 # 使用方法:
@@ -36,7 +36,7 @@ echo "=== marmot v${TAG} dpkgパッケージビルド ==="
 echo ""
 
 # バイナリの存在確認
-for bin in marmotd mactl maadm marmot-lb-agent; do
+for bin in marmotd mactl maadm marmot-lb-agent mke-lb-controller; do
     if [ ! -f "${BINDIR}/${bin}" ]; then
         echo "エラー: ${BINDIR}/${bin} が見つかりません。"
         echo "先に各コマンドをビルドしてください:"
@@ -73,6 +73,7 @@ mkdir -p "${PKG_DIR}/var/lib/marmot/volumes"
 echo "バイナリをコピー中..."
 install -m 0755 "${BINDIR}/marmotd" "${PKG_DIR}/usr/local/marmot/marmotd"
 install -m 0755 "${BINDIR}/marmot-lb-agent" "${PKG_DIR}/usr/local/marmot/marmot-lb-agent"
+install -m 0755 "${BINDIR}/mke-lb-controller" "${PKG_DIR}/usr/local/marmot/mke-lb-controller"
 install -m 0755 "${BINDIR}/mactl"   "${PKG_DIR}/usr/local/bin/mactl"
 ln -s mactl "${PKG_DIR}/usr/local/bin/mactl-ssh"
 install -m 0755 "${BINDIR}/maadm"   "${PKG_DIR}/usr/local/bin/maadm"

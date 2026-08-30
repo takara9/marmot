@@ -3,6 +3,7 @@
   "domain": "labo.local",
   "etcd_url": "http://127.0.0.1:2379",
   "api_listen_addr": "0.0.0.0:8750",
+  "api-advertise-host-bridge-address": "",
   "dns_listen_addr": "127.0.0.1:53",
   "dns_upstream": "8.8.8.8:53",
   "dns_client_allow_cidrs": [

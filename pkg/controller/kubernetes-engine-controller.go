@@ -25,6 +25,7 @@ const (
 var (
 	provisionKubernetesEngineControlPlane  = ProvisionKubernetesEngineControlPlane
 	provisionKubernetesEngineNodes         = ProvisionKubernetesEngineNodes
+	provisionKubernetesEngineLoadBalancer  = ProvisionKubernetesEngineLoadBalancer
 	reconcileKubernetesEngineRunningRoutes = reconcileKubernetesEngineRunningNodeRoutes
 )
 
@@ -221,16 +222,31 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineProvisioning(ke ap
 		slog.Warn("reconcileKubernetesEngineProvisioning: failed to reload control plane status", "id", id, "err", err)
 		return
 	}
-	ready, err := provisionKubernetesEngineNodes(c.db, c.mkeConf, current)
+	// ロードバランサー仮想サーバーの status.creationTimeStamp がノードより早くなるよう、
+	// ノードのReady待ちより先に呼び出す(互いに依存しないため並行して進めても問題ない)。
+	loadBalancerReady, err := provisionKubernetesEngineLoadBalancer(c.db, c.mkeConf, current)
+	if err != nil {
+		message := fmt.Sprintf("load balancer provisioning failed: %v", err)
+		_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_PROVISIONING, message)
+		return
+	}
+
+	nodesReady, err := provisionKubernetesEngineNodes(c.db, c.mkeConf, current)
 	if err != nil {
 		message := fmt.Sprintf("node provisioning failed: %v", err)
 		_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_PROVISIONING, message)
 		return
 	}
-	if !ready {
+
+	if !loadBalancerReady {
+		_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_PROVISIONING, "waiting for load balancer server to become ready")
+		return
+	}
+	if !nodesReady {
 		_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_PROVISIONING, "waiting for Kubernetes nodes to become Ready")
 		return
 	}
+
 	if err := c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, ""); err != nil {
 		slog.Warn("UpdateKubernetesEngineStatusWithMessage() failed", "id", id, "err", err)
 	}
@@ -303,11 +319,23 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineDeleting(ke api.Ku
 
 	// ネットワークやコントロールプレーンを解体する前に、このクラスタが所有するノード用仮想サーバーの
 	// 削除を要求し、それら全てが消えるまで待つ。VMがネットワークに接続されたまま専用ネットワークが
-	// 削除されるのを避けるため、サーバー削除を先行させる。
+	// 削除されるのを避けるため、サーバー削除を先行させる。mke専用ロードバランサー用仮想サーバー
+	// (存在する場合)も同様にここで削除対象へ含める。
 	nodeServers, err := findKubernetesEngineNodeServers(c.db, current)
 	if err != nil {
 		slog.Warn("findKubernetesEngineNodeServers() failed", "id", id, "err", err)
 		return
+	}
+	loadBalancerServer, err := findKubernetesEngineLoadBalancerServer(c.db, current)
+	if err != nil {
+		slog.Warn("findKubernetesEngineLoadBalancerServer() failed", "id", id, "err", err)
+		return
+	}
+	if loadBalancerServer != nil {
+		if loadBalancerServer.Status == nil || loadBalancerServer.Status.DeletionTimeStamp == nil {
+			revokeKubernetesEngineLoadBalancerApiKey(c.db, *loadBalancerServer)
+		}
+		nodeServers = append(nodeServers, *loadBalancerServer)
 	}
 	if len(nodeServers) > 0 {
 		for _, server := range nodeServers {

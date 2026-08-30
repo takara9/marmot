@@ -308,6 +308,8 @@ jobs:
       - system-tests
     if: always()
     steps:
+    - name: 前回残留のroot所有ファイルを除去(保険)
+      run: sudo rm -rf cmd/mactl/bin
     - uses: actions/checkout@v5
     #- uses: actions/setup-go@v6
     #  with:
@@ -337,6 +339,8 @@ jobs:
       - system-tests
     if: always()
     steps:
+    - name: 前回残留のroot所有ファイルを除去(保険)
+      run: sudo rm -rf cmd/mactl/bin
     - uses: actions/checkout@v5
     #- uses: actions/setup-go@v6
     #  with:
@@ -366,6 +370,8 @@ jobs:
       - system-tests
     if: always()
     steps:
+    - name: 前回残留のroot所有ファイルを除去(保険)
+      run: sudo rm -rf cmd/mactl/bin
     - uses: actions/checkout@v5
     #- uses: actions/setup-go@v6
     #  with:
@@ -396,6 +402,8 @@ jobs:
       - system-tests
     if: always()
     steps:
+    - name: 前回残留のroot所有ファイルを除去(保険)
+      run: sudo rm -rf cmd/mactl/bin
     - uses: actions/checkout@v5
     #- uses: actions/setup-go@v6
     #  with:

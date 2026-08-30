@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -521,6 +522,113 @@ func cleanupStaleOVSPorts() {
 		}
 		slog.Debug("removed stale ovs port", "port", name, "reason", errText)
 	}
+}
+
+// ReconcileActiveDomainNetworkAttachments は、marmotdホストの再起動でlibvirtdが
+// autostartにより各ドメインを直接起動した場合(marmotdのDefineAndStartVM()を経由しないため
+// OVSポート衝突時のstale-port掃除・再試行が働かない)に、vnetインターフェースがOVS上で
+// 実際には転送可能な状態になっていないドメインを検知し、そのドメインだけ再起動して
+// 復旧を試みる。ホスト起動直後の一度のベストエフォート処理として呼び出す想定で、
+// 正常なドメインには何もしない(冪等)。
+func (l *LibVirtEp) ReconcileActiveDomainNetworkAttachments() {
+	cleanupStaleOVSPorts()
+
+	doms, err := l.Com.ListAllDomains(libvirt.ConnectListAllDomainsFlags(libvirt.CONNECT_LIST_DOMAINS_ACTIVE))
+	if err != nil {
+		slog.Warn("ReconcileActiveDomainNetworkAttachments: failed to list active domains", "err", err)
+		return
+	}
+
+	for i := range doms {
+		dom := doms[i]
+		name, nameErr := dom.GetName()
+		if nameErr != nil {
+			name = "(unknown)"
+		}
+
+		vnet, broken := domainBrokenOVSInterface(&dom)
+		if broken {
+			slog.Warn("domain network interface is not attached to OVS after host restart, restarting domain to reattach", "domain", name, "interface", vnet)
+			if restartErr := restartDomainForOVSReattach(&dom); restartErr != nil {
+				slog.Warn("failed to restart domain to recover OVS attachment", "domain", name, "interface", vnet, "err", restartErr)
+			} else {
+				slog.Debug("domain restarted to recover OVS attachment", "domain", name, "interface", vnet)
+			}
+		}
+		_ = dom.Free()
+	}
+}
+
+// domainBrokenOVSInterface は、ドメインの各vnetインターフェースのうち、OVS上でofportが
+// 割り当てられていない(ポート未登録またはアタッチ失敗)ものを1つ返す。全て正常なら ("", false)。
+func domainBrokenOVSInterface(dom *libvirt.Domain) (string, bool) {
+	xml, err := dom.GetXMLDesc(0)
+	if err != nil {
+		return "", false
+	}
+	var cfg libvirtxml.Domain
+	if err := cfg.Unmarshal(xml); err != nil {
+		return "", false
+	}
+	if cfg.Devices == nil {
+		return "", false
+	}
+	for _, iface := range cfg.Devices.Interfaces {
+		if iface.Target == nil || !strings.HasPrefix(iface.Target.Dev, "vnet") {
+			continue
+		}
+		if !ovsPortIsHealthy(iface.Target.Dev) {
+			return iface.Target.Dev, true
+		}
+	}
+	return "", false
+}
+
+// ovsPortIsHealthy は、指定したOVSポート名にofportが正しく割り当てられているかを確認する。
+func ovsPortIsHealthy(portName string) bool {
+	cmd := exec.Command("ovs-vsctl", "get", "Interface", portName, "ofport")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return false
+	}
+	return parseOVSOfport(string(out)) > 0
+}
+
+// parseOVSOfport は `ovs-vsctl get Interface <name> ofport` の出力を解析する。
+// 未割り当て(-1)や空文字はアタッチ失敗を示す。
+func parseOVSOfport(output string) int {
+	value := strings.TrimSpace(output)
+	ofport, err := strconv.Atoi(value)
+	if err != nil {
+		return -1
+	}
+	return ofport
+}
+
+// restartDomainForOVSReattach は、稼働中ドメインを一度停止して起動し直すことで、
+// libvirtにvnet↔OVSポートのアタッチをやり直させる。DefineAndStartVM()と同様に
+// OVSポート衝突時はstale-port掃除を1回リトライする。
+func restartDomainForOVSReattach(dom *libvirt.Domain) error {
+	state, _, err := dom.GetState()
+	if err != nil {
+		return err
+	}
+	if isDomainLive(state) {
+		if err := dom.Destroy(); err != nil {
+			return fmt.Errorf("failed to stop domain before OVS reattach: %w", err)
+		}
+	}
+
+	if err := dom.Create(); err != nil {
+		if !isOVSPortAttachConflict(err) {
+			return err
+		}
+		cleanupStaleOVSPorts()
+		if err := dom.Create(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (l *LibVirtEp) ListDomains() ([]string, error) {

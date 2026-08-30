@@ -1909,6 +1909,75 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /kubernetes-engine/{id}/loadbalancer/vip:
+    post:
+      summary: "Allocate a VIP for a Service type=LoadBalancer and register it in the internal DNS"
+      operationId: apiCreateKubernetesEngineLoadBalancerVip
+      tags:
+        - kubernetes-engine
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the KubernetesEngine
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KubernetesEngineLoadBalancerVipRequest"
+      responses:
+        "201":
+          description: VIP allocated (or already allocated; idempotent)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KubernetesEngineLoadBalancerVip"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /kubernetes-engine/{id}/loadbalancer/vip/{namespace}/{serviceName}:
+    delete:
+      summary: "Release a VIP for a Service type=LoadBalancer and remove it from the internal DNS"
+      operationId: apiDeleteKubernetesEngineLoadBalancerVip
+      tags:
+        - kubernetes-engine
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the KubernetesEngine
+          schema:
+            type: string
+        - name: namespace
+          in: path
+          required: true
+          description: The namespace of the Service
+          schema:
+            type: string
+        - name: serviceName
+          in: path
+          required: true
+          description: The name of the Service
+          schema:
+            type: string
+      responses:
+        "200":
+          description: VIP released (idempotent if already released)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Success"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
 components:
   schemas:
@@ -2448,6 +2517,26 @@ components:
         external:
           type: string
           description: "外部アクセス用ネットワーク。default または host-bridge。"
+    KubernetesEngineLoadBalancerVipRequest:
+      type: object
+      required:
+        - namespace
+        - serviceName
+      properties:
+        namespace:
+          type: string
+        serviceName:
+          type: string
+    KubernetesEngineLoadBalancerVip:
+      type: object
+      required:
+        - vip
+        - fqdn
+      properties:
+        vip:
+          type: string
+        fqdn:
+          type: string
     ApplicationLoadBalancer:
       type: object
       required:

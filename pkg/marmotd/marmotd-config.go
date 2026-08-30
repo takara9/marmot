@@ -92,6 +92,12 @@ type MarmotdConfig struct {
 	// 例: "0.0.0.0:8750"
 	APIListenAddr string `json:"api_listen_addr"`
 
+	// mke専用ロードバランサー仮想サーバー等、host-bridge経由でmarmotd APIへ
+	// アクセスする外部プロセスに案内する、このmarmotdホスト自身のhost-bridge
+	// 接続アドレス。自動検出はせず、運用者が明示的に設定する。
+	// 例: "192.168.1.10"
+	APIAdvertiseHostBridgeAddress string `json:"api-advertise-host-bridge-address"`
+
 	// internal-DNS サーバーのバインドアドレスとポート番号
 	// 例: "127.0.0.1:53"
 	DNSListenAddr string `json:"dns_listen_addr"`
@@ -322,6 +328,7 @@ func normalizeConfig(cfg *MarmotdConfig) *MarmotdConfig {
 	if strings.TrimSpace(normalized.APIListenAddr) == "" {
 		normalized.APIListenAddr = defaults.APIListenAddr
 	}
+	normalized.APIAdvertiseHostBridgeAddress = strings.TrimSpace(normalized.APIAdvertiseHostBridgeAddress)
 	if strings.TrimSpace(normalized.DNSListenAddr) == "" {
 		if resolved, ok := resolveDNSListenAddrFromInterfaces(); ok {
 			normalized.DNSListenAddr = resolved
