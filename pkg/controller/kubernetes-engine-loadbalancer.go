@@ -221,7 +221,7 @@ func ProvisionKubernetesEngineLoadBalancer(database *db.Database, mkeConf *marmo
 	if err != nil {
 		return false, fmt.Errorf("failed to resolve marmotd API URL for load balancer: %w", err)
 	}
-	apiKeyID, apiKeyToken, err := issueKubernetesEngineLoadBalancerApiKey(database, resourceIDForApiKeyComment(ke))
+	keyID, apiKeyToken, err := issueKubernetesEngineLoadBalancerApiKey(database, resourceIDForApiKeyComment(ke))
 	if err != nil {
 		return false, fmt.Errorf("failed to issue load balancer marmotd API key: %w", err)
 	}
@@ -230,8 +230,8 @@ func ProvisionKubernetesEngineLoadBalancer(database *db.Database, mkeConf *marmo
 		if apiKeyCommitted {
 			return
 		}
-		if delErr := database.DeleteUserApiKey(kubernetesEngineLoadBalancerApiKeyUserID, apiKeyID); delErr != nil && delErr != db.ErrNotFound {
-			slog.Warn("failed to revoke load balancer API key after provisioning error", "apiKeyId", apiKeyID, "err", delErr)
+		if delErr := database.DeleteUserApiKey(kubernetesEngineLoadBalancerApiKeyUserID, keyID); delErr != nil && delErr != db.ErrNotFound {
+			slog.Warn("failed to revoke load balancer API key after provisioning error", "key_id", keyID, "err", delErr)
 		}
 	}()
 	marmotdCAFile, marmotdCAData, err := buildKubernetesEngineLoadBalancerMarmotdCA()
@@ -248,7 +248,7 @@ func ProvisionKubernetesEngineLoadBalancer(database *db.Database, mkeConf *marmo
 	}
 
 	labels[kubernetesEngineLoadBalancerLabelProvisioned] = "true"
-	labels[kubernetesEngineLoadBalancerLabelApiKeyID] = apiKeyID
+	labels[kubernetesEngineLoadBalancerLabelApiKeyID] = keyID
 	if err := database.UpdateServer(server.Metadata.Id, api.Server{Metadata: api.Metadata{Labels: &labels}}); err != nil {
 		return false, fmt.Errorf("failed to mark load balancer server as provisioned: %w", err)
 	}
@@ -314,12 +314,12 @@ func revokeKubernetesEngineLoadBalancerApiKey(database *db.Database, server api.
 		return
 	}
 	labels := *server.Metadata.Labels
-	apiKeyID, ok := labels[kubernetesEngineLoadBalancerLabelApiKeyID].(string)
-	if !ok || strings.TrimSpace(apiKeyID) == "" {
+	keyID, ok := labels[kubernetesEngineLoadBalancerLabelApiKeyID].(string)
+	if !ok || strings.TrimSpace(keyID) == "" {
 		return
 	}
-	if err := database.DeleteUserApiKey(kubernetesEngineLoadBalancerApiKeyUserID, apiKeyID); err != nil && err != db.ErrNotFound {
+	if err := database.DeleteUserApiKey(kubernetesEngineLoadBalancerApiKeyUserID, keyID); err != nil && err != db.ErrNotFound {
 		slog.Warn("revokeKubernetesEngineLoadBalancerApiKey: DeleteUserApiKey() failed",
-			"serverId", api.ServerID(server), "apiKeyId", apiKeyID, "err", err)
+			"serverId", api.ServerID(server), "key_id", keyID, "err", err)
 	}
 }

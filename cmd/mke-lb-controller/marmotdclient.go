@@ -23,16 +23,16 @@ type marmotdClient struct {
 	keID       string
 }
 
-// loadMarmotdClient は、apiKeyPath からmarmotd APIKeyトークンを読み込み、必要に応じて
+// loadMarmotdClient は、keyFilePath からmarmotd APIKeyトークンを読み込み、必要に応じて
 // 追加の CA 証明書でHTTPS接続を検証しながらクライアントを組み立てる。
-func loadMarmotdClient(baseURL, apiKeyPath, keID, caFile string) (*marmotdClient, error) {
-	raw, err := os.ReadFile(apiKeyPath)
+func loadMarmotdClient(baseURL, keyFilePath, keID, caFile string) (*marmotdClient, error) {
+	raw, err := os.ReadFile(keyFilePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read marmotd API key file %q: %w", apiKeyPath, err)
+		return nil, fmt.Errorf("failed to read marmotd API key file %q: %w", keyFilePath, err)
 	}
 	apiKey := strings.TrimSpace(string(raw))
 	if apiKey == "" {
-		return nil, fmt.Errorf("marmotd API key file %q is empty", apiKeyPath)
+		return nil, fmt.Errorf("marmotd API key file %q is empty", keyFilePath)
 	}
 
 	client := &http.Client{Timeout: 10 * time.Second}

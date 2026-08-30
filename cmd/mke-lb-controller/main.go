@@ -41,7 +41,7 @@ func main() {
 	if strings.TrimSpace(*marmotdURL) == "" {
 		log.Printf("marmotd-url is not set, host-bridge address collection and VIP allocation are disabled")
 	} else if mClient, err = loadMarmotdClient(*marmotdURL, *marmotdApiKeyFile, *kubernetesEngineID, *marmotdCAFile); err != nil {
-		log.Fatalf("failed to initialize marmotd client: %v", err)
+		log.Fatalf("failed to initialize marmotd client")
 	}
 
 	ticker := time.NewTicker(time.Duration(*intervalSeconds) * time.Second)
