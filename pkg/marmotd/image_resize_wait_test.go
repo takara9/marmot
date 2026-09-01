@@ -146,3 +146,68 @@ func TestIsQemuImgWriteLockError(t *testing.T) {
 		})
 	}
 }
+
+func TestRetryTransientOp(t *testing.T) {
+	t.Parallel()
+
+	t.Run("succeeds after transient failures", func(t *testing.T) {
+		t.Parallel()
+
+		calls := 0
+		var retries []int
+		err := retryTransientOp(context.Background(), 5, time.Millisecond, func() error {
+			calls++
+			if calls < 3 {
+				return errors.New("partprobe /dev/nbd0 failed: exit status 1, output=")
+			}
+			return nil
+		}, func(attempt int, _ error) {
+			retries = append(retries, attempt)
+		})
+		if err != nil {
+			t.Fatalf("retryTransientOp() error = %v, want nil", err)
+		}
+		if calls != 3 {
+			t.Fatalf("calls = %d, want 3", calls)
+		}
+		if len(retries) != 2 {
+			t.Fatalf("retries = %v, want 2 entries", retries)
+		}
+	})
+
+	t.Run("returns last error when all attempts fail", func(t *testing.T) {
+		t.Parallel()
+
+		calls := 0
+		wantErr := errors.New("partprobe /dev/nbd0 failed: exit status 1, output=")
+		err := retryTransientOp(context.Background(), 3, time.Millisecond, func() error {
+			calls++
+			return wantErr
+		}, nil)
+		if !errors.Is(err, wantErr) {
+			t.Fatalf("retryTransientOp() error = %v, want %v", err, wantErr)
+		}
+		if calls != 3 {
+			t.Fatalf("calls = %d, want 3", calls)
+		}
+	})
+
+	t.Run("stops retrying when context is done", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		calls := 0
+		err := retryTransientOp(ctx, 3, time.Millisecond, func() error {
+			calls++
+			return errors.New("busy")
+		}, nil)
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("retryTransientOp() error = %v, want context.Canceled", err)
+		}
+		if calls != 1 {
+			t.Fatalf("calls = %d, want 1", calls)
+		}
+	})
+}
