@@ -472,8 +472,9 @@ func (c *controller) imageSyncAuthToken() (string, error) {
 }
 
 func buildHeadImageDownloadURL(headIP, imageID string) string {
+	cfg := marmotd.CurrentConfig()
 	port := "8750"
-	apiListenAddr := strings.TrimSpace(marmotd.CurrentConfig().APIListenAddr)
+	apiListenAddr := strings.TrimSpace(cfg.APIListenAddr)
 	if host, p, err := net.SplitHostPort(apiListenAddr); err == nil {
 		if strings.TrimSpace(p) != "" {
 			port = p
@@ -485,7 +486,12 @@ func buildHeadImageDownloadURL(headIP, imageID string) string {
 		}
 	}
 
-	return fmt.Sprintf("http://%s:%s/api/v1/image/%s/qcow2", headIP, port, imageID)
+	scheme := "http"
+	if strings.TrimSpace(cfg.TLSCertFile) != "" && strings.TrimSpace(cfg.TLSKeyFile) != "" {
+		scheme = "https"
+	}
+
+	return fmt.Sprintf("%s://%s:%s/api/v1/image/%s/qcow2", scheme, headIP, port, imageID)
 }
 
 func downloadImageFromHeadWithContext(ctx context.Context, sourceURL, destPath, authToken string) error {

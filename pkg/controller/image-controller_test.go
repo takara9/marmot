@@ -7,12 +7,26 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/takara9/marmot/pkg/marmotd"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("downloadImageFromHeadWithContext", func() {
-	It("sends the auth token as a Bearer Authorization header", func() {
+	It("uses HTTPS when marmotd is configured for TLS", func() {
+		orig := marmotd.CurrentConfig()
+		marmotd.SetRuntimeConfig(&marmotd.MarmotdConfig{
+			APIListenAddr: "0.0.0.0:9443",
+			TLSCertFile:   "/etc/marmot/certs/server.crt",
+			TLSKeyFile:    "/etc/marmot/certs/server.key",
+		})
+		defer marmotd.SetRuntimeConfig(orig)
+
+		Expect(buildHeadImageDownloadURL("10.0.0.2", "image-123")).To(Equal("https://10.0.0.2:9443/api/v1/image/image-123/qcow2"))
+	})
+
+	It("sends the auth token as a ****** header", func() {
 		var gotAuthz string
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			gotAuthz = r.Header.Get("Authorization")
@@ -24,7 +38,7 @@ var _ = Describe("downloadImageFromHeadWithContext", func() {
 		destPath := filepath.Join(GinkgoT().TempDir(), "image.qcow2")
 		err := downloadImageFromHeadWithContext(context.Background(), server.URL, destPath, "test-token")
 		Expect(err).NotTo(HaveOccurred())
-		Expect(gotAuthz).To(Equal("Bearer test-token"))
+		Expect(gotAuthz).To(Equal("******"))
 
 		data, err := os.ReadFile(destPath)
 		Expect(err).NotTo(HaveOccurred())
