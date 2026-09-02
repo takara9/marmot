@@ -733,7 +733,13 @@ func waitForBlockDevice(ctx context.Context, devicePath string, timeout time.Dur
 }
 
 func refreshPartitionDevices(ctx context.Context, nbdDev string) error {
-	if err := runCmd(ctx, "partprobe", nbdDev); err != nil {
+	// qemu-nbd の attach直後はカーネルが非同期にパーティションスキャン中で、
+	// partprobe が一過性の busy で exit status 1 になることがあるため短くリトライする。
+	if err := retryTransientOp(ctx, 5, 200*time.Millisecond, func() error {
+		return runCmd(ctx, "partprobe", nbdDev)
+	}, func(attempt int, err error) {
+		slog.Warn("partprobe transient failure; retrying", "nbdDevice", nbdDev, "attempt", attempt, "err", err)
+	}); err != nil {
 		return err
 	}
 	if err := runCmd(ctx, "partx", "-u", nbdDev); err != nil {
@@ -743,6 +749,39 @@ func refreshPartitionDevices(ctx context.Context, nbdDev string) error {
 		slog.Warn("udevadm settle failed", "nbdDevice", nbdDev, "err", err)
 	}
 	return nil
+}
+
+// retryTransientOp は op を最大 attempts 回まで実行し、失敗のたびに onRetry で通知して delay 待機する。
+func retryTransientOp(ctx context.Context, attempts int, delay time.Duration, op func() error, onRetry func(attempt int, err error)) error {
+	if attempts < 1 {
+		attempts = 1
+	}
+	if delay < 0 {
+		delay = 0
+	}
+
+	var lastErr error
+	for i := 0; i < attempts; i++ {
+		err := op()
+		if err == nil {
+			return nil
+		}
+		lastErr = err
+		if i == attempts-1 {
+			return err
+		}
+		if onRetry != nil {
+			onRetry(i+1, err)
+		}
+		if delay > 0 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+	}
+	return lastErr
 }
 
 func detectPartitionTableType(ctx context.Context, devicePath string) (string, error) {
