@@ -33,6 +33,28 @@ etcdの可用性は、etcdクラスタを構成することで対応を計画し
 /tmp# systemctl disabel etcd
 ```
 
+## ベアメタル導入時のユニークな hostid 設定
+
+`mactl cluster` の `HOSTID` 列は、各ノードで `hostid` コマンドを実行した値です。
+この値は、ネットワークのフェイルオーバー優先順位、IPAM、スケジューラのタイブレークにも
+使われるため、クラスタ内の全ノードで一意である必要があります。
+
+クローンしたOSイメージや `/etc/hosts` のホスト名解決が `127.0.1.1` のままのベアメタル機では、
+`/etc/hostid` が存在しないと glibc の `gethostid()` がホスト間で同じ値を返し、
+複数ノードの HOSTID が重複することがあります。marmot / etcd を起動する前に、
+各ノードで一意な `/etc/hostid` を設定してください。
+
+```console
+root@marmot1:/tmp# hostid
+007f0100
+root@marmot1:/tmp# sudo bash -c 'head -c4 /dev/urandom > /etc/hostid'
+root@marmot1:/tmp# hostid
+61e3eba0
+```
+
+上記をクラスタの全ノードで実施し、`hostid` の出力がノードごとに異なることを確認してから、
+次の手順に進んでください。
+
 ## マスターの etcd を 他ノードからアクセス可能にする
 
 クラスタの他メンバーと etcd を共有できるように、クラスタネットワークのIPアドレスにポートを開くように設定する。
