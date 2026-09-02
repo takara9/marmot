@@ -316,10 +316,15 @@ func (c *controller) syncFollowerImageFromHead(followerImage api.Image, headImag
 		return fmt.Errorf("failed to create follower image directory: %w", err)
 	}
 
+	authToken, err := c.imageSyncAuthToken()
+	if err != nil {
+		return fmt.Errorf("failed to obtain image sync auth token: %w", err)
+	}
+
 	timeout := marmotd.CurrentConfig().ImageDownloadTimeout()
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	if err := downloadImageFromHeadWithContext(ctx, headURL, destinationPath); err != nil {
+	if err := downloadImageFromHeadWithContext(ctx, headURL, destinationPath, authToken); err != nil {
 		return err
 	}
 
@@ -443,6 +448,29 @@ func setIntPtrFromHead(dst **int, src *int) bool {
 	return true
 }
 
+// imageSyncAuthToken は、他ノードの qcow2 ダウンロードAPI（Bearer認証必須）を呼び出すための
+// 内部用APIキーを bootstrap admin 配下に遅延発行し、プロセス生存期間中キャッシュして再利用する。
+func (c *controller) imageSyncAuthToken() (string, error) {
+	c.imageSyncAuthMu.Lock()
+	defer c.imageSyncAuthMu.Unlock()
+
+	if c.imageSyncAPIToken != "" {
+		return c.imageSyncAPIToken, nil
+	}
+
+	sessionType := "generated"
+	comment := fmt.Sprintf("image-controller internal replication (node=%s)", c.marmot.NodeName)
+	_, rawToken, err := c.marmot.Db.CreateUserApiKey(db.BootstrapAdminUserID, api.ApiKeyCreateRequest{
+		Comment:     util.StringPtr(comment),
+		SessionType: &sessionType,
+	})
+	if err != nil {
+		return "", err
+	}
+	c.imageSyncAPIToken = rawToken
+	return c.imageSyncAPIToken, nil
+}
+
 func buildHeadImageDownloadURL(headIP, imageID string) string {
 	port := "8750"
 	apiListenAddr := strings.TrimSpace(marmotd.CurrentConfig().APIListenAddr)
@@ -460,12 +488,13 @@ func buildHeadImageDownloadURL(headIP, imageID string) string {
 	return fmt.Sprintf("http://%s:%s/api/v1/image/%s/qcow2", headIP, port, imageID)
 }
 
-func downloadImageFromHeadWithContext(ctx context.Context, sourceURL, destPath string) error {
+func downloadImageFromHeadWithContext(ctx context.Context, sourceURL, destPath, authToken string) error {
 	client := &http.Client{Timeout: marmotd.CurrentConfig().ImageDownloadTimeout()}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURL, nil)
 	if err != nil {
 		return fmt.Errorf("create request failed: %w", err)
 	}
+	req.Header.Set("Authorization", "Bearer "+authToken)
 
 	resp, err := client.Do(req)
 	if err != nil {

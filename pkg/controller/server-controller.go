@@ -27,6 +27,8 @@ type controller struct {
 	stopChan                   chan struct{}
 	doneChan                   chan struct{}
 	stopOnce                   sync.Once
+	imageSyncAuthMu            sync.Mutex // imageSyncAPIToken の保護
+	imageSyncAPIToken          string
 }
 
 // VMコントローラーの開始
