@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -278,10 +279,55 @@ func (d *Database) updateKubernetesEngineSpec(id string, desired api.KubernetesE
 		return fmt.Errorf("spec.nodeSpec cannot be changed after creation")
 	}
 
+	cmp, err := compareKubernetesVersions(desired.Version, rec.Spec.Version)
+	if err != nil {
+		return err
+	}
+	if cmp < 0 {
+		return fmt.Errorf("spec.version downgrade is not supported (current: %s, desired: %s)", rec.Spec.Version, desired.Version)
+	}
+
 	rec.Spec.Nodes = desired.Nodes
 	rec.Spec.Version = desired.Version
 
 	return d.PutJSONCAS(key, expected, &rec)
+}
+
+// compareKubernetesVersions は "major.minor" または "major.minor.patch" 形式のバージョン文字列を
+// 数値として比較する。a<b なら負、a==b なら0、a>b なら正の値を返す。
+func compareKubernetesVersions(a, b string) (int, error) {
+	av, err := parseKubernetesVersion(a)
+	if err != nil {
+		return 0, err
+	}
+	bv, err := parseKubernetesVersion(b)
+	if err != nil {
+		return 0, err
+	}
+	for i := 0; i < len(av); i++ {
+		if av[i] != bv[i] {
+			return av[i] - bv[i], nil
+		}
+	}
+	return 0, nil
+}
+
+// parseKubernetesVersion は "1.30" や "1.30.2" のようなバージョン文字列を
+// 数値の配列 [major, minor, patch] に変換する(patch省略時は0扱い)。
+func parseKubernetesVersion(v string) ([3]int, error) {
+	var result [3]int
+	parts := strings.Split(strings.TrimSpace(v), ".")
+	if len(parts) < 2 || len(parts) > 3 {
+		return result, fmt.Errorf("invalid version format: %q", v)
+	}
+	for i, part := range parts {
+		n, err := strconv.Atoi(part)
+		if err != nil || n < 0 {
+			return result, fmt.Errorf("invalid version format: %q", v)
+		}
+		result[i] = n
+	}
+	return result, nil
 }
 
 func (d *Database) putKubernetesEngineById(rec api.KubernetesEngine) error {
