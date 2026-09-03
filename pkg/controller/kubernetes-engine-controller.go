@@ -28,6 +28,8 @@ var (
 	provisionKubernetesEngineLoadBalancer  = ProvisionKubernetesEngineLoadBalancer
 	reconcileKubernetesEngineRunningRoutes = reconcileKubernetesEngineRunningNodeRoutes
 	drainAndDeleteKubernetesEngineNode     = DrainAndDeleteKubernetesEngineNode
+	upgradeKubernetesEngineControlPlane    = UpgradeKubernetesEngineControlPlane
+	upgradeKubernetesEngineNode            = UpgradeKubernetesEngineNode
 )
 
 // kubernetesEngineController は MKE (Marmot Kubernetes Engine) コントローラーです。
@@ -145,7 +147,7 @@ func (c *kubernetesEngineController) kubernetesEngineControllerLoop() {
 			c.reconcileKubernetesEnginePending(item)
 		case db.KUBERNETES_ENGINE_PROVISIONING:
 			c.reconcileKubernetesEngineProvisioning(item)
-		case db.KUBERNETES_ENGINE_RUNNING, db.KUBERNETES_ENGINE_SCALING_OUT, db.KUBERNETES_ENGINE_SCALING_IN:
+		case db.KUBERNETES_ENGINE_RUNNING, db.KUBERNETES_ENGINE_SCALING_OUT, db.KUBERNETES_ENGINE_SCALING_IN, db.KUBERNETES_ENGINE_UPGRADING:
 			c.reconcileKubernetesEngineRunning(item)
 		case db.KUBERNETES_ENGINE_DELETING:
 			c.reconcileKubernetesEngineDeleting(item)
@@ -275,6 +277,10 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineRunning(ke api.Kub
 		c.reconcileKubernetesEngineScaleIn(id, ke)
 		return
 	}
+	if ke.Status != nil && ke.Status.StatusCode == db.KUBERNETES_ENGINE_UPGRADING {
+		c.reconcileKubernetesEngineUpgrading(id, ke)
+		return
+	}
 
 	servers, err := findKubernetesEngineNodeServers(c.db, ke)
 	if err != nil {
@@ -302,6 +308,19 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineRunning(ke api.Kub
 			c.reconcileKubernetesEngineScaleIn(id, ke)
 			return
 		}
+		if active == ke.Spec.Nodes {
+			needsUpgrade, err := kubernetesEngineNeedsUpgrade(ke)
+			if err != nil {
+				slog.Warn("reconcileKubernetesEngineRunning: failed to determine upgrade need", "id", id, "err", err)
+			} else if needsUpgrade {
+				if err := c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_UPGRADING, "upgrading Kubernetes version"); err != nil {
+					slog.Warn("reconcileKubernetesEngineRunning: failed to transition to UPGRADING", "id", id, "err", err)
+					return
+				}
+				c.reconcileKubernetesEngineUpgrading(id, ke)
+				return
+			}
+		}
 	}
 
 	slog.Debug("KubernetesEngineはRUNNING状態です", "id", id, "name", ke.Metadata.Name)
@@ -327,6 +346,53 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineRunning(ke api.Kub
 		message := fmt.Sprintf("pod network route reconciliation failed: %v", err)
 		_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, message)
 		slog.Warn("reconcileKubernetesEngineRunning: node route reconciliation failed", "id", id, "err", err)
+	}
+}
+
+// reconcileKubernetesEngineUpgrading はUPGRADING中に呼び出され、spec.versionに合わせて
+// コントロールプレーン(kube-apiserver/kube-scheduler/kube-controller-manager、および専用etcdの
+// 再確認)を先に更新し、完了後にノードをindex昇順で1台ずつcordon→drain[4bで実装したドレイン処理を
+// 流用]→kubelet/kube-proxyバイナリの強制差し替え→uncordon→Ready確認まで進める。
+// 1tickにつきコントロールプレーン更新またはノード1台分のみ進め、エラー時はメッセージを記録して
+// 停止する(自動ロールバックは行わない)。全ノードが最新バージョンになった時点でRUNNINGへ戻す。
+func (c *kubernetesEngineController) reconcileKubernetesEngineUpgrading(id string, ke api.KubernetesEngine) {
+	needsControlPlaneUpgrade, err := kubernetesEngineNeedsUpgrade(ke)
+	if err != nil {
+		message := fmt.Sprintf("upgrade failed: %v", err)
+		_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_UPGRADING, message)
+		slog.Warn("reconcileKubernetesEngineUpgrading: failed to determine control plane upgrade need", "id", id, "err", err)
+		return
+	}
+	if needsControlPlaneUpgrade {
+		if err := upgradeKubernetesEngineControlPlane(c.db, c.mkeConf, c.etcdURL, ke); err != nil {
+			message := fmt.Sprintf("control plane upgrade failed: %v", err)
+			_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_UPGRADING, message)
+			slog.Warn("reconcileKubernetesEngineUpgrading: control plane upgrade failed", "id", id, "err", err)
+			return
+		}
+		_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_UPGRADING, "control plane upgraded, upgrading nodes")
+		return
+	}
+
+	target, err := selectKubernetesEngineNodeForUpgrade(c.db, ke)
+	if err != nil {
+		message := fmt.Sprintf("upgrade failed: %v", err)
+		_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_UPGRADING, message)
+		slog.Warn("reconcileKubernetesEngineUpgrading: node selection failed", "id", id, "err", err)
+		return
+	}
+	if target != nil {
+		if err := upgradeKubernetesEngineNode(c.db, c.mkeConf, ke, *target); err != nil {
+			message := fmt.Sprintf("node upgrade failed: %v", err)
+			_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_UPGRADING, message)
+			slog.Warn("reconcileKubernetesEngineUpgrading: node upgrade failed", "id", id, "node", target.Metadata.Name, "err", err)
+			return
+		}
+		return
+	}
+
+	if err := c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, ""); err != nil {
+		slog.Warn("reconcileKubernetesEngineUpgrading: failed to transition back to RUNNING", "id", id, "err", err)
 	}
 }
 

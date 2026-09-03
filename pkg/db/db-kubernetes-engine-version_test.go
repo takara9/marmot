@@ -44,3 +44,28 @@ func TestCompareKubernetesVersions(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateKubernetesEngineVersionUpgrade(t *testing.T) {
+	cases := []struct {
+		name             string
+		current, desired string
+		wantErr          bool
+	}{
+		{name: "same minor patch bump", current: "1.30", desired: "1.30.2", wantErr: false},
+		{name: "single minor upgrade", current: "1.30", desired: "1.31", wantErr: false},
+		{name: "skip two minor versions", current: "1.30", desired: "1.32", wantErr: true},
+		{name: "major version upgrade", current: "1.36", desired: "2.0", wantErr: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateKubernetesEngineVersionUpgrade(tc.current, tc.desired)
+			if tc.wantErr && err == nil {
+				t.Fatalf("validateKubernetesEngineVersionUpgrade(%q, %q) expected error, got nil", tc.current, tc.desired)
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("validateKubernetesEngineVersionUpgrade(%q, %q) unexpected error: %v", tc.current, tc.desired, err)
+			}
+		})
+	}
+}

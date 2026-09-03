@@ -20,11 +20,15 @@ var kubernetesEngineNodeSSHDialTimeout = 10 * time.Second
 // kubernetesEngineNodeProvisionData holds everything needed to provision a
 // KubernetesEngine worker node over SSH (replacing the former ansible-playbook based flow).
 type kubernetesEngineNodeProvisionData struct {
-	NodeName            string
-	NodeIP              string
-	KubernetesVersion   string
-	ContainerdVersion   string
-	RuncVersion         string
+	NodeName          string
+	NodeIP            string
+	KubernetesVersion string
+	ContainerdVersion string
+	RuncVersion       string
+	// ForceBinaryReplace は、kubelet/kube-proxyバイナリが既に存在してもKubernetesVersionの内容で
+	// 強制的に再ダウンロード・再インストールし、サービスを再起動する(バージョンアップグレード時に使用)。
+	// falseの場合は既存動作(test -eで存在すればスキップ)を維持する。
+	ForceBinaryReplace  bool
 	CACert              []byte
 	KubeletCert         []byte
 	KubeletKey          []byte
@@ -145,17 +149,19 @@ func runKubernetesEngineNodeProvisionSteps(runner kubernetesEngineNodeCommandRun
 		binURL := fmt.Sprintf("https://dl.k8s.io/release/%s/bin/linux/%s/%s", data.KubernetesVersion, arch, bin)
 		shaURL := binURL + ".sha256"
 		dest := "/usr/local/bin/" + bin
+		installCmd := fmt.Sprintf(
+			"tmp=$(mktemp) && "+
+				"curl -fsSL %s -o \"$tmp\" && "+
+				"sha=$(curl -fsSL %s | awk '{print $1}') && "+
+				"echo \"$sha  $tmp\" | sha256sum -c - && "+
+				"install -m 0755 \"$tmp\" %s",
+			shellQuote(binURL), shellQuote(shaURL), shellQuote(dest),
+		)
+		if !data.ForceBinaryReplace {
+			installCmd = fmt.Sprintf("test -e %s || (%s)", shellQuote(dest), installCmd)
+		}
 		if err := runner.step("install "+bin+" binary", func() error {
-			return runner.run(fmt.Sprintf(
-				"test -e %s || ("+
-					"tmp=$(mktemp) && "+
-					"curl -fsSL %s -o \"$tmp\" && "+
-					"sha=$(curl -fsSL %s | awk '{print $1}') && "+
-					"echo \"$sha  $tmp\" | sha256sum -c - && "+
-					"install -m 0755 \"$tmp\" %s"+
-					")",
-				shellQuote(dest), shellQuote(binURL), shellQuote(shaURL), shellQuote(dest),
-			), nil)
+			return runner.run(installCmd, nil)
 		}); err != nil {
 			return err
 		}
@@ -228,6 +234,11 @@ func runKubernetesEngineNodeProvisionSteps(runner kubernetesEngineNodeCommandRun
 	}
 
 	return runner.step("enable Kubernetes node services", func() error {
+		if data.ForceBinaryReplace {
+			// upgrade時は、既にactiveなkubelet/kube-proxyへ新バイナリを反映させるため明示的に再起動する
+			// (enable --nowは既にactiveなユニットには何もしない)。
+			return runner.run("systemctl daemon-reload && systemctl enable --now containerd && systemctl restart kubelet kube-proxy", nil)
+		}
 		return runner.run("systemctl daemon-reload && systemctl enable --now containerd kubelet kube-proxy", nil)
 	})
 }

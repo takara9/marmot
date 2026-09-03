@@ -114,6 +114,33 @@ func cordonKubernetesEngineNode(ke api.KubernetesEngine, nodeName string) error 
 	return fmt.Errorf("unexpected status %s when cordoning node %s", code, nodeName)
 }
 
+// uncordonKubernetesEngineNode は対象ノードのspec.unschedulableをfalseに戻す(kubectl uncordon相当)。
+// ノードが既に存在しない場合は完了済みとみなす。
+func uncordonKubernetesEngineNode(ke api.KubernetesEngine, nodeName string) error {
+	namespace, caPath, certPath, keyPath, apiBase, err := kubernetesEngineAdminAPIContext(ke)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	targetURL := apiBase + "/api/v1/nodes/" + nodeName
+	cmd := exec.CommandContext(ctx, "ip", "netns", "exec", namespace, "curl",
+		"--silent", "--show-error", "--output", "/dev/null", "--write-out", "%{http_code}",
+		"--cacert", caPath, "--cert", certPath, "--key", keyPath,
+		"-H", "Content-Type: application/merge-patch+json",
+		"-X", "PATCH", "--data-binary", "@-", targetURL)
+	cmd.Stdin = strings.NewReader(`{"spec":{"unschedulable":false}}`)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to uncordon node %s: %w (output=%s)", nodeName, err, strings.TrimSpace(string(output)))
+	}
+	code := strings.TrimSpace(string(output))
+	if code == "200" || code == "404" {
+		return nil
+	}
+	return fmt.Errorf("unexpected status %s when uncordoning node %s", code, nodeName)
+}
+
 // listKubernetesEnginePodsOnNode は対象ノード上のPodのうち、DaemonSetが管理するもの
 // (kubectl drain --ignore-daemonsets相当)を除いた一覧を返す。
 func listKubernetesEnginePodsOnNode(ke api.KubernetesEngine, nodeName string) ([]kubernetesEnginePodRef, error) {
@@ -210,10 +237,10 @@ func deleteKubernetesEngineNodeObject(ke api.KubernetesEngine, nodeName string) 
 	return fmt.Errorf("unexpected status %s when deleting node %s", code, nodeName)
 }
 
-// DrainAndDeleteKubernetesEngineNode は対象ノードをcordon→drain(DaemonSet管理下のPodを除き
-// Eviction APIで退避)→Kubernetes Node削除まで進める。VM(仮想サーバー)自体の削除要求は
-// 呼び出し元(コントローラー)がSetDeleteTimestampで別途行う。
-func DrainAndDeleteKubernetesEngineNode(ke api.KubernetesEngine, nodeName string) error {
+// drainKubernetesEngineNode は対象ノードをcordon→drain(DaemonSet管理下のPodを除きEviction APIで
+// 退避)まで進める。ノードオブジェクト自体の削除は行わない(スケールインとローリング
+// アップグレードの双方から共有するため、削除処理は呼び出し元に委ねる)。
+func drainKubernetesEngineNode(ke api.KubernetesEngine, nodeName string) error {
 	if err := cordonKubernetesEngineNode(ke, nodeName); err != nil {
 		return err
 	}
@@ -225,6 +252,16 @@ func DrainAndDeleteKubernetesEngineNode(ke api.KubernetesEngine, nodeName string
 		if err := evictKubernetesEnginePodFn(ke, pod.Namespace, pod.Name); err != nil {
 			return fmt.Errorf("failed to drain node %s: %w", nodeName, err)
 		}
+	}
+	return nil
+}
+
+// DrainAndDeleteKubernetesEngineNode は対象ノードをcordon→drain(DaemonSet管理下のPodを除き
+// Eviction APIで退避)→Kubernetes Node削除まで進める。VM(仮想サーバー)自体の削除要求は
+// 呼び出し元(コントローラー)がSetDeleteTimestampで別途行う。
+func DrainAndDeleteKubernetesEngineNode(ke api.KubernetesEngine, nodeName string) error {
+	if err := drainKubernetesEngineNode(ke, nodeName); err != nil {
+		return err
 	}
 	if err := deleteKubernetesEngineNodeObject(ke, nodeName); err != nil {
 		return err

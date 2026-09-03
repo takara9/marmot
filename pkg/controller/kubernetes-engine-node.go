@@ -26,8 +26,12 @@ const (
 	kubernetesEngineNodeLabelIndex             = "kubernetesEngineNodeIndex"
 	kubernetesEngineNodeLabelProvisioned       = "kubernetesEngineNodeProvisioned"
 	kubernetesEngineNodeLabelIptablesPersisted = "kubernetesEngineNodeIptablesPersisted"
-	defaultKubernetesEngineNodeCPU             = 2
-	defaultKubernetesEngineNodeMemory          = 2048
+	// kubernetesEngineNodeLabelKubeletVersion は、ノードへ最後に反映済みのKubernetesバージョン
+	// (status.resolvedKubernetesVersion相当)を記録するラベル。ローリングアップグレード時、
+	// このラベルがクラスタの現在のresolvedバージョンと一致しないノードをアップグレード対象として選ぶ。
+	kubernetesEngineNodeLabelKubeletVersion = "kubernetesEngineNodeKubeletVersion"
+	defaultKubernetesEngineNodeCPU          = 2
+	defaultKubernetesEngineNodeMemory       = 2048
 
 	// kubernetesEngineNetworkKindBridge は、ノード間通信用ネットワーク上でシンプルな
 	// bridge CNIを使用するモード（spec.nodeSpec.network.kindの既定値）。
@@ -142,6 +146,7 @@ func ProvisionKubernetesEngineNodes(database *db.Database, mkeConf *marmotd.MKEC
 				return false, err
 			}
 			labels[kubernetesEngineNodeLabelProvisioned] = "true"
+			labels[kubernetesEngineNodeLabelKubeletVersion] = strings.TrimSpace(*ke.Status.ResolvedKubernetesVersion)
 			if networkKind != kubernetesEngineNetworkKindCilium {
 				labels[kubernetesEngineNodeLabelIptablesPersisted] = "true"
 			}
@@ -493,6 +498,13 @@ func kubernetesEngineNodeInternalIP(server api.Server, networkName string) (stri
 }
 
 func configureKubernetesEngineNode(mkeConf *marmotd.MKEConfig, ke api.KubernetesEngine, nodeName, nodeIP string, nodeIndex int) error {
+	return configureKubernetesEngineNodeBinaries(mkeConf, ke, nodeName, nodeIP, nodeIndex, false)
+}
+
+// configureKubernetesEngineNodeBinaries は configureKubernetesEngineNode の実体。force=true の場合、
+// kubelet/kube-proxyバイナリが既に存在してもke.Status.ResolvedKubernetesVersionの内容で強制的に
+// 再インストール・再起動する(ローリングアップグレードのノード側処理から使用)。
+func configureKubernetesEngineNodeBinaries(mkeConf *marmotd.MKEConfig, ke api.KubernetesEngine, nodeName, nodeIP string, nodeIndex int, force bool) error {
 	clusterName := strings.TrimSpace(ke.Metadata.Name)
 	caPath, _ := KubernetesEngineCAPaths(DefaultKubernetesEnginePkiDir, clusterName)
 	kubeletCertPath, kubeletKeyPath, err := IssueKubernetesEngineCertificate(DefaultKubernetesEnginePkiDir, clusterName, KubernetesEngineCertRequest{
@@ -541,6 +553,7 @@ func configureKubernetesEngineNode(mkeConf *marmotd.MKEConfig, ke api.Kubernetes
 		PodCIDR:             kubernetesEnginePodCIDR(nodeIndex),
 		PodNetworkSupernet:  kubernetesEnginePodNetworkSupernet,
 		CNIPluginsVersion:   strings.TrimPrefix(strings.TrimSpace(mkeConf.CNIPluginsVersion), "v"),
+		ForceBinaryReplace:  force,
 	}
 	nodeID := fmt.Sprintf("%s-%s", api.KubernetesEngineID(ke), nodeName)
 	if marmotd.CurrentConfig().CephEnabled {

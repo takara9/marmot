@@ -292,11 +292,37 @@ func (d *Database) updateKubernetesEngineSpec(id string, desired api.KubernetesE
 	if cmp < 0 {
 		return fmt.Errorf("spec.version downgrade is not supported (current: %s, desired: %s)", rec.Spec.Version, desired.Version)
 	}
+	if cmp > 0 {
+		if err := validateKubernetesEngineVersionUpgrade(rec.Spec.Version, desired.Version); err != nil {
+			return err
+		}
+	}
 
 	rec.Spec.Nodes = desired.Nodes
 	rec.Spec.Version = desired.Version
 
 	return d.PutJSONCAS(key, expected, &rec)
+}
+
+// validateKubernetesEngineVersionUpgrade は、Kubernetesは1マイナーバージョンずつの
+// アップグレードが原則であることから、メジャーバージョン変更や2つ以上のマイナーバージョンの
+// 飛び越しを拒否する(ダウングレードは呼び出し元で既に拒否済みのため、ここでは扱わない)。
+func validateKubernetesEngineVersionUpgrade(current, desired string) error {
+	currentVersion, err := parseKubernetesVersion(current)
+	if err != nil {
+		return err
+	}
+	desiredVersion, err := parseKubernetesVersion(desired)
+	if err != nil {
+		return err
+	}
+	if desiredVersion[0] != currentVersion[0] {
+		return fmt.Errorf("spec.version major version upgrade is not supported in a single step (current: %s, desired: %s)", current, desired)
+	}
+	if desiredVersion[1]-currentVersion[1] > 1 {
+		return fmt.Errorf("spec.version upgrade must not skip more than one minor version (current: %s, desired: %s)", current, desired)
+	}
+	return nil
 }
 
 // compareKubernetesVersions は "major.minor" または "major.minor.patch" 形式のバージョン文字列を
