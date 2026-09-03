@@ -281,7 +281,7 @@ func (d *Database) updateKubernetesEngineSpec(id string, desired api.KubernetesE
 	}
 	expected := resp.Kvs[0].ModRevision
 
-	if !reflect.DeepEqual(desired.NodeSpec, rec.Spec.NodeSpec) {
+	if desired.NodeSpec != nil && !reflect.DeepEqual(desired.NodeSpec, rec.Spec.NodeSpec) {
 		return fmt.Errorf("spec.nodeSpec cannot be changed after creation")
 	}
 
