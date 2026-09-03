@@ -348,14 +348,16 @@ func compareKubernetesVersions(a, b string) (int, error) {
 // 数値の配列 [major, minor, patch] に変換する(patch省略時は0扱い)。
 func parseKubernetesVersion(v string) ([3]int, error) {
 	var result [3]int
-	parts := strings.Split(strings.TrimSpace(v), ".")
+	raw := strings.TrimSpace(v)
+	clean := strings.TrimPrefix(raw, "v")
+	parts := strings.Split(clean, ".")
 	if len(parts) < 2 || len(parts) > 3 {
-		return result, fmt.Errorf("invalid version format: %q", v)
+		return result, fmt.Errorf("invalid version format: %q", raw)
 	}
 	for i, part := range parts {
 		n, err := strconv.Atoi(part)
 		if err != nil || n < 0 {
-			return result, fmt.Errorf("invalid version format: %q", v)
+			return result, fmt.Errorf("invalid version format: %q", raw)
 		}
 		result[i] = n
 	}
