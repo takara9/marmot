@@ -24,6 +24,14 @@ func TestReconcileKubernetesEngineRunningRecoversMissingControlPlaneNamespace(t 
 		t.Fatalf("CreateKubernetesEngine() failed: %v", err)
 	}
 	id := api.KubernetesEngineID(ke)
+	if _, err := database.MakeServerEntry(api.Server{
+		Metadata: api.Metadata{Name: "mke-ns-recover-node-1", Labels: &map[string]interface{}{
+			kubernetesEngineNodeLabelOwner: id,
+			kubernetesEngineNodeLabelRole:  kubernetesEngineNodeRoleValue,
+		}},
+	}); err != nil {
+		t.Fatalf("MakeServerEntry() failed: %v", err)
+	}
 	if err := database.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, ""); err != nil {
 		t.Fatalf("failed to set RUNNING: %v", err)
 	}
@@ -75,6 +83,14 @@ func TestReconcileKubernetesEngineRunningSkipsRecoveryWhenNamespaceHealthy(t *te
 		t.Fatalf("CreateKubernetesEngine() failed: %v", err)
 	}
 	id := api.KubernetesEngineID(ke)
+	if _, err := database.MakeServerEntry(api.Server{
+		Metadata: api.Metadata{Name: "mke-ns-healthy-node-1", Labels: &map[string]interface{}{
+			kubernetesEngineNodeLabelOwner: id,
+			kubernetesEngineNodeLabelRole:  kubernetesEngineNodeRoleValue,
+		}},
+	}); err != nil {
+		t.Fatalf("MakeServerEntry() failed: %v", err)
+	}
 	if err := database.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, ""); err != nil {
 		t.Fatalf("failed to set RUNNING: %v", err)
 	}
@@ -114,6 +130,14 @@ func TestReconcileKubernetesEngineRunningRecordsMessageWhenRecoveryFails(t *test
 		t.Fatalf("CreateKubernetesEngine() failed: %v", err)
 	}
 	id := api.KubernetesEngineID(ke)
+	if _, err := database.MakeServerEntry(api.Server{
+		Metadata: api.Metadata{Name: "mke-ns-recover-fail-node-1", Labels: &map[string]interface{}{
+			kubernetesEngineNodeLabelOwner: id,
+			kubernetesEngineNodeLabelRole:  kubernetesEngineNodeRoleValue,
+		}},
+	}); err != nil {
+		t.Fatalf("MakeServerEntry() failed: %v", err)
+	}
 	if err := database.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, ""); err != nil {
 		t.Fatalf("failed to set RUNNING: %v", err)
 	}
@@ -163,6 +187,14 @@ func TestReconcileKubernetesEngineRunningReconciliatesNodeRoutes(t *testing.T) {
 		t.Fatalf("CreateKubernetesEngine() failed: %v", err)
 	}
 	id := api.KubernetesEngineID(ke)
+	if _, err := database.MakeServerEntry(api.Server{
+		Metadata: api.Metadata{Name: "mke-routes-recover-node-1", Labels: &map[string]interface{}{
+			kubernetesEngineNodeLabelOwner: id,
+			kubernetesEngineNodeLabelRole:  kubernetesEngineNodeRoleValue,
+		}},
+	}); err != nil {
+		t.Fatalf("MakeServerEntry() failed: %v", err)
+	}
 	if err := database.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, ""); err != nil {
 		t.Fatalf("failed to set RUNNING: %v", err)
 	}
@@ -207,6 +239,14 @@ func TestReconcileKubernetesEngineRunningRecordsMessageWhenRouteReconciliationFa
 		t.Fatalf("CreateKubernetesEngine() failed: %v", err)
 	}
 	id := api.KubernetesEngineID(ke)
+	if _, err := database.MakeServerEntry(api.Server{
+		Metadata: api.Metadata{Name: "mke-routes-recover-fail-node-1", Labels: &map[string]interface{}{
+			kubernetesEngineNodeLabelOwner: id,
+			kubernetesEngineNodeLabelRole:  kubernetesEngineNodeRoleValue,
+		}},
+	}); err != nil {
+		t.Fatalf("MakeServerEntry() failed: %v", err)
+	}
 	if err := database.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, ""); err != nil {
 		t.Fatalf("failed to set RUNNING: %v", err)
 	}

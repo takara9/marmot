@@ -107,3 +107,91 @@ func TestReconcileKubernetesEngineProvisioningTransitionsWhenNodesReady(t *testi
 		t.Fatalf("status = %+v, want RUNNING", updated.Status)
 	}
 }
+
+func TestReconcileKubernetesEngineRunningScalesOutWhenNodesIncrease(t *testing.T) {
+	database := newGatewayTestDatabase(t)
+	ke, err := database.CreateKubernetesEngine(api.KubernetesEngine{
+		ApiVersion: "v1",
+		Kind:       "KubernetesEngine",
+		Metadata:   api.Metadata{Name: "demo-scale-out"},
+		Spec:       api.KubernetesEngineSpec{Version: "1.36", Nodes: 1},
+	})
+	if err != nil {
+		t.Fatalf("CreateKubernetesEngine() failed: %v", err)
+	}
+	id := api.KubernetesEngineID(ke)
+	if err := database.UpdateKubernetesEngineControlPlaneStatus(id, "172.16.1.2", "172.16.1.3", 26443, "v1.36.2"); err != nil {
+		t.Fatalf("failed to set control plane status: %v", err)
+	}
+	if err := database.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, ""); err != nil {
+		t.Fatalf("failed to set RUNNING: %v", err)
+	}
+	if err := database.UpdateKubernetesEngineSpec(id, api.KubernetesEngineSpec{Version: "1.36", Nodes: 2}); err != nil {
+		t.Fatalf("UpdateKubernetesEngineSpec() failed: %v", err)
+	}
+	ke, err = database.GetKubernetesEngineById(id)
+	if err != nil {
+		t.Fatalf("GetKubernetesEngineById() failed: %v", err)
+	}
+
+	oldNodes := provisionKubernetesEngineNodes
+	t.Cleanup(func() { provisionKubernetesEngineNodes = oldNodes })
+	provisionKubernetesEngineNodes = func(_ *db.Database, _ *marmotd.MKEConfig, _ api.KubernetesEngine) (bool, error) {
+		return true, nil
+	}
+
+	ctrl := &kubernetesEngineController{db: database, mkeConf: &marmotd.MKEConfig{}, etcdURL: "http://127.0.0.1:2379"}
+	ctrl.reconcileKubernetesEngineRunning(ke)
+
+	updated, err := database.GetKubernetesEngineById(id)
+	if err != nil {
+		t.Fatalf("GetKubernetesEngineById() failed: %v", err)
+	}
+	if updated.Status == nil || updated.Status.StatusCode != db.KUBERNETES_ENGINE_RUNNING {
+		t.Fatalf("status = %+v, want RUNNING after scale-out completes", updated.Status)
+	}
+}
+
+func TestReconcileKubernetesEngineRunningStaysScalingOutUntilNodesReady(t *testing.T) {
+	database := newGatewayTestDatabase(t)
+	ke, err := database.CreateKubernetesEngine(api.KubernetesEngine{
+		ApiVersion: "v1",
+		Kind:       "KubernetesEngine",
+		Metadata:   api.Metadata{Name: "demo-scale-out-pending"},
+		Spec:       api.KubernetesEngineSpec{Version: "1.36", Nodes: 1},
+	})
+	if err != nil {
+		t.Fatalf("CreateKubernetesEngine() failed: %v", err)
+	}
+	id := api.KubernetesEngineID(ke)
+	if err := database.UpdateKubernetesEngineControlPlaneStatus(id, "172.16.1.2", "172.16.1.3", 26443, "v1.36.2"); err != nil {
+		t.Fatalf("failed to set control plane status: %v", err)
+	}
+	if err := database.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, ""); err != nil {
+		t.Fatalf("failed to set RUNNING: %v", err)
+	}
+	if err := database.UpdateKubernetesEngineSpec(id, api.KubernetesEngineSpec{Version: "1.36", Nodes: 2}); err != nil {
+		t.Fatalf("UpdateKubernetesEngineSpec() failed: %v", err)
+	}
+	ke, err = database.GetKubernetesEngineById(id)
+	if err != nil {
+		t.Fatalf("GetKubernetesEngineById() failed: %v", err)
+	}
+
+	oldNodes := provisionKubernetesEngineNodes
+	t.Cleanup(func() { provisionKubernetesEngineNodes = oldNodes })
+	provisionKubernetesEngineNodes = func(_ *db.Database, _ *marmotd.MKEConfig, _ api.KubernetesEngine) (bool, error) {
+		return false, nil
+	}
+
+	ctrl := &kubernetesEngineController{db: database, mkeConf: &marmotd.MKEConfig{}, etcdURL: "http://127.0.0.1:2379"}
+	ctrl.reconcileKubernetesEngineRunning(ke)
+
+	updated, err := database.GetKubernetesEngineById(id)
+	if err != nil {
+		t.Fatalf("GetKubernetesEngineById() failed: %v", err)
+	}
+	if updated.Status == nil || updated.Status.StatusCode != db.KUBERNETES_ENGINE_SCALING_OUT {
+		t.Fatalf("status = %+v, want SCALING_OUT while nodes are not yet ready", updated.Status)
+	}
+}

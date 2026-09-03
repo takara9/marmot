@@ -144,7 +144,7 @@ func (c *kubernetesEngineController) kubernetesEngineControllerLoop() {
 			c.reconcileKubernetesEnginePending(item)
 		case db.KUBERNETES_ENGINE_PROVISIONING:
 			c.reconcileKubernetesEngineProvisioning(item)
-		case db.KUBERNETES_ENGINE_RUNNING:
+		case db.KUBERNETES_ENGINE_RUNNING, db.KUBERNETES_ENGINE_SCALING_OUT:
 			c.reconcileKubernetesEngineRunning(item)
 		case db.KUBERNETES_ENGINE_DELETING:
 			c.reconcileKubernetesEngineDeleting(item)
@@ -258,9 +258,29 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineProvisioning(ke ap
 // systemdユニットがNetworkNamespacePath不在で起動失敗し続けるため、ここで検知して復旧する。
 // また、ノードVMの再起動で失われたPod CIDR宛の静的経路(`ip route replace`は永続化されない)も
 // 毎tick再設定し、Service(NodePort等)の疎通が失われたままにならないようにする。
+// spec.nodesが現在のノード数を上回っている場合、または既にSCALING_OUT中の場合は、
+// スケールアウト処理へ委譲する(完了するまでRUNNINGへの他の処理は行わない)。
 // TODO: 次フェーズでノードの状態監視を行い、異常時はFAILED等へ遷移させる。
 func (c *kubernetesEngineController) reconcileKubernetesEngineRunning(ke api.KubernetesEngine) {
 	id := api.KubernetesEngineID(ke)
+
+	if ke.Status != nil && ke.Status.StatusCode == db.KUBERNETES_ENGINE_SCALING_OUT {
+		c.reconcileKubernetesEngineScaleOut(id, ke)
+		return
+	}
+
+	servers, err := findKubernetesEngineNodeServers(c.db, ke)
+	if err != nil {
+		slog.Warn("reconcileKubernetesEngineRunning: failed to list node servers", "id", id, "err", err)
+	} else if len(servers) < ke.Spec.Nodes {
+		if err := c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_SCALING_OUT, "adding nodes to match spec.nodes"); err != nil {
+			slog.Warn("reconcileKubernetesEngineRunning: failed to transition to SCALING_OUT", "id", id, "err", err)
+			return
+		}
+		c.reconcileKubernetesEngineScaleOut(id, ke)
+		return
+	}
+
 	slog.Debug("KubernetesEngineはRUNNING状態です", "id", id, "name", ke.Metadata.Name)
 
 	namespace, _, _, err := KubernetesEngineControlPlaneNetworkNames(ke.Metadata.Name)
@@ -284,6 +304,24 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineRunning(ke api.Kub
 		message := fmt.Sprintf("pod network route reconciliation failed: %v", err)
 		_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, message)
 		slog.Warn("reconcileKubernetesEngineRunning: node route reconciliation failed", "id", id, "err", err)
+	}
+}
+
+// reconcileKubernetesEngineScaleOut はSCALING_OUT中に呼び出され、不足ノードの作成・セットアップを
+// 冪等に進める。全ノードがReadyになった時点でRUNNINGへ戻す。
+func (c *kubernetesEngineController) reconcileKubernetesEngineScaleOut(id string, ke api.KubernetesEngine) {
+	ready, err := provisionKubernetesEngineNodes(c.db, c.mkeConf, ke)
+	if err != nil {
+		message := fmt.Sprintf("scale-out failed: %v", err)
+		_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_SCALING_OUT, message)
+		slog.Warn("reconcileKubernetesEngineScaleOut: node provisioning failed", "id", id, "err", err)
+		return
+	}
+	if !ready {
+		return
+	}
+	if err := c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, ""); err != nil {
+		slog.Warn("reconcileKubernetesEngineScaleOut: failed to transition back to RUNNING", "id", id, "err", err)
 	}
 }
 
