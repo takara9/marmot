@@ -20,14 +20,14 @@ import (
 )
 
 const (
-	kubernetesEngineNodeLabelOwner       = "kubernetesEngineId"
-	kubernetesEngineNodeLabelRole        = "kubernetesEngineRole"
-	kubernetesEngineNodeRoleValue        = "node"
-	kubernetesEngineNodeLabelIndex       = "kubernetesEngineNodeIndex"
-	kubernetesEngineNodeLabelProvisioned        = "kubernetesEngineNodeProvisioned"
-	kubernetesEngineNodeLabelIptablesPersisted  = "kubernetesEngineNodeIptablesPersisted"
-	defaultKubernetesEngineNodeCPU       = 2
-	defaultKubernetesEngineNodeMemory    = 2048
+	kubernetesEngineNodeLabelOwner             = "kubernetesEngineId"
+	kubernetesEngineNodeLabelRole              = "kubernetesEngineRole"
+	kubernetesEngineNodeRoleValue              = "node"
+	kubernetesEngineNodeLabelIndex             = "kubernetesEngineNodeIndex"
+	kubernetesEngineNodeLabelProvisioned       = "kubernetesEngineNodeProvisioned"
+	kubernetesEngineNodeLabelIptablesPersisted = "kubernetesEngineNodeIptablesPersisted"
+	defaultKubernetesEngineNodeCPU             = 2
+	defaultKubernetesEngineNodeMemory          = 2048
 
 	// kubernetesEngineNetworkKindBridge は、ノード間通信用ネットワーク上でシンプルな
 	// bridge CNIを使用するモード（spec.nodeSpec.network.kindの既定値）。
@@ -44,12 +44,12 @@ const (
 var kubernetesEngineNodeNamePattern = regexp.MustCompile(`-node-(\d+)$`)
 
 var (
-	kubernetesEngineNodePrivateKeyPath        = marmotd.GatewayPrivateKeyPath()
-	kubernetesEngineNodePublicKeyPath         = marmotd.GatewayPublicKeyPath()
-	ensureKubernetesEngineNodeSSHAssets       = marmotd.EnsureGatewayRuntimeAssets
-	runKubernetesEngineNodeProvision          = provisionKubernetesEngineNodeSSH
-	runKubernetesEngineNodeIptablesReconcile  = reconcileKubernetesEngineNodeIptablesSSH
-	queryKubernetesEngineNodes                = queryKubernetesEngineNodesCommand
+	kubernetesEngineNodePrivateKeyPath       = marmotd.GatewayPrivateKeyPath()
+	kubernetesEngineNodePublicKeyPath        = marmotd.GatewayPublicKeyPath()
+	ensureKubernetesEngineNodeSSHAssets      = marmotd.EnsureGatewayRuntimeAssets
+	runKubernetesEngineNodeProvision         = provisionKubernetesEngineNodeSSH
+	runKubernetesEngineNodeIptablesReconcile = reconcileKubernetesEngineNodeIptablesSSH
+	queryKubernetesEngineNodes               = queryKubernetesEngineNodesCommand
 )
 
 type kubernetesNodeList struct {
@@ -97,7 +97,10 @@ func ProvisionKubernetesEngineNodes(database *db.Database, mkeConf *marmotd.MKEC
 		return false, err
 	}
 	if len(servers) > ke.Spec.Nodes {
-		return false, fmt.Errorf("KubernetesEngine has %d nodes, expected %d; scale-in is handled in phase 12", len(servers), ke.Spec.Nodes)
+		// PROVISIONING中はスケールインを行わない(RUNNING到達後にreconcileKubernetesEngineRunningが
+		// SCALING_INへ遷移させて処理する)。ここに到達するのは、RUNNINGへ進む前にspec.nodesが
+		// 既存ノード数未満へ減らされた異常なケースのみ。
+		return false, fmt.Errorf("KubernetesEngine has %d nodes, expected %d; decrease spec.nodes only after the cluster reaches RUNNING", len(servers), ke.Spec.Nodes)
 	}
 	if len(servers) < ke.Spec.Nodes {
 		if err := createMissingKubernetesEngineNodeServers(database, ke, servers); err != nil {

@@ -27,6 +27,7 @@ var (
 	provisionKubernetesEngineNodes         = ProvisionKubernetesEngineNodes
 	provisionKubernetesEngineLoadBalancer  = ProvisionKubernetesEngineLoadBalancer
 	reconcileKubernetesEngineRunningRoutes = reconcileKubernetesEngineRunningNodeRoutes
+	drainAndDeleteKubernetesEngineNode     = DrainAndDeleteKubernetesEngineNode
 )
 
 // kubernetesEngineController は MKE (Marmot Kubernetes Engine) コントローラーです。
@@ -144,7 +145,7 @@ func (c *kubernetesEngineController) kubernetesEngineControllerLoop() {
 			c.reconcileKubernetesEnginePending(item)
 		case db.KUBERNETES_ENGINE_PROVISIONING:
 			c.reconcileKubernetesEngineProvisioning(item)
-		case db.KUBERNETES_ENGINE_RUNNING, db.KUBERNETES_ENGINE_SCALING_OUT:
+		case db.KUBERNETES_ENGINE_RUNNING, db.KUBERNETES_ENGINE_SCALING_OUT, db.KUBERNETES_ENGINE_SCALING_IN:
 			c.reconcileKubernetesEngineRunning(item)
 		case db.KUBERNETES_ENGINE_DELETING:
 			c.reconcileKubernetesEngineDeleting(item)
@@ -260,6 +261,8 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineProvisioning(ke ap
 // 毎tick再設定し、Service(NodePort等)の疎通が失われたままにならないようにする。
 // spec.nodesが現在のノード数を上回っている場合、または既にSCALING_OUT中の場合は、
 // スケールアウト処理へ委譲する(完了するまでRUNNINGへの他の処理は行わない)。
+// spec.nodesが現在のノード数を下回っている場合、または既にSCALING_IN中の場合は、
+// スケールイン処理へ委譲する。
 // TODO: 次フェーズでノードの状態監視を行い、異常時はFAILED等へ遷移させる。
 func (c *kubernetesEngineController) reconcileKubernetesEngineRunning(ke api.KubernetesEngine) {
 	id := api.KubernetesEngineID(ke)
@@ -268,17 +271,37 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineRunning(ke api.Kub
 		c.reconcileKubernetesEngineScaleOut(id, ke)
 		return
 	}
+	if ke.Status != nil && ke.Status.StatusCode == db.KUBERNETES_ENGINE_SCALING_IN {
+		c.reconcileKubernetesEngineScaleIn(id, ke)
+		return
+	}
 
 	servers, err := findKubernetesEngineNodeServers(c.db, ke)
 	if err != nil {
 		slog.Warn("reconcileKubernetesEngineRunning: failed to list node servers", "id", id, "err", err)
-	} else if len(servers) < ke.Spec.Nodes {
-		if err := c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_SCALING_OUT, "adding nodes to match spec.nodes"); err != nil {
-			slog.Warn("reconcileKubernetesEngineRunning: failed to transition to SCALING_OUT", "id", id, "err", err)
+	} else {
+		active := 0
+		for _, server := range servers {
+			if server.Status == nil || server.Status.DeletionTimeStamp == nil {
+				active++
+			}
+		}
+		if active < ke.Spec.Nodes {
+			if err := c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_SCALING_OUT, "adding nodes to match spec.nodes"); err != nil {
+				slog.Warn("reconcileKubernetesEngineRunning: failed to transition to SCALING_OUT", "id", id, "err", err)
+				return
+			}
+			c.reconcileKubernetesEngineScaleOut(id, ke)
 			return
 		}
-		c.reconcileKubernetesEngineScaleOut(id, ke)
-		return
+		if active > ke.Spec.Nodes {
+			if err := c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_SCALING_IN, "removing nodes to match spec.nodes"); err != nil {
+				slog.Warn("reconcileKubernetesEngineRunning: failed to transition to SCALING_IN", "id", id, "err", err)
+				return
+			}
+			c.reconcileKubernetesEngineScaleIn(id, ke)
+			return
+		}
 	}
 
 	slog.Debug("KubernetesEngineはRUNNING状態です", "id", id, "name", ke.Metadata.Name)
@@ -322,6 +345,48 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineScaleOut(id string
 	}
 	if err := c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, ""); err != nil {
 		slog.Warn("reconcileKubernetesEngineScaleOut: failed to transition back to RUNNING", "id", id, "err", err)
+	}
+}
+
+// reconcileKubernetesEngineScaleIn はSCALING_IN中に呼び出され、spec.nodesを超過する
+// アクティブノードのうちindex最大の1台を選んでcordon→drain→ノード削除→VM削除要求まで
+// 1tickにつき1台ずつ進める(可用性維持のためのローリング処理)。超過が解消し、既存の
+// 削除要求も完了していればRUNNINGへ戻す。
+func (c *kubernetesEngineController) reconcileKubernetesEngineScaleIn(id string, ke api.KubernetesEngine) {
+	target, err := selectKubernetesEngineNodeForScaleIn(c.db, ke)
+	if err != nil {
+		message := fmt.Sprintf("scale-in failed: %v", err)
+		_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_SCALING_IN, message)
+		slog.Warn("reconcileKubernetesEngineScaleIn: node selection failed", "id", id, "err", err)
+		return
+	}
+	if target != nil {
+		if err := drainAndDeleteKubernetesEngineNode(ke, target.Metadata.Name); err != nil {
+			message := fmt.Sprintf("scale-in failed: %v", err)
+			_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_SCALING_IN, message)
+			slog.Warn("reconcileKubernetesEngineScaleIn: drain/delete node failed", "id", id, "node", target.Metadata.Name, "err", err)
+			return
+		}
+		serverID := api.ServerID(*target)
+		if err := c.db.SetDeleteTimestamp(serverID); err != nil {
+			slog.Warn("reconcileKubernetesEngineScaleIn: SetDeleteTimestamp failed", "id", id, "serverId", serverID, "err", err)
+		}
+		return
+	}
+
+	// アクティブノードは既にspec.nodes以下。削除要求済みのVMがまだ残っていれば完了を待つ。
+	servers, err := findKubernetesEngineNodeServers(c.db, ke)
+	if err != nil {
+		slog.Warn("reconcileKubernetesEngineScaleIn: failed to list node servers", "id", id, "err", err)
+		return
+	}
+	for _, server := range servers {
+		if server.Status != nil && server.Status.DeletionTimeStamp != nil {
+			return
+		}
+	}
+	if err := c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, ""); err != nil {
+		slog.Warn("reconcileKubernetesEngineScaleIn: failed to transition back to RUNNING", "id", id, "err", err)
 	}
 }
 
