@@ -453,7 +453,7 @@ func validateKubernetesEngineApplyForbiddenChanges(existing api.KubernetesEngine
 	if desired.Metadata.Name != "" && desired.Metadata.Name != existing.Metadata.Name {
 		forbidden = append(forbidden, "metadata.name")
 	}
-	if !reflect.DeepEqual(desired.Spec.NodeSpec, existing.Spec.NodeSpec) {
+	if desired.Spec.NodeSpec != nil && !reflect.DeepEqual(desired.Spec.NodeSpec, existing.Spec.NodeSpec) {
 		forbidden = append(forbidden, "spec.nodeSpec")
 	}
 
