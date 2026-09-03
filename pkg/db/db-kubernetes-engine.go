@@ -20,6 +20,9 @@ const (
 	KUBERNETES_ENGINE_RUNNING      = 2
 	KUBERNETES_ENGINE_DELETING     = 3
 	KUBERNETES_ENGINE_FAILED       = 4
+	KUBERNETES_ENGINE_UPGRADING    = 5
+	KUBERNETES_ENGINE_SCALING_IN   = 6
+	KUBERNETES_ENGINE_SCALING_OUT  = 7
 
 	// KubernetesEngine が専用作成するノード間通信ネットワークの所有者ラベル
 	KubernetesEngineNetworkLabelOwner          = "kubernetesEngineId"
@@ -33,6 +36,9 @@ var KubernetesEngineStatus = map[int]string{
 	KUBERNETES_ENGINE_RUNNING:      "RUNNING",
 	KUBERNETES_ENGINE_DELETING:     "DELETING",
 	KUBERNETES_ENGINE_FAILED:       "FAILED",
+	KUBERNETES_ENGINE_UPGRADING:    "UPGRADING",
+	KUBERNETES_ENGINE_SCALING_IN:   "SCALING_IN",
+	KUBERNETES_ENGINE_SCALING_OUT:  "SCALING_OUT",
 }
 
 // CreateKubernetesEngine は KubernetesEngine を etcd に登録する。
