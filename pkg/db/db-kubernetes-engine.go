@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"reflect"
 	"strings"
 	"time"
 
@@ -236,6 +237,51 @@ func (d *Database) UpdateKubernetesEngineControlPlaneStatus(id, ipAddress, hostI
 		}
 		return err
 	}
+}
+
+// UpdateKubernetesEngineSpec は spec.nodes と spec.version のみを更新する。
+// nodeSpec(cpu/memory/network)は起動済みノードに反映できないため、変更があれば拒否する。
+func (d *Database) UpdateKubernetesEngineSpec(id string, desired api.KubernetesEngineSpec) error {
+	for {
+		err := d.updateKubernetesEngineSpec(id, desired)
+		if err == ErrUpdateConflict {
+			continue
+		}
+		return err
+	}
+}
+
+func (d *Database) updateKubernetesEngineSpec(id string, desired api.KubernetesEngineSpec) error {
+	if desired.Nodes < 1 {
+		return fmt.Errorf("spec.nodes must be greater than zero")
+	}
+	if strings.TrimSpace(desired.Version) == "" {
+		return fmt.Errorf("spec.version is required")
+	}
+
+	lockKey := "/lock/kubernetes-engine/" + id
+	mutex, err := d.LockKey(lockKey)
+	if err != nil {
+		return err
+	}
+	defer d.UnlockKey(mutex)
+
+	key := KubernetesEnginePrefix + "/" + id
+	var rec api.KubernetesEngine
+	resp, err := d.GetJSON(key, &rec)
+	if err != nil {
+		return err
+	}
+	expected := resp.Kvs[0].ModRevision
+
+	if !reflect.DeepEqual(desired.NodeSpec, rec.Spec.NodeSpec) {
+		return fmt.Errorf("spec.nodeSpec cannot be changed after creation")
+	}
+
+	rec.Spec.Nodes = desired.Nodes
+	rec.Spec.Version = desired.Version
+
+	return d.PutJSONCAS(key, expected, &rec)
 }
 
 func (d *Database) putKubernetesEngineById(rec api.KubernetesEngine) error {

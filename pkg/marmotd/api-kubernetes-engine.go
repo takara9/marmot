@@ -46,6 +46,22 @@ func (s *Server) ApiGetKubernetesEngineById(ctx echo.Context, id string) error {
 	return ctx.JSON(http.StatusOK, item)
 }
 
+// ApiUpdateKubernetesEngineById は spec.nodes/spec.version の変更のみを受け付け、etcdに書き込む。
+// 実際のスケール/バージョンアップグレード処理はコントローラーがRUNNING状態のリコンサイルで行う。
+func (s *Server) ApiUpdateKubernetesEngineById(ctx echo.Context, id string) error {
+	var rec api.KubernetesEngine
+	if err := ctx.Bind(&rec); err != nil {
+		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: "invalid request body"})
+	}
+	if err := s.Ma.Db.UpdateKubernetesEngineSpec(id, rec.Spec); err != nil {
+		if errors.Is(err, db.ErrNotFound) {
+			return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "IDが存在しません"})
+		}
+		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: err.Error()})
+	}
+	return ctx.JSON(http.StatusOK, api.Success{Id: id, Message: util.StringPtr("Accepted the request to update the kubernetes engine")})
+}
+
 func (s *Server) ApiDeleteKubernetesEngineById(ctx echo.Context, id string) error {
 	if _, err := s.Ma.Db.GetKubernetesEngineById(id); err != nil {
 		if errors.Is(err, db.ErrNotFound) {

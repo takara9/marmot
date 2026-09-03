@@ -70,6 +70,7 @@ func rbacOperationMiddlewares(s *Server) map[string][]echo.MiddlewareFunc {
 		"apiGetKubernetesEngines":              {Resource: "KubernetesEngine", Verb: "read"},
 		"apiCreateKubernetesEngine":            {Resource: "KubernetesEngine", Verb: "create"},
 		"apiGetKubernetesEngineById":           {Resource: "KubernetesEngine", Verb: "read"},
+		"apiUpdateKubernetesEngineById":        {Resource: "KubernetesEngine", Verb: "update"},
 		"apiDeleteKubernetesEngineById":        {Resource: "KubernetesEngine", Verb: "delete"},
 		"apiGetKubernetesEngineKubeconfigById": {Resource: "KubernetesEngine", Verb: "read"},
 

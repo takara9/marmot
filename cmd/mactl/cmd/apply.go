@@ -16,7 +16,7 @@ import (
 var applyCmd = &cobra.Command{
 	Use:   "apply [RESOURCE]",
 	Short: "Create or update a resource from a file or stdin",
-	Long:  `Apply a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw, applicationloadbalancer/alb, networkloadbalancer/nlb) from a manifest file or stdin. Creates if not exists, updates if exists. If RESOURCE is omitted, it is inferred from manifest kind.`,
+	Long:  `Apply a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw, applicationloadbalancer/alb, networkloadbalancer/nlb, kubernetesengine/mke) from a manifest file or stdin. Creates if not exists, updates if exists. If RESOURCE is omitted, it is inferred from manifest kind.`,
 	Args:  cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// マニフェストファイルが指定されていない場合はエラー
@@ -67,6 +67,10 @@ var applyCmd = &cobra.Command{
 				}
 			case "networkloadbalancer":
 				if err := applyNetworkLoadBalancer(manifest); err != nil {
+					return fmt.Errorf("manifest %d: %w", index+1, err)
+				}
+			case "kubernetesengine":
+				if err := applyKubernetesEngine(manifest); err != nil {
 					return fmt.Errorf("manifest %d: %w", index+1, err)
 				}
 			default:
@@ -363,6 +367,100 @@ func applyNetwork(manifest map[string]interface{}) error {
 	}
 
 	return processApplyResponse(byteBody, exists)
+}
+
+// applyKubernetesEngine は、既存クラスタが無ければ作成し、既存があれば
+// spec.nodes/spec.version のみを更新する(nodeSpec等は変更禁止、フェーズ12参照)。
+func applyKubernetesEngine(manifest map[string]interface{}) error {
+	m, err := getClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	kubernetesEngine, err := ManifestToKubernetesEngine(manifest)
+	if err != nil {
+		return fmt.Errorf("failed to convert manifest to kubernetes engine: %w", err)
+	}
+
+	if kubernetesEngine.ApiVersion == "" {
+		return fmt.Errorf("apiVersion is required")
+	}
+	if kubernetesEngine.Kind == "" {
+		return fmt.Errorf("kind is required")
+	}
+	if strings.TrimSpace(kubernetesEngine.Metadata.Name) == "" {
+		return fmt.Errorf("metadata.name is required")
+	}
+
+	list, _, err := m.GetKubernetesEngines()
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes engine list: %w", err)
+	}
+	var items []api.KubernetesEngine
+	if err := json.Unmarshal(list, &items); err != nil {
+		return fmt.Errorf("failed to decode kubernetes engine list: %w", err)
+	}
+
+	exists := false
+	var existingId string
+	var existingKE api.KubernetesEngine
+	for _, item := range items {
+		if item.Metadata.Name == kubernetesEngine.Metadata.Name {
+			exists = true
+			existingId = api.KubernetesEngineID(item)
+			existingKE = item
+			break
+		}
+	}
+
+	var byteBody []byte
+	if exists {
+		if err := validateKubernetesEngineApplyForbiddenChanges(existingKE, *kubernetesEngine); err != nil {
+			return err
+		}
+		api.SetKubernetesEngineID(kubernetesEngine, existingId)
+		byteBody, _, err = m.UpdateKubernetesEngineById(existingId, *kubernetesEngine)
+		if err != nil {
+			return fmt.Errorf("failed to update kubernetes engine: %w", err)
+		}
+	} else {
+		if strings.TrimSpace(kubernetesEngine.Spec.Version) == "" {
+			return fmt.Errorf("spec.version is required")
+		}
+		if kubernetesEngine.Spec.Nodes <= 0 {
+			return fmt.Errorf("spec.nodes must be greater than zero")
+		}
+		byteBody, _, err = m.CreateKubernetesEngine(*kubernetesEngine)
+		if err != nil {
+			return fmt.Errorf("failed to create kubernetes engine: %w", err)
+		}
+	}
+
+	return processApplyResponse(byteBody, exists)
+}
+
+// validateKubernetesEngineApplyForbiddenChanges は、フェーズ12の制約
+// (変更可能フィールドはspec.nodesとspec.versionのみ)に基づき、それ以外の変更を拒否する。
+func validateKubernetesEngineApplyForbiddenChanges(existing api.KubernetesEngine, desired api.KubernetesEngine) error {
+	forbidden := make([]string, 0, 4)
+
+	if desired.ApiVersion != "" && desired.ApiVersion != existing.ApiVersion {
+		forbidden = append(forbidden, "apiVersion")
+	}
+	if desired.Kind != "" && desired.Kind != existing.Kind {
+		forbidden = append(forbidden, "kind")
+	}
+	if desired.Metadata.Name != "" && desired.Metadata.Name != existing.Metadata.Name {
+		forbidden = append(forbidden, "metadata.name")
+	}
+	if !reflect.DeepEqual(desired.Spec.NodeSpec, existing.Spec.NodeSpec) {
+		forbidden = append(forbidden, "spec.nodeSpec")
+	}
+
+	if len(forbidden) > 0 {
+		return fmt.Errorf("apply: the following fields cannot be changed: %s", strings.Join(forbidden, ", "))
+	}
+	return nil
 }
 
 func validateServerApplyForbiddenChanges(existing api.Server, desired api.Server) error {
