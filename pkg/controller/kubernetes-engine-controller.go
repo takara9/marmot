@@ -30,6 +30,11 @@ var (
 	drainAndDeleteKubernetesEngineNode     = DrainAndDeleteKubernetesEngineNode
 	upgradeKubernetesEngineControlPlane    = UpgradeKubernetesEngineControlPlane
 	upgradeKubernetesEngineNode            = UpgradeKubernetesEngineNode
+
+	// releaseKubernetesEngineLoadBalancerVipsFn / removeKubernetesEngineCephRBDImagesFn は
+	// 削除フローの差し替え口(単体テストで実際のクラスタ・Ceph無しに検証するため)。
+	releaseKubernetesEngineLoadBalancerVipsFn = releaseKubernetesEngineLoadBalancerVips
+	removeKubernetesEngineCephRBDImagesFn     = removeKubernetesEngineCephRBDImages
 )
 
 // kubernetesEngineController は MKE (Marmot Kubernetes Engine) コントローラーです。
@@ -486,6 +491,13 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineDeleting(ke api.Ku
 		return
 	}
 
+	// フェーズ11で払い出したVIP(host-bridge IPAM)と内部DNSエントリーは、クラスタ全体削除時には
+	// mke専用ロードバランサー(mke-lb-controller)がServiceの消失を検知して個別に解放する機会を
+	// 失うため、ここで一括解放する。ベストエフォートとし、失敗してもクラスタ削除は継続する。
+	if err := releaseKubernetesEngineLoadBalancerVipsFn(c.db, current); err != nil {
+		slog.Warn("releaseKubernetesEngineLoadBalancerVips() failed", "id", id, "err", err)
+	}
+
 	// ネットワークやコントロールプレーンを解体する前に、このクラスタが所有するノード用仮想サーバーの
 	// 削除を要求し、それら全てが消えるまで待つ。VMがネットワークに接続されたまま専用ネットワークが
 	// 削除されるのを避けるため、サーバー削除を先行させる。mke専用ロードバランサー用仮想サーバー
@@ -507,6 +519,22 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineDeleting(ke api.Ku
 		nodeServers = append(nodeServers, *loadBalancerServer)
 	}
 	if len(nodeServers) > 0 {
+		alreadyMarked := false
+		for _, server := range nodeServers {
+			if server.Status != nil && server.Status.DeletionTimeStamp != nil {
+				alreadyMarked = true
+				break
+			}
+		}
+		if !alreadyMarked && current.Status != nil && current.Status.ControlPlaneIpAddress != nil {
+			// ノード用VM(Ceph-CSIのprovisioner Podの実行元)がまだ生きている最後のタイミングで、
+			// Ceph-CSI(RBD)が払い出し済みのPVCをkube-apiserver経由で削除し、RBD imageの実削除を
+			// Ceph-CSI本来の削除経路(watcher解放等を含む)に委ねる(CephFSサブボリュームは対象外)。
+			// ベストエフォートとし、失敗してもノード用サーバーの削除は継続する。
+			if cephErr := removeKubernetesEngineCephRBDImagesFn(current); cephErr != nil {
+				slog.Warn("removeKubernetesEngineCephRBDImages() failed", "id", id, "err", cephErr)
+			}
+		}
 		for _, server := range nodeServers {
 			if server.Status != nil && server.Status.DeletionTimeStamp != nil {
 				continue

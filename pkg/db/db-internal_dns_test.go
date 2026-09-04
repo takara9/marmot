@@ -88,6 +88,47 @@ var _ = Describe("InternalDNS", Ordered, func() {
 		Context("登録の削除 IPv4", func() {
 		})
 
+		Context("FQDNエントリーの一覧取得(ListDnsEntriesByFQDNSuffix)", func() {
+			var d *db.Database
+			var err error
+			suffix := "cluster1.host1.labo.local"
+			fqdnA := "svcA.nsA." + suffix
+			fqdnB := "svcB.nsB." + suffix
+			otherFqdn := "svcC.nsC.cluster2.host1.labo.local"
+
+			It("データベース接続の生成", func() {
+				d, err = db.NewDatabase(url)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("複数のFQDNエントリーを登録", func() {
+				Expect(d.PutDnsEntryFQDN(fqdnA, "192.168.100.10")).To(Succeed())
+				Expect(d.PutDnsEntryFQDN(fqdnB, "192.168.100.11")).To(Succeed())
+				Expect(d.PutDnsEntryFQDN(otherFqdn, "192.168.100.12")).To(Succeed())
+			})
+
+			It("接尾辞に一致するエントリーのみを取得できる", func() {
+				entries, err := d.ListDnsEntriesByFQDNSuffix(suffix)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(entries).To(HaveLen(2))
+				Expect(entries).To(HaveKeyWithValue(fqdnA, "192.168.100.10"))
+				Expect(entries).To(HaveKeyWithValue(fqdnB, "192.168.100.11"))
+				Expect(entries).NotTo(HaveKey(otherFqdn))
+			})
+
+			It("該当エントリーが無い場合は空のmapを返す", func() {
+				entries, err := d.ListDnsEntriesByFQDNSuffix("no-such-cluster.host1.labo.local")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(entries).To(BeEmpty())
+			})
+
+			It("後始末: 登録したエントリーを削除", func() {
+				Expect(d.DeleteDnsEntryFQDN(fqdnA)).To(Succeed())
+				Expect(d.DeleteDnsEntryFQDN(fqdnB)).To(Succeed())
+				Expect(d.DeleteDnsEntryFQDN(otherFqdn)).To(Succeed())
+			})
+		})
+
 		Context("DNS名とIPv6の登録", func() {
 		})
 
