@@ -27,6 +27,9 @@ var (
 	provisionKubernetesEngineNodes         = ProvisionKubernetesEngineNodes
 	provisionKubernetesEngineLoadBalancer  = ProvisionKubernetesEngineLoadBalancer
 	reconcileKubernetesEngineRunningRoutes = reconcileKubernetesEngineRunningNodeRoutes
+	drainAndDeleteKubernetesEngineNode     = DrainAndDeleteKubernetesEngineNode
+	upgradeKubernetesEngineControlPlane    = UpgradeKubernetesEngineControlPlane
+	upgradeKubernetesEngineNode            = UpgradeKubernetesEngineNode
 )
 
 // kubernetesEngineController は MKE (Marmot Kubernetes Engine) コントローラーです。
@@ -144,7 +147,7 @@ func (c *kubernetesEngineController) kubernetesEngineControllerLoop() {
 			c.reconcileKubernetesEnginePending(item)
 		case db.KUBERNETES_ENGINE_PROVISIONING:
 			c.reconcileKubernetesEngineProvisioning(item)
-		case db.KUBERNETES_ENGINE_RUNNING:
+		case db.KUBERNETES_ENGINE_RUNNING, db.KUBERNETES_ENGINE_SCALING_OUT, db.KUBERNETES_ENGINE_SCALING_IN, db.KUBERNETES_ENGINE_UPGRADING:
 			c.reconcileKubernetesEngineRunning(item)
 		case db.KUBERNETES_ENGINE_DELETING:
 			c.reconcileKubernetesEngineDeleting(item)
@@ -258,9 +261,68 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineProvisioning(ke ap
 // systemdユニットがNetworkNamespacePath不在で起動失敗し続けるため、ここで検知して復旧する。
 // また、ノードVMの再起動で失われたPod CIDR宛の静的経路(`ip route replace`は永続化されない)も
 // 毎tick再設定し、Service(NodePort等)の疎通が失われたままにならないようにする。
+// spec.nodesが現在のノード数を上回っている場合、または既にSCALING_OUT中の場合は、
+// スケールアウト処理へ委譲する(完了するまでRUNNINGへの他の処理は行わない)。
+// spec.nodesが現在のノード数を下回っている場合、または既にSCALING_IN中の場合は、
+// スケールイン処理へ委譲する。
 // TODO: 次フェーズでノードの状態監視を行い、異常時はFAILED等へ遷移させる。
 func (c *kubernetesEngineController) reconcileKubernetesEngineRunning(ke api.KubernetesEngine) {
 	id := api.KubernetesEngineID(ke)
+
+	if ke.Status != nil && ke.Status.StatusCode == db.KUBERNETES_ENGINE_SCALING_OUT {
+		c.reconcileKubernetesEngineScaleOut(id, ke)
+		return
+	}
+	if ke.Status != nil && ke.Status.StatusCode == db.KUBERNETES_ENGINE_SCALING_IN {
+		c.reconcileKubernetesEngineScaleIn(id, ke)
+		return
+	}
+	if ke.Status != nil && ke.Status.StatusCode == db.KUBERNETES_ENGINE_UPGRADING {
+		c.reconcileKubernetesEngineUpgrading(id, ke)
+		return
+	}
+
+	servers, err := findKubernetesEngineNodeServers(c.db, ke)
+	if err != nil {
+		slog.Warn("reconcileKubernetesEngineRunning: failed to list node servers", "id", id, "err", err)
+	} else {
+		active := 0
+		for _, server := range servers {
+			if server.Status == nil || server.Status.DeletionTimeStamp == nil {
+				active++
+			}
+		}
+		if active < ke.Spec.Nodes {
+			if err := c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_SCALING_OUT, "adding nodes to match spec.nodes"); err != nil {
+				slog.Warn("reconcileKubernetesEngineRunning: failed to transition to SCALING_OUT", "id", id, "err", err)
+				return
+			}
+			c.reconcileKubernetesEngineScaleOut(id, ke)
+			return
+		}
+		if active > ke.Spec.Nodes {
+			if err := c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_SCALING_IN, "removing nodes to match spec.nodes"); err != nil {
+				slog.Warn("reconcileKubernetesEngineRunning: failed to transition to SCALING_IN", "id", id, "err", err)
+				return
+			}
+			c.reconcileKubernetesEngineScaleIn(id, ke)
+			return
+		}
+		if active == ke.Spec.Nodes {
+			needsUpgrade, err := kubernetesEngineNeedsUpgrade(ke)
+			if err != nil {
+				slog.Warn("reconcileKubernetesEngineRunning: failed to determine upgrade need", "id", id, "err", err)
+			} else if needsUpgrade {
+				if err := c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_UPGRADING, "upgrading Kubernetes version"); err != nil {
+					slog.Warn("reconcileKubernetesEngineRunning: failed to transition to UPGRADING", "id", id, "err", err)
+					return
+				}
+				c.reconcileKubernetesEngineUpgrading(id, ke)
+				return
+			}
+		}
+	}
+
 	slog.Debug("KubernetesEngineはRUNNING状態です", "id", id, "name", ke.Metadata.Name)
 
 	namespace, _, _, err := KubernetesEngineControlPlaneNetworkNames(ke.Metadata.Name)
@@ -284,6 +346,113 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineRunning(ke api.Kub
 		message := fmt.Sprintf("pod network route reconciliation failed: %v", err)
 		_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, message)
 		slog.Warn("reconcileKubernetesEngineRunning: node route reconciliation failed", "id", id, "err", err)
+	}
+}
+
+// reconcileKubernetesEngineUpgrading はUPGRADING中に呼び出され、spec.versionに合わせて
+// コントロールプレーン(kube-apiserver/kube-scheduler/kube-controller-manager、および専用etcdの
+// 再確認)を先に更新し、完了後にノードをindex昇順で1台ずつcordon→drain[4bで実装したドレイン処理を
+// 流用]→kubelet/kube-proxyバイナリの強制差し替え→uncordon→Ready確認まで進める。
+// 1tickにつきコントロールプレーン更新またはノード1台分のみ進め、エラー時はメッセージを記録して
+// 停止する(自動ロールバックは行わない)。全ノードが最新バージョンになった時点でRUNNINGへ戻す。
+func (c *kubernetesEngineController) reconcileKubernetesEngineUpgrading(id string, ke api.KubernetesEngine) {
+	needsControlPlaneUpgrade, err := kubernetesEngineNeedsUpgrade(ke)
+	if err != nil {
+		message := fmt.Sprintf("upgrade failed: %v", err)
+		_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_UPGRADING, message)
+		slog.Warn("reconcileKubernetesEngineUpgrading: failed to determine control plane upgrade need", "id", id, "err", err)
+		return
+	}
+	if needsControlPlaneUpgrade {
+		if err := upgradeKubernetesEngineControlPlane(c.db, c.mkeConf, c.etcdURL, ke); err != nil {
+			message := fmt.Sprintf("control plane upgrade failed: %v", err)
+			_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_UPGRADING, message)
+			slog.Warn("reconcileKubernetesEngineUpgrading: control plane upgrade failed", "id", id, "err", err)
+			return
+		}
+		_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_UPGRADING, "control plane upgraded, upgrading nodes")
+		return
+	}
+
+	target, err := selectKubernetesEngineNodeForUpgrade(c.db, ke)
+	if err != nil {
+		message := fmt.Sprintf("upgrade failed: %v", err)
+		_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_UPGRADING, message)
+		slog.Warn("reconcileKubernetesEngineUpgrading: node selection failed", "id", id, "err", err)
+		return
+	}
+	if target != nil {
+		if err := upgradeKubernetesEngineNode(c.db, c.mkeConf, ke, *target); err != nil {
+			message := fmt.Sprintf("node upgrade failed: %v", err)
+			_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_UPGRADING, message)
+			slog.Warn("reconcileKubernetesEngineUpgrading: node upgrade failed", "id", id, "node", target.Metadata.Name, "err", err)
+			return
+		}
+		return
+	}
+
+	if err := c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, ""); err != nil {
+		slog.Warn("reconcileKubernetesEngineUpgrading: failed to transition back to RUNNING", "id", id, "err", err)
+	}
+}
+
+// reconcileKubernetesEngineScaleOut はSCALING_OUT中に呼び出され、不足ノードの作成・セットアップを
+// 冪等に進める。全ノードがReadyになった時点でRUNNINGへ戻す。
+func (c *kubernetesEngineController) reconcileKubernetesEngineScaleOut(id string, ke api.KubernetesEngine) {
+	ready, err := provisionKubernetesEngineNodes(c.db, c.mkeConf, ke)
+	if err != nil {
+		message := fmt.Sprintf("scale-out failed: %v", err)
+		_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_SCALING_OUT, message)
+		slog.Warn("reconcileKubernetesEngineScaleOut: node provisioning failed", "id", id, "err", err)
+		return
+	}
+	if !ready {
+		return
+	}
+	if err := c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, ""); err != nil {
+		slog.Warn("reconcileKubernetesEngineScaleOut: failed to transition back to RUNNING", "id", id, "err", err)
+	}
+}
+
+// reconcileKubernetesEngineScaleIn はSCALING_IN中に呼び出され、spec.nodesを超過する
+// アクティブノードのうちindex最大の1台を選んでcordon→drain→ノード削除→VM削除要求まで
+// 1tickにつき1台ずつ進める(可用性維持のためのローリング処理)。超過が解消し、既存の
+// 削除要求も完了していればRUNNINGへ戻す。
+func (c *kubernetesEngineController) reconcileKubernetesEngineScaleIn(id string, ke api.KubernetesEngine) {
+	target, err := selectKubernetesEngineNodeForScaleIn(c.db, ke)
+	if err != nil {
+		message := fmt.Sprintf("scale-in failed: %v", err)
+		_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_SCALING_IN, message)
+		slog.Warn("reconcileKubernetesEngineScaleIn: node selection failed", "id", id, "err", err)
+		return
+	}
+	if target != nil {
+		if err := drainAndDeleteKubernetesEngineNode(ke, target.Metadata.Name); err != nil {
+			message := fmt.Sprintf("scale-in failed: %v", err)
+			_ = c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_SCALING_IN, message)
+			slog.Warn("reconcileKubernetesEngineScaleIn: drain/delete node failed", "id", id, "node", target.Metadata.Name, "err", err)
+			return
+		}
+		serverID := api.ServerID(*target)
+		if err := c.db.SetDeleteTimestamp(serverID); err != nil {
+			slog.Warn("reconcileKubernetesEngineScaleIn: SetDeleteTimestamp failed", "id", id, "serverId", serverID, "err", err)
+		}
+		return
+	}
+
+	// アクティブノードは既にspec.nodes以下。削除要求済みのVMがまだ残っていれば完了を待つ。
+	servers, err := findKubernetesEngineNodeServers(c.db, ke)
+	if err != nil {
+		slog.Warn("reconcileKubernetesEngineScaleIn: failed to list node servers", "id", id, "err", err)
+		return
+	}
+	for _, server := range servers {
+		if server.Status != nil && server.Status.DeletionTimeStamp != nil {
+			return
+		}
+	}
+	if err := c.db.UpdateKubernetesEngineStatusWithMessage(id, db.KUBERNETES_ENGINE_RUNNING, ""); err != nil {
+		slog.Warn("reconcileKubernetesEngineScaleIn: failed to transition back to RUNNING", "id", id, "err", err)
 	}
 }
 

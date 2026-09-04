@@ -1858,6 +1858,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+    put:
+      summary: "Update KubernetesEngine spec (nodes/version) by Id"
+      operationId: apiUpdateKubernetesEngineById
+      tags:
+        - kubernetes-engine
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the KubernetesEngine to update
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KubernetesEngine"
+      responses:
+        "200":
+          description: Updated the KubernetesEngine
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Success"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
     delete:
       summary: "Delete KubernetesEngine"
       operationId: apiDeleteKubernetesEngineById

@@ -774,6 +774,9 @@ type ApiUpdateImageByIdJSONRequestBody = Image
 // ApiCreateKubernetesEngineJSONRequestBody defines body for ApiCreateKubernetesEngine for application/json ContentType.
 type ApiCreateKubernetesEngineJSONRequestBody = KubernetesEngine
 
+// ApiUpdateKubernetesEngineByIdJSONRequestBody defines body for ApiUpdateKubernetesEngineById for application/json ContentType.
+type ApiUpdateKubernetesEngineByIdJSONRequestBody = KubernetesEngine
+
 // ApiCreateKubernetesEngineLoadBalancerVipJSONRequestBody defines body for ApiCreateKubernetesEngineLoadBalancerVip for application/json ContentType.
 type ApiCreateKubernetesEngineLoadBalancerVipJSONRequestBody = KubernetesEngineLoadBalancerVipRequest
 
@@ -905,6 +908,9 @@ type ServerInterface interface {
 	// ApiGetKubernetesEngineById Info for a specific KubernetesEngine
 	// (GET /kubernetes-engine/{id})
 	ApiGetKubernetesEngineById(ctx echo.Context, id string) error
+	// ApiUpdateKubernetesEngineById Update KubernetesEngine spec (nodes/version) by Id
+	// (PUT /kubernetes-engine/{id})
+	ApiUpdateKubernetesEngineById(ctx echo.Context, id string) error
 	// ApiGetKubernetesEngineKubeconfigById Download admin kubeconfig for KubernetesEngine
 	// (GET /kubernetes-engine/{id}/kubeconfig)
 	ApiGetKubernetesEngineKubeconfigById(ctx echo.Context, id string) error
@@ -1396,6 +1402,22 @@ func (w *ServerInterfaceWrapper) ApiGetKubernetesEngineById(ctx echo.Context) er
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.ApiGetKubernetesEngineById(ctx, id)
+	return err
+}
+
+// ApiUpdateKubernetesEngineById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiUpdateKubernetesEngineById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: ctx.Request().URL.RawPath == ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiUpdateKubernetesEngineById(ctx, id)
 	return err
 }
 
@@ -2300,6 +2322,7 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.POST(options.BaseURL+"/kubernetes-engine", wrapper.ApiCreateKubernetesEngine, options.OperationMiddlewares["apiCreateKubernetesEngine"]...)
 	router.DELETE(options.BaseURL+"/kubernetes-engine/:id", wrapper.ApiDeleteKubernetesEngineById, options.OperationMiddlewares["apiDeleteKubernetesEngineById"]...)
 	router.GET(options.BaseURL+"/kubernetes-engine/:id", wrapper.ApiGetKubernetesEngineById, options.OperationMiddlewares["apiGetKubernetesEngineById"]...)
+	router.PUT(options.BaseURL+"/kubernetes-engine/:id", wrapper.ApiUpdateKubernetesEngineById, options.OperationMiddlewares["apiUpdateKubernetesEngineById"]...)
 	router.GET(options.BaseURL+"/kubernetes-engine/:id/kubeconfig", wrapper.ApiGetKubernetesEngineKubeconfigById, options.OperationMiddlewares["apiGetKubernetesEngineKubeconfigById"]...)
 	router.POST(options.BaseURL+"/kubernetes-engine/:id/loadbalancer/vip", wrapper.ApiCreateKubernetesEngineLoadBalancerVip, options.OperationMiddlewares["apiCreateKubernetesEngineLoadBalancerVip"]...)
 	router.DELETE(options.BaseURL+"/kubernetes-engine/:id/loadbalancer/vip/:namespace/:serviceName", wrapper.ApiDeleteKubernetesEngineLoadBalancerVip, options.OperationMiddlewares["apiDeleteKubernetesEngineLoadBalancerVip"]...)

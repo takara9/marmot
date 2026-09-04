@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,6 +20,9 @@ const (
 	KUBERNETES_ENGINE_RUNNING      = 2
 	KUBERNETES_ENGINE_DELETING     = 3
 	KUBERNETES_ENGINE_FAILED       = 4
+	KUBERNETES_ENGINE_UPGRADING    = 5
+	KUBERNETES_ENGINE_SCALING_IN   = 6
+	KUBERNETES_ENGINE_SCALING_OUT  = 7
 
 	// KubernetesEngine が専用作成するノード間通信ネットワークの所有者ラベル
 	KubernetesEngineNetworkLabelOwner          = "kubernetesEngineId"
@@ -31,6 +36,9 @@ var KubernetesEngineStatus = map[int]string{
 	KUBERNETES_ENGINE_RUNNING:      "RUNNING",
 	KUBERNETES_ENGINE_DELETING:     "DELETING",
 	KUBERNETES_ENGINE_FAILED:       "FAILED",
+	KUBERNETES_ENGINE_UPGRADING:    "UPGRADING",
+	KUBERNETES_ENGINE_SCALING_IN:   "SCALING_IN",
+	KUBERNETES_ENGINE_SCALING_OUT:  "SCALING_OUT",
 }
 
 // CreateKubernetesEngine は KubernetesEngine を etcd に登録する。
@@ -236,6 +244,124 @@ func (d *Database) UpdateKubernetesEngineControlPlaneStatus(id, ipAddress, hostI
 		}
 		return err
 	}
+}
+
+// UpdateKubernetesEngineSpec は spec.nodes と spec.version のみを更新する。
+// nodeSpec(cpu/memory/network)は起動済みノードに反映できないため、変更があれば拒否する。
+func (d *Database) UpdateKubernetesEngineSpec(id string, desired api.KubernetesEngineSpec) error {
+	for {
+		err := d.updateKubernetesEngineSpec(id, desired)
+		if err == ErrUpdateConflict {
+			continue
+		}
+		return err
+	}
+}
+
+func (d *Database) updateKubernetesEngineSpec(id string, desired api.KubernetesEngineSpec) error {
+	if desired.Nodes < 1 {
+		return fmt.Errorf("spec.nodes must be greater than zero")
+	}
+	if strings.TrimSpace(desired.Version) == "" {
+		return fmt.Errorf("spec.version is required")
+	}
+
+	lockKey := "/lock/kubernetes-engine/" + id
+	mutex, err := d.LockKey(lockKey)
+	if err != nil {
+		return err
+	}
+	defer d.UnlockKey(mutex)
+
+	key := KubernetesEnginePrefix + "/" + id
+	var rec api.KubernetesEngine
+	resp, err := d.GetJSON(key, &rec)
+	if err != nil {
+		return err
+	}
+	expected := resp.Kvs[0].ModRevision
+
+	if desired.NodeSpec != nil && !reflect.DeepEqual(desired.NodeSpec, rec.Spec.NodeSpec) {
+		return fmt.Errorf("spec.nodeSpec cannot be changed after creation")
+	}
+
+	cmp, err := compareKubernetesVersions(desired.Version, rec.Spec.Version)
+	if err != nil {
+		return err
+	}
+	if cmp < 0 {
+		return fmt.Errorf("spec.version downgrade is not supported (current: %s, desired: %s)", rec.Spec.Version, desired.Version)
+	}
+	if cmp > 0 {
+		if err := validateKubernetesEngineVersionUpgrade(rec.Spec.Version, desired.Version); err != nil {
+			return err
+		}
+	}
+
+	rec.Spec.Nodes = desired.Nodes
+	rec.Spec.Version = desired.Version
+
+	return d.PutJSONCAS(key, expected, &rec)
+}
+
+// validateKubernetesEngineVersionUpgrade は、Kubernetesは1マイナーバージョンずつの
+// アップグレードが原則であることから、メジャーバージョン変更や2つ以上のマイナーバージョンの
+// 飛び越しを拒否する(ダウングレードは呼び出し元で既に拒否済みのため、ここでは扱わない)。
+func validateKubernetesEngineVersionUpgrade(current, desired string) error {
+	currentVersion, err := parseKubernetesVersion(current)
+	if err != nil {
+		return err
+	}
+	desiredVersion, err := parseKubernetesVersion(desired)
+	if err != nil {
+		return err
+	}
+	if desiredVersion[0] != currentVersion[0] {
+		return fmt.Errorf("spec.version major version upgrade is not supported in a single step (current: %s, desired: %s)", current, desired)
+	}
+	if desiredVersion[1]-currentVersion[1] > 1 {
+		return fmt.Errorf("spec.version upgrade must not skip more than one minor version (current: %s, desired: %s)", current, desired)
+	}
+	return nil
+}
+
+// compareKubernetesVersions は "major.minor" または "major.minor.patch" 形式のバージョン文字列を
+// 数値として比較する。a<b なら負、a==b なら0、a>b なら正の値を返す。
+func compareKubernetesVersions(a, b string) (int, error) {
+	av, err := parseKubernetesVersion(a)
+	if err != nil {
+		return 0, err
+	}
+	bv, err := parseKubernetesVersion(b)
+	if err != nil {
+		return 0, err
+	}
+	for i := 0; i < len(av); i++ {
+		if av[i] != bv[i] {
+			return av[i] - bv[i], nil
+		}
+	}
+	return 0, nil
+}
+
+// parseKubernetesVersion は "1.30" や "1.30.2" のようなバージョン文字列を
+// 数値の配列 [major, minor, patch] に変換する(patch省略時は0扱い)。
+func parseKubernetesVersion(v string) ([3]int, error) {
+	var result [3]int
+	raw := strings.TrimSpace(v)
+	clean := strings.TrimPrefix(raw, "v")
+	parts := strings.Split(clean, ".")
+	if len(parts) < 2 || len(parts) > 3 {
+		return result, fmt.Errorf("invalid version format: %q", raw)
+	}
+	for i, part := range parts {
+		n, err := strconv.Atoi(part)
+		if err != nil || n < 0 {
+			return result, fmt.Errorf("invalid version format: %q", raw)
+		}
+		result[i] = n
+	}
+	return result, nil
 }
 
 func (d *Database) putKubernetesEngineById(rec api.KubernetesEngine) error {

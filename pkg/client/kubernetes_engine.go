@@ -55,6 +55,23 @@ func (m *MarmotEndpoint) GetKubernetesEngineById(id string) ([]byte, *url.URL, e
 	return m.httpRequest2(req)
 }
 
+func (m *MarmotEndpoint) UpdateKubernetesEngineById(id string, spec api.KubernetesEngine) ([]byte, *url.URL, error) {
+	slog.Debug("===", "UpdateKubernetesEngineById is called", "===")
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/kubernetes-engine/"+id)
+	if err != nil {
+		return nil, nil, err
+	}
+	byteJSON, err := json.Marshal(spec)
+	if err != nil {
+		return nil, nil, err
+	}
+	req, err := http.NewRequest("PUT", reqURL, bytes.NewBuffer(byteJSON))
+	if err != nil {
+		return nil, nil, err
+	}
+	return m.httpRequest2(req)
+}
+
 func (m *MarmotEndpoint) DeleteKubernetesEngineById(id string) ([]byte, *url.URL, error) {
 	slog.Debug("===", "DeleteKubernetesEngineById is called", "===")
 	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/kubernetes-engine/"+id)

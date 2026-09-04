@@ -39,6 +39,10 @@ var (
 	systemdDisableUnit  = func(unit string) error { return runSystemctlUnitCommand("disable", unit) }
 	systemdStartUnit    = func(unit string) error { return exec.Command("systemctl", "start", unit).Run() }
 	systemdStopUnit     = func(unit string) error { return runSystemctlUnitCommand("stop", unit) }
+	// systemdRestartUnit は、ユニットファイルの内容(ExecStartのバイナリパス等)を書き換えた後、
+	// 既に起動中のプロセスへ変更を反映させるために使用する(startは起動中のユニットには
+	// 何もしないため、バージョンアップグレード時の再起動には使えない)。
+	systemdRestartUnit = func(unit string) error { return exec.Command("systemctl", "restart", unit).Run() }
 )
 
 // systemdUnitMissingError はsystemctlがユニット不在を理由に失敗したことを表す。
