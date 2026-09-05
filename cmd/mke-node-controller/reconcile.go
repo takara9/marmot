@@ -39,7 +39,9 @@ func reconcile(ctx context.Context, kc *kubeClient, instances cloudprovider.Inst
 				desiredExternalIP = addr.Address
 			}
 		}
-		if node.InternalIP != desiredInternalIP || node.ExternalIP != desiredExternalIP {
+		if desiredInternalIP == "" {
+			log.Printf("skipping node address update (InternalIP missing in instance metadata): name=%s", node.Name)
+		} else if node.InternalIP != desiredInternalIP || node.ExternalIP != desiredExternalIP {
 			if err := kc.SetNodeAddresses(ctx, node.Name, desiredInternalIP, desiredExternalIP); err != nil {
 				log.Printf("failed to set addresses for node %s: %v", node.Name, err)
 			} else {
