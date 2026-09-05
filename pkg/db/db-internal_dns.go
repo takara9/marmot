@@ -1,6 +1,8 @@
 package db
 
 import (
+	"encoding/json"
+	"errors"
 	"log/slog"
 	"strings"
 )
@@ -106,6 +108,44 @@ func (d *Database) GetDnsEntryFQDN(fqdn string) (string, error) {
 		return "", err
 	}
 	return ipAddress, nil
+}
+
+// ListDnsEntriesByFQDNSuffix は、完全修飾ドメイン名の末尾に一致する(=同じ親ドメインに属する)
+// 全エントリーを FQDN -> IPアドレス の対応表として返す。1件も無い場合は空のmapを返す(エラーにしない)。
+// 例: suffixFQDN="cluster1.host1.labo.local" を指定すると、
+// "svcA.nsA.cluster1.host1.labo.local" 等、配下の全エントリーを取得できる。
+func (d *Database) ListDnsEntriesByFQDNSuffix(suffixFQDN string) (map[string]string, error) {
+	trimmed := strings.TrimSuffix(strings.TrimSpace(suffixFQDN), ".")
+	if trimmed == "" {
+		return map[string]string{}, nil
+	}
+	prefix := fqdnToInternalDNSKey(trimmed) + "/"
+	resp, err := d.GetByPrefix(prefix)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return map[string]string{}, nil
+		}
+		return nil, err
+	}
+	result := make(map[string]string, len(resp.Kvs))
+	for _, kv := range resp.Kvs {
+		rest := strings.TrimPrefix(string(kv.Key), prefix)
+		if rest == "" {
+			continue
+		}
+		restLabels := strings.Split(rest, "/")
+		for i, j := 0, len(restLabels)-1; i < j; i, j = i+1, j-1 {
+			restLabels[i], restLabels[j] = restLabels[j], restLabels[i]
+		}
+		var ipAddress string
+		if err := json.Unmarshal(kv.Value, &ipAddress); err != nil {
+			slog.Warn("ListDnsEntriesByFQDNSuffix: failed to decode DNS entry", "key", string(kv.Key), "err", err)
+			continue
+		}
+		fqdn := strings.Join(restLabels, ".") + "." + trimmed
+		result[fqdn] = ipAddress
+	}
+	return result, nil
 }
 
 // DeleteDnsEntryFQDN は、完全修飾ドメイン名でエントリーを削除する。
