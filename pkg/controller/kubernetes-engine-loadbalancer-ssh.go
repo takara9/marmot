@@ -9,7 +9,7 @@ import (
 // HA-Proxyのインストール、ロードバランサーコントローラー(mke-lb-controller)の配布・起動、
 // kube-apiserverへアクセスするためのkubeconfigの配布を行う。ノードと同様、コントロールプレーン用
 // netns経由で「ノード間通信用ネットワーク」上のアドレスへ到達する。
-func provisionKubernetesEngineLoadBalancerSSH(address, privateKeyPath, namespace, resourceID string, kubeconfig, controllerBinary []byte, apiKeyToken, marmotdURL, marmotdCAFile string, marmotdCACert []byte, kubernetesEngineID string) error {
+func provisionKubernetesEngineLoadBalancerSSH(address, privateKeyPath, namespace, resourceID string, kubeconfig, controllerBinary []byte, apiKeyToken, marmotdURL, marmotdCAFile string, marmotdCACert []byte, kubernetesEngineID string, cloudControllerManagerEnabled bool) error {
 	client, err := dialKubernetesEngineNodeSSH(address, privateKeyPath, namespace)
 	if err != nil {
 		return fmt.Errorf("failed to connect to load balancer server: %w", err)
@@ -66,7 +66,7 @@ func provisionKubernetesEngineLoadBalancerSSH(address, privateKeyPath, namespace
 
 	if err := runner.step("install mke-lb-controller systemd unit", func() error {
 		return runner.writeFile(kubernetesEngineLoadBalancerControllerSystemdUnitPath, "0644",
-			[]byte(kubernetesEngineLoadBalancerControllerUnit(marmotdURL, marmotdCAFile, kubernetesEngineID)))
+			[]byte(kubernetesEngineLoadBalancerControllerUnit(marmotdURL, marmotdCAFile, kubernetesEngineID, cloudControllerManagerEnabled)))
 	}); err != nil {
 		return err
 	}
@@ -76,10 +76,16 @@ func provisionKubernetesEngineLoadBalancerSSH(address, privateKeyPath, namespace
 	})
 }
 
-func kubernetesEngineLoadBalancerControllerUnit(marmotdURL, marmotdCAFile, kubernetesEngineID string) string {
+func kubernetesEngineLoadBalancerControllerUnit(marmotdURL, marmotdCAFile, kubernetesEngineID string, cloudControllerManagerEnabled bool) string {
 	caArgs := ""
 	if strings.TrimSpace(marmotdCAFile) != "" {
 		caArgs = fmt.Sprintf(" --marmotd-ca-file=%s", marmotdCAFile)
+	}
+	cloudControllerManagerArg := ""
+	if cloudControllerManagerEnabled {
+		// CCM(mke-node-controller)がNode.status.addressesを設定するクラスタでは、
+		// mke-lb-controller側のSetNodeAddresses呼び出しと競合するため無効化する(フェーズ14項目4)。
+		cloudControllerManagerArg = " --cloud-controller-manager-enabled=true"
 	}
 	return fmt.Sprintf(`[Unit]
 Description=MKE Load Balancer Controller
@@ -87,11 +93,11 @@ Wants=network-online.target haproxy.service
 After=network-online.target haproxy.service
  
 [Service]
-ExecStart=%s --kubeconfig=%s --haproxy-config=%s --marmotd-url=%s --marmotd-apikey-file=%s%s --kubernetes-engine-id=%s --vip-interface=enp1s0
+ExecStart=%s --kubeconfig=%s --haproxy-config=%s --marmotd-url=%s --marmotd-apikey-file=%s%s --kubernetes-engine-id=%s --vip-interface=enp1s0%s
 Restart=always
 RestartSec=5
  
 [Install]
 WantedBy=multi-user.target
-`, kubernetesEngineLoadBalancerControllerBinaryDestPath, kubernetesEngineLoadBalancerKubeconfigPath, kubernetesEngineLoadBalancerHAProxyConfigPath, marmotdURL, kubernetesEngineLoadBalancerApiKeyPath, caArgs, kubernetesEngineID)
+`, kubernetesEngineLoadBalancerControllerBinaryDestPath, kubernetesEngineLoadBalancerKubeconfigPath, kubernetesEngineLoadBalancerHAProxyConfigPath, marmotdURL, kubernetesEngineLoadBalancerApiKeyPath, caArgs, kubernetesEngineID, cloudControllerManagerArg)
 }

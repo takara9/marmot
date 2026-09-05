@@ -232,6 +232,67 @@ spec:
 ## フェーズ13: 削除・クリーンナップ
 - 仮想ネットワーク、ストレージ、仮想サーバー、コントロールプレーンプロセス群（専用etcd/kube-apiserver等）の一貫した削除処理
 
+## フェーズ14: Kubernetes の Cloud Controller Manager（CCM）を導入
+
+### 1. `cloud-provider` インターフェースの実装
+- CCM が要求する Go interface（`cloudprovider.Interface`）を実装する `marmot-cloud-provider` （仮称）を新規開発する。
+- 実装対象のサブインターフェースを選定する:
+  - `LoadBalancer`: `EnsureLoadBalancer` / `UpdateLoadBalancer` / `EnsureLoadBalancerDeleted` を実装し、既存の「ロードバランサーコントローラー」（フェーズ11で開発したHA-Proxy連携ロジック）を、この標準インターフェースの内部実装として移植する。
+  - `Instances`/`InstancesV2`: `InstanceExists` / `InstanceShutdown` / `InstanceMetadata` を実装し、marmotd の仮想サーバー状態（Server API）と連携してノードのライフサイクル情報を返す。
+  - `Zones`: シングルクラスタ構成では不要と判断するか、marmotホスト名などをリージョン/ゾーンとして仮に返すか検討、リージョンとゾーンはmke.jsonにセットした値を返す。
+  - `Routes`: OVS/Cilium 側でルーティングを完結しているため、実装不要と判断できるか検証する。
+- **実施内容**:
+  - k8s.io/cloud-provider非依存の方針を維持したまま、`pkg/cloudprovider.InstanceMetadata`(既存フィールド`Region`/`Zone`)に、`mke.json`の`MKEConfig.CloudProviderRegion`/`CloudProviderZone`由来の値を設定するようにした(`pkg/cloudprovider/marmotd_instances.go`の`NewMarmotdInstances`にregion/zone引数を追加)。独立した`Zones`インターフェースは追加していない(未設定時は空文字列のまま、Region/Zoneどちらも省略可能)。
+  - `cmd/mke-node-controller`に`--region`/`--zone`フラグを追加し、`pkg/controller/kubernetes-engine-cloudprovider-provision.go`の`ProvisionKubernetesEngineCloudControllerManager`が`mkeConf.CloudProviderRegion`/`CloudProviderZone`が設定されている場合のみsystemdユニットのExecStartに`--region=`/`--zone=`を付与する。
+  - 検証はユニットテストのみ(`go test ./pkg/cloudprovider/...`、`go test ./pkg/controller/...`)。`kubectl get nodes`での実際の反映確認は項目7に持ち越し。
+
+### 2. 認証・API連携の設計
+- CCM から marmotd API（Server/Network情報取得）へアクセスするための認証情報（APIキー等）の発行・配布方法を決める。
+- kube-apiserver との通信用 kubeconfig を、他コントロールプレーンプロセス同様に発行・配置する。
+
+### 3. systemd ユニットとしての起動管理
+- `cloud-controller-manager` 用の systemd ユニットファイルをクラスタごとに生成する仕組みを、既存の kube-apiserver 等と同じライフサイクル管理基盤（フェーズ4/6で構築済みの仕組み）に統合する。
+- `--cloud-provider=external` を kubelet / kube-controller-manager に設定し、CCM を有効化する起動オプションの変更を反映する。
+
+### 4. 既存のノード初期化フローとの整合
+- 現状「MKEのノードコントローラーが host-bridge IP を EXTERNAL-IP にセット」しているフェーズ11の処理を、CCM の `InstanceMetadata`（`ProviderID`, `NodeAddresses`）による標準的な設定に置き換えるか、共存させるかを決定する。
+- 各ノードに `--cloud-provider=external` を設定した場合、CCM が初期化するまで `node.cloudprovider.kubernetes.io/uninitialized` taint が付与される点への対応（CCM起動タイミングとノード起動タイミングの順序保証）を設計する。
+- **方針（決定事項）**:
+  - 現状の `mke-lb-controller`（`cmd/mke-lb-controller`）は、`kubeclient.go` の `SetNodeAddresses` で `node.status.addresses` に InternalIP/ExternalIP(host-bridge IP) を直接PATCHしている。CCM導入後は、CCMの `Instances.InstanceMetadata` が同じ情報（`ProviderID`, `NodeAddresses`）を提供するため、両者が同時に書き込むと競合する。
+  - そのため、**クラスタ単位でCCM有効/無効を排他的に切り替える**方式とする。CCMが有効なクラスタでは `mke-lb-controller` 側の `SetNodeAddresses` 呼び出しを行わない（LoadBalancer VIP管理も、項目5の実施内容の通りCCM有効/無効で排他的に切り替える）。
+  - taint対応: kubeletに `--cloud-provider=external` を設定するクラスタでは、ノードVM起動前に対象クラスタのCCM(`cloud-controller-manager`)が起動済みであることを起動順序として保証する（「CCM起動 → ノードVM起動」の順）。CCMが `InstanceMetadata` を返せるようになった時点でuninitialized taintは自動解消されるため、追加のポーリング処理は不要。
+  - 本項目時点ではCCM本体（実行可能バイナリ）・kubelet/kube-controller-managerへの `--cloud-provider=external` 設定はいずれも未実装のため、上記は方針の明記のみとし、コード変更は行わない。
+- **実施内容**:
+  - kubeletのsystemdユニット（`pkg/controller/kubernetes-engine-node-ssh.go`の`kubernetesEngineNodeKubeletUnit`）に、`mkeConf.CloudControllerManagerEnabled`が true のクラスタのノードのみ `--cloud-provider=external` を付与するようにした（`kubernetesEngineNodeProvisionData.CloudProviderEnabled`経由で`pkg/controller/kubernetes-engine-node.go`の`configureKubernetesEngineNodeBinaries`から伝播）。
+  - `mke-lb-controller`（`cmd/mke-lb-controller`）に `--cloud-controller-manager-enabled` フラグを追加し、trueの場合は`reconcile()`内の`SetNodeAddresses`呼び出しをスキップするようにした（host-bridgeアドレス収集・HAProxy backend生成は継続）。VIP払い出し/解放(`requestVip`/`releaseVip`)も、同フラグがtrueの場合はスキップするようにした(項目5参照。VIP管理はmke-node-controllerに一本化)。このフラグは、`pkg/controller/kubernetes-engine-loadbalancer-ssh.go`の`kubernetesEngineLoadBalancerControllerUnit`が生成するsystemdユニットのExecStartに、`mkeConf.CloudControllerManagerEnabled`が true の場合のみ追加される（`pkg/controller/kubernetes-engine-loadbalancer.go`から伝播）。
+  - 「CCM起動 → ノードVM起動」の順序保証は、`reconcileKubernetesEngineProvisioning`（`pkg/controller/kubernetes-engine-controller.go`）が同一reconcile呼び出し内で`provisionKubernetesEngineControlPlane`（CCMプロビジョニングを含む、フェーズ14項目3・6を参照）を`provisionKubernetesEngineNodes`より先に呼び出す既存の順序で自然に満たされているため、追加の順序制御ロジックは実装していない。
+  - 検証はユニットテストのみ（`go test ./pkg/controller/...`、`go test ./cmd/mke-lb-controller/...`）。CCM本体との統合検証は項目7に持ち越し。
+
+### 5. 既存 LoadBalancer 連携ロジックの置き換え／共存方針
+- フェーズ11で実装済みの「ロードバランサーコントローラー」の VIP払い出し・内部DNS登録ロジックを、CCM の `LoadBalancer` インターフェース実装に移植するか、既存プロセスをそのまま残しCCMは未導入のままとするかの方針を決定する（移植コストと利点の比較）。
+- **方針（決定事項）**:
+  - `k8s.io/cloud-provider` には依存せず、marmot-native な `pkg/cloudprovider.LoadBalancer` インターフェース（`EnsureLoadBalancer`/`EnsureLoadBalancerDeleted`）を新設し、フェーズ11の `mke-lb-controller`（`marmotdclient.go`の`requestVip`/`releaseVip`）と同等のVIP払い出し・解放ロジックを `MarmotdLoadBalancer` として移植した。既存の「k8s.io依存を追加しない」方針は維持している。
+  - `mke-lb-controller` プロセス自体は削除せず、HAProxy連携（VIPを使ったbackend生成）はそのまま維持する。VIP払い出し/解放の**呼び出し元のみ**を、クラスタのCCM有効/無効設定に応じて `mke-lb-controller` と `mke-node-controller`（CCM相当）のどちらか一方に排他的に切り替える（項目4のSetNodeAddresses排他化と同じ設計パターン）。
+- **実施内容**:
+  - `pkg/cloudprovider/interface.go` に `LoadBalancerService{Namespace, Name}` と `LoadBalancer` インターフェースを追加。
+  - `pkg/client/kubernetes_engine.go` に既存のmarmotd REST API（`/kubernetes-engine/{id}/loadbalancer/vip`のPOST/DELETE、フェーズ11で実装済み・冪等）を呼び出す `CreateKubernetesEngineLoadBalancerVip`/`DeleteKubernetesEngineLoadBalancerVip` を追加。
+  - `pkg/cloudprovider/marmotd_loadbalancer.go`（新規）に `MarmotdLoadBalancer` を実装。`EnsureLoadBalancer`はVIP払い出し後に空文字列でないことを検証し、`EnsureLoadBalancerDeleted`はmarmotd側が冪等（未払い出しVIPの削除もHTTP 200）なため404等の特別処理は行わない。
+  - `cmd/mke-node-controller` に `ListLoadBalancerServices`/`SetServiceLoadBalancerIngressIP`（`kubeclient.go`）と `reconcileLoadBalancer`（`reconcile.go`）を追加し、`type=LoadBalancer` かつVIP未設定のServiceにVIPを払い出し `status.loadBalancer.ingress` へ反映、Service削除時はVIPを解放するループを実装（`knownServiceVIPs`でクロスイテレーション状態を保持）。`main.go`に`--region`/`--zone`同様の配線を追加。
+  - `cmd/mke-lb-controller/main.go` の `reconcile()` 内、VIP払い出し(`mClient.requestVip`)呼び出しとVIP解放(`mClient.releaseVip`)呼び出しの両方を、既存の`SetNodeAddresses`と同じ `cloudControllerManagerEnabled` フラグでスキップするように変更し、`mke-node-controller`との排他性を確保した（HAProxy backend生成自体は、既にServiceに設定済みのVIPを消費するだけなので無条件のまま）。
+  - 検証はユニットテストのみ（`go test ./pkg/cloudprovider/...`、`go test ./cmd/mke-node-controller/...`、`go test ./cmd/mke-lb-controller/...`）。実クラスタでのVIP払い出し/内部DNS登録の統合確認は項目7に持ち越し。
+
+### 6. クラスタ削除時のクリーンナップ対応
+- フェーズ13の削除処理に、CCM 用 systemdユニットの停止・無効化・ユニットファイル削除を追加する。
+- **実施内容**:
+  - `DeprovisionKubernetesEngineControlPlane`（`pkg/controller/kubernetes-engine-control-plane.go`）に `DeleteKubernetesEngineCloudControllerManagerUnit` の呼び出しを追加した。他の解体ステップと同様にベストエフォートで実行し、失敗してもエラーを集約するのみでIPAM解放等の後続処理を継続する。CCM未導入クラスタ（ユニット不在）でも冪等に成功する。
+  - CCM用APIKeyの失効（`revokeKubernetesEngineCloudProviderApiKey`）は見送った。発行済みAPIKeyのkeyIDを永続化する仕組み（LB用途では`Server`のラベルに保存）が無く、CCMプロビジョニング自体もまだ作成フローに組み込まれていないため。CCMプロビジョニングをクラスタ作成フローへ統合する段階で、keyIDの永続化とあわせて失効処理も追加する。
+
+### 7. 検証
+- `kubectl get nodes` で `EXTERNAL-IP` / `PROVIDER-ID` が正しく反映されることを確認する。
+- Service `type=LoadBalancer` 作成時に、既存のHA-Proxy連携と同等の動作（VIP払い出し、内部DNS登録）がCCM経由で行われることを確認する。
+- **方針（決定事項）**:
+  - 現時点で実施済みの検証: 項目1（Region/Zone設定伝播）・項目2（APIKey発行/kubeconfig生成）・項目3（systemdユニット生成/起動/削除）・項目5（marmot-native LoadBalancer、VIP払い出し/解放の排他制御）・項目6（削除フローへの組み込み）は、いずれもユニットテストでのみ検証済み。`go test ./pkg/cloudprovider/... ./pkg/controller/... ./cmd/mke-node-controller/... ./cmd/mke-lb-controller/...` で確認しており、`pkg/controller`の既知の無関係な事前既存フレーキー3件（`image-controller_test.go`の認証トークンマスキング、`kubernetes-engine-network-lifecycle_test.go`の削除待ちタイミング依存2件）を除き全てPASSしている。他パッケージ（`pkg/cloudprovider`/`cmd/mke-node-controller`/`cmd/mke-lb-controller`）は全PASS。
+  - `kubectl get nodes`でのEXTERNAL-IP/PROVIDER-ID確認、およびService type=LoadBalancer経由のVIP払い出し/内部DNS登録の実クラスタでの確認は、実CCMバイナリの実装とクラスタ作成フローへの組み込み（`k8s.io/cloud-provider`依存追加を伴う、本フェーズの対象外）が完了するまで持ち越す。本フェーズ（項目7）の検証範囲はユニットテストのみとし、これ以上のコード変更は行わない。
 
 ---
 

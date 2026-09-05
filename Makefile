@@ -1,4 +1,4 @@
-PROGRAMS = mactl marmotd maadm marmot-lb-agent mke-lb-controller
+PROGRAMS = mactl marmotd maadm marmot-lb-agent mke-lb-controller mke-node-controller
 .PHONY: all $(PROGRAMS)
 all:	$(PROGRAMS)
 
@@ -59,6 +59,7 @@ install:
 	install -m 0755 $(BINDIR)/$(SERVER_EXE) $(DISTDIR)
 	install -m 0755 $(BINDIR)/marmot-lb-agent $(DISTDIR)
 	install -m 0755 $(BINDIR)/mke-lb-controller $(DISTDIR)
+	install -m 0755 $(BINDIR)/mke-node-controller $(DISTDIR)
 	rm -f /etc/systemd/system/marmot.service
 	install -m 0644 $(BINDIR)/marmot.service /lib/systemd/system
 	rm -f /usr/local/bin/$(CLIENT_CMD)

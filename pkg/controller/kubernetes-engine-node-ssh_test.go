@@ -179,6 +179,17 @@ var _ = Describe("runKubernetesEngineNodeProvisionSteps", func() {
 			}
 		}
 		Expect(runner.files["/etc/systemd/system/kubelet.service"]).To(ContainSubstring("--hostname-override=mke-demo-node-1 --node-ip=172.16.1.10"))
+		Expect(runner.files["/etc/systemd/system/kubelet.service"]).NotTo(ContainSubstring("--cloud-provider=external"))
+	})
+
+	It("adds --cloud-provider=external to the kubelet unit when CloudProviderEnabled is set", func() {
+		runner := &fakeKubernetesEngineNodeCommandRunner{outputs: map[string]string{"uname -m": "x86_64"}}
+		data := newTestKubernetesEngineNodeProvisionData()
+		data.CloudProviderEnabled = true
+
+		Expect(runKubernetesEngineNodeProvisionSteps(runner, data)).To(Succeed())
+
+		Expect(runner.files["/etc/systemd/system/kubelet.service"]).To(ContainSubstring("--hostname-override=mke-demo-node-1 --node-ip=172.16.1.10 --cloud-provider=external"))
 	})
 
 	It("selects arm64 assets when the node reports an aarch64 architecture", func() {

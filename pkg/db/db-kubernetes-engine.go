@@ -28,6 +28,11 @@ const (
 	KubernetesEngineNetworkLabelOwner          = "kubernetesEngineId"
 	KubernetesEngineNetworkLabelManagedBy      = "managedBy"
 	KubernetesEngineNetworkLabelManagedByValue = "kubernetes-engine-controller"
+
+	// KubernetesEngineCloudProviderLabelApiKeyID は、cloud-controller-manager(mke-node-controller)
+	// がmarmotd APIへアクセスする際に使用するAPIKeyのID(admin ユーザー配下)を保持する
+	// Metadata.Labelsのキー。クラスタ削除時にこのラベルからAPIKeyを特定して失効させる。
+	KubernetesEngineCloudProviderLabelApiKeyID = "kubernetesEngineCloudProviderApiKeyID"
 )
 
 var KubernetesEngineStatus = map[int]string{
@@ -237,6 +242,32 @@ func (d *Database) UpdateKubernetesEngineControlPlaneStatus(id, ipAddress, hostI
 		rec.Status.ControlPlaneHostIpAddress = util.StringPtr(hostIPAddress)
 		rec.Status.ResolvedKubernetesVersion = util.StringPtr(resolvedVersion)
 		rec.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+
+		err = d.putKubernetesEngineById(rec)
+		if err == ErrUpdateConflict {
+			continue
+		}
+		return err
+	}
+}
+
+// UpdateKubernetesEngineCloudProviderApiKeyID は、cloud-controller-manager(mke-node-controller)
+// がmarmotd APIへアクセスするために発行したAPIKeyのIDをMetadata.Labelsに記録する。
+// クラスタ削除時にこのラベルからAPIKeyを特定して失効させる。
+func (d *Database) UpdateKubernetesEngineCloudProviderApiKeyID(id, keyID string) error {
+	for {
+		rec, err := d.GetKubernetesEngineById(id)
+		if err != nil {
+			return err
+		}
+		labels := map[string]interface{}{}
+		if rec.Metadata.Labels != nil {
+			for k, v := range *rec.Metadata.Labels {
+				labels[k] = v
+			}
+		}
+		labels[KubernetesEngineCloudProviderLabelApiKeyID] = keyID
+		rec.Metadata.Labels = &labels
 
 		err = d.putKubernetesEngineById(rec)
 		if err == ErrUpdateConflict {

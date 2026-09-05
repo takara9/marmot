@@ -112,3 +112,38 @@ func (m *MarmotEndpoint) GetKubernetesEngineKubeconfigById(id string) ([]byte, *
 	}
 	return body, jobURL, nil
 }
+
+// CreateKubernetesEngineLoadBalancerVip は、Service type=LoadBalancer 用のVIPを
+// namespace/serviceName に対して払い出す(内部DNS登録込み)。既に払い出し済みの場合は
+// marmotd側で同じVIPが返る(冪等)。
+func (m *MarmotEndpoint) CreateKubernetesEngineLoadBalancerVip(id string, req api.KubernetesEngineLoadBalancerVipRequest) ([]byte, *url.URL, error) {
+	slog.Debug("===", "CreateKubernetesEngineLoadBalancerVip is called", "===")
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/kubernetes-engine/"+id+"/loadbalancer/vip")
+	if err != nil {
+		return nil, nil, err
+	}
+	byteJSON, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, err
+	}
+	httpReq, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(byteJSON))
+	if err != nil {
+		return nil, nil, err
+	}
+	return m.httpRequest2(httpReq)
+}
+
+// DeleteKubernetesEngineLoadBalancerVip は、namespace/serviceName に払い出し済みのVIPと
+// 内部DNSエントリーを解放する。未払い出しの場合もmarmotd側で成功として扱われる(冪等)。
+func (m *MarmotEndpoint) DeleteKubernetesEngineLoadBalancerVip(id, namespace, serviceName string) ([]byte, *url.URL, error) {
+	slog.Debug("===", "DeleteKubernetesEngineLoadBalancerVip is called", "===")
+	reqURL, err := url.JoinPath(m.Scheme+"://"+m.HostPort, m.BasePath, "/kubernetes-engine/"+id+"/loadbalancer/vip/"+namespace+"/"+serviceName)
+	if err != nil {
+		return nil, nil, err
+	}
+	httpReq, err := http.NewRequest("DELETE", reqURL, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	return m.httpRequest2(httpReq)
+}

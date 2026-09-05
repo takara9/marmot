@@ -243,7 +243,7 @@ func ProvisionKubernetesEngineLoadBalancer(database *db.Database, mkeConf *marmo
 		return false, err
 	}
 	resourceID := fmt.Sprintf("%s-lb", api.KubernetesEngineID(ke))
-	if err := runKubernetesEngineLoadBalancerProvision(nodeIP, kubernetesEngineNodePrivateKeyPath, namespace, resourceID, kubeconfig, controllerBinary, apiKeyToken, marmotdURL, marmotdCAFile, marmotdCAData, api.KubernetesEngineID(ke)); err != nil {
+	if err := runKubernetesEngineLoadBalancerProvision(nodeIP, kubernetesEngineNodePrivateKeyPath, namespace, resourceID, kubeconfig, controllerBinary, apiKeyToken, marmotdURL, marmotdCAFile, marmotdCAData, api.KubernetesEngineID(ke), mkeConf.CloudControllerManagerEnabled); err != nil {
 		return false, fmt.Errorf("failed to provision load balancer: %w", err)
 	}
 
