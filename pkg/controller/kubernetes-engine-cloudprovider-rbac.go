@@ -8,8 +8,8 @@ import (
 )
 
 // kubernetesEngineCloudControllerManagerRBACProbeURLPath は、CCM用RBACが既に適用済みかどうかの
-// 判定に使うClusterRoleのURLパス。
-const kubernetesEngineCloudControllerManagerRBACProbeURLPath = "/apis/rbac.authorization.k8s.io/v1/clusterroles/system:cloud-controller-manager"
+// 判定に使うClusterRoleBindingのURLパス。
+const kubernetesEngineCloudControllerManagerRBACProbeURLPath = "/apis/rbac.authorization.k8s.io/v1/clusterrolebindings/system:cloud-controller-manager"
 
 // EnsureKubernetesEngineCloudControllerManagerRBAC は、cloud-controller-manager
 // (クライアント証明書のCommonName/Organization = system:cloud-controller-manager) が
