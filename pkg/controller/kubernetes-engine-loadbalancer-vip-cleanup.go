@@ -53,6 +53,7 @@ func releaseKubernetesEngineLoadBalancerVips(database *db.Database, ke api.Kuber
 			continue
 		}
 		if vnet.Spec.IpNetworkId == nil || strings.TrimSpace(*vnet.Spec.IpNetworkId) == "" {
+			errs = append(errs, fmt.Errorf("host-bridge network has no ipNetworkId; cannot release VIP %s (%s)", vip, fqdn))
 			continue
 		}
 		if err := database.ReleaseIP(api.VirtualNetworkID(vnet), strings.TrimSpace(*vnet.Spec.IpNetworkId), vip); err != nil && !errors.Is(err, db.ErrNotFound) {
