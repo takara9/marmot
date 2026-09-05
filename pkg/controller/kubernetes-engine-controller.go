@@ -519,14 +519,7 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineDeleting(ke api.Ku
 		nodeServers = append(nodeServers, *loadBalancerServer)
 	}
 	if len(nodeServers) > 0 {
-		alreadyMarked := false
-		for _, server := range nodeServers {
-			if server.Status != nil && server.Status.DeletionTimeStamp != nil {
-				alreadyMarked = true
-				break
-			}
-		}
-		if !alreadyMarked && current.Status != nil && current.Status.ControlPlaneIpAddress != nil {
+		if current.Status != nil && current.Status.ControlPlaneIpAddress != nil {
 			// ノード用VM(Ceph-CSIのprovisioner Podの実行元)がまだ生きている最後のタイミングで、
 			// Ceph-CSI(RBD)が払い出し済みのPVCをkube-apiserver経由で削除し、RBD imageの実削除を
 			// Ceph-CSI本来の削除経路(watcher解放等を含む)に委ねる(CephFSサブボリュームは対象外)。
