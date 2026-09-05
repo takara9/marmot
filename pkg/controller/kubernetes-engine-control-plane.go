@@ -141,7 +141,15 @@ func ProvisionKubernetesEngineControlPlane(database *db.Database, mkeConf *marmo
 	if err = EnsureKubernetesEngineControlPlaneNAT(hostBindAddress, ipAddress, apiServerPort); err != nil {
 		return err
 	}
-	return CheckKubernetesEngineControlPlaneHealth(networkCfg.Namespace, assets.CACertPath, ipAddress, apiServerPort)
+	if err = CheckKubernetesEngineControlPlaneHealth(networkCfg.Namespace, assets.CACertPath, ipAddress, apiServerPort); err != nil {
+		return err
+	}
+	if mkeConf.CloudControllerManagerEnabled {
+		if err = ProvisionKubernetesEngineCloudControllerManager(database, DefaultKubernetesControlPlaneConfigDir, DefaultKubernetesEnginePkiDir, mkeConf, ke, ipAddress, apiServerPort); err != nil {
+			return fmt.Errorf("failed to provision cloud-controller-manager: %w", err)
+		}
+	}
+	return nil
 }
 
 // DeprovisionKubernetesEngineControlPlane はコントロールプレーンの解体を行う。
@@ -159,6 +167,14 @@ func DeprovisionKubernetesEngineControlPlane(database *db.Database, mkeConf *mar
 	var errs []error
 	if err := DeleteKubernetesEngineControlPlaneUnits(clusterName); err != nil {
 		errs = append(errs, fmt.Errorf("delete control plane units: %w", err))
+	}
+	// CCMは現時点では任意導入(スキャフォールドのみ)だが、ユニットが存在すれば必ず後始末する。
+	// 未導入クラスタではユニット不在として冪等に成功する。
+	if err := DeleteKubernetesEngineCloudControllerManagerUnit(clusterName); err != nil {
+		errs = append(errs, fmt.Errorf("delete cloud-controller-manager unit: %w", err))
+	}
+	if err := revokeKubernetesEngineCloudProviderApiKeyForEngine(database, ke); err != nil {
+		errs = append(errs, fmt.Errorf("revoke cloud-controller-manager API key: %w", err))
 	}
 	if err := DeprovisionKubernetesEngineEtcd(clusterName); err != nil {
 		errs = append(errs, fmt.Errorf("deprovision etcd: %w", err))

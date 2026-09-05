@@ -95,6 +95,11 @@ func ProvisionKubernetesEngineNodes(database *db.Database, mkeConf *marmotd.MKEC
 	if err := EnsureKubernetesEngineClusterDNS(ke); err != nil {
 		return false, fmt.Errorf("failed to install cluster DNS: %w", err)
 	}
+	if mkeConf.CloudControllerManagerEnabled {
+		if err := EnsureKubernetesEngineCloudControllerManagerRBAC(ke); err != nil {
+			return false, fmt.Errorf("failed to ensure cloud-controller-manager RBAC: %w", err)
+		}
+	}
 
 	servers, err := findKubernetesEngineNodeServers(database, ke)
 	if err != nil {
@@ -535,25 +540,26 @@ func configureKubernetesEngineNodeBinaries(mkeConf *marmotd.MKEConfig, ke api.Ku
 	}
 	endpoint := fmt.Sprintf("https://%s:%d", *ke.Status.ControlPlaneIpAddress, *ke.Status.ApiServerPort)
 	data := kubernetesEngineNodeProvisionData{
-		NodeName:            nodeName,
-		NodeIP:              nodeIP,
-		KubernetesVersion:   strings.TrimSpace(*ke.Status.ResolvedKubernetesVersion),
-		ContainerdVersion:   strings.TrimPrefix(strings.TrimSpace(mkeConf.ContainerdVersion), "v"),
-		RuncVersion:         strings.TrimPrefix(strings.TrimSpace(mkeConf.RuncVersion), "v"),
-		CACert:              contents[0],
-		KubeletCert:         contents[1],
-		KubeletKey:          contents[2],
-		KubeProxyCert:       contents[3],
-		KubeProxyKey:        contents[4],
-		KubeletKubeconfig:   []byte(renderKubernetesEngineNodeKubeconfig(endpoint, "system:node", "/etc/kubernetes/pki/kubelet.crt", "/etc/kubernetes/pki/kubelet.key")),
-		KubeProxyKubeconfig: []byte(renderKubernetesEngineNodeKubeconfig(endpoint, "system:kube-proxy", "/etc/kubernetes/pki/kube-proxy.crt", "/etc/kubernetes/pki/kube-proxy.key")),
-		KubeletConfig:       []byte(renderKubernetesEngineKubeletConfig()),
-		KubeProxyConfig:     []byte(renderKubernetesEngineKubeProxyConfig()),
-		NetworkKind:         kubernetesEngineNodeNetworkKind(ke),
-		PodCIDR:             kubernetesEnginePodCIDR(nodeIndex),
-		PodNetworkSupernet:  kubernetesEnginePodNetworkSupernet,
-		CNIPluginsVersion:   strings.TrimPrefix(strings.TrimSpace(mkeConf.CNIPluginsVersion), "v"),
-		ForceBinaryReplace:  force,
+		NodeName:             nodeName,
+		NodeIP:               nodeIP,
+		KubernetesVersion:    strings.TrimSpace(*ke.Status.ResolvedKubernetesVersion),
+		ContainerdVersion:    strings.TrimPrefix(strings.TrimSpace(mkeConf.ContainerdVersion), "v"),
+		RuncVersion:          strings.TrimPrefix(strings.TrimSpace(mkeConf.RuncVersion), "v"),
+		CACert:               contents[0],
+		KubeletCert:          contents[1],
+		KubeletKey:           contents[2],
+		KubeProxyCert:        contents[3],
+		KubeProxyKey:         contents[4],
+		KubeletKubeconfig:    []byte(renderKubernetesEngineNodeKubeconfig(endpoint, "system:node", "/etc/kubernetes/pki/kubelet.crt", "/etc/kubernetes/pki/kubelet.key")),
+		KubeProxyKubeconfig:  []byte(renderKubernetesEngineNodeKubeconfig(endpoint, "system:kube-proxy", "/etc/kubernetes/pki/kube-proxy.crt", "/etc/kubernetes/pki/kube-proxy.key")),
+		KubeletConfig:        []byte(renderKubernetesEngineKubeletConfig()),
+		KubeProxyConfig:      []byte(renderKubernetesEngineKubeProxyConfig()),
+		NetworkKind:          kubernetesEngineNodeNetworkKind(ke),
+		PodCIDR:              kubernetesEnginePodCIDR(nodeIndex),
+		PodNetworkSupernet:   kubernetesEnginePodNetworkSupernet,
+		CNIPluginsVersion:    strings.TrimPrefix(strings.TrimSpace(mkeConf.CNIPluginsVersion), "v"),
+		ForceBinaryReplace:   force,
+		CloudProviderEnabled: mkeConf.CloudControllerManagerEnabled,
 	}
 	nodeID := fmt.Sprintf("%s-%s", api.KubernetesEngineID(ke), nodeName)
 	if marmotd.CurrentConfig().CephEnabled {

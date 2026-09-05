@@ -23,6 +23,7 @@ func main() {
 	marmotdCAFile := flag.String("marmotd-ca-file", "", "Path to a PEM-encoded CA bundle used to verify marmotd over HTTPS")
 	kubernetesEngineID := flag.String("kubernetes-engine-id", "", "ID of the KubernetesEngine this load balancer belongs to (required for VIP allocation)")
 	vipInterface := flag.String("vip-interface", "", "Network interface on this load balancer VM to assign VIP addresses to (required for HAProxy to bind to the VIP)")
+	cloudControllerManagerEnabled := flag.Bool("cloud-controller-manager-enabled", false, "Set when the cluster's cloud-controller-manager (mke-node-controller) owns Node status.addresses; disables this controller's own SetNodeAddresses calls to avoid conflicting writes")
 	flag.Parse()
 
 	if *intervalSeconds <= 0 {
@@ -54,7 +55,7 @@ func main() {
 	lastAppliedHash := ""
 	knownServiceVIPs := map[string]string{}
 	for {
-		lastAppliedHash, knownServiceVIPs = reconcile(ctx, client, mClient, *haproxyConfigPath, *vipInterface, lastAppliedHash, knownServiceVIPs)
+		lastAppliedHash, knownServiceVIPs = reconcile(ctx, client, mClient, *haproxyConfigPath, *vipInterface, lastAppliedHash, knownServiceVIPs, *cloudControllerManagerEnabled)
 		select {
 		case <-ctx.Done():
 			return
@@ -63,7 +64,7 @@ func main() {
 	}
 }
 
-func reconcile(ctx context.Context, client *kubeClient, mClient *marmotdClient, haproxyConfigPath, vipInterface, lastAppliedHash string, knownServiceVIPs map[string]string) (string, map[string]string) {
+func reconcile(ctx context.Context, client *kubeClient, mClient *marmotdClient, haproxyConfigPath, vipInterface, lastAppliedHash string, knownServiceVIPs map[string]string, cloudControllerManagerEnabled bool) (string, map[string]string) {
 	nodes, err := client.ListNodes(ctx)
 	if err != nil {
 		log.Printf("failed to list nodes: %v", err)
@@ -91,6 +92,11 @@ func reconcile(ctx context.Context, client *kubeClient, mClient *marmotdClient, 
 			log.Printf("node host-bridge address observed: name=%s hostBridgeAddress=%s", node.Name, addr)
 			haproxyNodes = append(haproxyNodes, nodeInfo{Name: node.Name, InternalIP: addr})
 
+			// cloud-controller-manager(mke-node-controller)がNode.status.addressesを設定する
+			// クラスタでは、この呼び出しと競合するため行わない(フェーズ14項目4の排他切り替え)。
+			if cloudControllerManagerEnabled {
+				continue
+			}
 			if node.ExternalIP != addr {
 				if err := client.SetNodeAddresses(ctx, node.Name, node.InternalIP, addr); err != nil {
 					log.Printf("failed to set ExternalIP for node %s: %v", node.Name, err)
@@ -111,7 +117,7 @@ func reconcile(ctx context.Context, client *kubeClient, mClient *marmotdClient, 
 	for i := range services {
 		svc := &services[i]
 
-		if svc.VIP == "" && mClient != nil {
+		if svc.VIP == "" && mClient != nil && !cloudControllerManagerEnabled {
 			vip, err := mClient.requestVip(ctx, svc.Namespace, svc.Name)
 			if err != nil {
 				log.Printf("failed to request VIP for service %s/%s: %v", svc.Namespace, svc.Name, err)
@@ -137,7 +143,9 @@ func reconcile(ctx context.Context, client *kubeClient, mClient *marmotdClient, 
 		}
 	}
 
-	if mClient != nil {
+	// cloud-controller-manager(mke-node-controller)がVIPの払い出し/解放を担うクラスタでは、
+	// この呼び出しと竞合するため行わない(フェーズ14項目5の排他切り替え)。
+	if mClient != nil && !cloudControllerManagerEnabled {
 		for key, vip := range knownServiceVIPs {
 			if _, ok := currentServiceVIPs[key]; ok {
 				continue

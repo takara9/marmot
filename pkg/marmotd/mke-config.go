@@ -63,6 +63,18 @@ type MKEConfig struct {
 	// marmotdが稼働するホストの実IPアドレス。kubectlアクセス用kubeconfigのserverフィールドや
 	// kube-apiserver証明書のSANにも使用される。未設定の場合、フェーズ10のDNAT設定はエラーになる。
 	ControlPlaneBindAddress string `json:"control_plane_bind_address"`
+
+	// CloudControllerManagerEnabled は、クラスタ作成時に mke-node-controller を
+	// cloud-controller-manager用systemdユニットとして自動起動するかどうか。既定はfalse(任意導入)。
+	// trueにする場合は、kubeletの--cloud-provider=external切り替え、mke-lb-controllerの
+	// SetNodeAddresses呼び出し停止(フェーズ14項目4の排他切り替え)とあわせて有効化を検討すること。
+	CloudControllerManagerEnabled bool `json:"cloud_controller_manager_enabled"`
+
+	// CloudProviderRegion/CloudProviderZone は、mke-node-controller(CCM相当)がNodeの
+	// InstanceMetadataとして返すリージョン/ゾーン名(フェーズ14項目1)。未設定(空文字列)の場合は
+	// 設定しない。シングルクラスタ構成では省略してよい。
+	CloudProviderRegion string `json:"cloud_provider_region"`
+	CloudProviderZone   string `json:"cloud_provider_zone"`
 }
 
 // defaultMKEConfig はコンフィグファイルが存在しない場合や、一部フィールドが

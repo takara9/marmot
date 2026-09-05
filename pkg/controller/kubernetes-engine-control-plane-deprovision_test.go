@@ -105,3 +105,100 @@ func TestDeprovisionKubernetesEngineControlPlaneReleasesIPsDespitePartialFailure
 		t.Fatalf("control plane host IP %s still marked in use", hostIP)
 	}
 }
+
+// DeprovisionKubernetesEngineControlPlane は、CCM(cloud-controller-manager)用systemdユニットの
+// 停止・無効化もベストエフォートで試行することを確認する。CCMは項目3時点では任意導入(未作成でも
+// 冪等に成功する)だが、削除フローに組み込まれていることを呼び出し記録で検証する。
+func TestDeprovisionKubernetesEngineControlPlaneDeletesCloudControllerManagerUnit(t *testing.T) {
+	database := newGatewayTestDatabase(t)
+	ctrl := &kubernetesEngineController{db: database, node: "node-a"}
+
+	ke := newTestKubernetesEngine(t, database, "deprov-ccm-test")
+	id := api.KubernetesEngineID(ke)
+	networkName := kubernetesEngineNetworkName(ke)
+
+	ctrl.reconcileKubernetesEnginePending(ke)
+	network, err := database.GetVirtualNetworkByName(networkName)
+	if err != nil {
+		t.Fatalf("GetVirtualNetworkByName(%q) failed: %v", networkName, err)
+	}
+	vnetId := api.VirtualNetworkID(network)
+
+	ipNetId, err := database.CreateIpNetwork(vnetId, &api.IPNetwork{AddressMaskLen: util.StringPtr("172.16.201.0/24")})
+	if err != nil {
+		t.Fatalf("CreateIpNetwork() failed: %v", err)
+	}
+	network.Spec.BridgeName = util.StringPtr("br-test-deprov-ccm")
+	network.Spec.IpNetworkId = util.StringPtr(ipNetId)
+	if err := database.UpdateVirtualNetworkById(vnetId, network); err != nil {
+		t.Fatalf("UpdateVirtualNetworkById() failed: %v", err)
+	}
+
+	controlPlaneIP, _, err := database.AllocateIP(vnetId, ipNetId, "mke-control-plane-"+id)
+	if err != nil {
+		t.Fatalf("AllocateIP() for control plane failed: %v", err)
+	}
+	hostIP, _, err := database.AllocateIP(vnetId, ipNetId, "mke-control-plane-host-"+id)
+	if err != nil {
+		t.Fatalf("AllocateIP() for control plane host failed: %v", err)
+	}
+	if err := database.UpdateKubernetesEngineControlPlaneStatus(id, controlPlaneIP, hostIP, 26444, "1.30.0"); err != nil {
+		t.Fatalf("UpdateKubernetesEngineControlPlaneStatus() failed: %v", err)
+	}
+	ke, err = database.GetKubernetesEngineById(id)
+	if err != nil {
+		t.Fatalf("GetKubernetesEngineById() failed: %v", err)
+	}
+
+	var recordedCalls []string
+	origStop := systemdStopUnit
+	origDisable := systemdDisableUnit
+	origReload := systemdDaemonReload
+	systemdStopUnit = func(unit string) error {
+		recordedCalls = append(recordedCalls, "stop:"+unit)
+		return nil
+	}
+	systemdDisableUnit = func(unit string) error {
+		recordedCalls = append(recordedCalls, "disable:"+unit)
+		return nil
+	}
+	systemdDaemonReload = func() error { return nil }
+	t.Cleanup(func() {
+		systemdStopUnit = origStop
+		systemdDisableUnit = origDisable
+		systemdDaemonReload = origReload
+	})
+
+	origUnitDir := controlPlaneSystemdUnitDir
+	controlPlaneSystemdUnitDir = t.TempDir()
+	t.Cleanup(func() { controlPlaneSystemdUnitDir = origUnitDir })
+
+	// namespace/OVSポート操作は実環境依存のためフェイクに差し替える。
+	origDeleteNamespace := controlPlaneDeleteNamespace
+	origDeleteOVSPort := controlPlaneDeleteOVSPort
+	controlPlaneDeleteNamespace = func(string) error { return nil }
+	controlPlaneDeleteOVSPort = func(string, string) error { return nil }
+	t.Cleanup(func() {
+		controlPlaneDeleteNamespace = origDeleteNamespace
+		controlPlaneDeleteOVSPort = origDeleteOVSPort
+	})
+
+	mkeConf := &marmotd.MKEConfig{}
+	if err := DeprovisionKubernetesEngineControlPlane(database, mkeConf, ke); err != nil {
+		t.Fatalf("DeprovisionKubernetesEngineControlPlane() failed: %v", err)
+	}
+
+	ccmUnit := KubernetesEngineCloudControllerManagerUnitName("deprov-ccm-test")
+	foundStop, foundDisable := false, false
+	for _, call := range recordedCalls {
+		if call == "stop:"+ccmUnit {
+			foundStop = true
+		}
+		if call == "disable:"+ccmUnit {
+			foundDisable = true
+		}
+	}
+	if !foundStop || !foundDisable {
+		t.Fatalf("cloud-controller-manager unit %q was not stopped/disabled during deprovision, calls=%v", ccmUnit, recordedCalls)
+	}
+}

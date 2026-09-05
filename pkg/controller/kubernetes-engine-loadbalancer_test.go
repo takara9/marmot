@@ -50,8 +50,14 @@ var _ = Describe("KubernetesEngineLoadBalancer", func() {
 	})
 
 	It("includes the custom marmotd CA file when HTTPS is enabled", func() {
-		unit := kubernetesEngineLoadBalancerControllerUnit("https://10.0.0.10:8750", kubernetesEngineLoadBalancerMarmotdCAPath, "ke123")
+		unit := kubernetesEngineLoadBalancerControllerUnit("https://10.0.0.10:8750", kubernetesEngineLoadBalancerMarmotdCAPath, "ke123", false)
 		Expect(unit).To(ContainSubstring("--marmotd-ca-file=/etc/marmot/mke-lb-marmotd-ca.pem"))
+		Expect(unit).NotTo(ContainSubstring("--cloud-controller-manager-enabled"))
+	})
+
+	It("includes the cloud-controller-manager-enabled flag when CCM is enabled for the cluster", func() {
+		unit := kubernetesEngineLoadBalancerControllerUnit("https://10.0.0.10:8750", "", "ke123", true)
+		Expect(unit).To(ContainSubstring("--cloud-controller-manager-enabled=true"))
 	})
 
 	It("skips provisioning entirely when the load balancer is disabled", func() {

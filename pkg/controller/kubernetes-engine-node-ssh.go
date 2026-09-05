@@ -61,6 +61,11 @@ type kubernetesEngineNodeProvisionData struct {
 	CephUser string
 	// CephKeyringContent は /etc/ceph/ceph.client.<CephUser>.keyring の内容。
 	CephKeyringContent []byte
+
+	// CloudProviderEnabled は mkeConf.CloudControllerManagerEnabled の値。trueの場合、
+	// kubeletユニットに--cloud-provider=externalを付与し、CCM(mke-node-controller)による
+	// ノード初期化(ProviderID/NodeAddresses)を待ち受ける状態にする(フェーズ14項目4)。
+	CloudProviderEnabled bool
 }
 
 // kubernetesEngineNodeRoute は、Bridge CNI選択時にノードへ追加する、
@@ -218,7 +223,7 @@ func runKubernetesEngineNodeProvisionSteps(runner kubernetesEngineNodeCommandRun
 		content string
 	}{
 		{"containerd.service", kubernetesEngineNodeContainerdUnit()},
-		{"kubelet.service", kubernetesEngineNodeKubeletUnit(data.NodeName, data.NodeIP)},
+		{"kubelet.service", kubernetesEngineNodeKubeletUnit(data.NodeName, data.NodeIP, data.CloudProviderEnabled)},
 		{"kube-proxy.service", kubernetesEngineNodeKubeProxyUnit()},
 	}
 	if err := runner.step("install systemd units", func() error {
@@ -485,20 +490,26 @@ WantedBy=multi-user.target
 `
 }
 
-func kubernetesEngineNodeKubeletUnit(nodeName, nodeIP string) string {
+func kubernetesEngineNodeKubeletUnit(nodeName, nodeIP string, cloudProviderEnabled bool) string {
+	cloudProviderArg := ""
+	if cloudProviderEnabled {
+		// CCM(mke-node-controller)がProviderID/NodeAddressesを設定するまで、kubeletは
+		// node.cloudprovider.kubernetes.io/uninitialized taintを付与した状態でNodeを登録する。
+		cloudProviderArg = " --cloud-provider=external"
+	}
 	return fmt.Sprintf(`[Unit]
 Description=Kubernetes Kubelet
 Wants=network-online.target containerd.service
 After=network-online.target containerd.service
 
 [Service]
-ExecStart=/usr/local/bin/kubelet --config=/etc/kubernetes/kubelet/config.yaml --kubeconfig=/etc/kubernetes/kubelet.kubeconfig --hostname-override=%s --node-ip=%s
+ExecStart=/usr/local/bin/kubelet --config=/etc/kubernetes/kubelet/config.yaml --kubeconfig=/etc/kubernetes/kubelet.kubeconfig --hostname-override=%s --node-ip=%s%s
 Restart=always
 RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
-`, nodeName, nodeIP)
+`, nodeName, nodeIP, cloudProviderArg)
 }
 
 func kubernetesEngineNodeKubeProxyUnit() string {
