@@ -278,7 +278,7 @@ Ceph CSIによるストレージ連携やロードバランサー連携など、
 ```console
 cd /tmp
 apt-get update
-VERSION=0.25.1
+VERSION=0.30.0
 curl -OL https://github.com/takara9/marmot/releases/download/v${VERSION}/marmot_v${VERSION}_amd64.deb
 sudo apt install -y ./marmot_v${VERSION}_amd64.deb
 ```
@@ -287,8 +287,8 @@ sudo apt install -y ./marmot_v${VERSION}_amd64.deb
 
 ```console
 $ mactl vesion
-Server version = 0.25.1
-Client version = 0.25.1
+Server version = 0.30.0
+Client version = 0.30.0
 ```
 
 詳しいインストール手順は、以下のドキュメントを参照してください。
