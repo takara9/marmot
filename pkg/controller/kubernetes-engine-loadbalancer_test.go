@@ -8,7 +8,7 @@ import (
 )
 
 var _ = Describe("KubernetesEngineLoadBalancer", func() {
-	It("is enabled only when nodeSpec.network.external is host-bridge", func() {
+	It("is disabled by default but enabled when external is host-bridge", func() {
 		ke := api.KubernetesEngine{Metadata: api.Metadata{Name: "demo"}}
 		Expect(kubernetesEngineLoadBalancerEnabled(ke)).To(BeFalse())
 
@@ -61,7 +61,15 @@ var _ = Describe("KubernetesEngineLoadBalancer", func() {
 	})
 
 	It("skips provisioning entirely when the load balancer is disabled", func() {
-		ke := api.KubernetesEngine{Metadata: api.Metadata{Name: "demo"}}
+		defaultExternal := "default"
+		ke := api.KubernetesEngine{
+			Metadata: api.Metadata{Name: "demo"},
+			Spec: api.KubernetesEngineSpec{
+				NodeSpec: &api.KubernetesEngineNodeSpec{
+					Network: &api.KubernetesEngineNodeNetwork{External: &defaultExternal},
+				},
+			},
+		}
 		ready, err := ProvisionKubernetesEngineLoadBalancer(nil, nil, ke)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ready).To(BeTrue())

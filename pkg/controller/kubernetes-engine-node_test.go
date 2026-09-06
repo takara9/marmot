@@ -115,31 +115,31 @@ var _ = Describe("KubernetesEngineNode", func() {
 		Expect(address).To(Equal("172.16.1.10"))
 	})
 
-	It("rejects an unsupported nodeSpec.network.kind", func() {
+	It("rejects an unsupported nodeSpec.network.cni-plugin", func() {
 		kind := "flannel"
 		ke := api.KubernetesEngine{
 			Metadata: api.Metadata{Name: "demo"},
 			Spec: api.KubernetesEngineSpec{
 				Nodes:    1,
-				NodeSpec: &api.KubernetesEngineNodeSpec{Network: &api.KubernetesEngineNodeNetwork{Kind: &kind}},
+				NodeSpec: &api.KubernetesEngineNodeSpec{Network: &api.KubernetesEngineNodeNetwork{CniPlugin: &kind}},
 			},
 		}
 		_, err := buildKubernetesEngineNodeServerSpec(ke, 0, "ssh-rsa AAAA")
 		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("nodeSpec.network.kind"))
+		Expect(err.Error()).To(ContainSubstring("nodeSpec.network.cni-plugin"))
 	})
 
-	It("defaults nodeSpec.network.kind to bridge (none) when unset", func() {
+	It("defaults nodeSpec.network.cni-plugin to bridge (none) when unset", func() {
 		ke := api.KubernetesEngine{Metadata: api.Metadata{Name: "demo"}}
 		Expect(kubernetesEngineNodeNetworkKind(ke)).To(Equal(kubernetesEngineNetworkKindBridge))
 	})
 
-	It("recognizes cilium as a valid nodeSpec.network.kind", func() {
+	It("recognizes cilium as a valid nodeSpec.network.cni-plugin", func() {
 		kind := "Cilium"
 		ke := api.KubernetesEngine{
 			Metadata: api.Metadata{Name: "demo"},
 			Spec: api.KubernetesEngineSpec{
-				NodeSpec: &api.KubernetesEngineNodeSpec{Network: &api.KubernetesEngineNodeNetwork{Kind: &kind}},
+				NodeSpec: &api.KubernetesEngineNodeSpec{Network: &api.KubernetesEngineNodeNetwork{CniPlugin: &kind}},
 			},
 		}
 		Expect(kubernetesEngineNodeNetworkKind(ke)).To(Equal(kubernetesEngineNetworkKindCilium))

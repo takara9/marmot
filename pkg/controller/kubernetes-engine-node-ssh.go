@@ -39,7 +39,7 @@ type kubernetesEngineNodeProvisionData struct {
 	KubeletConfig       []byte
 	KubeProxyConfig     []byte
 
-	// NetworkKind は spec.nodeSpec.network.kind ("none"=bridge または "cilium")。
+	// NetworkKind は spec.nodeSpec.network.cni-plugin ("none"=bridge または "cilium")。
 	// "cilium" の場合、ノード側でのBridge CNIのインストール・設定は行わない
 	// （Ciliumのインストールマニフェスト側がCNI設定を配置する）。
 	NetworkKind string
@@ -259,7 +259,7 @@ func detectKubernetesEngineNodeArch(runner kubernetesEngineNodeCommandRunner) (s
 	return "arm64", nil
 }
 
-// installKubernetesEngineBridgeCNI は、Bridge CNI（既定のnetwork.kind=none）選択時に、
+// installKubernetesEngineBridgeCNI は、Bridge CNI（既定のnetwork.cni-plugin=none）選択時に、
 // CNIプラグインバイナリの導入、ノード専用Pod CIDRを使ったbridge CNI設定の生成、
 // クラスタ外向け通信のみをマスカレードするiptables設定を行う。
 func installKubernetesEngineBridgeCNI(runner kubernetesEngineNodeCommandRunner, data kubernetesEngineNodeProvisionData) error {

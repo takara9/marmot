@@ -25,8 +25,8 @@ spec:
     nodeSpec:
         cpu: 4
         memory: 8192
-        network:
-            kind: none # Cilliumを選択可能とする
+        network: ## 省略時のデフォルトは cni-plugin=none, external=host-bridgeとなる。
+            cni-plugin: none # Cilliumを選択可能とする
             external: host-bridge | default
 ```
 
@@ -40,7 +40,8 @@ spec:
 - 「ノード間通信用ネットワーク」は、クラスタ毎にノード間通信用ネットワークが作成され接続されるので、指定する必要は無い。
 - Cephへの接続は必須なので、「モニターのIPアドレス」、「ストレージ用ネットワーク」などの設定は、marmotd.json で配置する。
 - spec.versionは、対応可能なバージョンを特に限定しない。 コントローラーから挙がったエラーを返す。
-
+- spec.nodeSpec.network.cni-plugin を省略した場合は、Kubernetesプロジェクトから提供される CNIプラグインのBridgeが使用される。
+- spec.nodeSpec.network.cni-plugin=ciliumを設定した場合、サードパーティ cilium を使用したオーバーレイ・ネットワークが形成される。
 
 ## アーキテクチャ設計
 
@@ -141,6 +142,7 @@ spec:
 ## フェーズ8: CNI有効化
 - Bridge選択時は、設定とルーティング設定追加
 - Cilium選択時のインストール・設定
+    - mke/cni-ciliumの下にある YAMLファイル群を適用して、ciliumを有効化する。
 
 ## フェーズ9: CSI（Ceph）連携
 - Ceph CSIの自動インストールとストレージ用ネットワーク接続
