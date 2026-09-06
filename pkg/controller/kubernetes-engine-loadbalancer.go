@@ -72,8 +72,9 @@ var runKubernetesEngineLoadBalancerProvision = provisionKubernetesEngineLoadBala
 
 // kubernetesEngineLoadBalancerEnabled は、spec.nodeSpec.network.external が host-bridge の
 // 場合のみ mke専用ロードバランサーを有効とする(defaultではNATが必要になるため使用しない)。
+// external省略時はhost-bridgeがデフォルトとなる。
 func kubernetesEngineLoadBalancerEnabled(ke api.KubernetesEngine) bool {
-	external := "default"
+	external := "host-bridge"
 	if ke.Spec.NodeSpec != nil && ke.Spec.NodeSpec.Network != nil && ke.Spec.NodeSpec.Network.External != nil {
 		external = strings.TrimSpace(*ke.Spec.NodeSpec.Network.External)
 	}

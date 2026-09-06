@@ -244,7 +244,7 @@ func createMissingKubernetesEngineNodeServers(database *db.Database, ke api.Kube
 }
 
 func buildKubernetesEngineNodeServerSpec(ke api.KubernetesEngine, index int, publicKey string) (api.Server, error) {
-	externalNetwork := "default"
+	externalNetwork := "host-bridge"
 	cpu := defaultKubernetesEngineNodeCPU
 	memory := defaultKubernetesEngineNodeMemory
 	if ke.Spec.NodeSpec != nil {
