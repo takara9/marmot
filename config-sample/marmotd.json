@@ -1,0 +1,62 @@
+{
+  "node_name": "hv0",
+  "domain": "labo.local",
+  "etcd_url": "http://127.0.0.1:2379",
+  "api_listen_addr": "0.0.0.0:8750",
+  "api-advertise-host-bridge-address": "192.168.1.8",
+  "dns_listen_addr": "192.168.1.8:53",
+  "dns_upstream": "8.8.8.8:53",
+  "dns_client_allow_cidrs": [
+    "127.0.0.1/32",
+    "192.168.1.0/24",
+    "10.1.0.0/16"
+  ],
+  "default_underlay_interface": "br0",
+  "os_volume_group": "",
+  "data_volume_group": "",
+  "deletion_delay_seconds": 10,
+  "session_idle_timeout": "5d",
+  "image_create_from_vm_timeout_seconds": 600,
+  "image_create_from_url_timeout_seconds": 1800,
+  "image_download_timeout_seconds": 1800,
+  "image_resize_timeout_seconds": 600,
+  "image_delete_timeout_seconds": 120,
+  "os_images": [
+    {
+      "name": "ubuntu24.04",
+      "url": "https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img",
+      "osName": "ubuntu",
+      "osVersion": "24.04"
+    },
+    {
+      "name": "ubuntu26.04",
+      "url": "https://cloud-images.ubuntu.com/releases/resolute/release/ubuntu-26.04-server-cloudimg-amd64.img",
+      "osName": "ubuntu",
+      "osVersion": "26.04"
+    }
+  ],
+  "loki_push_url": "http://192.168.1.9:3100/loki/api/v1/push",
+  "tls_cert_file": "",
+  "tls_key_file": "",
+  "host-bridge-ip-net-addr": "192.168.1.0/24",
+  "host-bridge-ip-addr-start": "192.168.1.170",
+  "host-bridge-ip-addr-end":  "192.168.1.189",
+  "host-bridge-default" :  {
+      "netmasklen": 24,
+      "nameservers": {
+        "addresses": [
+          "192.168.1.8"
+        ],
+        "search": [
+          "labo.local"
+        ]
+      },
+      "routes": [
+        {
+          "to": "default",
+          "via": "192.168.1.1"
+        }
+      ]
+    },
+    "ceph_enabled": true
+}

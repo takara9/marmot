@@ -1,0 +1,17 @@
+{
+    "kubernetes_version": "v1.36.2",
+    "containerd_version": "2.3.1",
+    "etcd_version": "3.6.8",
+    "cni_version": "0.4.0",
+    "default_cni_type": "bridge",
+    "runc_version": "1.4.0",
+    "control_plane_bind_address": "192.168.1.8",
+    "clusterID": "070aabed-a12a-11f1-8a75-921da53eb49a",
+    "monitors": ["192.168.1.170:6789"],
+    "rbdUserId": "rbduser1",
+    "rbdUserKey": "AQDGp45qMcwsBhAAGurQXn8l7hf3wU4gOiUNnA==",
+    "cephfsUserId": "fsuser1",
+    "cephfsUserKey": "AQDpp45qeHR8FBAAgHJA+Gdy9PFKkzIM5r+AGA==",
+    "cloud_controller_manager_enabled": true
+}
+

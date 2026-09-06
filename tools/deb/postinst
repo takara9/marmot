@@ -12,6 +12,7 @@ PLAYBOOK_DST_DIR="/var/lib/marmot/ansible-playbooks"
 PLAYBOOK_TEMPLATE_DIR="${PLAYBOOK_DST_DIR}/templates"
 MKE_MANIFEST_SRC_DIR="/usr/local/marmot/mke-manifests"
 MKE_MANIFEST_DST_DIR="/var/lib/marmot/mke-manifests"
+CONFIG_SAMPLE_SRC_DIR="/usr/local/marmot/config-sample"
 
 if [ -f "${LEGACY_CONFIG_FILE}" ]; then
     CONFIG_FILE="${LEGACY_CONFIG_FILE}"
@@ -78,6 +79,13 @@ fi
 mkdir -p "${MKE_MANIFEST_DST_DIR}"
 if [ -d "${MKE_MANIFEST_SRC_DIR}" ]; then
     cp -a "${MKE_MANIFEST_SRC_DIR}/." "${MKE_MANIFEST_DST_DIR}/"
+fi
+
+if [ -f "${CONFIG_SAMPLE_SRC_DIR}/marmotd.json" ]; then
+    cp -a "${CONFIG_SAMPLE_SRC_DIR}/marmotd.json" "/etc/marmot/marmotd.json-sample"
+fi
+if [ -f "${CONFIG_SAMPLE_SRC_DIR}/mke.json" ]; then
+    cp -a "${CONFIG_SAMPLE_SRC_DIR}/mke.json" "/etc/marmot/mke.json-sample"
 fi
 
 systemctl enable libvirtd.service

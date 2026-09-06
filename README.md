@@ -47,6 +47,7 @@ Marmotは、プライベートクラウド運用をよりシンプルにし、In
 - **Network Load Balancer** — iptables ベースの L4 ロードバランサーで仮想ネットワーク内トラフィックを分散
 - **OpenTelemetry メトリクス** — Prometheus エクスポーターによる可観測性を標準提供, Loki へのログ転送も標準装備
 - **RBAC によるアクセス制御** — Administrator / Compute-Operator / Viewer などのロールベースで API 操作を制限
+- **MKE (Marmot Kubernetes Engine)** — 抽象化されたYAMLからKubernetesクラスタを構築・運用できる専用コントローラー
 - **ゲストOS Ubuntu Linux 22.04/24.04, Alpine Linux 3.23 サポート**
 - **ホストOS Ubuntu 24.04 サポート**
 
@@ -139,14 +140,14 @@ server-20        marmot3       RUNNING       1    1024     192.168.1.20     host
 
 # sshでのログイン
 $ mactl ssh ubuntu@server-20 -- -i vmkey 
-ubuntu@server-20:~$ 
+ubuntu@server-20:~$ # ログイン後に、コマンドを実行してみて、お楽しみください。
 ubuntu@server-20:~$ exit
 
 # サーバーの削除
 $ mactl delete server server-20
 
-# サーバー名をカンマ区切りで複数削除
-$ mactl delete server biz,rest1,rest2,rest3,db
+# サーバー名をカンマ区切って複数の仮想サーバーの削除も可能です
+$ mactl delete server server-20
 ```
 
 `mactl ssh` を使うと、DNSを設定することなく、サーバー名で、sshログインできます。
@@ -161,6 +162,7 @@ mactl [mactlのフラグ] ssh [USER@]SERVER-NAME -- [SSH-ARGS...]
 
 ### Ceph ボリュームの作成（オプション）
 
+事前の準備として、[Cephの仮想サーバー](https://github.com/takara9/marmot-manifests/tree/main/56-ceph-single-node)を起動して、Cephのサーバーを準備しておきます。
 Marmot は `type: ceph` の Volume をサポートしています。`storageClass`（`hdd` / `ssd` / `nvme`）に応じて、`marmotd` が Ceph プールを選択します。
 
 ```yaml
@@ -189,6 +191,55 @@ $ mactl delete volume data-ceph-01
 注: `type: ceph` を利用する場合、`marmotd` 側で `ceph_enabled` と `ceph_pool_by_class` の設定が必要です（後述）。
 
 
+### Kubernetesクラスタの作成（MKE）
+
+MKE (Marmot Kubernetes Engine) を使うと、Kubernetesの詳細な知識がなくても、シンプルなYAML一枚でKubernetesクラスタを構築できます。ノード数やCPU/メモリなどのリソース、CNIプラグイン（Cilium選択可）、外部接続用ネットワークを宣言するだけで、コントロールプレーンからワーカーノード、専用ロードバランサー、Cephストレージ連携まで、`marmotd` が自動的に構築します。
+
+```yaml
+apiVersion: v1
+kind: KubernetesEngine
+metadata:
+    name: mke0
+    comment: 検証用K8sクラスタ
+spec:
+    version: "1.36"
+    nodes: 3
+    nodeSpec:
+        cpu: 2
+        memory: 4192
+        auth:
+            publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGAAL3eo+VgR6pj9eGuz62rBp/wbs4dSp3XljqBBymnW For marmot VMs"
+```
+
+以下は、デプロイから kubectl コマンドの実行までの操作例です。
+
+```console
+# クラスタの作成
+$ mactl create -f mke0.yaml
+
+# 状態の確認
+$ mactl get mke
+NAME              VERSION   NODES   STATUS        AGE     
+----              -------   -----   ------        ---     
+mke0              1.36      3       RUNNING       3m   
+
+# KUBECONFIGのダウンロード
+$ mactl get mke mke0 --download
+kubeconfig downloaded: /home/ubuntu/.kube/config
+
+# kubectl コマンドの実行
+$ kubectl get node
+NAME              STATUS   ROLES    AGE     VERSION
+mke-mke0-node-1   Ready    <none>   2m43s   v1.36.4
+mke-mke0-node-2   Ready    <none>   113s    v1.36.4
+mke-mke0-node-3   Ready    <none>   65s     v1.36.4
+
+# クラスタの削除
+$ mactl delete mke mke0
+```
+
+Ceph CSIによるストレージ連携やロードバランサー連携など、詳細な設計は [docs/MEMO-marmot-kubernetes-engine.md](docs/MEMO-marmot-kubernetes-engine.md) を参照してください。
+
 
 ## インストール
 
@@ -196,6 +247,8 @@ $ mactl delete volume data-ceph-01
 - Ubuntu Linux 24.04 がインストールされていること。
 - ルート`/`ファイルシステムが、3G程度空いていること。 marmotが依存モジュール 1.2GBほどが、インストールされます。
 - `/var/lib/marmot` が、30GB程度の空きがあること。（OSイメージ取得で約2GB、１台の仮想マシン起動で16GBを消費します。
+- `/etc/marmot/marmotd.json-sample`, `/etc/marmot/mke.json-sample` を参考にして、設定を実施してください。
+
 
 ### Ceph 連携を使う場合の追加要件（オプション）
 - `marmotd` を実行するホストに `ceph-common` がインストールされ、`ceph` / `rbd` コマンドが利用可能であること。

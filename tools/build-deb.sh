@@ -99,6 +99,12 @@ mkdir -p "${PKG_DIR}/usr/local/marmot/mke-manifests"
 cp -a "${ROOT_DIR}/mke/." "${PKG_DIR}/usr/local/marmot/mke-manifests/"
 
 echo "設定ファイルのサンプルをコピー中..."
+mkdir -p "${PKG_DIR}/usr/local/marmot/config-sample"
+install -m 0644 "${ROOT_DIR}/config-sample/marmotd.json" \
+    "${PKG_DIR}/usr/local/marmot/config-sample/marmotd.json"
+install -m 0644 "${ROOT_DIR}/config-sample/mke.json" \
+    "${PKG_DIR}/usr/local/marmot/config-sample/mke.json"
+
 # インストール済みサイズを計算 (KB単位)
 INSTALLED_SIZE=$(du -sk "${PKG_DIR}" | cut -f1)
 
