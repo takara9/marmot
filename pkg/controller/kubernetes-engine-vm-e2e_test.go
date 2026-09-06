@@ -119,6 +119,10 @@ var _ = Describe("KubernetesEngine VM E2E", Ordered, func() {
 			Spec: api.KubernetesEngineSpec{
 				Version: "1.36",
 				Nodes:   1,
+				// host-bridge IPAM未設定のCIランナーでも動くよう、external=defaultを明示する。
+				NodeSpec: &api.KubernetesEngineNodeSpec{
+					Network: &api.KubernetesEngineNodeNetwork{External: util.StringPtr("default")},
+				},
 			},
 		})
 		Expect(err).NotTo(HaveOccurred())
