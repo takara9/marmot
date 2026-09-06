@@ -3,7 +3,14 @@ package controller
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/base64"
+	"encoding/pem"
 	"fmt"
+	"math/big"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -59,6 +66,13 @@ type kubernetesEngineManifestObject struct {
 
 const kubernetesEngineCiliumNamespace = "kube-system"
 
+type kubernetesEngineCiliumTLSMaterials struct {
+	caCert     string
+	caKey      string
+	serverCert string
+	serverKey  string
+}
+
 // kubernetesEngineCiliumProbeURLPath は、Ciliumが既にインストール済みかどうかの判定に使う
 // DaemonSetのURLパス。
 const kubernetesEngineCiliumProbeURLPath = "/apis/apps/v1/namespaces/kube-system/daemonsets/cilium"
@@ -110,18 +124,105 @@ func EnsureKubernetesEngineCiliumCNI(mkeConf *marmotd.MKEConfig, ke api.Kubernet
 		return nil
 	}
 
+	tlsMaterials, err := generateKubernetesEngineCiliumTLSMaterials()
+	if err != nil {
+		return err
+	}
 	for _, name := range manifestFiles {
 		content, err := os.ReadFile(filepath.Join(manifestDir, name))
 		if err != nil {
 			return fmt.Errorf("failed to read Cilium manifest %s: %w", name, err)
 		}
 		for _, doc := range splitKubernetesEngineYAMLDocuments(content) {
+			doc, err = prepareKubernetesEngineCiliumManifest(doc, tlsMaterials)
+			if err != nil {
+				return fmt.Errorf("failed to prepare Cilium manifest %s: %w", name, err)
+			}
 			if err := applyKubernetesEngineManifestObject(namespace, caPath, adminCertPath, adminKeyPath, apiEndpointBase, doc); err != nil {
 				return fmt.Errorf("failed to apply Cilium manifest %s: %w", name, err)
 			}
 		}
 	}
 	return nil
+}
+
+func generateKubernetesEngineCiliumTLSMaterials() (kubernetesEngineCiliumTLSMaterials, error) {
+	now := time.Now().UTC()
+	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		return kubernetesEngineCiliumTLSMaterials{}, err
+	}
+	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return kubernetesEngineCiliumTLSMaterials{}, err
+	}
+	caTemplate := &x509.Certificate{
+		SerialNumber:          serial,
+		Subject:               pkix.Name{CommonName: "cilium-ca"},
+		NotBefore:             now,
+		NotAfter:              now.AddDate(10, 0, 0),
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+	}
+	caDER, err := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
+	if err != nil {
+		return kubernetesEngineCiliumTLSMaterials{}, err
+	}
+
+	serverKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return kubernetesEngineCiliumTLSMaterials{}, err
+	}
+	serverSerial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		return kubernetesEngineCiliumTLSMaterials{}, err
+	}
+	serverTemplate := &x509.Certificate{
+		SerialNumber: serverSerial,
+		Subject:      pkix.Name{CommonName: "hubble-grpc.cilium.io"},
+		DNSNames:     []string{"*.hubble-grpc.cilium.io", "*.default.hubble-grpc.cilium.io"},
+		NotBefore:    now,
+		NotAfter:     now.AddDate(1, 0, 0),
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+	}
+	serverDER, err := x509.CreateCertificate(rand.Reader, serverTemplate, caTemplate, &serverKey.PublicKey, caKey)
+	if err != nil {
+		return kubernetesEngineCiliumTLSMaterials{}, err
+	}
+
+	encode := func(typ string, data []byte) string {
+		return base64.StdEncoding.EncodeToString(pem.EncodeToMemory(&pem.Block{Type: typ, Bytes: data}))
+	}
+	return kubernetesEngineCiliumTLSMaterials{
+		caCert:     encode("CERTIFICATE", caDER),
+		caKey:      encode("RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(caKey)),
+		serverCert: encode("CERTIFICATE", serverDER),
+		serverKey:  encode("RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(serverKey)),
+	}, nil
+}
+
+func prepareKubernetesEngineCiliumManifest(doc []byte, materials kubernetesEngineCiliumTLSMaterials) ([]byte, error) {
+	var obj kubernetesEngineManifestObject
+	if err := yaml.Unmarshal(doc, &obj); err != nil {
+		return nil, err
+	}
+	if obj.Kind != "Secret" || (obj.Metadata.Name != "cilium-ca" && obj.Metadata.Name != "hubble-server-certs") {
+		return doc, nil
+	}
+	var manifest map[string]interface{}
+	if err := yaml.Unmarshal(doc, &manifest); err != nil {
+		return nil, err
+	}
+	if obj.Metadata.Name == "cilium-ca" {
+		manifest["data"] = map[string]string{"ca.crt": materials.caCert, "ca.key": materials.caKey}
+	} else {
+		manifest["data"] = map[string]string{
+			"ca.crt": materials.caCert, "tls.crt": materials.serverCert, "tls.key": materials.serverKey,
+		}
+	}
+	return yaml.Marshal(manifest)
 }
 
 // kubernetesEngineCiliumManifestFiles は、dir直下にある".yaml"/".yml"拡張子のファイル名を
