@@ -9,9 +9,9 @@
     "clusterID": "070aabed-a12a-11f1-8a75-921da53eb49a",
     "monitors": ["192.168.1.170:6789"],
     "rbdUserId": "rbduser1",
-    "rbdUserKey": "AQDGp45qMcwsBhAAGurQXn8l7hf3wU4gOiUNnA==",
+    "rbdUserKey": "<REPLACE_WITH_YOUR_CEPH_KEY>",
     "cephfsUserId": "fsuser1",
-    "cephfsUserKey": "AQDpp45qeHR8FBAAgHJA+Gdy9PFKkzIM5r+AGA==",
+    "cephfsUserKey": "<REPLACE_WITH_YOUR_CEPH_KEY>",
     "cloud_controller_manager_enabled": true
 }
 
