@@ -353,11 +353,11 @@ type KubernetesEngineLoadBalancerVipRequest struct {
 
 // KubernetesEngineNodeNetwork defines model for KubernetesEngineNodeNetwork.
 type KubernetesEngineNodeNetwork struct {
+	// CniPlugin ノード間通信用ネットワークのCNIプラグイン。none(既定)またはcilium。
+	CniPlugin *string `json:"cni-plugin,omitempty" yaml:"cni-plugin,omitempty"`
+
 	// External 外部アクセス用ネットワーク。default または host-bridge。
 	External *string `json:"external,omitempty" yaml:"external,omitempty"`
-
-	// Kind ノード間通信用ネットワークの種類。none(既定)またはcilium。
-	Kind *string `json:"kind,omitempty" yaml:"kind,omitempty"`
 }
 
 // KubernetesEngineNodeSpec defines model for KubernetesEngineNodeSpec.

@@ -2541,9 +2541,9 @@ components:
     KubernetesEngineNodeNetwork:
       type: object
       properties:
-        kind:
+        cni-plugin:
           type: string
-          description: "ノード間通信用ネットワークの種類。none(既定)またはcilium。"
+          description: "ノード間通信用ネットワークのCNIプラグイン。none(既定)またはcilium。"
         external:
           type: string
           description: "外部アクセス用ネットワーク。default または host-bridge。"

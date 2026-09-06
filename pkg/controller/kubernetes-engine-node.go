@@ -34,7 +34,7 @@ const (
 	defaultKubernetesEngineNodeMemory       = 2048
 
 	// kubernetesEngineNetworkKindBridge は、ノード間通信用ネットワーク上でシンプルな
-	// bridge CNIを使用するモード（spec.nodeSpec.network.kindの既定値）。
+	// bridge CNIを使用するモード（spec.nodeSpec.network.cni-pluginの既定値）。
 	kubernetesEngineNetworkKindBridge = "none"
 	// kubernetesEngineNetworkKindCilium は、CiliumをCNIとしてインストールするモード。
 	kubernetesEngineNetworkKindCilium = "cilium"
@@ -390,22 +390,22 @@ func kubernetesEnginePodCIDR(index int) string {
 	return fmt.Sprintf("10.244.%d.0/24", index+1)
 }
 
-// validatedKubernetesEngineNodeNetworkKind は spec.nodeSpec.network.kind を検証したうえで返す。
+// validatedKubernetesEngineNodeNetworkKind は spec.nodeSpec.network.cni-plugin を検証したうえで返す。
 func validatedKubernetesEngineNodeNetworkKind(ke api.KubernetesEngine) (string, error) {
 	kind := kubernetesEngineNetworkKindBridge
-	if ke.Spec.NodeSpec != nil && ke.Spec.NodeSpec.Network != nil && ke.Spec.NodeSpec.Network.Kind != nil {
-		trimmed := strings.ToLower(strings.TrimSpace(*ke.Spec.NodeSpec.Network.Kind))
+	if ke.Spec.NodeSpec != nil && ke.Spec.NodeSpec.Network != nil && ke.Spec.NodeSpec.Network.CniPlugin != nil {
+		trimmed := strings.ToLower(strings.TrimSpace(*ke.Spec.NodeSpec.Network.CniPlugin))
 		if trimmed != "" {
 			kind = trimmed
 		}
 	}
 	if kind != kubernetesEngineNetworkKindBridge && kind != kubernetesEngineNetworkKindCilium {
-		return "", fmt.Errorf("nodeSpec.network.kind must be %s or %s", kubernetesEngineNetworkKindBridge, kubernetesEngineNetworkKindCilium)
+		return "", fmt.Errorf("nodeSpec.network.cni-plugin must be %s or %s", kubernetesEngineNetworkKindBridge, kubernetesEngineNetworkKindCilium)
 	}
 	return kind, nil
 }
 
-// kubernetesEngineNodeNetworkKind は検証済みのnetwork.kindを返す。呼び出し時点では
+// kubernetesEngineNodeNetworkKind は検証済みのnetwork.cni-pluginを返す。呼び出し時点では
 // buildKubernetesEngineNodeServerSpec(または本関数自身の検証)を経由済みである前提のため、
 // 不正な値は既定値(bridge)として扱う。
 func kubernetesEngineNodeNetworkKind(ke api.KubernetesEngine) string {

@@ -26,7 +26,7 @@ spec:
         cpu: 4
         memory: 8192
         network:
-            kind: none # Cilliumを選択可能とする
+            cni-plugin: none # Cilliumを選択可能とする
             external: host-bridge | default
 ```
 
@@ -141,6 +141,7 @@ spec:
 ## フェーズ8: CNI有効化
 - Bridge選択時は、設定とルーティング設定追加
 - Cilium選択時のインストール・設定
+    - mke/cni-ciliumの下にある YAMLファイル群を適用して、ciliumを有効化する。
 
 ## フェーズ9: CSI（Ceph）連携
 - Ceph CSIの自動インストールとストレージ用ネットワーク接続

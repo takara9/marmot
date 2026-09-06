@@ -23,8 +23,8 @@ func TestValidateKubernetesEngineApplyForbiddenChanges(t *testing.T) {
 				Cpu:    util.IntPtrInt(2),
 				Memory: util.IntPtrInt(4096),
 				Network: &api.KubernetesEngineNodeNetwork{
-					Kind:     util.StringPtr("cilium"),
-					External: util.StringPtr("default"),
+					CniPlugin: util.StringPtr("cilium"),
+					External:  util.StringPtr("default"),
 				},
 			},
 		},
@@ -52,8 +52,8 @@ func TestValidateKubernetesEngineApplyForbiddenChanges(t *testing.T) {
 			Cpu:    util.IntPtrInt(4),
 			Memory: util.IntPtrInt(4096),
 			Network: &api.KubernetesEngineNodeNetwork{
-				Kind:     util.StringPtr("cilium"),
-				External: util.StringPtr("default"),
+				CniPlugin: util.StringPtr("cilium"),
+				External:  util.StringPtr("default"),
 			},
 		}
 		err := validateKubernetesEngineApplyForbiddenChanges(existing, desired)

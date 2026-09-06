@@ -36,10 +36,6 @@ type MKEConfig struct {
 	// 例: "1.4.0"
 	CNIPluginsVersion string `json:"cni_plugins_version"`
 
-	// spec.nodeSpec.network.kind=cilium 選択時に適用するインストールマニフェストのURL。
-	// 未設定の場合、Ciliumを選択したクラスタの構成はエラーになる。
-	CiliumManifestURL string `json:"cilium_manifest_url"`
-
 	// runc のバージョン
 	// 例: "1.4.0"
 	RuncVersion string `json:"runc_version"`

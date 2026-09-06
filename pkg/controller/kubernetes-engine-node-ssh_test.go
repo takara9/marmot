@@ -215,7 +215,7 @@ var _ = Describe("runKubernetesEngineNodeProvisionSteps", func() {
 		Expect(err.Error()).To(ContainSubstring("install runtime dependencies"))
 	})
 
-	It("installs and configures the bridge CNI when network.kind is not cilium", func() {
+	It("installs and configures the bridge CNI when network.cni-plugin is not cilium", func() {
 		runner := &fakeKubernetesEngineNodeCommandRunner{outputs: map[string]string{"uname -m": "x86_64"}}
 		data := newTestKubernetesEngineNodeProvisionData()
 
@@ -244,7 +244,7 @@ var _ = Describe("runKubernetesEngineNodeProvisionSteps", func() {
 		Expect(runner.files["/etc/systemd/system/marmot-mke-iptables-restore.service"]).To(ContainSubstring("ExecStop=/usr/local/sbin/marmot-mke-iptables-restore.sh save"))
 	})
 
-	It("skips the bridge CNI installation when network.kind is cilium", func() {
+	It("skips the bridge CNI installation when network.cni-plugin is cilium", func() {
 		runner := &fakeKubernetesEngineNodeCommandRunner{outputs: map[string]string{"uname -m": "x86_64"}}
 		data := newTestKubernetesEngineNodeProvisionData()
 		data.NetworkKind = kubernetesEngineNetworkKindCilium

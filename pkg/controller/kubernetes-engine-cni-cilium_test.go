@@ -1,9 +1,39 @@
 package controller
 
 import (
+	"os"
+	"path/filepath"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+var _ = Describe("kubernetesEngineCiliumManifestFiles", func() {
+	It("returns yaml/yml files in filename order, ignoring dotfiles and subdirectories", func() {
+		dir := GinkgoT().TempDir()
+		Expect(os.WriteFile(filepath.Join(dir, "cilium.yaml"), []byte("kind: Namespace\n"), 0o644)).To(Succeed())
+		Expect(os.WriteFile(filepath.Join(dir, "extra.yml"), []byte("kind: ConfigMap\n"), 0o644)).To(Succeed())
+		Expect(os.WriteFile(filepath.Join(dir, ".cilium.yaml.swp"), []byte("junk"), 0o644)).To(Succeed())
+		Expect(os.WriteFile(filepath.Join(dir, "README.md"), []byte("ignore me"), 0o644)).To(Succeed())
+		Expect(os.MkdirAll(filepath.Join(dir, "subdir.yaml"), 0o755)).To(Succeed())
+
+		files, err := kubernetesEngineCiliumManifestFiles(dir)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(files).To(Equal([]string{"cilium.yaml", "extra.yml"}))
+	})
+
+	It("returns an error when the directory has no manifest files", func() {
+		dir := GinkgoT().TempDir()
+		_, err := kubernetesEngineCiliumManifestFiles(dir)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("no Cilium manifest files found"))
+	})
+
+	It("returns an error when the directory does not exist", func() {
+		_, err := kubernetesEngineCiliumManifestFiles(filepath.Join(GinkgoT().TempDir(), "does-not-exist"))
+		Expect(err).To(HaveOccurred())
+	})
+})
 
 var _ = Describe("splitKubernetesEngineYAMLDocuments", func() {
 	It("splits documents separated by ---", func() {

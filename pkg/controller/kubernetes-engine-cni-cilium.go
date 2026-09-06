@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -61,8 +63,12 @@ const kubernetesEngineCiliumNamespace = "kube-system"
 // DaemonSetのURLパス。
 const kubernetesEngineCiliumProbeURLPath = "/apis/apps/v1/namespaces/kube-system/daemonsets/cilium"
 
-// EnsureKubernetesEngineCiliumCNI は spec.nodeSpec.network.kind=cilium のクラスタに対して、
-// mkeConf.CiliumManifestURL で指定されたKubernetesインストールマニフェストを
+// kubernetesEngineCiliumManifestsSubdir は、DefaultKubernetesEngineMKEManifestsDir配下で
+// Ciliumインストールマニフェスト(mke/cni-cilium由来)が置かれるディレクトリ名。
+const kubernetesEngineCiliumManifestsSubdir = "cni-cilium"
+
+// EnsureKubernetesEngineCiliumCNI は spec.nodeSpec.network.cni-plugin=cilium のクラスタに対して、
+// DefaultKubernetesEngineMKEManifestsDir/cni-cilium 配下のYAMLマニフェスト群を
 // コントロールプレーンのAPIサーバーへ適用する。既にCiliumのDaemonSetが存在する場合は
 // 何もしない（冪等）。
 //
@@ -70,15 +76,13 @@ const kubernetesEngineCiliumProbeURLPath = "/apis/apps/v1/namespaces/kube-system
 // 更新（kubectl applyのようなdiffベースの更新）は行わない。バージョンアップ等で
 // マニフェストの内容を更新したい場合は、既存リソースを削除してから再実行すること。
 func EnsureKubernetesEngineCiliumCNI(mkeConf *marmotd.MKEConfig, ke api.KubernetesEngine) error {
-	manifestURL := strings.TrimSpace(mkeConf.CiliumManifestURL)
-	if manifestURL == "" {
-		return fmt.Errorf("nodeSpec.network.kind=cilium requires cilium_manifest_url to be configured in %s", marmotd.DefaultMKEConfigPath)
-	}
-	if !strings.HasPrefix(manifestURL, "https://") {
-		return fmt.Errorf("cilium_manifest_url must use https:// (got %q)", manifestURL)
-	}
 	if ke.Status == nil || ke.Status.ControlPlaneIpAddress == nil || ke.Status.ApiServerPort == nil {
 		return fmt.Errorf("KubernetesEngine control plane status is incomplete")
+	}
+	manifestDir := filepath.Join(DefaultKubernetesEngineMKEManifestsDir, kubernetesEngineCiliumManifestsSubdir)
+	manifestFiles, err := kubernetesEngineCiliumManifestFiles(manifestDir)
+	if err != nil {
+		return err
 	}
 	clusterName := strings.TrimSpace(ke.Metadata.Name)
 	namespace, _, _, err := KubernetesEngineControlPlaneNetworkNames(clusterName)
@@ -106,16 +110,42 @@ func EnsureKubernetesEngineCiliumCNI(mkeConf *marmotd.MKEConfig, ke api.Kubernet
 		return nil
 	}
 
-	manifest, err := kubernetesDownload(manifestURL)
-	if err != nil {
-		return fmt.Errorf("failed to download Cilium manifest from %s: %w", manifestURL, err)
-	}
-	for _, doc := range splitKubernetesEngineYAMLDocuments(manifest) {
-		if err := applyKubernetesEngineManifestObject(namespace, caPath, adminCertPath, adminKeyPath, apiEndpointBase, doc); err != nil {
-			return err
+	for _, name := range manifestFiles {
+		content, err := os.ReadFile(filepath.Join(manifestDir, name))
+		if err != nil {
+			return fmt.Errorf("failed to read Cilium manifest %s: %w", name, err)
+		}
+		for _, doc := range splitKubernetesEngineYAMLDocuments(content) {
+			if err := applyKubernetesEngineManifestObject(namespace, caPath, adminCertPath, adminKeyPath, apiEndpointBase, doc); err != nil {
+				return fmt.Errorf("failed to apply Cilium manifest %s: %w", name, err)
+			}
 		}
 	}
 	return nil
+}
+
+// kubernetesEngineCiliumManifestFiles は、dir直下にある".yaml"/".yml"拡張子のファイル名を
+// (os.ReadDirの仕様によりファイル名順で)返す。隠しファイル(vimのスワップファイル等)や
+// サブディレクトリは無視する。1件も無い場合はエラーとする。
+func kubernetesEngineCiliumManifestFiles(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read Cilium manifests dir %s: %w", dir, err)
+	}
+	var files []string
+	for _, entry := range entries {
+		if entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+		if !strings.HasSuffix(entry.Name(), ".yaml") && !strings.HasSuffix(entry.Name(), ".yml") {
+			continue
+		}
+		files = append(files, entry.Name())
+	}
+	if len(files) == 0 {
+		return nil, fmt.Errorf("no Cilium manifest files found in %s", dir)
+	}
+	return files, nil
 }
 
 // splitKubernetesEngineYAMLDocuments は、"---"区切りのマニフェストを個々のYAMLドキュメントへ
