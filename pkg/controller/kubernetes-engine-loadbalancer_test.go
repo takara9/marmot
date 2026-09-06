@@ -8,9 +8,9 @@ import (
 )
 
 var _ = Describe("KubernetesEngineLoadBalancer", func() {
-	It("is enabled by default (external omitted defaults to host-bridge) but disabled when external is default", func() {
+	It("is disabled by default but enabled when external is host-bridge", func() {
 		ke := api.KubernetesEngine{Metadata: api.Metadata{Name: "demo"}}
-		Expect(kubernetesEngineLoadBalancerEnabled(ke)).To(BeTrue())
+		Expect(kubernetesEngineLoadBalancerEnabled(ke)).To(BeFalse())
 
 		defaultExternal := "default"
 		ke.Spec.NodeSpec = &api.KubernetesEngineNodeSpec{
