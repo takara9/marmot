@@ -28,7 +28,7 @@ var _ = Describe("KubernetesEngineControlPlaneUnits", func() {
 
 		apiServerUnit, err := os.ReadFile(filepath.Join(controlPlaneSystemdUnitDir, "mke-kube-apiserver-demo.service"))
 		Expect(err).NotTo(HaveOccurred())
-		for _, want := range []string{"NetworkNamespacePath=/run/netns/mke-demo", "--etcd-servers=http://127.0.0.1:23790", "--secure-port=6443", "--advertise-address=172.16.90.100", "--kubelet-preferred-address-types=InternalIP", "--kubelet-client-certificate=/pki/kube-apiserver-kubelet-client.crt", "--kubelet-client-key=/pki/kube-apiserver-kubelet-client.key"} {
+		for _, want := range []string{"NetworkNamespacePath=/run/netns/mke-demo", "--etcd-servers=http://127.0.0.1:23790", "--secure-port=6443", "--advertise-address=172.16.90.100", "--kubelet-preferred-address-types=InternalIP", "--kubelet-client-certificate=/pki/kube-apiserver-kubelet-client.crt", "--kubelet-client-key=/pki/kube-apiserver-kubelet-client.key", "--requestheader-client-ca-file=/pki/front-proxy-ca.crt", "--requestheader-allowed-names=front-proxy-client", "--requestheader-extra-headers-prefix=X-Remote-Extra-", "--requestheader-group-headers=X-Remote-Group", "--requestheader-username-headers=X-Remote-User", "--proxy-client-cert-file=/pki/front-proxy-client.crt", "--proxy-client-key-file=/pki/front-proxy-client.key", "--enable-aggregator-routing=true"} {
 			Expect(string(apiServerUnit)).To(ContainSubstring(want))
 		}
 
@@ -81,6 +81,9 @@ func testControlPlaneUnitConfig() KubernetesEngineControlPlaneUnitConfig {
 			ControllerManagerConfigPath:  "/config/kube-controller-manager.kubeconfig",
 			ServiceAccountPublicKeyPath:  "/pki/service-account.pub",
 			ServiceAccountPrivateKeyPath: "/pki/service-account.key",
+			FrontProxyCACertPath:         "/pki/front-proxy-ca.crt",
+			ProxyClientCertPath:          "/pki/front-proxy-client.crt",
+			ProxyClientKeyPath:           "/pki/front-proxy-client.key",
 		},
 	}
 }

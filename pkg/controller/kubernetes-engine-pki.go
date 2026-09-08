@@ -67,6 +67,14 @@ func KubernetesEngineServiceAccountKeyPaths(pkiDir, clusterName string) (publicK
 	return filepath.Join(dir, "service-account.pub"), filepath.Join(dir, "service-account.key")
 }
 
+// KubernetesEngineFrontProxyCAPaths は、API集約層(aggregation layer)のrequestheader認証で使う
+// front-proxy専用CAの証明書・秘密鍵のパスを返す。クライアント証明書認証用のクラスタCAとは
+// 信頼元を分離するため、別のCAとして管理する。
+func KubernetesEngineFrontProxyCAPaths(pkiDir, clusterName string) (certPath, keyPath string) {
+	dir := kubernetesEngineClusterPkiDir(pkiDir, clusterName)
+	return filepath.Join(dir, "front-proxy-ca.crt"), filepath.Join(dir, "front-proxy-ca.key")
+}
+
 // validateKubernetesEnginePkiClusterName はクラスタ名がディレクトリ/ファイル名として
 // 安全であることを検証し、前後の空白を除いた名前を返す。
 func validateKubernetesEnginePkiClusterName(clusterName string) (string, error) {
@@ -98,7 +106,34 @@ func EnsureKubernetesEngineCA(pkiDir, clusterName string) (certPath, keyPath str
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", "", fmt.Errorf("failed to create pki dir: %w", err)
 	}
-	if err := withKubernetesEnginePkiLock(filepath.Join(dir, ".ca.lock"), func() error {
+	if err := ensureKubernetesEngineSelfSignedCA(dir, ".ca.lock", certPath, keyPath, fmt.Sprintf("mke-%s-ca", name)); err != nil {
+		return "", "", err
+	}
+	return certPath, keyPath, nil
+}
+
+// EnsureKubernetesEngineFrontProxyCA は、API集約層(aggregation layer)のrequestheader認証専用の
+// 自己署名CAを生成する。クラスタCA(クライアント証明書認証に使用)とは信頼元を分離するため、
+// 別のCAとして管理する。既に生成済みの場合は再生成せずそのパスを返す(冪等)。
+func EnsureKubernetesEngineFrontProxyCA(pkiDir, clusterName string) (certPath, keyPath string, err error) {
+	name, err := validateKubernetesEnginePkiClusterName(clusterName)
+	if err != nil {
+		return "", "", err
+	}
+	certPath, keyPath = KubernetesEngineFrontProxyCAPaths(pkiDir, name)
+	dir := kubernetesEngineClusterPkiDir(pkiDir, name)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", "", fmt.Errorf("failed to create pki dir: %w", err)
+	}
+	if err := ensureKubernetesEngineSelfSignedCA(dir, ".front-proxy-ca.lock", certPath, keyPath, fmt.Sprintf("mke-%s-front-proxy-ca", name)); err != nil {
+		return "", "", err
+	}
+	return certPath, keyPath, nil
+}
+
+// ensureKubernetesEngineSelfSignedCA は、certPath/keyPathに自己署名CAが無ければ生成する(冪等)。
+func ensureKubernetesEngineSelfSignedCA(dir, lockName, certPath, keyPath, commonName string) error {
+	return withKubernetesEnginePkiLock(filepath.Join(dir, lockName), func() error {
 		if certFileExists(certPath) && certFileExists(keyPath) {
 			return nil
 		}
@@ -115,7 +150,7 @@ func EnsureKubernetesEngineCA(pkiDir, clusterName string) (certPath, keyPath str
 		caTemplate := &x509.Certificate{
 			SerialNumber: serial,
 			Subject: pkix.Name{
-				CommonName:   fmt.Sprintf("mke-%s-ca", name),
+				CommonName:   commonName,
 				Organization: []string{"marmot"},
 			},
 			NotBefore:             now.Add(-time.Hour),
@@ -136,10 +171,7 @@ func EnsureKubernetesEngineCA(pkiDir, clusterName string) (certPath, keyPath str
 			return err
 		}
 		return nil
-	}); err != nil {
-		return "", "", err
-	}
-	return certPath, keyPath, nil
+	})
 }
 
 // IssueKubernetesEngineCertificate はクラスタ専用CAで署名したリーフ証明書を発行する。
@@ -149,6 +181,24 @@ func IssueKubernetesEngineCertificate(pkiDir, clusterName string, req Kubernetes
 	if err != nil {
 		return "", "", err
 	}
+	caCertPath, caKeyPath := KubernetesEngineCAPaths(pkiDir, name)
+	return issueKubernetesEngineCertificateWithCA(pkiDir, name, caCertPath, caKeyPath, req)
+}
+
+// IssueKubernetesEngineFrontProxyClientCertificate は、front-proxy CA(クラスタCAとは別)で
+// 署名したproxy-clientクライアント証明書を発行する。kube-apiserverの--proxy-client-cert-file/
+// --proxy-client-key-fileに使用し、requestheader認証(--requestheader-client-ca-file)の
+// 信頼元と一致させる。既に同名の証明書が存在する場合は再発行せずそのパスを返す(冪等)。
+func IssueKubernetesEngineFrontProxyClientCertificate(pkiDir, clusterName string, req KubernetesEngineCertRequest) (certPath, keyPath string, err error) {
+	name, err := validateKubernetesEnginePkiClusterName(clusterName)
+	if err != nil {
+		return "", "", err
+	}
+	caCertPath, caKeyPath := KubernetesEngineFrontProxyCAPaths(pkiDir, name)
+	return issueKubernetesEngineCertificateWithCA(pkiDir, name, caCertPath, caKeyPath, req)
+}
+
+func issueKubernetesEngineCertificateWithCA(pkiDir, name, caCertPath, caKeyPath string, req KubernetesEngineCertRequest) (certPath, keyPath string, err error) {
 	reqName := strings.TrimSpace(req.Name)
 	if reqName == "" {
 		return "", "", fmt.Errorf("certificate request name is empty")
@@ -172,10 +222,9 @@ func IssueKubernetesEngineCertificate(pkiDir, clusterName string, req Kubernetes
 			return nil
 		}
 
-		caCertPath, caKeyPath := KubernetesEngineCAPaths(pkiDir, name)
 		caCert, caKey, err := loadKubernetesEngineCA(caCertPath, caKeyPath)
 		if err != nil {
-			return fmt.Errorf("failed to load cluster CA: %w", err)
+			return fmt.Errorf("failed to load CA: %w", err)
 		}
 
 		var extKeyUsage []x509.ExtKeyUsage

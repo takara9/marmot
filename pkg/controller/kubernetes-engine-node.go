@@ -95,6 +95,9 @@ func ProvisionKubernetesEngineNodes(database *db.Database, mkeConf *marmotd.MKEC
 	if err := EnsureKubernetesEngineClusterDNS(ke); err != nil {
 		return false, fmt.Errorf("failed to install cluster DNS: %w", err)
 	}
+	if err := EnsureKubernetesEngineMetricsServer(ke); err != nil {
+		return false, fmt.Errorf("failed to install metrics-server: %w", err)
+	}
 	if mkeConf.CloudControllerManagerEnabled {
 		if err := EnsureKubernetesEngineCloudControllerManagerRBAC(ke); err != nil {
 			return false, fmt.Errorf("failed to ensure cloud-controller-manager RBAC: %w", err)

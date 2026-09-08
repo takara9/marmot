@@ -43,6 +43,25 @@ var _ = Describe("EnsureKubernetesEngineControlPlaneAssets", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(kubeletClientCert.Subject.Organization).To(ContainElement("system:masters"))
 		Expect(certFileExists(assets.KubeletClientKeyPath)).To(BeTrue())
+
+		Expect(certFileExists(assets.FrontProxyCACertPath)).To(BeTrue())
+		proxyClientCertPEM, err := os.ReadFile(assets.ProxyClientCertPath)
+		Expect(err).NotTo(HaveOccurred())
+		block, _ = pem.Decode(proxyClientCertPEM)
+		Expect(block).NotTo(BeNil())
+		proxyClientCert, err := x509.ParseCertificate(block.Bytes)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(proxyClientCert.Subject.CommonName).To(Equal("front-proxy-client"))
+		Expect(certFileExists(assets.ProxyClientKeyPath)).To(BeTrue())
+
+		// front-proxy-clientはクラスタCAではなくfront-proxy CAで署名されている必要がある。
+		frontProxyCACertPEM, err := os.ReadFile(assets.FrontProxyCACertPath)
+		Expect(err).NotTo(HaveOccurred())
+		block, _ = pem.Decode(frontProxyCACertPEM)
+		Expect(block).NotTo(BeNil())
+		frontProxyCACert, err := x509.ParseCertificate(block.Bytes)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(proxyClientCert.CheckSignatureFrom(frontProxyCACert)).To(Succeed())
 	})
 })
 
