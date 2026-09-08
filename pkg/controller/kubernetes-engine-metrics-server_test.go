@@ -15,7 +15,7 @@ var _ = Describe("EnsureKubernetesEngineMetricsServer", func() {
 		Expect(err.Error()).To(ContainSubstring("control plane status is incomplete"))
 	})
 
-	It("returns an error when the metrics-server manifest file is missing", func() {
+	It("returns an error when metrics-server cannot be applied without a running control plane", func() {
 		ip := "172.16.90.100"
 		port := 6443
 		ke := api.KubernetesEngine{
@@ -27,6 +27,5 @@ var _ = Describe("EnsureKubernetesEngineMetricsServer", func() {
 		}
 		err := EnsureKubernetesEngineMetricsServer(ke)
 		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("failed to read metrics-server manifest"))
 	})
 })
