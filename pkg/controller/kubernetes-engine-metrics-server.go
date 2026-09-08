@@ -18,8 +18,8 @@ const kubernetesEngineMetricsServerManifestsSubdir = "metrics-server"
 const kubernetesEngineMetricsServerManifestFile = "components.yaml"
 
 // kubernetesEngineMetricsServerProbeURLPath は、metrics-serverが既にインストール済みかどうかの
-// 判定に使うDeploymentのURLパス。
-const kubernetesEngineMetricsServerProbeURLPath = "/apis/apps/v1/namespaces/kube-system/deployments/metrics-server"
+// 判定に使うAPIServiceのURLパス。
+const kubernetesEngineMetricsServerProbeURLPath = "/apis/apiregistration.k8s.io/v1/apiservices/v1beta1.metrics.k8s.io"
 
 // EnsureKubernetesEngineMetricsServer は、DefaultKubernetesEngineMKEManifestsDir/metrics-server
 // 配下のマニフェストをコントロールプレーンのAPIサーバーへ適用する。metrics-serverはAPI集約層
