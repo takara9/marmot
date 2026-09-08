@@ -28,6 +28,14 @@ type KubernetesEngineControlPlaneAssets struct {
 	ControllerManagerConfigPath  string
 	ServiceAccountPublicKeyPath  string
 	ServiceAccountPrivateKeyPath string
+	// FrontProxyCACertPath は、API集約層(aggregation layer)のrequestheader認証で信頼する
+	// front-proxy専用CA証明書のパス(--requestheader-client-ca-file)。
+	FrontProxyCACertPath string
+	// ProxyClientCertPath/ProxyClientKeyPath は、kube-apiserverがmetrics-server等の
+	// 集約APIサーバーへプロキシする際に提示するクライアント証明書(--proxy-client-cert-file/
+	// --proxy-client-key-file)。front-proxy CAで署名される。
+	ProxyClientCertPath string
+	ProxyClientKeyPath  string
 }
 
 type controlPlaneKubeconfig struct {
@@ -151,6 +159,19 @@ func EnsureKubernetesEngineControlPlaneAssets(pkiDir, configDir, clusterName, ap
 	if err != nil {
 		return KubernetesEngineControlPlaneAssets{}, err
 	}
+	frontProxyCACertPath, _, err := EnsureKubernetesEngineFrontProxyCA(pkiDir, clusterName)
+	if err != nil {
+		return KubernetesEngineControlPlaneAssets{}, err
+	}
+	// CN=front-proxy-client は --requestheader-allowed-names と一致させる必要がある。
+	proxyClientCertPath, proxyClientKeyPath, err := IssueKubernetesEngineFrontProxyClientCertificate(pkiDir, clusterName, KubernetesEngineCertRequest{
+		Name:       "front-proxy-client",
+		CommonName: "front-proxy-client",
+		Usage:      KubernetesEngineCertUsageClient,
+	})
+	if err != nil {
+		return KubernetesEngineControlPlaneAssets{}, err
+	}
 
 	clusterDir := filepath.Join(configDir, clusterName)
 	if err := os.MkdirAll(clusterDir, 0o700); err != nil {
@@ -175,6 +196,9 @@ func EnsureKubernetesEngineControlPlaneAssets(pkiDir, configDir, clusterName, ap
 		ControllerManagerConfigPath:  controllerManagerConfigPath,
 		ServiceAccountPublicKeyPath:  serviceAccountPublicKeyPath,
 		ServiceAccountPrivateKeyPath: serviceAccountPrivateKeyPath,
+		FrontProxyCACertPath:         frontProxyCACertPath,
+		ProxyClientCertPath:          proxyClientCertPath,
+		ProxyClientKeyPath:           proxyClientKeyPath,
 	}, nil
 }
 
