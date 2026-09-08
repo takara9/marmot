@@ -479,6 +479,10 @@ jobs:
     - name: 仮想ネットワーク作成
       run: |
         sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/setup-libvirt-networks.sh
+    - name: mke-manifests同期 (tools/deb/postinstと同じcp -aロジック)
+      run: |
+        sudo mkdir -p /var/lib/marmot/mke-manifests
+        sudo cp -a mke/. /var/lib/marmot/mke-manifests/
     - name: MKEノード実VM E2Eテスト
       run: |
         cd pkg/marmotd
