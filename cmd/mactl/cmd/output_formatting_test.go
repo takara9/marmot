@@ -211,6 +211,78 @@ var _ = Describe("Output formatting", func() {
 			}).NotTo(Panic())
 		})
 	})
+
+	Describe("describeKubernetesEngineText", func() {
+		It("outputs kubernetes engine details without panicking", func() {
+			ke := &api.KubernetesEngine{
+				Metadata: api.Metadata{
+					Name: "test-mke",
+					Id:   "mke-001",
+				},
+				Spec: api.KubernetesEngineSpec{
+					Version: "1.36",
+					Nodes:   2,
+				},
+			}
+
+			Expect(func() {
+				_ = describeKubernetesEngineText(ke, nil, nil)
+			}).NotTo(Panic())
+		})
+
+		It("includes node and load balancer rows", func() {
+			nodeCPU := 2
+			nodeMemory := 4096
+			internalAddr := "172.16.1.10"
+			externalAddr := "192.168.1.50"
+			nodes := []api.Server{{
+				Metadata: api.Metadata{Name: "mke-node-1"},
+				Spec: api.ServerSpec{
+					Cpu:    &nodeCPU,
+					Memory: &nodeMemory,
+					NetworkInterface: &[]api.NetworkInterface{
+						{Networkname: "default", Address: &internalAddr},
+						{Networkname: "host-bridge", Address: &externalAddr},
+					},
+				},
+			}}
+
+			output := captureOutput(func() {
+				_ = describeKubernetesEngineText(&api.KubernetesEngine{
+					Metadata: api.Metadata{Name: "test-mke"},
+				}, nodes, nil)
+			})
+
+			Expect(output).To(ContainSubstring("mke-node-1"), output)
+			Expect(output).To(ContainSubstring(internalAddr), output)
+			Expect(output).To(ContainSubstring(externalAddr), output)
+		})
+	})
+
+	Describe("kubernetesEngineServerIPs", func() {
+		It("treats host-bridge as external and the other network as internal", func() {
+			internalAddr := "172.16.1.10"
+			externalAddr := "192.168.1.50"
+			server := api.Server{
+				Spec: api.ServerSpec{
+					NetworkInterface: &[]api.NetworkInterface{
+						{Networkname: "default", Address: &internalAddr},
+						{Networkname: "host-bridge", Address: &externalAddr},
+					},
+				},
+			}
+
+			internalIP, externalIP := kubernetesEngineServerIPs(server)
+			Expect(internalIP).To(Equal(internalAddr))
+			Expect(externalIP).To(Equal(externalAddr))
+		})
+
+		It("returns dashes when no network interfaces are set", func() {
+			internalIP, externalIP := kubernetesEngineServerIPs(api.Server{})
+			Expect(internalIP).To(Equal("-"))
+			Expect(externalIP).To(Equal("-"))
+		})
+	})
 })
 
 // captureOutput captures stdout temporarily

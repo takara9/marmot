@@ -8,13 +8,14 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/client"
 	"go.yaml.in/yaml/v3"
 )
 
 var describeCmd = &cobra.Command{
 	Use:   "describe RESOURCE NAME",
 	Short: "Show detailed information about a resource",
-	Long:  `Describe a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw) with NAME specified. Shows formatted text output.`,
+	Long:  `Describe a resource (server/srv, image/img, volume/vol, network/net, gateway/gw, vpngateway/vpngw, kubernetesengine/mke) with NAME specified. Shows formatted text output.`,
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		resourceName := args[0]
@@ -35,6 +36,8 @@ var describeCmd = &cobra.Command{
 			return describeGateway(objectName)
 		case "vpngateway":
 			return describeVpnGateway(objectName)
+		case "kubernetesengine":
+			return describeKubernetesEngine(objectName)
 		default:
 			return fmt.Errorf("unknown resource type: %s", resourceName)
 		}
@@ -1074,6 +1077,206 @@ func gatewayRemoteCIDRsOrDefault(values *[]string, legacy *string) string {
 		return "0.0.0.0/0"
 	}
 	return strings.Join(items, ", ")
+}
+
+// kubernetesEngineNodeLabelOwner/Role は pkg/controller/kubernetes-engine-node.go の
+// 同名定数と値を揃える必要がある(ノード/ロードバランサーサーバーに付与されるラベル)。
+const (
+	kubernetesEngineNodeLabelOwner        = "kubernetesEngineId"
+	kubernetesEngineNodeLabelRole         = "kubernetesEngineRole"
+	kubernetesEngineNodeRoleValue         = "node"
+	kubernetesEngineLoadBalancerRoleValue = "loadbalancer"
+)
+
+func describeKubernetesEngine(name string) error {
+	m, err := getClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	list, _, err := m.GetKubernetesEngines()
+	if err != nil {
+		return fmt.Errorf("failed to list kubernetes engines: %w", err)
+	}
+
+	var items []api.KubernetesEngine
+	if err := json.Unmarshal(list, &items); err != nil {
+		return fmt.Errorf("failed to parse kubernetes engines: %w", err)
+	}
+
+	matches := make([]api.KubernetesEngine, 0)
+	for _, item := range items {
+		if item.Metadata.Name == name {
+			matches = append(matches, item)
+		}
+	}
+
+	if len(matches) == 0 {
+		return fmt.Errorf("kubernetes engine %q not found", name)
+	}
+	if len(matches) > 1 {
+		return fmt.Errorf("multiple kubernetes engines found with name %q; please query by id via API", name)
+	}
+
+	found := matches[0]
+	if outputStyle != "text" {
+		return describeResource(found)
+	}
+
+	nodes, loadBalancers, err := kubernetesEngineOwnedServers(m, api.KubernetesEngineID(found))
+	if err != nil {
+		return err
+	}
+
+	return describeKubernetesEngineText(&found, nodes, loadBalancers)
+}
+
+// kubernetesEngineOwnedServers は、指定されたKubernetesEngineが所有するノード/
+// ロードバランサーサーバーを、ラベル(kubernetesEngineId, kubernetesEngineRole)で絞り込んで返す。
+func kubernetesEngineOwnedServers(m *client.MarmotEndpoint, ownerID string) (nodes []api.Server, loadBalancers []api.Server, err error) {
+	list, _, err := m.GetServers()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to list servers: %w", err)
+	}
+
+	var servers []api.Server
+	if err := json.Unmarshal(list, &servers); err != nil {
+		return nil, nil, fmt.Errorf("failed to parse servers: %w", err)
+	}
+
+	for _, s := range servers {
+		if s.Metadata.Labels == nil {
+			continue
+		}
+		labels := *s.Metadata.Labels
+		owner, _ := labels[kubernetesEngineNodeLabelOwner].(string)
+		if owner != ownerID {
+			continue
+		}
+		role, _ := labels[kubernetesEngineNodeLabelRole].(string)
+		switch role {
+		case kubernetesEngineNodeRoleValue:
+			nodes = append(nodes, s)
+		case kubernetesEngineLoadBalancerRoleValue:
+			loadBalancers = append(loadBalancers, s)
+		}
+	}
+
+	return nodes, loadBalancers, nil
+}
+
+func describeKubernetesEngineText(ke *api.KubernetesEngine, nodes []api.Server, loadBalancers []api.Server) error {
+	if ke == nil {
+		return fmt.Errorf("kubernetes engine is nil")
+	}
+
+	id := "-"
+	if strings.TrimSpace(ke.Metadata.Id) != "" {
+		id = strings.TrimSpace(ke.Metadata.Id)
+	}
+
+	statusText := "-"
+	statusCode := "-"
+	created := "-"
+	updated := "-"
+	statusMessage := "-"
+	apiServerPort := "-"
+	resolvedVersion := "-"
+	controlPlaneIP := "-"
+	if ke.Status != nil {
+		statusCode = fmt.Sprintf("%d", ke.Status.StatusCode)
+		if ke.Status.Status != nil && strings.TrimSpace(*ke.Status.Status) != "" {
+			statusText = strings.TrimSpace(*ke.Status.Status)
+		}
+		if ke.Status.LastUpdateTimeStamp != nil {
+			updated = ke.Status.LastUpdateTimeStamp.Local().Format("2006-01-02 15:04:05")
+		}
+		if ke.Status.Message != nil && strings.TrimSpace(*ke.Status.Message) != "" {
+			statusMessage = strings.TrimSpace(*ke.Status.Message)
+		}
+		if ke.Status.ApiServerPort != nil {
+			apiServerPort = fmt.Sprintf("%d", *ke.Status.ApiServerPort)
+		}
+		if ke.Status.ResolvedKubernetesVersion != nil && strings.TrimSpace(*ke.Status.ResolvedKubernetesVersion) != "" {
+			resolvedVersion = strings.TrimSpace(*ke.Status.ResolvedKubernetesVersion)
+		}
+		if ke.Status.ControlPlaneIpAddress != nil && strings.TrimSpace(*ke.Status.ControlPlaneIpAddress) != "" {
+			controlPlaneIP = strings.TrimSpace(*ke.Status.ControlPlaneIpAddress)
+		}
+	}
+	ct := creationTime(ke.Status)
+	if !ct.IsZero() {
+		created = ct.Local().Format("2006-01-02 15:04:05")
+	}
+
+	fmt.Println("Metadata:")
+	fmt.Printf("  Name:          %s\n", ke.Metadata.Name)
+	fmt.Printf("  Kind:          %s\n", ke.Kind)
+	fmt.Printf("  ID:            %s\n", id)
+
+	fmt.Println("\nStatus:")
+	fmt.Printf("  State:         %s\n", statusText)
+	fmt.Printf("  StatusCode:    %s\n", statusCode)
+	fmt.Printf("  Age:           %s\n", formatServerAge(ke.Status))
+	fmt.Printf("  Created:       %s\n", created)
+	fmt.Printf("  Updated:       %s\n", updated)
+	fmt.Printf("  Message:       %s\n", statusMessage)
+
+	fmt.Println("\nSpec:")
+	fmt.Printf("  Version:            %s (requested), %s (resolved)\n", ke.Spec.Version, resolvedVersion)
+	fmt.Printf("  Nodes:              %d\n", ke.Spec.Nodes)
+	fmt.Printf("  ControlPlaneIP:     %s\n", controlPlaneIP)
+	fmt.Printf("  ApiServerPort:      %s\n", apiServerPort)
+
+	fmt.Println("\nNodes:")
+	printKubernetesEngineServerTable(nodes)
+
+	fmt.Println("\nLoadBalancers:")
+	printKubernetesEngineServerTable(loadBalancers)
+
+	return nil
+}
+
+func printKubernetesEngineServerTable(servers []api.Server) {
+	if len(servers) == 0 {
+		fmt.Println("  -")
+		return
+	}
+
+	fmt.Println("  NAME              CPU  MEMORY(GB)  INTERNAL-IP      EXTERNAL-IP")
+	fmt.Println("  ----              ---  ----------  -----------      -----------")
+	for _, s := range servers {
+		cpu := "-"
+		if s.Spec.Cpu != nil {
+			cpu = fmt.Sprintf("%d", *s.Spec.Cpu)
+		}
+		mem := formatMemoryGB(s.Spec.Memory)
+		internalIP, externalIP := kubernetesEngineServerIPs(s)
+		fmt.Printf("  %-16s  %-3s  %-10s  %-15s  %s\n", s.Metadata.Name, cpu, mem, internalIP, externalIP)
+	}
+}
+
+// kubernetesEngineServerIPs は、host-bridge接続I/FのアドレスをEXTERNAL-IP、それ以外の
+// 最初のI/FのアドレスをINTERNAL-IPとして返す(cmd/mke-lb-controllerと同じ規約)。
+func kubernetesEngineServerIPs(s api.Server) (internalIP, externalIP string) {
+	internalIP, externalIP = "-", "-"
+	if s.Spec.NetworkInterface == nil {
+		return
+	}
+	for _, nic := range *s.Spec.NetworkInterface {
+		if nic.Address == nil || strings.TrimSpace(*nic.Address) == "" {
+			continue
+		}
+		addr := strings.TrimSpace(*nic.Address)
+		if nic.Networkname == "host-bridge" {
+			externalIP = addr
+			continue
+		}
+		if internalIP == "-" {
+			internalIP = addr
+		}
+	}
+	return
 }
 
 func describeResource(resource interface{}) error {
