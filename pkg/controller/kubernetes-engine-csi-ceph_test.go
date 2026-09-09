@@ -95,6 +95,8 @@ func TestPrepareKubernetesEngineCephCSIManifests(t *testing.T) {
 	mustWriteFile(t, filepath.Join(baseDir, "ceph-fs", "csi-cephfs-secret.yaml"), "stringData:\n  userID: fsuser1\n  userKey: BBBB\n")
 	mustWriteFile(t, filepath.Join(baseDir, "ceph-fs", "cephfs-storageclass.yaml"), "parameters:\n  clusterID: 070aabed-a12a-11f1-8a75-921da53eb49a\n  fsName: cephfs\n")
 	mustWriteFile(t, filepath.Join(baseDir, "snapshot-crds", "snapshot.storage.k8s.io_volumesnapshotclasses.yaml"), "kind: CustomResourceDefinition\n")
+	mustWriteFile(t, filepath.Join(baseDir, "snapshot-crds", "snapshot.storage.k8s.io_volumesnapshotcontents.yaml"), "kind: CustomResourceDefinition\n")
+	mustWriteFile(t, filepath.Join(baseDir, "snapshot-crds", "snapshot.storage.k8s.io_volumesnapshots.yaml"), "kind: CustomResourceDefinition\n")
 	mustWriteFile(t, filepath.Join(baseDir, "snapshot-controller", "snapshot-controller-rbac.yaml"), "kind: ServiceAccount\n")
 	mustWriteFile(t, filepath.Join(baseDir, "snapshot-controller", "snapshot-controller.yaml"), "kind: Deployment\n")
 	mustWriteFile(t, filepath.Join(baseDir, "kms", "vault.yaml"), "kind: Deployment\n")
