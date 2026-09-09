@@ -90,9 +90,15 @@ func TestPrepareKubernetesEngineCephCSIManifests(t *testing.T) {
 `)
 	mustWriteFile(t, filepath.Join(baseDir, "ceph-rbd", "csi-rbd-secret.yaml"), "stringData:\n  userID: rbduser1\n  userKey: AAAA\n")
 	mustWriteFile(t, filepath.Join(baseDir, "ceph-rbd", "rbd-storageclass.yaml"), "parameters:\n  clusterID: 070aabed-a12a-11f1-8a75-921da53eb49a\n  pool: rbdpool\n")
+	mustWriteFile(t, filepath.Join(baseDir, "ceph-rbd", "snapshotclass.yaml"), "parameters:\n  clusterID: 070aabed-a12a-11f1-8a75-921da53eb49a\n")
 	mustWriteFile(t, filepath.Join(baseDir, "ceph-rbd", "csidriver.yaml"), "kind: CSIDriver\n")
 	mustWriteFile(t, filepath.Join(baseDir, "ceph-fs", "csi-cephfs-secret.yaml"), "stringData:\n  userID: fsuser1\n  userKey: BBBB\n")
 	mustWriteFile(t, filepath.Join(baseDir, "ceph-fs", "cephfs-storageclass.yaml"), "parameters:\n  clusterID: 070aabed-a12a-11f1-8a75-921da53eb49a\n  fsName: cephfs\n")
+	mustWriteFile(t, filepath.Join(baseDir, "snapshot-crds", "snapshot.storage.k8s.io_volumesnapshotclasses.yaml"), "kind: CustomResourceDefinition\n")
+	mustWriteFile(t, filepath.Join(baseDir, "snapshot-crds", "snapshot.storage.k8s.io_volumesnapshotcontents.yaml"), "kind: CustomResourceDefinition\n")
+	mustWriteFile(t, filepath.Join(baseDir, "snapshot-crds", "snapshot.storage.k8s.io_volumesnapshots.yaml"), "kind: CustomResourceDefinition\n")
+	mustWriteFile(t, filepath.Join(baseDir, "snapshot-controller", "snapshot-controller-rbac.yaml"), "kind: ServiceAccount\n")
+	mustWriteFile(t, filepath.Join(baseDir, "snapshot-controller", "snapshot-controller.yaml"), "kind: Deployment\n")
 	mustWriteFile(t, filepath.Join(baseDir, "kms", "vault.yaml"), "kind: Deployment\n")
 
 	clusterDir := filepath.Join(baseDir, "clusters", "test-cluster")
@@ -123,6 +129,11 @@ func TestPrepareKubernetesEngineCephCSIManifests(t *testing.T) {
 		t.Fatalf("rbd-storageclass.yaml not rendered correctly:\n%s", rbdStorageClass)
 	}
 
+	snapshotClass := mustReadFile(t, filepath.Join(clusterDir, "ceph-rbd", "snapshotclass.yaml"))
+	if !strings.Contains(snapshotClass, "clusterID: my-cluster") {
+		t.Fatalf("snapshotclass.yaml not rendered correctly:\n%s", snapshotClass)
+	}
+
 	cephfsSecret := mustReadFile(t, filepath.Join(clusterDir, "ceph-fs", "csi-cephfs-secret.yaml"))
 	if !strings.Contains(cephfsSecret, "userID: fsadmin") || !strings.Contains(cephfsSecret, "userKey: fskey==") {
 		t.Fatalf("csi-cephfs-secret.yaml not rendered correctly:\n%s", cephfsSecret)
@@ -139,6 +150,12 @@ func TestPrepareKubernetesEngineCephCSIManifests(t *testing.T) {
 	}
 	if got := mustReadFile(t, filepath.Join(clusterDir, "kms", "vault.yaml")); got != "kind: Deployment\n" {
 		t.Fatalf("vault.yaml should be copied verbatim, got: %q", got)
+	}
+	if got := mustReadFile(t, filepath.Join(clusterDir, "snapshot-crds", "snapshot.storage.k8s.io_volumesnapshotclasses.yaml")); got != "kind: CustomResourceDefinition\n" {
+		t.Fatalf("snapshot-crds should be copied verbatim, got: %q", got)
+	}
+	if got := mustReadFile(t, filepath.Join(clusterDir, "snapshot-controller", "snapshot-controller.yaml")); got != "kind: Deployment\n" {
+		t.Fatalf("snapshot-controller should be copied verbatim, got: %q", got)
 	}
 
 	// Idempotency: re-running with different values must not overwrite the already-copied dir.

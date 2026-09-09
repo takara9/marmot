@@ -24,6 +24,8 @@ const DefaultKubernetesEngineMKEManifestsDir = "/var/lib/marmot/mke-manifests"
 var kubernetesEngineCephCSITemplateEntries = []string{
 	"ceph-conf.yaml",
 	"csi-config-map.yaml",
+	"snapshot-crds",
+	"snapshot-controller",
 	"ceph-rbd",
 	"ceph-fs",
 	"kms",
@@ -35,6 +37,14 @@ var kubernetesEngineCephCSITemplateEntries = []string{
 var kubernetesEngineCephCSIApplyOrder = []string{
 	"ceph-conf.yaml",
 	"csi-config-map.yaml",
+	// VolumeSnapshotClass等はKubernetes標準組み込みではないため、external-snapshotter提供の
+	// CRDを他のCSIリソースより先に登録しておく必要がある。
+	filepath.Join("snapshot-crds", "snapshot.storage.k8s.io_volumesnapshotclasses.yaml"),
+	filepath.Join("snapshot-crds", "snapshot.storage.k8s.io_volumesnapshotcontents.yaml"),
+	filepath.Join("snapshot-crds", "snapshot.storage.k8s.io_volumesnapshots.yaml"),
+	// VolumeSnapshot↔VolumeSnapshotContentの双方向バインドはCSIサイドカーではなくこのコントローラが行う。
+	filepath.Join("snapshot-controller", "snapshot-controller-rbac.yaml"),
+	filepath.Join("snapshot-controller", "snapshot-controller.yaml"),
 	filepath.Join("ceph-rbd", "csi-provisioner-rbac.yaml"),
 	filepath.Join("ceph-rbd", "csi-nodeplugin-rbac.yaml"),
 	filepath.Join("ceph-rbd", "csi-rbdplugin-provisioner.yaml"),
@@ -45,6 +55,7 @@ var kubernetesEngineCephCSIApplyOrder = []string{
 	filepath.Join("kms", "kms-config.yaml"),
 	filepath.Join("ceph-rbd", "csi-rbd-secret.yaml"),
 	filepath.Join("ceph-rbd", "rbd-storageclass.yaml"),
+	filepath.Join("ceph-rbd", "snapshotclass.yaml"),
 	filepath.Join("ceph-fs", "csi-provisioner-rbac.yaml"),
 	filepath.Join("ceph-fs", "csi-nodeplugin-rbac.yaml"),
 	filepath.Join("ceph-fs", "csi-cephfsplugin-provisioner.yaml"),
@@ -214,6 +225,9 @@ func prepareKubernetesEngineCephCSIManifests(baseDir, clusterDir string, values 
 			return kubernetesEngineSetYAMLSecretValues(content, values.RBDUserID, values.RBDUserKey)
 		}},
 		{rel: filepath.Join("ceph-rbd", "rbd-storageclass.yaml"), edit: func(content string) (string, error) {
+			return kubernetesEngineSetYAMLScalar(content, "clusterID", values.ClusterID)
+		}},
+		{rel: filepath.Join("ceph-rbd", "snapshotclass.yaml"), edit: func(content string) (string, error) {
 			return kubernetesEngineSetYAMLScalar(content, "clusterID", values.ClusterID)
 		}},
 		{rel: filepath.Join("ceph-fs", "csi-cephfs-secret.yaml"), secretFile: true, edit: func(content string) (string, error) {

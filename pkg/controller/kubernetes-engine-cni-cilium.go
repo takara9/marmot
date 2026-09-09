@@ -50,8 +50,9 @@ var kubernetesEngineManifestResources = map[string]kubernetesEngineManifestResou
 	"policy/v1/PodDisruptionBudget":                    {group: "policy", version: "v1", resource: "poddisruptionbudgets", namespaced: true},
 	"storage.k8s.io/v1/StorageClass":                   {group: "storage.k8s.io", version: "v1", resource: "storageclasses", namespaced: false},
 	"storage.k8s.io/v1/CSIDriver":                      {group: "storage.k8s.io", version: "v1", resource: "csidrivers", namespaced: false},
-	"batch/v1/Job":                                     {group: "batch", version: "v1", resource: "jobs", namespaced: true},
-	"apiregistration.k8s.io/v1/APIService":             {group: "apiregistration.k8s.io", version: "v1", resource: "apiservices", namespaced: false},
+	"snapshot.storage.k8s.io/v1/VolumeSnapshotClass":   {group: "snapshot.storage.k8s.io", version: "v1", resource: "volumesnapshotclasses", namespaced: false},
+	"batch/v1/Job":                         {group: "batch", version: "v1", resource: "jobs", namespaced: true},
+	"apiregistration.k8s.io/v1/APIService": {group: "apiregistration.k8s.io", version: "v1", resource: "apiservices", namespaced: false},
 }
 
 // kubernetesEngineManifestObject は、マニフェスト中の1ドキュメントからkind/name/namespaceを
