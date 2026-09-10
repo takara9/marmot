@@ -5,11 +5,13 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/takara9/marmot/pkg/db"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -75,6 +77,77 @@ func ensureGatewayKeyPair() error {
 	}
 	if err := os.WriteFile(publicKeyPath, ssh.MarshalAuthorizedKey(sshPublicKey), 0o644); err != nil {
 		return err
+	}
+	return nil
+}
+
+// gatewayKeyPairEtcdKey は、marmotクラスタの全ホストで共有するゲートウェイSSH鍵ペアを
+// 格納するetcdキー。
+const gatewayKeyPairEtcdKey = "/marmot/system/gateway-keypair"
+
+// gatewayKeyPairRecord はetcdに保存する鍵ペアの内容。
+type gatewayKeyPairRecord struct {
+	PrivateKeyPEM       string `json:"privateKeyPem"`
+	PublicKeyAuthorized string `json:"publicKeyAuthorized"`
+}
+
+// SyncGatewayKeyPairWithCluster は、ローカルのゲートウェイSSH鍵ペアをetcd上のクラスタ共有値と
+// 突き合わせ、ホスト間で一致させる。marmotクラスタ(複数ホスト)構成では、ホストごとに
+// ensureGatewayKeyPairでローカル生成した鍵がホスト間で食い違うと、あるホストが作成した
+// VMの authorized_keys に埋め込まれた公開鍵と、別ホストが後から使う秘密鍵が一致せず、
+// SSHによるノードプロビジョニングが恒久的に失敗する(単一ホスト構成では発生しない)。
+// この関数は、etcdにまだ共有鍵が無ければローカル鍵をCASで publish し、既にあれば
+// ローカルのファイルをその内容で上書きしてクラスタ全体を1つの鍵ペアへ収束させる。
+func SyncGatewayKeyPairWithCluster(database *db.Database) error {
+	if database == nil {
+		return fmt.Errorf("database is required to sync gateway key pair")
+	}
+	privateKeyPath := GatewayPrivateKeyPath()
+	publicKeyPath := GatewayPublicKeyPath()
+	localPrivate, err := os.ReadFile(privateKeyPath)
+	if err != nil {
+		return fmt.Errorf("failed to read local gateway private key: %w", err)
+	}
+	localPublic, err := os.ReadFile(publicKeyPath)
+	if err != nil {
+		return fmt.Errorf("failed to read local gateway public key: %w", err)
+	}
+
+	var shared gatewayKeyPairRecord
+	_, err = database.GetJSON(gatewayKeyPairEtcdKey, &shared)
+	switch {
+	case err == nil:
+		// クラスタ共有鍵が既に存在する場合、ローカルと異なれば上書きして収束させる。
+		return applyGatewaySharedKeyPairIfDifferent(shared, string(localPrivate), string(localPublic), privateKeyPath, publicKeyPath)
+	case errors.Is(err, db.ErrNotFound):
+		// 誰も共有鍵を publish していない場合、ローカル鍵を最初の共有鍵としてCAS登録を試みる。
+		local := gatewayKeyPairRecord{PrivateKeyPEM: string(localPrivate), PublicKeyAuthorized: string(localPublic)}
+		putErr := database.PutJSONCAS(gatewayKeyPairEtcdKey, 0, local)
+		if putErr == nil {
+			return nil
+		}
+		if !errors.Is(putErr, db.ErrUpdateConflict) {
+			return fmt.Errorf("failed to publish gateway key pair to etcd: %w", putErr)
+		}
+		// 他ホストが先にpublishしていた場合、その値を取得して収束させる。
+		if _, getErr := database.GetJSON(gatewayKeyPairEtcdKey, &shared); getErr != nil {
+			return fmt.Errorf("failed to fetch gateway key pair after publish conflict: %w", getErr)
+		}
+		return applyGatewaySharedKeyPairIfDifferent(shared, string(localPrivate), string(localPublic), privateKeyPath, publicKeyPath)
+	default:
+		return fmt.Errorf("failed to fetch cluster gateway key pair: %w", err)
+	}
+}
+
+func applyGatewaySharedKeyPairIfDifferent(shared gatewayKeyPairRecord, localPrivate, localPublic, privateKeyPath, publicKeyPath string) error {
+	if shared.PrivateKeyPEM == localPrivate && shared.PublicKeyAuthorized == localPublic {
+		return nil
+	}
+	if err := os.WriteFile(privateKeyPath, []byte(shared.PrivateKeyPEM), 0o600); err != nil {
+		return fmt.Errorf("failed to apply cluster gateway private key: %w", err)
+	}
+	if err := os.WriteFile(publicKeyPath, []byte(shared.PublicKeyAuthorized), 0o644); err != nil {
+		return fmt.Errorf("failed to apply cluster gateway public key: %w", err)
 	}
 	return nil
 }

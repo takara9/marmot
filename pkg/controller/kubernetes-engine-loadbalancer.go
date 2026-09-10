@@ -124,9 +124,6 @@ func buildKubernetesEngineLoadBalancerServerSpec(ke api.KubernetesEngine, public
 		kubernetesEngineNodeLabelRole:  kubernetesEngineLoadBalancerRoleValue,
 	}
 	metadata := api.Metadata{Name: name, Labels: &labels}
-	if ke.Metadata.NodeName != nil && strings.TrimSpace(*ke.Metadata.NodeName) != "" {
-		metadata.NodeName = util.StringPtr(strings.TrimSpace(*ke.Metadata.NodeName))
-	}
 	nics := []api.NetworkInterface{
 		{Networkname: kubernetesEngineLoadBalancerExternalNetwork},
 		{Networkname: kubernetesEngineNetworkName(ke)},

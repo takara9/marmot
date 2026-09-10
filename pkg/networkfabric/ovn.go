@@ -15,7 +15,7 @@ import (
 )
 
 // OVNFabric は OVN を優先して利用する Fabric 実装。
-// 現段階では geneve オーバーレイを OVN で扱い、既存 vxlan は OVS 実装へ委譲する。
+// geneve オーバーレイの論理スイッチ/ポートを OVN で管理する。
 type OVNFabric struct {
 	ovs *OVSFabric
 }

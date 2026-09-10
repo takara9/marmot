@@ -201,7 +201,11 @@ func (c *kubernetesEngineController) reconcileKubernetesEnginePending(ke api.Kub
 
 // reconcileKubernetesEngineProvisioning はコントロールプレーンとノードを冪等に構成し、
 // 全ノードがKubernetes API上でReadyになった時点でRUNNINGに進める。
+// コントロールプレーンはホストローカルなnetns/systemdユニットのため、担当ホスト以外では実行しない。
 func (c *kubernetesEngineController) reconcileKubernetesEngineProvisioning(ke api.KubernetesEngine) {
+	if !c.isKubernetesEngineOwnerHost(ke) {
+		return
+	}
 	id := api.KubernetesEngineID(ke)
 	lockKey := "/lock/kubernetes-engine/reconcile/" + id
 	mutex, err := c.db.LockKey(lockKey)
@@ -272,6 +276,9 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineProvisioning(ke ap
 // スケールイン処理へ委譲する。
 // TODO: 次フェーズでノードの状態監視を行い、異常時はFAILED等へ遷移させる。
 func (c *kubernetesEngineController) reconcileKubernetesEngineRunning(ke api.KubernetesEngine) {
+	if !c.isKubernetesEngineOwnerHost(ke) {
+		return
+	}
 	id := api.KubernetesEngineID(ke)
 
 	if ke.Status != nil && ke.Status.StatusCode == db.KUBERNETES_ENGINE_SCALING_OUT {
@@ -565,7 +572,8 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineDeleting(ke api.Ku
 			// CheckIPnetInUse()が常にtrueを返してネットワーク削除が永久にブロックされる。
 			if !deprovisionAttempted &&
 				network.Metadata.Name == kubernetesEngineNetworkName(current) &&
-				current.Status != nil && current.Status.ControlPlaneIpAddress != nil {
+				current.Status != nil && current.Status.ControlPlaneIpAddress != nil &&
+				c.isKubernetesEngineOwnerHost(current) {
 				deprovisionAttempted = true
 				if deprovErr := DeprovisionKubernetesEngineControlPlane(c.db, c.mkeConf, current); deprovErr != nil {
 					slog.Warn("DeprovisionKubernetesEngineControlPlane() failed", "id", id, "err", deprovErr)
@@ -586,6 +594,23 @@ func (c *kubernetesEngineController) reconcileKubernetesEngineDeleting(ke api.Ku
 		return
 	}
 	slog.Debug("kubernetes engine deleted", "id", id)
+}
+
+// isKubernetesEngineOwnerHost は、このホスト(c.node)がkeのコントロールプレーンを保持する
+// 担当ホスト(ke.Metadata.NodeName)かどうかを判定する。コントロールプレーン(専用etcd/
+// kube-apiserver等のsystemdユニットとnetns)はホストローカルな実体であり、担当外のホストが
+// 重複して構築・解体すると、同一クラスタに対して同期しない複数のコントロールプレーンが
+// 並行稼働するスプリットブレイン状態になる。NodeNameが未設定(旧データ等)の場合は、
+// 従来通り担当ホスト扱いとして処理を継続する。
+func (c *kubernetesEngineController) isKubernetesEngineOwnerHost(ke api.KubernetesEngine) bool {
+	if ke.Metadata.NodeName == nil {
+		return true
+	}
+	nodeName := strings.TrimSpace(*ke.Metadata.NodeName)
+	if nodeName == "" {
+		return true
+	}
+	return nodeName == c.node
 }
 
 // kubernetesEngineNetworkName はクラスタ専用のノード間通信ネットワーク名を返す。

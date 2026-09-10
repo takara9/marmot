@@ -28,15 +28,8 @@ func applyVirtualNetworkDefaults(network *api.VirtualNetwork, cfg *MarmotdConfig
 		network.Spec.OverlayMode = &overlayMode
 	}
 
-	isVxlan := strings.EqualFold(string(*network.Spec.OverlayMode), string(api.Vxlan))
-	isGeneve := strings.EqualFold(string(*network.Spec.OverlayMode), string(api.Geneve))
-	if !isVxlan && !isGeneve {
+	if !isGeneveOverlay(*network.Spec.OverlayMode) {
 		return nil
-	}
-
-	if isVxlan && network.Spec.PeerPolicy == nil {
-		peerPolicy := api.Auto
-		network.Spec.PeerPolicy = &peerPolicy
 	}
 
 	if network.Spec.UnderlayInterface == nil || strings.TrimSpace(*network.Spec.UnderlayInterface) == "" {
@@ -67,6 +60,10 @@ func applyVirtualNetworkDefaults(network *api.VirtualNetwork, cfg *MarmotdConfig
 	network.Spec.Vni = util.IntPtrInt(vni)
 
 	return nil
+}
+
+func isGeneveOverlay(mode api.VirtualNetworkSpecOverlayMode) bool {
+	return strings.EqualFold(string(mode), string(api.Geneve))
 }
 
 func usedVNISet(database *db.Database, excludeNetworkID string) (map[int]struct{}, error) {

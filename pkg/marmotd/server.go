@@ -1474,7 +1474,7 @@ func isManagedOverlayNetwork(vnet api.VirtualNetwork) bool {
 		return false
 	}
 	mode := strings.TrimSpace(string(*vnet.Spec.OverlayMode))
-	return strings.EqualFold(mode, string(api.Vxlan)) || strings.EqualFold(mode, string(api.Geneve))
+	return strings.EqualFold(mode, string(api.Geneve))
 }
 
 func (m *Marmot) ensureServerNetworkDependencies(serverConfig api.Server) error {

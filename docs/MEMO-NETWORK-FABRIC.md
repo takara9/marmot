@@ -1,5 +1,7 @@
 # Controller 層 OVS/VXLAN 統合実装計画
 
+> **[廃止済み]** このメモは VXLAN オーバーレイの実装当時の設計ログです。VXLANコード/APIは廃止され、Geneve(OVN管理)に一本化されました。履歴参照用に残しています。
+
 ## 概要
 方針 A（既存ステートマシン維持で段階的拡張）に基づいて、controller 層に OVS/VXLAN 操作責務を追加した実装を進める。  
 PENDING/PROVISIONING/ACTIVE/DELETING の各段階に fabric 実体操作を組み込む。
