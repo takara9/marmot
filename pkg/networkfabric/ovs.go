@@ -353,7 +353,9 @@ func (o *OVSFabric) PruneOverlayMesh(vnet *api.VirtualNetwork, remainPeers []str
 	// gnv- で始まる不要なトンネルを削除
 	for _, port := range currentPorts {
 		port = strings.TrimSpace(port)
-		isOverlayTunnelPort := strings.HasPrefix(port, "gnv-")
+		isOverlayTunnelPort := strings.HasPrefix(port, "gnv-") ||
+			strings.HasPrefix(port, "vx-") ||
+			strings.HasPrefix(port, "vxlan-")
 		if isOverlayTunnelPort && !keepTunnels[port] {
 			delCmd := ovsVSCTLCmd("del-port", bridgeName, port)
 			if output, err := delCmd.CombinedOutput(); err != nil {
