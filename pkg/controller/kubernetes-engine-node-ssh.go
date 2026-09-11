@@ -17,6 +17,13 @@ var kubernetesEngineNodeSSHPort = 22
 
 var kubernetesEngineNodeSSHDialTimeout = 10 * time.Second
 
+// kubernetesEngineNodeSSHCommandTimeoutは、リモートコマンド実行(session.Run/CombinedOutput)の上限時間。
+// golang.org/x/crypto/sshのSessionはcontextを受け付けないため、タイムアウトしないと
+// リモートコマンド(例: apt-getがdpkgロック待ちでハング)が
+// KubernetesEngineコントローラーのetcd分散ロック保持中の単一ゴルーチンを恒久にブロックし、
+// 全KubernetesEngineのリコンサイルが停止する(実際に発生した障害)。
+var kubernetesEngineNodeSSHCommandTimeout = 5 * time.Minute
+
 // kubernetesEngineNodeProvisionData holds everything needed to provision a
 // KubernetesEngine worker node over SSH (replacing the former ansible-playbook based flow).
 type kubernetesEngineNodeProvisionData struct {
@@ -599,14 +606,24 @@ func (r *kubernetesEngineNodeSSHRunner) run(cmd string, stdin io.Reader) error {
 	if stdin != nil {
 		session.Stdin = stdin
 	}
-	if err := session.Run(cmd); err != nil {
-		trimmed := strings.TrimSpace(buf.String())
-		if trimmed == "" {
-			return fmt.Errorf("remote command failed: %w", err)
+
+	done := make(chan error, 1)
+	go func() { done <- session.Run(cmd) }()
+
+	select {
+	case runErr := <-done:
+		if runErr != nil {
+			trimmed := strings.TrimSpace(buf.String())
+			if trimmed == "" {
+				return fmt.Errorf("remote command failed: %w", runErr)
+			}
+			return fmt.Errorf("remote command failed: %w: %s", runErr, trimmed)
 		}
-		return fmt.Errorf("remote command failed: %w: %s", err, trimmed)
+		return nil
+	case <-time.After(kubernetesEngineNodeSSHCommandTimeout):
+		_ = session.Close()
+		return fmt.Errorf("remote command timed out after %s", kubernetesEngineNodeSSHCommandTimeout)
 	}
-	return nil
 }
 
 func (r *kubernetesEngineNodeSSHRunner) output(cmd string) (string, error) {
@@ -615,11 +632,27 @@ func (r *kubernetesEngineNodeSSHRunner) output(cmd string) (string, error) {
 		return "", fmt.Errorf("failed to open ssh session: %w", err)
 	}
 	defer func() { _ = session.Close() }()
-	out, err := session.CombinedOutput(cmd)
-	if err != nil {
-		return "", fmt.Errorf("remote command failed: %w: %s", err, strings.TrimSpace(string(out)))
+
+	type result struct {
+		out []byte
+		err error
 	}
-	return strings.TrimSpace(string(out)), nil
+	done := make(chan result, 1)
+	go func() {
+		out, runErr := session.CombinedOutput(cmd)
+		done <- result{out: out, err: runErr}
+	}()
+
+	select {
+	case res := <-done:
+		if res.err != nil {
+			return "", fmt.Errorf("remote command failed: %w: %s", res.err, strings.TrimSpace(string(res.out)))
+		}
+		return strings.TrimSpace(string(res.out)), nil
+	case <-time.After(kubernetesEngineNodeSSHCommandTimeout):
+		_ = session.Close()
+		return "", fmt.Errorf("remote command timed out after %s", kubernetesEngineNodeSSHCommandTimeout)
+	}
 }
 
 func (r *kubernetesEngineNodeSSHRunner) writeFile(path, mode string, content []byte) error {
