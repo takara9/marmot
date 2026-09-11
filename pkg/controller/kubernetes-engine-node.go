@@ -292,10 +292,12 @@ func buildKubernetesEngineNodeServerSpec(ke api.KubernetesEngine, index int, pub
 		kubernetesEngineNodeLabelRole:  kubernetesEngineNodeRoleValue,
 		kubernetesEngineNodeLabelIndex: index,
 	}
+	// 注意: ke.Metadata.NodeName(コントロールプレーンの担当ホスト)をここでノードVMにコピーしない。
+	// コピーするとscheduler-controller.goが負荷分散を行わず全VMを同一ホストに固定し、
+	// marmotクラスタ(複数ホスト)構成でノードVMが1ホストに集中し负荷集中と起動遅延を引き起こす
+	// (issue #682付近で実際に発生した履歴あり)。ノード間通信ネットワーク経由でホスト間SSHはすでに
+	// 到達可能なため、ノードVMをコントロールプレーンと同一ホストに固定する必要はない。
 	metadata := api.Metadata{Name: name, Labels: &labels}
-	if ke.Metadata.NodeName != nil && strings.TrimSpace(*ke.Metadata.NodeName) != "" {
-		metadata.NodeName = util.StringPtr(strings.TrimSpace(*ke.Metadata.NodeName))
-	}
 	nics := []api.NetworkInterface{
 		{Networkname: externalNetwork},
 		{Networkname: kubernetesEngineNetworkName(ke)},

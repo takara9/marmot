@@ -124,9 +124,8 @@ func buildKubernetesEngineLoadBalancerServerSpec(ke api.KubernetesEngine, public
 		kubernetesEngineNodeLabelRole:  kubernetesEngineLoadBalancerRoleValue,
 	}
 	metadata := api.Metadata{Name: name, Labels: &labels}
-	if ke.Metadata.NodeName != nil && strings.TrimSpace(*ke.Metadata.NodeName) != "" {
-		metadata.NodeName = util.StringPtr(strings.TrimSpace(*ke.Metadata.NodeName))
-	}
+	// 注意: ke.Metadata.NodeNameをここでLB VMにコピーしない。理由はkubernetes-engine-node.goの
+	// buildKubernetesEngineNodeServerSpecのコメントを参照。
 	nics := []api.NetworkInterface{
 		{Networkname: kubernetesEngineLoadBalancerExternalNetwork},
 		{Networkname: kubernetesEngineNetworkName(ke)},
