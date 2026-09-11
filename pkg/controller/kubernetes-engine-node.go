@@ -293,6 +293,9 @@ func buildKubernetesEngineNodeServerSpec(ke api.KubernetesEngine, index int, pub
 		kubernetesEngineNodeLabelIndex: index,
 	}
 	metadata := api.Metadata{Name: name, Labels: &labels}
+	if ke.Metadata.NodeName != nil && strings.TrimSpace(*ke.Metadata.NodeName) != "" {
+		metadata.NodeName = util.StringPtr(strings.TrimSpace(*ke.Metadata.NodeName))
+	}
 	nics := []api.NetworkInterface{
 		{Networkname: externalNetwork},
 		{Networkname: kubernetesEngineNetworkName(ke)},
