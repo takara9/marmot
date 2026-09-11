@@ -626,10 +626,24 @@ func dialKubernetesEngineNodeSSH(address, privateKeyPath, namespace string) (*ss
 	if err != nil {
 		return nil, err
 	}
+	// ssh.ClientConfig.Timeoutはssh.Dial()内部のnet.DialTimeoutにのみ適用され、
+	// 既存のconnを渡すNewClientConnでは無視される。デッドラインを明示しないと
+	// バージョン交換/鍵交換/認証がリモート次第で無期限にブロックしうる
+	// (実際にsshd起動前のノードへの接続で発生した)。
+	if err := conn.SetDeadline(time.Now().Add(kubernetesEngineNodeSSHDialTimeout)); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("failed to set ssh handshake deadline: %w", err)
+	}
 	clientConn, chans, reqs, err := ssh.NewClientConn(conn, targetAddr, config)
 	if err != nil {
 		_ = conn.Close()
 		return nil, err
+	}
+	// ハンドシェイク後は解除し、以降のセッションI/Oはrun()/output()側の
+	// タイムアウト機構に委ねる。
+	if err := conn.SetDeadline(time.Time{}); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("failed to clear ssh handshake deadline: %w", err)
 	}
 	return ssh.NewClient(clientConn, chans, reqs), nil
 }
