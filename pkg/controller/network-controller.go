@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -52,7 +51,7 @@ func StartNetController(node string, etcdUrl string, deletionDelaySeconds int) (
 	c.stopChan = make(chan struct{})
 	c.doneChan = make(chan struct{})
 
-	// NetworkFabric の初期化（Geneve は OVN 前提、VXLAN は OVS で処理）
+	// NetworkFabric の初期化（Geneve オーバーレイは OVN 前提で処理）
 	networkFabric := networkfabric.NewOVNFabric()
 
 	// 起動時に既存の仮想ネットワークを取得して、データベースに登録する
@@ -97,7 +96,7 @@ func (c *controller) networkControllerLoop(fabric networkfabric.NetworkFabric) {
 
 	statuses, err := c.marmot.Db.GetAllHostStatus()
 	if err != nil {
-		slog.Warn("failed to get host statuses; skip vxlan hub failover reconciliation", "err", err)
+		slog.Warn("failed to get host statuses; skip overlay membership reconciliation", "err", err)
 	} else {
 		isLeader := marmotd.IsSchedulerLeader(c.marmot.NodeName, statuses)
 		currentMemberSignature := clusterMemberSignature(statuses)
@@ -107,28 +106,16 @@ func (c *controller) networkControllerLoop(fabric networkfabric.NetworkFabric) {
 			c.lastNetworkMemberSignature = currentMemberSignature
 		}
 
-		if isLeader {
-			if membershipChanged {
-				if changed, reconcileErr := c.reconcileOverlayMembershipWithCluster(vnets, statuses); reconcileErr != nil {
-					slog.Warn("failed to reconcile overlay membership after cluster change", "err", reconcileErr)
-				} else if changed {
-					refreshed, refreshErr := c.marmot.GetVirtualNetwork()
-					if refreshErr != nil {
-						slog.Warn("failed to refresh virtual networks after membership reconciliation", "err", refreshErr)
-					} else {
-						vnets = refreshed
-					}
+		if isLeader && membershipChanged {
+			if changed, reconcileErr := c.reconcileOverlayMembershipWithCluster(vnets, statuses); reconcileErr != nil {
+				slog.Warn("failed to reconcile overlay membership after cluster change", "err", reconcileErr)
+			} else if changed {
+				refreshed, refreshErr := c.marmot.GetVirtualNetwork()
+				if refreshErr != nil {
+					slog.Warn("failed to refresh virtual networks after membership reconciliation", "err", refreshErr)
+				} else {
+					vnets = refreshed
 				}
-			}
-
-			if err := c.reconcileVxlanHubFailovers(vnets, statuses); err != nil {
-				slog.Warn("failed to reconcile vxlan hub failovers", "err", err)
-			}
-			refreshed, refreshErr := c.marmot.GetVirtualNetwork()
-			if refreshErr != nil {
-				slog.Warn("failed to refresh virtual networks after hub failover reconciliation", "err", refreshErr)
-			} else {
-				vnets = refreshed
 			}
 		}
 	}
@@ -406,7 +393,7 @@ func (c *controller) reconcileOverlayMembershipWithCluster(vnets []api.VirtualNe
 		if networkSyncRole(&vnet.Metadata) == "follower" {
 			continue
 		}
-		if !isVxlanOverlay(vnet) && !isGeneveOverlay(vnet) {
+		if !isGeneveOverlay(vnet) {
 			continue
 		}
 		if vnet.Status != nil && vnet.Status.StatusCode == db.NETWORK_DELETING {
@@ -848,13 +835,6 @@ func matchesNetworkName(targetName string, candidateName string) bool {
 	return strings.TrimSpace(candidateName) == targetName
 }
 
-func isVxlanOverlay(vnet api.VirtualNetwork) bool {
-	if vnet.Spec.OverlayMode == nil {
-		return false
-	}
-	return strings.EqualFold(string(*vnet.Spec.OverlayMode), "vxlan")
-}
-
 func isGeneveOverlay(vnet api.VirtualNetwork) bool {
 	if vnet.Spec.OverlayMode == nil {
 		return false
@@ -863,7 +843,7 @@ func isGeneveOverlay(vnet api.VirtualNetwork) bool {
 }
 
 func (c *controller) ensureOverlayMeshForNetwork(fabric networkfabric.NetworkFabric, vnet api.VirtualNetwork) error {
-	if !isVxlanOverlay(vnet) && !isGeneveOverlay(vnet) {
+	if !isGeneveOverlay(vnet) {
 		return nil
 	}
 
@@ -871,24 +851,9 @@ func (c *controller) ensureOverlayMeshForNetwork(fabric networkfabric.NetworkFab
 		return fmt.Errorf("ensure bridge failed: %w", err)
 	}
 
-	if isVxlanOverlay(vnet) && vxlanPeerPolicy(vnet) == api.Manual {
-		slog.Debug("peerPolicy=manual: skip automatic vxlan ensure/prune", "networkId", api.VirtualNetworkID(vnet), "networkName", vnet.Metadata.Name)
-		return nil
-	}
-
-	peers := []string{}
-	if isVxlanOverlay(vnet) {
-		resolvedPeers, err := c.resolveVxlanPeerIPs(vnet)
-		if err != nil {
-			return err
-		}
-		peers = resolvedPeers
-	} else if isGeneveOverlay(vnet) {
-		resolvedPeers, err := c.resolveGenevePeerIPs(vnet)
-		if err != nil {
-			return err
-		}
-		peers = resolvedPeers
+	peers, err := c.resolveGenevePeerIPs(vnet)
+	if err != nil {
+		return err
 	}
 
 	if err := fabric.EnsureOverlayMesh(&vnet, peers); err != nil {
@@ -900,84 +865,6 @@ func (c *controller) ensureOverlayMeshForNetwork(fabric networkfabric.NetworkFab
 	}
 
 	return nil
-}
-
-func (c *controller) resolveVxlanPeerIPs(vnet api.VirtualNetwork) ([]string, error) {
-	if strings.TrimSpace(vnet.Metadata.Name) == "" {
-		return nil, fmt.Errorf("network metadata.name is required: networkId=%s", api.VirtualNetworkID(vnet))
-	}
-
-	targetName := strings.TrimSpace(vnet.Metadata.Name)
-	if targetName == "" {
-		return nil, fmt.Errorf("network metadata.name is empty: networkId=%s", api.VirtualNetworkID(vnet))
-	}
-
-	statuses, err := c.marmot.Db.GetAllHostStatus()
-	if err != nil {
-		return nil, err
-	}
-	ipByNode := map[string]string{}
-	for _, st := range statuses {
-		if st.NodeName == nil || st.IpAddress == nil {
-			continue
-		}
-		node := strings.TrimSpace(*st.NodeName)
-		ip := strings.TrimSpace(*st.IpAddress)
-		if node == "" || ip == "" {
-			continue
-		}
-		ipByNode[node] = ip
-	}
-
-	networks, err := c.marmot.Db.GetVirtualNetworks()
-	if err != nil {
-		return nil, err
-	}
-
-	selfNode := strings.TrimSpace(c.marmot.NodeName)
-	participantNodes := map[string]struct{}{}
-	hubCandidate := vxlanHubNodeFromNetwork(vnet)
-	for _, n := range networks {
-		if strings.TrimSpace(n.Metadata.Name) == "" || n.Metadata.NodeName == nil {
-			continue
-		}
-		if strings.TrimSpace(n.Metadata.Name) != targetName {
-			continue
-		}
-		if n.Status != nil && n.Status.StatusCode == db.NETWORK_DELETING {
-			continue
-		}
-
-		node := strings.TrimSpace(*n.Metadata.NodeName)
-		if node == "" {
-			continue
-		}
-		participantNodes[node] = struct{}{}
-
-		if hubCandidate == "" && vxlanNetworkRole(n) == "head" {
-			hubCandidate = node
-		}
-	}
-
-	peerPolicy := vxlanPeerPolicy(vnet)
-	if peerPolicy == api.Manual {
-		return nil, nil
-	}
-
-	if len(participantNodes) == 0 {
-		slog.Warn("vxlan participant discovery returned empty", "networkName", targetName, "networkId", api.VirtualNetworkID(vnet), "controllerNode", selfNode)
-		return nil, nil
-	}
-
-	hubNode := strings.TrimSpace(hubCandidate)
-	if hubNode == "" {
-		hubNode = pickDeterministicHubNode(participantNodes)
-		slog.Warn("vxlan hub node is not explicit; selected deterministic hub", "networkName", targetName, "networkId", api.VirtualNetworkID(vnet), "hubNode", hubNode)
-	}
-
-	peers := buildVxlanHubSpokePeerIPs(selfNode, hubNode, participantNodes, ipByNode)
-	sort.Strings(peers)
-	return peers, nil
 }
 
 func (c *controller) resolveGenevePeerIPs(vnet api.VirtualNetwork) ([]string, error) {
@@ -1039,226 +926,6 @@ func (c *controller) resolveGenevePeerIPs(vnet api.VirtualNetwork) ([]string, er
 	return peers, nil
 }
 
-func (c *controller) reconcileVxlanHubFailovers(vnets []api.VirtualNetwork, statuses []api.HostStatus) error {
-	type networkGroup struct {
-		name     string
-		networks []api.VirtualNetwork
-	}
-
-	groups := map[string]*networkGroup{}
-	for _, vnet := range vnets {
-		if !isVxlanOverlay(vnet) {
-			continue
-		}
-		peerPolicy := api.Auto
-		if vnet.Spec.PeerPolicy != nil {
-			peerPolicy = *vnet.Spec.PeerPolicy
-		}
-		if peerPolicy != api.Auto {
-			continue
-		}
-		if vnet.Status != nil && vnet.Status.StatusCode == db.NETWORK_DELETING {
-			continue
-		}
-		name := strings.TrimSpace(vnet.Metadata.Name)
-		if name == "" {
-			continue
-		}
-		group, exists := groups[name]
-		if !exists {
-			group = &networkGroup{name: name}
-			groups[name] = group
-		}
-		group.networks = append(group.networks, vnet)
-	}
-
-	activeByNode := collectActiveHostStatusByNode(statuses, time.Now())
-	for _, group := range groups {
-		if err := c.reconcileVxlanHubFailoverForNetworkName(group.name, activeByNode); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (c *controller) reconcileVxlanHubFailoverForNetworkName(networkName string, activeByNode map[string]api.HostStatus) error {
-	name := strings.TrimSpace(networkName)
-	if name == "" {
-		return nil
-	}
-
-	mutex, err := c.db.LockKey(failoverLockKeyForNetworkName(name))
-	if err != nil {
-		return err
-	}
-	defer c.db.UnlockKey(mutex)
-
-	networks, err := c.marmot.Db.GetVirtualNetworks()
-	if err != nil {
-		return err
-	}
-
-	group := make([]api.VirtualNetwork, 0, len(networks))
-	for _, vnet := range networks {
-		if !isVxlanOverlay(vnet) {
-			continue
-		}
-		if vxlanPeerPolicy(vnet) != api.Auto {
-			continue
-		}
-		if vnet.Status != nil && vnet.Status.StatusCode == db.NETWORK_DELETING {
-			continue
-		}
-		if strings.TrimSpace(vnet.Metadata.Name) != name {
-			continue
-		}
-		group = append(group, vnet)
-	}
-
-	return c.reconcileVxlanHubFailoverForGroup(group, activeByNode)
-}
-
-func (c *controller) reconcileVxlanHubFailoverForGroup(group []api.VirtualNetwork, activeByNode map[string]api.HostStatus) error {
-	if len(group) == 0 {
-		return nil
-	}
-	currentHub := resolveCurrentHubNode(group)
-	if currentHub == "" {
-		return nil
-	}
-	if _, ok := activeByNode[currentHub]; ok {
-		return nil
-	}
-
-	participants := map[string]struct{}{}
-	for _, vnet := range group {
-		if vnet.Metadata.NodeName == nil {
-			continue
-		}
-		node := strings.TrimSpace(*vnet.Metadata.NodeName)
-		if node == "" {
-			continue
-		}
-		participants[node] = struct{}{}
-	}
-
-	newHub := selectFailoverHubNode(participants, activeByNode)
-	if newHub == "" {
-		slog.Warn("vxlan hub failover skipped: no active participant available", "networkName", group[0].Metadata.Name, "oldHub", currentHub)
-		return nil
-	}
-	if newHub == currentHub {
-		return nil
-	}
-
-	promoted := findNetworkByNode(group, newHub)
-	if promoted == nil {
-		slog.Warn("vxlan hub failover skipped: selected hub has no network record", "networkName", group[0].Metadata.Name, "oldHub", currentHub, "newHub", newHub)
-		return nil
-	}
-	oldHead := findHeadNetworkRecord(group)
-
-	for _, network := range group {
-		labels := ensureNetworkLabelsMap(network.Metadata.Labels)
-		role := "follower"
-		headNetworkID := api.VirtualNetworkID(*promoted)
-		if api.VirtualNetworkID(network) == api.VirtualNetworkID(*promoted) {
-			role = "head"
-			headNetworkID = ""
-			if network.Spec.IpNetworkId == nil && oldHead != nil && oldHead.Spec.IpNetworkId != nil {
-				network.Spec.IpNetworkId = oldHead.Spec.IpNetworkId
-			}
-		} else {
-			network.Spec.IpNetworkId = nil
-		}
-		db.SetNetworkSyncLabels(labels, role, headNetworkID, newHub)
-		network.Metadata.Labels = &labels
-
-		if err := c.db.UpdateVirtualNetworkById(api.VirtualNetworkID(network), network); err != nil {
-			return err
-		}
-	}
-
-	slog.Warn("vxlan hub failover completed", "networkName", group[0].Metadata.Name, "oldHub", currentHub, "newHub", newHub, "headNetworkId", api.VirtualNetworkID(*promoted))
-	return nil
-}
-
-func ensureNetworkLabelsMap(src *map[string]interface{}) map[string]interface{} {
-	if src == nil {
-		return map[string]interface{}{}
-	}
-	out := make(map[string]interface{}, len(*src))
-	for key, value := range *src {
-		out[key] = value
-	}
-	return out
-}
-
-func findNetworkByNode(group []api.VirtualNetwork, nodeName string) *api.VirtualNetwork {
-	target := strings.TrimSpace(nodeName)
-	if target == "" {
-		return nil
-	}
-	for i := range group {
-		if group[i].Metadata.NodeName == nil {
-			continue
-		}
-		if strings.TrimSpace(*group[i].Metadata.NodeName) == target {
-			return &group[i]
-		}
-	}
-	return nil
-}
-
-func findHeadNetworkRecord(group []api.VirtualNetwork) *api.VirtualNetwork {
-	for i := range group {
-		if vxlanNetworkRole(group[i]) == "head" {
-			return &group[i]
-		}
-	}
-	return nil
-}
-
-func resolveCurrentHubNode(group []api.VirtualNetwork) string {
-	for _, vnet := range group {
-		hub := vxlanHubNodeFromNetwork(vnet)
-		if hub != "" {
-			return hub
-		}
-	}
-
-	participants := map[string]struct{}{}
-	for _, vnet := range group {
-		if vnet.Metadata.NodeName == nil {
-			continue
-		}
-		node := strings.TrimSpace(*vnet.Metadata.NodeName)
-		if node != "" {
-			participants[node] = struct{}{}
-		}
-	}
-	return pickDeterministicHubNode(participants)
-}
-
-func collectActiveHostStatusByNode(statuses []api.HostStatus, now time.Time) map[string]api.HostStatus {
-	active := map[string]api.HostStatus{}
-	cutoff := now.Add(-marmotd.ActiveHostThreshold)
-	for _, st := range statuses {
-		if st.NodeName == nil || st.LastUpdated == nil {
-			continue
-		}
-		node := strings.TrimSpace(*st.NodeName)
-		if node == "" {
-			continue
-		}
-		if st.LastUpdated.After(cutoff) {
-			active[node] = st
-		}
-	}
-	return active
-}
-
 func collectClusterMemberNodes(statuses []api.HostStatus) []string {
 	memberSet := map[string]struct{}{}
 	for _, st := range statuses {
@@ -1282,153 +949,4 @@ func collectClusterMemberNodes(statuses []api.HostStatus) []string {
 
 func clusterMemberSignature(statuses []api.HostStatus) string {
 	return strings.Join(collectClusterMemberNodes(statuses), ",")
-}
-
-func selectFailoverHubNode(participants map[string]struct{}, activeByNode map[string]api.HostStatus) string {
-	type candidate struct {
-		nodeName       string
-		hostID         uint32
-		hasValidHostID bool
-	}
-
-	candidates := make([]candidate, 0, len(participants))
-	for node := range participants {
-		node = strings.TrimSpace(node)
-		if node == "" {
-			continue
-		}
-		status, ok := activeByNode[node]
-		if !ok {
-			continue
-		}
-
-		c := candidate{nodeName: node}
-		if status.HostId != nil {
-			if parsed, ok := parseHexHostID(*status.HostId); ok {
-				c.hostID = parsed
-				c.hasValidHostID = true
-			}
-		}
-		candidates = append(candidates, c)
-	}
-
-	if len(candidates) == 0 {
-		return ""
-	}
-
-	sort.Slice(candidates, func(i, j int) bool {
-		if candidates[i].hasValidHostID != candidates[j].hasValidHostID {
-			return candidates[i].hasValidHostID
-		}
-		if candidates[i].hasValidHostID && candidates[i].hostID != candidates[j].hostID {
-			return candidates[i].hostID < candidates[j].hostID
-		}
-		return candidates[i].nodeName < candidates[j].nodeName
-	})
-
-	return candidates[0].nodeName
-}
-
-func parseHexHostID(raw string) (uint32, bool) {
-	v := strings.TrimSpace(raw)
-	if v == "" {
-		return 0, false
-	}
-	v = strings.TrimPrefix(strings.ToLower(v), "0x")
-	parsed, err := strconv.ParseUint(v, 16, 32)
-	if err != nil || parsed == 0 {
-		return 0, false
-	}
-	return uint32(parsed), true
-}
-
-func vxlanPeerPolicy(vnet api.VirtualNetwork) api.VirtualNetworkSpecPeerPolicy {
-	if vnet.Spec.PeerPolicy == nil {
-		return api.Auto
-	}
-	return *vnet.Spec.PeerPolicy
-}
-
-func failoverLockKeyForNetworkName(name string) string {
-	sanitized := strings.TrimSpace(name)
-	if sanitized == "" {
-		sanitized = "unknown"
-	}
-	replacer := strings.NewReplacer("/", "_", " ", "_", "\t", "_")
-	return "/lock/virtualnetwork/failover/" + replacer.Replace(sanitized)
-}
-
-func vxlanHubNodeFromNetwork(vnet api.VirtualNetwork) string {
-	if vnet.Metadata.Labels != nil {
-		headNode := strings.TrimSpace(db.GetHeadNetworkNodeName(*vnet.Metadata.Labels))
-		if headNode != "" {
-			return headNode
-		}
-	}
-	if vnet.Metadata.NodeName != nil {
-		return strings.TrimSpace(*vnet.Metadata.NodeName)
-	}
-	return ""
-}
-
-func vxlanNetworkRole(vnet api.VirtualNetwork) string {
-	if vnet.Metadata.Labels == nil {
-		return "head"
-	}
-	role := strings.TrimSpace(db.GetNetworkSyncRole(*vnet.Metadata.Labels))
-	if role == "" {
-		return "head"
-	}
-	return role
-}
-
-func pickDeterministicHubNode(nodes map[string]struct{}) string {
-	if len(nodes) == 0 {
-		return ""
-	}
-	candidates := make([]string, 0, len(nodes))
-	for node := range nodes {
-		candidates = append(candidates, node)
-	}
-	sort.Strings(candidates)
-	return candidates[0]
-}
-
-func buildVxlanHubSpokePeerIPs(selfNode, hubNode string, participantNodes map[string]struct{}, ipByNode map[string]string) []string {
-	self := strings.TrimSpace(selfNode)
-	hub := strings.TrimSpace(hubNode)
-	peers := make([]string, 0, len(participantNodes))
-	peerSet := map[string]struct{}{}
-
-	appendPeerIP := func(node string) {
-		ip, ok := ipByNode[node]
-		if !ok {
-			slog.Warn("host status ip is missing for vxlan peer node", "node", node)
-			return
-		}
-		ip = strings.TrimSpace(ip)
-		if ip == "" {
-			return
-		}
-		if _, exists := peerSet[ip]; exists {
-			return
-		}
-		peerSet[ip] = struct{}{}
-		peers = append(peers, ip)
-	}
-
-	if self != "" && self != hub && hub != "" {
-		appendPeerIP(hub)
-		return peers
-	}
-
-	for node := range participantNodes {
-		node = strings.TrimSpace(node)
-		if node == "" || node == self {
-			continue
-		}
-		appendPeerIP(node)
-	}
-
-	return peers
 }

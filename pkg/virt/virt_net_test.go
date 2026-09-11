@@ -44,16 +44,6 @@ var _ = Describe("CreateVirtualNetworkXML VirtualPort 付与条件", func() {
 		})
 	})
 
-	Context("overlay ネットワーク (vxlan) の場合", func() {
-		It("VirtualPort が nil でないこと", func() {
-			mode := overlayMode(api.Vxlan)
-			net := newTestVirtualNetwork("unit-vxlan", "br-vxlan", mode)
-			netxml, err := virt.CreateVirtualNetworkXML(net)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(netxml.VirtualPort).NotTo(BeNil())
-		})
-	})
-
 	Context("overlay ネットワーク (geneve) の場合", func() {
 		It("VirtualPort が nil でないこと", func() {
 			mode := overlayMode(api.Geneve)

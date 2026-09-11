@@ -50,6 +50,16 @@ var _ = Describe("Etcd", Ordered, func() {
 			})
 		})
 
+		Context("Test LockKey recovers from a stale session", func() {
+			It("recreates the session and still acquires the lock", func() {
+				// セッションを明示的に閉じ、リース失効(Done()がclose)を模擬する。
+				Expect(d.Session.Close()).To(Succeed())
+				mutex, err := d.LockKey("/lock/test/stale-session-recovery")
+				Expect(err).NotTo(HaveOccurred())
+				d.UnlockKey(mutex)
+			})
+		})
+
 		Context("Test Version", func() {
 			It("Set version", func() {
 				sv := "3.2.1"

@@ -50,11 +50,23 @@ var kubernetesEngineNodeNamePattern = regexp.MustCompile(`-node-(\d+)$`)
 var (
 	kubernetesEngineNodePrivateKeyPath       = marmotd.GatewayPrivateKeyPath()
 	kubernetesEngineNodePublicKeyPath        = marmotd.GatewayPublicKeyPath()
-	ensureKubernetesEngineNodeSSHAssets      = marmotd.EnsureGatewayRuntimeAssets
+	ensureKubernetesEngineNodeSSHAssets      = ensureAndSyncKubernetesEngineNodeSSHAssets
 	runKubernetesEngineNodeProvision         = provisionKubernetesEngineNodeSSH
 	runKubernetesEngineNodeIptablesReconcile = reconcileKubernetesEngineNodeIptablesSSH
 	queryKubernetesEngineNodes               = queryKubernetesEngineNodesCommand
 )
+
+// ensureAndSyncKubernetesEngineNodeSSHAssets は、ローカルのゲートウェイSSH鍵を用意した上で、
+// marmotクラスタ(複数ホスト)内の他ホストと鍵ペアが食い違わないようetcd経由で収束させる。
+// これが無いと、あるホストが作成したノードVMのauthorized_keysと、別ホストが後で使う
+// 秘密鍵が一致せず、SSHによるノードプロビジョニングが恒久的に失敗する(単一ホスト構成
+// では発生しない)。
+func ensureAndSyncKubernetesEngineNodeSSHAssets(database *db.Database) error {
+	if err := marmotd.EnsureGatewayRuntimeAssets(); err != nil {
+		return err
+	}
+	return marmotd.SyncGatewayKeyPairWithCluster(database)
+}
 
 type kubernetesNodeList struct {
 	Items []struct {
@@ -81,7 +93,7 @@ func ProvisionKubernetesEngineNodes(database *db.Database, mkeConf *marmotd.MKEC
 	if err != nil {
 		return false, err
 	}
-	if err := ensureKubernetesEngineNodeSSHAssets(); err != nil {
+	if err := ensureKubernetesEngineNodeSSHAssets(database); err != nil {
 		return false, fmt.Errorf("failed to prepare KubernetesEngine node SSH assets: %w", err)
 	}
 	if networkKind == kubernetesEngineNetworkKindCilium {
@@ -280,10 +292,12 @@ func buildKubernetesEngineNodeServerSpec(ke api.KubernetesEngine, index int, pub
 		kubernetesEngineNodeLabelRole:  kubernetesEngineNodeRoleValue,
 		kubernetesEngineNodeLabelIndex: index,
 	}
+	// 注意: ke.Metadata.NodeName(コントロールプレーンの担当ホスト)をここでノードVMにコピーしない。
+	// コピーするとscheduler-controller.goが負荷分散を行わず全VMを同一ホストに固定し、
+	// marmotクラスタ(複数ホスト)構成でノードVMが1ホストに集中し负荷集中と起動遅延を引き起こす
+	// (issue #682付近で実際に発生した履歴あり)。ノード間通信ネットワーク経由でホスト間SSHはすでに
+	// 到達可能なため、ノードVMをコントロールプレーンと同一ホストに固定する必要はない。
 	metadata := api.Metadata{Name: name, Labels: &labels}
-	if ke.Metadata.NodeName != nil && strings.TrimSpace(*ke.Metadata.NodeName) != "" {
-		metadata.NodeName = util.StringPtr(strings.TrimSpace(*ke.Metadata.NodeName))
-	}
 	nics := []api.NetworkInterface{
 		{Networkname: externalNetwork},
 		{Networkname: kubernetesEngineNetworkName(ke)},

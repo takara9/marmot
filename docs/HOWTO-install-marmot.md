@@ -52,7 +52,7 @@ sudo vi /etc/marmot/marmotd.json
 | `session_idle_timeout` | ログインセッションのアイドルタイムアウト（`m`/`h`/`d`） | `1h` |
 | `os_volume_group` | OS ボリューム用 LVM VG 名 | `vg1` |
 | `data_volume_group` | データボリューム用 LVM VG 名 | `vg2` |
-| `default_underlay_interface` | アンダーレイ NIC 名（Geneve/VXLAN 等で使用） | `""` |
+| `default_underlay_interface` | アンダーレイ NIC 名（Geneve 等で使用） | `""` |
 | `tls_cert_file` | HTTPS 用証明書ファイル（未設定なら HTTP） | `""` |
 | `tls_key_file` | HTTPS 用秘密鍵ファイル（未設定なら HTTP） | `""` |
 | `os_images` | 起動時に自動ダウンロード・登録する OS イメージ定義 | `[]` |

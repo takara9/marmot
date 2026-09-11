@@ -16,7 +16,6 @@ import (
 const (
 	Geneve VirtualNetworkSpecOverlayMode = "geneve"
 	None   VirtualNetworkSpecOverlayMode = "none"
-	Vxlan  VirtualNetworkSpecOverlayMode = "vxlan"
 )
 
 // Valid indicates whether the value is a known member of the VirtualNetworkSpecOverlayMode enum.
@@ -25,26 +24,6 @@ func (e VirtualNetworkSpecOverlayMode) Valid() bool {
 	case Geneve:
 		return true
 	case None:
-		return true
-	case Vxlan:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for VirtualNetworkSpecPeerPolicy.
-const (
-	Auto   VirtualNetworkSpecPeerPolicy = "auto"
-	Manual VirtualNetworkSpecPeerPolicy = "manual"
-)
-
-// Valid indicates whether the value is a known member of the VirtualNetworkSpecPeerPolicy enum.
-func (e VirtualNetworkSpecPeerPolicy) Valid() bool {
-	switch e {
-	case Auto:
-		return true
-	case Manual:
 		return true
 	default:
 		return false
@@ -674,28 +653,22 @@ type VirtualNetworkSpec struct {
 	Nat              *bool   `json:"nat,omitempty" yaml:"nat,omitempty"`
 	Netmask          *string `json:"netmask,omitempty" yaml:"netmask,omitempty"`
 
-	// OverlayMode Overlay mode for multi-node networks: 'none' (default), 'geneve' (OVN-managed), or 'vxlan' (deprecated).
+	// OverlayMode Overlay mode for multi-node networks: 'none' (default) or 'geneve' (OVN-managed).
 	OverlayMode *VirtualNetworkSpecOverlayMode `json:"overlayMode,omitempty" yaml:"overlayMode,omitempty"`
-
-	// PeerPolicy Policy for peer management: 'auto' or 'manual'. This field is ignored when OVN manages peers.
-	PeerPolicy *VirtualNetworkSpecPeerPolicy `json:"peerPolicy,omitempty" yaml:"peerPolicy,omitempty"`
-	Stp        *bool                         `json:"stp,omitempty" yaml:"stp,omitempty"`
+	Stp         *bool                          `json:"stp,omitempty" yaml:"stp,omitempty"`
 
 	// UnderlayInterface Interface name for underlay network used by overlay tunnels.
 	UnderlayInterface *string `json:"underlayInterface,omitempty" yaml:"underlayInterface,omitempty"`
 
-	// Vni Overlay VNI (0-16777215) used by Geneve/VXLAN.
+	// Vni Overlay VNI (0-16777215) used by Geneve.
 	Vni *int `json:"vni,omitempty" yaml:"vni,omitempty"`
 
 	// VpnAccess Enable VPN route injection for servers on this network.
 	VpnAccess *bool `json:"vpnAccess,omitempty" yaml:"vpnAccess,omitempty"`
 }
 
-// VirtualNetworkSpecOverlayMode Overlay mode for multi-node networks: 'none' (default), 'geneve' (OVN-managed), or 'vxlan' (deprecated).
+// VirtualNetworkSpecOverlayMode Overlay mode for multi-node networks: 'none' (default) or 'geneve' (OVN-managed).
 type VirtualNetworkSpecOverlayMode string
-
-// VirtualNetworkSpecPeerPolicy Policy for peer management: 'auto' or 'manual'. This field is ignored when OVN manages peers.
-type VirtualNetworkSpecPeerPolicy string
 
 // VolSpec defines model for VolSpec.
 type VolSpec struct {

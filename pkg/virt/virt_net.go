@@ -134,12 +134,12 @@ func CreateVirtualNetworkXML(net api.VirtualNetwork) (*libvirtxml.Network, error
 }
 
 // shouldUseOVSVirtualPort は、libvirt ネットワーク定義に Open vSwitch virtualport を
-// 付与すべきか判定する。overlay(vxlan/geneve) ネットワーク、または BridgeName が実際に
+// 付与すべきか判定する。overlay(geneve) ネットワーク、または BridgeName が実際に
 // OVS ブリッジの場合のみ true を返す。host-bridge 等の素の Linux bridge では false。
 func shouldUseOVSVirtualPort(net api.VirtualNetwork) bool {
 	if net.Spec.OverlayMode != nil {
 		mode := strings.TrimSpace(string(*net.Spec.OverlayMode))
-		if strings.EqualFold(mode, string(api.Vxlan)) || strings.EqualFold(mode, string(api.Geneve)) {
+		if strings.EqualFold(mode, string(api.Geneve)) {
 			return true
 		}
 	}

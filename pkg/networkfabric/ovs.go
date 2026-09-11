@@ -14,7 +14,7 @@ import (
 	"github.com/takara9/marmot/api"
 )
 
-// OVSFabric はシェルコマンドベースの OVS/VXLAN 実装。
+// OVSFabric はシェルコマンドベースの OVS/Geneve 実装。
 // 本番環境では将来 libopenswitch バインディングへの切り替えを前提に、
 // ここではコマンド呼び出しでプロトタイピングする。
 type OVSFabric struct {
@@ -199,7 +199,7 @@ func (o *OVSFabric) EnsureOverlayMesh(vnet *api.VirtualNetwork, peers []string) 
 		validPeers = append(validPeers, peerIP)
 	}
 	if len(validPeers) == 0 {
-		slog.Debug("no vxlan peers resolved, skipping tunnel ensure", "bridge", bridgeName)
+		slog.Debug("no overlay peers resolved, skipping tunnel ensure", "bridge", bridgeName)
 		return nil
 	}
 
@@ -219,13 +219,13 @@ func (o *OVSFabric) EnsureOverlayMesh(vnet *api.VirtualNetwork, peers []string) 
 			return fmt.Errorf("failed to check existing tunnel %s on %s: %w", tunnelName, bridgeName, err)
 		}
 		if exists {
-			slog.Debug("VXLAN tunnel already exists", "bridge", bridgeName, "tunnel", tunnelName, "peer", peerIP)
+			slog.Debug("overlay tunnel already exists", "bridge", bridgeName, "tunnel", tunnelName, "peer", peerIP)
 		}
 
 		if !exists {
 			createCmd := ovsVSCTLCmd("add-port", bridgeName, tunnelName)
 			if output, err := createCmd.CombinedOutput(); err != nil {
-				slog.Error("failed to add VXLAN port", "bridge", bridgeName, "tunnel", tunnelName, "peer", peerIP, "err", err, "output", string(output))
+				slog.Error("failed to add overlay tunnel port", "bridge", bridgeName, "tunnel", tunnelName, "peer", peerIP, "err", err, "output", string(output))
 				return fmt.Errorf("failed to add tunnel port %s to %s: %w (output=%s)", tunnelName, peerIP, err, strings.TrimSpace(string(output)))
 			}
 		}
@@ -243,11 +243,18 @@ func (o *OVSFabric) EnsureOverlayMesh(vnet *api.VirtualNetwork, peers []string) 
 
 		setCmd := ovsVSCTLCmd(args...)
 		if output, err := setCmd.CombinedOutput(); err != nil {
-			slog.Error("failed to configure VXLAN tunnel", "bridge", bridgeName, "tunnel", tunnelName, "peer", peerIP, "err", err, "output", string(output))
+			slog.Error("failed to configure overlay tunnel", "bridge", bridgeName, "tunnel", tunnelName, "peer", peerIP, "err", err, "output", string(output))
 			return fmt.Errorf("failed to configure tunnel %s to %s: %w (output=%s)", tunnelName, peerIP, err, strings.TrimSpace(string(output)))
 		}
 
 		slog.Debug("overlay tunnel created", "bridge", bridgeName, "tunnel", tunnelName, "peer", peerIP, "tunnelType", overlayTunnelType(vnet), "vni", vni, "underlayInterface", underlayIf, "localIP", localIP)
+	}
+
+	// ブリッジがホストを跨ぐGeneveトンネルを持つ場合、カプセル化オーバーヘッド分だけ
+	// ブリッジ自体のMTUを下げておく(物理NICはMTU 1500のまま、ジャンボフレーム未対応の
+	// 前提)。VM側のMTU補正と合わせて、大容量転送がMTU超過でブラックホール化するのを防ぐ。
+	if output, err := ovsVSCTLCmd("set", "interface", bridgeName, fmt.Sprintf("mtu_request=%d", overlayBridgeMTU)).CombinedOutput(); err != nil {
+		slog.Warn("failed to set overlay bridge MTU", "bridge", bridgeName, "err", err, "output", strings.TrimSpace(string(output)))
 	}
 
 	if err := reconcileSplitHorizonFlows(bridgeName); err != nil {
@@ -257,11 +264,14 @@ func (o *OVSFabric) EnsureOverlayMesh(vnet *api.VirtualNetwork, peers []string) 
 	return nil
 }
 
+// overlayBridgeMTU は、Geneveオーバーレイのカプセル化オーバーヘッド(外側Ethernet+IP+UDP+Geneve
+// で約50バイト)を見込んだブリッジの安全なMTU。物理NICのMTU(1500、ジャンボフレーム未対応)を
+// 超えないようにする。
+const overlayBridgeMTU = 1450
+
 func overlayTunnelType(vnet *api.VirtualNetwork) string {
-	if vnet != nil && vnet.Spec.OverlayMode != nil && strings.EqualFold(string(*vnet.Spec.OverlayMode), string(api.Geneve)) {
-		return "geneve"
-	}
-	return "vxlan"
+	_ = vnet
+	return "geneve"
 }
 
 func tunnelNameForPeer(bridgeName, peerIP string) string {
@@ -269,7 +279,7 @@ func tunnelNameForPeer(bridgeName, peerIP string) string {
 	_, _ = h.Write([]byte(strings.TrimSpace(bridgeName)))
 	_, _ = h.Write([]byte("|"))
 	_, _ = h.Write([]byte(strings.TrimSpace(peerIP)))
-	return fmt.Sprintf("vx-%08x", h.Sum32())
+	return fmt.Sprintf("gnv-%08x", h.Sum32())
 }
 
 func portExistsOnBridge(bridgeName, portName string) (bool, error) {
@@ -352,16 +362,18 @@ func (o *OVSFabric) PruneOverlayMesh(vnet *api.VirtualNetwork, remainPeers []str
 		}
 	}
 
-	// vxlan- (旧命名) / vx- (新命名) で始まる不要なトンネルを削除
+	// gnv- で始まる不要なトンネルを削除
 	for _, port := range currentPorts {
 		port = strings.TrimSpace(port)
-		isVxlanPort := strings.HasPrefix(port, "vxlan-") || strings.HasPrefix(port, "vx-")
-		if isVxlanPort && !keepTunnels[port] {
+		isOverlayTunnelPort := strings.HasPrefix(port, "gnv-") ||
+			strings.HasPrefix(port, "vx-") ||
+			strings.HasPrefix(port, "vxlan-")
+		if isOverlayTunnelPort && !keepTunnels[port] {
 			delCmd := ovsVSCTLCmd("del-port", bridgeName, port)
 			if output, err := delCmd.CombinedOutput(); err != nil {
-				slog.Warn("failed to delete VXLAN tunnel", "bridge", bridgeName, "tunnel", port, "err", err, "output", string(output))
+				slog.Warn("failed to delete overlay tunnel", "bridge", bridgeName, "tunnel", port, "err", err, "output", string(output))
 			} else {
-				slog.Debug("VXLAN tunnel deleted", "bridge", bridgeName, "tunnel", port)
+				slog.Debug("overlay tunnel deleted", "bridge", bridgeName, "tunnel", port)
 			}
 		}
 	}
@@ -374,15 +386,15 @@ func (o *OVSFabric) PruneOverlayMesh(vnet *api.VirtualNetwork, remainPeers []str
 }
 
 func reconcileSplitHorizonFlows(bridgeName string) error {
-	vxlanPorts, err := listVxlanPortsOnBridge(bridgeName)
+	overlayPorts, err := listOverlayTunnelPortsOnBridge(bridgeName)
 	if err != nil {
 		return err
 	}
-	if len(vxlanPorts) == 0 {
-		// VXLAN ポートが無い場合は split-horizon フローは不要。
+	if len(overlayPorts) == 0 {
+		// オーバーレイトンネルポートが無い場合は split-horizon フローは不要。
 		// 単一ノード時やブリッジ初期化直後に ovs-ofctl が
 		// "not a bridge or a socket" を返すケースを避ける。
-		slog.Debug("no vxlan ports on bridge, skipping split-horizon flow reconciliation", "bridge", bridgeName)
+		slog.Debug("no overlay tunnel ports on bridge, skipping split-horizon flow reconciliation", "bridge", bridgeName)
 		return nil
 	}
 
@@ -412,23 +424,23 @@ func reconcileSplitHorizonFlows(bridgeName string) error {
 	}
 
 	// 投入すべきフローセットを構築する。
-	desired := make([]string, 0, 1+len(vxlanPorts))
+	desired := make([]string, 0, 1+len(overlayPorts))
 	desired = append(desired, fmt.Sprintf("cookie=%s,priority=0,actions=NORMAL", splitHorizonCookie))
-	readyVxlanPorts := 0
-	for _, port := range vxlanPorts {
+	readyOverlayPorts := 0
+	for _, port := range overlayPorts {
 		ofport, ready, err := getInterfaceOfportIfReady(port)
 		if err != nil {
 			return err
 		}
 		if !ready {
-			slog.Warn("vxlan port ofport is not ready, skipping split-horizon rule for now", "bridge", bridgeName, "port", port)
+			slog.Warn("overlay tunnel port ofport is not ready, skipping split-horizon rule for now", "bridge", bridgeName, "port", port)
 			continue
 		}
-		readyVxlanPorts++
+		readyOverlayPorts++
 		desired = append(desired, fmt.Sprintf("cookie=%s,priority=300,in_port=%d,dl_dst=01:00:00:00:00:00/01:00:00:00:00:00,actions=%s", splitHorizonCookie, ofport, accessActions))
 	}
-	if readyVxlanPorts == 0 {
-		slog.Debug("all vxlan ports are not ready, skipping split-horizon flow reconciliation", "bridge", bridgeName)
+	if readyOverlayPorts == 0 {
+		slog.Debug("all overlay tunnel ports are not ready, skipping split-horizon flow reconciliation", "bridge", bridgeName)
 		return nil
 	}
 
@@ -445,7 +457,7 @@ func reconcileSplitHorizonFlows(bridgeName string) error {
 		return err
 	}
 
-	slog.Debug("split-horizon flows reconciled", "bridge", bridgeName, "vxlanPorts", readyVxlanPorts, "accessPorts", len(accessPorts))
+	slog.Debug("split-horizon flows reconciled", "bridge", bridgeName, "overlayPorts", readyOverlayPorts, "accessPorts", len(accessPorts))
 	return nil
 }
 
@@ -555,7 +567,7 @@ func listAccessPortsOnBridge(bridgeName string) ([]string, error) {
 	return accessPorts, nil
 }
 
-func listVxlanPortsOnBridge(bridgeName string) ([]string, error) {
+func listOverlayTunnelPortsOnBridge(bridgeName string) ([]string, error) {
 	cmd := ovsVSCTLCmd("list-ports", bridgeName)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -563,7 +575,7 @@ func listVxlanPortsOnBridge(bridgeName string) ([]string, error) {
 	}
 
 	ports := strings.Split(strings.TrimSpace(string(output)), "\n")
-	vxlanPorts := make([]string, 0, len(ports))
+	overlayPorts := make([]string, 0, len(ports))
 	for _, port := range ports {
 		port = strings.TrimSpace(port)
 		if port == "" {
@@ -577,12 +589,12 @@ func listVxlanPortsOnBridge(bridgeName string) ([]string, error) {
 		}
 
 		t := strings.Trim(strings.TrimSpace(string(typeOut)), "\"")
-		if t == "vxlan" || t == "geneve" {
-			vxlanPorts = append(vxlanPorts, port)
+		if t == "geneve" {
+			overlayPorts = append(overlayPorts, port)
 		}
 	}
 
-	return vxlanPorts, nil
+	return overlayPorts, nil
 }
 
 func getInterfaceOfport(portName string) (int, error) {
@@ -691,12 +703,12 @@ func (o *OVSFabric) GetBridgeStatus(vnet *api.VirtualNetwork) (bool, int, error)
 	}
 
 	ports := strings.Split(strings.TrimSpace(string(output)), "\n")
-	vxlanCount := 0
+	overlayCount := 0
 	for _, port := range ports {
-		if strings.HasPrefix(port, "vxlan-") || strings.HasPrefix(port, "vx-") {
-			vxlanCount++
+		if strings.HasPrefix(port, "gnv-") {
+			overlayCount++
 		}
 	}
 
-	return true, vxlanCount, nil
+	return true, overlayCount, nil
 }

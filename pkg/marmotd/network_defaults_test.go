@@ -18,7 +18,6 @@ var _ = Describe("VirtualNetworkDefaults", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(network.Spec.OverlayMode).NotTo(BeNil())
 			Expect(*network.Spec.OverlayMode).To(Equal(api.VirtualNetworkSpecOverlayMode(api.Geneve)))
-			Expect(network.Spec.PeerPolicy).To(BeNil())
 			Expect(network.Spec.Vni).NotTo(BeNil())
 			Expect(*network.Spec.Vni).To(Equal(minAutoVNI))
 		})
@@ -35,35 +34,8 @@ var _ = Describe("VirtualNetworkDefaults", func() {
 			Expect(*network.Spec.OverlayMode).To(Equal(api.VirtualNetworkSpecOverlayMode(api.Geneve)))
 		})
 
-		It("defaults peerPolicy to auto for vxlan overlays", func() {
-			overlayMode := api.Vxlan
-			network := api.VirtualNetwork{
-				Spec: api.VirtualNetworkSpec{
-					OverlayMode: &overlayMode,
-				},
-			}
-
-			err := applyVirtualNetworkDefaults(&network, nil, nil)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(network.Spec.PeerPolicy).NotTo(BeNil())
-			Expect(*network.Spec.PeerPolicy).To(Equal(api.VirtualNetworkSpecPeerPolicy(api.Auto)))
-		})
-
-		It("does not force peerPolicy for non-vxlan overlays", func() {
-			overlayMode := api.None
-			network := api.VirtualNetwork{
-				Spec: api.VirtualNetworkSpec{
-					OverlayMode: &overlayMode,
-				},
-			}
-
-			err := applyVirtualNetworkDefaults(&network, nil, nil)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(network.Spec.PeerPolicy).To(BeNil())
-		})
-
 		It("auto-assigns vni when omitted", func() {
-			overlayMode := api.Vxlan
+			overlayMode := api.Geneve
 			network := api.VirtualNetwork{
 				Spec: api.VirtualNetworkSpec{
 					OverlayMode: &overlayMode,
@@ -77,7 +49,7 @@ var _ = Describe("VirtualNetworkDefaults", func() {
 		})
 
 		It("returns error for out-of-range vni", func() {
-			overlayMode := api.Vxlan
+			overlayMode := api.Geneve
 			network := api.VirtualNetwork{
 				Spec: api.VirtualNetworkSpec{
 					OverlayMode: &overlayMode,

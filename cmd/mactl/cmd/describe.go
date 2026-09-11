@@ -734,7 +734,6 @@ func describeNetworkText(n *api.VirtualNetwork) error {
 	fmt.Printf("  NAT:           %s\n", boolOrDash(n.Spec.Nat))
 	fmt.Printf("  STP:           %s\n", boolOrDash(n.Spec.Stp))
 	fmt.Printf("  OverlayMode:   %s\n", overlayWithSemantics(n.Spec.OverlayMode))
-	fmt.Printf("  PeerPolicy:    %s\n", peerPolicyWithSemantics(n.Spec.OverlayMode, n.Spec.PeerPolicy))
 	fmt.Printf("  UnderlayIf:    %s\n", strOrDash(n.Spec.UnderlayInterface))
 	fmt.Printf("  VNI:           %s\n", vniWithSemantics(n.Spec.OverlayMode, n.Spec.Vni))
 
@@ -777,31 +776,7 @@ func overlayWithSemantics(v *api.VirtualNetworkSpecOverlayMode) string {
 	if strings.EqualFold(mode, string(api.Geneve)) {
 		return mode + " (OVN-managed)"
 	}
-	if strings.EqualFold(mode, string(api.Vxlan)) {
-		return mode + " (deprecated)"
-	}
 	return mode
-}
-
-func peerPolicyOrDash(v *api.VirtualNetworkSpecPeerPolicy) string {
-	if v == nil {
-		return "-"
-	}
-	return string(*v)
-}
-
-func peerPolicyWithSemantics(overlay *api.VirtualNetworkSpecOverlayMode, peerPolicy *api.VirtualNetworkSpecPeerPolicy) string {
-	value := peerPolicyOrDash(peerPolicy)
-	if overlay == nil {
-		return value
-	}
-	if strings.EqualFold(string(*overlay), string(api.Geneve)) {
-		if value == "-" {
-			return "- (ignored in OVN-managed mode)"
-		}
-		return value + " (ignored in OVN-managed mode)"
-	}
-	return value
 }
 
 func vniWithSemantics(overlay *api.VirtualNetworkSpecOverlayMode, vni *int) string {

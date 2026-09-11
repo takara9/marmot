@@ -17,6 +17,9 @@ func provisionKubernetesEngineLoadBalancerSSH(address, privateKeyPath, namespace
 	defer func() { _ = client.Close() }()
 
 	runner := &kubernetesEngineNodeSSHRunner{client: client, resourceID: resourceID}
+	if err := applyKubernetesEngineNodeMTUFix(runner, address); err != nil {
+		return err
+	}
 	if err := runner.step("install HA-Proxy", func() error {
 		return runner.run("DEBIAN_FRONTEND=noninteractive apt-get update && "+
 			"DEBIAN_FRONTEND=noninteractive apt-get install -y haproxy && "+

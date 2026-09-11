@@ -17,6 +17,13 @@ var kubernetesEngineNodeSSHPort = 22
 
 var kubernetesEngineNodeSSHDialTimeout = 10 * time.Second
 
+// kubernetesEngineNodeSSHCommandTimeoutは、リモートコマンド実行(session.Run/CombinedOutput)の上限時間。
+// golang.org/x/crypto/sshのSessionはcontextを受け付けないため、タイムアウトしないと
+// リモートコマンド(例: apt-getがdpkgロック待ちでハング)が
+// KubernetesEngineコントローラーのetcd分散ロック保持中の単一ゴルーチンを恒久にブロックし、
+// 全KubernetesEngineのリコンサイルが停止する(実際に発生した障害)。
+var kubernetesEngineNodeSSHCommandTimeout = 5 * time.Minute
+
 // kubernetesEngineNodeProvisionData holds everything needed to provision a
 // KubernetesEngine worker node over SSH (replacing the former ansible-playbook based flow).
 type kubernetesEngineNodeProvisionData struct {
@@ -84,6 +91,60 @@ type kubernetesEngineNodeCommandRunner interface {
 	writeFile(path, mode string, content []byte) error
 }
 
+// kubernetesEngineNodeOverlayMTUは、ノード間通信ネットワーク(host-bridge)が複数marmotホストにまたがるGeneve
+// オーバーレイを経由する際のカプセル化オーバーヘッド(外側Ethernet+IP+UDP+Geneveで約50バイト)を
+// 見込んだ安全なMTU。物理NICはMTU 1500のまま(ジャンボフレーム未有効)の前提で、
+// ゲスト側のMTUをこれより小さくしておかないと、ホストを跏ぐ大容量SSH転送
+// (mke-lb-controllerバイナリ配布等)がMTU超過でブラックホール化し、TCPがスタールする
+// (実際に発生した障害: marmotクラスタ構成でのKubernetesEngineがPROVISIONINGで恒久に停止)。
+const kubernetesEngineNodeOverlayMTU = 1450
+
+const kubernetesEngineNodeMTUFixScriptPath = "/usr/local/sbin/marmot-mke-node-mtu-fix.sh"
+const kubernetesEngineNodeMTUFixUnitPath = "/etc/systemd/system/marmot-mke-node-mtu-fix.service"
+
+// kubernetesEngineNodeMTUFixScriptは、指定したIPアドレス(ノード間通信ネットワーク上のIP)を持つ
+// インターフェースを探してMTUを補正する。netplanの設定を上書きしないよう、起動の都度
+// systemdユニット経由で再適用する(netplanの値を直接書き換えない)。
+func kubernetesEngineNodeMTUFixScript(nodeIP string) string {
+	return fmt.Sprintf(`#!/bin/sh
+set -e
+iface=$(ip -o -4 addr show | awk '{print $2, $4}' | grep " %s/" | head -n1 | awk '{print $1}')
+if [ -n "$iface" ]; then
+  ip link set dev "$iface" mtu %d
+fi
+`, nodeIP, kubernetesEngineNodeOverlayMTU)
+}
+
+func kubernetesEngineNodeMTUFixUnit() string {
+	return fmt.Sprintf(`[Unit]
+Description=Marmot MKE inter-node network MTU fix (Geneve overlay headroom)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%s
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+`, kubernetesEngineNodeMTUFixScriptPath)
+}
+
+// applyKubernetesEngineNodeMTUFixは、nodeIPが割り当てられたインターフェースのMTUを即時及び
+// 次回起動以降も永続的に補正する。ノード・ロLBプロビジョニングの両方から共通で呼ばれる。
+func applyKubernetesEngineNodeMTUFix(runner kubernetesEngineNodeCommandRunner, nodeIP string) error {
+	return runner.step("apply inter-node network MTU fix for Geneve overlay", func() error {
+		if err := runner.writeFile(kubernetesEngineNodeMTUFixScriptPath, "0755", []byte(kubernetesEngineNodeMTUFixScript(nodeIP))); err != nil {
+			return err
+		}
+		if err := runner.writeFile(kubernetesEngineNodeMTUFixUnitPath, "0644", []byte(kubernetesEngineNodeMTUFixUnit())); err != nil {
+			return err
+		}
+		return runner.run("systemctl daemon-reload && systemctl enable --now marmot-mke-node-mtu-fix.service", nil)
+	})
+}
+
 // provisionKubernetesEngineNodeSSH connects to the node via SSH and runs the same setup
 // steps that were previously encoded as an ansible-playbook (install runtime deps, fetch
 // containerd/runc/kubelet/kube-proxy, place credentials, install systemd units).
@@ -102,6 +163,10 @@ func provisionKubernetesEngineNodeSSH(address, privateKeyPath, namespace, nodeID
 }
 
 func runKubernetesEngineNodeProvisionSteps(runner kubernetesEngineNodeCommandRunner, data kubernetesEngineNodeProvisionData) error {
+
+	if err := applyKubernetesEngineNodeMTUFix(runner, data.NodeIP); err != nil {
+		return err
+	}
 
 	if err := runner.step("install runtime dependencies", func() error {
 		return runner.run("DEBIAN_FRONTEND=noninteractive apt-get update && "+
@@ -561,10 +626,24 @@ func dialKubernetesEngineNodeSSH(address, privateKeyPath, namespace string) (*ss
 	if err != nil {
 		return nil, err
 	}
+	// ssh.ClientConfig.Timeoutはssh.Dial()内部のnet.DialTimeoutにのみ適用され、
+	// 既存のconnを渡すNewClientConnでは無視される。デッドラインを明示しないと
+	// バージョン交換/鍵交換/認証がリモート次第で無期限にブロックしうる
+	// (実際にsshd起動前のノードへの接続で発生した)。
+	if err := conn.SetDeadline(time.Now().Add(kubernetesEngineNodeSSHDialTimeout)); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("failed to set ssh handshake deadline: %w", err)
+	}
 	clientConn, chans, reqs, err := ssh.NewClientConn(conn, targetAddr, config)
 	if err != nil {
 		_ = conn.Close()
 		return nil, err
+	}
+	// ハンドシェイク後は解除し、以降のセッションI/Oはrun()/output()側の
+	// タイムアウト機構に委ねる。
+	if err := conn.SetDeadline(time.Time{}); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("failed to clear ssh handshake deadline: %w", err)
 	}
 	return ssh.NewClient(clientConn, chans, reqs), nil
 }
@@ -599,14 +678,27 @@ func (r *kubernetesEngineNodeSSHRunner) run(cmd string, stdin io.Reader) error {
 	if stdin != nil {
 		session.Stdin = stdin
 	}
-	if err := session.Run(cmd); err != nil {
-		trimmed := strings.TrimSpace(buf.String())
-		if trimmed == "" {
-			return fmt.Errorf("remote command failed: %w", err)
+
+	done := make(chan error, 1)
+	go func() { done <- session.Run(cmd) }()
+
+	select {
+	case runErr := <-done:
+		if runErr != nil {
+			trimmed := strings.TrimSpace(buf.String())
+			if trimmed == "" {
+				return fmt.Errorf("remote command failed: %w", runErr)
+			}
+			return fmt.Errorf("remote command failed: %w: %s", runErr, trimmed)
 		}
-		return fmt.Errorf("remote command failed: %w: %s", err, trimmed)
+		return nil
+	case <-time.After(kubernetesEngineNodeSSHCommandTimeout):
+		// session.Close()はSSHチャンネルレベルのクローズであり、相手が応答しない場合自体が
+		// ブロックしうる(実際にこれが原因でタイムアウトしてもフリーズした)。
+		// 下位のトランスポートごと強制クローズし、session.Runの内部readを確実に中断させる。
+		_ = r.client.Close()
+		return fmt.Errorf("remote command timed out after %s", kubernetesEngineNodeSSHCommandTimeout)
 	}
-	return nil
 }
 
 func (r *kubernetesEngineNodeSSHRunner) output(cmd string) (string, error) {
@@ -615,11 +707,28 @@ func (r *kubernetesEngineNodeSSHRunner) output(cmd string) (string, error) {
 		return "", fmt.Errorf("failed to open ssh session: %w", err)
 	}
 	defer func() { _ = session.Close() }()
-	out, err := session.CombinedOutput(cmd)
-	if err != nil {
-		return "", fmt.Errorf("remote command failed: %w: %s", err, strings.TrimSpace(string(out)))
+
+	type result struct {
+		out []byte
+		err error
 	}
-	return strings.TrimSpace(string(out)), nil
+	done := make(chan result, 1)
+	go func() {
+		out, runErr := session.CombinedOutput(cmd)
+		done <- result{out: out, err: runErr}
+	}()
+
+	select {
+	case res := <-done:
+		if res.err != nil {
+			return "", fmt.Errorf("remote command failed: %w: %s", res.err, strings.TrimSpace(string(res.out)))
+		}
+		return strings.TrimSpace(string(res.out)), nil
+	case <-time.After(kubernetesEngineNodeSSHCommandTimeout):
+		// 上のrun()と同様の理由で、sessionではなくクライアント全体を強制クローズする。
+		_ = r.client.Close()
+		return "", fmt.Errorf("remote command timed out after %s", kubernetesEngineNodeSSHCommandTimeout)
+	}
 }
 
 func (r *kubernetesEngineNodeSSHRunner) writeFile(path, mode string, content []byte) error {

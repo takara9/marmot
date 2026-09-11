@@ -110,7 +110,7 @@ type MarmotdConfig struct {
 	// 例: ["192.168.1.0/24", "fd00::/64"]
 	DNSUpstreamAllowCIDRs []string `json:"dns_client_allow_cidrs"`
 
-	// VXLAN 利用時に underlayInterface が省略された場合の既定インターフェース名
+	// Geneve 利用時に underlayInterface が省略された場合の既定インターフェース名
 	DefaultUnderlayInterface string `json:"default_underlay_interface"`
 
 	// OS ボリューム用の LVM Volume Group 名
