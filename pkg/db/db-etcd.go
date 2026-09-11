@@ -84,10 +84,11 @@ func defaultDataVolumeGroup() string {
 }
 
 type Database struct {
-	Cli     *etcd.Client
-	Ctx     context.Context
-	Session *concurrency.Session
-	Mutex   *concurrency.Mutex
+	Cli       *etcd.Client
+	Ctx       context.Context
+	Session   *concurrency.Session
+	Mutex     *concurrency.Mutex
+	sessionMu sync.Mutex
 }
 
 func NewDatabase(url string) (*Database, error) {
@@ -128,7 +129,12 @@ func (d *Database) Close() error {
 }
 
 // LockKey: 指定キーに対する分散ロックを取得
+// etcdのリース失効等でSessionが失効している場合、再生成してから取得する
+// (再生成しないと、以後LockKeyを使う全てのリコンサイルが恒久的に失敗し続ける)。
 func (d *Database) LockKey(lockName string) (*concurrency.Mutex, error) {
+	if err := d.ensureLiveSession(); err != nil {
+		return nil, err
+	}
 	ctx, cancel := context.WithTimeout(d.Ctx, 5*time.Second)
 	defer cancel()
 	d.Mutex = concurrency.NewMutex(d.Session, lockName)
@@ -136,6 +142,34 @@ func (d *Database) LockKey(lockName string) (*concurrency.Mutex, error) {
 		return nil, fmt.Errorf("failed to acquire lock %s: %w", lockName, err)
 	}
 	return d.Mutex, nil
+}
+
+// ensureLiveSession は、現在のSessionが失効(Done()がclose済み)していれば
+// 新しいSessionへ再生成する。呼び出し元が並行してLockKeyを呼んでも二重生成
+// しないよう、専用のミューテックスで保護する。
+func (d *Database) ensureLiveSession() error {
+	d.sessionMu.Lock()
+	defer d.sessionMu.Unlock()
+
+	if d.Session != nil {
+		select {
+		case <-d.Session.Done():
+			// 失効しているので再生成に進む
+		default:
+			return nil
+		}
+	}
+
+	slog.Warn("etcd session is stale, recreating")
+	newSession, err := concurrency.NewSession(d.Cli, concurrency.WithContext(d.Ctx))
+	if err != nil {
+		return fmt.Errorf("failed to recreate etcd session: %w", err)
+	}
+	if d.Session != nil {
+		_ = d.Session.Close()
+	}
+	d.Session = newSession
+	return nil
 }
 
 // UnlockKey: エラーを無視してでも必ず呼ぶ想定
