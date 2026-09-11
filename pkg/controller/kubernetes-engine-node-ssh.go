@@ -91,6 +91,60 @@ type kubernetesEngineNodeCommandRunner interface {
 	writeFile(path, mode string, content []byte) error
 }
 
+// kubernetesEngineNodeOverlayMTUは、ノード間通信ネットワーク(host-bridge)が複数marmotホストにまたがるGeneve
+// オーバーレイを経由する際のカプセル化オーバーヘッド(外側Ethernet+IP+UDP+Geneveで約50バイト)を
+// 見込んだ安全なMTU。物理NICはMTU 1500のまま(ジャンボフレーム未有効)の前提で、
+// ゲスト側のMTUをこれより小さくしておかないと、ホストを跏ぐ大容量SSH転送
+// (mke-lb-controllerバイナリ配布等)がMTU超過でブラックホール化し、TCPがスタールする
+// (実際に発生した障害: marmotクラスタ構成でのKubernetesEngineがPROVISIONINGで恒久に停止)。
+const kubernetesEngineNodeOverlayMTU = 1450
+
+const kubernetesEngineNodeMTUFixScriptPath = "/usr/local/sbin/marmot-mke-node-mtu-fix.sh"
+const kubernetesEngineNodeMTUFixUnitPath = "/etc/systemd/system/marmot-mke-node-mtu-fix.service"
+
+// kubernetesEngineNodeMTUFixScriptは、指定したIPアドレス(ノード間通信ネットワーク上のIP)を持つ
+// インターフェースを探してMTUを補正する。netplanの設定を上書きしないよう、起動の都度
+// systemdユニット経由で再適用する(netplanの値を直接書き換えない)。
+func kubernetesEngineNodeMTUFixScript(nodeIP string) string {
+	return fmt.Sprintf(`#!/bin/sh
+set -e
+iface=$(ip -o -4 addr show | awk '{print $2, $4}' | grep " %s/" | head -n1 | awk '{print $1}')
+if [ -n "$iface" ]; then
+  ip link set dev "$iface" mtu %d
+fi
+`, nodeIP, kubernetesEngineNodeOverlayMTU)
+}
+
+func kubernetesEngineNodeMTUFixUnit() string {
+	return fmt.Sprintf(`[Unit]
+Description=Marmot MKE inter-node network MTU fix (Geneve overlay headroom)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%s
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+`, kubernetesEngineNodeMTUFixScriptPath)
+}
+
+// applyKubernetesEngineNodeMTUFixは、nodeIPが割り当てられたインターフェースのMTUを即時及び
+// 次回起動以降も永続的に補正する。ノード・ロLBプロビジョニングの両方から共通で呼ばれる。
+func applyKubernetesEngineNodeMTUFix(runner kubernetesEngineNodeCommandRunner, nodeIP string) error {
+	return runner.step("apply inter-node network MTU fix for Geneve overlay", func() error {
+		if err := runner.writeFile(kubernetesEngineNodeMTUFixScriptPath, "0755", []byte(kubernetesEngineNodeMTUFixScript(nodeIP))); err != nil {
+			return err
+		}
+		if err := runner.writeFile(kubernetesEngineNodeMTUFixUnitPath, "0644", []byte(kubernetesEngineNodeMTUFixUnit())); err != nil {
+			return err
+		}
+		return runner.run("systemctl daemon-reload && systemctl enable --now marmot-mke-node-mtu-fix.service", nil)
+	})
+}
+
 // provisionKubernetesEngineNodeSSH connects to the node via SSH and runs the same setup
 // steps that were previously encoded as an ansible-playbook (install runtime deps, fetch
 // containerd/runc/kubelet/kube-proxy, place credentials, install systemd units).
@@ -109,6 +163,10 @@ func provisionKubernetesEngineNodeSSH(address, privateKeyPath, namespace, nodeID
 }
 
 func runKubernetesEngineNodeProvisionSteps(runner kubernetesEngineNodeCommandRunner, data kubernetesEngineNodeProvisionData) error {
+
+	if err := applyKubernetesEngineNodeMTUFix(runner, data.NodeIP); err != nil {
+		return err
+	}
 
 	if err := runner.step("install runtime dependencies", func() error {
 		return runner.run("DEBIAN_FRONTEND=noninteractive apt-get update && "+

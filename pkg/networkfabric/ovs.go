@@ -250,12 +250,24 @@ func (o *OVSFabric) EnsureOverlayMesh(vnet *api.VirtualNetwork, peers []string) 
 		slog.Debug("overlay tunnel created", "bridge", bridgeName, "tunnel", tunnelName, "peer", peerIP, "tunnelType", overlayTunnelType(vnet), "vni", vni, "underlayInterface", underlayIf, "localIP", localIP)
 	}
 
+	// ブリッジがホストを跨ぐGeneveトンネルを持つ場合、カプセル化オーバーヘッド分だけ
+	// ブリッジ自体のMTUを下げておく(物理NICはMTU 1500のまま、ジャンボフレーム未対応の
+	// 前提)。VM側のMTU補正と合わせて、大容量転送がMTU超過でブラックホール化するのを防ぐ。
+	if output, err := ovsVSCTLCmd("set", "interface", bridgeName, fmt.Sprintf("mtu_request=%d", overlayBridgeMTU)).CombinedOutput(); err != nil {
+		slog.Warn("failed to set overlay bridge MTU", "bridge", bridgeName, "err", err, "output", strings.TrimSpace(string(output)))
+	}
+
 	if err := reconcileSplitHorizonFlows(bridgeName); err != nil {
 		return fmt.Errorf("failed to reconcile split-horizon flows on %s: %w", bridgeName, err)
 	}
 
 	return nil
 }
+
+// overlayBridgeMTU は、Geneveオーバーレイのカプセル化オーバーヘッド(外側Ethernet+IP+UDP+Geneve
+// で約50バイト)を見込んだブリッジの安全なMTU。物理NICのMTU(1500、ジャンボフレーム未対応)を
+// 超えないようにする。
+const overlayBridgeMTU = 1450
 
 func overlayTunnelType(vnet *api.VirtualNetwork) string {
 	_ = vnet
