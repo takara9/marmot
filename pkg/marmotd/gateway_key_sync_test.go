@@ -33,6 +33,7 @@ func TestSyncGatewayKeyPairWithCluster_PublishesLocalKeyWhenNoneShared(t *testin
 	}
 
 	database := newGatewayKeySyncTestDatabase(t)
+	resetGatewayKeyPairRecord(t, database)
 	if err := SyncGatewayKeyPairWithCluster(database); err != nil {
 		t.Fatalf("SyncGatewayKeyPairWithCluster() failed: %v", err)
 	}
@@ -57,6 +58,7 @@ func TestSyncGatewayKeyPairWithCluster_PublishesLocalKeyWhenNoneShared(t *testin
 func TestSyncGatewayKeyPairWithCluster_AdoptsExistingSharedKey(t *testing.T) {
 	setupGatewayKeyDir(t)
 	database := newGatewayKeySyncTestDatabase(t)
+	resetGatewayKeyPairRecord(t, database)
 
 	// 別ホストが先にpublish済みの状態を模倣する。
 	otherHostRecord := gatewayKeyPairRecord{
@@ -85,6 +87,16 @@ func TestSyncGatewayKeyPairWithCluster_AdoptsExistingSharedKey(t *testing.T) {
 	if string(gotPublic) != otherHostRecord.PublicKeyAuthorized {
 		t.Fatalf("local public key was not converged to the cluster-shared key")
 	}
+}
+
+func resetGatewayKeyPairRecord(t *testing.T, database *db.Database) {
+	t.Helper()
+	if err := database.DeleteJSON(gatewayKeyPairEtcdKey); err != nil && err != db.ErrNotFound {
+		t.Fatalf("DeleteJSON() failed to reset shared key: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = database.DeleteJSON(gatewayKeyPairEtcdKey)
+	})
 }
 
 func newGatewayKeySyncTestDatabase(t *testing.T) *db.Database {
