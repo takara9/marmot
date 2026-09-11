@@ -679,7 +679,10 @@ func (r *kubernetesEngineNodeSSHRunner) run(cmd string, stdin io.Reader) error {
 		}
 		return nil
 	case <-time.After(kubernetesEngineNodeSSHCommandTimeout):
-		_ = session.Close()
+		// session.Close()はSSHチャンネルレベルのクローズであり、相手が応答しない場合自体が
+		// ブロックしうる(実際にこれが原因でタイムアウトしてもフリーズした)。
+		// 下位のトランスポートごと強制クローズし、session.Runの内部readを確実に中断させる。
+		_ = r.client.Close()
 		return fmt.Errorf("remote command timed out after %s", kubernetesEngineNodeSSHCommandTimeout)
 	}
 }
@@ -708,7 +711,8 @@ func (r *kubernetesEngineNodeSSHRunner) output(cmd string) (string, error) {
 		}
 		return strings.TrimSpace(string(res.out)), nil
 	case <-time.After(kubernetesEngineNodeSSHCommandTimeout):
-		_ = session.Close()
+		// 上のrun()と同様の理由で、sessionではなくクライアント全体を強制クローズする。
+		_ = r.client.Close()
 		return "", fmt.Errorf("remote command timed out after %s", kubernetesEngineNodeSSHCommandTimeout)
 	}
 }
