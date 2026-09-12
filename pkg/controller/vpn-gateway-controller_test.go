@@ -11,7 +11,7 @@ import (
 
 func TestBuildVpnGatewayServerSpecSetsDefaultPublicRoute(t *testing.T) {
 	database := newGatewayTestDatabase(t)
-	ctrl := &controller{
+	ctrl := &vpnController{
 		db:     database,
 		marmot: &marmotd.Marmot{NodeName: "hvc", Db: database},
 	}
@@ -80,7 +80,7 @@ func TestBuildVpnGatewayServerSpecSetsDefaultPublicRoute(t *testing.T) {
 
 func TestBuildVpnGatewayServerSpecUsesCustomRoutes(t *testing.T) {
 	database := newGatewayTestDatabase(t)
-	ctrl := &controller{
+	ctrl := &vpnController{
 		db:     database,
 		marmot: &marmotd.Marmot{NodeName: "hvc", Db: database},
 	}
