@@ -31,7 +31,7 @@ var _ = Describe("KubernetesEngine VM E2E", Ordered, func() {
 		imageID           string
 		engine            api.KubernetesEngine
 		networkController *networkController
-		volumeController  *controller
+		volumeController  *volumeController
 		vmController      *serverController
 		mkeController     *kubernetesEngineController
 		mkeConfigPath     string
@@ -417,7 +417,7 @@ func kubernetesEngineE2ENodeRegistered(engine api.KubernetesEngine, expectedName
 	return false, nil
 }
 
-func cleanupKubernetesEngineVMEndToEnd(ma *marmotd.Marmot, mkeController *kubernetesEngineController, vmController *serverController, volumeController *controller, networkController *networkController, engine api.KubernetesEngine, imageID string) {
+func cleanupKubernetesEngineVMEndToEnd(ma *marmotd.Marmot, mkeController *kubernetesEngineController, vmController *serverController, volumeController *volumeController, networkController *networkController, engine api.KubernetesEngine, imageID string) {
 	var cleanupErrors []error
 	if api.KubernetesEngineID(engine) != "" {
 		if current, err := ma.Db.GetKubernetesEngineById(api.KubernetesEngineID(engine)); err == nil {
