@@ -28,9 +28,8 @@ var gatewayReservedInternalNetworks = map[string]struct{}{
 	"ovs-network": {},
 }
 
-// controller は gateway/vpn-gateway/network-load-balancer
-// の各コントローラーで共有される汎用構造体。
-type controller struct {
+// gwController は Gateway コントローラー専用の構造体。
+type gwController struct {
 	db            *db.Database
 	Lock          sync.Mutex
 	marmot        *marmotd.Marmot
@@ -41,7 +40,7 @@ type controller struct {
 }
 
 // Stop はコントローラーの定期処理を停止し、終了を待機する。
-func (c *controller) Stop() {
+func (c *gwController) Stop() {
 	if c == nil {
 		return
 	}
@@ -56,8 +55,8 @@ func (c *controller) Stop() {
 }
 
 // StartGatewayController starts controller loop for gateway resources.
-func StartGatewayController(node string, etcdUrl string) (*controller, error) {
-	var c controller
+func StartGatewayController(node string, etcdUrl string) (*gwController, error) {
+	var c gwController
 	var err error
 
 	c.deletionDelay = 15 * time.Second
@@ -88,7 +87,7 @@ func StartGatewayController(node string, etcdUrl string) (*controller, error) {
 	return &c, nil
 }
 
-func (c *controller) gatewayControllerLoop() {
+func (c *gwController) gatewayControllerLoop() {
 	slog.Debug("ゲートウェイコントローラーの制御ループ実行", "CONTROLLER", time.Now().Format("2006-01-02 15:04:05"))
 
 	gateways, err := c.db.GetGateways()
@@ -150,7 +149,7 @@ func (c *controller) gatewayControllerLoop() {
 	}
 }
 
-func (c *controller) isGatewayInternalServerMissing(gateway api.Gateway) (bool, error) {
+func (c *gwController) isGatewayInternalServerMissing(gateway api.Gateway) (bool, error) {
 	serverName := strings.TrimSpace(gateway.Spec.InternalServerName)
 	if serverName == "" {
 		return false, nil
@@ -166,7 +165,7 @@ func (c *controller) isGatewayInternalServerMissing(gateway api.Gateway) (bool, 
 	return false, nil
 }
 
-func (c *controller) deleteGatewayForMissingInternalServer(gateway api.Gateway) {
+func (c *gwController) deleteGatewayForMissingInternalServer(gateway api.Gateway) {
 	gatewayID := api.GatewayID(gateway)
 	serverID := strings.TrimSpace(gatewayManagedServerID(gateway))
 
@@ -184,7 +183,7 @@ func (c *controller) deleteGatewayForMissingInternalServer(gateway api.Gateway) 
 	slog.Debug("gateway deleted because spec.internalServerName target no longer exists", "gatewayId", gatewayID, "internalServerName", strings.TrimSpace(gateway.Spec.InternalServerName))
 }
 
-func (c *controller) reconcileGatewayPending(gateway api.Gateway) {
+func (c *gwController) reconcileGatewayPending(gateway api.Gateway) {
 	gatewayID := api.GatewayID(gateway)
 
 	if err := validateGatewayInternalNetwork(c.db, gateway.Spec.InternalVirtualNetwork); err != nil {
@@ -208,7 +207,7 @@ func (c *controller) reconcileGatewayPending(gateway api.Gateway) {
 	}
 }
 
-func (c *controller) reconcileGatewayProvisioning(gateway api.Gateway) {
+func (c *gwController) reconcileGatewayProvisioning(gateway api.Gateway) {
 	gatewayID := api.GatewayID(gateway)
 	serverID := gatewayManagedServerID(gateway)
 	if strings.TrimSpace(serverID) == "" {
@@ -242,7 +241,7 @@ func (c *controller) reconcileGatewayProvisioning(gateway api.Gateway) {
 	}
 }
 
-func (c *controller) reconcileGatewayConfiguring(gateway api.Gateway) {
+func (c *gwController) reconcileGatewayConfiguring(gateway api.Gateway) {
 	gatewayID := api.GatewayID(gateway)
 	serverID := gatewayManagedServerID(gateway)
 	if strings.TrimSpace(serverID) == "" {
@@ -288,7 +287,7 @@ func (c *controller) reconcileGatewayConfiguring(gateway api.Gateway) {
 	_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_ACTIVE, "")
 }
 
-func (c *controller) reconcileGatewayActive(gateway api.Gateway) {
+func (c *gwController) reconcileGatewayActive(gateway api.Gateway) {
 	gatewayID := api.GatewayID(gateway)
 	serverID := gatewayManagedServerID(gateway)
 	if strings.TrimSpace(serverID) == "" {
@@ -329,7 +328,7 @@ func (c *controller) reconcileGatewayActive(gateway api.Gateway) {
 	}
 }
 
-func (c *controller) reconcileGatewayDeleting(gateway api.Gateway) {
+func (c *gwController) reconcileGatewayDeleting(gateway api.Gateway) {
 	gatewayID := api.GatewayID(gateway)
 	serverID := gatewayManagedServerID(gateway)
 	if strings.TrimSpace(serverID) == "" {
@@ -358,7 +357,7 @@ func (c *controller) reconcileGatewayDeleting(gateway api.Gateway) {
 	}
 }
 
-func (c *controller) ensureGatewayManagedServerLabel(gatewayID string, serverID string) error {
+func (c *gwController) ensureGatewayManagedServerLabel(gatewayID string, serverID string) error {
 	gateway, err := c.db.GetGatewayById(gatewayID)
 	if err != nil {
 		return err
@@ -376,7 +375,7 @@ func (c *controller) ensureGatewayManagedServerLabel(gatewayID string, serverID 
 	return c.db.UpdateGatewayById(gatewayID, gateway)
 }
 
-func (c *controller) updateGatewayLabels(gatewayID string, mutate func(labels map[string]interface{})) error {
+func (c *gwController) updateGatewayLabels(gatewayID string, mutate func(labels map[string]interface{})) error {
 	gateway, err := c.db.GetGatewayById(gatewayID)
 	if err != nil {
 		return err
@@ -391,7 +390,7 @@ func (c *controller) updateGatewayLabels(gatewayID string, mutate func(labels ma
 	return c.db.UpdateGatewayById(gatewayID, gateway)
 }
 
-func (c *controller) ensureGatewayServerEntry(gateway api.Gateway) (string, error) {
+func (c *gwController) ensureGatewayServerEntry(gateway api.Gateway) (string, error) {
 	if serverID := gatewayManagedServerID(gateway); strings.TrimSpace(serverID) != "" {
 		if _, err := c.db.GetServerById(serverID); err == nil {
 			return serverID, nil
@@ -416,7 +415,7 @@ func (c *controller) ensureGatewayServerEntry(gateway api.Gateway) (string, erro
 	return api.ServerID(created), nil
 }
 
-func (c *controller) buildGatewayServerSpec(gateway api.Gateway, serverName string) (api.Server, error) {
+func (c *gwController) buildGatewayServerSpec(gateway api.Gateway, serverName string) (api.Server, error) {
 	publicIP := strings.TrimSpace(gateway.Spec.BindPublicIpAddress)
 	if publicIP == "" {
 		return api.Server{}, fmt.Errorf("gateway bindPublicIpAddress is empty")
@@ -466,7 +465,7 @@ func (c *controller) buildGatewayServerSpec(gateway api.Gateway, serverName stri
 	return api.Server{ApiVersion: "v1", Kind: "Server", Metadata: meta, Spec: spec}, nil
 }
 
-func (c *controller) lookupNetworkMaskLen(networkName string) (int, error) {
+func (c *gwController) lookupNetworkMaskLen(networkName string) (int, error) {
 	vnet, err := c.db.GetVirtualNetworkByName(networkName)
 	if err != nil {
 		return 0, err
@@ -484,7 +483,7 @@ func (c *controller) lookupNetworkMaskLen(networkName string) (int, error) {
 	return *ipnet.Netmasklen, nil
 }
 
-func (c *controller) lookupNetworkGateway(networkName string) (string, error) {
+func (c *gwController) lookupNetworkGateway(networkName string) (string, error) {
 	vnet, err := c.db.GetVirtualNetworkByName(strings.TrimSpace(networkName))
 	if err != nil {
 		return "", err
@@ -509,7 +508,7 @@ func (c *controller) lookupNetworkGateway(networkName string) (string, error) {
 	return "", fmt.Errorf("gateway is empty for %s", networkName)
 }
 
-func (c *controller) deriveGatewayInternalInterfaceAddress(networkName string) (string, error) {
+func (c *gwController) deriveGatewayInternalInterfaceAddress(networkName string) (string, error) {
 	vnet, err := c.db.GetVirtualNetworkByName(strings.TrimSpace(networkName))
 	if err != nil {
 		return "", err
@@ -546,7 +545,7 @@ func firstHostAddressFromCIDR(cidr string) (string, error) {
 	return host.String(), nil
 }
 
-func (c *controller) findServerByName(name string) (api.Server, error) {
+func (c *gwController) findServerByName(name string) (api.Server, error) {
 	servers, err := c.db.GetServers()
 	if err != nil {
 		return api.Server{}, err
@@ -559,7 +558,7 @@ func (c *controller) findServerByName(name string) (api.Server, error) {
 	return api.Server{}, db.ErrNotFound
 }
 
-func (c *controller) resolveGatewayInternalServerTarget(gateway api.Gateway) (string, error) {
+func (c *gwController) resolveGatewayInternalServerTarget(gateway api.Gateway) (string, error) {
 	serverName := strings.TrimSpace(gateway.Spec.InternalServerName)
 	internalNetwork := strings.TrimSpace(gateway.Spec.InternalVirtualNetwork)
 	if serverName == "" {
@@ -589,7 +588,7 @@ func (c *controller) resolveGatewayInternalServerTarget(gateway api.Gateway) (st
 	return "", fmt.Errorf("internal server %q on network %q does not have an assigned IP address", serverName, internalNetwork)
 }
 
-func (c *controller) handleGatewayConfigFailure(gatewayID string, err error) {
+func (c *gwController) handleGatewayConfigFailure(gatewayID string, err error) {
 	if err == nil {
 		return
 	}
@@ -606,7 +605,7 @@ func (c *controller) handleGatewayConfigFailure(gatewayID string, err error) {
 	_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_CONFIGURING, message)
 }
 
-func (c *controller) incrementGatewayConfigRetries(gatewayID string) (int, error) {
+func (c *gwController) incrementGatewayConfigRetries(gatewayID string) (int, error) {
 	next := 0
 	err := c.updateGatewayLabels(gatewayID, func(labels map[string]interface{}) {
 		next = db.GetGatewayAnsibleRetries(labels) + 1

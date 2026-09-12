@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/takara9/marmot/api"
@@ -17,6 +18,100 @@ import (
 const (
 	VPN_GATEWAY_CONTROLLER_INTERVAL = 15 * time.Second
 )
+
+// controller は vpn-gateway/network-load-balancer
+// の各コントローラーで共有される汎用構造体。
+type controller struct {
+	db            *db.Database
+	Lock          sync.Mutex
+	marmot        *marmotd.Marmot
+	deletionDelay time.Duration // DeletionTimestamp 検知から削除実行までの待機時間
+	stopChan      chan struct{}
+	doneChan      chan struct{}
+	stopOnce      sync.Once
+}
+
+// Stop はコントローラーの定期処理を停止し、終了を待機する。
+func (c *controller) Stop() {
+	if c == nil {
+		return
+	}
+	c.stopOnce.Do(func() {
+		if c.stopChan != nil {
+			close(c.stopChan)
+		}
+	})
+	if c.doneChan != nil {
+		<-c.doneChan
+	}
+}
+
+func (c *controller) lookupNetworkMaskLen(networkName string) (int, error) {
+	vnet, err := c.db.GetVirtualNetworkByName(networkName)
+	if err != nil {
+		return 0, err
+	}
+	if vnet.Spec.IpNetworkId == nil || strings.TrimSpace(*vnet.Spec.IpNetworkId) == "" {
+		return 0, fmt.Errorf("ipNetworkId is empty for %s", networkName)
+	}
+	ipnet, err := c.db.GetIpNetworkById(api.VirtualNetworkID(vnet), *vnet.Spec.IpNetworkId)
+	if err != nil {
+		return 0, err
+	}
+	if ipnet.Netmasklen == nil {
+		return 0, fmt.Errorf("netmasklen is empty for %s", networkName)
+	}
+	return *ipnet.Netmasklen, nil
+}
+
+func (c *controller) lookupNetworkGateway(networkName string) (string, error) {
+	vnet, err := c.db.GetVirtualNetworkByName(strings.TrimSpace(networkName))
+	if err != nil {
+		return "", err
+	}
+
+	if vnet.Spec.IpNetworkId != nil && strings.TrimSpace(*vnet.Spec.IpNetworkId) != "" {
+		ipnet, err := c.db.GetIpNetworkById(api.VirtualNetworkID(vnet), strings.TrimSpace(*vnet.Spec.IpNetworkId))
+		if err != nil {
+			return "", err
+		}
+		if ipnet.Gateway != nil {
+			if gw := strings.TrimSpace(*ipnet.Gateway); gw != "" {
+				return gw, nil
+			}
+		}
+	}
+
+	if vnet.Spec.IPNetworkAddress != nil && strings.TrimSpace(*vnet.Spec.IPNetworkAddress) != "" {
+		return firstHostAddressFromCIDR(*vnet.Spec.IPNetworkAddress)
+	}
+
+	return "", fmt.Errorf("gateway is empty for %s", networkName)
+}
+
+func (c *controller) deriveGatewayInternalInterfaceAddress(networkName string) (string, error) {
+	vnet, err := c.db.GetVirtualNetworkByName(strings.TrimSpace(networkName))
+	if err != nil {
+		return "", err
+	}
+	if vnet.Spec.IPNetworkAddress == nil || strings.TrimSpace(*vnet.Spec.IPNetworkAddress) == "" {
+		return "", fmt.Errorf("iPNetworkAddress is empty for %s", networkName)
+	}
+	return firstHostAddressFromCIDR(*vnet.Spec.IPNetworkAddress)
+}
+
+func (c *controller) findServerByName(name string) (api.Server, error) {
+	servers, err := c.db.GetServers()
+	if err != nil {
+		return api.Server{}, err
+	}
+	for _, s := range servers {
+		if strings.TrimSpace(s.Metadata.Name) == strings.TrimSpace(name) {
+			return s, nil
+		}
+	}
+	return api.Server{}, db.ErrNotFound
+}
 
 // StartVpnGatewayController starts controller loop for vpn-gateway resources.
 func StartVpnGatewayController(node string, etcdUrl string) (*controller, error) {
