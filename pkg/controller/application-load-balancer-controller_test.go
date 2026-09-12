@@ -28,7 +28,7 @@ func TestLoadBalancerControllerStateTransitions(t *testing.T) {
 	}, func(targetAddress, privateKeyPath string) (applicationLoadBalancerAgentState, error) {
 		return applicationLoadBalancerAgentState{LastAppliedHash: desiredHash, LastAppliedAt: time.Now().UTC().Add(time.Hour)}, nil
 	})
-	ctrl := &controller{
+	ctrl := &albController{
 		db:            database,
 		marmot:        &marmotd.Marmot{NodeName: "hvc", Db: database},
 		deletionDelay: 15 * time.Second,
@@ -97,7 +97,7 @@ func TestLoadBalancerControllerStateTransitions(t *testing.T) {
 
 func TestBuildApplicationLoadBalancerServerSpecSetsDefaultRouteOnPublicNIC(t *testing.T) {
 	database := newGatewayTestDatabase(t)
-	ctrl := &controller{
+	ctrl := &albController{
 		db:     database,
 		marmot: &marmotd.Marmot{NodeName: "hvc", Db: database},
 	}
@@ -166,7 +166,7 @@ func TestBuildApplicationLoadBalancerServerSpecSetsDefaultRouteOnPublicNIC(t *te
 
 func TestBuildApplicationLoadBalancerServerSpecUsesCustomPublicNetworkAndRoutes(t *testing.T) {
 	database := newGatewayTestDatabase(t)
-	ctrl := &controller{
+	ctrl := &albController{
 		db:     database,
 		marmot: &marmotd.Marmot{NodeName: "hvc", Db: database},
 	}
@@ -246,7 +246,7 @@ func TestLoadBalancerControllerWaitsForAgentApply(t *testing.T) {
 	}, func(targetAddress, privateKeyPath string) (applicationLoadBalancerAgentState, error) {
 		return applicationLoadBalancerAgentState{}, nil
 	})
-	ctrl := &controller{
+	ctrl := &albController{
 		db:            database,
 		marmot:        &marmotd.Marmot{NodeName: "hvc", Db: database},
 		deletionDelay: 15 * time.Second,
@@ -297,7 +297,7 @@ func TestLoadBalancerControllerWaitsForNewerAgentApplyResult(t *testing.T) {
 	}, func(targetAddress, privateKeyPath string) (applicationLoadBalancerAgentState, error) {
 		return applicationLoadBalancerAgentState{LastAppliedHash: desiredHash, LastAppliedAt: time.Time{}}, nil
 	})
-	ctrl := &controller{
+	ctrl := &albController{
 		db:            database,
 		marmot:        &marmotd.Marmot{NodeName: "hvc", Db: database},
 		deletionDelay: 15 * time.Second,
@@ -368,7 +368,7 @@ func TestLoadBalancerControllerAgentStateReadFailureThreshold(t *testing.T) {
 	}, func(targetAddress, privateKeyPath string) (applicationLoadBalancerAgentState, error) {
 		return applicationLoadBalancerAgentState{}, errors.New("agent state read failed")
 	})
-	ctrl := &controller{
+	ctrl := &albController{
 		db:            database,
 		marmot:        &marmotd.Marmot{NodeName: "hvc", Db: database},
 		deletionDelay: 15 * time.Second,
@@ -425,7 +425,7 @@ func TestLoadBalancerControllerRecoversAfterConsecutiveAgentReadSuccesses(t *tes
 		}
 		return applicationLoadBalancerAgentState{LastAppliedHash: desiredHash, LastAppliedAt: time.Now().UTC().Add(time.Hour)}, nil
 	})
-	ctrl := &controller{
+	ctrl := &albController{
 		db:            database,
 		marmot:        &marmotd.Marmot{NodeName: "hvc", Db: database},
 		deletionDelay: 15 * time.Second,
@@ -523,7 +523,7 @@ func TestLoadBalancerControllerDeletingRemovesObject(t *testing.T) {
 	}, func(targetAddress, privateKeyPath string) (applicationLoadBalancerAgentState, error) {
 		return applicationLoadBalancerAgentState{}, nil
 	})
-	ctrl := &controller{
+	ctrl := &albController{
 		db:            database,
 		marmot:        &marmotd.Marmot{NodeName: "hvc", Db: database},
 		deletionDelay: 15 * time.Second,
@@ -587,7 +587,7 @@ func TestLoadBalancerControllerDegradedRecoveryByBackendMatch(t *testing.T) {
 	}, func(targetAddress, privateKeyPath string) (applicationLoadBalancerAgentState, error) {
 		return applicationLoadBalancerAgentState{}, nil
 	})
-	ctrl := &controller{
+	ctrl := &albController{
 		db:            database,
 		marmot:        &marmotd.Marmot{NodeName: "hvc", Db: database},
 		deletionDelay: 15 * time.Second,

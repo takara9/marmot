@@ -28,8 +28,8 @@ var gatewayReservedInternalNetworks = map[string]struct{}{
 	"ovs-network": {},
 }
 
-// controller は gateway/vpn-gateway/application-load-balancer/
-// network-load-balancer の各コントローラーで共有される汎用構造体。
+// controller は gateway/vpn-gateway/network-load-balancer
+// の各コントローラーで共有される汎用構造体。
 type controller struct {
 	db            *db.Database
 	Lock          sync.Mutex

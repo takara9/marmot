@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/takara9/marmot/api"
@@ -31,9 +32,35 @@ var (
 	applicationLoadBalancerAgentStateRecoverySuccessRequired = defaultApplicationLoadBalancerAgentStateRecoverySuccessRequired
 )
 
+// albController は Application Load Balancer コントローラー専用の構造体。
+type albController struct {
+	db            *db.Database
+	Lock          sync.Mutex
+	marmot        *marmotd.Marmot
+	deletionDelay time.Duration // DeletionTimestamp 検知から削除実行までの待機時間
+	stopChan      chan struct{}
+	doneChan      chan struct{}
+	stopOnce      sync.Once
+}
+
+// Stop はコントローラーの定期処理を停止し、終了を待機する。
+func (c *albController) Stop() {
+	if c == nil {
+		return
+	}
+	c.stopOnce.Do(func() {
+		if c.stopChan != nil {
+			close(c.stopChan)
+		}
+	})
+	if c.doneChan != nil {
+		<-c.doneChan
+	}
+}
+
 // StartApplicationLoadBalancerController starts controller loop for load balancer resources.
-func StartApplicationLoadBalancerController(node string, etcdUrl string) (*controller, error) {
-	var c controller
+func StartApplicationLoadBalancerController(node string, etcdUrl string) (*albController, error) {
+	var c albController
 	var err error
 	applicationLoadBalancerControllerSettingsFromEnv()
 
@@ -65,7 +92,7 @@ func StartApplicationLoadBalancerController(node string, etcdUrl string) (*contr
 	return &c, nil
 }
 
-func (c *controller) applicationLoadBalancerControllerLoop() {
+func (c *albController) applicationLoadBalancerControllerLoop() {
 	slog.Debug("ロードバランサーコントローラーの制御ループ実行", "CONTROLLER", time.Now().Format("2006-01-02 15:04:05"))
 
 	items, err := c.db.GetLoadBalancers()
@@ -124,7 +151,7 @@ func (c *controller) applicationLoadBalancerControllerLoop() {
 	}
 }
 
-func (c *controller) isApplicationLoadBalancerManagedServerMissing(loadBalancer api.ApplicationLoadBalancer) (bool, error) {
+func (c *albController) isApplicationLoadBalancerManagedServerMissing(loadBalancer api.ApplicationLoadBalancer) (bool, error) {
 	serverID := strings.TrimSpace(applicationLoadBalancerManagedServerID(loadBalancer))
 	if serverID == "" {
 		return false, nil
@@ -139,7 +166,7 @@ func (c *controller) isApplicationLoadBalancerManagedServerMissing(loadBalancer 
 	return false, nil
 }
 
-func (c *controller) deleteApplicationLoadBalancerForMissingServer(loadBalancer api.ApplicationLoadBalancer) {
+func (c *albController) deleteApplicationLoadBalancerForMissingServer(loadBalancer api.ApplicationLoadBalancer) {
 	loadBalancerID := api.LoadBalancerID(loadBalancer)
 	c.cleanupApplicationLoadBalancerDesiredConfig(loadBalancerID)
 	if err := c.db.DeleteLoadBalancerById(loadBalancerID); err != nil {
@@ -149,7 +176,7 @@ func (c *controller) deleteApplicationLoadBalancerForMissingServer(loadBalancer 
 	slog.Debug("load balancer deleted because managed server no longer exists", "id", loadBalancerID)
 }
 
-func (c *controller) reconcileApplicationLoadBalancerPending(loadBalancer api.ApplicationLoadBalancer) {
+func (c *albController) reconcileApplicationLoadBalancerPending(loadBalancer api.ApplicationLoadBalancer) {
 	loadBalancerID := api.LoadBalancerID(loadBalancer)
 
 	if err := validateGatewayInternalNetwork(c.db, loadBalancer.Spec.InternalVirtualNetwork); err != nil {
@@ -179,7 +206,7 @@ func (c *controller) reconcileApplicationLoadBalancerPending(loadBalancer api.Ap
 	}
 }
 
-func (c *controller) reconcileApplicationLoadBalancerProvisioning(loadBalancer api.ApplicationLoadBalancer) {
+func (c *albController) reconcileApplicationLoadBalancerProvisioning(loadBalancer api.ApplicationLoadBalancer) {
 	loadBalancerID := api.LoadBalancerID(loadBalancer)
 	serverID := applicationLoadBalancerManagedServerID(loadBalancer)
 	if strings.TrimSpace(serverID) == "" {
@@ -213,7 +240,7 @@ func (c *controller) reconcileApplicationLoadBalancerProvisioning(loadBalancer a
 	}
 }
 
-func (c *controller) reconcileApplicationLoadBalancerConfiguring(loadBalancer api.ApplicationLoadBalancer) {
+func (c *albController) reconcileApplicationLoadBalancerConfiguring(loadBalancer api.ApplicationLoadBalancer) {
 	loadBalancerID := api.LoadBalancerID(loadBalancer)
 	serverID := applicationLoadBalancerManagedServerID(loadBalancer)
 	if strings.TrimSpace(serverID) == "" {
@@ -283,7 +310,7 @@ func (c *controller) reconcileApplicationLoadBalancerConfiguring(loadBalancer ap
 	c.observeApplicationLoadBalancerAgentState(loadBalancer, targetIP, configHash, applicationLoadBalancerStagedConfigAt(loadBalancer), desiredConfigPath)
 }
 
-func (c *controller) reconcileApplicationLoadBalancerActive(loadBalancer api.ApplicationLoadBalancer) {
+func (c *albController) reconcileApplicationLoadBalancerActive(loadBalancer api.ApplicationLoadBalancer) {
 	loadBalancerID := api.LoadBalancerID(loadBalancer)
 	serverID := applicationLoadBalancerManagedServerID(loadBalancer)
 	if strings.TrimSpace(serverID) == "" {
@@ -353,7 +380,7 @@ func (c *controller) reconcileApplicationLoadBalancerActive(loadBalancer api.App
 	}
 }
 
-func (c *controller) resolveApplicationLoadBalancerListenerBackends(loadBalancer api.ApplicationLoadBalancer) (map[string][]applicationLoadBalancerBackendServer, error) {
+func (c *albController) resolveApplicationLoadBalancerListenerBackends(loadBalancer api.ApplicationLoadBalancer) (map[string][]applicationLoadBalancerBackendServer, error) {
 	servers, err := c.db.GetServers()
 	if err != nil {
 		return nil, err
@@ -453,7 +480,7 @@ func applicationLoadBalancerBackendAvailabilityMessage(loadBalancer api.Applicat
 	return fmt.Sprintf("no backend matched for listener(s): %s", strings.Join(missing, ","))
 }
 
-func (c *controller) reconcileApplicationLoadBalancerDeleting(loadBalancer api.ApplicationLoadBalancer) {
+func (c *albController) reconcileApplicationLoadBalancerDeleting(loadBalancer api.ApplicationLoadBalancer) {
 	loadBalancerID := api.LoadBalancerID(loadBalancer)
 	c.cleanupApplicationLoadBalancerDesiredConfig(loadBalancerID)
 	serverID := applicationLoadBalancerManagedServerID(loadBalancer)
@@ -483,7 +510,7 @@ func (c *controller) reconcileApplicationLoadBalancerDeleting(loadBalancer api.A
 	}
 }
 
-func (c *controller) cleanupApplicationLoadBalancerDesiredConfig(loadBalancerID string) {
+func (c *albController) cleanupApplicationLoadBalancerDesiredConfig(loadBalancerID string) {
 	path := applicationLoadBalancerDesiredConfigPath(loadBalancerID)
 	if strings.TrimSpace(path) == "" {
 		return
@@ -493,7 +520,7 @@ func (c *controller) cleanupApplicationLoadBalancerDesiredConfig(loadBalancerID 
 	}
 }
 
-func (c *controller) ensureApplicationLoadBalancerManagedServerLabel(loadBalancerID string, serverID string) error {
+func (c *albController) ensureApplicationLoadBalancerManagedServerLabel(loadBalancerID string, serverID string) error {
 	loadBalancer, err := c.db.GetLoadBalancerById(loadBalancerID)
 	if err != nil {
 		return err
@@ -511,7 +538,7 @@ func (c *controller) ensureApplicationLoadBalancerManagedServerLabel(loadBalance
 	return c.db.UpdateLoadBalancerById(loadBalancerID, loadBalancer)
 }
 
-func (c *controller) updateApplicationLoadBalancerLabels(loadBalancerID string, mutate func(labels map[string]interface{})) error {
+func (c *albController) updateApplicationLoadBalancerLabels(loadBalancerID string, mutate func(labels map[string]interface{})) error {
 	loadBalancer, err := c.db.GetLoadBalancerById(loadBalancerID)
 	if err != nil {
 		return err
@@ -526,7 +553,74 @@ func (c *controller) updateApplicationLoadBalancerLabels(loadBalancerID string, 
 	return c.db.UpdateLoadBalancerById(loadBalancerID, loadBalancer)
 }
 
-func (c *controller) ensureApplicationLoadBalancerServerEntry(loadBalancer api.ApplicationLoadBalancer) (string, error) {
+func (c *albController) lookupNetworkMaskLen(networkName string) (int, error) {
+	vnet, err := c.db.GetVirtualNetworkByName(networkName)
+	if err != nil {
+		return 0, err
+	}
+	if vnet.Spec.IpNetworkId == nil || strings.TrimSpace(*vnet.Spec.IpNetworkId) == "" {
+		return 0, fmt.Errorf("ipNetworkId is empty for %s", networkName)
+	}
+	ipnet, err := c.db.GetIpNetworkById(api.VirtualNetworkID(vnet), *vnet.Spec.IpNetworkId)
+	if err != nil {
+		return 0, err
+	}
+	if ipnet.Netmasklen == nil {
+		return 0, fmt.Errorf("netmasklen is empty for %s", networkName)
+	}
+	return *ipnet.Netmasklen, nil
+}
+
+func (c *albController) lookupNetworkGateway(networkName string) (string, error) {
+	vnet, err := c.db.GetVirtualNetworkByName(strings.TrimSpace(networkName))
+	if err != nil {
+		return "", err
+	}
+
+	if vnet.Spec.IpNetworkId != nil && strings.TrimSpace(*vnet.Spec.IpNetworkId) != "" {
+		ipnet, err := c.db.GetIpNetworkById(api.VirtualNetworkID(vnet), strings.TrimSpace(*vnet.Spec.IpNetworkId))
+		if err != nil {
+			return "", err
+		}
+		if ipnet.Gateway != nil {
+			if gw := strings.TrimSpace(*ipnet.Gateway); gw != "" {
+				return gw, nil
+			}
+		}
+	}
+
+	if vnet.Spec.IPNetworkAddress != nil && strings.TrimSpace(*vnet.Spec.IPNetworkAddress) != "" {
+		return firstHostAddressFromCIDR(*vnet.Spec.IPNetworkAddress)
+	}
+
+	return "", fmt.Errorf("gateway is empty for %s", networkName)
+}
+
+func (c *albController) deriveGatewayInternalInterfaceAddress(networkName string) (string, error) {
+	vnet, err := c.db.GetVirtualNetworkByName(strings.TrimSpace(networkName))
+	if err != nil {
+		return "", err
+	}
+	if vnet.Spec.IPNetworkAddress == nil || strings.TrimSpace(*vnet.Spec.IPNetworkAddress) == "" {
+		return "", fmt.Errorf("iPNetworkAddress is empty for %s", networkName)
+	}
+	return firstHostAddressFromCIDR(*vnet.Spec.IPNetworkAddress)
+}
+
+func (c *albController) findServerByName(name string) (api.Server, error) {
+	servers, err := c.db.GetServers()
+	if err != nil {
+		return api.Server{}, err
+	}
+	for _, s := range servers {
+		if strings.TrimSpace(s.Metadata.Name) == strings.TrimSpace(name) {
+			return s, nil
+		}
+	}
+	return api.Server{}, db.ErrNotFound
+}
+
+func (c *albController) ensureApplicationLoadBalancerServerEntry(loadBalancer api.ApplicationLoadBalancer) (string, error) {
 	if serverID := applicationLoadBalancerManagedServerID(loadBalancer); strings.TrimSpace(serverID) != "" {
 		if _, err := c.db.GetServerById(serverID); err == nil {
 			return serverID, nil
@@ -551,7 +645,7 @@ func (c *controller) ensureApplicationLoadBalancerServerEntry(loadBalancer api.A
 	return api.ServerID(created), nil
 }
 
-func (c *controller) buildApplicationLoadBalancerServerSpec(loadBalancer api.ApplicationLoadBalancer, serverName string) (api.Server, error) {
+func (c *albController) buildApplicationLoadBalancerServerSpec(loadBalancer api.ApplicationLoadBalancer, serverName string) (api.Server, error) {
 	publicIP, cidrMaskLen, err := normalizePublicBindAddress(loadBalancer.Spec.BindPublicIpAddress)
 	if err != nil {
 		return api.Server{}, fmt.Errorf("invalid bindPublicIpAddress: %w", err)
@@ -642,7 +736,7 @@ func applicationLoadBalancerStagedConfigAt(loadBalancer api.ApplicationLoadBalan
 	return db.GetLoadBalancerStagedConfigAt(*loadBalancer.Metadata.Labels)
 }
 
-func (c *controller) observeApplicationLoadBalancerAgentState(loadBalancer api.ApplicationLoadBalancer, targetIP, desiredHash string, stagedAt time.Time, desiredConfigPath string) bool {
+func (c *albController) observeApplicationLoadBalancerAgentState(loadBalancer api.ApplicationLoadBalancer, targetIP, desiredHash string, stagedAt time.Time, desiredConfigPath string) bool {
 	loadBalancerID := api.LoadBalancerID(loadBalancer)
 	if strings.TrimSpace(desiredConfigPath) != "" {
 		localHash, err := fileSHA256Hex(desiredConfigPath)
@@ -724,7 +818,7 @@ func applicationLoadBalancerAgentApplyResultIsStale(lastAppliedAt, stagedAt time
 	return stagedAt.UTC().Sub(lastAppliedAt.UTC()) >= applicationLoadBalancerApplyResultFreshnessThreshold
 }
 
-func (c *controller) resolveApplicationLoadBalancerTargetAddress(loadBalancer api.ApplicationLoadBalancer) (string, error) {
+func (c *albController) resolveApplicationLoadBalancerTargetAddress(loadBalancer api.ApplicationLoadBalancer) (string, error) {
 	serverID := strings.TrimSpace(applicationLoadBalancerManagedServerID(loadBalancer))
 	if serverID == "" {
 		return "", fmt.Errorf("load balancer server reference is missing")
@@ -787,7 +881,7 @@ func normalizePublicBindAddress(raw string) (string, int, error) {
 	return "", 0, fmt.Errorf("invalid ip address %q", trimmed)
 }
 
-func (c *controller) handleApplicationLoadBalancerConfigFailure(loadBalancerID string, err error) {
+func (c *albController) handleApplicationLoadBalancerConfigFailure(loadBalancerID string, err error) {
 	if err == nil {
 		return
 	}
@@ -804,7 +898,7 @@ func (c *controller) handleApplicationLoadBalancerConfigFailure(loadBalancerID s
 	_ = c.db.UpdateLoadBalancerStatusWithMessage(loadBalancerID, db.LOAD_BALANCER_CONFIGURING, message)
 }
 
-func (c *controller) incrementApplicationLoadBalancerConfigRetries(loadBalancerID string) (int, error) {
+func (c *albController) incrementApplicationLoadBalancerConfigRetries(loadBalancerID string) (int, error) {
 	next := 0
 	err := c.updateApplicationLoadBalancerLabels(loadBalancerID, func(labels map[string]interface{}) {
 		next = db.GetLoadBalancerAnsibleRetries(labels) + 1
@@ -813,7 +907,7 @@ func (c *controller) incrementApplicationLoadBalancerConfigRetries(loadBalancerI
 	return next, err
 }
 
-func (c *controller) recordApplicationLoadBalancerAgentStateReadFailure(loadBalancerID string) (int, error) {
+func (c *albController) recordApplicationLoadBalancerAgentStateReadFailure(loadBalancerID string) (int, error) {
 	next := 0
 	err := c.updateApplicationLoadBalancerLabels(loadBalancerID, func(labels map[string]interface{}) {
 		next = db.GetLoadBalancerAgentStateReadFailures(labels) + 1
@@ -823,7 +917,7 @@ func (c *controller) recordApplicationLoadBalancerAgentStateReadFailure(loadBala
 	return next, err
 }
 
-func (c *controller) recordApplicationLoadBalancerAgentStateReadSuccess(loadBalancerID string) (int, error) {
+func (c *albController) recordApplicationLoadBalancerAgentStateReadSuccess(loadBalancerID string) (int, error) {
 	next := 0
 	err := c.updateApplicationLoadBalancerLabels(loadBalancerID, func(labels map[string]interface{}) {
 		db.SetLoadBalancerAgentStateReadFailures(labels, 0)
@@ -833,7 +927,7 @@ func (c *controller) recordApplicationLoadBalancerAgentStateReadSuccess(loadBala
 	return next, err
 }
 
-func (c *controller) resetApplicationLoadBalancerAgentStateReadSuccesses(loadBalancerID string) error {
+func (c *albController) resetApplicationLoadBalancerAgentStateReadSuccesses(loadBalancerID string) error {
 	return c.updateApplicationLoadBalancerLabels(loadBalancerID, func(labels map[string]interface{}) {
 		db.SetLoadBalancerAgentStateReadSuccesses(labels, 0)
 	})
