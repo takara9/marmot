@@ -20,23 +20,19 @@ const (
 	NETWORK_CONTROLLER_INTERVAL = 5 * time.Second
 )
 
-// controller は network/volume/image/gateway/vpn-gateway/application-load-balancer/
-// network-load-balancer の各コントローラーで共有される汎用構造体。
-type controller struct {
+// networkController は仮想ネットワークの状態を管理する専用コントローラー。
+type networkController struct {
 	db                         *db.Database
-	Lock                       sync.Mutex
 	marmot                     *marmotd.Marmot
 	deletionDelay              time.Duration // DeletionTimestamp 検知から削除実行までの待機時間
 	lastNetworkMemberSignature string
 	stopChan                   chan struct{}
 	doneChan                   chan struct{}
 	stopOnce                   sync.Once
-	imageSyncAuthMu            sync.Mutex // imageSyncAPIToken の保護
-	imageSyncAPIToken          string
 }
 
 // Stop はコントローラーの定期処理を停止し、終了を待機する。
-func (c *controller) Stop() {
+func (c *networkController) Stop() {
 	if c == nil {
 		return
 	}
@@ -52,8 +48,8 @@ func (c *controller) Stop() {
 
 // ネットワークコントローラーの開始
 // deletionDelaySeconds に 0 を渡した場合はデフォルト値 (10秒) が使用されます。
-func StartNetController(node string, etcdUrl string, deletionDelaySeconds int) (*controller, error) {
-	var c controller
+func StartNetController(node string, etcdUrl string, deletionDelaySeconds int) (*networkController, error) {
+	var c networkController
 	var err error
 
 	if deletionDelaySeconds <= 0 {
@@ -100,7 +96,7 @@ func StartNetController(node string, etcdUrl string, deletionDelaySeconds int) (
 }
 
 // コントローラーの制御ループ
-func (c *controller) networkControllerLoop(fabric networkfabric.NetworkFabric) {
+func (c *networkController) networkControllerLoop(fabric networkfabric.NetworkFabric) {
 	slog.Debug("ネットワークコントローラーの制御ループ実行", "CONTROLLER", time.Now().Format("2006-01-02 15:04:05"))
 
 	// 既存の仮想ネットワークを取得して、データベースに登録する
@@ -307,7 +303,7 @@ func (c *controller) networkControllerLoop(fabric networkfabric.NetworkFabric) {
 	// ワークキューから処理を取り出して、処理を実行する
 }
 
-func (c *controller) reconcileHeadProvisioningNetwork(vnet api.VirtualNetwork, fabric networkfabric.NetworkFabric) error {
+func (c *networkController) reconcileHeadProvisioningNetwork(vnet api.VirtualNetwork, fabric networkfabric.NetworkFabric) error {
 	vnetID := api.VirtualNetworkID(vnet)
 	if _, err := c.db.GetVirtualNetworkById(vnetID); err != nil {
 		if errors.Is(err, db.ErrNotFound) {
@@ -356,7 +352,7 @@ func networkSyncRole(metadata *api.Metadata) string {
 	return role
 }
 
-func (c *controller) ensureFollowerNetworksWaiting(headNetwork api.VirtualNetwork) error {
+func (c *networkController) ensureFollowerNetworksWaiting(headNetwork api.VirtualNetwork) error {
 	if strings.TrimSpace(headNetwork.Metadata.Name) == "" {
 		return nil
 	}
@@ -398,7 +394,7 @@ func (c *controller) ensureFollowerNetworksWaiting(headNetwork api.VirtualNetwor
 	return nil
 }
 
-func (c *controller) reconcileOverlayMembershipWithCluster(vnets []api.VirtualNetwork, statuses []api.HostStatus) (bool, error) {
+func (c *networkController) reconcileOverlayMembershipWithCluster(vnets []api.VirtualNetwork, statuses []api.HostStatus) (bool, error) {
 	memberNodes := collectClusterMemberNodes(statuses)
 	if len(memberNodes) == 0 {
 		return false, nil
@@ -486,7 +482,7 @@ func (c *controller) reconcileOverlayMembershipWithCluster(vnets []api.VirtualNe
 	return changed, nil
 }
 
-func (c *controller) distributeDeleteIntentToFollowerNetworks(headNetwork api.VirtualNetwork) error {
+func (c *networkController) distributeDeleteIntentToFollowerNetworks(headNetwork api.VirtualNetwork) error {
 	if headNetwork.Metadata.Labels == nil {
 		return nil
 	}
@@ -528,7 +524,7 @@ func (c *controller) distributeDeleteIntentToFollowerNetworks(headNetwork api.Vi
 	return nil
 }
 
-func (c *controller) distributeDeleteIntentToSameNameNetworks(sourceNetwork api.VirtualNetwork) error {
+func (c *networkController) distributeDeleteIntentToSameNameNetworks(sourceNetwork api.VirtualNetwork) error {
 	if strings.TrimSpace(sourceNetwork.Metadata.Name) == "" {
 		return nil
 	}
@@ -567,7 +563,7 @@ func (c *controller) distributeDeleteIntentToSameNameNetworks(sourceNetwork api.
 	return nil
 }
 
-func (c *controller) reconcileFollowerWaitingNetwork(waitingNetwork api.VirtualNetwork, fabric networkfabric.NetworkFabric) error {
+func (c *networkController) reconcileFollowerWaitingNetwork(waitingNetwork api.VirtualNetwork, fabric networkfabric.NetworkFabric) error {
 	if waitingNetwork.Metadata.Labels == nil {
 		return fmt.Errorf("labels are required for waiting network: networkId=%s", api.VirtualNetworkID(waitingNetwork))
 	}
@@ -606,7 +602,7 @@ func (c *controller) reconcileFollowerWaitingNetwork(waitingNetwork api.VirtualN
 	return nil
 }
 
-func (c *controller) reconcileFollowerActiveNetwork(followerNetwork api.VirtualNetwork, fabric networkfabric.NetworkFabric) error {
+func (c *networkController) reconcileFollowerActiveNetwork(followerNetwork api.VirtualNetwork, fabric networkfabric.NetworkFabric) error {
 	if followerNetwork.Metadata.Labels == nil {
 		return fmt.Errorf("labels are required for follower network: networkId=%s", api.VirtualNetworkID(followerNetwork))
 	}
@@ -638,7 +634,7 @@ func (c *controller) reconcileFollowerActiveNetwork(followerNetwork api.VirtualN
 	}
 }
 
-func (c *controller) recoverHeadErrorNetwork(vnet api.VirtualNetwork, fabric networkfabric.NetworkFabric) error {
+func (c *networkController) recoverHeadErrorNetwork(vnet api.VirtualNetwork, fabric networkfabric.NetworkFabric) error {
 	vnetID := api.VirtualNetworkID(vnet)
 	c.db.UpdateVirtualNetworkStatusWithMessage(vnetID, db.NETWORK_PROVISIONING, "recovery:head-reconcile")
 	if err := c.reconcileHeadProvisioningNetwork(vnet, fabric); err != nil {
@@ -648,7 +644,7 @@ func (c *controller) recoverHeadErrorNetwork(vnet api.VirtualNetwork, fabric net
 	return nil
 }
 
-func (c *controller) recoverFollowerErrorNetwork(vnet api.VirtualNetwork, fabric networkfabric.NetworkFabric) error {
+func (c *networkController) recoverFollowerErrorNetwork(vnet api.VirtualNetwork, fabric networkfabric.NetworkFabric) error {
 	vnetID := api.VirtualNetworkID(vnet)
 	if vnet.Metadata.Labels == nil {
 		return fmt.Errorf("labels are required for follower recovery: networkId=%s", vnetID)
@@ -693,7 +689,7 @@ func (c *controller) recoverFollowerErrorNetwork(vnet api.VirtualNetwork, fabric
 	}
 }
 
-func (c *controller) ensureVirtualNetworkPresent(vnet api.VirtualNetwork) error {
+func (c *networkController) ensureVirtualNetworkPresent(vnet api.VirtualNetwork) error {
 	if strings.TrimSpace(vnet.Metadata.Name) == "" {
 		return fmt.Errorf("network metadata.name is required: networkId=%s", api.VirtualNetworkID(vnet))
 	}
@@ -719,7 +715,7 @@ func (c *controller) ensureVirtualNetworkPresent(vnet api.VirtualNetwork) error 
 
 // ensureVirtualNetworkAbsent はフォロワーノードで libvirt ネットワーク実体のみを削除する。
 // DB・IPネットワーク削除はヘッドノードの DeleteVirtualNetwork が担うため、ここでは行わない。
-func (c *controller) ensureVirtualNetworkAbsent(vnet api.VirtualNetwork) error {
+func (c *networkController) ensureVirtualNetworkAbsent(vnet api.VirtualNetwork) error {
 	if strings.TrimSpace(vnet.Metadata.Name) == "" {
 		return fmt.Errorf("network metadata.name is required: networkId=%s", api.VirtualNetworkID(vnet))
 	}
@@ -762,7 +758,7 @@ func (d networkDeleteDependencies) statusMessage() string {
 	)
 }
 
-func (c *controller) collectDeleteBlockingDependencies(vnet api.VirtualNetwork) (networkDeleteDependencies, error) {
+func (c *networkController) collectDeleteBlockingDependencies(vnet api.VirtualNetwork) (networkDeleteDependencies, error) {
 	networkName := strings.TrimSpace(vnet.Metadata.Name)
 	networkID := strings.TrimSpace(api.VirtualNetworkID(vnet))
 
@@ -863,7 +859,7 @@ func isGeneveOverlay(vnet api.VirtualNetwork) bool {
 	return strings.EqualFold(string(*vnet.Spec.OverlayMode), string(api.Geneve))
 }
 
-func (c *controller) ensureOverlayMeshForNetwork(fabric networkfabric.NetworkFabric, vnet api.VirtualNetwork) error {
+func (c *networkController) ensureOverlayMeshForNetwork(fabric networkfabric.NetworkFabric, vnet api.VirtualNetwork) error {
 	if !isGeneveOverlay(vnet) {
 		return nil
 	}
@@ -888,7 +884,7 @@ func (c *controller) ensureOverlayMeshForNetwork(fabric networkfabric.NetworkFab
 	return nil
 }
 
-func (c *controller) resolveGenevePeerIPs(vnet api.VirtualNetwork) ([]string, error) {
+func (c *networkController) resolveGenevePeerIPs(vnet api.VirtualNetwork) ([]string, error) {
 	if strings.TrimSpace(vnet.Metadata.Name) == "" {
 		return nil, fmt.Errorf("network metadata.name is required: networkId=%s", api.VirtualNetworkID(vnet))
 	}

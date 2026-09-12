@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/takara9/marmot/api"
@@ -16,7 +17,34 @@ const (
 	VOLUME_STALE_TIMEOUT       = 10 * time.Minute
 )
 
-// controller 型の定義は network-controller.go を参照。
+// controller は volume/image/gateway/vpn-gateway/application-load-balancer/
+// network-load-balancer の各コントローラーで共有される汎用構造体。
+type controller struct {
+	db                *db.Database
+	Lock              sync.Mutex
+	marmot            *marmotd.Marmot
+	deletionDelay     time.Duration // DeletionTimestamp 検知から削除実行までの待機時間
+	stopChan          chan struct{}
+	doneChan          chan struct{}
+	stopOnce          sync.Once
+	imageSyncAuthMu   sync.Mutex // imageSyncAPIToken の保護
+	imageSyncAPIToken string
+}
+
+// Stop はコントローラーの定期処理を停止し、終了を待機する。
+func (c *controller) Stop() {
+	if c == nil {
+		return
+	}
+	c.stopOnce.Do(func() {
+		if c.stopChan != nil {
+			close(c.stopChan)
+		}
+	})
+	if c.doneChan != nil {
+		<-c.doneChan
+	}
+}
 
 // ボリュームコントローラーの開始
 // deletionDelaySeconds に 0 を渡した場合はデフォルト値 (10秒) が使用されます。
