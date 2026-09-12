@@ -19,8 +19,7 @@ const (
 	VPN_GATEWAY_CONTROLLER_INTERVAL = 15 * time.Second
 )
 
-// controller は vpn-gateway/network-load-balancer
-// の各コントローラーで共有される汎用構造体。
+// controller は vpn-gateway コントローラーで使用される汎用構造体。
 type controller struct {
 	db            *db.Database
 	Lock          sync.Mutex

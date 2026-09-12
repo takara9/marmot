@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/takara9/marmot/api"
@@ -28,9 +29,77 @@ var (
 	networkLoadBalancerApplyRetryBackoffSeconds = defaultNetworkLoadBalancerApplyRetryBackoffSeconds
 )
 
+// nlbController は Network Load Balancer コントローラー専用の構造体。
+type nlbController struct {
+	db            *db.Database
+	Lock          sync.Mutex
+	marmot        *marmotd.Marmot
+	deletionDelay time.Duration // DeletionTimestamp 検知から削除実行までの待機時間
+	stopChan      chan struct{}
+	doneChan      chan struct{}
+	stopOnce      sync.Once
+}
+
+// Stop はコントローラーの定期処理を停止し、終了を待機する。
+func (c *nlbController) Stop() {
+	if c == nil {
+		return
+	}
+	c.stopOnce.Do(func() {
+		if c.stopChan != nil {
+			close(c.stopChan)
+		}
+	})
+	if c.doneChan != nil {
+		<-c.doneChan
+	}
+}
+
+func (c *nlbController) lookupNetworkMaskLen(networkName string) (int, error) {
+	vnet, err := c.db.GetVirtualNetworkByName(networkName)
+	if err != nil {
+		return 0, err
+	}
+	if vnet.Spec.IpNetworkId == nil || strings.TrimSpace(*vnet.Spec.IpNetworkId) == "" {
+		return 0, fmt.Errorf("ipNetworkId is empty for %s", networkName)
+	}
+	ipnet, err := c.db.GetIpNetworkById(api.VirtualNetworkID(vnet), *vnet.Spec.IpNetworkId)
+	if err != nil {
+		return 0, err
+	}
+	if ipnet.Netmasklen == nil {
+		return 0, fmt.Errorf("netmasklen is empty for %s", networkName)
+	}
+	return *ipnet.Netmasklen, nil
+}
+
+func (c *nlbController) deriveGatewayInternalInterfaceAddress(networkName string) (string, error) {
+	vnet, err := c.db.GetVirtualNetworkByName(strings.TrimSpace(networkName))
+	if err != nil {
+		return "", err
+	}
+	if vnet.Spec.IPNetworkAddress == nil || strings.TrimSpace(*vnet.Spec.IPNetworkAddress) == "" {
+		return "", fmt.Errorf("iPNetworkAddress is empty for %s", networkName)
+	}
+	return firstHostAddressFromCIDR(*vnet.Spec.IPNetworkAddress)
+}
+
+func (c *nlbController) findServerByName(name string) (api.Server, error) {
+	servers, err := c.db.GetServers()
+	if err != nil {
+		return api.Server{}, err
+	}
+	for _, s := range servers {
+		if strings.TrimSpace(s.Metadata.Name) == strings.TrimSpace(name) {
+			return s, nil
+		}
+	}
+	return api.Server{}, db.ErrNotFound
+}
+
 // StartNetworkLoadBalancerController starts controller loop for NetworkLoadBalancer resources.
-func StartNetworkLoadBalancerController(node string, etcdUrl string) (*controller, error) {
-	var c controller
+func StartNetworkLoadBalancerController(node string, etcdUrl string) (*nlbController, error) {
+	var c nlbController
 	var err error
 	networkLoadBalancerControllerSettingsFromEnv()
 
@@ -75,7 +144,7 @@ func networkLoadBalancerControllerSettingsFromEnv() {
 	}
 }
 
-func (c *controller) networkLoadBalancerControllerLoop() {
+func (c *nlbController) networkLoadBalancerControllerLoop() {
 	slog.Debug("ネットワークロードバランサーコントローラーの制御ループ実行", "CONTROLLER", time.Now().Format("2006-01-02 15:04:05"))
 
 	items, err := c.db.GetNetworkLoadBalancers()
@@ -134,7 +203,7 @@ func (c *controller) networkLoadBalancerControllerLoop() {
 	}
 }
 
-func (c *controller) isNetworkLoadBalancerManagedServerMissing(loadBalancer api.NetworkLoadBalancer) (bool, error) {
+func (c *nlbController) isNetworkLoadBalancerManagedServerMissing(loadBalancer api.NetworkLoadBalancer) (bool, error) {
 	serverID := strings.TrimSpace(networkLoadBalancerManagedServerID(loadBalancer))
 	if serverID == "" {
 		return false, nil
@@ -148,7 +217,7 @@ func (c *controller) isNetworkLoadBalancerManagedServerMissing(loadBalancer api.
 	return false, nil
 }
 
-func (c *controller) deleteNetworkLoadBalancerForMissingServer(loadBalancer api.NetworkLoadBalancer) {
+func (c *nlbController) deleteNetworkLoadBalancerForMissingServer(loadBalancer api.NetworkLoadBalancer) {
 	loadBalancerID := api.NetworkLoadBalancerID(loadBalancer)
 	c.cleanupNetworkLoadBalancerPlaybook(loadBalancerID)
 	if err := c.db.DeleteNetworkLoadBalancerById(loadBalancerID); err != nil {
@@ -158,7 +227,7 @@ func (c *controller) deleteNetworkLoadBalancerForMissingServer(loadBalancer api.
 	slog.Debug("network load balancer deleted because managed server no longer exists", "id", loadBalancerID)
 }
 
-func (c *controller) reconcileNetworkLoadBalancerPending(loadBalancer api.NetworkLoadBalancer) {
+func (c *nlbController) reconcileNetworkLoadBalancerPending(loadBalancer api.NetworkLoadBalancer) {
 	loadBalancerID := api.NetworkLoadBalancerID(loadBalancer)
 
 	if err := validateGatewayInternalNetwork(c.db, loadBalancer.Spec.InternalVirtualNetwork); err != nil {
@@ -186,7 +255,7 @@ func (c *controller) reconcileNetworkLoadBalancerPending(loadBalancer api.Networ
 	}
 }
 
-func (c *controller) reconcileNetworkLoadBalancerProvisioning(loadBalancer api.NetworkLoadBalancer) {
+func (c *nlbController) reconcileNetworkLoadBalancerProvisioning(loadBalancer api.NetworkLoadBalancer) {
 	loadBalancerID := api.NetworkLoadBalancerID(loadBalancer)
 	serverID := networkLoadBalancerManagedServerID(loadBalancer)
 	if strings.TrimSpace(serverID) == "" {
@@ -219,7 +288,7 @@ func (c *controller) reconcileNetworkLoadBalancerProvisioning(loadBalancer api.N
 	}
 }
 
-func (c *controller) reconcileNetworkLoadBalancerConfiguring(loadBalancer api.NetworkLoadBalancer) {
+func (c *nlbController) reconcileNetworkLoadBalancerConfiguring(loadBalancer api.NetworkLoadBalancer) {
 	loadBalancerID := api.NetworkLoadBalancerID(loadBalancer)
 	serverID := networkLoadBalancerManagedServerID(loadBalancer)
 	if strings.TrimSpace(serverID) == "" {
@@ -297,7 +366,7 @@ func (c *controller) reconcileNetworkLoadBalancerConfiguring(loadBalancer api.Ne
 	_ = c.db.UpdateNetworkLoadBalancerStatusWithMessage(loadBalancerID, db.NETWORK_LOAD_BALANCER_ACTIVE, "")
 }
 
-func (c *controller) reconcileNetworkLoadBalancerActive(loadBalancer api.NetworkLoadBalancer) {
+func (c *nlbController) reconcileNetworkLoadBalancerActive(loadBalancer api.NetworkLoadBalancer) {
 	loadBalancerID := api.NetworkLoadBalancerID(loadBalancer)
 	serverID := networkLoadBalancerManagedServerID(loadBalancer)
 	if strings.TrimSpace(serverID) == "" {
@@ -355,7 +424,7 @@ func (c *controller) reconcileNetworkLoadBalancerActive(loadBalancer api.Network
 	_ = c.db.UpdateNetworkLoadBalancerStatusWithMessage(loadBalancerID, db.NETWORK_LOAD_BALANCER_ACTIVE, "")
 }
 
-func (c *controller) reconcileNetworkLoadBalancerDeleting(loadBalancer api.NetworkLoadBalancer) {
+func (c *nlbController) reconcileNetworkLoadBalancerDeleting(loadBalancer api.NetworkLoadBalancer) {
 	loadBalancerID := api.NetworkLoadBalancerID(loadBalancer)
 	c.cleanupNetworkLoadBalancerPlaybook(loadBalancerID)
 	serverID := networkLoadBalancerManagedServerID(loadBalancer)
@@ -385,7 +454,7 @@ func (c *controller) reconcileNetworkLoadBalancerDeleting(loadBalancer api.Netwo
 	}
 }
 
-func (c *controller) cleanupNetworkLoadBalancerPlaybook(loadBalancerID string) {
+func (c *nlbController) cleanupNetworkLoadBalancerPlaybook(loadBalancerID string) {
 	path := networkLoadBalancerPlaybookPath(loadBalancerID)
 	if strings.TrimSpace(path) == "" {
 		return
@@ -395,7 +464,7 @@ func (c *controller) cleanupNetworkLoadBalancerPlaybook(loadBalancerID string) {
 	}
 }
 
-func (c *controller) ensureNetworkLoadBalancerManagedServerLabel(loadBalancerID string, serverID string) error {
+func (c *nlbController) ensureNetworkLoadBalancerManagedServerLabel(loadBalancerID string, serverID string) error {
 	loadBalancer, err := c.db.GetNetworkLoadBalancerById(loadBalancerID)
 	if err != nil {
 		return err
@@ -413,7 +482,7 @@ func (c *controller) ensureNetworkLoadBalancerManagedServerLabel(loadBalancerID 
 	return c.db.UpdateNetworkLoadBalancerById(loadBalancerID, loadBalancer)
 }
 
-func (c *controller) updateNetworkLoadBalancerLabels(loadBalancerID string, mutate func(labels map[string]interface{})) error {
+func (c *nlbController) updateNetworkLoadBalancerLabels(loadBalancerID string, mutate func(labels map[string]interface{})) error {
 	loadBalancer, err := c.db.GetNetworkLoadBalancerById(loadBalancerID)
 	if err != nil {
 		return err
@@ -428,7 +497,7 @@ func (c *controller) updateNetworkLoadBalancerLabels(loadBalancerID string, muta
 	return c.db.UpdateNetworkLoadBalancerById(loadBalancerID, loadBalancer)
 }
 
-func (c *controller) ensureNetworkLoadBalancerServerEntry(loadBalancer api.NetworkLoadBalancer) (string, error) {
+func (c *nlbController) ensureNetworkLoadBalancerServerEntry(loadBalancer api.NetworkLoadBalancer) (string, error) {
 	if serverID := networkLoadBalancerManagedServerID(loadBalancer); strings.TrimSpace(serverID) != "" {
 		if _, err := c.db.GetServerById(serverID); err == nil {
 			return serverID, nil
@@ -453,7 +522,7 @@ func (c *controller) ensureNetworkLoadBalancerServerEntry(loadBalancer api.Netwo
 	return api.ServerID(created), nil
 }
 
-func (c *controller) buildNetworkLoadBalancerServerSpec(loadBalancer api.NetworkLoadBalancer, serverName string) (api.Server, error) {
+func (c *nlbController) buildNetworkLoadBalancerServerSpec(loadBalancer api.NetworkLoadBalancer, serverName string) (api.Server, error) {
 	publicIP := strings.TrimSpace(loadBalancer.Spec.BindPublicIpAddress)
 	if publicIP == "" {
 		return api.Server{}, fmt.Errorf("network load balancer bindPublicIpAddress is empty")
@@ -543,7 +612,7 @@ func networkLoadBalancerServerName(loadBalancer api.NetworkLoadBalancer) string 
 	return "nlb-" + name
 }
 
-func (c *controller) shouldRetryNetworkLoadBalancerApply(loadBalancer api.NetworkLoadBalancer) bool {
+func (c *nlbController) shouldRetryNetworkLoadBalancerApply(loadBalancer api.NetworkLoadBalancer) bool {
 	stagedAt := networkLoadBalancerStagedConfigAt(loadBalancer)
 	if stagedAt.IsZero() {
 		return true
@@ -554,7 +623,7 @@ func (c *controller) shouldRetryNetworkLoadBalancerApply(loadBalancer api.Networ
 	return time.Since(stagedAt) >= time.Duration(networkLoadBalancerApplyRetryBackoffSeconds)*time.Second
 }
 
-func (c *controller) handleNetworkLoadBalancerConfigFailure(loadBalancerID string, loadBalancer api.NetworkLoadBalancer, desiredHash string, err error) {
+func (c *nlbController) handleNetworkLoadBalancerConfigFailure(loadBalancerID string, loadBalancer api.NetworkLoadBalancer, desiredHash string, err error) {
 	if err == nil {
 		return
 	}
@@ -577,7 +646,7 @@ func (c *controller) handleNetworkLoadBalancerConfigFailure(loadBalancerID strin
 	_ = c.db.UpdateNetworkLoadBalancerStatusWithMessage(loadBalancerID, db.NETWORK_LOAD_BALANCER_CONFIGURING, message)
 }
 
-func (c *controller) incrementNetworkLoadBalancerConfigRetries(loadBalancerID string) (int, error) {
+func (c *nlbController) incrementNetworkLoadBalancerConfigRetries(loadBalancerID string) (int, error) {
 	next := 0
 	err := c.updateNetworkLoadBalancerLabels(loadBalancerID, func(labels map[string]interface{}) {
 		next = db.GetNetworkLoadBalancerAnsibleRetries(labels) + 1
@@ -586,7 +655,7 @@ func (c *controller) incrementNetworkLoadBalancerConfigRetries(loadBalancerID st
 	return next, err
 }
 
-func (c *controller) resolveNetworkLoadBalancerListenerBackends(loadBalancer api.NetworkLoadBalancer) (map[string][]networkLoadBalancerBackendServer, error) {
+func (c *nlbController) resolveNetworkLoadBalancerListenerBackends(loadBalancer api.NetworkLoadBalancer) (map[string][]networkLoadBalancerBackendServer, error) {
 	servers, err := c.db.GetServers()
 	if err != nil {
 		return nil, err
@@ -668,7 +737,7 @@ func networkLoadBalancerServerAddressInNetwork(server api.Server, networkName st
 	return ""
 }
 
-func (c *controller) resolveNetworkLoadBalancerTargetAddress(loadBalancer api.NetworkLoadBalancer) (string, error) {
+func (c *nlbController) resolveNetworkLoadBalancerTargetAddress(loadBalancer api.NetworkLoadBalancer) (string, error) {
 	serverID := strings.TrimSpace(networkLoadBalancerManagedServerID(loadBalancer))
 	if serverID == "" {
 		return "", fmt.Errorf("network load balancer server reference is missing")
