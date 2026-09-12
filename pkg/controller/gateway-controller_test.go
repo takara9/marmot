@@ -28,7 +28,7 @@ func TestGatewayControllerStateTransitions(t *testing.T) {
 		}
 		return nil
 	})
-	ctrl := &controller{
+	ctrl := &gwController{
 		db:            database,
 		marmot:        &marmotd.Marmot{NodeName: "hvc", Db: database},
 		deletionDelay: 15 * time.Second,
@@ -96,7 +96,7 @@ func TestGatewayControllerLoopIntegration_CreateToActive(t *testing.T) {
 		}
 		return nil
 	})
-	ctrl := &controller{
+	ctrl := &gwController{
 		db:            database,
 		marmot:        &marmotd.Marmot{NodeName: "hvc", Db: database},
 		deletionDelay: 15 * time.Second,
@@ -154,7 +154,7 @@ func TestGatewayControllerConfigRetryExceeded(t *testing.T) {
 	setupGatewayAnsibleTestHooks(t, func(playbookPath, gatewayAddress, privateKeyPath string) error {
 		return fmt.Errorf("simulated ansible failure")
 	})
-	ctrl := &controller{
+	ctrl := &gwController{
 		db:            database,
 		marmot:        &marmotd.Marmot{NodeName: "hvc", Db: database},
 		deletionDelay: 15 * time.Second,
@@ -204,7 +204,7 @@ func TestGatewayControllerDeletesGatewayWhenInternalServerMissing(t *testing.T) 
 	setupGatewayAnsibleTestHooks(t, func(playbookPath, gatewayAddress, privateKeyPath string) error {
 		return nil
 	})
-	ctrl := &controller{
+	ctrl := &gwController{
 		db:            database,
 		marmot:        &marmotd.Marmot{NodeName: "hvc", Db: database},
 		deletionDelay: 15 * time.Second,
