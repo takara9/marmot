@@ -483,31 +483,6 @@ func (c *gwController) lookupNetworkMaskLen(networkName string) (int, error) {
 	return *ipnet.Netmasklen, nil
 }
 
-func (c *gwController) lookupNetworkGateway(networkName string) (string, error) {
-	vnet, err := c.db.GetVirtualNetworkByName(strings.TrimSpace(networkName))
-	if err != nil {
-		return "", err
-	}
-
-	if vnet.Spec.IpNetworkId != nil && strings.TrimSpace(*vnet.Spec.IpNetworkId) != "" {
-		ipnet, err := c.db.GetIpNetworkById(api.VirtualNetworkID(vnet), strings.TrimSpace(*vnet.Spec.IpNetworkId))
-		if err != nil {
-			return "", err
-		}
-		if ipnet.Gateway != nil {
-			if gw := strings.TrimSpace(*ipnet.Gateway); gw != "" {
-				return gw, nil
-			}
-		}
-	}
-
-	if vnet.Spec.IPNetworkAddress != nil && strings.TrimSpace(*vnet.Spec.IPNetworkAddress) != "" {
-		return firstHostAddressFromCIDR(*vnet.Spec.IPNetworkAddress)
-	}
-
-	return "", fmt.Errorf("gateway is empty for %s", networkName)
-}
-
 func (c *gwController) deriveGatewayInternalInterfaceAddress(networkName string) (string, error) {
 	vnet, err := c.db.GetVirtualNetworkByName(strings.TrimSpace(networkName))
 	if err != nil {
