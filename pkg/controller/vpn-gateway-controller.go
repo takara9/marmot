@@ -19,8 +19,8 @@ const (
 	VPN_GATEWAY_CONTROLLER_INTERVAL = 15 * time.Second
 )
 
-// controller は vpn-gateway コントローラーで使用される汎用構造体。
-type controller struct {
+// vpnController は vpn-gateway コントローラーで使用される汎用構造体。
+type vpnController struct {
 	db            *db.Database
 	Lock          sync.Mutex
 	marmot        *marmotd.Marmot
@@ -31,7 +31,7 @@ type controller struct {
 }
 
 // Stop はコントローラーの定期処理を停止し、終了を待機する。
-func (c *controller) Stop() {
+func (c *vpnController) Stop() {
 	if c == nil {
 		return
 	}
@@ -45,7 +45,7 @@ func (c *controller) Stop() {
 	}
 }
 
-func (c *controller) lookupNetworkMaskLen(networkName string) (int, error) {
+func (c *vpnController) lookupNetworkMaskLen(networkName string) (int, error) {
 	vnet, err := c.db.GetVirtualNetworkByName(networkName)
 	if err != nil {
 		return 0, err
@@ -63,7 +63,7 @@ func (c *controller) lookupNetworkMaskLen(networkName string) (int, error) {
 	return *ipnet.Netmasklen, nil
 }
 
-func (c *controller) lookupNetworkGateway(networkName string) (string, error) {
+func (c *vpnController) lookupNetworkGateway(networkName string) (string, error) {
 	vnet, err := c.db.GetVirtualNetworkByName(strings.TrimSpace(networkName))
 	if err != nil {
 		return "", err
@@ -88,7 +88,7 @@ func (c *controller) lookupNetworkGateway(networkName string) (string, error) {
 	return "", fmt.Errorf("gateway is empty for %s", networkName)
 }
 
-func (c *controller) deriveGatewayInternalInterfaceAddress(networkName string) (string, error) {
+func (c *vpnController) deriveGatewayInternalInterfaceAddress(networkName string) (string, error) {
 	vnet, err := c.db.GetVirtualNetworkByName(strings.TrimSpace(networkName))
 	if err != nil {
 		return "", err
@@ -99,7 +99,7 @@ func (c *controller) deriveGatewayInternalInterfaceAddress(networkName string) (
 	return firstHostAddressFromCIDR(*vnet.Spec.IPNetworkAddress)
 }
 
-func (c *controller) findServerByName(name string) (api.Server, error) {
+func (c *vpnController) findServerByName(name string) (api.Server, error) {
 	servers, err := c.db.GetServers()
 	if err != nil {
 		return api.Server{}, err
@@ -113,8 +113,8 @@ func (c *controller) findServerByName(name string) (api.Server, error) {
 }
 
 // StartVpnGatewayController starts controller loop for vpn-gateway resources.
-func StartVpnGatewayController(node string, etcdUrl string) (*controller, error) {
-	var c controller
+func StartVpnGatewayController(node string, etcdUrl string) (*vpnController, error) {
+	var c vpnController
 	var err error
 
 	c.deletionDelay = 15 * time.Second
@@ -145,7 +145,7 @@ func StartVpnGatewayController(node string, etcdUrl string) (*controller, error)
 	return &c, nil
 }
 
-func (c *controller) vpnGatewayControllerLoop() {
+func (c *vpnController) vpnGatewayControllerLoop() {
 	slog.Debug("VPNゲートウェイコントローラーの制御ループ実行", "CONTROLLER", time.Now().Format("2006-01-02 15:04:05"))
 
 	items, err := c.db.GetVpnGateways()
@@ -204,7 +204,7 @@ func (c *controller) vpnGatewayControllerLoop() {
 	}
 }
 
-func (c *controller) isVpnGatewayManagedServerMissing(vpnGateway api.VpnGateway) (bool, error) {
+func (c *vpnController) isVpnGatewayManagedServerMissing(vpnGateway api.VpnGateway) (bool, error) {
 	serverID := strings.TrimSpace(vpnGatewayManagedServerID(vpnGateway))
 	if serverID == "" {
 		return false, nil
@@ -219,7 +219,7 @@ func (c *controller) isVpnGatewayManagedServerMissing(vpnGateway api.VpnGateway)
 	return false, nil
 }
 
-func (c *controller) deleteVpnGatewayForMissingServer(vpnGateway api.VpnGateway) {
+func (c *vpnController) deleteVpnGatewayForMissingServer(vpnGateway api.VpnGateway) {
 	vpnGatewayID := api.VpnGatewayID(vpnGateway)
 	if err := c.db.DeleteVpnGatewayById(vpnGatewayID); err != nil {
 		slog.Warn("DeleteVpnGatewayById() failed while auto-deleting vpn gateway", "id", vpnGatewayID, "err", err)
@@ -228,7 +228,7 @@ func (c *controller) deleteVpnGatewayForMissingServer(vpnGateway api.VpnGateway)
 	slog.Debug("vpn gateway deleted because managed server no longer exists", "id", vpnGatewayID)
 }
 
-func (c *controller) reconcileVpnGatewayPending(vpnGateway api.VpnGateway) {
+func (c *vpnController) reconcileVpnGatewayPending(vpnGateway api.VpnGateway) {
 	vpnGatewayID := api.VpnGatewayID(vpnGateway)
 
 	if err := validateGatewayInternalNetwork(c.db, vpnGateway.Spec.InternalVirtualNetwork); err != nil {
@@ -252,7 +252,7 @@ func (c *controller) reconcileVpnGatewayPending(vpnGateway api.VpnGateway) {
 	}
 }
 
-func (c *controller) reconcileVpnGatewayProvisioning(vpnGateway api.VpnGateway) {
+func (c *vpnController) reconcileVpnGatewayProvisioning(vpnGateway api.VpnGateway) {
 	vpnGatewayID := api.VpnGatewayID(vpnGateway)
 	serverID := vpnGatewayManagedServerID(vpnGateway)
 	if strings.TrimSpace(serverID) == "" {
@@ -286,7 +286,7 @@ func (c *controller) reconcileVpnGatewayProvisioning(vpnGateway api.VpnGateway) 
 	}
 }
 
-func (c *controller) reconcileVpnGatewayConfiguring(vpnGateway api.VpnGateway) {
+func (c *vpnController) reconcileVpnGatewayConfiguring(vpnGateway api.VpnGateway) {
 	vpnGatewayID := api.VpnGatewayID(vpnGateway)
 	serverID := vpnGatewayManagedServerID(vpnGateway)
 	if strings.TrimSpace(serverID) == "" {
@@ -338,7 +338,7 @@ func (c *controller) reconcileVpnGatewayConfiguring(vpnGateway api.VpnGateway) {
 	_ = c.db.UpdateVpnGatewayStatusWithMessage(vpnGatewayID, db.VPN_GATEWAY_ACTIVE, "")
 }
 
-func (c *controller) reconcileVpnGatewayActive(vpnGateway api.VpnGateway) {
+func (c *vpnController) reconcileVpnGatewayActive(vpnGateway api.VpnGateway) {
 	vpnGatewayID := api.VpnGatewayID(vpnGateway)
 	serverID := vpnGatewayManagedServerID(vpnGateway)
 	if strings.TrimSpace(serverID) == "" {
@@ -375,7 +375,7 @@ func (c *controller) reconcileVpnGatewayActive(vpnGateway api.VpnGateway) {
 	}
 }
 
-func (c *controller) reconcileVpnGatewayDeleting(vpnGateway api.VpnGateway) {
+func (c *vpnController) reconcileVpnGatewayDeleting(vpnGateway api.VpnGateway) {
 	vpnGatewayID := api.VpnGatewayID(vpnGateway)
 	serverID := vpnGatewayManagedServerID(vpnGateway)
 	if strings.TrimSpace(serverID) == "" {
@@ -404,7 +404,7 @@ func (c *controller) reconcileVpnGatewayDeleting(vpnGateway api.VpnGateway) {
 	}
 }
 
-func (c *controller) ensureVpnGatewayManagedServerLabel(vpnGatewayID string, serverID string) error {
+func (c *vpnController) ensureVpnGatewayManagedServerLabel(vpnGatewayID string, serverID string) error {
 	vpnGateway, err := c.db.GetVpnGatewayById(vpnGatewayID)
 	if err != nil {
 		return err
@@ -422,7 +422,7 @@ func (c *controller) ensureVpnGatewayManagedServerLabel(vpnGatewayID string, ser
 	return c.db.UpdateVpnGatewayById(vpnGatewayID, vpnGateway)
 }
 
-func (c *controller) updateVpnGatewayLabels(vpnGatewayID string, mutate func(labels map[string]interface{})) error {
+func (c *vpnController) updateVpnGatewayLabels(vpnGatewayID string, mutate func(labels map[string]interface{})) error {
 	vpnGateway, err := c.db.GetVpnGatewayById(vpnGatewayID)
 	if err != nil {
 		return err
@@ -437,7 +437,7 @@ func (c *controller) updateVpnGatewayLabels(vpnGatewayID string, mutate func(lab
 	return c.db.UpdateVpnGatewayById(vpnGatewayID, vpnGateway)
 }
 
-func (c *controller) ensureVpnGatewayServerEntry(vpnGateway api.VpnGateway) (string, error) {
+func (c *vpnController) ensureVpnGatewayServerEntry(vpnGateway api.VpnGateway) (string, error) {
 	if serverID := vpnGatewayManagedServerID(vpnGateway); strings.TrimSpace(serverID) != "" {
 		if _, err := c.db.GetServerById(serverID); err == nil {
 			return serverID, nil
@@ -462,7 +462,7 @@ func (c *controller) ensureVpnGatewayServerEntry(vpnGateway api.VpnGateway) (str
 	return api.ServerID(created), nil
 }
 
-func (c *controller) buildVpnGatewayServerSpec(vpnGateway api.VpnGateway, serverName string) (api.Server, error) {
+func (c *vpnController) buildVpnGatewayServerSpec(vpnGateway api.VpnGateway, serverName string) (api.Server, error) {
 	publicIP := strings.TrimSpace(vpnGateway.Spec.BindPublicIpAddress)
 	if publicIP == "" {
 		return api.Server{}, fmt.Errorf("vpn gateway bindPublicIpAddress is empty")
@@ -519,7 +519,7 @@ func (c *controller) buildVpnGatewayServerSpec(vpnGateway api.VpnGateway, server
 	return api.Server{ApiVersion: "v1", Kind: "Server", Metadata: meta, Spec: spec}, nil
 }
 
-func (c *controller) lookupNetworkCIDRByName(networkName string) (string, error) {
+func (c *vpnController) lookupNetworkCIDRByName(networkName string) (string, error) {
 	vnet, err := c.db.GetVirtualNetworkByName(strings.TrimSpace(networkName))
 	if err != nil {
 		return "", err
@@ -555,7 +555,7 @@ func (c *controller) lookupNetworkCIDRByName(networkName string) (string, error)
 	return "", fmt.Errorf("iPNetworkAddress and ipNetworkId-derived CIDR are empty for %s", networkName)
 }
 
-func (c *controller) resolveVpnGatewayTargetAddress(vpnGateway api.VpnGateway) (string, error) {
+func (c *vpnController) resolveVpnGatewayTargetAddress(vpnGateway api.VpnGateway) (string, error) {
 	serverID := strings.TrimSpace(vpnGatewayManagedServerID(vpnGateway))
 	if serverID == "" {
 		return "", fmt.Errorf("vpn gateway server reference is missing")
@@ -586,7 +586,7 @@ func (c *controller) resolveVpnGatewayTargetAddress(vpnGateway api.VpnGateway) (
 	return "", fmt.Errorf("vpn gateway public target address is missing")
 }
 
-func (c *controller) handleVpnGatewayConfigFailure(vpnGatewayID string, err error) {
+func (c *vpnController) handleVpnGatewayConfigFailure(vpnGatewayID string, err error) {
 	if err == nil {
 		return
 	}
@@ -603,7 +603,7 @@ func (c *controller) handleVpnGatewayConfigFailure(vpnGatewayID string, err erro
 	_ = c.db.UpdateVpnGatewayStatusWithMessage(vpnGatewayID, db.VPN_GATEWAY_CONFIGURING, message)
 }
 
-func (c *controller) incrementVpnGatewayConfigRetries(vpnGatewayID string) (int, error) {
+func (c *vpnController) incrementVpnGatewayConfigRetries(vpnGatewayID string) (int, error) {
 	next := 0
 	err := c.updateVpnGatewayLabels(vpnGatewayID, func(labels map[string]interface{}) {
 		next = db.GetVpnGatewayAnsibleRetries(labels) + 1
