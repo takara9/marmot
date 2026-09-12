@@ -16,15 +16,7 @@ const (
 	VOLUME_STALE_TIMEOUT       = 10 * time.Minute
 )
 
-/*
-var controllerCounter uint64 = 0
-
-type controller struct {
-	db     *db.Database
-	Lock   sync.Mutex
-	marmot *marmotd.Marmot
-}
-*/
+// controller 型の定義は network-controller.go を参照。
 
 // ボリュームコントローラーの開始
 // deletionDelaySeconds に 0 を渡した場合はデフォルト値 (10秒) が使用されます。
