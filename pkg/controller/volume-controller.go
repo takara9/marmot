@@ -17,22 +17,18 @@ const (
 	VOLUME_STALE_TIMEOUT       = 10 * time.Minute
 )
 
-// controller は volume/image/gateway/vpn-gateway/application-load-balancer/
-// network-load-balancer の各コントローラーで共有される汎用構造体。
-type controller struct {
-	db                *db.Database
-	Lock              sync.Mutex
-	marmot            *marmotd.Marmot
-	deletionDelay     time.Duration // DeletionTimestamp 検知から削除実行までの待機時間
-	stopChan          chan struct{}
-	doneChan          chan struct{}
-	stopOnce          sync.Once
-	imageSyncAuthMu   sync.Mutex // imageSyncAPIToken の保護
-	imageSyncAPIToken string
+// volumeController はボリュームの状態を管理する専用コントローラー。
+type volumeController struct {
+	db            *db.Database
+	marmot        *marmotd.Marmot
+	deletionDelay time.Duration // DeletionTimestamp 検知から削除実行までの待機時間
+	stopChan      chan struct{}
+	doneChan      chan struct{}
+	stopOnce      sync.Once
 }
 
 // Stop はコントローラーの定期処理を停止し、終了を待機する。
-func (c *controller) Stop() {
+func (c *volumeController) Stop() {
 	if c == nil {
 		return
 	}
@@ -48,8 +44,8 @@ func (c *controller) Stop() {
 
 // ボリュームコントローラーの開始
 // deletionDelaySeconds に 0 を渡した場合はデフォルト値 (10秒) が使用されます。
-func StartVolController(node string, etcdUrl string, deletionDelaySeconds int) (*controller, error) {
-	var c controller
+func StartVolController(node string, etcdUrl string, deletionDelaySeconds int) (*volumeController, error) {
+	var c volumeController
 	var err error
 
 	if deletionDelaySeconds <= 0 {
@@ -86,7 +82,7 @@ func StartVolController(node string, etcdUrl string, deletionDelaySeconds int) (
 }
 
 // コントローラーの制御ループ
-func (c *controller) volumeControllerLoop() {
+func (c *volumeController) volumeControllerLoop() {
 	slog.Debug("ボリュームコントローラーの制御ループ実行", "CONTROLLER", time.Now().Format("2006-01-02 15:04:05"))
 
 	statuses, err := c.marmot.Db.GetAllHostStatus()
