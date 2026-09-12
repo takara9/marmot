@@ -23,9 +23,8 @@ const (
 	IMAGE_CONTROLLER_INTERVAL = 5 * time.Second
 )
 
-// controller は image/gateway/vpn-gateway/application-load-balancer/
-// network-load-balancer の各コントローラーで共有される汎用構造体。
-type controller struct {
+// imageController はイメージコントローラー専用の構造体。
+type imageController struct {
 	db                *db.Database
 	Lock              sync.Mutex
 	marmot            *marmotd.Marmot
@@ -38,7 +37,7 @@ type controller struct {
 }
 
 // Stop はコントローラーの定期処理を停止し、終了を待機する。
-func (c *controller) Stop() {
+func (c *imageController) Stop() {
 	if c == nil {
 		return
 	}
@@ -54,8 +53,8 @@ func (c *controller) Stop() {
 
 // イメージコントローラーの開始
 // deletionDelaySeconds に 0 を渡した場合はデフォルト値 (10秒) が使用されます。
-func StartImageController(node string, etcdUrl string, deletionDelaySeconds int) (*controller, error) {
-	var c controller
+func StartImageController(node string, etcdUrl string, deletionDelaySeconds int) (*imageController, error) {
+	var c imageController
 	var err error
 
 	if deletionDelaySeconds <= 0 {
@@ -93,7 +92,7 @@ func StartImageController(node string, etcdUrl string, deletionDelaySeconds int)
 }
 
 // コントローラーの制御ループ
-func (c *controller) imageControllerLoop() {
+func (c *imageController) imageControllerLoop() {
 	slog.Debug("イメージコントローラーの制御ループ実行", "CONTROLLER", time.Now().Format(time.DateTime))
 
 	imgaes, err := c.marmot.GetImagesManage()
@@ -223,7 +222,7 @@ func (c *controller) imageControllerLoop() {
 	}
 }
 
-func (c *controller) ensureFollowerImagesWaiting(headImage api.Image) error {
+func (c *imageController) ensureFollowerImagesWaiting(headImage api.Image) error {
 	if strings.TrimSpace(headImage.Metadata.Name) == "" {
 		return nil
 	}
@@ -265,7 +264,7 @@ func (c *controller) ensureFollowerImagesWaiting(headImage api.Image) error {
 	return nil
 }
 
-func (c *controller) startFollowerSync(waitingImage api.Image) error {
+func (c *imageController) startFollowerSync(waitingImage api.Image) error {
 	if waitingImage.Metadata.Labels == nil {
 		return fmt.Errorf("labels are required for waiting image: imageId=%s", waitingImage.Metadata.Id)
 	}
@@ -308,7 +307,7 @@ func (c *controller) startFollowerSync(waitingImage api.Image) error {
 	return nil
 }
 
-func (c *controller) syncFollowerImageFromHead(followerImage api.Image, headImage api.Image) error {
+func (c *imageController) syncFollowerImageFromHead(followerImage api.Image, headImage api.Image) error {
 	if headImage.Metadata.NodeName == nil {
 		return fmt.Errorf("head image nodeName is required: headImageId=%s", headImage.Metadata.Id)
 	}
@@ -390,7 +389,7 @@ func (c *controller) syncFollowerImageFromHead(followerImage api.Image, headImag
 	return nil
 }
 
-func (c *controller) reconcileFollowerImageSpec(followerImage api.Image) error {
+func (c *imageController) reconcileFollowerImageSpec(followerImage api.Image) error {
 	if followerImage.Metadata.Labels == nil {
 		return nil
 	}
@@ -480,7 +479,7 @@ func setIntPtrFromHead(dst **int, src *int) bool {
 
 // imageSyncAuthToken は、他ノードの qcow2 ダウンロードAPI（Bearer認証必須）を呼び出すための
 // 内部用APIキーを bootstrap admin 配下に遅延発行し、プロセス生存期間中キャッシュして再利用する。
-func (c *controller) imageSyncAuthToken() (string, error) {
+func (c *imageController) imageSyncAuthToken() (string, error) {
 	c.imageSyncAuthMu.Lock()
 	defer c.imageSyncAuthMu.Unlock()
 

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/takara9/marmot/api"
@@ -25,6 +26,33 @@ var gatewayReservedInternalNetworks = map[string]struct{}{
 	"default":     {},
 	"host-bridge": {},
 	"ovs-network": {},
+}
+
+// controller は gateway/vpn-gateway/application-load-balancer/
+// network-load-balancer の各コントローラーで共有される汎用構造体。
+type controller struct {
+	db            *db.Database
+	Lock          sync.Mutex
+	marmot        *marmotd.Marmot
+	deletionDelay time.Duration // DeletionTimestamp 検知から削除実行までの待機時間
+	stopChan      chan struct{}
+	doneChan      chan struct{}
+	stopOnce      sync.Once
+}
+
+// Stop はコントローラーの定期処理を停止し、終了を待機する。
+func (c *controller) Stop() {
+	if c == nil {
+		return
+	}
+	c.stopOnce.Do(func() {
+		if c.stopChan != nil {
+			close(c.stopChan)
+		}
+	})
+	if c.doneChan != nil {
+		<-c.doneChan
+	}
 }
 
 // StartGatewayController starts controller loop for gateway resources.
