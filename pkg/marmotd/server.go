@@ -427,41 +427,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	slog.Debug("サーバーのネットワークインターフェースの設定")
 
 	// ネットワークの設定
-	if serverConfig.Spec.NetworkInterface == nil {
-		// ネットワーク指定なし、デフォルトネットワークを使用
-		slog.Debug("ネットワーク指定なし、デフォルトネットワークを使用")
-		mac, err := util.GenerateRandomMAC()
-		if err != nil {
-			slog.Error("GenerateRandomMAC()", "err", err)
-			return "", err
-		}
-		// サーバーのネットワーク情報を更新
-		var net api.NetworkInterface
-
-		// ネットワーク名から、ネットワークのIDを取得して、net.Networkidにセットする必要がある
-		xnet, err := m.Db.GetVirtualNetworkByName("default")
-		if err != nil {
-			slog.Error("GetNetworkIdByName()", "err", err)
-			return "", err
-		}
-
-		defaultNS := virt.NetSpec{
-			MAC:     mac.String(),
-			Network: xnet.Metadata.Name,
-			PortID:  uuid.New().String(),
-			Bus:     1,
-		}
-		if xnet.Spec.BridgeName != nil && shouldAttachOVSInterfaceID(xnet, strings.TrimSpace(*xnet.Spec.BridgeName)) {
-			defaultNS.InterfaceID = defaultNS.PortID
-		}
-		virtSpec.NetSpecs = []virt.NetSpec{defaultNS}
-
-		net.Networkid = api.VirtualNetworkID(xnet)
-		net.Networkname = xnet.Metadata.Name
-		net.Mac = &virtSpec.NetSpecs[0].MAC
-		net.Nameservers = defaultNameserversFromConfig()
-		serverConfig.Spec.NetworkInterface = &[]api.NetworkInterface{net}
-	} else {
+	// マニフェストでネットワーク未指定の場合はmgmtネットワークのみ強制接続される(issue #696)。
+	// defaultネットワークへの自動フォールバック接続は廃止した。
+	if serverConfig.Spec.NetworkInterface != nil {
 		slog.Debug("ネットワーク指定あり、指定されたネットワークを使用")
 		for i, reqNic := range *serverConfig.Spec.NetworkInterface {
 			slog.Debug("ネットワーク", "index", i, "network id", reqNic.Networkname)

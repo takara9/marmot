@@ -60,13 +60,10 @@ func SetupAlpineLinux(spec api.Server) error {
 		return err
 	}
 
+	// mgmtネットワークが常に強制付与されるため、通常ここでnilになることは無い(issue #696)。
+	// defaultネットワークへの自動フォールバックは廃止したため、念のため空スライスにする。
 	if spec.Spec.NetworkInterface == nil {
-		defaultNic := api.NetworkInterface{
-			Networkname: "default",
-			Dhcp4:       BoolPtr(true),
-			Dhcp6:       BoolPtr(false),
-		}
-		spec.Spec.NetworkInterface = &[]api.NetworkInterface{defaultNic}
+		spec.Spec.NetworkInterface = &[]api.NetworkInterface{}
 	}
 
 	if err := CreateAlpineInterfaces(*spec.Spec.NetworkInterface, mountPoint); err != nil {
@@ -82,15 +79,11 @@ func setupLinuxMountedVolume(spec api.Server, mountPoint string) error {
 		return err
 	}
 
-	// ネットワーク設定
+	// ネットワーク設定。mgmtネットワークが常に強制付与されるため、通常ここでnilになることは
+	// 無い(issue #696)。defaultネットワークへの自動フォールバックは廃止したため、念のため
+	// 空スライスにする。
 	if spec.Spec.NetworkInterface == nil {
-		// ネットワーク設定がない場合は、デフォルトネットワークにつないで、 DHCPでIPアドレスを取得する設定にする
-		defaultNic := api.NetworkInterface{
-			Networkname: "default",
-			Dhcp4:       BoolPtr(true),
-			Dhcp6:       BoolPtr(false),
-		}
-		spec.Spec.NetworkInterface = &[]api.NetworkInterface{defaultNic}
+		spec.Spec.NetworkInterface = &[]api.NetworkInterface{}
 	}
 
 	if err := CreateNetplanInterfaces(*spec.Spec.NetworkInterface, mountPoint); err != nil {
