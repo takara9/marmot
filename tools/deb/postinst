@@ -104,6 +104,16 @@ elif systemctl list-unit-files | grep -q '^ovs-vswitchd\.service'; then
     systemctl start ovs-vswitchd.service
 fi
 
+# apt-cacher-ng の設定(issue #696: マネジメント専用ネットワーク経由でゲストVMからアクセス可能にする)
+# 実際のアクセス制御はOVN ACL(management_network_acl_allow)側で行うため、ここでは
+# パッケージ既定のBindAddress(127.0.0.1)制限のみ解除して全インターフェースで待ち受けさせる。
+ACNG_CONF="/etc/apt-cacher-ng/acng.conf"
+if [ -f "${ACNG_CONF}" ]; then
+    sed -i 's/^BindAddress:.*/# BindAddress disabled by marmot (issue #696): listen on all interfaces, restrict via OVN ACL/' "${ACNG_CONF}"
+    systemctl enable apt-cacher-ng.service || true
+    systemctl restart apt-cacher-ng.service || true
+fi
+
 systemctl daemon-reload
 systemctl enable marmot.service
 systemctl start marmot.service

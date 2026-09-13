@@ -68,13 +68,79 @@ func (o *OVNFabric) EnsureOverlayMesh(vnet *api.VirtualNetwork, peers []string) 
 		if err := syncGeneveLogicalPorts(vnet, lsName, peers); err != nil {
 			return err
 		}
-		if enableGeneveOVSTunnelMesh {
+		// ACL適用ネットワークはゲストNICをOVN論理ポートとして正式に束縛するため、
+		// 生OVS geneveトンネルメッシュへのフォールバックを行わない(issue #696)。
+		if enableGeneveOVSTunnelMesh && !IsACLEnforcedNetwork(vnet) {
 			return o.ovs.EnsureOverlayMesh(vnet, peers)
 		}
 		return nil
 	}
 
 	return o.ovs.EnsureOverlayMesh(vnet, peers)
+}
+
+// IsACLEnforcedNetwork は、OVN ACLをゲストNICへ実効させるためにOVN論理ポート束縛が
+// 必要なネットワークかどうかを判定する(issue #696)。
+func IsACLEnforcedNetwork(vnet *api.VirtualNetwork) bool {
+	if vnet == nil || vnet.Metadata.Labels == nil {
+		return false
+	}
+	val, ok := (*vnet.Metadata.Labels)[api.NetworkLabelACLEnforced].(string)
+	if !ok {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(val), "true")
+}
+
+// EnsureGuestLogicalPort は、ACL適用ネットワーク上のゲストNIC用にOVN論理スイッチポートを
+// 作成する。portIDはOVSインターフェースのexternal_ids:iface-idと一致させる必要があり、
+// これによりovn-controllerが自動的にポートバインディングを行う(issue #696)。
+func (o *OVNFabric) EnsureGuestLogicalPort(vnet *api.VirtualNetwork, portID string, mac string, ip string) error {
+	portID = strings.TrimSpace(portID)
+	if portID == "" {
+		return fmt.Errorf("portID is required")
+	}
+	if !ovnCommandsAvailable() {
+		return fmt.Errorf("ovn-nbctl is required to manage guest logical ports")
+	}
+	lsName := logicalSwitchName(vnet)
+	if lsName == "" {
+		return fmt.Errorf("unable to determine OVN logical switch name")
+	}
+
+	if _, err := runOVNNBCTLCommand("--may-exist", "lsp-add", lsName, portID); err != nil {
+		return fmt.Errorf("failed to ensure OVN logical switch port %s on %s: %w", portID, lsName, err)
+	}
+
+	addresses := strings.TrimSpace(mac)
+	if addresses == "" {
+		addresses = "unknown"
+	} else if trimmedIP := strings.TrimSpace(ip); trimmedIP != "" {
+		addresses = addresses + " " + trimmedIP
+	}
+	if _, err := runOVNNBCTLCommand("lsp-set-addresses", portID, addresses); err != nil {
+		return fmt.Errorf("failed to set addresses on OVN logical switch port %s: %w", portID, err)
+	}
+	if _, err := runOVNNBCTLCommand("set", "logical_switch_port", portID, "external_ids:marmot_managed=true"); err != nil {
+		return fmt.Errorf("failed to set managed external_id on OVN logical switch port %s: %w", portID, err)
+	}
+
+	return nil
+}
+
+// DeleteGuestLogicalPort はゲストNIC用のOVN論理スイッチポートを削除する(issue #696)。
+func (o *OVNFabric) DeleteGuestLogicalPort(portID string) error {
+	portID = strings.TrimSpace(portID)
+	if portID == "" {
+		return nil
+	}
+	if !ovnCommandsAvailable() {
+		return fmt.Errorf("ovn-nbctl is required to manage guest logical ports")
+	}
+	if _, err := runOVNNBCTLCommand("--if-exists", "lsp-del", portID); err != nil {
+		return fmt.Errorf("failed to delete OVN logical switch port %s: %w", portID, err)
+	}
+	return nil
 }
 
 func (o *OVNFabric) PruneOverlayMesh(vnet *api.VirtualNetwork, remainPeers []string) error {
@@ -110,6 +176,31 @@ func (o *OVNFabric) DeleteBridge(vnet *api.VirtualNetwork) error {
 
 func (o *OVNFabric) GetBridgeStatus(vnet *api.VirtualNetwork) (bool, int, error) {
 	return o.ovs.GetBridgeStatus(vnet)
+}
+
+// EnsureACLs は対象ネットワークのOVN論理スイッチ上のACLを rules の内容で完全に同期する。
+// 既存のACLをすべて削除してから rules を再作成することで冪等に実現する(issue #696)。
+func (o *OVNFabric) EnsureACLs(vnet *api.VirtualNetwork, rules []ACLRule) error {
+	if !ovnCommandsAvailable() {
+		return fmt.Errorf("ovn-nbctl is required to manage ACLs")
+	}
+
+	lsName := logicalSwitchName(vnet)
+	if lsName == "" {
+		return fmt.Errorf("unable to determine OVN logical switch name")
+	}
+
+	if _, err := runOVNNBCTLCommand("acl-del", lsName); err != nil {
+		return fmt.Errorf("failed to clear existing ACLs on OVN logical switch %s: %w", lsName, err)
+	}
+
+	for _, rule := range rules {
+		if _, err := runOVNNBCTLCommand("acl-add", lsName, rule.Direction, fmt.Sprintf("%d", rule.Priority), rule.Match, rule.Action); err != nil {
+			return fmt.Errorf("failed to add ACL (direction=%s priority=%d match=%q action=%s) on OVN logical switch %s: %w", rule.Direction, rule.Priority, rule.Match, rule.Action, lsName, err)
+		}
+	}
+
+	return nil
 }
 
 func isGeneveOverlay(vnet *api.VirtualNetwork) bool {

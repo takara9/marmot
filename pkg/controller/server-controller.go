@@ -11,6 +11,7 @@ import (
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
+	"github.com/takara9/marmot/pkg/networkfabric"
 	"github.com/takara9/marmot/pkg/util"
 )
 
@@ -265,6 +266,13 @@ func (c *serverController) serverControllerLoop() {
 						if err := c.marmot.Db.ReleaseIP(nic.Networkid, *nic.IpNetworkId, *nic.Address); err != nil {
 							slog.Error("ReleaseIP()", "err", err)
 							continue
+						}
+					}
+
+					// OVN論理ポートを削除する(issue #696)
+					if nic.InterfaceId != nil && strings.TrimSpace(*nic.InterfaceId) != "" {
+						if err := networkfabric.NewOVNFabric().DeleteGuestLogicalPort(*nic.InterfaceId); err != nil {
+							slog.Error("DeleteGuestLogicalPort()", "err", err)
 						}
 					}
 

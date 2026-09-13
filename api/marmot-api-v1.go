@@ -380,10 +380,13 @@ type Nameservers struct {
 
 // NetworkInterface defines model for NetworkInterface.
 type NetworkInterface struct {
-	Address     *string      `json:"address,omitempty" yaml:"address,omitempty"`
-	Dhcp4       *bool        `json:"dhcp4,omitempty" yaml:"dhcp4,omitempty"`
-	Dhcp6       *bool        `json:"dhcp6,omitempty" yaml:"dhcp6,omitempty"`
-	Ethernet    *string      `json:"ethernet,omitempty" yaml:"ethernet,omitempty"`
+	Address  *string `json:"address,omitempty" yaml:"address,omitempty"`
+	Dhcp4    *bool   `json:"dhcp4,omitempty" yaml:"dhcp4,omitempty"`
+	Dhcp6    *bool   `json:"dhcp6,omitempty" yaml:"dhcp6,omitempty"`
+	Ethernet *string `json:"ethernet,omitempty" yaml:"ethernet,omitempty"`
+
+	// InterfaceId OVN論理スイッチポート名(iface-id)。OVN ACL適用ネットワークでゲストNICを論理ポートとして束縛するために使用する。
+	InterfaceId *string      `json:"interfaceId,omitempty" yaml:"interfaceId,omitempty"`
 	IpGateway   *string      `json:"ipGateway,omitempty" yaml:"ipGateway,omitempty"`
 	IpNetworkId *string      `json:"ipNetworkId,omitempty" yaml:"ipNetworkId,omitempty"`
 	Mac         *string      `json:"mac,omitempty" yaml:"mac,omitempty"`
