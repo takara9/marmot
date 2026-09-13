@@ -77,6 +77,12 @@ func StartNetController(node string, etcdUrl string, deletionDelaySeconds int) (
 		return nil, err
 	}
 
+	// マネジメント専用ネットワーク(mgmt)が無ければ作成する(issue #696)
+	if err := c.marmot.EnsureManagementNetwork(); err != nil {
+		slog.Error("Failed to ensure management network", "err", err)
+		return nil, err
+	}
+
 	// 定期実行の開始
 	ticker := time.NewTicker(NETWORK_CONTROLLER_INTERVAL)
 	go func() {
@@ -879,6 +885,16 @@ func (c *networkController) ensureOverlayMeshForNetwork(fabric networkfabric.Net
 
 	if err := fabric.PruneOverlayMesh(&vnet, peers); err != nil {
 		return fmt.Errorf("prune overlay mesh failed: %w", err)
+	}
+
+	// マネジメント専用ネットワーク(mgmt)のみ、ゲストVM間通信を遮断するOVN ACLを同期する(issue #696)
+	if strings.TrimSpace(vnet.Metadata.Name) == marmotd.ManagementNetworkName {
+		if aclFabric, ok := fabric.(networkfabric.ACLFabric); ok {
+			rules := marmotd.BuildManagementNetworkACLRules(marmotd.CurrentConfig())
+			if err := aclFabric.EnsureACLs(&vnet, rules); err != nil {
+				return fmt.Errorf("ensure management network ACLs failed: %w", err)
+			}
+		}
 	}
 
 	return nil
