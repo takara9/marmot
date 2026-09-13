@@ -160,6 +160,15 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 				GinkgoWriter.Println("Found Network:", string(byteJson))
 			}
 		})
+
+		It("マネジメント専用ネットワークの準備", func() {
+			err := marmotServer.Ma.EnsureManagementNetwork()
+			Expect(err).NotTo(HaveOccurred())
+			vnet, err := marmotServer.Ma.Db.GetVirtualNetworkByName(marmotd.ManagementNetworkName)
+			Expect(err).NotTo(HaveOccurred())
+			err = marmotServer.Ma.DeployVirtualNetwork(vnet)
+			Expect(err).NotTo(HaveOccurred())
+		})
 	})
 
 	Context("URLを指定してダウンロードしたイメージからVM起動イメージを作成する", func() {

@@ -749,6 +749,13 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		}
 		// ループの終わり
 	}
+
+	// マニフェスト指定の有無に関わらず、マネジメント専用ネットワーク(mgmt)用NICを強制的に追加する(issue #696)
+	if err := m.attachManagementNetworkInterface(&serverConfig, &virtSpec); err != nil {
+		slog.Error("attachManagementNetworkInterface()", "err", err)
+		return "", err
+	}
+
 	// サーバーのネットワーク情報を更新
 	err = m.Db.UpdateServer(api.ServerID(serverConfig), serverConfig)
 	if err != nil {

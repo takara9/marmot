@@ -79,6 +79,14 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("Found Network:", string(byteJson))
 		}
+
+		By("マネジメント専用ネットワークの準備")
+		err = marmotServer.Ma.EnsureManagementNetwork()
+		Expect(err).NotTo(HaveOccurred())
+		mgmtVnet, err := marmotServer.Ma.Db.GetVirtualNetworkByName(marmotd.ManagementNetworkName)
+		Expect(err).NotTo(HaveOccurred())
+		err = marmotServer.Ma.DeployVirtualNetwork(mgmtVnet)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	AfterAll(func(ctx0 SpecContext) {

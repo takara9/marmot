@@ -887,6 +887,16 @@ func (c *networkController) ensureOverlayMeshForNetwork(fabric networkfabric.Net
 		return fmt.Errorf("prune overlay mesh failed: %w", err)
 	}
 
+	// マネジメント専用ネットワーク(mgmt)のみ、ゲストVM間通信を遮断するOVN ACLを同期する(issue #696)
+	if strings.TrimSpace(vnet.Metadata.Name) == marmotd.ManagementNetworkName {
+		if aclFabric, ok := fabric.(networkfabric.ACLFabric); ok {
+			rules := marmotd.BuildManagementNetworkACLRules(marmotd.CurrentConfig())
+			if err := aclFabric.EnsureACLs(&vnet, rules); err != nil {
+				return fmt.Errorf("ensure management network ACLs failed: %w", err)
+			}
+		}
+	}
+
 	return nil
 }
 
