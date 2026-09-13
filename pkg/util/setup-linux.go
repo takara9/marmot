@@ -98,6 +98,35 @@ func setupLinuxMountedVolume(spec api.Server, mountPoint string) error {
 		return err
 	}
 
+	// mgmtネットワーク経由でapt-cacher-ngを使うようAPTプロキシを設定する(issue #696)
+	if err := writeAptCacherNGProxyConfig(mountPoint); err != nil {
+		slog.Error("writeAptCacherNGProxyConfig failed", "error", err)
+		return err
+	}
+
+	return nil
+}
+
+// managementNetworkAptCacherAddress / managementNetworkAptCacherPort は
+// marmotd.ManagementNetworkHostAddress ("10.245.0.1")上で稼働するapt-cacher-ngの
+// 固定アドレス・ポート(issue #696)。pkg/marmotd が pkg/util に依存するため、
+// 循環参照を避けるためここに複製している。値を変更する場合は両方を同期すること。
+const managementNetworkAptCacherAddress = "10.245.0.1"
+const managementNetworkAptCacherPort = 3142
+
+// writeAptCacherNGProxyConfig は、ゲストOSがMarmotホスト上のapt-cacher-ngを
+// パッケージ取得プロキシとして使うようAPT設定を書き込む(issue #696)。
+func writeAptCacherNGProxyConfig(mountPoint string) error {
+	aptConfDir := filepath.Join(mountPoint, "etc/apt/apt.conf.d")
+	if err := os.MkdirAll(aptConfDir, 0755); err != nil {
+		return fmt.Errorf("failed to create apt.conf.d directory: %w", err)
+	}
+
+	proxyFile := filepath.Join(aptConfDir, "95marmot-apt-cacher-ng")
+	content := fmt.Sprintf("Acquire::http::Proxy \"http://%s:%d\";\n", managementNetworkAptCacherAddress, managementNetworkAptCacherPort)
+	if err := os.WriteFile(proxyFile, []byte(content), 0644); err != nil {
+		return fmt.Errorf("failed to write apt-cacher-ng proxy config: %w", err)
+	}
 	return nil
 }
 

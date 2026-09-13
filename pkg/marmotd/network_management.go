@@ -20,6 +20,11 @@ const ManagementNetworkName = "mgmt"
 // ManagementNetworkCIDR はマネジメント専用ネットワークの固定IPネット(issue #696)。
 const ManagementNetworkCIDR = "10.245.0.0/16"
 
+// ManagementNetworkHostAddress は、Marmotホスト自身がmgmtネットワーク上で使用する
+// 固定IP(issue #696)。AllocateIP()はネットワークアドレス+1(ゲートウェイ相当)を
+// 予約領域として自動的にスキップするため、ゲストVMへのIPAM払い出しと衝突しない。
+const ManagementNetworkHostAddress = "10.245.0.1/16"
+
 // ManagementNetworkACLAllowPriority / ManagementNetworkACLDenyPriority は
 // mgmtネットワークのOVN ACL優先度(issue #696)。数値が大きいほど優先されるため、
 // 許可リストを拒否ルールより高い優先度にすることで例外的に通信を許可する。

@@ -320,6 +320,15 @@ func TestEnsureOverlayMesh_ACLEnforcedSkipsRawTunnelMesh(t *testing.T) {
 	}
 }
 
+func TestEnsureHostPresencePort_RequiresOVNCommands(t *testing.T) {
+	withOVNLookPath(t, false, false)
+	of := NewOVNFabric()
+	vnet := testGeneveVNet()
+	if err := of.EnsureHostPresencePort(vnet, "10.245.0.1/16"); err == nil {
+		t.Fatalf("expected error when ovn commands are unavailable")
+	}
+}
+
 func TestEnsureGuestLogicalPort_AddsPortAndAddresses(t *testing.T) {
 	withOVNLookPath(t, true, true)
 	calls := []ovnRunnerCall{}

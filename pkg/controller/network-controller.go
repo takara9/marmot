@@ -895,6 +895,16 @@ func (c *networkController) ensureOverlayMeshForNetwork(fabric networkfabric.Net
 				return fmt.Errorf("ensure management network ACLs failed: %w", err)
 			}
 		}
+
+		// ヘッドネットワークのみ、Marmotホスト自身の固定IPプレゼンスを1つだけ用意する(issue #696)。
+		// フォロワー(他ノード)側で複製すると、同一L2ドメイン内でIPが重複するため対象外とする。
+		if vnet.Metadata.Labels == nil || db.GetNetworkSyncRole(*vnet.Metadata.Labels) != "follower" {
+			if ovnFabric, ok := fabric.(*networkfabric.OVNFabric); ok {
+				if err := ovnFabric.EnsureHostPresencePort(&vnet, marmotd.ManagementNetworkHostAddress); err != nil {
+					return fmt.Errorf("ensure management network host presence failed: %w", err)
+				}
+			}
+		}
 	}
 
 	return nil
