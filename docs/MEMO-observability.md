@@ -58,3 +58,39 @@
 
 ## インストーラー
 - Grafana, Prometheus, Loki, Node Exporter, Alloy, OpenTelemetry, apt-cacher-ng など必要なソフトウェアをインストールするように追加する。
+
+
+
+Q1 マネジメントネットワークの予約名（mgmt 等）でよいか:  mgmtで良い
+Q2 ACLの許可リストの設定方法（marmotd.json に静的に書く／DBに登録する動的サービスディスカバリか）:  marmotd.json に静的に書く
+Q3 既存の default/host-bridge 以外に複数NIC強制付与した場合の、ディスクバス番号との衝突回避ロジック（server.go:649 のbusno計算）への影響有無: 無
+Q4 既存ゲスト（稼働中VM）への遡及適用は範囲外として良いか（新規作成のみ対象）: 遡及適用は範囲外
+
+
+実装方針（フェーズ分割案）
+大きな機能のため、1変更セット=1フェーズで段階的に進めることを提案します。
+
+フェーズ1: マネジメントネットワークの自動作成とIPAM
+
+marmotd 起動時（またはクラスタ初期化時）に予約名（例: mgmt）のネットワークを 10.245.0.0/16 で自動作成
+overlay は geneve 固定、既存の applyVirtualNetworkDefaults を流用
+host-bridge と同様に isIPAMUnmanagedNetwork 相当の予約名判定を追加
+フェーズ2: ゲストVMへの強制アタッチ
+
+server.go:430 のNIC組み立てロジックを変更し、マニフェストの NetworkInterface に関わらず、マネジメントネットワーク用NICを常に追加
+ゲストOS側のnetplan/interfaces生成（setup-linux.go）にも対応が必要
+フェーズ3: ACLによる通信制御
+
+OVN ACL（ovn-nbctl acl-add）を使い、マネジメントネットワークのlogical switch上で「ゲスト間拒否・許可リスト宛のみ許可」を実装
+許可リスト（Prometheus/Loki/DNSサーバーのIP:ポート）は marmotd.json などで設定可能にする想定
+フェーズ4: apt-cacher-ng 等インストーラー対応
+
+Marmotホスト側に apt-cacher-ng をセットアップし、マネジメントネットワーク経由でゲストVMからアクセス可能にする（ACL許可リストにも追加）
+フェーズ5: クラスタ横断疎通の検証
+
+既存の OVNFabric.EnsureOverlayMesh がクラスタ複数ノード間のgeneveメッシュを構築済みのため、マネジメントネットワークもこの仕組みに乗せられるか検証
+オープン事項（着手前に確認したいこと）
+マネジメントネットワークの予約名（mgmt 等）でよいか
+ACLの許可リストの設定方法（marmotd.json に静的に書く／DBに登録する動的サービスディスカバリか）
+既存の default/host-bridge 以外に複数NIC強制付与した場合の、ディスクバス番号との衝突回避ロジック（server.go:649 のbusno計算）への影響有無
+既存ゲスト（稼働中VM）への遡及適用は範囲外として良いか（新規作成のみ対象）
