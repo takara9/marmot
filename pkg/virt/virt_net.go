@@ -196,6 +196,17 @@ func (l *LibVirtEp) GetVirtualNetworkByName(name string) (*libvirt.Network, bool
 	return net, true, nil
 }
 
+// isNetworkAlreadyActiveError は、既に起動中のネットワークに対して net.Create() を
+// 呼び出した際のlibvirtエラーかどうかを判定する。DeployVirtualNetworkの再試行や、
+// CIランナーでlibvirtd状態が前回実行から持ち越された場合に発生し得るため、
+// 冪等に扱う(Destroy/Undefineの非アクティブ/未検出許容と対になる処理)。
+func isNetworkAlreadyActiveError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "already active")
+}
+
 func (l *LibVirtEp) DeleteVirtualNetwork(name string) error {
 	net, found, err := l.GetVirtualNetworkByName(name)
 	if err != nil {
@@ -250,8 +261,12 @@ func (l *LibVirtEp) DefineAndStartVirtualNetwork(network libvirtxml.Network) err
 	// Start Network
 	err = net.Create()
 	if err != nil {
-		slog.Error("Error starting network", "err", err)
-		return err
+		if isNetworkAlreadyActiveError(err) {
+			slog.Debug("Network already active, continue", "network", network.Name)
+		} else {
+			slog.Error("Error starting network", "err", err)
+			return err
+		}
 	}
 
 	//オートスタートを設定しないと、HVの再起動からの復帰時、停止している。
