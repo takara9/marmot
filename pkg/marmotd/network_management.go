@@ -41,7 +41,12 @@ func (m *Marmot) EnsureManagementNetwork() error {
 		return nil
 	}
 
-	if _, err := m.Db.GetVirtualNetworkByName(ManagementNetworkName); err == nil {
+	if existing, err := m.Db.GetVirtualNetworkByName(ManagementNetworkName); err == nil {
+		if existing.Spec.IpNetworkId == nil {
+			// libvirt上に残存するmgmtがetcd再作成時にIPAM未紐付けのまま自動インポートされたケースを修復する(issue #696)。
+			// 実際のIPAM作成/libvirt反映はDeployVirtualNetwork()に委ねるため、ここではPENDINGへ戻すのみ行う。
+			return m.resetManagementNetworkForReprovisioning(existing)
+		}
 		return nil
 	} else if err != db.ErrNotFound {
 		return err
@@ -83,6 +88,24 @@ func (m *Marmot) EnsureManagementNetwork() error {
 	}
 
 	slog.Debug("management network created", "name", ManagementNetworkName, "cidr", ManagementNetworkCIDR)
+	return nil
+}
+
+// resetManagementNetworkForReprovisioning は、libvirt上に残存していたmgmtネットワークが
+// GetVirtualNetworksAndPutDB()によってIpNetworkId未設定のままACTIVEでetcdにインポートされた
+// ケースを検知し、状態をPENDINGへ戻す(issue #696)。実際のIPネットワーク作成とlibvirt反映は
+// 通常のプロビジョニング経路(reconcileHeadProvisioningNetwork / DeployVirtualNetwork)に委ねる。
+func (m *Marmot) resetManagementNetworkForReprovisioning(vnet api.VirtualNetwork) error {
+	vnetID := api.VirtualNetworkID(vnet)
+	slog.Warn("management network found without IpNetworkId; resetting to PENDING for reprovisioning", "name", ManagementNetworkName, "id", vnetID)
+
+	if vnet.Spec.IPNetworkAddress == nil {
+		vnet.Spec.IPNetworkAddress = util.StringPtr(ManagementNetworkCIDR)
+		if err := m.Db.UpdateVirtualNetworkById(vnetID, vnet); err != nil {
+			return fmt.Errorf("failed to prepare management network for reprovisioning: %w", err)
+		}
+	}
+	m.Db.UpdateVirtualNetworkStatus(vnetID, db.NETWORK_PENDING)
 	return nil
 }
 

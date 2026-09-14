@@ -128,6 +128,17 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 		stdoutStderr, err = cmd.CombinedOutput()
 		Expect(err).NotTo(HaveOccurred())
 		GinkgoWriter.Println(string(stdoutStderr))
+
+		// mgmtが残存すると次回実行時にIpNetworkId未設定のまま自動インポートされる(issue #696)
+		By("ネットワークの削除 mgmt")
+		cmd = exec.Command("virsh", "net-destroy", "mgmt")
+		stdoutStderr, err = cmd.CombinedOutput()
+		Expect(err).NotTo(HaveOccurred())
+		GinkgoWriter.Println(string(stdoutStderr))
+		cmd = exec.Command("virsh", "net-undefine", "mgmt")
+		stdoutStderr, err = cmd.CombinedOutput()
+		Expect(err).NotTo(HaveOccurred())
+		GinkgoWriter.Println(string(stdoutStderr))
 	})
 
 	Context("クライアントからアクセステスト", func() {
