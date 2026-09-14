@@ -27,3 +27,18 @@ func TestWriteAptCacherNGProxyConfig(t *testing.T) {
 		t.Fatalf("proxy config = %q, want %q", string(data), want)
 	}
 }
+
+func TestAptCacherNGEnabledToggle(t *testing.T) {
+	orig := IsAptCacherNGEnabled()
+	t.Cleanup(func() { SetAptCacherNGEnabled(orig) })
+
+	SetAptCacherNGEnabled(false)
+	if IsAptCacherNGEnabled() {
+		t.Fatalf("expected disabled after SetAptCacherNGEnabled(false)")
+	}
+
+	SetAptCacherNGEnabled(true)
+	if !IsAptCacherNGEnabled() {
+		t.Fatalf("expected enabled after SetAptCacherNGEnabled(true)")
+	}
+}

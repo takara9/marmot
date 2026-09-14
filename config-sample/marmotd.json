@@ -66,5 +66,6 @@
         "protocol": "tcp",
         "port": 3142
       }
-    ]
+    ],
+    "apt_cacher_ng_enabled": true
 }

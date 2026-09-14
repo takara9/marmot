@@ -91,10 +91,14 @@ func setupLinuxMountedVolume(spec api.Server, mountPoint string) error {
 		return err
 	}
 
-	// mgmtネットワーク経由でapt-cacher-ngを使うようAPTプロキシを設定する(issue #696)
-	if err := writeAptCacherNGProxyConfig(mountPoint); err != nil {
-		slog.Error("writeAptCacherNGProxyConfig failed", "error", err)
-		return err
+	// apt_cacher_ng_enabled が有効な場合のみ、mgmtネットワーク経由でapt-cacher-ngを
+	// 使うようAPTプロキシを設定する(issue #696)。無効な環境(apt-cacher-ng未設定)で
+	// 強制すると、パッケージ取得自体が全て失敗するため既定は無効。
+	if IsAptCacherNGEnabled() {
+		if err := writeAptCacherNGProxyConfig(mountPoint); err != nil {
+			slog.Error("writeAptCacherNGProxyConfig failed", "error", err)
+			return err
+		}
 	}
 
 	return nil
