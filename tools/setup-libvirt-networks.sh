@@ -25,7 +25,7 @@ done
 ensure_service_if_exists() {
   local unit_name="$1"
   local required="${2:-false}"
-  if systemctl list-unit-files | grep -q "^${unit_name}\\.service"; then
+  if unit_file_exists "${unit_name}"; then
     sudo systemctl enable "${unit_name}.service" || true
     if ! sudo systemctl start "${unit_name}.service"; then
       if [[ "${required}" == "true" ]]; then
@@ -36,6 +36,22 @@ ensure_service_if_exists() {
   fi
 }
 
+# systemctl list-unit-files | grep -q はpipefail環境下で、grep -qが早期終了して
+# systemctlがSIGPIPEで非ゼロ終了すると、grep自体はマッチ成功でもパイプライン全体が
+# 失敗扱いになる(systemctlの終了コードにpipefailが引きずられるため)。
+# そのため出力を変数に取り込んでからパイプを使わずに判定する。
+ALL_SYSTEMD_UNIT_FILES="$(systemctl list-unit-files 2>/dev/null || true)"
+
+unit_file_exists() {
+  local unit_name="$1" line
+  while IFS= read -r line; do
+    if [[ "${line}" == "${unit_name}.service"* ]]; then
+      return 0
+    fi
+  done <<< "${ALL_SYSTEMD_UNIT_FILES}"
+  return 1
+}
+
 # mgmt管理ネットワーク(issue #696)がbr-intへのOVN論理スイッチ接続を前提にするため、
 # OVNユニットが未インストールの場合は明示的に失敗させる(サイレントスキップを防止)。
 # Ubuntu/Debianのovn-hostパッケージはovn-controllerを独立ユニットにせず、
@@ -43,7 +59,7 @@ ensure_service_if_exists() {
 require_any_unit_installed() {
   local unit_name
   for unit_name in "$@"; do
-    if systemctl list-unit-files | grep -q "^${unit_name}\\.service"; then
+    if unit_file_exists "${unit_name}"; then
       return 0
     fi
   done
@@ -109,7 +125,7 @@ create_ovs_bridge() {
 }
 
 restart_ovs_runtime() {
-  if systemctl list-unit-files | grep -q '^openvswitch-switch\.service'; then
+  if unit_file_exists openvswitch-switch; then
     sudo systemctl restart openvswitch-switch.service
     return
   fi
