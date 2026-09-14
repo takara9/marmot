@@ -36,14 +36,26 @@ ensure_service_if_exists() {
   fi
 }
 
+# mgmt管理ネットワーク(issue #696)がbr-intへのOVN論理スイッチ接続を前提にするため、
+# OVNユニットが未インストールの場合は明示的に失敗させる(サイレントスキップを防止)。
+require_unit_installed() {
+  local unit_name="$1"
+  if ! systemctl list-unit-files | grep -q "^${unit_name}\\.service"; then
+    echo "required systemd unit ${unit_name}.service is not installed (install ovn-central/ovn-host packages)" >&2
+    return 1
+  fi
+}
+
 ensure_ovn_ovs_runtime() {
   ensure_service_if_exists openvswitch-switch true
   ensure_service_if_exists ovsdb-server true
   ensure_service_if_exists ovs-vswitchd true
-  ensure_service_if_exists ovn-central
-  ensure_service_if_exists ovn-northd
-  ensure_service_if_exists ovn-controller
-  ensure_service_if_exists ovn-host
+  # ovn-controllerがbr-intを生成するため必須(未インストールならここで停止する)。
+  require_unit_installed ovn-controller
+  ensure_service_if_exists ovn-central true
+  ensure_service_if_exists ovn-northd true
+  ensure_service_if_exists ovn-controller true
+  ensure_service_if_exists ovn-host true
 }
 
 print_ovs_diagnostics() {
@@ -64,6 +76,22 @@ wait_for_linux_bridge() {
     fi
     sleep 1
   done
+  return 1
+}
+
+# br-intはOVN統合ブリッジで、ovn-controller起動時に自動生成される(marmotd側では作成しない、issue #696)。
+# ここで生成を確認しておかないと、mgmt管理ネットワークのIPAMが永久に完了しない。
+ensure_br_int_ready() {
+  if sudo ovs-vsctl br-exists br-int && wait_for_linux_bridge br-int; then
+    echo "br-int already exists"
+    return 0
+  fi
+  echo "waiting for ovn-controller to create br-int"
+  if wait_for_linux_bridge br-int && sudo ovs-vsctl br-exists br-int; then
+    return 0
+  fi
+  echo "br-int was not created by ovn-controller; check OVN central/controller connectivity" >&2
+  print_ovs_diagnostics
   return 1
 }
 
@@ -144,6 +172,9 @@ ensure_ovn_ovs_runtime
 if ! sudo ovs-appctl -t ovs-vswitchd version >/dev/null 2>&1; then
   echo "ovs-vswitchd is not responding" >&2
   print_ovs_diagnostics
+  exit 1
+fi
+if ! ensure_br_int_ready; then
   exit 1
 fi
 ensure_ovs_bridge "ovsbr0"
