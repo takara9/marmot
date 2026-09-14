@@ -24,7 +24,7 @@ var _ = Describe("MarmotdTest", Ordered, func() {
 	BeforeAll(func(specCtx SpecContext) {
 		opts := &slog.HandlerOptions{
 			AddSource: true,
-			//Level:     slog.LevelDebug,
+			Level:     slog.LevelDebug, // mgmtネットワーク詰まりの原因調査のため一時的に有効化(issue #696)
 		}
 		logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
 		slog.SetDefault(logger)
