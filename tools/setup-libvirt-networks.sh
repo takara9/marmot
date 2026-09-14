@@ -38,20 +38,25 @@ ensure_service_if_exists() {
 
 # mgmt管理ネットワーク(issue #696)がbr-intへのOVN論理スイッチ接続を前提にするため、
 # OVNユニットが未インストールの場合は明示的に失敗させる(サイレントスキップを防止)。
-require_unit_installed() {
-  local unit_name="$1"
-  if ! systemctl list-unit-files | grep -q "^${unit_name}\\.service"; then
-    echo "required systemd unit ${unit_name}.service is not installed (install ovn-central/ovn-host packages)" >&2
-    return 1
-  fi
+# Ubuntu/Debianのovn-hostパッケージはovn-controllerを独立ユニットにせず、
+# ovn-host.service経由で起動するため、候補ユニット名のいずれかが存在すればよしとする。
+require_any_unit_installed() {
+  local unit_name
+  for unit_name in "$@"; do
+    if systemctl list-unit-files | grep -q "^${unit_name}\\.service"; then
+      return 0
+    fi
+  done
+  echo "none of the required systemd units (${*}) are installed (install ovn-central/ovn-host packages)" >&2
+  return 1
 }
 
 ensure_ovn_ovs_runtime() {
   ensure_service_if_exists openvswitch-switch true
   ensure_service_if_exists ovsdb-server true
   ensure_service_if_exists ovs-vswitchd true
-  # ovn-controllerがbr-intを生成するため必須(未インストールならここで停止する)。
-  require_unit_installed ovn-controller
+  # ovn-controllerを起動するユニット(ovn-host、または独立したovn-controller)がbr-intを生成するため必須。
+  require_any_unit_installed ovn-host ovn-controller
   ensure_service_if_exists ovn-central true
   ensure_service_if_exists ovn-northd true
   ensure_service_if_exists ovn-controller true
