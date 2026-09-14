@@ -363,6 +363,41 @@ func TestEnsureGuestLogicalPort_RequiresPortID(t *testing.T) {
 	}
 }
 
+func TestEnsureGuestLogicalPort_DeletesStalePortOnDifferentSwitchAndRetries(t *testing.T) {
+	withOVNLookPath(t, true, true)
+	calls := []ovnRunnerCall{}
+	lspAddAttempts := 0
+	withOVNRunner(t, func(args ...string) (string, error) {
+		calls = append(calls, ovnRunnerCall{args: append([]string{}, args...)})
+		if len(args) >= 2 && args[0] == "--may-exist" && args[1] == "lsp-add" {
+			lspAddAttempts++
+			if lspAddAttempts == 1 {
+				return "", fmt.Errorf("ovn-nbctl: marmot-host-mgmt: port already exists but in switch marmot-net-38eca")
+			}
+		}
+		return "", nil
+	})
+
+	of := NewOVNFabric()
+	vnet := testGeneveVNet()
+	if err := of.EnsureGuestLogicalPort(vnet, "marmot-host-mgmt", "52:54:00:00:00:01", "10.245.0.1"); err != nil {
+		t.Fatalf("EnsureGuestLogicalPort returned error: %v", err)
+	}
+
+	if lspAddAttempts != 2 {
+		t.Fatalf("expected lsp-add to be retried once after stale port deletion, got attempts=%d calls=%v", lspAddAttempts, calls)
+	}
+	foundDel := false
+	for _, c := range calls {
+		if reflect.DeepEqual(c.args, []string{"--if-exists", "lsp-del", "marmot-host-mgmt"}) {
+			foundDel = true
+		}
+	}
+	if !foundDel {
+		t.Fatalf("expected stale port to be deleted before retry, calls=%v", calls)
+	}
+}
+
 func TestDeleteGuestLogicalPort_DeletesPort(t *testing.T) {
 	withOVNLookPath(t, true, true)
 	calls := []ovnRunnerCall{}

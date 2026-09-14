@@ -109,7 +109,18 @@ func (o *OVNFabric) EnsureGuestLogicalPort(vnet *api.VirtualNetwork, portID stri
 	}
 
 	if _, err := runOVNNBCTLCommand("--may-exist", "lsp-add", lsName, portID); err != nil {
-		return fmt.Errorf("failed to ensure OVN logical switch port %s on %s: %w", portID, lsName, err)
+		if !isPortExistsOnDifferentSwitchError(err) {
+			return fmt.Errorf("failed to ensure OVN logical switch port %s on %s: %w", portID, lsName, err)
+		}
+		// 別スイッチに残留した同名ポート(例: ネットワーク再作成でスイッチ名が変わった場合の
+		// 残骸)と衝突している。古いポートを削除してから正しいスイッチへ再作成する(issue #696)。
+		slog.Warn("OVN logical switch port name collides with a port on a different switch; deleting stale port and retrying", "portId", portID, "switch", lsName, "err", err)
+		if _, delErr := runOVNNBCTLCommand("--if-exists", "lsp-del", portID); delErr != nil {
+			return fmt.Errorf("failed to delete stale OVN logical switch port %s: %w", portID, delErr)
+		}
+		if _, err := runOVNNBCTLCommand("--may-exist", "lsp-add", lsName, portID); err != nil {
+			return fmt.Errorf("failed to ensure OVN logical switch port %s on %s (retry): %w", portID, lsName, err)
+		}
 	}
 
 	addresses := strings.TrimSpace(mac)
@@ -126,6 +137,16 @@ func (o *OVNFabric) EnsureGuestLogicalPort(vnet *api.VirtualNetwork, portID stri
 	}
 
 	return nil
+}
+
+// isPortExistsOnDifferentSwitchError は、OVN論理ポート名が別の論理スイッチで既に
+// 使用されているために lsp-add が失敗した際のovn-nbctlエラーかどうかを判定する。
+func isPortExistsOnDifferentSwitchError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "port already exists") && strings.Contains(msg, "but in switch")
 }
 
 // DeleteGuestLogicalPort はゲストNIC用のOVN論理スイッチポートを削除する(issue #696)。
