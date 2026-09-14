@@ -316,7 +316,7 @@ jobs:
     #    go-version: '1.26.2'
     - name: OVNパッケージのインストール確認(mgmtネットワーク用, issue #696)
       run: |
-        sudo apt-get update
+        sudo apt-get update || true
         sudo apt-get install -y ovn-central ovn-host
     - name: 仮想ネットワーク作成
       run: |
@@ -351,7 +351,7 @@ jobs:
     #    go-version: '1.26.2'
     - name: OVNパッケージのインストール確認(mgmtネットワーク用, issue #696)
       run: |
-        sudo apt-get update
+        sudo apt-get update || true
         sudo apt-get install -y ovn-central ovn-host
     - name: 仮想ネットワーク作成
       run: |
@@ -386,7 +386,7 @@ jobs:
     #    go-version: '1.26.2'
     - name: OVNパッケージのインストール確認(mgmtネットワーク用, issue #696)
       run: |
-        sudo apt-get update
+        sudo apt-get update || true
         sudo apt-get install -y ovn-central ovn-host
     - name: 仮想ネットワーク削除
       if: always()
@@ -422,7 +422,7 @@ jobs:
     #    go-version: '1.26.2'
     - name: OVNパッケージのインストール確認(mgmtネットワーク用, issue #696)
       run: |
-        sudo apt-get update
+        sudo apt-get update || true
         sudo apt-get install -y ovn-central ovn-host
     - name: 仮想ネットワーク削除
       if: always()
