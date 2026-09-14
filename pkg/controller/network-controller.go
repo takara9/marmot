@@ -329,14 +329,17 @@ func (c *networkController) reconcileHeadProvisioningNetwork(vnet api.VirtualNet
 	if err != nil {
 		return fmt.Errorf("libvirt:lookup-failed:%w", err)
 	}
-	if !found {
-		if err := c.marmot.DeployVirtualNetwork(vnet); err != nil {
-			return fmt.Errorf("libvirt:deploy-failed:%w", err)
-		}
-	} else {
+	if found {
 		defer func() {
 			_ = net.Free()
 		}()
+	}
+	if !found || vnet.Spec.IpNetworkId == nil {
+		// libvirt側に既に定義済みでも、DB側のIPAM初期化(IpNetworkId)が未完了なら実行する。
+		// DefineAndStartVirtualNetworkは冪等化済みのため、既存定義への再実行も安全(issue #696)。
+		if err := c.marmot.DeployVirtualNetwork(vnet); err != nil {
+			return fmt.Errorf("libvirt:deploy-failed:%w", err)
+		}
 	}
 
 	if err := c.ensureOverlayMeshForNetwork(fabric, vnet); err != nil {
