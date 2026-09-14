@@ -99,8 +99,20 @@ func (m *Marmot) resetManagementNetworkForReprovisioning(vnet api.VirtualNetwork
 	vnetID := api.VirtualNetworkID(vnet)
 	slog.Warn("management network found without IpNetworkId; resetting to PENDING for reprovisioning", "name", ManagementNetworkName, "id", vnetID)
 
+	needsUpdate := false
 	if vnet.Spec.IPNetworkAddress == nil {
 		vnet.Spec.IPNetworkAddress = util.StringPtr(ManagementNetworkCIDR)
+		needsUpdate = true
+	}
+	// libvirt XMLからの自動インポートはOverlayMode/VNIを設定しないため、新規作成時と同じ
+	// 既定値ロジックで補完する。未補完だとOVN論理スイッチが作成されない(issue #696)。
+	if vnet.Spec.OverlayMode == nil || strings.TrimSpace(string(*vnet.Spec.OverlayMode)) == "" {
+		if err := applyVirtualNetworkDefaults(&vnet, CurrentConfig(), m.Db); err != nil {
+			return fmt.Errorf("failed to apply defaults to management network for reprovisioning: %w", err)
+		}
+		needsUpdate = true
+	}
+	if needsUpdate {
 		if err := m.Db.UpdateVirtualNetworkById(vnetID, vnet); err != nil {
 			return fmt.Errorf("failed to prepare management network for reprovisioning: %w", err)
 		}
