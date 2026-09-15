@@ -407,6 +407,41 @@ func TestEnsureGuestLogicalPort_DeletesStalePortOnDifferentSwitchAndRetries(t *t
 	}
 }
 
+func TestEnsureGuestLogicalPort_DeletesStaleDuplicateIPPortAndRetries(t *testing.T) {
+	withOVNLookPath(t, true, true)
+	calls := []ovnRunnerCall{}
+	setAddrAttempts := 0
+	withOVNRunner(t, func(args ...string) (string, error) {
+		calls = append(calls, ovnRunnerCall{args: append([]string{}, args...)})
+		if len(args) >= 1 && args[0] == "lsp-set-addresses" {
+			setAddrAttempts++
+			if setAddrAttempts == 1 {
+				return "", fmt.Errorf("ovn-nbctl: Error on switch marmot-net-d71b3: duplicate IPv4 address '10.245.0.2' found on logical switch port 'bdabdad7-a91d-45b5-b5db-ffc342f76610'")
+			}
+		}
+		return "", nil
+	})
+
+	of := NewOVNFabric()
+	vnet := testGeneveVNet()
+	if err := of.EnsureGuestLogicalPort(vnet, "new-port", "52:54:00:00:00:02", "10.245.0.2"); err != nil {
+		t.Fatalf("EnsureGuestLogicalPort returned error: %v", err)
+	}
+
+	if setAddrAttempts != 2 {
+		t.Fatalf("expected lsp-set-addresses to be retried once after stale port deletion, got attempts=%d calls=%v", setAddrAttempts, calls)
+	}
+	foundDel := false
+	for _, c := range calls {
+		if reflect.DeepEqual(c.args, []string{"--if-exists", "lsp-del", "bdabdad7-a91d-45b5-b5db-ffc342f76610"}) {
+			foundDel = true
+		}
+	}
+	if !foundDel {
+		t.Fatalf("expected stale conflicting port to be deleted before retry, calls=%v", calls)
+	}
+}
+
 func TestDeleteGuestLogicalPort_DeletesPort(t *testing.T) {
 	withOVNLookPath(t, true, true)
 	calls := []ovnRunnerCall{}

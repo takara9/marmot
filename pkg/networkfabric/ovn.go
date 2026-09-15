@@ -130,7 +130,19 @@ func (o *OVNFabric) EnsureGuestLogicalPort(vnet *api.VirtualNetwork, portID stri
 		addresses = addresses + " " + trimmedIP
 	}
 	if _, err := runOVNNBCTLCommand("lsp-set-addresses", portID, addresses); err != nil {
-		return fmt.Errorf("failed to set addresses on OVN logical switch port %s: %w", portID, err)
+		staleID, isDup := parseDuplicateIPAddressConflictPortID(err)
+		if !isDup || staleID == portID {
+			return fmt.Errorf("failed to set addresses on OVN logical switch port %s: %w", portID, err)
+		}
+		// NIC情報の永続化前にattachManagementNetworkInterface等が失敗すると、
+		// OVN側にだけポートとIPが孤児として残る。孤児ポートを削除して再試行する(issue #696)。
+		slog.Warn("OVN logical switch port address collides with a stale orphaned port; deleting stale port and retrying", "portId", portID, "staleConflictingPortId", staleID, "switch", lsName, "err", err)
+		if _, delErr := runOVNNBCTLCommand("--if-exists", "lsp-del", staleID); delErr != nil {
+			return fmt.Errorf("failed to delete stale OVN logical switch port %s: %w", staleID, delErr)
+		}
+		if _, err := runOVNNBCTLCommand("lsp-set-addresses", portID, addresses); err != nil {
+			return fmt.Errorf("failed to set addresses on OVN logical switch port %s (retry): %w", portID, err)
+		}
 	}
 	if _, err := runOVNNBCTLCommand("set", "logical_switch_port", portID, "external_ids:marmot_managed=true"); err != nil {
 		return fmt.Errorf("failed to set managed external_id on OVN logical switch port %s: %w", portID, err)
@@ -147,6 +159,22 @@ func isPortExistsOnDifferentSwitchError(err error) bool {
 	}
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "port already exists") && strings.Contains(msg, "but in switch")
+}
+
+// duplicateIPAddressPortPattern は、lsp-set-addressesが同一IPを保持する既存ポートとの
+// 重複で失敗した際のovn-nbctlエラーメッセージから、衝突相手のポートIDを抽出する(issue #696)。
+var duplicateIPAddressPortPattern = regexp.MustCompile(`(?i)duplicate ipv4 address '[^']*' found on logical switch port '([0-9a-fA-F-]+)'`)
+
+// parseDuplicateIPAddressConflictPortID は、IPアドレス重複エラーから衝突ポートIDを取り出す。
+func parseDuplicateIPAddressConflictPortID(err error) (string, bool) {
+	if err == nil {
+		return "", false
+	}
+	m := duplicateIPAddressPortPattern.FindStringSubmatch(err.Error())
+	if len(m) != 2 {
+		return "", false
+	}
+	return m[1], true
 }
 
 // DeleteGuestLogicalPort はゲストNIC用のOVN論理スイッチポートを削除する(issue #696)。
