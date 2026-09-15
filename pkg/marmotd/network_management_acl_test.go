@@ -11,8 +11,8 @@ func TestBuildManagementNetworkACLRules_ValidAllowEntriesPlusDefaultDeny(t *test
 	}
 
 	rules := BuildManagementNetworkACLRules(cfg)
-	if len(rules) != 3 {
-		t.Fatalf("len(rules) = %d, want 3 (2 allow + 1 deny)", len(rules))
+	if len(rules) != 4 {
+		t.Fatalf("len(rules) = %d, want 4 (2 allow + 2 deny)", len(rules))
 	}
 
 	want0 := "ip4 && ip4.dst==10.245.0.1/32 && tcp.dst==9090"
@@ -25,9 +25,14 @@ func TestBuildManagementNetworkACLRules_ValidAllowEntriesPlusDefaultDeny(t *test
 		t.Fatalf("rules[1] = %+v, want match=%q action=allow-related", rules[1], want1)
 	}
 
-	last := rules[len(rules)-1]
-	if last.Match != "ip4" || last.Action != "drop" || last.Priority != ManagementNetworkACLDenyPriority {
-		t.Fatalf("last rule = %+v, want default deny rule", last)
+	ip4Deny := rules[2]
+	if ip4Deny.Match != "ip4" || ip4Deny.Action != "drop" || ip4Deny.Priority != ManagementNetworkACLDenyPriority {
+		t.Fatalf("rules[2] = %+v, want default ip4 deny rule", ip4Deny)
+	}
+
+	ip6Deny := rules[3]
+	if ip6Deny.Match != "ip6" || ip6Deny.Action != "drop" || ip6Deny.Priority != ManagementNetworkACLDenyPriority {
+		t.Fatalf("rules[3] = %+v, want default ip6 deny rule", ip6Deny)
 	}
 }
 
@@ -41,17 +46,20 @@ func TestBuildManagementNetworkACLRules_SkipsInvalidEntries(t *testing.T) {
 	}
 
 	rules := BuildManagementNetworkACLRules(cfg)
-	if len(rules) != 1 {
-		t.Fatalf("len(rules) = %d, want 1 (only default deny, all allow entries invalid)", len(rules))
+	if len(rules) != 2 {
+		t.Fatalf("len(rules) = %d, want 2 (only default ip4/ip6 deny, all allow entries invalid)", len(rules))
 	}
-	if rules[0].Action != "drop" {
-		t.Fatalf("rules[0].Action = %q, want drop", rules[0].Action)
+	if rules[0].Action != "drop" || rules[1].Action != "drop" {
+		t.Fatalf("rules = %+v, want drop", rules)
 	}
 }
 
 func TestBuildManagementNetworkACLRules_NilConfigReturnsOnlyDeny(t *testing.T) {
 	rules := BuildManagementNetworkACLRules(nil)
-	if len(rules) != 1 || rules[0].Action != "drop" {
-		t.Fatalf("rules = %+v, want single default deny rule", rules)
+	if len(rules) != 2 || rules[0].Action != "drop" || rules[1].Action != "drop" {
+		t.Fatalf("rules = %+v, want ip4 and ip6 default deny rules", rules)
+	}
+	if rules[0].Match != "ip4" || rules[1].Match != "ip6" {
+		t.Fatalf("rules = %+v, want ip4 then ip6 deny", rules)
 	}
 }

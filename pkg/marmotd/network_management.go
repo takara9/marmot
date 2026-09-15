@@ -255,11 +255,18 @@ func BuildManagementNetworkACLRules(cfg *MarmotdConfig) []networkfabric.ACLRule 
 		}
 	}
 
-	// 許可リストに一致しない発信通信はすべて拒否する(ゲストVM同士の通信を含む)
+	// 許可リストに一致しない発信通信はすべて拒否する(ゲストVM同士の通信を含む)。
+	// IPv4だけでなくIPv6も対象にし、許可リストに存在しない経路での通信を防ぐ。
 	rules = append(rules, networkfabric.ACLRule{
 		Direction: "from-lport",
 		Priority:  ManagementNetworkACLDenyPriority,
 		Match:     "ip4",
+		Action:    "drop",
+	})
+	rules = append(rules, networkfabric.ACLRule{
+		Direction: "from-lport",
+		Priority:  ManagementNetworkACLDenyPriority,
+		Match:     "ip6",
 		Action:    "drop",
 	})
 
