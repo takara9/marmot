@@ -203,6 +203,8 @@ func (o *OVNFabric) GetBridgeStatus(vnet *api.VirtualNetwork) (bool, int, error)
 
 // EnsureACLs は対象ネットワークのOVN論理スイッチ上のACLを rules の内容で完全に同期する。
 // 既存のACLをすべて削除してから rules を再作成することで冪等に実現する(issue #696)。
+// acl-del と acl-add は単一の ovn-nbctl 呼び出し(単一OVSDBトランザクション)にまとめて
+// アトミックに適用し、途中で失敗しても deny ルールが失われた状態で残らないようにする。
 func (o *OVNFabric) EnsureACLs(vnet *api.VirtualNetwork, rules []ACLRule) error {
 	if !ovnCommandsAvailable() {
 		return fmt.Errorf("ovn-nbctl is required to manage ACLs")
@@ -213,14 +215,13 @@ func (o *OVNFabric) EnsureACLs(vnet *api.VirtualNetwork, rules []ACLRule) error 
 		return fmt.Errorf("unable to determine OVN logical switch name")
 	}
 
-	if _, err := runOVNNBCTLCommand("acl-del", lsName); err != nil {
-		return fmt.Errorf("failed to clear existing ACLs on OVN logical switch %s: %w", lsName, err)
+	args := []string{"acl-del", lsName}
+	for _, rule := range rules {
+		args = append(args, "--", "acl-add", lsName, rule.Direction, fmt.Sprintf("%d", rule.Priority), rule.Match, rule.Action)
 	}
 
-	for _, rule := range rules {
-		if _, err := runOVNNBCTLCommand("acl-add", lsName, rule.Direction, fmt.Sprintf("%d", rule.Priority), rule.Match, rule.Action); err != nil {
-			return fmt.Errorf("failed to add ACL (direction=%s priority=%d match=%q action=%s) on OVN logical switch %s: %w", rule.Direction, rule.Priority, rule.Match, rule.Action, lsName, err)
-		}
+	if _, err := runOVNNBCTLCommand(args...); err != nil {
+		return fmt.Errorf("failed to synchronize ACLs on OVN logical switch %s: %w", lsName, err)
 	}
 
 	return nil

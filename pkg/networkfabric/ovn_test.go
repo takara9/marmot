@@ -254,16 +254,25 @@ func TestEnsureACLs_ClearsThenRecreatesRules(t *testing.T) {
 		t.Fatalf("EnsureACLs returned error: %v", err)
 	}
 
-	if len(calls) != 3 {
-		t.Fatalf("expected 3 ovn-nbctl calls (acl-del + 2x acl-add), got=%d calls=%v", len(calls), calls)
+	// acl-del と acl-add はすべて単一の ovn-nbctl 呼び出し(単一OVSDBトランザクション)にまとめられ、
+	// 途中で失敗しても deny ルールが失われた状態にならないことを確認する。
+	if len(calls) != 1 {
+		t.Fatalf("expected a single ovn-nbctl call (acl-del + 2x acl-add as one transaction), got=%d calls=%v", len(calls), calls)
 	}
-	if calls[0].args[0] != "acl-del" {
-		t.Fatalf("expected first call to be acl-del, got=%v", calls[0].args)
+	got := calls[0].args
+	if got[0] != "acl-del" {
+		t.Fatalf("expected call to start with acl-del, got=%v", got)
 	}
-	for i, want := range rules {
-		got := calls[i+1].args
-		if got[0] != "acl-add" || got[2] != want.Direction || got[3] != fmt.Sprintf("%d", want.Priority) || got[4] != want.Match || got[5] != want.Action {
-			t.Fatalf("unexpected acl-add call %d: got=%v want direction=%s priority=%d match=%s action=%s", i, got, want.Direction, want.Priority, want.Match, want.Action)
+	want := []string{"acl-del", "marmot-net-net-1"}
+	for _, rule := range rules {
+		want = append(want, "--", "acl-add", "marmot-net-net-1", rule.Direction, fmt.Sprintf("%d", rule.Priority), rule.Match, rule.Action)
+	}
+	if len(got) != len(want) {
+		t.Fatalf("unexpected ovn-nbctl args: got=%v want=%v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("unexpected ovn-nbctl args at index %d: got=%v want=%v", i, got, want)
 		}
 	}
 }
