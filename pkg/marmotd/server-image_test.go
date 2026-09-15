@@ -15,6 +15,7 @@ import (
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
+	"github.com/takara9/marmot/pkg/networkfabric"
 	"github.com/takara9/marmot/pkg/util"
 )
 
@@ -86,6 +87,10 @@ var _ = Describe("ServerImageCopyingTest", Ordered, func() {
 		mgmtVnet, err := marmotServer.Ma.Db.GetVirtualNetworkByName(marmotd.ManagementNetworkName)
 		Expect(err).NotTo(HaveOccurred())
 		err = marmotServer.Ma.DeployVirtualNetwork(mgmtVnet)
+		Expect(err).NotTo(HaveOccurred())
+		// このテストはネットワークコントローラーを起動しないため、通常はコントローラーが
+		// 担うOVN論理スイッチ作成を明示的に行う(issue #696)。
+		err = networkfabric.NewOVNFabric().EnsureOverlayMesh(&mgmtVnet, nil)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
