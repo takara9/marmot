@@ -622,6 +622,14 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			if vnet.Spec.BridgeName != nil && shouldAttachOVSInterfaceID(vnet, strings.TrimSpace(*vnet.Spec.BridgeName)) {
 				ns.InterfaceID = ns.PortID
 			}
+			// OVN ACLを実トラフィックへ適用するため、マニフェストで明示指定されたNICについても
+			// ゲストNICをOVN論理ポートとして正式に束縛する(issue #696)。
+			if networkfabric.IsACLEnforcedNetwork(&vnet) {
+				if err := networkfabric.NewOVNFabric().EnsureGuestLogicalPort(&vnet, ns.PortID, ns.MAC, ipaddr); err != nil {
+					slog.Error("EnsureGuestLogicalPort()", "err", err)
+					return "", err
+				}
+			}
 
 			// VLAN対応
 			if reqNic.Portgroup != nil {
@@ -637,6 +645,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			var ni api.NetworkInterface
 			ni.Networkname = reqNic.Networkname
 			ni.Networkid = api.VirtualNetworkID(vnet)
+			if networkfabric.IsACLEnforcedNetwork(&vnet) {
+				ni.InterfaceId = util.StringPtr(ns.PortID)
+			}
 
 			// ここでIP Network Idがセットされた場合、データベースにも保存する必要がある
 			if reqNic.IpNetworkId != nil {
