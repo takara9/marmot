@@ -42,6 +42,31 @@ func TestBuildManagementNetworkACLRules_ValidAllowEntriesPlusDefaultDeny(t *test
 	}
 }
 
+func TestBuildManagementNetworkACLRules_UsesIPv6FamilyInAllowEntries(t *testing.T) {
+	cfg := &MarmotdConfig{
+		ManagementNetworkACLAllow: []ManagementNetworkACLAllowEntry{
+			{Description: "repo-v6", CIDR: "2001:db8::10", Protocol: "tcp", Port: 443},
+		},
+	}
+
+	rules := BuildManagementNetworkACLRules(cfg)
+	if len(rules) != 3 {
+		t.Fatalf("len(rules) = %d, want 3 (1 allow + 2 deny)", len(rules))
+	}
+	want := "ip6 && ip6.dst==2001:db8::10/128 && tcp.dst==443"
+	if rules[0].Match != want || rules[0].Action != "allow-related" {
+		t.Fatalf("rules[0] = %+v, want match=%q action=allow-related", rules[0], want)
+	}
+}
+
+func TestNormalizeManagementNetworkACLCIDR_IPv6HostUses128(t *testing.T) {
+	got := normalizeManagementNetworkACLCIDR("2001:db8::1")
+	want := "2001:db8::1/128"
+	if got != want {
+		t.Fatalf("normalizeManagementNetworkACLCIDR() = %q, want %q", got, want)
+	}
+}
+
 func TestBuildManagementNetworkACLRules_SkipsInvalidEntries(t *testing.T) {
 	cfg := &MarmotdConfig{
 		ManagementNetworkACLAllow: []ManagementNetworkACLAllowEntry{

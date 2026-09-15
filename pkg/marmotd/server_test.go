@@ -15,6 +15,7 @@ import (
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
+	"github.com/takara9/marmot/pkg/networkfabric"
 	"github.com/takara9/marmot/pkg/util"
 )
 
@@ -167,6 +168,8 @@ var _ = Describe("サーバーテスト", Ordered, func() {
 			vnet, err := marmotServer.Ma.Db.GetVirtualNetworkByName(marmotd.ManagementNetworkName)
 			Expect(err).NotTo(HaveOccurred())
 			err = marmotServer.Ma.DeployVirtualNetwork(vnet)
+			Expect(err).NotTo(HaveOccurred())
+			err = networkfabric.NewOVNFabric().EnsureOverlayMesh(&vnet, nil)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})

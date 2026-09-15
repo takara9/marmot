@@ -171,6 +171,11 @@ func managementNetworkDrift(vnet *api.VirtualNetwork) []string {
 // 他のNICのインデックス(PCIバス番号/ゲストOS側のインターフェース名対応)を変えないよう、
 // 常に配列の末尾に追加する。
 func (m *Marmot) attachManagementNetworkInterface(serverConfig *api.Server, virtSpec *virt.ServerSpec) error {
+	if serverConfig.Spec.NetworkInterface != nil && len(*serverConfig.Spec.NetworkInterface) > MaxGuestNetworkInterfaces {
+		return fmt.Errorf("server has %d network interfaces, exceeding the maximum supported for guest interface naming (%d)",
+			len(*serverConfig.Spec.NetworkInterface), MaxGuestNetworkInterfaces)
+	}
+
 	if serverConfig.Spec.NetworkInterface != nil {
 		for _, nic := range *serverConfig.Spec.NetworkInterface {
 			if strings.TrimSpace(nic.Networkname) == ManagementNetworkName {
@@ -205,13 +210,20 @@ func (m *Marmot) attachManagementNetworkInterface(serverConfig *api.Server, virt
 		slog.Error("AllocateIP(mgmt)", "err", err)
 		return err
 	}
+	releaseAllocatedIP := func() {
+		if err := m.Db.ReleaseIP(api.VirtualNetworkID(vnet), *vnet.Spec.IpNetworkId, ipaddr); err != nil {
+			slog.Error("ReleaseIP(mgmt rollback)", "err", err, "networkId", api.VirtualNetworkID(vnet), "ipNetworkId", *vnet.Spec.IpNetworkId, "ip", ipaddr)
+		}
+	}
 	ipnet, err := m.Db.GetIpNetworkById(api.VirtualNetworkID(vnet), *vnet.Spec.IpNetworkId)
 	if err != nil {
 		slog.Error("GetIpNetworkById(mgmt)", "err", err)
+		releaseAllocatedIP()
 		return err
 	}
 	if err := m.Db.PutDnsEntry(serverConfig.Metadata.Name, ManagementNetworkName, ipaddr); err != nil {
 		slog.Error("PutDnsEntry(mgmt)", "err", err)
+		releaseAllocatedIP()
 		return err
 	}
 
@@ -237,6 +249,10 @@ func (m *Marmot) attachManagementNetworkInterface(serverConfig *api.Server, virt
 	if networkfabric.IsACLEnforcedNetwork(&vnet) {
 		if err := networkfabric.NewOVNFabric().EnsureGuestLogicalPort(&vnet, ns.PortID, ns.MAC, ipaddr); err != nil {
 			slog.Error("EnsureGuestLogicalPort(mgmt)", "err", err)
+			if dnsErr := m.Db.DeleteDnsEntryByName(serverConfig.Metadata.Name, ManagementNetworkName); dnsErr != nil {
+				slog.Error("DeleteDnsEntryByName(mgmt rollback)", "err", dnsErr, "hostId", serverConfig.Metadata.Name)
+			}
+			releaseAllocatedIP()
 			return err
 		}
 	}
@@ -259,6 +275,12 @@ func (m *Marmot) attachManagementNetworkInterface(serverConfig *api.Server, virt
 	}
 	if ipnet.Netmask != nil {
 		ni.Netmask = util.StringPtr(*ipnet.Netmask)
+	}
+	if ipnet.Nameservers != nil {
+		ni.Nameservers = ipnet.Nameservers
+	}
+	if ni.Nameservers == nil {
+		ni.Nameservers = defaultNameserversFromConfig()
 	}
 
 	if serverConfig.Spec.NetworkInterface == nil {
@@ -316,6 +338,10 @@ func managementNetworkACLAllowMatch(entry ManagementNetworkACLAllowEntry) (strin
 	if cidr == "" {
 		return "", false
 	}
+	prefix, err := netip.ParsePrefix(cidr)
+	if err != nil {
+		return "", false
+	}
 	proto := strings.ToLower(strings.TrimSpace(entry.Protocol))
 	if proto != "tcp" && proto != "udp" {
 		return "", false
@@ -323,7 +349,11 @@ func managementNetworkACLAllowMatch(entry ManagementNetworkACLAllowEntry) (strin
 	if entry.Port <= 0 || entry.Port > 65535 {
 		return "", false
 	}
-	return fmt.Sprintf("ip4 && ip4.dst==%s && %s.dst==%d", cidr, proto, entry.Port), true
+	family := "ip4"
+	if prefix.Addr().Is6() {
+		family = "ip6"
+	}
+	return fmt.Sprintf("%s && %s.dst==%s && %s.dst==%d", family, family, prefix.String(), proto, entry.Port), true
 }
 
 func normalizeManagementNetworkACLCIDR(raw string) string {
@@ -331,11 +361,11 @@ func normalizeManagementNetworkACLCIDR(raw string) string {
 	if trimmed == "" {
 		return ""
 	}
-	if _, err := netip.ParsePrefix(trimmed); err == nil {
-		return trimmed
+	if prefix, err := netip.ParsePrefix(trimmed); err == nil {
+		return prefix.Masked().String()
 	}
 	if addr, err := netip.ParseAddr(trimmed); err == nil {
-		return addr.String() + "/32"
+		return netip.PrefixFrom(addr, addr.BitLen()).String()
 	}
 	return ""
 }
