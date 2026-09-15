@@ -177,7 +177,9 @@ func (o *OVNFabric) PruneOverlayMesh(vnet *api.VirtualNetwork, remainPeers []str
 		if err := pruneGeneveLogicalPorts(vnet, lsName, remainPeers); err != nil {
 			return err
 		}
-		if enableGeneveOVSTunnelMesh {
+		// ACL適用ネットワークはEnsureOverlayMeshと同様に生OVS geneveトンネルメッシュへの
+		// フォールバックを行わないため、pruneパスも同じ条件でスキップする(issue #696)。
+		if enableGeneveOVSTunnelMesh && !IsACLEnforcedNetwork(vnet) {
 			return o.ovs.PruneOverlayMesh(vnet, remainPeers)
 		}
 		return nil
