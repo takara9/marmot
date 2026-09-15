@@ -270,8 +270,12 @@ func (m *Marmot) DeployVirtualNetwork(vnet api.VirtualNetwork) error {
 		}
 		id, err := m.Db.CreateIpNetwork(vnetID, &ipNetworkSpec)
 		if err != nil {
-			slog.Error("Failed to create IP network", "err", err)
-			return err
+			if strings.Contains(err.Error(), db.ErrAlreadyExists) && strings.TrimSpace(id) != "" {
+				slog.Warn("IP network already exists; reusing existing id", "vnetId", vnetID, "ipNetworkId", id, "cidr", *vnet.Spec.IPNetworkAddress)
+			} else {
+				slog.Error("Failed to create IP network", "err", err)
+				return err
+			}
 		}
 		vnet.Spec.IpNetworkId = util.StringPtr(id)
 	}

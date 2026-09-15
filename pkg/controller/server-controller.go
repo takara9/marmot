@@ -11,6 +11,7 @@ import (
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/marmotd"
+	"github.com/takara9/marmot/pkg/networkfabric"
 	"github.com/takara9/marmot/pkg/util"
 )
 
@@ -264,7 +265,13 @@ func (c *serverController) serverControllerLoop() {
 					if nic.IpNetworkId != nil && nic.Address != nil {
 						if err := c.marmot.Db.ReleaseIP(nic.Networkid, *nic.IpNetworkId, *nic.Address); err != nil {
 							slog.Error("ReleaseIP()", "err", err)
-							continue
+						}
+					}
+
+					// OVN論理ポートを削除する(issue #696)
+					if nic.InterfaceId != nil && strings.TrimSpace(*nic.InterfaceId) != "" {
+						if err := networkfabric.NewOVNFabric().DeleteGuestLogicalPort(*nic.InterfaceId); err != nil {
+							slog.Error("DeleteGuestLogicalPort()", "err", err)
 						}
 					}
 
@@ -383,6 +390,21 @@ func isRetryableServerProvisionError(err error) bool {
 	// ノード間レプリケーション中に OS イメージ実体が未到達な場合は再試行する。
 	if strings.Contains(msg, "failed to copy qcow2 volume") {
 		if strings.Contains(msg, "no such file") || strings.Contains(msg, "not found") || strings.Contains(msg, "does not exist") {
+			return true
+		}
+	}
+
+	// OVN論理ポート作成時の一時的障害(ovn-db再起動、接続断、タイムアウト等)は再試行する。
+	if strings.Contains(msg, "failed to ensure ovn logical switch port") ||
+		strings.Contains(msg, "failed to set addresses on ovn logical switch port") ||
+		strings.Contains(msg, "failed to set managed external_id on ovn logical switch port") {
+		if strings.Contains(msg, "connection refused") ||
+			strings.Contains(msg, "connection reset") ||
+			strings.Contains(msg, "timed out") ||
+			strings.Contains(msg, "timeout") ||
+			strings.Contains(msg, "temporar") ||
+			strings.Contains(msg, "try again") ||
+			strings.Contains(msg, "resource busy") {
 			return true
 		}
 	}

@@ -57,5 +57,14 @@
       { "storageClass": "hdd",  "pool": "marmot-hdd" },
       { "storageClass": "ssd",  "pool": "marmot-ssd" },
       { "storageClass": "nvme", "pool": "marmot-nvme" }
-  ]
+  ],
+  "management_network_acl_allow": [
+    {
+      "description": "apt-cacher-ng",
+      "cidr": "10.245.0.1/32",
+      "protocol": "tcp",
+      "port": 3142
+    }
+  ],
+  "apt_cacher_ng_enabled": true
 }

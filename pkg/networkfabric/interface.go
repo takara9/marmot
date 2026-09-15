@@ -32,6 +32,22 @@ type NetworkFabric interface {
 	GetBridgeStatus(vnet *api.VirtualNetwork) (exists bool, peerCount int, err error)
 }
 
+// ACLRule は OVN の論理スイッチに適用するACL(アクセス制御リスト)1件分を表す。
+type ACLRule struct {
+	Direction string // "from-lport" または "to-lport"
+	Priority  int    // 数値が大きいほど優先される(OVN仕様)
+	Match     string // OVNのmatch式(例: "ip4 && ip4.dst==10.245.0.1 && tcp.dst==9090")
+	Action    string // "allow" / "allow-related" / "drop" / "reject"
+}
+
+// ACLFabric は OVN ACLをサポートするFabricが実装するオプションの拡張インターフェース。
+// OVSベースの非OVN Fabricは実装しなくてよい。
+type ACLFabric interface {
+	// EnsureACLs は対象ネットワークの論理スイッチ上のACLを rules の内容で完全に同期する。
+	// 既存のACLはすべて削除してから rules を再作成する(冪等)。
+	EnsureACLs(vnet *api.VirtualNetwork, rules []ACLRule) error
+}
+
 // PeerNode はメッシュ構成用のピア情報。
 type PeerNode struct {
 	NodeName   string // ノード名

@@ -25,7 +25,7 @@ done
 ensure_service_if_exists() {
   local unit_name="$1"
   local required="${2:-false}"
-  if systemctl list-unit-files | grep -q "^${unit_name}\\.service"; then
+  if unit_file_exists "${unit_name}"; then
     sudo systemctl enable "${unit_name}.service" || true
     if ! sudo systemctl start "${unit_name}.service"; then
       if [[ "${required}" == "true" ]]; then
@@ -36,14 +36,47 @@ ensure_service_if_exists() {
   fi
 }
 
+# systemctl list-unit-files | grep -q はpipefail環境下で、grep -qが早期終了して
+# systemctlがSIGPIPEで非ゼロ終了すると、grep自体はマッチ成功でもパイプライン全体が
+# 失敗扱いになる(systemctlの終了コードにpipefailが引きずられるため)。
+# そのため出力を変数に取り込んでからパイプを使わずに判定する。
+ALL_SYSTEMD_UNIT_FILES="$(systemctl list-unit-files 2>/dev/null || true)"
+
+unit_file_exists() {
+  local unit_name="$1" line
+  while IFS= read -r line; do
+    if [[ "${line}" == "${unit_name}.service"* ]]; then
+      return 0
+    fi
+  done <<< "${ALL_SYSTEMD_UNIT_FILES}"
+  return 1
+}
+
+# mgmt管理ネットワーク(issue #696)がbr-intへのOVN論理スイッチ接続を前提にするため、
+# OVNユニットが未インストールの場合は明示的に失敗させる(サイレントスキップを防止)。
+# Ubuntu/Debianのovn-hostパッケージはovn-controllerを独立ユニットにせず、
+# ovn-host.service経由で起動するため、候補ユニット名のいずれかが存在すればよしとする。
+require_any_unit_installed() {
+  local unit_name
+  for unit_name in "$@"; do
+    if unit_file_exists "${unit_name}"; then
+      return 0
+    fi
+  done
+  echo "none of the required systemd units (${*}) are installed (install ovn-central/ovn-host packages)" >&2
+  return 1
+}
+
 ensure_ovn_ovs_runtime() {
   ensure_service_if_exists openvswitch-switch true
   ensure_service_if_exists ovsdb-server true
   ensure_service_if_exists ovs-vswitchd true
-  ensure_service_if_exists ovn-central
-  ensure_service_if_exists ovn-northd
-  ensure_service_if_exists ovn-controller
-  ensure_service_if_exists ovn-host
+  # ovn-controllerを起動するユニット(ovn-host、または独立したovn-controller)がbr-intを生成するため必須。
+  require_any_unit_installed ovn-host ovn-controller
+  ensure_service_if_exists ovn-central true
+  ensure_service_if_exists ovn-northd true
+  ensure_service_if_exists ovn-controller true
+  ensure_service_if_exists ovn-host true
 }
 
 print_ovs_diagnostics() {
@@ -67,6 +100,22 @@ wait_for_linux_bridge() {
   return 1
 }
 
+# br-intはOVN統合ブリッジで、ovn-controller起動時に自動生成される(marmotd側では作成しない、issue #696)。
+# ここで生成を確認しておかないと、mgmt管理ネットワークのIPAMが永久に完了しない。
+ensure_br_int_ready() {
+  if sudo ovs-vsctl br-exists br-int && wait_for_linux_bridge br-int; then
+    echo "br-int already exists"
+    return 0
+  fi
+  echo "waiting for ovn-controller to create br-int"
+  if wait_for_linux_bridge br-int && sudo ovs-vsctl br-exists br-int; then
+    return 0
+  fi
+  echo "br-int was not created by ovn-controller; check OVN central/controller connectivity" >&2
+  print_ovs_diagnostics
+  return 1
+}
+
 create_ovs_bridge() {
   local bridge_name="$1"
 
@@ -76,7 +125,7 @@ create_ovs_bridge() {
 }
 
 restart_ovs_runtime() {
-  if systemctl list-unit-files | grep -q '^openvswitch-switch\.service'; then
+  if unit_file_exists openvswitch-switch; then
     sudo systemctl restart openvswitch-switch.service
     return
   fi
@@ -144,6 +193,9 @@ ensure_ovn_ovs_runtime
 if ! sudo ovs-appctl -t ovs-vswitchd version >/dev/null 2>&1; then
   echo "ovs-vswitchd is not responding" >&2
   print_ovs_diagnostics
+  exit 1
+fi
+if ! ensure_br_int_ready; then
   exit 1
 fi
 ensure_ovs_bridge "ovsbr0"

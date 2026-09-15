@@ -60,13 +60,10 @@ func SetupAlpineLinux(spec api.Server) error {
 		return err
 	}
 
+	// mgmtネットワークが常に強制付与されるため、通常ここでnilになることは無い(issue #696)。
+	// defaultネットワークへの自動フォールバックは廃止したため、念のため空スライスにする。
 	if spec.Spec.NetworkInterface == nil {
-		defaultNic := api.NetworkInterface{
-			Networkname: "default",
-			Dhcp4:       BoolPtr(true),
-			Dhcp6:       BoolPtr(false),
-		}
-		spec.Spec.NetworkInterface = &[]api.NetworkInterface{defaultNic}
+		spec.Spec.NetworkInterface = &[]api.NetworkInterface{}
 	}
 
 	if err := CreateAlpineInterfaces(*spec.Spec.NetworkInterface, mountPoint); err != nil {
@@ -82,15 +79,11 @@ func setupLinuxMountedVolume(spec api.Server, mountPoint string) error {
 		return err
 	}
 
-	// ネットワーク設定
+	// ネットワーク設定。mgmtネットワークが常に強制付与されるため、通常ここでnilになることは
+	// 無い(issue #696)。defaultネットワークへの自動フォールバックは廃止したため、念のため
+	// 空スライスにする。
 	if spec.Spec.NetworkInterface == nil {
-		// ネットワーク設定がない場合は、デフォルトネットワークにつないで、 DHCPでIPアドレスを取得する設定にする
-		defaultNic := api.NetworkInterface{
-			Networkname: "default",
-			Dhcp4:       BoolPtr(true),
-			Dhcp6:       BoolPtr(false),
-		}
-		spec.Spec.NetworkInterface = &[]api.NetworkInterface{defaultNic}
+		spec.Spec.NetworkInterface = &[]api.NetworkInterface{}
 	}
 
 	if err := CreateNetplanInterfaces(*spec.Spec.NetworkInterface, mountPoint); err != nil {
@@ -98,6 +91,39 @@ func setupLinuxMountedVolume(spec api.Server, mountPoint string) error {
 		return err
 	}
 
+	// apt_cacher_ng_enabled が有効な場合のみ、mgmtネットワーク経由でapt-cacher-ngを
+	// 使うようAPTプロキシを設定する(issue #696)。無効な環境(apt-cacher-ng未設定)で
+	// 強制すると、パッケージ取得自体が全て失敗するため既定は無効。
+	if IsAptCacherNGEnabled() {
+		if err := writeAptCacherNGProxyConfig(mountPoint); err != nil {
+			slog.Error("writeAptCacherNGProxyConfig failed", "error", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+// managementNetworkAptCacherAddress / managementNetworkAptCacherPort は
+// marmotd.ManagementNetworkHostAddress ("10.245.0.1")上で稼働するapt-cacher-ngの
+// 固定アドレス・ポート(issue #696)。pkg/marmotd が pkg/util に依存するため、
+// 循環参照を避けるためここに複製している。値を変更する場合は両方を同期すること。
+const managementNetworkAptCacherAddress = "10.245.0.1"
+const managementNetworkAptCacherPort = 3142
+
+// writeAptCacherNGProxyConfig は、ゲストOSがMarmotホスト上のapt-cacher-ngを
+// パッケージ取得プロキシとして使うようAPT設定を書き込む(issue #696)。
+func writeAptCacherNGProxyConfig(mountPoint string) error {
+	aptConfDir := filepath.Join(mountPoint, "etc/apt/apt.conf.d")
+	if err := os.MkdirAll(aptConfDir, 0755); err != nil {
+		return fmt.Errorf("failed to create apt.conf.d directory: %w", err)
+	}
+
+	proxyFile := filepath.Join(aptConfDir, "95marmot-apt-cacher-ng")
+	content := fmt.Sprintf("Acquire::http::Proxy \"http://%s:%d\";\n", managementNetworkAptCacherAddress, managementNetworkAptCacherPort)
+	if err := os.WriteFile(proxyFile, []byte(content), 0644); err != nil {
+		return fmt.Errorf("failed to write apt-cacher-ng proxy config: %w", err)
+	}
 	return nil
 }
 

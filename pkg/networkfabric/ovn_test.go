@@ -227,6 +227,246 @@ func TestEnsureOverlayMesh_GeneveSyncsLogicalSwitchAndPorts(t *testing.T) {
 	}
 }
 
+func TestEnsureACLs_RequiresOVNCommands(t *testing.T) {
+	withOVNLookPath(t, false, false)
+	of := NewOVNFabric()
+	vnet := testGeneveVNet()
+	if err := of.EnsureACLs(vnet, []ACLRule{}); err == nil {
+		t.Fatalf("expected error when ovn commands are unavailable")
+	}
+}
+
+func TestEnsureACLs_ClearsThenRecreatesRules(t *testing.T) {
+	withOVNLookPath(t, true, true)
+	calls := []ovnRunnerCall{}
+	withOVNRunner(t, func(args ...string) (string, error) {
+		calls = append(calls, ovnRunnerCall{args: append([]string{}, args...)})
+		return "", nil
+	})
+
+	of := NewOVNFabric()
+	vnet := testGeneveVNet()
+	rules := []ACLRule{
+		{Direction: "from-lport", Priority: 2000, Match: "ip4 && ip4.dst==10.245.0.1 && tcp.dst==9090", Action: "allow-related"},
+		{Direction: "from-lport", Priority: 1000, Match: "ip4", Action: "drop"},
+	}
+	if err := of.EnsureACLs(vnet, rules); err != nil {
+		t.Fatalf("EnsureACLs returned error: %v", err)
+	}
+
+	// acl-del と acl-add はすべて単一の ovn-nbctl 呼び出し(単一OVSDBトランザクション)にまとめられ、
+	// 途中で失敗しても deny ルールが失われた状態にならないことを確認する。
+	if len(calls) != 1 {
+		t.Fatalf("expected a single ovn-nbctl call (acl-del + 2x acl-add as one transaction), got=%d calls=%v", len(calls), calls)
+	}
+	got := calls[0].args
+	if got[0] != "acl-del" {
+		t.Fatalf("expected call to start with acl-del, got=%v", got)
+	}
+	want := []string{"acl-del", "marmot-net-net-1"}
+	for _, rule := range rules {
+		want = append(want, "--", "acl-add", "marmot-net-net-1", rule.Direction, fmt.Sprintf("%d", rule.Priority), rule.Match, rule.Action)
+	}
+	if len(got) != len(want) {
+		t.Fatalf("unexpected ovn-nbctl args: got=%v want=%v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("unexpected ovn-nbctl args at index %d: got=%v want=%v", i, got, want)
+		}
+	}
+}
+
+func TestIsACLEnforcedNetwork(t *testing.T) {
+	if IsACLEnforcedNetwork(nil) {
+		t.Fatalf("nil vnet should not be ACL enforced")
+	}
+
+	vnet := testGeneveVNet()
+	if IsACLEnforcedNetwork(vnet) {
+		t.Fatalf("vnet without labels should not be ACL enforced")
+	}
+
+	labels := map[string]interface{}{api.NetworkLabelACLEnforced: "true"}
+	vnet.Metadata.Labels = &labels
+	if !IsACLEnforcedNetwork(vnet) {
+		t.Fatalf("vnet with acl-enforced label=true should be ACL enforced")
+	}
+
+	labels[api.NetworkLabelACLEnforced] = "false"
+	if IsACLEnforcedNetwork(vnet) {
+		t.Fatalf("vnet with acl-enforced label=false should not be ACL enforced")
+	}
+}
+
+func TestEnsureOverlayMesh_ACLEnforcedSkipsRawTunnelMesh(t *testing.T) {
+	withGeneveOVSTunnelMesh(t, true)
+	withOVNLookPath(t, true, true)
+	withOVSVSRunner(t, func(args ...string) (string, error) {
+		rawTunnelCalled := len(args) >= 2 && args[0] == "add-port"
+		if rawTunnelCalled {
+			t.Fatalf("raw OVS tunnel mesh should not be used for ACL-enforced network, got args=%v", args)
+		}
+		return "", nil
+	})
+	withOVNSBRunner(t, func(args ...string) (string, error) {
+		return "geneve", nil
+	})
+	withOVNRunner(t, func(args ...string) (string, error) {
+		if len(args) >= 2 && args[0] == "lsp-list" {
+			return "", nil
+		}
+		return "", nil
+	})
+
+	of := NewOVNFabric()
+	vnet := testGeneveVNet()
+	labels := map[string]interface{}{api.NetworkLabelACLEnforced: "true"}
+	vnet.Metadata.Labels = &labels
+
+	if err := of.EnsureOverlayMesh(vnet, []string{"10.0.0.2"}); err != nil {
+		t.Fatalf("EnsureOverlayMesh returned error: %v", err)
+	}
+}
+
+func TestEnsureHostPresencePort_RequiresOVNCommands(t *testing.T) {
+	withOVNLookPath(t, false, false)
+	of := NewOVNFabric()
+	vnet := testGeneveVNet()
+	if err := of.EnsureHostPresencePort(vnet, "10.245.0.1/16"); err == nil {
+		t.Fatalf("expected error when ovn commands are unavailable")
+	}
+}
+
+func TestEnsureGuestLogicalPort_AddsPortAndAddresses(t *testing.T) {
+	withOVNLookPath(t, true, true)
+	calls := []ovnRunnerCall{}
+	withOVNRunner(t, func(args ...string) (string, error) {
+		calls = append(calls, ovnRunnerCall{args: append([]string{}, args...)})
+		return "", nil
+	})
+
+	of := NewOVNFabric()
+	vnet := testGeneveVNet()
+	if err := of.EnsureGuestLogicalPort(vnet, "port-1", "52:54:00:00:00:01", "10.245.0.5"); err != nil {
+		t.Fatalf("EnsureGuestLogicalPort returned error: %v", err)
+	}
+
+	if len(calls) != 3 {
+		t.Fatalf("expected 3 ovn-nbctl calls (lsp-add + lsp-set-addresses + set external_ids), got=%d calls=%v", len(calls), calls)
+	}
+	if !reflect.DeepEqual(calls[0].args[:2], []string{"--may-exist", "lsp-add"}) {
+		t.Fatalf("expected lsp-add call, got=%v", calls[0].args)
+	}
+	if calls[1].args[0] != "lsp-set-addresses" || calls[1].args[2] != "52:54:00:00:00:01 10.245.0.5" {
+		t.Fatalf("unexpected lsp-set-addresses call: got=%v", calls[1].args)
+	}
+}
+
+func TestEnsureGuestLogicalPort_RequiresPortID(t *testing.T) {
+	withOVNLookPath(t, true, true)
+	of := NewOVNFabric()
+	vnet := testGeneveVNet()
+	if err := of.EnsureGuestLogicalPort(vnet, "", "52:54:00:00:00:01", "10.245.0.5"); err == nil {
+		t.Fatalf("expected error when portID is empty")
+	}
+}
+
+func TestEnsureGuestLogicalPort_DeletesStalePortOnDifferentSwitchAndRetries(t *testing.T) {
+	withOVNLookPath(t, true, true)
+	calls := []ovnRunnerCall{}
+	lspAddAttempts := 0
+	withOVNRunner(t, func(args ...string) (string, error) {
+		calls = append(calls, ovnRunnerCall{args: append([]string{}, args...)})
+		if len(args) >= 2 && args[0] == "--may-exist" && args[1] == "lsp-add" {
+			lspAddAttempts++
+			if lspAddAttempts == 1 {
+				return "", fmt.Errorf("ovn-nbctl: marmot-host-mgmt: port already exists but in switch marmot-net-38eca")
+			}
+		}
+		return "", nil
+	})
+
+	of := NewOVNFabric()
+	vnet := testGeneveVNet()
+	if err := of.EnsureGuestLogicalPort(vnet, "marmot-host-mgmt", "52:54:00:00:00:01", "10.245.0.1"); err != nil {
+		t.Fatalf("EnsureGuestLogicalPort returned error: %v", err)
+	}
+
+	if lspAddAttempts != 2 {
+		t.Fatalf("expected lsp-add to be retried once after stale port deletion, got attempts=%d calls=%v", lspAddAttempts, calls)
+	}
+	foundDel := false
+	for _, c := range calls {
+		if reflect.DeepEqual(c.args, []string{"--if-exists", "lsp-del", "marmot-host-mgmt"}) {
+			foundDel = true
+		}
+	}
+	if !foundDel {
+		t.Fatalf("expected stale port to be deleted before retry, calls=%v", calls)
+	}
+}
+
+func TestEnsureGuestLogicalPort_DeletesStaleDuplicateIPPortAndRetries(t *testing.T) {
+	withOVNLookPath(t, true, true)
+	calls := []ovnRunnerCall{}
+	setAddrAttempts := 0
+	withOVNRunner(t, func(args ...string) (string, error) {
+		calls = append(calls, ovnRunnerCall{args: append([]string{}, args...)})
+		if len(args) >= 1 && args[0] == "lsp-set-addresses" {
+			setAddrAttempts++
+			if setAddrAttempts == 1 {
+				return "", fmt.Errorf("ovn-nbctl: Error on switch marmot-net-d71b3: duplicate IPv4 address '10.245.0.2' found on logical switch port 'bdabdad7-a91d-45b5-b5db-ffc342f76610'")
+			}
+		}
+		return "", nil
+	})
+
+	of := NewOVNFabric()
+	vnet := testGeneveVNet()
+	if err := of.EnsureGuestLogicalPort(vnet, "new-port", "52:54:00:00:00:02", "10.245.0.2"); err != nil {
+		t.Fatalf("EnsureGuestLogicalPort returned error: %v", err)
+	}
+
+	if setAddrAttempts != 2 {
+		t.Fatalf("expected lsp-set-addresses to be retried once after stale port deletion, got attempts=%d calls=%v", setAddrAttempts, calls)
+	}
+	foundDel := false
+	for _, c := range calls {
+		if reflect.DeepEqual(c.args, []string{"--if-exists", "lsp-del", "bdabdad7-a91d-45b5-b5db-ffc342f76610"}) {
+			foundDel = true
+		}
+	}
+	if !foundDel {
+		t.Fatalf("expected stale conflicting port to be deleted before retry, calls=%v", calls)
+	}
+}
+
+func TestDeleteGuestLogicalPort_DeletesPort(t *testing.T) {
+	withOVNLookPath(t, true, true)
+	calls := []ovnRunnerCall{}
+	withOVNRunner(t, func(args ...string) (string, error) {
+		calls = append(calls, ovnRunnerCall{args: append([]string{}, args...)})
+		return "", nil
+	})
+
+	of := NewOVNFabric()
+	if err := of.DeleteGuestLogicalPort("port-1"); err != nil {
+		t.Fatalf("DeleteGuestLogicalPort returned error: %v", err)
+	}
+	if len(calls) != 1 || !reflect.DeepEqual(calls[0].args, []string{"--if-exists", "lsp-del", "port-1"}) {
+		t.Fatalf("unexpected calls=%v", calls)
+	}
+}
+
+func TestDeleteGuestLogicalPort_EmptyPortIDNoop(t *testing.T) {
+	withOVNLookPath(t, false, false)
+	of := NewOVNFabric()
+	if err := of.DeleteGuestLogicalPort(""); err != nil {
+		t.Fatalf("expected no error for empty portID, got: %v", err)
+	}
+}
+
 func TestOVNDBTargetsFromOVSRemote(t *testing.T) {
 	withOVSVSRunner(t, func(args ...string) (string, error) {
 		if len(args) >= 4 && args[0] == "get" && args[3] == "external_ids:ovn-remote" {
