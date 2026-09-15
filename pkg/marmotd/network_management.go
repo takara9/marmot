@@ -25,6 +25,12 @@ const ManagementNetworkCIDR = "10.245.0.0/16"
 // 予約領域として自動的にスキップするため、ゲストVMへのIPAM払い出しと衝突しない。
 const ManagementNetworkHostAddress = "10.245.0.1/16"
 
+// MaxGuestNetworkInterfaces は、ゲストOS側のインターフェース名対応表
+// (CreateNetplanInterfaces/CreateAlpineInterfaces の固定6要素配列)が
+// 扱えるNICの最大本数(issue #696)。これを超えるインデックスへアクセスすると
+// ブートボリューム設定時にpanicするため、mgmt NICの自動追加もこの上限を守る。
+const MaxGuestNetworkInterfaces = 6
+
 // ManagementNetworkACLAllowPriority / ManagementNetworkACLDenyPriority は
 // mgmtネットワークのOVN ACL優先度(issue #696)。数値が大きいほど優先されるため、
 // 許可リストを拒否ルールより高い優先度にすることで例外的に通信を許可する。
@@ -133,6 +139,11 @@ func (m *Marmot) attachManagementNetworkInterface(serverConfig *api.Server, virt
 				return nil
 			}
 		}
+	}
+
+	if serverConfig.Spec.NetworkInterface != nil && len(*serverConfig.Spec.NetworkInterface) >= MaxGuestNetworkInterfaces {
+		return fmt.Errorf("cannot attach management network interface '%s': server already has %d network interfaces, which is the maximum supported for guest interface naming",
+			ManagementNetworkName, len(*serverConfig.Spec.NetworkInterface))
 	}
 
 	vnet, err := m.Db.GetVirtualNetworkByName(ManagementNetworkName)
