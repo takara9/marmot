@@ -110,6 +110,11 @@ func (c *networkController) networkControllerLoop(fabric networkfabric.NetworkFa
 		slog.Error("Failed to get virtual networks and put DB", "err", err)
 		return
 	}
+	// mgmt が削除されても定期ループで再作成し、再起動まで欠落し続けることを防ぐ。
+	if err := c.marmot.EnsureManagementNetwork(); err != nil {
+		slog.Error("Failed to ensure management network in controller loop", "err", err)
+		return
+	}
 
 	vnets, err := c.marmot.GetVirtualNetwork()
 	if err != nil {
