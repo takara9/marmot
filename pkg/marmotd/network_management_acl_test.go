@@ -1,6 +1,12 @@
 package marmotd
 
-import "testing"
+import (
+	"strings"
+	"testing"
+
+	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/util"
+)
 
 func TestBuildManagementNetworkACLRules_ValidAllowEntriesPlusDefaultDeny(t *testing.T) {
 	cfg := &MarmotdConfig{
@@ -61,5 +67,93 @@ func TestBuildManagementNetworkACLRules_NilConfigReturnsOnlyDeny(t *testing.T) {
 	}
 	if rules[0].Match != "ip4" || rules[1].Match != "ip6" {
 		t.Fatalf("rules = %+v, want ip4 then ip6 deny", rules)
+	}
+}
+
+func TestValidateExistingManagementNetwork_AcceptsReservedConfiguration(t *testing.T) {
+	vnet := newReservedManagementNetworkForTest()
+	ipNetID := "ipnet-1"
+	vnet.Spec.IpNetworkId = &ipNetID
+
+	if err := validateExistingManagementNetwork(vnet); err != nil {
+		t.Fatalf("validateExistingManagementNetwork() error = %v, want nil", err)
+	}
+}
+
+func TestValidateExistingManagementNetwork_RejectsIncompatibleConfiguration(t *testing.T) {
+	vnet := newReservedManagementNetworkForTest()
+	ipNetID := "ipnet-1"
+	vnet.Spec.IpNetworkId = &ipNetID
+	vnet.Spec.IPNetworkAddress = util.StringPtr("10.99.0.0/24")
+	vnet.Spec.BridgeName = util.StringPtr("virbr0")
+	overlayMode := api.None
+	vnet.Spec.OverlayMode = &overlayMode
+	labels := map[string]interface{}{}
+	vnet.Metadata.Labels = &labels
+
+	err := validateExistingManagementNetwork(vnet)
+	if err == nil {
+		t.Fatal("validateExistingManagementNetwork() error = nil, want incompatibility error")
+	}
+	for _, want := range []string{
+		"cidr must be " + ManagementNetworkCIDR,
+		"overlayMode must be geneve",
+		"bridgeName must be " + api.OVNIntegrationBridgeName,
+		"label " + api.NetworkLabelACLEnforced + " must be true",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("validateExistingManagementNetwork() error = %q, want substring %q", err.Error(), want)
+		}
+	}
+}
+
+func TestReconcileManagementNetworkSpec_NormalizesReservedSettings(t *testing.T) {
+	vnet := api.VirtualNetwork{
+		Metadata: api.Metadata{
+			Name: ManagementNetworkName,
+			Labels: &map[string]interface{}{
+				"keep": "me",
+			},
+		},
+		Spec: api.VirtualNetworkSpec{
+			IPNetworkAddress: util.StringPtr("192.168.0.0/24"),
+			BridgeName:       util.StringPtr("virbr0"),
+		},
+	}
+
+	reconcileManagementNetworkSpec(&vnet)
+
+	if vnet.Spec.IPNetworkAddress == nil || *vnet.Spec.IPNetworkAddress != ManagementNetworkCIDR {
+		t.Fatalf("IPNetworkAddress = %v, want %q", vnet.Spec.IPNetworkAddress, ManagementNetworkCIDR)
+	}
+	if vnet.Spec.BridgeName == nil || *vnet.Spec.BridgeName != api.OVNIntegrationBridgeName {
+		t.Fatalf("BridgeName = %v, want %q", vnet.Spec.BridgeName, api.OVNIntegrationBridgeName)
+	}
+	if vnet.Spec.OverlayMode == nil || *vnet.Spec.OverlayMode != api.Geneve {
+		t.Fatalf("OverlayMode = %v, want %q", vnet.Spec.OverlayMode, api.Geneve)
+	}
+	if vnet.Metadata.Labels == nil || (*vnet.Metadata.Labels)["keep"] != "me" {
+		t.Fatalf("Labels = %#v, want preserved custom label", vnet.Metadata.Labels)
+	}
+	if got, ok := (*vnet.Metadata.Labels)[api.NetworkLabelACLEnforced].(string); !ok || got != "true" {
+		t.Fatalf("ACL label = %#v, want %q", (*vnet.Metadata.Labels)[api.NetworkLabelACLEnforced], "true")
+	}
+}
+
+func newReservedManagementNetworkForTest() api.VirtualNetwork {
+	labels := map[string]interface{}{
+		api.NetworkLabelACLEnforced: "true",
+	}
+	overlayMode := api.Geneve
+	return api.VirtualNetwork{
+		Metadata: api.Metadata{
+			Name:   ManagementNetworkName,
+			Labels: &labels,
+		},
+		Spec: api.VirtualNetworkSpec{
+			IPNetworkAddress: util.StringPtr(ManagementNetworkCIDR),
+			BridgeName:       util.StringPtr(api.OVNIntegrationBridgeName),
+			OverlayMode:      &overlayMode,
+		},
 	}
 }

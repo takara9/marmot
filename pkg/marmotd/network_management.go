@@ -53,6 +53,9 @@ func (m *Marmot) EnsureManagementNetwork() error {
 			// 実際のIPAM作成/libvirt反映はDeployVirtualNetwork()に委ねるため、ここではPENDINGへ戻すのみ行う。
 			return m.resetManagementNetworkForReprovisioning(existing)
 		}
+		if err := validateExistingManagementNetwork(existing); err != nil {
+			return err
+		}
 		return nil
 	} else if err != db.ErrNotFound {
 		return err
@@ -105,26 +108,61 @@ func (m *Marmot) resetManagementNetworkForReprovisioning(vnet api.VirtualNetwork
 	vnetID := api.VirtualNetworkID(vnet)
 	slog.Warn("management network found without IpNetworkId; resetting to PENDING for reprovisioning", "name", ManagementNetworkName, "id", vnetID)
 
-	needsUpdate := false
-	if vnet.Spec.IPNetworkAddress == nil {
-		vnet.Spec.IPNetworkAddress = util.StringPtr(ManagementNetworkCIDR)
-		needsUpdate = true
-	}
+	reconcileManagementNetworkSpec(&vnet)
 	// libvirt XMLからの自動インポートはOverlayMode/VNIを設定しないため、新規作成時と同じ
 	// 既定値ロジックで補完する。未補完だとOVN論理スイッチが作成されない(issue #696)。
-	if vnet.Spec.OverlayMode == nil || strings.TrimSpace(string(*vnet.Spec.OverlayMode)) == "" {
-		if err := applyVirtualNetworkDefaults(&vnet, CurrentConfig(), m.Db); err != nil {
-			return fmt.Errorf("failed to apply defaults to management network for reprovisioning: %w", err)
-		}
-		needsUpdate = true
+	if err := applyVirtualNetworkDefaults(&vnet, CurrentConfig(), m.Db); err != nil {
+		return fmt.Errorf("failed to apply defaults to management network for reprovisioning: %w", err)
 	}
-	if needsUpdate {
-		if err := m.Db.UpdateVirtualNetworkById(vnetID, vnet); err != nil {
-			return fmt.Errorf("failed to prepare management network for reprovisioning: %w", err)
-		}
+	if err := m.Db.UpdateVirtualNetworkById(vnetID, vnet); err != nil {
+		return fmt.Errorf("failed to prepare management network for reprovisioning: %w", err)
 	}
 	m.Db.UpdateVirtualNetworkStatus(vnetID, db.NETWORK_PENDING)
 	return nil
+}
+
+func validateExistingManagementNetwork(vnet api.VirtualNetwork) error {
+	drift := managementNetworkDrift(&vnet)
+	if len(drift) == 0 {
+		return nil
+	}
+	return fmt.Errorf("management network %q exists with incompatible settings: %s", ManagementNetworkName, strings.Join(drift, ", "))
+}
+
+func reconcileManagementNetworkSpec(vnet *api.VirtualNetwork) {
+	if vnet == nil {
+		return
+	}
+	vnet.Spec.IPNetworkAddress = util.StringPtr(ManagementNetworkCIDR)
+	vnet.Spec.BridgeName = util.StringPtr(api.OVNIntegrationBridgeName)
+	overlayMode := api.Geneve
+	vnet.Spec.OverlayMode = &overlayMode
+	if vnet.Metadata.Labels == nil {
+		labels := map[string]interface{}{}
+		vnet.Metadata.Labels = &labels
+	}
+	(*vnet.Metadata.Labels)[api.NetworkLabelACLEnforced] = "true"
+}
+
+func managementNetworkDrift(vnet *api.VirtualNetwork) []string {
+	if vnet == nil {
+		return []string{"network object is nil"}
+	}
+
+	var drift []string
+	if vnet.Spec.IPNetworkAddress == nil || strings.TrimSpace(*vnet.Spec.IPNetworkAddress) != ManagementNetworkCIDR {
+		drift = append(drift, fmt.Sprintf("cidr must be %s", ManagementNetworkCIDR))
+	}
+	if vnet.Spec.OverlayMode == nil || !strings.EqualFold(strings.TrimSpace(string(*vnet.Spec.OverlayMode)), string(api.Geneve)) {
+		drift = append(drift, "overlayMode must be geneve")
+	}
+	if vnet.Spec.BridgeName == nil || strings.TrimSpace(*vnet.Spec.BridgeName) != api.OVNIntegrationBridgeName {
+		drift = append(drift, fmt.Sprintf("bridgeName must be %s", api.OVNIntegrationBridgeName))
+	}
+	if !networkfabric.IsACLEnforcedNetwork(vnet) {
+		drift = append(drift, fmt.Sprintf("label %s must be true", api.NetworkLabelACLEnforced))
+	}
+	return drift
 }
 
 // attachManagementNetworkInterface は、マニフェストの指定有無に関わらず、
