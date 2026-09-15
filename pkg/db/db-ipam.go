@@ -53,6 +53,17 @@ func (d *Database) CreateIpNetwork(vnetid string, spec *api.IPNetwork) (string, 
 	}
 	prefix = prefix.Masked()
 
+	// 重複CIDRチェックと新規作成の間に競合が起きないよう、vnetId単位でロックする。
+	// 未ロックだと、複数ノードからの同時呼び出しで同一CIDRのip_networkが二重作成され、
+	// それぞれが独立にIPを払い出して重複割り当てを起こす(issue #696)。
+	lockKey := NetworkPrefix + "/" + vnetid + "/ip_network_create_lock"
+	mutex, err := d.LockKey(lockKey)
+	if err != nil {
+		slog.Error("CreateIpNetwork()", "err", err, "vnetId", vnetid, "lockKey", lockKey)
+		return "", err
+	}
+	defer d.UnlockKey(mutex)
+
 	// 既存のネットワークアドレスのリストを取得
 	// IDは返す
 	networks, err := d.GetIpNetworks(vnetid)
