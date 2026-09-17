@@ -30,12 +30,11 @@ func (s *Server) ApiConsoleServerById(ctx echo.Context, id string) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	consolePath := ""
-	if server.Status != nil && server.Status.Console != nil {
+	// Cached Status.Console can point to a PTY reassigned to another domain after a libvirtd/host
+	// restart, so always prefer a live lookup and only fall back to the cached value if that fails.
+	consolePath := strings.TrimSpace(resolveConsolePathFallback(server))
+	if consolePath == "" && server.Status != nil && server.Status.Console != nil {
 		consolePath = strings.TrimSpace(*server.Status.Console)
-	}
-	if consolePath == "" {
-		consolePath = strings.TrimSpace(resolveConsolePathFallback(server))
 	}
 	if consolePath == "" {
 		return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "console path is not available"})
@@ -46,14 +45,14 @@ func (s *Server) ApiConsoleServerById(ctx echo.Context, id string) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: "response writer does not support hijacking"})
 	}
 
-		conn, _, err := hijacker.Hijack()
+	conn, _, err := hijacker.Hijack()
 	if err != nil {
 		slog.Error("ApiConsoleServerById() hijack failed", "id", id, "err", err)
 		return err
 	}
 
 	if _, err := io.WriteString(conn, "HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nConnection: close\r\n\r\n"); err != nil {
-			_ = conn.Close()
+		_ = conn.Close()
 		return err
 	}
 
