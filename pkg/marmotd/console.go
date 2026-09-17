@@ -30,12 +30,11 @@ func (s *Server) ApiConsoleServerById(ctx echo.Context, id string) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	consolePath := ""
-	if server.Status != nil && server.Status.Console != nil {
+	// Cached Status.Console can point to a PTY reassigned to another domain after a libvirtd/host
+	// restart, so always prefer a live lookup and only fall back to the cached value if that fails.
+	consolePath := strings.TrimSpace(resolveConsolePathFallback(server))
+	if consolePath == "" && server.Status != nil && server.Status.Console != nil {
 		consolePath = strings.TrimSpace(*server.Status.Console)
-	}
-	if consolePath == "" {
-		consolePath = strings.TrimSpace(resolveConsolePathFallback(server))
 	}
 	if consolePath == "" {
 		return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "console path is not available"})
