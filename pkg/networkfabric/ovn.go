@@ -68,13 +68,128 @@ func (o *OVNFabric) EnsureOverlayMesh(vnet *api.VirtualNetwork, peers []string) 
 		if err := syncGeneveLogicalPorts(vnet, lsName, peers); err != nil {
 			return err
 		}
-		if enableGeneveOVSTunnelMesh {
+		// ACL適用ネットワークはゲストNICをOVN論理ポートとして正式に束縛するため、
+		// 生OVS geneveトンネルメッシュへのフォールバックを行わない(issue #696)。
+		if enableGeneveOVSTunnelMesh && !IsACLEnforcedNetwork(vnet) {
 			return o.ovs.EnsureOverlayMesh(vnet, peers)
 		}
 		return nil
 	}
 
 	return o.ovs.EnsureOverlayMesh(vnet, peers)
+}
+
+// IsACLEnforcedNetwork は、OVN ACLをゲストNICへ実効させるためにOVN論理ポート束縛が
+// 必要なネットワークかどうかを判定する(issue #696)。
+func IsACLEnforcedNetwork(vnet *api.VirtualNetwork) bool {
+	if vnet == nil || vnet.Metadata.Labels == nil {
+		return false
+	}
+	val, ok := (*vnet.Metadata.Labels)[api.NetworkLabelACLEnforced].(string)
+	if !ok {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(val), "true")
+}
+
+// EnsureGuestLogicalPort は、ACL適用ネットワーク上のゲストNIC用にOVN論理スイッチポートを
+// 作成する。portIDはOVSインターフェースのexternal_ids:iface-idと一致させる必要があり、
+// これによりovn-controllerが自動的にポートバインディングを行う(issue #696)。
+func (o *OVNFabric) EnsureGuestLogicalPort(vnet *api.VirtualNetwork, portID string, mac string, ip string) error {
+	portID = strings.TrimSpace(portID)
+	if portID == "" {
+		return fmt.Errorf("portID is required")
+	}
+	if !ovnCommandsAvailable() {
+		return fmt.Errorf("ovn-nbctl is required to manage guest logical ports")
+	}
+	lsName := logicalSwitchName(vnet)
+	if lsName == "" {
+		return fmt.Errorf("unable to determine OVN logical switch name")
+	}
+
+	if _, err := runOVNNBCTLCommand("--may-exist", "lsp-add", lsName, portID); err != nil {
+		if !isPortExistsOnDifferentSwitchError(err) {
+			return fmt.Errorf("failed to ensure OVN logical switch port %s on %s: %w", portID, lsName, err)
+		}
+		// 別スイッチに残留した同名ポート(例: ネットワーク再作成でスイッチ名が変わった場合の
+		// 残骸)と衝突している。古いポートを削除してから正しいスイッチへ再作成する(issue #696)。
+		slog.Warn("OVN logical switch port name collides with a port on a different switch; deleting stale port and retrying", "portId", portID, "switch", lsName, "err", err)
+		if _, delErr := runOVNNBCTLCommand("--if-exists", "lsp-del", portID); delErr != nil {
+			return fmt.Errorf("failed to delete stale OVN logical switch port %s: %w", portID, delErr)
+		}
+		if _, err := runOVNNBCTLCommand("--may-exist", "lsp-add", lsName, portID); err != nil {
+			return fmt.Errorf("failed to ensure OVN logical switch port %s on %s (retry): %w", portID, lsName, err)
+		}
+	}
+
+	addresses := strings.TrimSpace(mac)
+	if addresses == "" {
+		addresses = "unknown"
+	} else if trimmedIP := strings.TrimSpace(ip); trimmedIP != "" {
+		addresses = addresses + " " + trimmedIP
+	}
+	if _, err := runOVNNBCTLCommand("lsp-set-addresses", portID, addresses); err != nil {
+		staleID, isDup := parseDuplicateIPAddressConflictPortID(err)
+		if !isDup || staleID == portID {
+			return fmt.Errorf("failed to set addresses on OVN logical switch port %s: %w", portID, err)
+		}
+		// NIC情報の永続化前にattachManagementNetworkInterface等が失敗すると、
+		// OVN側にだけポートとIPが孤児として残る。孤児ポートを削除して再試行する(issue #696)。
+		slog.Warn("OVN logical switch port address collides with a stale orphaned port; deleting stale port and retrying", "portId", portID, "staleConflictingPortId", staleID, "switch", lsName, "err", err)
+		if _, delErr := runOVNNBCTLCommand("--if-exists", "lsp-del", staleID); delErr != nil {
+			return fmt.Errorf("failed to delete stale OVN logical switch port %s: %w", staleID, delErr)
+		}
+		if _, err := runOVNNBCTLCommand("lsp-set-addresses", portID, addresses); err != nil {
+			return fmt.Errorf("failed to set addresses on OVN logical switch port %s (retry): %w", portID, err)
+		}
+	}
+	if _, err := runOVNNBCTLCommand("set", "logical_switch_port", portID, "external_ids:marmot_managed=true"); err != nil {
+		return fmt.Errorf("failed to set managed external_id on OVN logical switch port %s: %w", portID, err)
+	}
+
+	return nil
+}
+
+// isPortExistsOnDifferentSwitchError は、OVN論理ポート名が別の論理スイッチで既に
+// 使用されているために lsp-add が失敗した際のovn-nbctlエラーかどうかを判定する。
+func isPortExistsOnDifferentSwitchError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "port already exists") && strings.Contains(msg, "but in switch")
+}
+
+// duplicateIPAddressPortPattern は、lsp-set-addressesが同一IPを保持する既存ポートとの
+// 重複で失敗した際のovn-nbctlエラーメッセージから、衝突相手のポートIDを抽出する(issue #696)。
+var duplicateIPAddressPortPattern = regexp.MustCompile(`(?i)duplicate ipv4 address '[^']*' found on logical switch port '([0-9a-fA-F-]+)'`)
+
+// parseDuplicateIPAddressConflictPortID は、IPアドレス重複エラーから衝突ポートIDを取り出す。
+func parseDuplicateIPAddressConflictPortID(err error) (string, bool) {
+	if err == nil {
+		return "", false
+	}
+	m := duplicateIPAddressPortPattern.FindStringSubmatch(err.Error())
+	if len(m) != 2 {
+		return "", false
+	}
+	return m[1], true
+}
+
+// DeleteGuestLogicalPort はゲストNIC用のOVN論理スイッチポートを削除する(issue #696)。
+func (o *OVNFabric) DeleteGuestLogicalPort(portID string) error {
+	portID = strings.TrimSpace(portID)
+	if portID == "" {
+		return nil
+	}
+	if !ovnCommandsAvailable() {
+		return fmt.Errorf("ovn-nbctl is required to manage guest logical ports")
+	}
+	if _, err := runOVNNBCTLCommand("--if-exists", "lsp-del", portID); err != nil {
+		return fmt.Errorf("failed to delete OVN logical switch port %s: %w", portID, err)
+	}
+	return nil
 }
 
 func (o *OVNFabric) PruneOverlayMesh(vnet *api.VirtualNetwork, remainPeers []string) error {
@@ -90,7 +205,9 @@ func (o *OVNFabric) PruneOverlayMesh(vnet *api.VirtualNetwork, remainPeers []str
 		if err := pruneGeneveLogicalPorts(vnet, lsName, remainPeers); err != nil {
 			return err
 		}
-		if enableGeneveOVSTunnelMesh {
+		// ACL適用ネットワークはEnsureOverlayMeshと同様に生OVS geneveトンネルメッシュへの
+		// フォールバックを行わないため、pruneパスも同じ条件でスキップする(issue #696)。
+		if enableGeneveOVSTunnelMesh && !IsACLEnforcedNetwork(vnet) {
 			return o.ovs.PruneOverlayMesh(vnet, remainPeers)
 		}
 		return nil
@@ -110,6 +227,32 @@ func (o *OVNFabric) DeleteBridge(vnet *api.VirtualNetwork) error {
 
 func (o *OVNFabric) GetBridgeStatus(vnet *api.VirtualNetwork) (bool, int, error) {
 	return o.ovs.GetBridgeStatus(vnet)
+}
+
+// EnsureACLs は対象ネットワークのOVN論理スイッチ上のACLを rules の内容で完全に同期する。
+// 既存のACLをすべて削除してから rules を再作成することで冪等に実現する(issue #696)。
+// acl-del と acl-add は単一の ovn-nbctl 呼び出し(単一OVSDBトランザクション)にまとめて
+// アトミックに適用し、途中で失敗しても deny ルールが失われた状態で残らないようにする。
+func (o *OVNFabric) EnsureACLs(vnet *api.VirtualNetwork, rules []ACLRule) error {
+	if !ovnCommandsAvailable() {
+		return fmt.Errorf("ovn-nbctl is required to manage ACLs")
+	}
+
+	lsName := logicalSwitchName(vnet)
+	if lsName == "" {
+		return fmt.Errorf("unable to determine OVN logical switch name")
+	}
+
+	args := []string{"acl-del", lsName}
+	for _, rule := range rules {
+		args = append(args, "--", "acl-add", lsName, rule.Direction, fmt.Sprintf("%d", rule.Priority), rule.Match, rule.Action)
+	}
+
+	if _, err := runOVNNBCTLCommand(args...); err != nil {
+		return fmt.Errorf("failed to synchronize ACLs on OVN logical switch %s: %w", lsName, err)
+	}
+
+	return nil
 }
 
 func isGeneveOverlay(vnet *api.VirtualNetwork) bool {

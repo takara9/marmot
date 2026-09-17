@@ -196,6 +196,26 @@ func (l *LibVirtEp) GetVirtualNetworkByName(name string) (*libvirt.Network, bool
 	return net, true, nil
 }
 
+// isNetworkAlreadyActiveError は、既に起動中のネットワークに対して net.Create() を
+// 呼び出した際のlibvirtエラーかどうかを判定する。DeployVirtualNetworkの再試行や、
+// CIランナーでlibvirtd状態が前回実行から持ち越された場合に発生し得るため、
+// 冪等に扱う(Destroy/Undefineの非アクティブ/未検出許容と対になる処理)。
+func isNetworkAlreadyActiveError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "already active")
+}
+
+// isNetworkAlreadyExistsError は、同名で別UUIDのネットワークが既に存在するために
+// NetworkDefineXML が失敗した際のlibvirtエラーかどうかを判定する。
+func isNetworkAlreadyExistsError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "already exists with uuid")
+}
+
 func (l *LibVirtEp) DeleteVirtualNetwork(name string) error {
 	net, found, err := l.GetVirtualNetworkByName(name)
 	if err != nil {
@@ -243,15 +263,46 @@ func (l *LibVirtEp) DefineAndStartVirtualNetwork(network libvirtxml.Network) err
 	// Create Network
 	net, err := l.Com.NetworkDefineXML(xmlString)
 	if err != nil {
-		slog.Error("Error defining network", "err", err)
-		return err
+		if !isNetworkAlreadyExistsError(err) {
+			slog.Error("Error defining network", "err", err)
+			return err
+		}
+		// 同名で別UUIDのネットワークが既に存在する(例: CIランナーでlibvirtd状態が前回実行から
+		// 持ち越された場合)。既存のUUIDを採用して再定義することで冪等に扱う。
+		slog.Warn("network already exists with a different uuid; adopting existing uuid and retrying", "network", network.Name, "err", err)
+		existing, lookupErr := l.Com.LookupNetworkByName(network.Name)
+		if lookupErr != nil {
+			slog.Error("Error looking up existing network by name", "err", lookupErr)
+			return err
+		}
+		existingUUID, uuidErr := existing.GetUUIDString()
+		_ = existing.Free()
+		if uuidErr != nil {
+			slog.Error("Error getting existing network uuid", "err", uuidErr)
+			return err
+		}
+		network.UUID = existingUUID
+		xmlString, err = network.Marshal()
+		if err != nil {
+			slog.Error("Error marshaling network XML (retry)", "err", err)
+			return err
+		}
+		net, err = l.Com.NetworkDefineXML(xmlString)
+		if err != nil {
+			slog.Error("Error defining network (retry)", "err", err)
+			return err
+		}
 	}
 
 	// Start Network
 	err = net.Create()
 	if err != nil {
-		slog.Error("Error starting network", "err", err)
-		return err
+		if isNetworkAlreadyActiveError(err) {
+			slog.Debug("Network already active, continue", "network", network.Name)
+		} else {
+			slog.Error("Error starting network", "err", err)
+			return err
+		}
 	}
 
 	//オートスタートを設定しないと、HVの再起動からの復帰時、停止している。

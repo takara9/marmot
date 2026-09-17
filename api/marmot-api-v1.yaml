@@ -2150,6 +2150,9 @@ components:
           items:
             type: integer
             format: uint
+        interfaceId:
+          type: string
+          description: OVN論理スイッチポート名(iface-id)。OVN ACL適用ネットワークでゲストNICを論理ポートとして束縛するために使用する。
     Nameservers:
       type: object
       properties:

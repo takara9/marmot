@@ -56,6 +56,18 @@ func NewOVSFabric() *OVSFabric {
 	return &OVSFabric{}
 }
 
+// protectedBridgeNames は Marmot が作成・削除の対象としない共有インフラのブリッジ名。
+// api.OVNIntegrationBridgeName ("br-int") はOVNが管理する統合ブリッジであり、
+// 既存を前提として扱う(issue #696)。
+var protectedBridgeNames = map[string]struct{}{
+	api.OVNIntegrationBridgeName: {},
+}
+
+func isProtectedBridge(bridgeName string) bool {
+	_, ok := protectedBridgeNames[strings.TrimSpace(bridgeName)]
+	return ok
+}
+
 // EnsureBridge は OVS ブリッジを作成または確認する。
 func (o *OVSFabric) EnsureBridge(vnet *api.VirtualNetwork) error {
 	if vnet == nil || vnet.Spec.BridgeName == nil {
@@ -63,6 +75,12 @@ func (o *OVSFabric) EnsureBridge(vnet *api.VirtualNetwork) error {
 	}
 
 	bridgeName := *vnet.Spec.BridgeName
+
+	if isProtectedBridge(bridgeName) {
+		// 共有インフラのブリッジは既存を前提とし、作成・再作成の対象にしない。
+		slog.Debug("skip ensure for protected bridge", "bridge", bridgeName)
+		return nil
+	}
 
 	// ブリッジ存在確認
 	checkCtx, checkCancel := context.WithTimeout(context.Background(), ovsCommandTimeout)
@@ -661,6 +679,12 @@ func (o *OVSFabric) DeleteBridge(vnet *api.VirtualNetwork) error {
 	}
 
 	bridgeName := *vnet.Spec.BridgeName
+
+	if isProtectedBridge(bridgeName) {
+		// 共有インフラのブリッジは削除しない(誤ってOVN統合ブリッジ等を破壊するのを防ぐ)。
+		slog.Warn("refusing to delete protected bridge", "bridge", bridgeName)
+		return nil
+	}
 
 	// ブリッジ存在確認
 	checkCmd := ovsVSCTLCmd("br-exists", bridgeName)

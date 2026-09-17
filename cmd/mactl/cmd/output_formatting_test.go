@@ -79,7 +79,7 @@ var _ = Describe("Output formatting", func() {
 			Expect(lines[2]).To(ContainSubstring("2h"), output)
 		})
 
-		It("hides default continuation line when non-default networks exist by default", func() {
+		It("hides mgmt continuation line when non-mgmt networks exist by default", func() {
 			originalShowAll := getServerShowAll
 			getServerShowAll = false
 			DeferCleanup(func() {
@@ -93,7 +93,7 @@ var _ = Describe("Output formatting", func() {
 					Metadata: api.Metadata{Name: "server-na-trim"},
 					Spec: api.ServerSpec{NetworkInterface: &[]api.NetworkInterface{
 						{Address: &addrPrimary, Networkname: "app-net"},
-						{Networkname: "default"},
+						{Networkname: "mgmt"},
 						{Address: &addrSecondary, Networkname: "host-bridge"},
 					}},
 				}})
@@ -102,10 +102,10 @@ var _ = Describe("Output formatting", func() {
 
 			Expect(output).To(ContainSubstring("app-net"), output)
 			Expect(output).To(ContainSubstring("host-bridge"), output)
-			Expect(output).NotTo(ContainSubstring("default"), output)
+			Expect(output).NotTo(ContainSubstring("mgmt"), output)
 		})
 
-		It("keeps default line when default is the only attached network", func() {
+		It("keeps mgmt line when mgmt is the only attached network", func() {
 			originalShowAll := getServerShowAll
 			getServerShowAll = false
 			DeferCleanup(func() {
@@ -114,15 +114,15 @@ var _ = Describe("Output formatting", func() {
 
 			output := captureOutput(func() {
 				err := outputServers([]api.Server{{
-					Metadata: api.Metadata{Name: "server-default-only"},
+					Metadata: api.Metadata{Name: "server-mgmt-only"},
 					Spec: api.ServerSpec{NetworkInterface: &[]api.NetworkInterface{
-						{Networkname: "default"},
+						{Networkname: "mgmt"},
 					}},
 				}})
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			Expect(output).To(ContainSubstring("default"), output)
+			Expect(output).To(ContainSubstring("mgmt"), output)
 		})
 
 		It("keeps all continuation lines including N/A IP when --all is enabled", func() {
@@ -139,7 +139,7 @@ var _ = Describe("Output formatting", func() {
 					Metadata: api.Metadata{Name: "server-na-all"},
 					Spec: api.ServerSpec{NetworkInterface: &[]api.NetworkInterface{
 						{Address: &addrPrimary, Networkname: "app-net"},
-						{Networkname: "default"},
+						{Networkname: "mgmt"},
 						{Address: &addrSecondary, Networkname: "host-bridge"},
 					}},
 				}})
@@ -147,7 +147,7 @@ var _ = Describe("Output formatting", func() {
 			})
 
 			Expect(output).To(ContainSubstring("app-net"), output)
-			Expect(output).To(ContainSubstring("default"), output)
+			Expect(output).To(ContainSubstring("mgmt"), output)
 			Expect(output).To(ContainSubstring("host-bridge"), output)
 		})
 	})

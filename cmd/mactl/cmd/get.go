@@ -1022,22 +1022,22 @@ func outputServers(servers []api.Server) error {
 			networkLines := serverNetworkLines(s)
 
 			// --all なし時:
-			// - default 以外のネットワークがあれば default を隠す
-			// - default しかなければ表示を維持
+			// - mgmt 以外のネットワークがあれば mgmt を隠す(mgmtは常に強制接続されるノイズのため, issue #696)
+			// - mgmt しかなければ表示を維持
 			// - N/A/N/A はノイズなので隠す
 			filteredLines := networkLines
 			if !getServerShowAll {
-				hasNonDefaultNetwork := false
+				hasNonMgmtNetwork := false
 				for _, line := range networkLines {
-					if line.network != "default" && line.network != "N/A" {
-						hasNonDefaultNetwork = true
+					if line.network != "mgmt" && line.network != "N/A" {
+						hasNonMgmtNetwork = true
 						break
 					}
 				}
 
 				filteredLines = make([]serverNetworkLine, 0, len(networkLines))
 				for _, line := range networkLines {
-					if hasNonDefaultNetwork && line.network == "default" {
+					if hasNonMgmtNetwork && line.network == "mgmt" {
 						continue
 					}
 					if line.address == "N/A" && line.network == "N/A" {

@@ -180,6 +180,10 @@ jobs:
     - name: ランナーのセットアップ
       run: |
         sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/setup.sh
+    - name: OVNパッケージのインストール確認(mgmtネットワーク用, issue #696)
+      run: |
+        sudo apt-get update || true
+        sudo apt-get install -y ovn-central ovn-host
     - name: 仮想ネットワーク作成
       run: | 
         sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/setup-libvirt-networks.sh
@@ -220,6 +224,10 @@ jobs:
     #- uses: actions/setup-go@v6
     #  with:
     #    go-version: '1.26.2'
+    - name: OVNパッケージのインストール確認(mgmtネットワーク用, issue #696)
+      run: |
+        sudo apt-get update || true
+        sudo apt-get install -y ovn-central ovn-host
     - name: 仮想ネットワーク作成
       run: | 
         sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/setup-libvirt-networks.sh
@@ -273,6 +281,10 @@ jobs:
     #- uses: actions/setup-go@v6
     #  with:
     #    go-version: '1.26.2'
+    - name: OVNパッケージのインストール確認(mgmtネットワーク用, issue #696)
+      run: |
+        sudo apt-get update || true
+        sudo apt-get install -y ovn-central ovn-host
     - name: 仮想ネットワーク作成
       run: | 
         sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/setup-libvirt-networks.sh
@@ -314,6 +326,10 @@ jobs:
     #- uses: actions/setup-go@v6
     #  with:
     #    go-version: '1.26.2'
+    - name: OVNパッケージのインストール確認(mgmtネットワーク用, issue #696)
+      run: |
+        sudo apt-get update || true
+        sudo apt-get install -y ovn-central ovn-host
     - name: 仮想ネットワーク作成
       run: |
         sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/setup-libvirt-networks.sh
@@ -345,6 +361,10 @@ jobs:
     #- uses: actions/setup-go@v6
     #  with:
     #    go-version: '1.26.2'
+    - name: OVNパッケージのインストール確認(mgmtネットワーク用, issue #696)
+      run: |
+        sudo apt-get update || true
+        sudo apt-get install -y ovn-central ovn-host
     - name: 仮想ネットワーク作成
       run: |
         sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/setup-libvirt-networks.sh
@@ -376,6 +396,10 @@ jobs:
     #- uses: actions/setup-go@v6
     #  with:
     #    go-version: '1.26.2'
+    - name: OVNパッケージのインストール確認(mgmtネットワーク用, issue #696)
+      run: |
+        sudo apt-get update || true
+        sudo apt-get install -y ovn-central ovn-host
     - name: 仮想ネットワーク削除
       if: always()
       run: |
@@ -408,6 +432,10 @@ jobs:
     #- uses: actions/setup-go@v6
     #  with:
     #    go-version: '1.26.2'
+    - name: OVNパッケージのインストール確認(mgmtネットワーク用, issue #696)
+      run: |
+        sudo apt-get update || true
+        sudo apt-get install -y ovn-central ovn-host
     - name: 仮想ネットワーク削除
       if: always()
       run: | 
@@ -476,6 +504,10 @@ jobs:
     if: always()
     steps:
     - uses: actions/checkout@v5
+    - name: OVNパッケージのインストール確認(mgmtネットワーク用, issue #696)
+      run: |
+        sudo apt-get update || true
+        sudo apt-get install -y ovn-central ovn-host
     - name: 仮想ネットワーク作成
       run: |
         sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/setup-libvirt-networks.sh

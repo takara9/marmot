@@ -427,41 +427,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	slog.Debug("サーバーのネットワークインターフェースの設定")
 
 	// ネットワークの設定
-	if serverConfig.Spec.NetworkInterface == nil {
-		// ネットワーク指定なし、デフォルトネットワークを使用
-		slog.Debug("ネットワーク指定なし、デフォルトネットワークを使用")
-		mac, err := util.GenerateRandomMAC()
-		if err != nil {
-			slog.Error("GenerateRandomMAC()", "err", err)
-			return "", err
-		}
-		// サーバーのネットワーク情報を更新
-		var net api.NetworkInterface
-
-		// ネットワーク名から、ネットワークのIDを取得して、net.Networkidにセットする必要がある
-		xnet, err := m.Db.GetVirtualNetworkByName("default")
-		if err != nil {
-			slog.Error("GetNetworkIdByName()", "err", err)
-			return "", err
-		}
-
-		defaultNS := virt.NetSpec{
-			MAC:     mac.String(),
-			Network: xnet.Metadata.Name,
-			PortID:  uuid.New().String(),
-			Bus:     1,
-		}
-		if xnet.Spec.BridgeName != nil && shouldAttachOVSInterfaceID(xnet, strings.TrimSpace(*xnet.Spec.BridgeName)) {
-			defaultNS.InterfaceID = defaultNS.PortID
-		}
-		virtSpec.NetSpecs = []virt.NetSpec{defaultNS}
-
-		net.Networkid = api.VirtualNetworkID(xnet)
-		net.Networkname = xnet.Metadata.Name
-		net.Mac = &virtSpec.NetSpecs[0].MAC
-		net.Nameservers = defaultNameserversFromConfig()
-		serverConfig.Spec.NetworkInterface = &[]api.NetworkInterface{net}
-	} else {
+	// マニフェストでネットワーク未指定の場合はmgmtネットワークのみ強制接続される(issue #696)。
+	// defaultネットワークへの自動フォールバック接続は廃止した。
+	if serverConfig.Spec.NetworkInterface != nil {
 		slog.Debug("ネットワーク指定あり、指定されたネットワークを使用")
 		for i, reqNic := range *serverConfig.Spec.NetworkInterface {
 			slog.Debug("ネットワーク", "index", i, "network id", reqNic.Networkname)
@@ -654,6 +622,14 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			if vnet.Spec.BridgeName != nil && shouldAttachOVSInterfaceID(vnet, strings.TrimSpace(*vnet.Spec.BridgeName)) {
 				ns.InterfaceID = ns.PortID
 			}
+			// OVN ACLを実トラフィックへ適用するため、マニフェストで明示指定されたNICについても
+			// ゲストNICをOVN論理ポートとして正式に束縛する(issue #696)。
+			if networkfabric.IsACLEnforcedNetwork(&vnet) {
+				if err := networkfabric.NewOVNFabric().EnsureGuestLogicalPort(&vnet, ns.PortID, ns.MAC, ipaddr); err != nil {
+					slog.Error("EnsureGuestLogicalPort()", "err", err)
+					return "", err
+				}
+			}
 
 			// VLAN対応
 			if reqNic.Portgroup != nil {
@@ -669,6 +645,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			var ni api.NetworkInterface
 			ni.Networkname = reqNic.Networkname
 			ni.Networkid = api.VirtualNetworkID(vnet)
+			if networkfabric.IsACLEnforcedNetwork(&vnet) {
+				ni.InterfaceId = util.StringPtr(ns.PortID)
+			}
 
 			// ここでIP Network Idがセットされた場合、データベースにも保存する必要がある
 			if reqNic.IpNetworkId != nil {
@@ -749,6 +728,13 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		}
 		// ループの終わり
 	}
+
+	// マニフェスト指定の有無に関わらず、マネジメント専用ネットワーク(mgmt)用NICを強制的に追加する(issue #696)
+	if err := m.attachManagementNetworkInterface(&serverConfig, &virtSpec); err != nil {
+		slog.Error("attachManagementNetworkInterface()", "err", err)
+		return "", err
+	}
+
 	// サーバーのネットワーク情報を更新
 	err = m.Db.UpdateServer(api.ServerID(serverConfig), serverConfig)
 	if err != nil {

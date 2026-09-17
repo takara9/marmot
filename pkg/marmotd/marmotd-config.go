@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/util"
 )
 
 const DefaultConfigPath = "/etc/marmot/marmotd.json"
@@ -201,6 +202,26 @@ type MarmotdConfig struct {
 	// 例: [{"storageClass":"hdd","pool":"marmot-hdd"},{"storageClass":"ssd","pool":"marmot-ssd"}]
 	// 旧 map 形式はサポートしない。
 	CephPoolByClass map[string]string `json:"ceph_pool_by_class"`
+
+	// マネジメント専用ネットワーク(mgmt)上で、ゲストVMからの通信を許可する宛先の一覧(issue #696)。
+	// ここに列挙されていない宛先への通信は拒否される(ゲストVM同士の通信を含む)。
+	// 例: [{"description":"prometheus","cidr":"10.245.0.1/32","protocol":"tcp","port":9090}]
+	ManagementNetworkACLAllow []ManagementNetworkACLAllowEntry `json:"management_network_acl_allow"`
+
+	// apt-cacher-ng連携の有効/無効フラグ(issue #696)。
+	// true の場合のみ、新規作成するUbuntu/Debian系ゲストにAPTプロキシ設定
+	// (http://10.245.0.1:3142)を自動書き込みする。apt-cacher-ngが実際に到達可能な
+	// 環境(パッケージインストール済み、ACL許可リストにも登録済み)でのみ有効化すること。
+	// false（省略時）の場合、ゲストのAPT設定には一切手を加えない。
+	AptCacherNGEnabled bool `json:"apt_cacher_ng_enabled"`
+}
+
+// ManagementNetworkACLAllowEntry は mgmt ネットワーク上で許可する通信の1エントリ。
+type ManagementNetworkACLAllowEntry struct {
+	Description string `json:"description"`
+	CIDR        string `json:"cidr"`
+	Protocol    string `json:"protocol"` // "tcp" または "udp"
+	Port        int    `json:"port"`
 }
 
 func (c *MarmotdConfig) UnmarshalJSON(data []byte) error {
@@ -304,6 +325,8 @@ func defaultConfig() *MarmotdConfig {
 		CephEnabled:                       false,
 		CephCrushRuleByClass:              make(map[string]string),
 		CephPoolByClass:                   make(map[string]string),
+		ManagementNetworkACLAllow:         []ManagementNetworkACLAllowEntry{},
+		AptCacherNGEnabled:                false,
 	}
 }
 
@@ -534,6 +557,7 @@ func SetRuntimeConfig(cfg *MarmotdConfig) {
 	runtimeConfigState.mu.Unlock()
 
 	db.SetDefaultVolumeGroups(normalized.OSVolumeGroup, normalized.DataVolumeGroup)
+	util.SetAptCacherNGEnabled(normalized.AptCacherNGEnabled)
 }
 
 func CurrentConfig() *MarmotdConfig {
