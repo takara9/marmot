@@ -43,14 +43,14 @@ consolePath := strings.TrimSpace(resolveConsolePathFallback(server))
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: "response writer does not support hijacking"})
 	}
 
-		conn, _, err := hijacker.Hijack()
+	conn, _, err := hijacker.Hijack()
 	if err != nil {
 		slog.Error("ApiConsoleServerById() hijack failed", "id", id, "err", err)
 		return err
 	}
 
 	if _, err := io.WriteString(conn, "HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nConnection: close\r\n\r\n"); err != nil {
-			_ = conn.Close()
+		_ = conn.Close()
 		return err
 	}
 
