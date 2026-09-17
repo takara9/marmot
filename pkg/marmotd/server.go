@@ -577,6 +577,9 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 					slog.Error("PutDnsEntry()", "err", err)
 					return "", err
 				}
+			} else if util.OrDefault(reqNic.Dhcp4, false) || util.OrDefault(reqNic.Dhcp6, false) {
+				// dhcp4/dhcp6 が明示的に指定されている場合は、Marmot の IPAM 割当を行わず外部DHCPに委ねる(issue #697)。
+				slog.Debug("Skipping Marmot IP allocation for dhcp-requested interface", "network id", api.VirtualNetworkID(vnet), "network name", vnet.Metadata.Name)
 			} else {
 				// IPアドレスの指定が無いので、IPアドレスを割り当て
 				slog.Debug("IPアドレスの割り当て", "network id", api.VirtualNetworkID(vnet), "network name", vnet.Metadata.Name)
@@ -662,6 +665,8 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 			if bitmask > 0 {
 				ni.Netmasklen = util.IntPtrInt(bitmask)
 			}
+			ni.Dhcp4 = reqNic.Dhcp4
+			ni.Dhcp6 = reqNic.Dhcp6
 
 			ni.Routes = reqNic.Routes
 			ni.Nameservers = reqNic.Nameservers
