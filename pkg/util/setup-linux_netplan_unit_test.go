@@ -127,3 +127,32 @@ func TestCreateNetplanInterfacesHonorsDhcp6Only(t *testing.T) {
 		t.Fatalf("netplan missing dhcp6: true, got:\n%s", got)
 	}
 }
+
+func TestCreateNetplanInterfacesDefaultsDhcpWhenFlagsOmitted(t *testing.T) {
+	mountPoint := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(mountPoint, "etc", "netplan"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	requestConfig := []api.NetworkInterface{
+		{
+			Networkname: "host-bridge",
+		},
+	}
+
+	if err := CreateNetplanInterfaces(requestConfig, mountPoint); err != nil {
+		t.Fatalf("CreateNetplanInterfaces() unexpected error = %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(mountPoint, "etc", "netplan", "00-nic.yaml"))
+	if err != nil {
+		t.Fatalf("ReadFile() unexpected error = %v", err)
+	}
+	got := string(data)
+	if !strings.Contains(got, "dhcp4: true") {
+		t.Fatalf("netplan missing dhcp4: true, got:\n%s", got)
+	}
+	if !strings.Contains(got, "dhcp6: true") {
+		t.Fatalf("netplan missing dhcp6: true, got:\n%s", got)
+	}
+}
