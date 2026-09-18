@@ -65,3 +65,94 @@ func TestCreateNetplanInterfacesAcceptsValidDefaultRoute(t *testing.T) {
 		t.Fatalf("CreateNetplanInterfaces() unexpected error = %v", err)
 	}
 }
+
+func TestCreateNetplanInterfacesHonorsDhcp4Only(t *testing.T) {
+	mountPoint := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(mountPoint, "etc", "netplan"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	requestConfig := []api.NetworkInterface{
+		{
+			Networkname: "host-bridge",
+			Dhcp4:       BoolPtr(true),
+			Dhcp6:       BoolPtr(false),
+		},
+	}
+
+	if err := CreateNetplanInterfaces(requestConfig, mountPoint); err != nil {
+		t.Fatalf("CreateNetplanInterfaces() unexpected error = %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(mountPoint, "etc", "netplan", "00-nic.yaml"))
+	if err != nil {
+		t.Fatalf("ReadFile() unexpected error = %v", err)
+	}
+	got := string(data)
+	if !strings.Contains(got, "dhcp4: true") {
+		t.Fatalf("netplan missing dhcp4: true, got:\n%s", got)
+	}
+	if !strings.Contains(got, "dhcp6: false") {
+		t.Fatalf("netplan missing dhcp6: false, got:\n%s", got)
+	}
+}
+
+func TestCreateNetplanInterfacesHonorsDhcp6Only(t *testing.T) {
+	mountPoint := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(mountPoint, "etc", "netplan"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	requestConfig := []api.NetworkInterface{
+		{
+			Networkname: "host-bridge",
+			Dhcp4:       BoolPtr(false),
+			Dhcp6:       BoolPtr(true),
+		},
+	}
+
+	if err := CreateNetplanInterfaces(requestConfig, mountPoint); err != nil {
+		t.Fatalf("CreateNetplanInterfaces() unexpected error = %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(mountPoint, "etc", "netplan", "00-nic.yaml"))
+	if err != nil {
+		t.Fatalf("ReadFile() unexpected error = %v", err)
+	}
+	got := string(data)
+	if !strings.Contains(got, "dhcp4: false") {
+		t.Fatalf("netplan missing dhcp4: false, got:\n%s", got)
+	}
+	if !strings.Contains(got, "dhcp6: true") {
+		t.Fatalf("netplan missing dhcp6: true, got:\n%s", got)
+	}
+}
+
+func TestCreateNetplanInterfacesDefaultsDhcpWhenFlagsOmitted(t *testing.T) {
+	mountPoint := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(mountPoint, "etc", "netplan"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	requestConfig := []api.NetworkInterface{
+		{
+			Networkname: "host-bridge",
+		},
+	}
+
+	if err := CreateNetplanInterfaces(requestConfig, mountPoint); err != nil {
+		t.Fatalf("CreateNetplanInterfaces() unexpected error = %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(mountPoint, "etc", "netplan", "00-nic.yaml"))
+	if err != nil {
+		t.Fatalf("ReadFile() unexpected error = %v", err)
+	}
+	got := string(data)
+	if !strings.Contains(got, "dhcp4: true") {
+		t.Fatalf("netplan missing dhcp4: true, got:\n%s", got)
+	}
+	if !strings.Contains(got, "dhcp6: true") {
+		t.Fatalf("netplan missing dhcp6: true, got:\n%s", got)
+	}
+}

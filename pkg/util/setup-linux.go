@@ -563,8 +563,8 @@ func CreateNetplanInterfaces(requestConfig []api.NetworkInterface, mountPoint st
 				ethCfg.Addresses = append(ethCfg.Addresses, addr)
 			} else {
 				slog.Debug("IP address is not specified in the request, enabling DHCP", "ip address", nic.Address, "netmask length", nic.Netmasklen)
-				ethCfg.DHCP4 = true
-				ethCfg.DHCP6 = true
+				ethCfg.DHCP4 = OrDefault(nic.Dhcp4, true)
+				ethCfg.DHCP6 = OrDefault(nic.Dhcp6, true)
 			}
 
 			// ルート設定 (IPv4/IPv6共通)
