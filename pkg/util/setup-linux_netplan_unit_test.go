@@ -95,6 +95,9 @@ func TestCreateNetplanInterfacesHonorsDhcp4Only(t *testing.T) {
 	if !strings.Contains(got, "dhcp6: false") {
 		t.Fatalf("netplan missing dhcp6: false, got:\n%s", got)
 	}
+	if !strings.Contains(got, "accept-ra: false") {
+		t.Fatalf("netplan missing accept-ra: false when dhcp6 is disabled, got:\n%s", got)
+	}
 }
 
 func TestCreateNetplanInterfacesHonorsDhcp6Only(t *testing.T) {
@@ -125,6 +128,9 @@ func TestCreateNetplanInterfacesHonorsDhcp6Only(t *testing.T) {
 	}
 	if !strings.Contains(got, "dhcp6: true") {
 		t.Fatalf("netplan missing dhcp6: true, got:\n%s", got)
+	}
+	if strings.Contains(got, "accept-ra") {
+		t.Fatalf("netplan should not set accept-ra when dhcp6 is enabled, got:\n%s", got)
 	}
 }
 

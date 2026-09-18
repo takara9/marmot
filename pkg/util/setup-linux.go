@@ -491,6 +491,7 @@ type Ethernet struct {
 	Addresses   []string   `yaml:"addresses,omitempty"`
 	DHCP4       bool       `yaml:"dhcp4"`
 	DHCP6       bool       `yaml:"dhcp6"`
+	AcceptRA    *bool      `yaml:"accept-ra,omitempty"`
 	Routes      []Route    `yaml:"routes,omitempty"`
 	Nameservers Nameserver `yaml:"nameservers,omitempty"`
 }
@@ -565,6 +566,10 @@ func CreateNetplanInterfaces(requestConfig []api.NetworkInterface, mountPoint st
 				slog.Debug("IP address is not specified in the request, enabling DHCP", "ip address", nic.Address, "netmask length", nic.Netmasklen)
 				ethCfg.DHCP4 = OrDefault(nic.Dhcp4, true)
 				ethCfg.DHCP6 = OrDefault(nic.Dhcp6, true)
+				// dhcp6が無効な場合、RA経由のSLAACでIPv6アドレスが付与されないようにする
+				if !ethCfg.DHCP6 {
+					ethCfg.AcceptRA = BoolPtr(false)
+				}
 			}
 
 			// ルート設定 (IPv4/IPv6共通)
