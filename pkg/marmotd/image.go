@@ -5,9 +5,11 @@ package marmotd
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -16,6 +18,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/takara9/marmot/api"
@@ -113,7 +116,7 @@ func (m *Marmot) CreateNewImageManageWithContext(ctx context.Context, id string)
 	// イメージをダウンロードする
 	downloadCtx, downloadCancel := newTimeoutContext(ctx, CurrentConfig().ImageDownloadTimeout())
 	defer downloadCancel()
-	if err := downloadImageWithContext(downloadCtx, src, downloadPath); err != nil {
+	if err := downloadImageWithRetry(downloadCtx, src, downloadPath); err != nil {
 		slog.Error("Failed to download image", "imgId", id, "url", src, "err", err)
 		return markFailed(err)
 	}
@@ -400,6 +403,54 @@ func downloadImage(sourceURL, destPath string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), CurrentConfig().ImageDownloadTimeout())
 	defer cancel()
 	return downloadImageWithContext(ctx, sourceURL, destPath)
+}
+
+const (
+	imageDownloadRetryAttempts = 3
+	imageDownloadRetryDelay    = 5 * time.Second
+)
+
+// downloadImageWithRetry は、インストール直後などDNS解決が一時的に不安定な状況を想定し、
+// 一時的なネットワークエラー時のみ短い間隔でダウンロードを再試行する。
+func downloadImageWithRetry(ctx context.Context, sourceURL, destPath string) error {
+	var lastErr error
+	for attempt := 1; attempt <= imageDownloadRetryAttempts; attempt++ {
+		err := downloadImageWithContext(ctx, sourceURL, destPath)
+		if err == nil {
+			return nil
+		}
+		lastErr = err
+		if !isTransientDownloadError(err) || attempt == imageDownloadRetryAttempts {
+			return err
+		}
+		slog.Warn("image download transient failure; retrying", "url", sourceURL, "attempt", attempt, "maxAttempts", imageDownloadRetryAttempts, "err", err)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(imageDownloadRetryDelay):
+		}
+	}
+	return lastErr
+}
+
+// isTransientDownloadError は、DNS解決失敗やコネクション拒否/リセットなど、
+// 再試行で回復し得るネットワークエラーかどうかを判定する。
+func isTransientDownloadError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		return true
+	}
+	if errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.ECONNRESET) {
+		return true
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+	return false
 }
 
 func downloadImageWithContext(ctx context.Context, sourceURL, destPath string) error {
