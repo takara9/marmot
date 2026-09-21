@@ -91,6 +91,13 @@ fi
 systemctl enable libvirtd.service
 systemctl start libvirtd.service
 
+# libvirt が自動生成する default ネットワークは使用しないため削除する(issue #714)
+# mgmt ネットワーク1本に統一し、marmot には取り込ませない
+if command -v virsh >/dev/null 2>&1 && virsh net-info default >/dev/null 2>&1; then
+    virsh net-destroy default >/dev/null 2>&1 || true
+    virsh net-undefine default >/dev/null 2>&1 || true
+fi
+
 systemctl enable iscsid.service
 systemctl start iscsid.service
 
