@@ -113,6 +113,8 @@ const managementNetworkAptCacherPort = 3142
 
 // writeAptCacherNGProxyConfig は、ゲストOSがMarmotホスト上のapt-cacher-ngを
 // パッケージ取得プロキシとして使うようAPT設定を書き込む(issue #696)。
+// apt-cacher-ngはデフォルトでHTTPS CONNECTトンネルを拒否するため、HTTPSリポジトリ
+// (例: download.docker.com)はプロキシを経由させず直接アクセスさせる(issue #710)。
 func writeAptCacherNGProxyConfig(mountPoint string) error {
 	aptConfDir := filepath.Join(mountPoint, "etc/apt/apt.conf.d")
 	if err := os.MkdirAll(aptConfDir, 0755); err != nil {
@@ -120,7 +122,7 @@ func writeAptCacherNGProxyConfig(mountPoint string) error {
 	}
 
 	proxyFile := filepath.Join(aptConfDir, "95marmot-apt-cacher-ng")
-	content := fmt.Sprintf("Acquire::http::Proxy \"http://%s:%d\";\n", managementNetworkAptCacherAddress, managementNetworkAptCacherPort)
+	content := fmt.Sprintf("Acquire::http::Proxy \"http://%s:%d\";\nAcquire::https::Proxy \"DIRECT\";\n", managementNetworkAptCacherAddress, managementNetworkAptCacherPort)
 	if err := os.WriteFile(proxyFile, []byte(content), 0644); err != nil {
 		return fmt.Errorf("failed to write apt-cacher-ng proxy config: %w", err)
 	}
