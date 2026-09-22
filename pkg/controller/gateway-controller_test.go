@@ -308,6 +308,108 @@ func TestGatewayConfiguringWaitsForSSHReadiness(t *testing.T) {
 	}
 }
 
+func TestGatewayConfiguringResetsSSHReadinessWhenManagedServerRecreated(t *testing.T) {
+	database := newGatewayTestDatabase(t)
+
+	playbookCalls := 0
+	setupGatewayAnsibleTestHooks(t, func(playbookPath, gatewayAddress, privateKeyPath string) error {
+		playbookCalls++
+		return nil
+	})
+
+	reachable := false
+	oldProbe := isGatewaySSHReachable
+	isGatewaySSHReachable = func(string) bool { return reachable }
+	t.Cleanup(func() { isGatewaySSHReachable = oldProbe })
+
+	ctrl := &gwController{
+		db:            database,
+		marmot:        &marmotd.Marmot{NodeName: "hvc", Db: database},
+		deletionDelay: 15 * time.Second,
+	}
+
+	_ = mustCreateVirtualNetwork(t, database, "web-servers")
+	mustCreateInternalServer(t, database, "server-10", "web-servers", "172.16.10.2")
+	createdGateway := mustCreateGateway(t, database, "igw-recreate", "web-servers", "192.168.1.121")
+	gatewayID := api.GatewayID(createdGateway)
+
+	ctrl.reconcileGatewayPending(createdGateway)
+	afterPending, err := database.GetGatewayById(gatewayID)
+	if err != nil {
+		t.Fatalf("GetGatewayById() failed after pending reconcile: %v", err)
+	}
+	oldServerID := gatewayManagedServerID(afterPending)
+	if err := database.UpdateServerStatus(oldServerID, db.SERVER_RUNNING, ""); err != nil {
+		t.Fatalf("UpdateServerStatus() failed for first running transition: %v", err)
+	}
+	ctrl.reconcileGatewayProvisioning(afterPending)
+	afterProvisioning, err := database.GetGatewayById(gatewayID)
+	if err != nil {
+		t.Fatalf("GetGatewayById() failed after provisioning reconcile: %v", err)
+	}
+
+	ctrl.reconcileGatewayConfiguring(afterProvisioning)
+	afterFirstWait, err := database.GetGatewayById(gatewayID)
+	if err != nil {
+		t.Fatalf("GetGatewayById() failed after first readiness wait: %v", err)
+	}
+	if afterFirstWait.Status == nil || afterFirstWait.Status.StatusCode != db.GATEWAY_CONFIGURING {
+		t.Fatalf("gateway status after first readiness wait = %v, want %d(CONFIGURING)", afterFirstWait.Status, db.GATEWAY_CONFIGURING)
+	}
+	if _, hasSince := db.GetGatewayConfiguringSince(*afterFirstWait.Metadata.Labels); !hasSince {
+		t.Fatalf("configuringSince label was not recorded before managed server recreation")
+	}
+	if err := ctrl.updateGatewayLabels(gatewayID, func(labels map[string]interface{}) {
+		db.SetGatewayConfiguringSince(labels, time.Now().Add(-2*gatewaySSHReadinessTimeout))
+	}); err != nil {
+		t.Fatalf("updateGatewayLabels() failed to backdate configuringSince: %v", err)
+	}
+
+	if err := database.DeleteServerById(oldServerID); err != nil {
+		t.Fatalf("DeleteServerById() failed for old managed server: %v", err)
+	}
+	newServerID, err := ctrl.ensureGatewayServerEntry(afterFirstWait)
+	if err != nil {
+		t.Fatalf("ensureGatewayServerEntry() failed for replacement managed server: %v", err)
+	}
+	if newServerID == oldServerID {
+		t.Fatalf("managed server id was not replaced: old=%q new=%q", oldServerID, newServerID)
+	}
+	if err := ctrl.ensureGatewayManagedServerLabel(gatewayID, newServerID); err != nil {
+		t.Fatalf("ensureGatewayManagedServerLabel() failed for replacement managed server: %v", err)
+	}
+	afterReassign, err := database.GetGatewayById(gatewayID)
+	if err != nil {
+		t.Fatalf("GetGatewayById() failed after reassigning managed server: %v", err)
+	}
+	if afterReassign.Metadata.Labels != nil {
+		if _, hasSince := db.GetGatewayConfiguringSince(*afterReassign.Metadata.Labels); hasSince {
+			t.Fatalf("configuringSince label should stay cleared after assigning a replacement server")
+		}
+	}
+
+	if err := database.UpdateServerStatus(newServerID, db.SERVER_RUNNING, ""); err != nil {
+		t.Fatalf("UpdateServerStatus() failed for replacement running transition: %v", err)
+	}
+	ctrl.reconcileGatewayConfiguring(afterReassign)
+	afterReplacementWait, err := database.GetGatewayById(gatewayID)
+	if err != nil {
+		t.Fatalf("GetGatewayById() failed after replacement readiness wait: %v", err)
+	}
+	if afterReplacementWait.Status == nil || afterReplacementWait.Status.StatusCode != db.GATEWAY_CONFIGURING {
+		t.Fatalf("gateway status after replacement readiness wait = %v, want %d(CONFIGURING)", afterReplacementWait.Status, db.GATEWAY_CONFIGURING)
+	}
+	if playbookCalls != 0 {
+		t.Fatalf("playbookCalls = %d, want 0 while replacement SSH is not reachable", playbookCalls)
+	}
+	if got := db.GetGatewayAnsibleRetries(*afterReplacementWait.Metadata.Labels); got != 0 {
+		t.Fatalf("ansibleRetries = %d, want 0 while replacement gateway is waiting for SSH readiness", got)
+	}
+	if _, hasSince := db.GetGatewayConfiguringSince(*afterReplacementWait.Metadata.Labels); !hasSince {
+		t.Fatalf("configuringSince label was not re-recorded for the replacement server")
+	}
+}
+
 func TestGatewayControllerDeletesGatewayWhenInternalServerMissing(t *testing.T) {
 	database := newGatewayTestDatabase(t)
 	setupGatewayAnsibleTestHooks(t, func(playbookPath, gatewayAddress, privateKeyPath string) error {

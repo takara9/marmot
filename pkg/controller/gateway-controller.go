@@ -211,6 +211,9 @@ func (c *gwController) reconcileGatewayProvisioning(gateway api.Gateway) {
 	gatewayID := api.GatewayID(gateway)
 	serverID := gatewayManagedServerID(gateway)
 	if strings.TrimSpace(serverID) == "" {
+		_ = c.updateGatewayLabels(gatewayID, func(labels map[string]interface{}) {
+			db.ClearGatewayConfiguringSince(labels)
+		})
 		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_PENDING, "gateway server reference is missing")
 		return
 	}
@@ -218,6 +221,9 @@ func (c *gwController) reconcileGatewayProvisioning(gateway api.Gateway) {
 	server, err := c.db.GetServerById(serverID)
 	if err != nil {
 		if errors.Is(err, db.ErrNotFound) {
+			_ = c.updateGatewayLabels(gatewayID, func(labels map[string]interface{}) {
+				db.ClearGatewayConfiguringSince(labels)
+			})
 			_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_PENDING, "gateway server not found, recreating")
 			return
 		}
@@ -245,6 +251,9 @@ func (c *gwController) reconcileGatewayConfiguring(gateway api.Gateway) {
 	gatewayID := api.GatewayID(gateway)
 	serverID := gatewayManagedServerID(gateway)
 	if strings.TrimSpace(serverID) == "" {
+		_ = c.updateGatewayLabels(gatewayID, func(labels map[string]interface{}) {
+			db.ClearGatewayConfiguringSince(labels)
+		})
 		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_PENDING, "gateway server reference is missing")
 		return
 	}
@@ -252,6 +261,9 @@ func (c *gwController) reconcileGatewayConfiguring(gateway api.Gateway) {
 	server, err := c.db.GetServerById(serverID)
 	if err != nil {
 		if errors.Is(err, db.ErrNotFound) {
+			_ = c.updateGatewayLabels(gatewayID, func(labels map[string]interface{}) {
+				db.ClearGatewayConfiguringSince(labels)
+			})
 			_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_PENDING, "gateway server not found, recreating")
 			return
 		}
@@ -399,6 +411,7 @@ func (c *gwController) ensureGatewayManagedServerLabel(gatewayID string, serverI
 	if db.GetGatewayManagedServerID(labels) == strings.TrimSpace(serverID) {
 		return nil
 	}
+	db.ClearGatewayConfiguringSince(labels)
 	db.SetGatewayManagedServerID(labels, serverID)
 	gateway.Metadata.Labels = &labels
 	return c.db.UpdateGatewayById(gatewayID, gateway)
