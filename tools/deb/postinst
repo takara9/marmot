@@ -23,6 +23,19 @@ if [ -f "${CONFIG_FILE}" ]; then
     if [ -n "${NODE_NAME}" ]; then
         sed -i "s/\"node_name\": \"[^\"]*\"/\"node_name\": \"${NODE_NAME}\"/" "${CONFIG_FILE}"
     fi
+
+    # デフォルトルートの送信元アドレスを、このMarmotホストのIPアドレスとして採用する
+    HOST_IP="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i <= NF; i++) if ($i == "src") print $(i + 1)}' | head -n1)"
+    if [ -n "${HOST_IP}" ]; then
+        sed -i -E "s#\"api-advertise-host-bridge-address\": *\"[^\"]*\"#\"api-advertise-host-bridge-address\": \"${HOST_IP}\"#" "${CONFIG_FILE}"
+        sed -i -E "s#\"dns_listen_addr\": *\"[^\"]*\"#\"dns_listen_addr\": \"${HOST_IP}:53\"#" "${CONFIG_FILE}"
+    else
+        echo "warning: failed to detect host IP address; api-advertise-host-bridge-address/dns_listen_addr were not updated" >&2
+    fi
+
+    sed -i -E "s#\"host-bridge-ip-net-addr\": *\"[^\"]*\"#\"host-bridge-ip-net-addr\": \"192.168.1.0/24\"#" "${CONFIG_FILE}"
+    sed -i -E "s#\"host-bridge-ip-addr-start\": *\"[^\"]*\"#\"host-bridge-ip-addr-start\": \"192.168.1.200\"#" "${CONFIG_FILE}"
+    sed -i -E "s#\"host-bridge-ip-addr-end\": *\"[^\"]*\"#\"host-bridge-ip-addr-end\": \"192.168.1.250\"#" "${CONFIG_FILE}"
 fi
 
 mkdir -p "${KEY_DIR}"
