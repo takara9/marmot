@@ -47,22 +47,28 @@ var _ = Describe("KubernetesEngineControlPlaneNAT", func() {
 
 		Expect(EnsureKubernetesEngineControlPlaneNAT("203.0.113.10", "172.16.90.100", 6443)).To(Succeed())
 
-		var sawDNATCheck, sawDNATAdd, sawMasqCheck, sawMasqAdd bool
+		var sawPreroutingCheck, sawPreroutingAdd, sawOutputCheck, sawOutputAdd, sawMasqCheck, sawMasqAdd bool
 		for _, call := range iptablesCalls {
 			joined := strings.Join(call, " ")
 			switch {
 			case strings.Contains(joined, "-C") && strings.Contains(joined, "PREROUTING"):
-				sawDNATCheck = true
+				sawPreroutingCheck = true
 			case strings.Contains(joined, "-A") && strings.Contains(joined, "PREROUTING"):
-				sawDNATAdd = true
+				sawPreroutingAdd = true
+			case strings.Contains(joined, "-C") && strings.Contains(joined, "OUTPUT"):
+				sawOutputCheck = true
+			case strings.Contains(joined, "-A") && strings.Contains(joined, "OUTPUT"):
+				sawOutputAdd = true
 			case strings.Contains(joined, "-C") && strings.Contains(joined, "POSTROUTING"):
 				sawMasqCheck = true
 			case strings.Contains(joined, "-A") && strings.Contains(joined, "POSTROUTING"):
 				sawMasqAdd = true
 			}
 		}
-		Expect(sawDNATCheck).To(BeTrue())
-		Expect(sawDNATAdd).To(BeTrue())
+		Expect(sawPreroutingCheck).To(BeTrue())
+		Expect(sawPreroutingAdd).To(BeTrue())
+		Expect(sawOutputCheck).To(BeTrue())
+		Expect(sawOutputAdd).To(BeTrue())
 		Expect(sawMasqCheck).To(BeTrue())
 		Expect(sawMasqAdd).To(BeTrue())
 	})
@@ -97,7 +103,7 @@ var _ = Describe("KubernetesEngineControlPlaneNAT", func() {
 		}
 
 		Expect(RemoveKubernetesEngineControlPlaneNAT("203.0.113.10", "172.16.90.100", 6443)).To(Succeed())
-		Expect(deleteChains).To(Equal([]string{"POSTROUTING", "PREROUTING"}))
+		Expect(deleteChains).To(Equal([]string{"POSTROUTING", "OUTPUT", "PREROUTING"}))
 	})
 
 	It("skips removing rules that are already absent", func() {

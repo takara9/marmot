@@ -20,14 +20,15 @@ const (
 	VPN_GATEWAY_PROVISIONING = 4
 	VPN_GATEWAY_CONFIGURING  = 5
 
-	VpnGatewayLabelManagedServerID = "vpnGatewayServerId"
-	VpnGatewayLabelManagedBy       = "managedBy"
-	VpnGatewayLabelManagedByValue  = "vpn-gateway-controller"
-	VpnGatewayServerLabelGatewayID = "vpnGatewayId"
-	VpnGatewayServerLabelRole      = "role"
-	VpnGatewayServerLabelRoleValue = "vpn-gateway"
-	VpnGatewayLabelAnsibleRetries  = "ansibleRetries"
-	VpnGatewayLabelAppliedConfig   = "appliedConfigHash"
+	VpnGatewayLabelManagedServerID  = "vpnGatewayServerId"
+	VpnGatewayLabelManagedBy        = "managedBy"
+	VpnGatewayLabelManagedByValue   = "vpn-gateway-controller"
+	VpnGatewayServerLabelGatewayID  = "vpnGatewayId"
+	VpnGatewayServerLabelRole       = "role"
+	VpnGatewayServerLabelRoleValue  = "vpn-gateway"
+	VpnGatewayLabelAnsibleRetries   = "ansibleRetries"
+	VpnGatewayLabelAppliedConfig    = "appliedConfigHash"
+	VpnGatewayLabelConfiguringSince = "configuringSince"
 )
 
 var VpnGatewayStatus = map[int]string{
@@ -95,6 +96,37 @@ func GetVpnGatewayAppliedConfigHash(labels map[string]interface{}) string {
 		return ""
 	}
 	return strings.TrimSpace(val)
+}
+
+// SetVpnGatewayConfiguringSince は、SSH到達性待ちの開始時刻を記録する。
+// この待機はansibleRetriesを消費しないため、経過時間の判定に別途必要。
+func SetVpnGatewayConfiguringSince(labels map[string]interface{}, since time.Time) {
+	if labels == nil {
+		return
+	}
+	labels[VpnGatewayLabelConfiguringSince] = since.UTC().Format(time.RFC3339)
+}
+
+func GetVpnGatewayConfiguringSince(labels map[string]interface{}) (time.Time, bool) {
+	if labels == nil {
+		return time.Time{}, false
+	}
+	val, ok := labels[VpnGatewayLabelConfiguringSince].(string)
+	if !ok || strings.TrimSpace(val) == "" {
+		return time.Time{}, false
+	}
+	parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(val))
+	if err != nil {
+		return time.Time{}, false
+	}
+	return parsed, true
+}
+
+func ClearVpnGatewayConfiguringSince(labels map[string]interface{}) {
+	if labels == nil {
+		return
+	}
+	delete(labels, VpnGatewayLabelConfiguringSince)
 }
 
 func (d *Database) CreateVpnGateway(spec api.VpnGateway) (api.VpnGateway, error) {
