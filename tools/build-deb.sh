@@ -136,7 +136,8 @@ Depends: libvirt-daemon-system,
  open-iscsi,
  targetcli-fb,
  ansible-core,
- apt-cacher-ng
+ apt-cacher-ng,
+ ceph-common
 Section: admin
 Priority: optional
 Description: marmot - VM クラスター管理サービス
