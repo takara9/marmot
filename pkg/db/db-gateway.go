@@ -20,14 +20,15 @@ const (
 	GATEWAY_FAILED       = 4
 	GATEWAY_DELETING     = 5
 
-	GatewayLabelManagedServerID = "gatewayServerId"
-	GatewayLabelManagedBy       = "managedBy"
-	GatewayLabelManagedByValue  = "gateway-controller"
-	GatewayServerLabelGatewayID = "gatewayId"
-	GatewayServerLabelRole      = "role"
-	GatewayServerLabelRoleValue = "gateway"
-	GatewayLabelAnsibleRetries  = "ansibleRetries"
-	GatewayLabelAppliedConfig   = "appliedConfigHash"
+	GatewayLabelManagedServerID  = "gatewayServerId"
+	GatewayLabelManagedBy        = "managedBy"
+	GatewayLabelManagedByValue   = "gateway-controller"
+	GatewayServerLabelGatewayID  = "gatewayId"
+	GatewayServerLabelRole       = "role"
+	GatewayServerLabelRoleValue  = "gateway"
+	GatewayLabelAnsibleRetries   = "ansibleRetries"
+	GatewayLabelAppliedConfig    = "appliedConfigHash"
+	GatewayLabelConfiguringSince = "configuringSince"
 )
 
 var GatewayStatus = map[int]string{
@@ -95,6 +96,37 @@ func GetGatewayAppliedConfigHash(labels map[string]interface{}) string {
 		return ""
 	}
 	return strings.TrimSpace(val)
+}
+
+// SetGatewayConfiguringSince は、SSH到達性待ちの開始時刻を記録する。
+// この待機はansibleRetriesを消費しないため、経過時間の判定に別途必要。
+func SetGatewayConfiguringSince(labels map[string]interface{}, since time.Time) {
+	if labels == nil {
+		return
+	}
+	labels[GatewayLabelConfiguringSince] = since.UTC().Format(time.RFC3339)
+}
+
+func GetGatewayConfiguringSince(labels map[string]interface{}) (time.Time, bool) {
+	if labels == nil {
+		return time.Time{}, false
+	}
+	val, ok := labels[GatewayLabelConfiguringSince].(string)
+	if !ok || strings.TrimSpace(val) == "" {
+		return time.Time{}, false
+	}
+	parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(val))
+	if err != nil {
+		return time.Time{}, false
+	}
+	return parsed, true
+}
+
+func ClearGatewayConfiguringSince(labels map[string]interface{}) {
+	if labels == nil {
+		return
+	}
+	delete(labels, GatewayLabelConfiguringSince)
 }
 
 // CreateGateway stores a gateway object in etcd with a generated ID and PENDING status.

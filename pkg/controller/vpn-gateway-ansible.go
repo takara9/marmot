@@ -191,7 +191,7 @@ func runVpnGatewayPlaybookCommand(playbookPath, gatewayAddress, privateKeyPath s
 		playbookPath,
 		"--private-key", key,
 		"-u", vpnGatewayAnsibleDefaultUsername,
-		"--ssh-common-args", "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
+		"--ssh-common-args", "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5",
 	}
 	return runAnsiblePlaybookWithLogging(args, "vpn-gateway", resourceID)
 }

@@ -5,12 +5,14 @@ import (
 	"crypto/sha256"
 	_ "embed"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/marmotd"
@@ -20,6 +22,10 @@ const (
 	gatewayAnsiblePlaybookDir     = "/var/lib/marmot/ansible-playbooks"
 	gatewayAnsibleMaxRetryCount   = 3
 	gatewayAnsibleDefaultUsername = "root"
+	// gatewaySSHReadinessTimeout はVM起動待ち(SSH未応答)を許容する上限。この間はansibleRetriesを消費しない。
+	gatewaySSHReadinessTimeout = 5 * time.Minute
+	gatewaySSHProbeTimeout     = 3 * time.Second
+	gatewaySSHProbePort        = "22"
 )
 
 //go:embed gateway-playbooks/gateway-iptables.yaml.tmpl
@@ -29,7 +35,23 @@ var (
 	gatewayPlaybookDir    = gatewayAnsiblePlaybookDir
 	gatewayPrivateKeyPath = marmotd.GatewayPrivateKeyPath()
 	runGatewayPlaybook    = runGatewayPlaybookCommand
+	isGatewaySSHReachable = probeGatewaySSHReachable
 )
+
+// probeGatewaySSHReachable はSSHポートへのTCP到達性のみを確認する。
+// cloud-init完了前はConnection timed out/refusedになるため、ansible実行前のゲートとして使う。
+func probeGatewaySSHReachable(address string) bool {
+	address = strings.TrimSpace(address)
+	if address == "" {
+		return false
+	}
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort(address, gatewaySSHProbePort), gatewaySSHProbeTimeout)
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
+}
 
 type gatewayPortRule struct {
 	Protocol string
@@ -125,7 +147,7 @@ func gatewayRemoteCIDRs(spec api.GatewaySpec) []string {
 		}
 	} else if spec.RemoteCIDR != nil {
 		if trimmed := strings.TrimSpace(*spec.RemoteCIDR); trimmed != "" {
-		remoteCIDRs = append(remoteCIDRs, trimmed)
+			remoteCIDRs = append(remoteCIDRs, trimmed)
 		}
 	}
 	if len(remoteCIDRs) == 0 {
@@ -177,7 +199,7 @@ func runGatewayPlaybookCommand(playbookPath, gatewayAddress, privateKeyPath stri
 		playbookPath,
 		"--private-key", key,
 		"-u", gatewayAnsibleDefaultUsername,
-		"--ssh-common-args", "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
+		"--ssh-common-args", "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5",
 	}
 	return runAnsiblePlaybookWithLogging(args, "gateway", resourceID)
 }
