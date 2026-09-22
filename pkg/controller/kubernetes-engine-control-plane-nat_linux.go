@@ -44,10 +44,12 @@ func (r controlPlaneIPTablesRule) deleteArgs() []string {
 	return append([]string{"-t", r.table, "-D", r.chain}, r.spec...)
 }
 
-func kubernetesEngineControlPlaneDNATRule(hostBindAddress, internalIP string, port int) controlPlaneIPTablesRule {
+// chain には "PREROUTING"(他ホストからの着信用)と "OUTPUT"(marmotdホスト自身が発信する
+// ローカルトラフィック用、PREROUTINGを経由しないため別途必要)の両方を渡して使用する。
+func kubernetesEngineControlPlaneDNATRule(chain, hostBindAddress, internalIP string, port int) controlPlaneIPTablesRule {
 	return controlPlaneIPTablesRule{
 		table: "nat",
-		chain: "PREROUTING",
+		chain: chain,
 		spec: []string{
 			"-p", "tcp", "-d", hostBindAddress, "--dport", strconv.Itoa(port),
 			"-j", "DNAT", "--to-destination", fmt.Sprintf("%s:%d", internalIP, port),
@@ -117,7 +119,11 @@ func EnsureKubernetesEngineControlPlaneNAT(hostBindAddress, internalIP string, p
 	if err := controlPlaneEnableIPForward(); err != nil {
 		return err
 	}
-	if err := ensureControlPlaneIPTablesRule(kubernetesEngineControlPlaneDNATRule(hostBindAddress, internalIP, port)); err != nil {
+	if err := ensureControlPlaneIPTablesRule(kubernetesEngineControlPlaneDNATRule("PREROUTING", hostBindAddress, internalIP, port)); err != nil {
+		return err
+	}
+	// marmotdホスト自身から発信するローカルトラフィックはPREROUTINGを経由しないため、OUTPUTにも同じDNATを追加する
+	if err := ensureControlPlaneIPTablesRule(kubernetesEngineControlPlaneDNATRule("OUTPUT", hostBindAddress, internalIP, port)); err != nil {
 		return err
 	}
 	return ensureControlPlaneIPTablesRule(kubernetesEngineControlPlaneMasqueradeRule(internalIP, port))
@@ -129,5 +135,8 @@ func RemoveKubernetesEngineControlPlaneNAT(hostBindAddress, internalIP string, p
 	if err := removeControlPlaneIPTablesRule(kubernetesEngineControlPlaneMasqueradeRule(internalIP, port)); err != nil {
 		return err
 	}
-	return removeControlPlaneIPTablesRule(kubernetesEngineControlPlaneDNATRule(hostBindAddress, internalIP, port))
+	if err := removeControlPlaneIPTablesRule(kubernetesEngineControlPlaneDNATRule("OUTPUT", hostBindAddress, internalIP, port)); err != nil {
+		return err
+	}
+	return removeControlPlaneIPTablesRule(kubernetesEngineControlPlaneDNATRule("PREROUTING", hostBindAddress, internalIP, port))
 }
