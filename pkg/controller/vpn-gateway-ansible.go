@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/marmotd"
@@ -20,6 +21,10 @@ const (
 	vpnGatewayAnsiblePlaybookDir     = "/var/lib/marmot/ansible-playbooks"
 	vpnGatewayAnsibleMaxRetryCount   = 5
 	vpnGatewayAnsibleDefaultUsername = "root"
+	// vpnGatewaySSHReadinessTimeout はVM起動待ち(SSH未応答)を許容する上限。この間はansibleRetriesを消費しない。
+	vpnGatewaySSHReadinessTimeout = 5 * time.Minute
+	vpnGatewaySSHProbeTimeout     = 3 * time.Second
+	vpnGatewaySSHProbePort        = "22"
 )
 
 //go:embed gateway-playbooks/vpn-gateway-openvpn.yaml.tmpl
@@ -29,7 +34,23 @@ var (
 	vpnGatewayPlaybookDir    = vpnGatewayAnsiblePlaybookDir
 	vpnGatewayPrivateKeyPath = marmotd.GatewayPrivateKeyPath()
 	runVpnGatewayPlaybook    = runVpnGatewayPlaybookCommand
+	isVpnGatewaySSHReachable = probeVpnGatewaySSHReachable
 )
+
+// probeVpnGatewaySSHReachable はSSHポートへのTCP到達性のみを確認する。
+// cloud-init完了前はConnection refusedになるため、ansible実行前のゲートとして使う。
+func probeVpnGatewaySSHReachable(address string) bool {
+	address = strings.TrimSpace(address)
+	if address == "" {
+		return false
+	}
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort(address, vpnGatewaySSHProbePort), vpnGatewaySSHProbeTimeout)
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
+}
 
 type vpnGatewayPlaybookData struct {
 	TargetIP             string

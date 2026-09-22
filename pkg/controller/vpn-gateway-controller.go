@@ -317,6 +317,12 @@ func (c *vpnController) reconcileVpnGatewayConfiguring(vpnGateway api.VpnGateway
 		c.handleVpnGatewayConfigFailure(vpnGatewayID, err)
 		return
 	}
+
+	if !isVpnGatewaySSHReachable(targetIP) {
+		c.waitForVpnGatewaySSHReadiness(vpnGatewayID, vpnGateway, targetIP)
+		return
+	}
+
 	playbookPath := filepath.Join(vpnGatewayPlaybookDir, fmt.Sprintf("vpn-gateway-%s.yaml", vpnGatewayID))
 	if err := renderVpnGatewayPlaybook(playbookPath, targetIP, vpnGateway, internalCIDR); err != nil {
 		c.handleVpnGatewayConfigFailure(vpnGatewayID, err)
@@ -330,12 +336,34 @@ func (c *vpnController) reconcileVpnGatewayConfiguring(vpnGateway api.VpnGateway
 	configHash := desiredVpnGatewayConfigHash(vpnGateway)
 	if err := c.updateVpnGatewayLabels(vpnGatewayID, func(labels map[string]interface{}) {
 		db.SetVpnGatewayAnsibleRetries(labels, 0)
+		db.ClearVpnGatewayConfiguringSince(labels)
 		db.SetVpnGatewayAppliedConfigHash(labels, configHash)
 	}); err != nil {
 		_ = c.db.UpdateVpnGatewayStatusWithMessage(vpnGatewayID, db.VPN_GATEWAY_FAILED, err.Error())
 		return
 	}
 	_ = c.db.UpdateVpnGatewayStatusWithMessage(vpnGatewayID, db.VPN_GATEWAY_ACTIVE, "")
+}
+
+// waitForVpnGatewaySSHReadiness はVM起動直後でSSHがまだ開いていない間、ansibleRetriesを消費せずCONFIGURINGのまま待機する。
+// 待機がvpnGatewaySSHReadinessTimeoutを超えたら通常のansible失敗経路(リトライ/FAILED)へ引き継ぐ。
+func (c *vpnController) waitForVpnGatewaySSHReadiness(vpnGatewayID string, vpnGateway api.VpnGateway, targetIP string) {
+	since, hasSince := vpnGatewayConfiguringSince(vpnGateway)
+	if !hasSince {
+		if err := c.updateVpnGatewayLabels(vpnGatewayID, func(labels map[string]interface{}) {
+			db.SetVpnGatewayConfiguringSince(labels, time.Now())
+		}); err != nil {
+			_ = c.db.UpdateVpnGatewayStatusWithMessage(vpnGatewayID, db.VPN_GATEWAY_FAILED, err.Error())
+			return
+		}
+		_ = c.db.UpdateVpnGatewayStatusWithMessage(vpnGatewayID, db.VPN_GATEWAY_CONFIGURING, "vpn gateway waiting for SSH to become reachable")
+		return
+	}
+	if time.Since(since) < vpnGatewaySSHReadinessTimeout {
+		_ = c.db.UpdateVpnGatewayStatusWithMessage(vpnGatewayID, db.VPN_GATEWAY_CONFIGURING, "vpn gateway waiting for SSH to become reachable")
+		return
+	}
+	c.handleVpnGatewayConfigFailure(vpnGatewayID, fmt.Errorf("vpn gateway target %s did not become SSH reachable within %s", targetIP, vpnGatewaySSHReadinessTimeout))
 }
 
 func (c *vpnController) reconcileVpnGatewayActive(vpnGateway api.VpnGateway) {
@@ -367,6 +395,7 @@ func (c *vpnController) reconcileVpnGatewayActive(vpnGateway api.VpnGateway) {
 	if vpnGatewayAppliedConfigHash(vpnGateway) != desiredVpnGatewayConfigHash(vpnGateway) {
 		if err := c.updateVpnGatewayLabels(vpnGatewayID, func(labels map[string]interface{}) {
 			db.SetVpnGatewayAnsibleRetries(labels, 0)
+			db.ClearVpnGatewayConfiguringSince(labels)
 		}); err != nil {
 			_ = c.db.UpdateVpnGatewayStatusWithMessage(vpnGatewayID, db.VPN_GATEWAY_FAILED, err.Error())
 			return
@@ -624,6 +653,13 @@ func vpnGatewayAppliedConfigHash(vpnGateway api.VpnGateway) string {
 		return ""
 	}
 	return db.GetVpnGatewayAppliedConfigHash(*vpnGateway.Metadata.Labels)
+}
+
+func vpnGatewayConfiguringSince(vpnGateway api.VpnGateway) (time.Time, bool) {
+	if vpnGateway.Metadata.Labels == nil {
+		return time.Time{}, false
+	}
+	return db.GetVpnGatewayConfiguringSince(*vpnGateway.Metadata.Labels)
 }
 
 func vpnGatewayServerName(vpnGateway api.VpnGateway) string {
