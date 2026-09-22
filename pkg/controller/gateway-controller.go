@@ -267,6 +267,12 @@ func (c *gwController) reconcileGatewayConfiguring(gateway api.Gateway) {
 		c.handleGatewayConfigFailure(gatewayID, err)
 		return
 	}
+
+	if !isGatewaySSHReachable(gateway.Spec.BindPublicIpAddress) {
+		c.waitForGatewaySSHReadiness(gatewayID, gateway)
+		return
+	}
+
 	configHash := desiredGatewayConfigHash(gateway, targetIP)
 	playbookPath := filepath.Join(gatewayPlaybookDir, fmt.Sprintf("gateway-%s.yaml", gatewayID))
 	if err := renderGatewayPlaybook(playbookPath, targetIP, gateway.Spec.ServerPorts, gatewayRemoteCIDRs(gateway.Spec)); err != nil {
@@ -279,12 +285,34 @@ func (c *gwController) reconcileGatewayConfiguring(gateway api.Gateway) {
 	}
 	if err := c.updateGatewayLabels(gatewayID, func(labels map[string]interface{}) {
 		db.SetGatewayAnsibleRetries(labels, 0)
+		db.ClearGatewayConfiguringSince(labels)
 		db.SetGatewayAppliedConfigHash(labels, configHash)
 	}); err != nil {
 		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_FAILED, err.Error())
 		return
 	}
 	_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_ACTIVE, "")
+}
+
+// waitForGatewaySSHReadiness はVM起動直後でSSHがまだ開いていない間、ansibleRetriesを消費せずCONFIGURINGのまま待機する。
+// 待機がgatewaySSHReadinessTimeoutを超えたら通常のansible失敗経路(リトライ/FAILED)へ引き継ぐ。
+func (c *gwController) waitForGatewaySSHReadiness(gatewayID string, gateway api.Gateway) {
+	since, hasSince := gatewayConfiguringSince(gateway)
+	if !hasSince {
+		if err := c.updateGatewayLabels(gatewayID, func(labels map[string]interface{}) {
+			db.SetGatewayConfiguringSince(labels, time.Now())
+		}); err != nil {
+			_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_FAILED, err.Error())
+			return
+		}
+		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_CONFIGURING, "gateway waiting for SSH to become reachable")
+		return
+	}
+	if time.Since(since) < gatewaySSHReadinessTimeout {
+		_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_CONFIGURING, "gateway waiting for SSH to become reachable")
+		return
+	}
+	c.handleGatewayConfigFailure(gatewayID, fmt.Errorf("gateway target %s did not become SSH reachable within %s", gateway.Spec.BindPublicIpAddress, gatewaySSHReadinessTimeout))
 }
 
 func (c *gwController) reconcileGatewayActive(gateway api.Gateway) {
@@ -320,6 +348,7 @@ func (c *gwController) reconcileGatewayActive(gateway api.Gateway) {
 	if gatewayAppliedConfigHash(gateway) != desiredGatewayConfigHash(gateway, targetIP) {
 		if err := c.updateGatewayLabels(gatewayID, func(labels map[string]interface{}) {
 			db.SetGatewayAnsibleRetries(labels, 0)
+			db.ClearGatewayConfiguringSince(labels)
 		}); err != nil {
 			_ = c.db.UpdateGatewayStatusWithMessage(gatewayID, db.GATEWAY_FAILED, err.Error())
 			return
@@ -618,6 +647,13 @@ func gatewayAppliedConfigHash(gateway api.Gateway) string {
 		return ""
 	}
 	return db.GetGatewayAppliedConfigHash(*gateway.Metadata.Labels)
+}
+
+func gatewayConfiguringSince(gateway api.Gateway) (time.Time, bool) {
+	if gateway.Metadata.Labels == nil {
+		return time.Time{}, false
+	}
+	return db.GetGatewayConfiguringSince(*gateway.Metadata.Labels)
 }
 
 func gatewayServerName(gateway api.Gateway) string {
