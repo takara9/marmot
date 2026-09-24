@@ -63,17 +63,17 @@ func maybeApplyServerAnsiblePlaybook(m *client.MarmotEndpoint, server api.Server
 	if err != nil {
 		return err
 	}
-	privateKeyPath, err := resolveServerAnsiblePrivateKeyPath()
+	privateKeyPaths, err := resolveServerAnsiblePrivateKeyPaths()
 	if err != nil {
 		return err
 	}
 
-	if err := waitServerAnsiblePingReady(targetAddress, privateKeyPath, serverAnsiblePingTimeout, serverAnsiblePingPollInterval); err != nil {
+	if err := waitServerAnsiblePingReady(targetAddress, privateKeyPaths, serverAnsiblePingTimeout, serverAnsiblePingPollInterval); err != nil {
 		return err
 	}
 
 	fmt.Fprintln(os.Stderr, "playbook 適用開始.....")
-	if err := runServerAnsiblePlaybook(playbookPath, inventoryPath, privateKeyPath, server.Spec.Ansible.ExtraArgs); err != nil {
+	if err := runServerAnsiblePlaybook(playbookPath, inventoryPath, privateKeyPaths, server.Spec.Ansible.ExtraArgs); err != nil {
 		return err
 	}
 	return nil
@@ -271,36 +271,45 @@ func resolveServerAnsibleFilePath(path, field string) (string, error) {
 	return p, nil
 }
 
-func resolveServerAnsiblePrivateKeyPath() (string, error) {
+// resolveServerAnsiblePrivateKeyPaths は、Ansible疎通に使う秘密鍵の候補を返す。
+// 環境変数が設定されている場合はそれを唯一の候補として使う。
+// 未設定の場合は ~/.ssh に存在する鍵を全て候補として返し、SSH自身に
+// (IdentitiesOnly=yes の下で)有効な鍵を選ばせる。こうすることで、VM側に認可された
+// 鍵の種類(id_rsa/id_ed25519等)を mactl 側が事前に知らなくても疎通できる(issue #723)。
+func resolveServerAnsiblePrivateKeyPaths() ([]string, error) {
 	if p := strings.TrimSpace(os.Getenv(serverAnsiblePrivateKeyEnvName)); p != "" {
 		if _, err := os.Stat(p); err != nil {
-			return "", fmt.Errorf("%s points to missing key: %s", serverAnsiblePrivateKeyEnvName, p)
+			return nil, fmt.Errorf("%s points to missing key: %s", serverAnsiblePrivateKeyEnvName, p)
 		}
-		return p, nil
+		return []string{p}, nil
 	}
 
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	candidates := []string{
 		filepath.Join(home, ".ssh", "id_ed25519"),
 		filepath.Join(home, ".ssh", "id_rsa"),
 		filepath.Join(home, ".ssh", "id_ecdsa"),
 	}
+	found := make([]string, 0, len(candidates))
 	for _, candidate := range candidates {
 		if _, err := os.Stat(candidate); err == nil {
-			return candidate, nil
+			found = append(found, candidate)
 		}
 	}
-	return "", fmt.Errorf("no private key found; set %s or place key under ~/.ssh", serverAnsiblePrivateKeyEnvName)
+	if len(found) == 0 {
+		return nil, fmt.Errorf("no private key found; set %s or place key under ~/.ssh", serverAnsiblePrivateKeyEnvName)
+	}
+	return found, nil
 }
 
-func waitServerAnsiblePingReady(targetAddress, privateKeyPath string, timeout, interval time.Duration) error {
+func waitServerAnsiblePingReady(targetAddress string, privateKeyPaths []string, timeout, interval time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	var lastErr error
 	for {
-		if err := runServerAnsiblePing(targetAddress, privateKeyPath); err == nil {
+		if err := runServerAnsiblePing(targetAddress, privateKeyPaths); err == nil {
 			return nil
 		} else {
 			lastErr = err
@@ -312,15 +321,15 @@ func waitServerAnsiblePingReady(targetAddress, privateKeyPath string, timeout, i
 	}
 }
 
-func runServerAnsiblePing(targetAddress, privateKeyPath string) error {
+func runServerAnsiblePing(targetAddress string, privateKeyPaths []string) error {
 	args := []string{
 		"all",
 		"-i", targetAddress + ",",
 		"-m", "ping",
-		"--private-key", privateKeyPath,
 	}
+	args = append(args, serverAnsiblePrivateKeyCLIArgs(privateKeyPaths)...)
 	cmd := serverAnsibleExecCommand("ansible", args...)
-	cmd.Env = serverAnsibleCommandEnv()
+	cmd.Env = serverAnsibleCommandEnv(privateKeyPaths)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		trimmed := strings.TrimSpace(string(output))
@@ -332,12 +341,12 @@ func runServerAnsiblePing(targetAddress, privateKeyPath string) error {
 	return nil
 }
 
-func runServerAnsiblePlaybook(playbookPath, inventoryPath, privateKeyPath string, extraArgs *[]string) error {
+func runServerAnsiblePlaybook(playbookPath, inventoryPath string, privateKeyPaths []string, extraArgs *[]string) error {
 	args := []string{
 		"-i", inventoryPath,
 		playbookPath,
-		"--private-key", privateKeyPath,
 	}
+	args = append(args, serverAnsiblePrivateKeyCLIArgs(privateKeyPaths)...)
 	if extraArgs != nil {
 		expandedArgs, err := expandServerAnsibleExtraArgs(*extraArgs)
 		if err != nil {
@@ -346,11 +355,21 @@ func runServerAnsiblePlaybook(playbookPath, inventoryPath, privateKeyPath string
 		args = append(args, expandedArgs...)
 	}
 	cmd := serverAnsibleExecCommand("ansible-playbook", args...)
-	cmd.Env = serverAnsibleCommandEnv()
+	cmd.Env = serverAnsibleCommandEnv(privateKeyPaths)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("ansible-playbook failed: %w", err)
+	}
+	return nil
+}
+
+// serverAnsiblePrivateKeyCLIArgs は、鍵候補が1件のときだけ --private-key を使う。
+// 複数件ある場合は ansible の --private-key が単一指定しか受け付けないため、
+// serverAnsibleCommandEnv() が組み立てる ANSIBLE_SSH_ARGS の IdentityFile 群に委ねる。
+func serverAnsiblePrivateKeyCLIArgs(privateKeyPaths []string) []string {
+	if len(privateKeyPaths) == 1 {
+		return []string{"--private-key", privateKeyPaths[0]}
 	}
 	return nil
 }
@@ -442,15 +461,22 @@ func splitServerAnsibleExtraArg(value string) ([]string, error) {
 	return tokens, nil
 }
 
-func serverAnsibleCommandEnv() []string {
+func serverAnsibleCommandEnv(privateKeyPaths []string) []string {
 	env := os.Environ()
 	if _, err := os.Stat("ansible.cfg"); err == nil {
 		return env
+	}
+	sshArgs := "-o ControlMaster=auto -o ControlPersist=60s -o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes"
+	// 鍵候補が複数ある場合、--private-key は使わずここで全候補を IdentityFile として渡す。
+	if len(privateKeyPaths) > 1 {
+		for _, key := range privateKeyPaths {
+			sshArgs += " -i " + key
+		}
 	}
 	return append(env,
 		"ANSIBLE_HOST_KEY_CHECKING=False",
 		"ANSIBLE_DEPRECATION_WARNINGS=False",
 		"ANSIBLE_REMOTE_TEMP=/tmp",
-		"ANSIBLE_SSH_ARGS=-o ControlMaster=auto -o ControlPersist=60s -o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes",
+		"ANSIBLE_SSH_ARGS="+sshArgs,
 	)
 }
