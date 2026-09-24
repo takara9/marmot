@@ -296,15 +296,63 @@ func TestServerAnsibleCommandEnvWithMultipleKeys(t *testing.T) {
 	sshArgs := ""
 	for _, item := range env {
 		if strings.HasPrefix(item, "ANSIBLE_SSH_ARGS=") {
-			sshArgs = item
+			sshArgs = strings.TrimPrefix(item, "ANSIBLE_SSH_ARGS=")
 			break
 		}
 	}
-	if !strings.Contains(sshArgs, "-i /tmp/id_ed25519") || !strings.Contains(sshArgs, "-i /tmp/id_rsa") {
-		t.Fatalf("ANSIBLE_SSH_ARGS = %q, want it to contain both key candidates", sshArgs)
+
+	tokens, err := splitServerAnsibleExtraArg(sshArgs)
+	if err != nil {
+		t.Fatalf("splitServerAnsibleExtraArg() unexpected err: %v", err)
+	}
+	if !reflect.DeepEqual(tokens, []string{
+		"-o", "ControlMaster=auto",
+		"-o", "ControlPersist=60s",
+		"-o", "UserKnownHostsFile=/dev/null",
+		"-o", "IdentitiesOnly=yes",
+		"-i", "/tmp/id_ed25519",
+		"-i", "/tmp/id_rsa",
+	}) {
+		t.Fatalf("splitServerAnsibleExtraArg(%q) = %#v", sshArgs, tokens)
 	}
 	if !strings.Contains(sshArgs, "IdentitiesOnly=yes") {
 		t.Fatalf("ANSIBLE_SSH_ARGS = %q, want IdentitiesOnly=yes", sshArgs)
+	}
+}
+
+func TestServerAnsibleCommandEnvWithMultipleKeysContainingWhitespace(t *testing.T) {
+	tmp := t.TempDir()
+	cwd, _ := os.Getwd()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("Chdir() failed: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(cwd)
+	})
+
+	keyWithWhitespace := "/tmp/Test User/id_ed25519"
+	env := serverAnsibleCommandEnv([]string{keyWithWhitespace, "/tmp/id_rsa"})
+	sshArgs := ""
+	for _, item := range env {
+		if strings.HasPrefix(item, "ANSIBLE_SSH_ARGS=") {
+			sshArgs = strings.TrimPrefix(item, "ANSIBLE_SSH_ARGS=")
+			break
+		}
+	}
+
+	tokens, err := splitServerAnsibleExtraArg(sshArgs)
+	if err != nil {
+		t.Fatalf("splitServerAnsibleExtraArg() unexpected err: %v", err)
+	}
+	if !reflect.DeepEqual(tokens, []string{
+		"-o", "ControlMaster=auto",
+		"-o", "ControlPersist=60s",
+		"-o", "UserKnownHostsFile=/dev/null",
+		"-o", "IdentitiesOnly=yes",
+		"-i", keyWithWhitespace,
+		"-i", "/tmp/id_rsa",
+	}) {
+		t.Fatalf("splitServerAnsibleExtraArg(%q) = %#v", sshArgs, tokens)
 	}
 }
 

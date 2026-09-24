@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -470,7 +471,7 @@ func serverAnsibleCommandEnv(privateKeyPaths []string) []string {
 	// 鍵候補が複数ある場合、--private-key は使わずここで全候補を IdentityFile として渡す。
 	if len(privateKeyPaths) > 1 {
 		for _, key := range privateKeyPaths {
-			sshArgs += " -i " + key
+			sshArgs += " -i " + strconv.Quote(key)
 		}
 	}
 	return append(env,
