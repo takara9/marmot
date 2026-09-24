@@ -218,12 +218,46 @@ func TestResolveServerAnsiblePrivateKeyPathWithEnv(t *testing.T) {
 		t.Fatalf("Setenv() failed: %v", err)
 	}
 
-	got, err := resolveServerAnsiblePrivateKeyPath()
+	got, err := resolveServerAnsiblePrivateKeyPaths()
 	if err != nil {
-		t.Fatalf("resolveServerAnsiblePrivateKeyPath() unexpected err: %v", err)
+		t.Fatalf("resolveServerAnsiblePrivateKeyPaths() unexpected err: %v", err)
 	}
-	if got != keyPath {
-		t.Fatalf("resolveServerAnsiblePrivateKeyPath() = %q, want %q", got, keyPath)
+	if len(got) != 1 || got[0] != keyPath {
+		t.Fatalf("resolveServerAnsiblePrivateKeyPaths() = %v, want [%q]", got, keyPath)
+	}
+}
+
+// TestResolveServerAnsiblePrivateKeyPathsReturnsAllCandidates は、~/.ssh に
+// id_rsa と id_ed25519 が両方存在する場合に、両方が候補として返ることを検証する(issue #723)。
+func TestResolveServerAnsiblePrivateKeyPathsReturnsAllCandidates(t *testing.T) {
+	tmp := t.TempDir()
+	sshDir := filepath.Join(tmp, ".ssh")
+	if err := os.MkdirAll(sshDir, 0o700); err != nil {
+		t.Fatalf("MkdirAll() failed: %v", err)
+	}
+	ed25519Path := filepath.Join(sshDir, "id_ed25519")
+	rsaPath := filepath.Join(sshDir, "id_rsa")
+	if err := os.WriteFile(ed25519Path, []byte("dummy"), 0o600); err != nil {
+		t.Fatalf("WriteFile() failed: %v", err)
+	}
+	if err := os.WriteFile(rsaPath, []byte("dummy"), 0o600); err != nil {
+		t.Fatalf("WriteFile() failed: %v", err)
+	}
+
+	old := os.Getenv(serverAnsiblePrivateKeyEnvName)
+	_ = os.Unsetenv(serverAnsiblePrivateKeyEnvName)
+	t.Cleanup(func() {
+		_ = os.Setenv(serverAnsiblePrivateKeyEnvName, old)
+	})
+	t.Setenv("HOME", tmp)
+
+	got, err := resolveServerAnsiblePrivateKeyPaths()
+	if err != nil {
+		t.Fatalf("resolveServerAnsiblePrivateKeyPaths() unexpected err: %v", err)
+	}
+	want := []string{ed25519Path, rsaPath}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("resolveServerAnsiblePrivateKeyPaths() = %v, want %v", got, want)
 	}
 }
 
@@ -237,12 +271,88 @@ func TestServerAnsibleCommandEnvWithoutConfig(t *testing.T) {
 		_ = os.Chdir(cwd)
 	})
 
-	env := serverAnsibleCommandEnv()
+	env := serverAnsibleCommandEnv([]string{"/tmp/id_test"})
 	if !containsPrefix(env, "ANSIBLE_HOST_KEY_CHECKING=False") {
 		t.Fatalf("serverAnsibleCommandEnv() should include ANSIBLE_HOST_KEY_CHECKING when ansible.cfg is absent")
 	}
 	if !containsPrefix(env, "ANSIBLE_REMOTE_TEMP=/tmp") {
 		t.Fatalf("serverAnsibleCommandEnv() should include ANSIBLE_REMOTE_TEMP=/tmp when ansible.cfg is absent")
+	}
+}
+
+// TestServerAnsibleCommandEnvWithMultipleKeys は、鍵候補が複数ある場合に
+// 全候補が ANSIBLE_SSH_ARGS の IdentityFile として渡されることを検証する(issue #723)。
+func TestServerAnsibleCommandEnvWithMultipleKeys(t *testing.T) {
+	tmp := t.TempDir()
+	cwd, _ := os.Getwd()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("Chdir() failed: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(cwd)
+	})
+
+	env := serverAnsibleCommandEnv([]string{"/tmp/id_ed25519", "/tmp/id_rsa"})
+	sshArgs := ""
+	for _, item := range env {
+		if strings.HasPrefix(item, "ANSIBLE_SSH_ARGS=") {
+			sshArgs = strings.TrimPrefix(item, "ANSIBLE_SSH_ARGS=")
+			break
+		}
+	}
+
+	tokens, err := splitServerAnsibleExtraArg(sshArgs)
+	if err != nil {
+		t.Fatalf("splitServerAnsibleExtraArg() unexpected err: %v", err)
+	}
+	if !reflect.DeepEqual(tokens, []string{
+		"-o", "ControlMaster=auto",
+		"-o", "ControlPersist=60s",
+		"-o", "UserKnownHostsFile=/dev/null",
+		"-o", "IdentitiesOnly=yes",
+		"-i", "/tmp/id_ed25519",
+		"-i", "/tmp/id_rsa",
+	}) {
+		t.Fatalf("splitServerAnsibleExtraArg(%q) = %#v", sshArgs, tokens)
+	}
+	if !strings.Contains(sshArgs, "IdentitiesOnly=yes") {
+		t.Fatalf("ANSIBLE_SSH_ARGS = %q, want IdentitiesOnly=yes", sshArgs)
+	}
+}
+
+func TestServerAnsibleCommandEnvWithMultipleKeysContainingWhitespace(t *testing.T) {
+	tmp := t.TempDir()
+	cwd, _ := os.Getwd()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("Chdir() failed: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(cwd)
+	})
+
+	keyWithWhitespace := "/tmp/Test User/id_ed25519"
+	env := serverAnsibleCommandEnv([]string{keyWithWhitespace, "/tmp/id_rsa"})
+	sshArgs := ""
+	for _, item := range env {
+		if strings.HasPrefix(item, "ANSIBLE_SSH_ARGS=") {
+			sshArgs = strings.TrimPrefix(item, "ANSIBLE_SSH_ARGS=")
+			break
+		}
+	}
+
+	tokens, err := splitServerAnsibleExtraArg(sshArgs)
+	if err != nil {
+		t.Fatalf("splitServerAnsibleExtraArg() unexpected err: %v", err)
+	}
+	if !reflect.DeepEqual(tokens, []string{
+		"-o", "ControlMaster=auto",
+		"-o", "ControlPersist=60s",
+		"-o", "UserKnownHostsFile=/dev/null",
+		"-o", "IdentitiesOnly=yes",
+		"-i", keyWithWhitespace,
+		"-i", "/tmp/id_rsa",
+	}) {
+		t.Fatalf("splitServerAnsibleExtraArg(%q) = %#v", sshArgs, tokens)
 	}
 }
 
@@ -259,7 +369,7 @@ func TestServerAnsibleCommandEnvWithConfig(t *testing.T) {
 	if err := os.WriteFile("ansible.cfg", []byte("[defaults]\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile() failed: %v", err)
 	}
-	env := serverAnsibleCommandEnv()
+	env := serverAnsibleCommandEnv([]string{"/tmp/id_test"})
 	if containsPrefix(env, "ANSIBLE_HOST_KEY_CHECKING=False") {
 		t.Fatalf("serverAnsibleCommandEnv() must not inject ansible env vars when ansible.cfg exists")
 	}
@@ -391,7 +501,7 @@ func TestRunServerAnsiblePlaybookWithExtraArgs(t *testing.T) {
 	}
 
 	extraArgs := []string{"flush-cache", `tags "nginx,mysql"`, "", "   ", "--skip-tags=cache"}
-	err := runServerAnsiblePlaybook("/tmp/playbook.yaml", "/tmp/hosts", "/tmp/id_test", &extraArgs)
+	err := runServerAnsiblePlaybook("/tmp/playbook.yaml", "/tmp/hosts", []string{"/tmp/id_test"}, &extraArgs)
 	if err != nil {
 		t.Fatalf("runServerAnsiblePlaybook() unexpected err: %v", err)
 	}
@@ -413,9 +523,34 @@ func TestRunServerAnsiblePlaybookWithExtraArgs(t *testing.T) {
 	}
 }
 
+// TestRunServerAnsiblePlaybookWithMultipleKeys は、鍵候補が複数ある場合に
+// --private-key を使わず全候補を SSH に委ねることを検証する(issue #723)。
+func TestRunServerAnsiblePlaybookWithMultipleKeys(t *testing.T) {
+	original := serverAnsibleExecCommand
+	t.Cleanup(func() {
+		serverAnsibleExecCommand = original
+	})
+
+	var gotArgs []string
+	serverAnsibleExecCommand = func(name string, args ...string) *exec.Cmd {
+		gotArgs = append([]string{}, args...)
+		return exec.Command("true")
+	}
+
+	err := runServerAnsiblePlaybook("/tmp/playbook.yaml", "/tmp/hosts", []string{"/tmp/id_ed25519", "/tmp/id_rsa"}, nil)
+	if err != nil {
+		t.Fatalf("runServerAnsiblePlaybook() unexpected err: %v", err)
+	}
+
+	wantArgs := []string{"-i", "/tmp/hosts", "/tmp/playbook.yaml"}
+	if !reflect.DeepEqual(gotArgs, wantArgs) {
+		t.Fatalf("args = %#v, want %#v (no --private-key when multiple key candidates exist)", gotArgs, wantArgs)
+	}
+}
+
 func TestRunServerAnsiblePlaybookWithInvalidExtraArgs(t *testing.T) {
 	extraArgs := []string{`tags "nginx,mysql`}
-	err := runServerAnsiblePlaybook("/tmp/playbook.yaml", "/tmp/hosts", "/tmp/id_test", &extraArgs)
+	err := runServerAnsiblePlaybook("/tmp/playbook.yaml", "/tmp/hosts", []string{"/tmp/id_test"}, &extraArgs)
 	if err == nil {
 		t.Fatalf("runServerAnsiblePlaybook() expected error for invalid extra args")
 	}
@@ -438,7 +573,7 @@ func TestRunServerAnsiblePingWithoutUserOption(t *testing.T) {
 		return exec.Command("true")
 	}
 
-	err := runServerAnsiblePing("192.168.1.64", "/tmp/id_test")
+	err := runServerAnsiblePing("192.168.1.64", []string{"/tmp/id_test"})
 	if err != nil {
 		t.Fatalf("runServerAnsiblePing() unexpected err: %v", err)
 	}
