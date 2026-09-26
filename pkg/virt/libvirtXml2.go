@@ -715,16 +715,35 @@ func (l *LibVirtEp) ResumeDomain(vmname string) error {
 }
 
 // 仮想マシンの停止
+// domainShutdownTimeout / domainShutdownPollInterval は、ACPI経由の正常シャットダウン完了を
+// 待つ上限時間とポーリング間隔。CPU/Memory変更等のダウンタイムワークフローで強制電源断(Destroy)
+// を使うと、cloud-initのSSHホストキー生成等が未完了のまま失われる恐れがあるための対策。
+const domainShutdownTimeout = 60 * time.Second
+const domainShutdownPollInterval = 2 * time.Second
+
 func (l *LibVirtEp) StopDomain(vmname string) error {
 	domain, err := l.Com.LookupDomainByName(vmname)
 	if err != nil {
 		return err
 	}
 
-	// ドメインの停止
-	err = domain.Destroy()
+	state, _, err := domain.GetState()
 	if err != nil {
 		return err
+	}
+
+	if state != libvirt.DOMAIN_SHUTOFF {
+		if err := domain.Shutdown(); err != nil {
+			slog.Warn("Shutdown() failed; falling back to forced power-off", "vmname", vmname, "err", err)
+			if err := domain.Destroy(); err != nil {
+				return err
+			}
+		} else if err := waitForDomainShutoff(domain.GetState, domainShutdownTimeout, domainShutdownPollInterval); err != nil {
+			slog.Warn("graceful shutdown timed out; falling back to forced power-off", "vmname", vmname, "err", err)
+			if err := domain.Destroy(); err != nil {
+				return err
+			}
+		}
 	}
 
 	// autostart を disable に変更
@@ -734,6 +753,24 @@ func (l *LibVirtEp) StopDomain(vmname string) error {
 	}
 
 	return nil
+}
+
+// waitForDomainShutoff は getState が DOMAIN_SHUTOFF を返すまでポーリングする。
+func waitForDomainShutoff(getState func() (libvirt.DomainState, int, error), timeout, interval time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		state, _, err := getState()
+		if err != nil {
+			return err
+		}
+		if state == libvirt.DOMAIN_SHUTOFF {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("domain did not shut down within %s", timeout)
+		}
+		time.Sleep(interval)
+	}
 }
 
 // 仮想マシンの開始

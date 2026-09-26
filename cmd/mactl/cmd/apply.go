@@ -140,6 +140,19 @@ func applyServer(manifest map[string]interface{}) error {
 			return err
 		}
 
+		if serverResourceChangeRequiresDowntime(existingServer, *server) {
+			ok, confirmErr := confirmDowntimeForServerApply(existingServer.Metadata.Name)
+			if confirmErr != nil {
+				return fmt.Errorf("failed to read confirmation: %w", confirmErr)
+			}
+			if !ok {
+				return fmt.Errorf("apply canceled by user")
+			}
+		}
+
+		// マニフェスト由来の薄いNIC情報(networkname等のみ)を既存のNIC情報で置き換える(issue #726)
+		preserveExistingNetworkInterfaceOnApply(existingServer, server)
+
 		// 更新
 		api.SetServerID(server, existingId)
 		byteBody, _, err = m.UpdateServerById(existingId, *server)
@@ -181,6 +194,18 @@ func confirmDowntimeForServerApply(serverName string) (bool, error) {
 
 	answer := strings.ToLower(strings.TrimSpace(input))
 	return answer == "y" || answer == "yes", nil
+}
+
+// serverResourceChangeRequiresDowntime は、spec.cpu/spec.memory の変更により
+// サーバーの停止・再起動(ダウンタイム)が発生するかどうかを判定する。
+func serverResourceChangeRequiresDowntime(existing api.Server, desired api.Server) bool {
+	if desired.Spec.Cpu != nil && (existing.Spec.Cpu == nil || *desired.Spec.Cpu != *existing.Spec.Cpu) {
+		return true
+	}
+	if desired.Spec.Memory != nil && (existing.Spec.Memory == nil || *desired.Spec.Memory != *existing.Spec.Memory) {
+		return true
+	}
+	return false
 }
 
 func applyImage(manifest map[string]interface{}) error {
@@ -530,6 +555,16 @@ func validateServerApplyForbiddenChanges(existing api.Server, desired api.Server
 	return nil
 }
 
+// preserveExistingNetworkInterfaceOnApply は、validateServerApplyForbiddenChanges を
+// 通過した場合(=NIC自体は実質的に不変)に限り、マニフェスト由来の薄いNIC情報
+// (networkname等のみ)を既存のNIC情報(Address/Mac/mgmt NIC等)で置き換える(issue #726)。
+func preserveExistingNetworkInterfaceOnApply(existing api.Server, desired *api.Server) {
+	if desired == nil || desired.Spec.NetworkInterface == nil {
+		return
+	}
+	desired.Spec.NetworkInterface = existing.Spec.NetworkInterface
+}
+
 func networkInterfacesMatchRequested(existingPtr, desiredPtr *[]api.NetworkInterface) bool {
 	if desiredPtr == nil {
 		return true
@@ -540,12 +575,21 @@ func networkInterfacesMatchRequested(existingPtr, desiredPtr *[]api.NetworkInter
 
 	existing := *existingPtr
 	desired := *desiredPtr
-	if len(existing) != len(desired) {
-		return false
-	}
 
-	for i := range desired {
-		if !networkInterfaceMatchesRequested(existing[i], desired[i]) {
+	// mgmt など existing にのみ存在する自動付与NIC(issue #696)は比較対象にしない(issue #725)。
+	for _, d := range desired {
+		matched := false
+		for _, e := range existing {
+			if e.Networkname != d.Networkname {
+				continue
+			}
+			if !networkInterfaceMatchesRequested(e, d) {
+				return false
+			}
+			matched = true
+			break
+		}
+		if !matched {
 			return false
 		}
 	}
