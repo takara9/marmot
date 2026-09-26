@@ -594,7 +594,27 @@ func networkInterfacesMatchRequested(existingPtr, desiredPtr *[]api.NetworkInter
 		}
 	}
 
+	for _, e := range existing {
+		if isReservedAutoAttachedNetworkInterface(e) {
+			continue
+		}
+		matched := false
+		for _, d := range desired {
+			if networkInterfaceMatchesRequested(e, d) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+
 	return true
+}
+
+func isReservedAutoAttachedNetworkInterface(nic api.NetworkInterface) bool {
+	return nic.Networkname == "mgmt"
 }
 
 func networkInterfaceMatchesRequested(existing, desired api.NetworkInterface) bool {

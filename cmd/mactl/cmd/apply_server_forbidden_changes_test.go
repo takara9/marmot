@@ -122,6 +122,39 @@ func TestValidateServerApplyForbiddenChanges(t *testing.T) {
 		}
 	})
 
+	t.Run("reject cpu change when desired omits non-management NIC", func(t *testing.T) {
+		existingWithExtraNIC := existing
+		existingWithExtraNIC.Spec.NetworkInterface = &[]api.NetworkInterface{
+			{
+				Networkname: "host-bridge",
+				Networkid:   "default",
+			},
+			{
+				Networkname: "private-net",
+				Networkid:   "private-net-id",
+			},
+		}
+
+		desired := api.Server{
+			Spec: api.ServerSpec{
+				Cpu: util.IntPtrInt(4),
+				NetworkInterface: &[]api.NetworkInterface{
+					{
+						Networkname: "host-bridge",
+					},
+				},
+			},
+		}
+
+		err := validateServerApplyForbiddenChanges(existingWithExtraNIC, desired)
+		if err == nil {
+			t.Fatalf("validateServerApplyForbiddenChanges() expected error")
+		}
+		if !strings.Contains(err.Error(), "spec.networkInterface") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
 	t.Run("reject networkInterface networkname change", func(t *testing.T) {
 		existingWithNIC := existing
 		existingWithNIC.Spec.NetworkInterface = &[]api.NetworkInterface{
