@@ -5,6 +5,8 @@ import (
 	"net"
 	"net/netip"
 	"testing"
+
+	"github.com/takara9/marmot/pkg/marmotd"
 )
 
 type stubAddr struct {
@@ -180,7 +182,6 @@ func TestShouldForwardUpstream(t *testing.T) {
 	}
 }
 
-
 func TestShouldForwardUpstreamWithAllowlist(t *testing.T) {
 	allowed := []netip.Prefix{
 		netip.MustParsePrefix("192.168.1.0/24"),
@@ -271,6 +272,29 @@ func TestParseAllowedUpstreamCIDRs(t *testing.T) {
 				if got[index] != tt.want[index] {
 					t.Fatalf("prefix mismatch at %d: want=%s got=%s", index, tt.want[index], got[index])
 				}
+			}
+		})
+	}
+}
+
+func TestParseDNSUpstreamAllowCIDRs(t *testing.T) {
+	tests := []struct {
+		name        string
+		listenAddr  string
+		mgmtAllowed bool
+	}{
+		{name: "wildcard listener allows management network", listenAddr: "0.0.0.0:53", mgmtAllowed: true},
+		{name: "specific listener does not allow management network", listenAddr: "127.0.0.1:53"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			allowed, err := parseDNSUpstreamAllowCIDRs(&marmotd.MarmotdConfig{DNSListenAddr: tt.listenAddr})
+			if err != nil {
+				t.Fatalf("parseDNSUpstreamAllowCIDRs() error = %v", err)
+			}
+			addr := &net.UDPAddr{IP: net.ParseIP("10.245.0.10"), Port: 53000}
+			if got := shouldForwardUpstream(addr, allowed); got != tt.mgmtAllowed {
+				t.Fatalf("shouldForwardUpstream() = %v, want %v", got, tt.mgmtAllowed)
 			}
 		})
 	}

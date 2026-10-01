@@ -76,6 +76,27 @@ func TestEnsureManagementDNSForwarder_EmptyDNSListenAddrReturnsError(t *testing.
 	}
 }
 
+func TestIsWildcardDNSListenAddr(t *testing.T) {
+	tests := []struct {
+		addr string
+		want bool
+	}{
+		{addr: "0.0.0.0:53", want: true},
+		{addr: "[::]:53", want: true},
+		{addr: ":53", want: true},
+		{addr: "127.0.0.1:53", want: false},
+		{addr: "192.168.1.10:53", want: false},
+		{addr: "invalid", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.addr, func(t *testing.T) {
+			if got := isWildcardDNSListenAddr(tt.addr); got != tt.want {
+				t.Fatalf("isWildcardDNSListenAddr(%q) = %v, want %v", tt.addr, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestManagementNetworkNameserversFromConfig_ReturnsMgmtHostAddress(t *testing.T) {
 	ns := managementNetworkNameserversFromConfig()
 	if ns == nil || ns.Addresses == nil {

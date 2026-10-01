@@ -45,6 +45,10 @@ func EnsureManagementDNSForwarder(cfg *MarmotdConfig) error {
 	if upstream == "" {
 		return fmt.Errorf("dns_listen_addr is empty; cannot start management network dns forwarder")
 	}
+	if isWildcardDNSListenAddr(upstream) {
+		slog.Debug("management network dns is served by the wildcard internal dns listener", "upstream", upstream)
+		return nil
+	}
 
 	prefix, err := netip.ParsePrefix(ManagementNetworkHostAddress)
 	if err != nil {
@@ -60,6 +64,18 @@ func EnsureManagementDNSForwarder(cfg *MarmotdConfig) error {
 	managementDNSForwarderConn = conn
 	slog.Debug("management network dns forwarder started", "listen", listenAddr, "upstream", upstream)
 	return nil
+}
+
+func isWildcardDNSListenAddr(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+	if host == "" {
+		return true
+	}
+	ip, err := netip.ParseAddr(host)
+	return err == nil && ip.IsUnspecified()
 }
 
 // managementNetworkNameserversFromConfig は、mgmt NIC用のnameserverを返す(issue #696)。
