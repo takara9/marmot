@@ -21,6 +21,9 @@ const managementDNSForwarderTimeout = 3 * time.Second
 // managementDNSForwarderBufferSize はDNSメッセージ受信用バッファサイズ(EDNS0を考慮し4096バイト)。
 const managementDNSForwarderBufferSize = 4096
 
+// managementDNSForwarderMaxConcurrent は同時に上位DNSへ転送する問い合わせ数の上限。
+const managementDNSForwarderMaxConcurrent = 128
+
 var (
 	managementDNSForwarderMu   sync.Mutex
 	managementDNSForwarderConn net.PacketConn
@@ -98,13 +101,13 @@ func startUDPDNSForwarder(listenAddr, upstreamAddr string) (net.PacketConn, erro
 	if err != nil {
 		return nil, err
 	}
-	go runUDPDNSForwarderLoop(conn, upstreamAddr)
+	go runUDPDNSForwarderLoop(conn, upstreamAddr, make(chan struct{}, managementDNSForwarderMaxConcurrent))
 	return conn, nil
 }
 
 // runUDPDNSForwarderLoop は conn への受信を繰り返し、クエリ毎に forwardUDPDNSQuery へ委譲する。
 // conn がClose()されるなど読み取りエラー時にループを終了する。
-func runUDPDNSForwarderLoop(conn net.PacketConn, upstreamAddr string) {
+func runUDPDNSForwarderLoop(conn net.PacketConn, upstreamAddr string, semaphore chan struct{}) {
 	buf := make([]byte, managementDNSForwarderBufferSize)
 	for {
 		n, addr, err := conn.ReadFrom(buf)
@@ -113,7 +116,15 @@ func runUDPDNSForwarderLoop(conn net.PacketConn, upstreamAddr string) {
 		}
 		query := make([]byte, n)
 		copy(query, buf[:n])
-		go forwardUDPDNSQuery(conn, addr, query, upstreamAddr)
+		select {
+		case semaphore <- struct{}{}:
+			go func() {
+				defer func() { <-semaphore }()
+				forwardUDPDNSQuery(conn, addr, query, upstreamAddr)
+			}()
+		default:
+			slog.Warn("management network dns forwarder: concurrency limit reached; dropping query", "client", addr)
+		}
 	}
 }
 
