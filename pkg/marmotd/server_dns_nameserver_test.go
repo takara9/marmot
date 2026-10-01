@@ -75,3 +75,55 @@ func TestDefaultNameserversFromConfig_UsesListenAddrWhenNotWildcardOrLoopback(t 
 		}
 	}
 }
+
+func TestDefaultNameserversForNetwork(t *testing.T) {
+	orig := CurrentConfig()
+	t.Cleanup(func() {
+		SetRuntimeConfig(orig)
+	})
+
+	cfg := *orig
+	cfg.DNSListenAddr = "192.168.122.10:53"
+	cfg.DNSUpstream = "1.1.1.1:53"
+	SetRuntimeConfig(&cfg)
+
+	tests := []struct {
+		name        string
+		networkName string
+		want        []string
+	}{
+		{
+			name:        "mgmt network",
+			networkName: ManagementNetworkName,
+			want:        []string{"10.245.0.1"},
+		},
+		{
+			name:        "explicit mgmt NIC",
+			networkName: " mgmt ",
+			want:        []string{"10.245.0.1"},
+		},
+		{
+			name:        "other network",
+			networkName: "default",
+			want:        []string{"192.168.122.10", "1.1.1.1"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ns := defaultNameserversForNetwork(tc.networkName)
+			if ns == nil || ns.Addresses == nil {
+				t.Fatalf("defaultNameserversForNetwork(%q) = nil, want %v", tc.networkName, tc.want)
+			}
+			got := *ns.Addresses
+			if len(got) != len(tc.want) {
+				t.Fatalf("nameserver count = %d, want %d, got=%v", len(got), len(tc.want), got)
+			}
+			for i := range tc.want {
+				if got[i] != tc.want[i] {
+					t.Fatalf("nameserver[%d] = %q, want %q", i, got[i], tc.want[i])
+				}
+			}
+		})
+	}
+}
