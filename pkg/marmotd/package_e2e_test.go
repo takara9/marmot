@@ -122,15 +122,19 @@ func TestPostinstMigratesManagementDNSACLIdempotently(t *testing.T) {
 	if err := json.Unmarshal(configBytes, &config); err != nil {
 		t.Fatalf("Unmarshal(config) failed: %v", err)
 	}
-	if len(config.ManagementNetworkACLAllow) != 2 {
-		t.Fatalf("management_network_acl_allow has %d entries, want 2", len(config.ManagementNetworkACLAllow))
+	if len(config.ManagementNetworkACLAllow) != 3 {
+		t.Fatalf("management_network_acl_allow has %d entries, want 3", len(config.ManagementNetworkACLAllow))
 	}
 	if entry := config.ManagementNetworkACLAllow[0]; entry.Description != "apt-cacher-ng" || entry.Port != 3142 {
 		t.Fatalf("existing ACL was not preserved: %+v", entry)
 	}
-	entry := config.ManagementNetworkACLAllow[1]
-	if entry.Description != "dns" || entry.CIDR != "10.245.0.1/32" || entry.Protocol != "udp" || entry.Port != 53 {
-		t.Fatalf("migrated DNS ACL = %+v", entry)
+	proxyEntry := config.ManagementNetworkACLAllow[1]
+	if proxyEntry.Description != "apt-cacher-ng" || proxyEntry.CIDR != "10.245.0.1/32" || proxyEntry.Protocol != "tcp" || proxyEntry.Port != 3142 {
+		t.Fatalf("migrated APT proxy ACL = %+v", proxyEntry)
+	}
+	dnsEntry := config.ManagementNetworkACLAllow[2]
+	if dnsEntry.Description != "dns" || dnsEntry.CIDR != "10.245.0.1/32" || dnsEntry.Protocol != "udp" || dnsEntry.Port != 53 {
+		t.Fatalf("migrated DNS ACL = %+v", dnsEntry)
 	}
 }
 

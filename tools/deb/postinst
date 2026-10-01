@@ -34,22 +34,33 @@ allow_entries = config.setdefault("management_network_acl_allow", [])
 if not isinstance(allow_entries, list):
     raise ValueError("management_network_acl_allow must be a list")
 
-has_dns_allow = any(
-    isinstance(entry, dict)
-    and entry.get("cidr") == "10.245.0.1/32"
-    and str(entry.get("protocol", "")).lower() == "udp"
-    and entry.get("port") == 53
-    for entry in allow_entries
-)
-if not has_dns_allow:
-    allow_entries.append(
-        {
-            "description": "dns",
-            "cidr": "10.245.0.1/32",
-            "protocol": "udp",
-            "port": 53,
-        }
-    )
+required_rules = [
+    {
+        "description": "apt-cacher-ng",
+        "cidr": "10.245.0.1/32",
+        "protocol": "tcp",
+        "port": 3142,
+    },
+    {
+        "description": "dns",
+        "cidr": "10.245.0.1/32",
+        "protocol": "udp",
+        "port": 53,
+    },
+]
+changed = False
+for rule in required_rules:
+    if not any(
+        isinstance(entry, dict)
+        and entry.get("cidr") == rule["cidr"]
+        and str(entry.get("protocol", "")).lower() == rule["protocol"]
+        and entry.get("port") == rule["port"]
+        for entry in allow_entries
+    ):
+        allow_entries.append(rule)
+        changed = True
+
+if changed:
     mode = stat.S_IMODE(os.stat(config_path).st_mode)
     temp_path = None
     try:
