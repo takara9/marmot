@@ -280,7 +280,8 @@ func (m *Marmot) attachManagementNetworkInterface(serverConfig *api.Server, virt
 		ni.Nameservers = ipnet.Nameservers
 	}
 	if ni.Nameservers == nil {
-		ni.Nameservers = defaultNameserversFromConfig()
+		// mgmtネットワーク専用DNSフォワーダー(10.245.0.1)を問い合わせ先とする(issue #696)。
+		ni.Nameservers = managementNetworkNameserversFromConfig()
 	}
 
 	if serverConfig.Spec.NetworkInterface == nil {
