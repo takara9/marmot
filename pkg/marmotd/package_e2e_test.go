@@ -1,6 +1,7 @@
 package marmotd
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -74,6 +75,62 @@ func TestDebPackageIncludesGatewayAssets(t *testing.T) {
 		if !strings.Contains(postinst, want) {
 			t.Fatalf("postinst missing %q\n%s", want, postinst)
 		}
+	}
+}
+
+func TestPostinstMigratesManagementDNSACLIdempotently(t *testing.T) {
+	python, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("python3 command not found")
+	}
+	repoRoot := findRepoRootForTest(t)
+	postinst, err := os.ReadFile(filepath.Join(repoRoot, "tools", "deb", "postinst"))
+	if err != nil {
+		t.Fatalf("ReadFile(postinst) failed: %v", err)
+	}
+	const startMarker = "python3 - \"${CONFIG_FILE}\" <<'PY'\n"
+	start := strings.Index(string(postinst), startMarker)
+	if start < 0 {
+		t.Fatal("postinst management DNS ACL migration not found")
+	}
+	start += len(startMarker)
+	end := strings.Index(string(postinst[start:]), "\nPY\n")
+	if end < 0 {
+		t.Fatal("postinst management DNS ACL migration terminator not found")
+	}
+	migration := string(postinst[start : start+end])
+
+	configPath := filepath.Join(t.TempDir(), "marmotd.json")
+	configContents := `{"management_network_acl_allow":[{"description":"apt-cacher-ng","cidr":"10.245.0.1/32","protocol":"tcp","port":3142}]}`
+	if err := os.WriteFile(configPath, []byte(configContents), 0600); err != nil {
+		t.Fatalf("WriteFile(config) failed: %v", err)
+	}
+	for range 2 {
+		cmd := exec.Command(python, "-c", migration, configPath)
+		if output, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("run postinst migration failed: %v\n%s", err, output)
+		}
+	}
+
+	configBytes, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("ReadFile(config) failed: %v", err)
+	}
+	var config struct {
+		ManagementNetworkACLAllow []ManagementNetworkACLAllowEntry `json:"management_network_acl_allow"`
+	}
+	if err := json.Unmarshal(configBytes, &config); err != nil {
+		t.Fatalf("Unmarshal(config) failed: %v", err)
+	}
+	if len(config.ManagementNetworkACLAllow) != 2 {
+		t.Fatalf("management_network_acl_allow has %d entries, want 2", len(config.ManagementNetworkACLAllow))
+	}
+	if entry := config.ManagementNetworkACLAllow[0]; entry.Description != "apt-cacher-ng" || entry.Port != 3142 {
+		t.Fatalf("existing ACL was not preserved: %+v", entry)
+	}
+	entry := config.ManagementNetworkACLAllow[1]
+	if entry.Description != "dns" || entry.CIDR != "10.245.0.1/32" || entry.Protocol != "udp" || entry.Port != 53 {
+		t.Fatalf("migrated DNS ACL = %+v", entry)
 	}
 }
 
