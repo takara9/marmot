@@ -108,7 +108,7 @@ func forwardUDPDNSQuery(conn net.PacketConn, clientAddr net.Addr, query []byte, 
 		slog.Error("management network dns forwarder: failed to dial upstream", "upstream", upstreamAddr, "err", err)
 		return
 	}
-	defer upstreamConn.Close()
+	defer func() { _ = upstreamConn.Close() }()
 
 	if err := upstreamConn.SetDeadline(time.Now().Add(managementDNSForwarderTimeout)); err != nil {
 		slog.Error("management network dns forwarder: failed to set deadline", "err", err)

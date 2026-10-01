@@ -26,7 +26,7 @@ func startUDPEchoUpstreamForTest(t *testing.T, response []byte) (addr string, cl
 			}
 		}
 	}()
-	return conn.LocalAddr().String(), func() { conn.Close() }
+	return conn.LocalAddr().String(), func() { _ = conn.Close() }
 }
 
 func TestStartUDPDNSForwarder_RelaysQueryAndResponse(t *testing.T) {
@@ -38,13 +38,13 @@ func TestStartUDPDNSForwarder_RelaysQueryAndResponse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("startUDPDNSForwarder() error = %v", err)
 	}
-	defer forwarderConn.Close()
+	defer func() { _ = forwarderConn.Close() }()
 
 	client, err := net.Dial("udp", forwarderConn.LocalAddr().String())
 	if err != nil {
 		t.Fatalf("failed to dial forwarder: %v", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	if _, err := client.Write([]byte("fake-dns-query")); err != nil {
 		t.Fatalf("failed to send query: %v", err)
