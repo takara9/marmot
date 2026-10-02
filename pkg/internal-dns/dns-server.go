@@ -10,7 +10,6 @@ import (
 	"net"
 	"net/netip"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/miekg/dns"
@@ -22,7 +21,6 @@ var errInvalidDNSRecordIP = errors.New("invalid IP address in DNS record")
 
 type controller struct {
 	db       *db.Database
-	mu       sync.Mutex
 	marmot   *marmotd.Marmot
 	server   *dns.Server // サーバーインスタンスを保持
 	etcdUrl  string
