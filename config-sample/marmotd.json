@@ -65,6 +65,12 @@
         "cidr": "10.245.0.1/32",
         "protocol": "tcp",
         "port": 3142
+      },
+      {
+        "description": "dns",
+        "cidr": "10.245.0.1/32",
+        "protocol": "udp",
+        "port": 53
       }
     ],
     "apt_cacher_ng_enabled": true

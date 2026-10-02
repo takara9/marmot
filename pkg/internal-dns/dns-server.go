@@ -10,7 +10,6 @@ import (
 	"net"
 	"net/netip"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/miekg/dns"
@@ -21,13 +20,12 @@ import (
 var errInvalidDNSRecordIP = errors.New("invalid IP address in DNS record")
 
 type controller struct {
-	db       *db.Database
-	mu       sync.Mutex
-	marmot   *marmotd.Marmot
-	server   *dns.Server // サーバーインスタンスを保持
-	etcdUrl  string
-	client   *dns.Client
-	Upstream string // 外部DNSサーバーのアドレス (例: "
+	db                   *db.Database
+	marmot               *marmotd.Marmot
+	server               *dns.Server // サーバーインスタンスを保持
+	etcdUrl              string
+	client               *dns.Client
+	Upstream             string // 外部DNSサーバーのアドレス (例: "
 	allowedUpstreamCIDRs []netip.Prefix
 }
 
@@ -42,7 +40,7 @@ func StartInternalDNSServer(ctx context.Context, node string, etcdUrl string, cf
 		}
 	}
 
-	allowedUpstreamCIDRs, err := parseAllowedUpstreamCIDRs(cfg.DNSUpstreamAllowCIDRs)
+	allowedUpstreamCIDRs, err := parseDNSUpstreamAllowCIDRs(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("parse dns upstream allowlist: %w", err)
 	}
@@ -54,11 +52,11 @@ func StartInternalDNSServer(ctx context.Context, node string, etcdUrl string, cf
 	}
 
 	c := &controller{
-		marmot:   m,
-		db:       m.Db,
-		etcdUrl:  etcdUrl,
-		Upstream: cfg.DNSUpstream,
-		client:   &dns.Client{Timeout: 5 * time.Second},
+		marmot:               m,
+		db:                   m.Db,
+		etcdUrl:              etcdUrl,
+		Upstream:             cfg.DNSUpstream,
+		client:               &dns.Client{Timeout: 5 * time.Second},
 		allowedUpstreamCIDRs: allowedUpstreamCIDRs,
 	}
 
@@ -91,6 +89,26 @@ func StartInternalDNSServer(ctx context.Context, node string, etcdUrl string, cf
 	}()
 
 	return c, nil
+}
+
+func parseDNSUpstreamAllowCIDRs(cfg *marmotd.MarmotdConfig) ([]netip.Prefix, error) {
+	cidrs := append([]string(nil), cfg.DNSUpstreamAllowCIDRs...)
+	if isWildcardDNSListenAddr(cfg.DNSListenAddr) {
+		cidrs = append(cidrs, marmotd.ManagementNetworkCIDR)
+	}
+	return parseAllowedUpstreamCIDRs(cidrs)
+}
+
+func isWildcardDNSListenAddr(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+	if host == "" {
+		return true
+	}
+	ip, err := netip.ParseAddr(host)
+	return err == nil && ip.IsUnspecified()
 }
 
 func (c *controller) startServer() error {

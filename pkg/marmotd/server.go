@@ -680,7 +680,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 				applyHostBridgeDefaultsFromConfig(&ni)
 			}
 			if ni.Nameservers == nil {
-				ni.Nameservers = defaultNameserversFromConfig()
+				ni.Nameservers = defaultNameserversForNetwork(reqNic.Networkname)
 			}
 
 			debugPrintln("=== ネットワークインターフェースの情報確認 ===", "network interface", "ipaddr", ipaddr, "bitmask", bitmask)
@@ -1247,6 +1247,7 @@ func defaultNameserversFromConfig() *api.Nameservers {
 	} else if primary := util.NameserverForDNSListenAddr(cfg.DNSListenAddr); primary != "" {
 		addrs = appendUniqueAddress(addrs, primary)
 	}
+
 	if upstream := util.NameserverForDNSListenAddr(cfg.DNSUpstream); upstream != "" {
 		addrs = appendUniqueAddress(addrs, upstream)
 	}
@@ -1254,6 +1255,13 @@ func defaultNameserversFromConfig() *api.Nameservers {
 		return nil
 	}
 	return &api.Nameservers{Addresses: &addrs}
+}
+
+func defaultNameserversForNetwork(networkName string) *api.Nameservers {
+	if strings.TrimSpace(networkName) == ManagementNetworkName {
+		return managementNetworkNameserversFromConfig()
+	}
+	return defaultNameserversFromConfig()
 }
 
 func shouldUsePublicFallbackNameserver(dnsListenAddr string) bool {

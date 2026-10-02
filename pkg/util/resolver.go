@@ -1,110 +1,9 @@
 package util
 
 import (
-	"fmt"
-	"log/slog"
 	"net"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 )
-
-const marmotResolvConfTemplate = "# generate by marmotd\nnameserver %s\noptions edns0 trust-ad\nsearch host-bridge\n"
-
-const (
-	resolvConfPath             = "/etc/resolv.conf"
-	marmotResolvConfBackupFile = "resolv.conf.marmot.bak"
-)
-
-// SetupLocalResolver disables systemd-resolved and rewrites /etc/resolv.conf for marmot internal DNS.
-// If /etc/resolv.conf already has a nameserver entry that matches the IP derived from dnsListenAddr,
-// it skips the rewrite entirely.
-func SetupLocalResolver(dnsListenAddr string) error {
-	nameserver := nameserverForDNSListenAddr(dnsListenAddr)
-
-	if current, err := currentNameserverInResolvConf(); err == nil && current == nameserver {
-		slog.Debug("resolv.conf nameserver already matches dns_listen_addr; skipping rewrite", "nameserver", nameserver)
-		return nil
-	}
-
-	resolvConfContent := fmt.Sprintf(marmotResolvConfTemplate, nameserver)
-	backupPath := filepath.Join(filepath.Dir(resolvConfPath), marmotResolvConfBackupFile)
-	if err := backupResolvConfIfNeeded(resolvConfPath, backupPath); err != nil {
-		return err
-	}
-
-	if err := runSystemctlResolved("stop"); err != nil {
-		return err
-	}
-	if err := runSystemctlResolved("disable"); err != nil {
-		return err
-	}
-	if err := os.Remove(resolvConfPath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("remove %s: %w", resolvConfPath, err)
-	}
-	if err := os.WriteFile(resolvConfPath, []byte(resolvConfContent), 0644); err != nil {
-		return fmt.Errorf("write %s: %w", resolvConfPath, err)
-	}
-	return nil
-}
-
-func backupResolvConfIfNeeded(sourcePath, backupPath string) error {
-	if _, err := os.Stat(backupPath); err == nil {
-		return nil
-	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("stat %s: %w", backupPath, err)
-	}
-
-	content, err := os.ReadFile(sourcePath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return fmt.Errorf("read %s for backup: %w", sourcePath, err)
-	}
-
-	f, err := os.OpenFile(backupPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
-	if err != nil {
-		if os.IsExist(err) {
-			return nil
-		}
-		return fmt.Errorf("create backup %s: %w", backupPath, err)
-	}
-	defer func() {
-		_ = f.Close()
-	}()
-
-	if _, err := f.Write(content); err != nil {
-		return fmt.Errorf("write backup %s: %w", backupPath, err)
-	}
-
-	slog.Info("resolv.conf backup created", "path", backupPath)
-	return nil
-}
-
-// currentNameserverInResolvConf returns the first nameserver IP found in /etc/resolv.conf.
-func currentNameserverInResolvConf() (string, error) {
-	data, err := os.ReadFile(resolvConfPath)
-	if err != nil {
-		return "", err
-	}
-	return parseNameserverFromResolvConf(string(data))
-}
-
-// parseNameserverFromResolvConf extracts the first nameserver IP from resolv.conf content.
-func parseNameserverFromResolvConf(content string) (string, error) {
-	for _, line := range strings.Split(content, "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "nameserver") {
-			fields := strings.Fields(line)
-			if len(fields) >= 2 {
-				return fields[1], nil
-			}
-		}
-	}
-	return "", fmt.Errorf("no nameserver entry found in /etc/resolv.conf")
-}
 
 // NameserverForDNSListenAddr extracts the nameserver IP from a dns_listen_addr string (host:port).
 // "0.0.0.0" and "" are normalized to "127.0.0.1".
@@ -128,21 +27,4 @@ func nameserverForDNSListenAddr(dnsListenAddr string) string {
 	default:
 		return host
 	}
-}
-
-func runSystemctlResolved(action string) error {
-	cmd := exec.Command("systemctl", action, "systemd-resolved.service")
-	output, err := cmd.CombinedOutput()
-	if err == nil {
-		return nil
-	}
-
-	msg := string(output)
-	if strings.Contains(msg, "Unit systemd-resolved.service could not be found") ||
-		strings.Contains(msg, "Loaded: not-found") {
-		slog.Warn("systemd-resolved.service is not installed; continue", "action", action)
-		return nil
-	}
-
-	return fmt.Errorf("%s systemd-resolved.service: %w: %s", action, err, strings.TrimSpace(msg))
 }

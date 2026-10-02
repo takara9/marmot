@@ -911,6 +911,11 @@ func (c *networkController) ensureOverlayMeshForNetwork(fabric networkfabric.Net
 				if err := ovnFabric.EnsureHostPresencePort(&vnet, marmotd.ManagementNetworkHostAddress); err != nil {
 					return fmt.Errorf("ensure management network host presence failed: %w", err)
 				}
+				// mgmt-hostポートの準備完了後にDNSフォワーダーを起動する(issue #696)。
+				// bind失敗時は次回の定期ループで再試行するため、ここではログのみで継続する。
+				if err := marmotd.EnsureManagementDNSForwarder(marmotd.CurrentConfig()); err != nil {
+					slog.Warn("failed to start management network dns forwarder; will retry next loop", "err", err)
+				}
 			}
 		}
 	}

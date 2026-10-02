@@ -19,6 +19,64 @@ if [ -f "${LEGACY_CONFIG_FILE}" ]; then
 fi
 
 if [ -f "${CONFIG_FILE}" ]; then
+    python3 - "${CONFIG_FILE}" <<'PY'
+import json
+import os
+import stat
+import sys
+import tempfile
+
+config_path = sys.argv[1]
+with open(config_path, encoding="utf-8") as config_file:
+    config = json.load(config_file)
+
+allow_entries = config.setdefault("management_network_acl_allow", [])
+if not isinstance(allow_entries, list):
+    raise ValueError("management_network_acl_allow must be a list")
+
+required_rules = [
+    {
+        "description": "apt-cacher-ng",
+        "cidr": "10.245.0.1/32",
+        "protocol": "tcp",
+        "port": 3142,
+    },
+    {
+        "description": "dns",
+        "cidr": "10.245.0.1/32",
+        "protocol": "udp",
+        "port": 53,
+    },
+]
+changed = False
+for rule in required_rules:
+    if not any(
+        isinstance(entry, dict)
+        and entry.get("cidr") == rule["cidr"]
+        and str(entry.get("protocol", "")).lower() == rule["protocol"]
+        and entry.get("port") == rule["port"]
+        for entry in allow_entries
+    ):
+        allow_entries.append(rule)
+        changed = True
+
+if changed:
+    mode = stat.S_IMODE(os.stat(config_path).st_mode)
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=os.path.dirname(config_path), delete=False
+        ) as temp_file:
+            temp_path = temp_file.name
+            json.dump(config, temp_file, indent=2)
+            temp_file.write("\n")
+        os.chmod(temp_path, mode)
+        os.replace(temp_path, config_path)
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            os.unlink(temp_path)
+PY
+
     NODE_NAME="$(hostname)"
     if [ -n "${NODE_NAME}" ]; then
         sed -i "s/\"node_name\": \"[^\"]*\"/\"node_name\": \"${NODE_NAME}\"/" "${CONFIG_FILE}"
