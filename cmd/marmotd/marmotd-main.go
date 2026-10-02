@@ -192,12 +192,6 @@ func main() {
 		return
 	}
 
-	// ローカルリゾルバーの初期化（内部DNSの起動成功後に切り替える）
-	if err := util.SetupLocalResolver(cfg.DNSListenAddr); err != nil {
-		slog.Error("Failed to setup local resolver", "err", err)
-		return
-	}
-
 	// Provision OS images from configuration
 	if err := marmotd.ProvisionOSImages(Server.Ma, cfg.OSImages); err != nil {
 		slog.Warn("OS image provisioning encountered an error", "err", err)
