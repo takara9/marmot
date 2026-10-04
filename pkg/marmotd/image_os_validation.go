@@ -31,7 +31,7 @@ func validateImageOSSpec(spec *api.ImageSpec) error {
 
 	canonical := canonicalOSName(osName)
 	if canonical == "" {
-		return fmt.Errorf("invalid spec.osName: %q (allowed: alpine, ubuntu, rockey, debian)", osName)
+		return fmt.Errorf("invalid spec.osName: %q (allowed: alpine, ubuntu, rocky, rockey, debian)", osName)
 	}
 
 	allowedVersions := map[string]map[string]struct{}{
@@ -43,7 +43,8 @@ func validateImageOSSpec(spec *api.ImageSpec) error {
 			"24.04": {},
 			"26.04": {},
 		},
-		"rockey": {
+		// rockey は rocky の正式化前の旧表記(互換維持のため canonicalOSName で rocky へ正規化する)。
+		"rocky": {
 			"8": {},
 			"9": {},
 		},
@@ -65,8 +66,9 @@ func canonicalOSName(name string) string {
 		return "alpine"
 	case "ubuntu":
 		return "ubuntu"
-	case "rockey":
-		return "rockey"
+	case "rocky", "rockey":
+		// rockey は既存データとの互換のために受け付ける rocky の旧表記。
+		return "rocky"
 	case "debian":
 		return "debian"
 	default:

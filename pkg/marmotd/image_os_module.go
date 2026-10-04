@@ -73,6 +73,7 @@ var (
 	imageOSModuleUbuntu2404 = commonImageOSModule{moduleKey: "ubuntu24.04"}
 	imageOSModuleUbuntu     = commonImageOSModule{moduleKey: "ubuntu"}
 	imageOSModuleAlpine323  = commonImageOSModule{moduleKey: "alpine3.23", customizeHandler: customizeAlpineQcowImageWithContext}
+	imageOSModuleRocky9     = commonImageOSModule{moduleKey: "rocky9", customizeHandler: customizeRockyQcowImageWithContext}
 )
 
 func resolveImageOSModuleFromImage(img api.Image) (imageOSModule, error) {
@@ -84,6 +85,11 @@ func resolveImageOSModuleFromImage(img api.Image) (imageOSModule, error) {
 func resolveImageOSModuleFromSpec(osName, osVersion string) (imageOSModule, error) {
 	name := strings.ToLower(strings.TrimSpace(osName))
 	version := strings.TrimSpace(osVersion)
+
+	// rockey は rocky の旧表記。既存データとの互換のためエイリアスとして扱う。
+	if name == "rockey" {
+		name = "rocky"
+	}
 
 	switch name {
 	case "ubuntu":
@@ -100,6 +106,11 @@ func resolveImageOSModuleFromSpec(osName, osVersion string) (imageOSModule, erro
 			return imageOSModuleAlpine323, nil
 		}
 		return nil, fmt.Errorf("unsupported alpine image module version: %s", version)
+	case "rocky":
+		if version == "9" {
+			return imageOSModuleRocky9, nil
+		}
+		return nil, fmt.Errorf("unsupported rocky image module version: %s", version)
 	case "":
 		return imageOSModuleUbuntu2204, nil
 	default:

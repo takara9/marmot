@@ -20,6 +20,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/takara9/marmot/api"
 	"go.yaml.in/yaml/v3"
 )
@@ -68,6 +69,42 @@ func SetupAlpineLinux(spec api.Server) error {
 
 	if err := CreateAlpineInterfaces(*spec.Spec.NetworkInterface, mountPoint); err != nil {
 		slog.Error("CreateAlpineInterfaces failed", "error", err)
+		return err
+	}
+
+	return nil
+}
+
+// SetupRockyLinux は Rocky Linux のブートボリュームを初期化する。
+// ネットワーク設定は NetworkManager の keyfile 形式で書き込む(Rocky 9 は
+// NetworkManager が既定のネットワークマネージャのため、Ubuntu の netplan、
+// Alpine の /etc/network/interfaces に相当する)。
+func SetupRockyLinux(spec api.Server) error {
+	if spec.Spec.BootVolume == nil {
+		return fmt.Errorf("BootVolume is nil")
+	}
+
+	mountPoint, nbdDev, err := MountVolume(*spec.Spec.BootVolume)
+	if err != nil {
+		slog.Error("MountVolume failed", "error", err)
+		return err
+	}
+	defer func() {
+		_ = UnMountVolume(*spec.Spec.BootVolume, mountPoint, nbdDev)
+	}()
+
+	if err := setupMountedIdentity(spec, mountPoint); err != nil {
+		return err
+	}
+
+	// mgmtネットワークが常に強制付与されるため、通常ここでnilになることは無い(issue #696)。
+	// defaultネットワークへの自動フォールバックは廃止したため、念のため空スライスにする。
+	if spec.Spec.NetworkInterface == nil {
+		spec.Spec.NetworkInterface = &[]api.NetworkInterface{}
+	}
+
+	if err := CreateNetworkManagerKeyfiles(*spec.Spec.NetworkInterface, mountPoint); err != nil {
+		slog.Error("CreateNetworkManagerKeyfiles failed", "error", err)
 		return err
 	}
 
@@ -667,6 +704,192 @@ func validateNetplanRoute(nic api.NetworkInterface, route Route, ifaceName strin
 	}
 
 	return nil
+}
+
+// CreateNetworkManagerKeyfiles は Rocky Linux (NetworkManager) 向けの NIC 設定を
+// keyfile 形式(/etc/NetworkManager/system-connections/*.nmconnection)で書き出す。
+// NIC名の割り当てや静的アドレス指定時の挙動は CreateNetplanInterfaces と揃える。
+func CreateNetworkManagerKeyfiles(requestConfig []api.NetworkInterface, mountPoint string) error {
+	nicName := []string{"enp1s0", "enp2s0", "enp7s0", "enp8s0", "enp9s0", "enp10s0"}
+
+	connDir := filepath.Join(mountPoint, "etc", "NetworkManager", "system-connections")
+	if err := os.MkdirAll(connDir, 0755); err != nil {
+		return fmt.Errorf("failed to create NetworkManager system-connections directory: %w", err)
+	}
+
+	// ネットワーク設定がない場合は、デフォルトネットワークにつないで、DHCPでIPアドレスを取得する設定にする
+	if len(requestConfig) == 0 {
+		return writeNMConnectionFile(connDir, nicName[0], nmConnectionConfig{dhcp4: true, dhcp6: true})
+	}
+
+	for idx, nic := range requestConfig {
+		ifaceName := nicName[idx]
+		cfg := nmConnectionConfig{}
+
+		// IPアドレスとネットマスク長があれば、DHCPは無効にする(CreateNetplanInterfacesと同様)
+		if nic.Address != nil && nic.Netmasklen != nil {
+			cfg.address = fmt.Sprintf("%s/%d", *nic.Address, *nic.Netmasklen)
+			cfg.addressIsIPv6 = checkIPVersion(strings.TrimSpace(*nic.Address)) == "IPv6"
+		} else {
+			cfg.dhcp4 = OrDefault(nic.Dhcp4, true)
+			cfg.dhcp6 = OrDefault(nic.Dhcp6, true)
+		}
+
+		if nic.Routes != nil {
+			for _, r := range *nic.Routes {
+				if r.To == nil || r.Via == nil {
+					return fmt.Errorf("route requires both to and via on interface %s", ifaceName)
+				}
+				route := Route{To: *r.To, Via: *r.Via}
+				if err := validateNetplanRoute(nic, route, ifaceName); err != nil {
+					return err
+				}
+				cfg.routes = append(cfg.routes, route)
+			}
+		}
+
+		if nic.Nameservers != nil {
+			if nic.Nameservers.Addresses != nil {
+				cfg.dnsAddresses = append(cfg.dnsAddresses, (*nic.Nameservers.Addresses)...)
+			}
+			if nic.Nameservers.Search != nil {
+				cfg.dnsSearch = append(cfg.dnsSearch, (*nic.Nameservers.Search)...)
+			}
+		}
+
+		if err := writeNMConnectionFile(connDir, ifaceName, cfg); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// nmConnectionConfig は1つの NetworkManager keyfile 接続プロファイルを組み立てるための中間表現。
+type nmConnectionConfig struct {
+	address       string
+	addressIsIPv6 bool
+	dhcp4         bool
+	dhcp6         bool
+	routes        []Route
+	dnsAddresses  []string
+	dnsSearch     []string
+}
+
+// writeNMConnectionFile は nmConnectionConfig から NetworkManager keyfile を生成し、
+// mountPoint配下の connDir に書き込む。NetworkManagerはパーミッションに厳しいため
+// 0600 (所有者のみ読み書き) で保存する。
+func writeNMConnectionFile(connDir, ifaceName string, cfg nmConnectionConfig) error {
+	var b strings.Builder
+
+	b.WriteString("[connection]\n")
+	fmt.Fprintf(&b, "id=%s\n", ifaceName)
+	fmt.Fprintf(&b, "uuid=%s\n", uuid.NewString())
+	b.WriteString("type=ethernet\n")
+	fmt.Fprintf(&b, "interface-name=%s\n", ifaceName)
+	b.WriteString("autoconnect=true\n\n")
+
+	b.WriteString("[ethernet]\n\n")
+
+	ipv4Routes, ipv6Routes := splitRoutesByFamily(cfg.routes)
+	ipv4DNS, ipv6DNS := splitAddressesByFamily(cfg.dnsAddresses)
+
+	b.WriteString("[ipv4]\n")
+	switch {
+	case cfg.address != "" && !cfg.addressIsIPv6:
+		b.WriteString("method=manual\n")
+		fmt.Fprintf(&b, "address1=%s\n", cfg.address)
+	case cfg.address != "" && cfg.addressIsIPv6:
+		b.WriteString("method=disabled\n")
+	case cfg.dhcp4:
+		b.WriteString("method=auto\n")
+	default:
+		b.WriteString("method=disabled\n")
+	}
+	writeNMRoutes(&b, ipv4Routes)
+	writeNMDNS(&b, ipv4DNS, cfg.dnsSearch)
+	b.WriteString("\n")
+
+	b.WriteString("[ipv6]\n")
+	switch {
+	case cfg.address != "" && cfg.addressIsIPv6:
+		b.WriteString("method=manual\n")
+		fmt.Fprintf(&b, "address1=%s\n", cfg.address)
+	case cfg.address != "" && !cfg.addressIsIPv6:
+		b.WriteString("method=disabled\n")
+	case cfg.dhcp6:
+		b.WriteString("method=auto\n")
+	default:
+		b.WriteString("method=disabled\n")
+	}
+	writeNMRoutes(&b, ipv6Routes)
+	writeNMDNS(&b, ipv6DNS, nil)
+	b.WriteString("\n")
+
+	filePath := filepath.Join(connDir, ifaceName+".nmconnection")
+	if err := os.WriteFile(filePath, []byte(b.String()), 0600); err != nil {
+		return fmt.Errorf("write NetworkManager connection file failed: %w", err)
+	}
+
+	debugPrintln(fmt.Sprintf("Generated %s successfully:\n\n%s", filePath, b.String()))
+
+	return nil
+}
+
+// splitRoutesByFamily はゲートウェイ(via)のアドレス種別でルートをIPv4/IPv6に分類する。
+// "default" の宛先は NetworkManager keyfile 形式の表記(0.0.0.0/0 または ::/0)に変換する。
+func splitRoutesByFamily(routes []Route) ([]Route, []Route) {
+	var ipv4, ipv6 []Route
+	for _, r := range routes {
+		isIPv6 := checkIPVersion(strings.TrimSpace(r.Via)) == "IPv6"
+		to := strings.TrimSpace(r.To)
+		if strings.EqualFold(to, "default") {
+			if isIPv6 {
+				to = "::/0"
+			} else {
+				to = "0.0.0.0/0"
+			}
+		}
+		route := Route{To: to, Via: r.Via}
+		if isIPv6 {
+			ipv6 = append(ipv6, route)
+		} else {
+			ipv4 = append(ipv4, route)
+		}
+	}
+	return ipv4, ipv6
+}
+
+// splitAddressesByFamily はネームサーバのアドレスをIPv4/IPv6に分類する。
+func splitAddressesByFamily(addresses []string) ([]string, []string) {
+	var ipv4, ipv6 []string
+	for _, addr := range addresses {
+		addr = strings.TrimSpace(addr)
+		if addr == "" {
+			continue
+		}
+		if checkIPVersion(addr) == "IPv6" {
+			ipv6 = append(ipv6, addr)
+		} else {
+			ipv4 = append(ipv4, addr)
+		}
+	}
+	return ipv4, ipv6
+}
+
+func writeNMRoutes(b *strings.Builder, routes []Route) {
+	for i, r := range routes {
+		fmt.Fprintf(b, "route%d=%s,%s\n", i+1, r.To, r.Via)
+	}
+}
+
+func writeNMDNS(b *strings.Builder, dnsAddresses []string, dnsSearch []string) {
+	if len(dnsAddresses) > 0 {
+		fmt.Fprintf(b, "dns=%s;\n", strings.Join(dnsAddresses, ";"))
+	}
+	if len(dnsSearch) > 0 {
+		fmt.Fprintf(b, "dns-search=%s;\n", strings.Join(dnsSearch, ";"))
+	}
 }
 
 // LOOP_CTL_GET_FREE は新しい空きループデバイスを取得するための定数
