@@ -2,7 +2,7 @@
 
 ## 背景・要望
 
-marmot で Windows 仮想マシン（Windows Server 2022 を想定）を起動できるようにしたい。
+marmot で Windows 仮想マシン（Windows Server 2022 および Windows Server 2025 を想定）を起動できるようにしたい。
 最終的にはフルプロビジョニング対応（イメージ作成〜自動セットアップ）まで見据える。
 
 ## 現状のアーキテクチャ（Linux 専用の前提）
@@ -32,15 +32,15 @@ marmot の VM 起動パイプラインは Linux を前提に作られており�
 | フェーズ | 内容 | ステータス |
 |---|---|---|
 | Phase 1 | libvirt ドメイン生成の Windows 対応 + グラフィカルコンソール取得機能 | 未着手（提案合意待ち） |
-| Phase 2 | Windows Server 2022 ベースイメージのビルド手順整備（autounattend.xml + virtio-win ドライバ組込 + cloudbase-init 事前導入）と marmot イメージ登録への取り込み | 未着手 |
+| Phase 2 | Windows Server 2022 / 2025 のベースイメージのビルド手順整備（autounattend.xml + virtio-win ドライバ組込 + cloudbase-init 事前導入）と marmot イメージ登録への取り込み | 未着手 |
 | Phase 3 | cloudbase-init 向けプロビジョニング ISO 生成（config-drive 形式）でユーザー/SSH キー/ホスト名を自動設定 | 未着手 |
 
-対象 Windows バージョン: **Windows Server 2022**
+対象 Windows バージョン: **Windows Server 2022 および Windows Server 2025**
 
 ## Phase 1 詳細スコープ（提案・未承認）
 
 ### 目的
-1. `osVariant=windows2022` 系 VM を libvirt ドメインとして正しく起動できるようにする。
+1. `osVariant=windows2022` / `windows2025` 系 VM を libvirt ドメインとして正しく起動できるようにする。
 2. `mactl` から SPICE 接続情報（ホスト IP:ポート、パスワード）を取得し、手元の `remote-viewer` で
    画面に接続できるようにする（Windows 系 VM 限定）。
 
@@ -54,7 +54,7 @@ marmot の VM 起動パイプラインは Linux を前提に作られており�
   - `OsName == "windows"` の場合のみ分岐:
     - UEFI ファームウェア
     - ディスクバスを `virtio-scsi` に変更
-    - TPM 2.0 デバイス（要否は要確認、下記オープン課題参照）
+    - TPM 2.0 デバイス（`backend type='emulator' version='2.0'` の `swtpm` バックエンドを追加する）
     - `clock` を `localtime` に変更
     - QXL ビデオデバイス追加
     - SPICE の `Listen` をノードのアドレスに変更 + `Passwd` を VM 生成時にランダム生成して設定
@@ -71,10 +71,76 @@ marmot の VM 起動パイプラインは Linux を前提に作られており�
 ### 完了条件（案）
 - `go build ./...` 成功
 - `go test ./pkg/virt/... ./pkg/marmotd/... ./cmd/mactl/...` 成功
-- `osVariant=windows2022` 指定時に生成される XML が UEFI/TPM/QXL/SPICE（パスワード付き LAN Listen）に
-  なることをユニットテストで確認
+- `osVariant=windows2022` / `windows2025` 指定時に生成される XML が UEFI/TPM（`swtpm` エミュレータバックエンド）/QXL/SPICE
+  （パスワード付き LAN Listen）になることをユニットテストで確認
 - Linux 系 `osVariant` で生成される XML に差分がないことを確認
 - `mactl console --graphical <windows-vm-name>` で host/port/passwd が表示されることを確認（手動確認）
+
+## Phase 2 詳細スコープ（提案）
+
+### 目的
+利用者が正規に用意した Windows Server 2022 および Windows Server 2025 の各インストール ISO から、
+marmot で利用するバージョン別ベースイメージを再現可能な手順で作成し、marmot のイメージとして登録できるようにする。
+
+### 非目的
+- Windows Server 2022 / 2025 インストール ISO の入手・配布、およびライセンスの調達・管理は行わない。
+- libvirt ドメイン生成やグラフィカルコンソールの Windows 対応は含めない（Phase 1）。
+- VM 起動時のユーザー、SSH キー、ホスト名などの自動設定は含めない（Phase 3）。
+- VM ごとの config-drive 形式のプロビジョニング ISO 生成は含めない（Phase 3）。
+
+### 変更範囲（案）
+- Windows Server 2022 / 2025 それぞれのベースイメージ作成手順を整備する。
+  - 各バージョンについて、利用者が用意した対応するインストール ISO を入力とする。
+  - `autounattend.xml` を使った無人インストール手順を用意する。
+  - 対象バージョンごとに virtio-win ドライバおよび cloudbase-init の対応状況を確認し、イメージに組み込む。
+    初期設定と VM ごとの設定値の適用は Phase 3 で扱う。
+  - 各バージョンのベースイメージを QCOW2 形式で出力する。
+- バージョンを識別できる形で各イメージを marmot に登録する手順を整備する。
+
+### 完了条件（案）
+- 利用者が正規に用意した Windows Server 2022 / 2025 の各 ISO を使い、文書化された手順でそれぞれのベースイメージを作成できる。
+- 各 QCOW2 イメージに対応する virtio-win ドライバと cloudbase-init が導入されていることを確認できる。
+- 各イメージをバージョン識別可能な形で marmot に登録できる手順が明記されている。
+- Phase 1 の対応後、各バージョンのイメージで VM の起動を個別に確認できることが検証項目に含まれている。
+- ISO やライセンスなど、手順の前提条件と利用者が準備するものが明記されている。
+- Phase 1 の起動・コンソール対応、および Phase 3 の VM ごとのプロビジョニングとの境界が明記されている。
+
+## Phase 3 詳細スコープ（提案）
+
+### 目的
+Windows VM 起動時に、Linux の cloud-init 相当の処理を cloudbase-init で実現し、
+ユーザー/SSH キー/ホスト名などを自動設定できるようにする。
+
+### 非目的
+- Windows ベースイメージ自体の作成（Phase 2 で対応）。
+- libvirt ドメイン XML 生成の Windows 対応（Phase 1 で対応）。
+- Ansible 等による VM 内部の構成管理の自動化（将来検討、本フェーズでは対象外）。
+
+### 変更範囲（案）
+- `pkg/marmotd/cloudbase-init.go`（新規）
+  - `GenerateCloudbaseInitISO` 関数を新設。OpenStack ConfigDrive 互換形式
+    （`openstack/latest/meta_data.json` + `user_data`）で ISO を生成する。
+  - `user_data` は cloudbase-init が解釈可能な形式（cloud-config サブセット or PowerShell スクリプト）で
+    ユーザー作成・パスワード設定・SSH 公開鍵登録・ホスト名設定を記述する。
+- `pkg/marmotd/server_image_module.go`
+  - `serverImageModule` インターフェースの実装として `serverImageModuleWindows2022` / `serverImageModuleWindows2025`
+    を追加する。
+  - 各実装の `GenerateCloudInitISO` を `GenerateCloudbaseInitISO` 呼び出しに差し替える。
+  - `resolveServerImageModuleFromOS` に Phase 2 で導入した `osName == "windows"` 分岐を追加する。
+- `pkg/marmotd/server.go`
+  - ISO 生成・CD-ROM アタッチ処理は Linux/Windows 共通のインターフェース経由のため変更は最小限
+    （OS 別の分岐はモジュール側に閉じる想定）。
+- `api/marmot-api-v1.yaml` + コード生成（`api/marmot-api-v1.go` は直接編集しない）
+  - 必要であれば Administrator パスワード等 Windows 固有の認証パラメータを API スキーマに追加する。
+
+### 完了条件（案）
+- `go build ./...` 成功。
+- `go test ./pkg/marmotd/...` 成功。
+- `osVariant=windows2022` / `windows2025` のサーバー作成時に ConfigDrive 形式 ISO が生成されることを
+  ユニットテストで確認する。
+- Linux 系 VM の既存 cloud-init 生成処理に差分がないことを確認する。
+- Phase 1 / Phase 2 の成果物を用いて実際に Windows VM を起動し、cloudbase-init によってユーザー名/SSH キー/
+  ホスト名が反映されることを手動確認する。
 
 ## セキュリティ上の考慮事項
 
@@ -86,9 +152,11 @@ marmot の VM 起動パイプラインは Linux を前提に作られており�
 
 ## オープン課題（未確定・要確認）
 
-- TPM 2.0 デバイスの要否（Windows Server 2022 はセットアップ時に TPM 必須ではないが、機能要件次第で検討）
 - UEFI Secure Boot の要否（Phase 1 ではスコープ外とする案）
 - グラフィカルコンソールの実装方式は「SPICE 接続情報を `mactl` から取得し、手元の `remote-viewer` で接続」で
   合意（ブラウザ向け noVNC/spice-html5 プロキシは今回は不採用）
 - SPICE Listen アドレスは「ノードの LAN アドレスで直接接続できるようにしたい」で合意
 - Windows イメージ作成方法（Phase 2）は「作成方法から相談したい」の状態で、具体的な手順は未検討
+- Administrator パスワードの生成・取得方法（SPICE パスワードと同様に API 経由でランダム生成して返す方式にするか）（Phase 3）
+- cloudbase-init の `user_data` 形式（cloud-config 互換 vs PowerShell スクリプト）の選定（Phase 3）
+- ホスト名反映に sysprep との併用が必要か（Phase 3）
