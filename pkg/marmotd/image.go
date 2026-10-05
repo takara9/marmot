@@ -863,27 +863,41 @@ func findFreeNbdDeviceByIndex(i int) (string, error) {
 	return "", fmt.Errorf("device %s is busy", devicePath)
 }
 
-// defaultSysBlockRoot は /sys/block のルートパス。
-const defaultSysBlockRoot = "/sys/block"
-
-// findLastPartitionNumberInRoot は nbdDev (例: /dev/nbd0) のパーティションのうち、最大番号
-// (= ディスク上最後のパーティション)を sysfs から求める。qemu-img resize で追加された空き領域は
+// findLastPartitionNumber は nbdDev (例: /dev/nbd0) に現在接続されているイメージの
+// パーティションテーブルを parted で直接読み取り、最大のパーティション番号
+// (= ディスク上最後のパーティション)を求める。qemu-img resize で追加された空き領域は
 // 物理的に最後のパーティションに隣接するため、単一パーティション構成(Ubuntu/Alpine)でも
 // GPTで複数パーティションを持つ構成(Rocky 9等)でも、常にこの最終パーティションがリサイズ対象になる。
-// sysBlockRoot を引数化することで、テストから疑似的な sysfs ディレクトリ構造を参照できるようにしている。
-func findLastPartitionNumberInRoot(sysBlockRoot, nbdDev string) (int, error) {
-	base := filepath.Base(nbdDev)
-	pattern := filepath.Join(sysBlockRoot, base, base+"p*")
-	matches, err := filepath.Glob(pattern)
+//
+// sysfs のパーティションデバイスノード(/sys/block/<dev>/<dev>pN)やカーネルの
+// パーティションスキャン状態には依存しない。NBDデバイス番号は使い回されるため、
+// udevd が無い/弱いCI環境では前回接続されていた別イメージのパーティション情報が
+// カーネル側に残留することがあり、sysfs を参照する方式では誤ったパーティション番号
+// (例: 1パーティションのUbuntuイメージに対し存在しない16番)を拾ってしまっていた
+// (issue #622, #737)。parted でオンディスクのパーティションテーブルを直接読むことで、
+// この種の残留状態の影響を受けないようにしている。
+func findLastPartitionNumber(ctx context.Context, nbdDev string) (int, error) {
+	cmd := exec.CommandContext(ctx, "parted", "-m", "-s", nbdDev, "unit", "s", "print")
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return 0, fmt.Errorf("glob partitions for %s failed: %w", nbdDev, err)
+		return 0, fmt.Errorf("parted -m -s %s unit s print failed: %w, output=%s", nbdDev, err, strings.TrimSpace(string(out)))
 	}
+	return parseLastPartitionNumberFromPartedOutput(string(out))
+}
 
+// parseLastPartitionNumberFromPartedOutput は `parted -m -s <dev> unit s print` の出力から
+// 最大のパーティション番号を求める。ヘッダ行("BYT;")、ディスク概要行、qemu-img resize 直後に
+// 表示されるGPT不整合の警告メッセージなどは、いずれも先頭フィールドが数値にならないため
+// 自然に無視される。
+func parseLastPartitionNumberFromPartedOutput(output string) (int, error) {
 	maxNum := 0
-	for _, m := range matches {
-		name := filepath.Base(m)
-		numStr := strings.TrimPrefix(name, base+"p")
-		n, err := strconv.Atoi(numStr)
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		field, _, _ := strings.Cut(line, ":")
+		n, err := strconv.Atoi(field)
 		if err != nil {
 			continue
 		}
@@ -892,22 +906,17 @@ func findLastPartitionNumberInRoot(sysBlockRoot, nbdDev string) (int, error) {
 		}
 	}
 	if maxNum == 0 {
-		return 0, fmt.Errorf("no partition devices found for %s", nbdDev)
+		return 0, fmt.Errorf("no partitions found in parted output")
 	}
 	return maxNum, nil
 }
 
-// waitForLastPartitionNumber は findLastPartitionNumberInRoot が成功するまでポーリングする。
-// qemu-nbd 接続直後はカーネルのパーティションスキャンが非同期のため、短時間のリトライが必要になる。
+// waitForLastPartitionNumber は findLastPartitionNumber が成功するまでポーリングする。
+// qemu-nbd 接続直後は一時的にI/Oが安定しないことがあるため、短時間のリトライを行う。
 func waitForLastPartitionNumber(ctx context.Context, nbdDev string, timeout time.Duration) (int, error) {
-	return waitForLastPartitionNumberInRoot(ctx, defaultSysBlockRoot, nbdDev, timeout)
-}
-
-// waitForLastPartitionNumberInRoot は waitForLastPartitionNumber の本体。sysBlockRoot を引数化している。
-func waitForLastPartitionNumberInRoot(ctx context.Context, sysBlockRoot, nbdDev string, timeout time.Duration) (int, error) {
 	deadline := time.Now().Add(timeout)
 	for {
-		if n, err := findLastPartitionNumberInRoot(sysBlockRoot, nbdDev); err == nil {
+		if n, err := findLastPartitionNumber(ctx, nbdDev); err == nil {
 			return n, nil
 		}
 		if err := ctx.Err(); err != nil {

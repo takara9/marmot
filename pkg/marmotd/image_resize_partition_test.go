@@ -2,113 +2,90 @@ package marmotd
 
 import (
 	"context"
-	"os"
-	"path/filepath"
-	"strconv"
 	"testing"
-	"time"
 )
 
-// makeFakeNbdPartitions は t.TempDir() 配下に /sys/block/<base>/<base>pN 相当の
-// 疑似ディレクトリを作成する(Rocky 9 のようなGPT複数パーティション構成を模擬する)。
-func makeFakeNbdPartitions(t *testing.T, base string, partitionNumbers []int) string {
-	t.Helper()
-	root := t.TempDir()
-	diskDir := filepath.Join(root, base)
-	if err := os.MkdirAll(diskDir, 0755); err != nil {
-		t.Fatalf("MkdirAll() error = %v", err)
-	}
-	for _, n := range partitionNumbers {
-		partDir := filepath.Join(diskDir, base+"p"+strconv.Itoa(n))
-		if err := os.MkdirAll(partDir, 0755); err != nil {
-			t.Fatalf("MkdirAll() error = %v", err)
-		}
-	}
-	return root
-}
+// 実機で取得した `parted -m -s <dev> unit s print` の出力例。
+const partedOutputSinglePartitionGPT = `BYT;
+/dev/nbd0:2097152s:unknown:512:512:gpt:不明:;
+1:2048s:2095103s:2093056s::p1:;
+`
 
-func TestFindLastPartitionNumberInRoot(t *testing.T) {
+const partedOutputMultiplePartitionsGPT = `BYT;
+/dev/nbd0:4194304s:unknown:512:512:gpt:不明:;
+1:2048s:409599s:407552s::p1:;
+2:409600s:819199s:409600s::p2:;
+3:819200s:1228799s:409600s::p3:;
+`
+
+// Rocky 9 GenericCloud イメージ相当(bios_grub/ESP/boot/root)。
+const partedOutputRocky9GPT = `BYT;
+/dev/nbd0:33554432s:unknown:512:512:gpt:Virtio Block Device:;
+1:2048s:6143s:4096s::p.legacy:bios_grub;
+2:6144s:211967s:205824s:fat16:p.UEFI:boot, esp;
+3:211968s:2273279s:2061312s:xfs:p.lxboot:bls_boot;
+4:2273280s:33552383s:31279104s:xfs:p.lxroot:;
+`
+
+// qemu-img resize 直後、--fix 実行前に print すると、GPTバックアップヘッダの不整合警告が
+// 先頭に出力されるが、パーティション一覧自体は正しく取得できる(issue #622, #737)。
+const partedOutputWithResizeWarning = `警告: /dev/nbd0 で利用可能な領域の一部が利用されていません。GPT を修正して全ての領域を利用可能にするか(2097152 ブロック増えます)、このままで続行することができますが、どうしますか？ 
+BYT;
+/dev/nbd0:4194304s:unknown:512:512:gpt:不明:;
+1:2048s:2095103s:2093056s::p1:;
+`
+
+const partedOutputDOSSinglePartition = `BYT;
+/dev/sda:41943040s:scsi:512:512:msdos:Virtual Disk:;
+1:2048s:41940991s:41938944s:ext4::boot;
+`
+
+func TestParseLastPartitionNumberFromPartedOutput(t *testing.T) {
 	t.Parallel()
 
-	t.Run("single partition (Ubuntu/Alpine相当)", func(t *testing.T) {
-		t.Parallel()
-		root := makeFakeNbdPartitions(t, "nbd0", []int{1})
+	tests := []struct {
+		name    string
+		output  string
+		want    int
+		wantErr bool
+	}{
+		{name: "single partition GPT (Ubuntu/Alpine相当)", output: partedOutputSinglePartitionGPT, want: 1},
+		{name: "multiple partitions GPT", output: partedOutputMultiplePartitionsGPT, want: 3},
+		{name: "Rocky 9 GenericCloud (4 partitions)", output: partedOutputRocky9GPT, want: 4},
+		{name: "resize warning prefix is ignored", output: partedOutputWithResizeWarning, want: 1},
+		{name: "dos partition table", output: partedOutputDOSSinglePartition, want: 1},
+		{name: "empty output", output: "", wantErr: true},
+		{name: "header only, no partitions", output: "BYT;\n/dev/nbd0:2097152s:unknown:512:512:gpt:不明:;\n", wantErr: true},
+	}
 
-		got, err := findLastPartitionNumberInRoot(root, "/dev/nbd0")
-		if err != nil {
-			t.Fatalf("findLastPartitionNumberInRoot() error = %v", err)
-		}
-		if got != 1 {
-			t.Fatalf("findLastPartitionNumberInRoot() = %d, want 1", got)
-		}
-	})
-
-	t.Run("multiple partitions (Rocky 9相当)", func(t *testing.T) {
-		t.Parallel()
-		root := makeFakeNbdPartitions(t, "nbd0", []int{1, 2, 3, 4})
-
-		got, err := findLastPartitionNumberInRoot(root, "/dev/nbd0")
-		if err != nil {
-			t.Fatalf("findLastPartitionNumberInRoot() error = %v", err)
-		}
-		if got != 4 {
-			t.Fatalf("findLastPartitionNumberInRoot() = %d, want 4", got)
-		}
-	})
-
-	t.Run("no partitions found", func(t *testing.T) {
-		t.Parallel()
-		root := t.TempDir()
-
-		if _, err := findLastPartitionNumberInRoot(root, "/dev/nbd0"); err == nil {
-			t.Fatalf("expected error when no partitions exist")
-		}
-	})
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := parseLastPartitionNumberFromPartedOutput(tt.output)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil (result=%d)", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("parseLastPartitionNumberFromPartedOutput() error = %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("parseLastPartitionNumberFromPartedOutput() = %d, want %d", got, tt.want)
+			}
+		})
+	}
 }
 
-func TestWaitForLastPartitionNumberInRoot(t *testing.T) {
+func TestFindLastPartitionNumberInvalidDevice(t *testing.T) {
 	t.Parallel()
 
-	t.Run("succeeds once partitions appear", func(t *testing.T) {
-		t.Parallel()
-		root := t.TempDir()
-
-		go func() {
-			time.Sleep(50 * time.Millisecond)
-			diskDir := filepath.Join(root, "nbd0")
-			_ = os.MkdirAll(filepath.Join(diskDir, "nbd0p1"), 0755)
-			_ = os.MkdirAll(filepath.Join(diskDir, "nbd0p2"), 0755)
-		}()
-
-		got, err := waitForLastPartitionNumberInRoot(context.Background(), root, "/dev/nbd0", 2*time.Second)
-		if err != nil {
-			t.Fatalf("waitForLastPartitionNumberInRoot() error = %v", err)
-		}
-		if got != 2 {
-			t.Fatalf("waitForLastPartitionNumberInRoot() = %d, want 2", got)
-		}
-	})
-
-	t.Run("returns error on timeout", func(t *testing.T) {
-		t.Parallel()
-		root := t.TempDir()
-
-		if _, err := waitForLastPartitionNumberInRoot(context.Background(), root, "/dev/nbd0", 150*time.Millisecond); err == nil {
-			t.Fatalf("expected timeout error")
-		}
-	})
-
-	t.Run("returns context error when canceled", func(t *testing.T) {
-		t.Parallel()
-		root := t.TempDir()
-
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-
-		if _, err := waitForLastPartitionNumberInRoot(ctx, root, "/dev/nbd0", time.Second); err == nil {
-			t.Fatalf("expected context canceled error")
-		}
-	})
+	// 存在しないデバイスを指定した場合、parted がエラーになることを確認する。
+	if _, err := findLastPartitionNumber(context.Background(), "/dev/marmot-test-nonexistent"); err == nil {
+		t.Fatalf("expected error for nonexistent device")
+	}
 }
 
 func TestDetectFilesystemTypeInvalidDevice(t *testing.T) {
