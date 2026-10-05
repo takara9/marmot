@@ -16,6 +16,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -655,7 +656,6 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 			continue
 		}
 		nbdDev = candidate
-		partDev = nbdDev + "p1"
 
 		// 念のため stale 接続を切る（未接続なら失敗しても無視）
 		_ = runCmd(ctx, "qemu-nbd", "-d", nbdDev)
@@ -688,8 +688,14 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 
 	resizeTarget := nbdDev
 	usingPartitionTarget := false
-	if err := waitForBlockDevice(ctx, partDev, 5*time.Second); err == nil {
-		if err := runCmd(ctx, "parted", nbdDev, "--fix", "--script", "resizepart", "1", "100%"); err != nil {
+	// リサイズ対象は「ディスク上の最終パーティション」とする。Ubuntu/Alpineの単一パーティション
+	// 構成ではp1がそのまま最終パーティションになるが、Rocky 9のようにGPTで複数パーティション
+	// (bios_grub/ESP/boot/root等)を持つ構成では、qemu-img resizeで追加された空き領域は
+	// 物理的に最後のパーティションに隣接するため、常に"1"ではなく最終パーティション番号を
+	// 対象にする必要がある(issue #622)。
+	if partNum, err := waitForLastPartitionNumber(ctx, nbdDev, 5*time.Second); err == nil {
+		partDev = fmt.Sprintf("%sp%d", nbdDev, partNum)
+		if err := runCmd(ctx, "parted", nbdDev, "--fix", "--script", "resizepart", strconv.Itoa(partNum), "100%"); err != nil {
 			return err
 		}
 
@@ -703,17 +709,19 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 		usingPartitionTarget = true
 	} else {
 		if hasPartitionTable {
-			slog.Warn("Partition table detected; extend wait for partition device instead of falling back to whole disk", "nbdDevice", nbdDev, "partition", partDev, "ptType", partitionTableType, "err", err)
+			slog.Warn("Partition table detected; extend wait for partition device instead of falling back to whole disk", "nbdDevice", nbdDev, "ptType", partitionTableType, "err", err)
 			if err := refreshPartitionDevices(ctx, nbdDev); err != nil {
 				return err
 			}
-			if err := waitForBlockDevice(ctx, partDev, 30*time.Second); err != nil {
+			partNum, err := waitForLastPartitionNumber(ctx, nbdDev, 30*time.Second)
+			if err != nil {
 				return err
 			}
+			partDev = fmt.Sprintf("%sp%d", nbdDev, partNum)
 			resizeTarget = partDev
 			usingPartitionTarget = true
 		} else {
-			slog.Warn("Partition table was not detected; fallback to whole-disk filesystem resize", "nbdDevice", nbdDev, "partition", partDev, "err", err)
+			slog.Warn("Partition table was not detected; fallback to whole-disk filesystem resize", "nbdDevice", nbdDev, "err", err)
 		}
 	}
 
@@ -736,6 +744,44 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 		}
 	}
 
+	if err := growFilesystem(ctx, resizeTarget, nbdDev, partDev, usingPartitionTarget, hasPartitionTable, partitionTableType); err != nil {
+		return err
+	}
+
+	if err := runCmd(ctx, "qemu-nbd", "-d", nbdDev); err != nil {
+		return err
+	}
+	connected = false
+
+	if err := runQemuImgInfoWithRetry(ctx, imageTemplatePath, 10, 300*time.Millisecond); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// growFilesystem は resizeTarget 上のファイルシステムを、リサイズ済みのパーティション/ディスク
+// サイズまで拡張する。ファイルシステム種別により手順が異なる(ext系はオフラインでresize2fs可能だが、
+// xfsはオフラインリサイズに対応していないためマウントしてxfs_growfsする必要がある)。
+// Rocky 9 の GenericCloud イメージは /boot・/ ともに xfs のため、xfs 分岐が必要になる(issue #622)。
+func growFilesystem(ctx context.Context, resizeTarget, nbdDev, partDev string, usingPartitionTarget, hasPartitionTable bool, partitionTableType string) error {
+	fsType, err := detectFilesystemType(ctx, resizeTarget)
+	if err != nil {
+		slog.Warn("Failed to detect filesystem type; falling back to ext* resize path", "device", resizeTarget, "err", err)
+	}
+
+	switch fsType {
+	case "xfs":
+		return growXFSFilesystem(ctx, resizeTarget)
+	case "ext2", "ext3", "ext4", "":
+		return growExtFilesystem(ctx, resizeTarget, nbdDev, partDev, usingPartitionTarget, hasPartitionTable, partitionTableType)
+	default:
+		return fmt.Errorf("unsupported filesystem type for resize: %q (device=%s)", fsType, resizeTarget)
+	}
+}
+
+// growExtFilesystem は ext2/ext3/ext4 ファイルシステムを resize2fs で拡張する(Ubuntu/Alpineの既定経路)。
+func growExtFilesystem(ctx context.Context, resizeTarget, nbdDev, partDev string, usingPartitionTarget, hasPartitionTable bool, partitionTableType string) error {
 	if err := runCmd(ctx, "e2fsck", "-f", resizeTarget, "-y"); err != nil {
 		if usingPartitionTarget && isMissingBlockDeviceError(err) {
 			if hasPartitionTable {
@@ -761,20 +807,41 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 			return err
 		}
 	}
-	if err := runCmd(ctx, "resize2fs", resizeTarget); err != nil {
+	return runCmd(ctx, "resize2fs", resizeTarget)
+}
+
+// growXFSFilesystem は xfs ファイルシステムを拡張する。xfs_growfs はマウント済みのファイルシステム
+// に対してのみ動作する(ext系のresize2fsと異なりオフラインリサイズ不可)ため、一時ディレクトリに
+// マウントしてから実行する。
+func growXFSFilesystem(ctx context.Context, resizeTarget string) error {
+	mountPoint, err := os.MkdirTemp("", "marmot-xfs-grow-")
+	if err != nil {
+		return fmt.Errorf("create temp mount point for xfs_growfs failed: %w", err)
+	}
+	defer func() {
+		_ = os.RemoveAll(mountPoint)
+	}()
+
+	if err := runCmd(ctx, "mount", resizeTarget, mountPoint); err != nil {
 		return err
 	}
+	defer func() {
+		if err := runCmd(ctx, "umount", mountPoint); err != nil {
+			slog.Error("umount failed after xfs_growfs", "mountPoint", mountPoint, "device", resizeTarget, "err", err)
+		}
+	}()
 
-	if err := runCmd(ctx, "qemu-nbd", "-d", nbdDev); err != nil {
-		return err
+	return runCmd(ctx, "xfs_growfs", mountPoint)
+}
+
+// detectFilesystemType は devicePath 上のファイルシステム種別を取得する。
+func detectFilesystemType(ctx context.Context, devicePath string) (string, error) {
+	cmd := exec.CommandContext(ctx, "lsblk", "-n", "-o", "FSTYPE", devicePath)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("lsblk -n -o FSTYPE %s failed: %w, output=%s", devicePath, err, strings.TrimSpace(string(out)))
 	}
-	connected = false
-
-	if err := runQemuImgInfoWithRetry(ctx, imageTemplatePath, 10, 300*time.Millisecond); err != nil {
-		return err
-	}
-
-	return nil
+	return strings.ToLower(strings.TrimSpace(string(out))), nil
 }
 
 func findFreeNbdDeviceByIndex(i int) (string, error) {
@@ -788,6 +855,68 @@ func findFreeNbdDeviceByIndex(i int) (string, error) {
 		return devicePath, nil
 	}
 	return "", fmt.Errorf("device %s is busy", devicePath)
+}
+
+// defaultSysBlockRoot は /sys/block のルートパス。
+const defaultSysBlockRoot = "/sys/block"
+
+// findLastPartitionNumber は nbdDev (例: /dev/nbd0) のパーティションのうち、最大番号
+// (= ディスク上最後のパーティション)を sysfs から求める。qemu-img resize で追加された空き領域は
+// 物理的に最後のパーティションに隣接するため、単一パーティション構成(Ubuntu/Alpine)でも
+// GPTで複数パーティションを持つ構成(Rocky 9等)でも、常にこの最終パーティションがリサイズ対象になる。
+func findLastPartitionNumber(nbdDev string) (int, error) {
+	return findLastPartitionNumberInRoot(defaultSysBlockRoot, nbdDev)
+}
+
+// findLastPartitionNumberInRoot は findLastPartitionNumber の本体。sysBlockRoot を引数化することで
+// テストから疑似的な sysfs ディレクトリ構造を参照できるようにしている。
+func findLastPartitionNumberInRoot(sysBlockRoot, nbdDev string) (int, error) {
+	base := filepath.Base(nbdDev)
+	pattern := filepath.Join(sysBlockRoot, base, base+"p*")
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return 0, fmt.Errorf("glob partitions for %s failed: %w", nbdDev, err)
+	}
+
+	maxNum := 0
+	for _, m := range matches {
+		name := filepath.Base(m)
+		numStr := strings.TrimPrefix(name, base+"p")
+		n, err := strconv.Atoi(numStr)
+		if err != nil {
+			continue
+		}
+		if n > maxNum {
+			maxNum = n
+		}
+	}
+	if maxNum == 0 {
+		return 0, fmt.Errorf("no partition devices found for %s", nbdDev)
+	}
+	return maxNum, nil
+}
+
+// waitForLastPartitionNumber は findLastPartitionNumber が成功するまでポーリングする。
+// qemu-nbd 接続直後はカーネルのパーティションスキャンが非同期のため、短時間のリトライが必要になる。
+func waitForLastPartitionNumber(ctx context.Context, nbdDev string, timeout time.Duration) (int, error) {
+	return waitForLastPartitionNumberInRoot(ctx, defaultSysBlockRoot, nbdDev, timeout)
+}
+
+// waitForLastPartitionNumberInRoot は waitForLastPartitionNumber の本体。sysBlockRoot を引数化している。
+func waitForLastPartitionNumberInRoot(ctx context.Context, sysBlockRoot, nbdDev string, timeout time.Duration) (int, error) {
+	deadline := time.Now().Add(timeout)
+	for {
+		if n, err := findLastPartitionNumberInRoot(sysBlockRoot, nbdDev); err == nil {
+			return n, nil
+		}
+		if err := ctx.Err(); err != nil {
+			return 0, err
+		}
+		if time.Now().After(deadline) {
+			return 0, fmt.Errorf("no partition devices found for %s within %s", nbdDev, timeout)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
 }
 
 func waitForBlockDevice(ctx context.Context, devicePath string, timeout time.Duration) error {
