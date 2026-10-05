@@ -659,6 +659,12 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 
 		// 念のため stale 接続を切る（未接続なら失敗しても無視）
 		_ = runCmd(ctx, "qemu-nbd", "-d", nbdDev)
+		// NBDデバイス番号は使い回されるため、前回この番号に接続されていたイメージの
+		// パーティション情報がカーネル側に残っている場合がある(CI環境などudevdが
+		// 動作していない場合は、qemu-nbd切断後も自動的に消えない)。新しいイメージの
+		// パーティション数を誤認しないよう、接続前に明示的に消去しておく
+		// (issue #622, 失敗例: 1パーティションのUbuntuイメージに対し resizepart 16 が実行される)。
+		_ = runCmd(ctx, "partx", "-d", nbdDev)
 		if err := runCmd(ctx, "qemu-nbd", "-c", nbdDev, imageTemplatePath); err != nil {
 			attachErrs = append(attachErrs, fmt.Sprintf("%s: %v", nbdDev, err))
 			continue
@@ -860,16 +866,11 @@ func findFreeNbdDeviceByIndex(i int) (string, error) {
 // defaultSysBlockRoot は /sys/block のルートパス。
 const defaultSysBlockRoot = "/sys/block"
 
-// findLastPartitionNumber は nbdDev (例: /dev/nbd0) のパーティションのうち、最大番号
+// findLastPartitionNumberInRoot は nbdDev (例: /dev/nbd0) のパーティションのうち、最大番号
 // (= ディスク上最後のパーティション)を sysfs から求める。qemu-img resize で追加された空き領域は
 // 物理的に最後のパーティションに隣接するため、単一パーティション構成(Ubuntu/Alpine)でも
 // GPTで複数パーティションを持つ構成(Rocky 9等)でも、常にこの最終パーティションがリサイズ対象になる。
-func findLastPartitionNumber(nbdDev string) (int, error) {
-	return findLastPartitionNumberInRoot(defaultSysBlockRoot, nbdDev)
-}
-
-// findLastPartitionNumberInRoot は findLastPartitionNumber の本体。sysBlockRoot を引数化することで
-// テストから疑似的な sysfs ディレクトリ構造を参照できるようにしている。
+// sysBlockRoot を引数化することで、テストから疑似的な sysfs ディレクトリ構造を参照できるようにしている。
 func findLastPartitionNumberInRoot(sysBlockRoot, nbdDev string) (int, error) {
 	base := filepath.Base(nbdDev)
 	pattern := filepath.Join(sysBlockRoot, base, base+"p*")
@@ -896,7 +897,7 @@ func findLastPartitionNumberInRoot(sysBlockRoot, nbdDev string) (int, error) {
 	return maxNum, nil
 }
 
-// waitForLastPartitionNumber は findLastPartitionNumber が成功するまでポーリングする。
+// waitForLastPartitionNumber は findLastPartitionNumberInRoot が成功するまでポーリングする。
 // qemu-nbd 接続直後はカーネルのパーティションスキャンが非同期のため、短時間のリトライが必要になる。
 func waitForLastPartitionNumber(ctx context.Context, nbdDev string, timeout time.Duration) (int, error) {
 	return waitForLastPartitionNumberInRoot(ctx, defaultSysBlockRoot, nbdDev, timeout)
