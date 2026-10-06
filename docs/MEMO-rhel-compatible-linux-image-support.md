@@ -10,11 +10,11 @@ Rocky Linux、AlmaLinux などの RHEL 互換ディストリビューション�
 
 ## 実装状況（更新）
 
-初回対応（Rocky Linux 9）および AlmaLinux 9、Debian 12/13、Rocky Linux 8、AlmaLinux 8 は既に実装済み。以下の経路がすべて対応している。
+初回対応（Rocky Linux 9）および AlmaLinux 9、Debian 12/13、Rocky Linux 8、AlmaLinux 8、Rocky Linux 10、AlmaLinux 10 は既に実装済み。以下の経路がすべて対応している。
 
-- `validateImageOSSpec`: `rocky`（`8`/`9`）、`rockey`（`rocky` の旧表記、互換維持のため許可）、`almalinux`（`8`/`9`）、`debian`（`12`/`13`）
-- `resolveImageOSModuleFromSpec` / `resolveServerImageModuleFromOS`: `rocky8`、`rocky9`、`almalinux8`、`almalinux9`、`debian12`、`debian13` の各モジュールへ解決
-- `deriveOSFromVariant`: variant 文字列（`rocky8`/`rockey8`、`rocky9`/`rockey9`、`almalinux8`、`almalinux9`、`debian12`、`debian13`）からの OS 推定
+- `validateImageOSSpec`: `rocky`（`8`/`9`/`10`）、`rockey`（`rocky` の旧表記、互換維持のため許可）、`almalinux`（`8`/`9`/`10`）、`debian`（`12`/`13`）
+- `resolveImageOSModuleFromSpec` / `resolveServerImageModuleFromOS`: `rocky8`、`rocky9`、`rocky10`、`almalinux8`、`almalinux9`、`almalinux10`、`debian12`、`debian13` の各モジュールへ解決
+- `deriveOSFromVariant`: variant 文字列（`rocky8`/`rockey8`、`rocky9`/`rockey9`、`rocky10`、`almalinux8`、`almalinux9`、`almalinux10`、`debian12`、`debian13`）からの OS 推定
 
 Rocky Linux 8 については、以下のテスト用 upstream cloud image で実イメージを検証済み。
 
@@ -28,6 +28,17 @@ AlmaLinux 8 についても対応済み。以下の upstream cloud image で実�
 
 検証の結果、パーティション構成（GPT、LVM 無し、root が最大パーティション）、`net.ifnames=0`（eth0/eth1 命名）、legacy ネットワークスクリプト（`/etc/sysconfig/network-scripts/ifcfg-eth0`）の同梱は Rocky Linux 8 と同様。Rocky 8 対応時に追加した `removeLegacyIfcfgNetworkScripts` は `SetupAlmaLinux` でも共通利用されるため、追加のコード変更無しでこの差分にも対応済み。
 
+Rocky Linux 10 についても対応済み。以下の upstream cloud image で実イメージを検証済み。
+
+- `https://dl.rockylinux.org/pub/rocky/10/images/x86_64/Rocky-10-GenericCloud.latest.x86_64.qcow2`
+
+検証の結果、パーティション構成（GPT、LVM 無し、root が最大パーティション、bios_grub/ESP/bls_boot/root の4パーティション構成）、デフォルトユーザー（`rocky`）、sshd のサービス名、legacy ネットワークスクリプトが無い点は Rocky Linux 9 と同様で、既存の `customizeRockyQcowImageWithContext`・`util.SetupRockyLinux` がそのまま使える。唯一の違いとして、Rocky Linux 10 は `net.ifnames=0` を設定しておらず、NIC は systemd の予測可能命名（`enp1s0` 等）になる。これは `CreateNetworkManagerKeyfiles` の `nicName`（`enp1s0` 等）がもともと想定する命名方式と一致するため、追加のコード変更は不要。
+
+AlmaLinux 10 についても対応済み。以下の upstream cloud image で実イメージを検証済み。
+
+- `https://repo.almalinux.org/almalinux/10/cloud/x86_64/images/AlmaLinux-10-GenericCloud-latest.x86_64.qcow2`
+
+検証の結果、パーティション構成（GPT、LVM 無し、root が最大パーティション、bios_grub/ESP/boot/root の4パーティション構成）、デフォルトユーザー（`almalinux`）、sshd のサービス名、legacy ネットワークスクリプトが無い点は AlmaLinux 9 と同様で、既存の `customizeAlmaLinuxQcowImageWithContext`・`util.SetupAlmaLinux` がそのまま使える。Rocky Linux 10 とは異なり、AlmaLinux 10 は引き続き `net.ifnames=0`（eth0/eth1 命名）を設定しており、この点は AlmaLinux 8 と同様(MACアドレスでマッチする既存ロジックで対応済み)のため、追加のコード変更は不要。
 
 ## 現状（初回対応前の記録）
 

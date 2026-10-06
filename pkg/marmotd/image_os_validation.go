@@ -45,12 +45,14 @@ func validateImageOSSpec(spec *api.ImageSpec) error {
 		},
 		// rockey は rocky の正式化前の旧表記(互換維持のため canonicalOSName で rocky へ正規化する)。
 		"rocky": {
-			"8": {},
-			"9": {},
+			"8":  {},
+			"9":  {},
+			"10": {},
 		},
 		"almalinux": {
-			"8": {},
-			"9": {},
+			"8":  {},
+			"9":  {},
+			"10": {},
 		},
 		"debian": {
 			"12": {},

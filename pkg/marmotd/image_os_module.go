@@ -69,16 +69,18 @@ func (m commonImageOSModule) applyFollowerSpec(follower *api.Image, head api.Ima
 }
 
 var (
-	imageOSModuleUbuntu2204 = commonImageOSModule{moduleKey: "ubuntu22.04"}
-	imageOSModuleUbuntu2404 = commonImageOSModule{moduleKey: "ubuntu24.04"}
-	imageOSModuleUbuntu     = commonImageOSModule{moduleKey: "ubuntu"}
-	imageOSModuleAlpine323  = commonImageOSModule{moduleKey: "alpine3.23", customizeHandler: customizeAlpineQcowImageWithContext}
-	imageOSModuleRocky8     = commonImageOSModule{moduleKey: "rocky8", customizeHandler: customizeRockyQcowImageWithContext}
-	imageOSModuleRocky9     = commonImageOSModule{moduleKey: "rocky9", customizeHandler: customizeRockyQcowImageWithContext}
-	imageOSModuleAlmaLinux8 = commonImageOSModule{moduleKey: "almalinux8", customizeHandler: customizeAlmaLinuxQcowImageWithContext}
-	imageOSModuleAlmaLinux9 = commonImageOSModule{moduleKey: "almalinux9", customizeHandler: customizeAlmaLinuxQcowImageWithContext}
-	imageOSModuleDebian12   = commonImageOSModule{moduleKey: "debian12", customizeHandler: customizeDebianQcowImageWithContext}
-	imageOSModuleDebian13   = commonImageOSModule{moduleKey: "debian13", customizeHandler: customizeDebianQcowImageWithContext}
+	imageOSModuleUbuntu2204  = commonImageOSModule{moduleKey: "ubuntu22.04"}
+	imageOSModuleUbuntu2404  = commonImageOSModule{moduleKey: "ubuntu24.04"}
+	imageOSModuleUbuntu      = commonImageOSModule{moduleKey: "ubuntu"}
+	imageOSModuleAlpine323   = commonImageOSModule{moduleKey: "alpine3.23", customizeHandler: customizeAlpineQcowImageWithContext}
+	imageOSModuleRocky8      = commonImageOSModule{moduleKey: "rocky8", customizeHandler: customizeRockyQcowImageWithContext}
+	imageOSModuleRocky9      = commonImageOSModule{moduleKey: "rocky9", customizeHandler: customizeRockyQcowImageWithContext}
+	imageOSModuleRocky10     = commonImageOSModule{moduleKey: "rocky10", customizeHandler: customizeRockyQcowImageWithContext}
+	imageOSModuleAlmaLinux8  = commonImageOSModule{moduleKey: "almalinux8", customizeHandler: customizeAlmaLinuxQcowImageWithContext}
+	imageOSModuleAlmaLinux9  = commonImageOSModule{moduleKey: "almalinux9", customizeHandler: customizeAlmaLinuxQcowImageWithContext}
+	imageOSModuleAlmaLinux10 = commonImageOSModule{moduleKey: "almalinux10", customizeHandler: customizeAlmaLinuxQcowImageWithContext}
+	imageOSModuleDebian12    = commonImageOSModule{moduleKey: "debian12", customizeHandler: customizeDebianQcowImageWithContext}
+	imageOSModuleDebian13    = commonImageOSModule{moduleKey: "debian13", customizeHandler: customizeDebianQcowImageWithContext}
 )
 
 func resolveImageOSModuleFromImage(img api.Image) (imageOSModule, error) {
@@ -117,6 +119,8 @@ func resolveImageOSModuleFromSpec(osName, osVersion string) (imageOSModule, erro
 			return imageOSModuleRocky8, nil
 		case "9":
 			return imageOSModuleRocky9, nil
+		case "10":
+			return imageOSModuleRocky10, nil
 		default:
 			return nil, fmt.Errorf("unsupported rocky image module version: %s", version)
 		}
@@ -126,6 +130,8 @@ func resolveImageOSModuleFromSpec(osName, osVersion string) (imageOSModule, erro
 			return imageOSModuleAlmaLinux8, nil
 		case "9":
 			return imageOSModuleAlmaLinux9, nil
+		case "10":
+			return imageOSModuleAlmaLinux10, nil
 		default:
 			return nil, fmt.Errorf("unsupported almalinux image module version: %s", version)
 		}

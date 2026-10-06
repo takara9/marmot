@@ -47,8 +47,10 @@ func TestValidateImageOSSpecSupportsRequestedOSMatrix(t *testing.T) {
 		{name: "rockey", osName: "rockey", osVersion: "9"},
 		{name: "rocky8", osName: "rocky", osVersion: "8"},
 		{name: "rocky9", osName: "rocky", osVersion: "9"},
+		{name: "rocky10", osName: "rocky", osVersion: "10"},
 		{name: "almalinux8", osName: "almalinux", osVersion: "8"},
 		{name: "almalinux9", osName: "almalinux", osVersion: "9"},
+		{name: "almalinux10", osName: "almalinux", osVersion: "10"},
 		{name: "debian12", osName: "debian", osVersion: "12"},
 		{name: "debian13", osName: "debian", osVersion: "13"},
 	}

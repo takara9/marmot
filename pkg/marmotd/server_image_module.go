@@ -35,14 +35,16 @@ func (m commonServerImageModule) GenerateCloudInitISO(path, password, sshKey str
 }
 
 var (
-	serverImageModuleUbuntu2204 = commonServerImageModule{key: "ubuntu22.04"}
-	serverImageModuleUbuntu2404 = commonServerImageModule{key: "ubuntu24.04"}
-	serverImageModuleUbuntu     = commonServerImageModule{key: "ubuntu"}
-	serverImageModuleAlpine323  = commonServerImageModule{key: "alpine3.23", setupBootVolumeFn: util.SetupAlpineLinux}
-	serverImageModuleRocky8     = commonServerImageModule{key: "rocky8", setupBootVolumeFn: util.SetupRockyLinux}
-	serverImageModuleRocky9     = commonServerImageModule{key: "rocky9", setupBootVolumeFn: util.SetupRockyLinux}
-	serverImageModuleAlmaLinux8 = commonServerImageModule{key: "almalinux8", setupBootVolumeFn: util.SetupAlmaLinux}
-	serverImageModuleAlmaLinux9 = commonServerImageModule{key: "almalinux9", setupBootVolumeFn: util.SetupAlmaLinux}
+	serverImageModuleUbuntu2204  = commonServerImageModule{key: "ubuntu22.04"}
+	serverImageModuleUbuntu2404  = commonServerImageModule{key: "ubuntu24.04"}
+	serverImageModuleUbuntu      = commonServerImageModule{key: "ubuntu"}
+	serverImageModuleAlpine323   = commonServerImageModule{key: "alpine3.23", setupBootVolumeFn: util.SetupAlpineLinux}
+	serverImageModuleRocky8      = commonServerImageModule{key: "rocky8", setupBootVolumeFn: util.SetupRockyLinux}
+	serverImageModuleRocky9      = commonServerImageModule{key: "rocky9", setupBootVolumeFn: util.SetupRockyLinux}
+	serverImageModuleRocky10     = commonServerImageModule{key: "rocky10", setupBootVolumeFn: util.SetupRockyLinux}
+	serverImageModuleAlmaLinux8  = commonServerImageModule{key: "almalinux8", setupBootVolumeFn: util.SetupAlmaLinux}
+	serverImageModuleAlmaLinux9  = commonServerImageModule{key: "almalinux9", setupBootVolumeFn: util.SetupAlmaLinux}
+	serverImageModuleAlmaLinux10 = commonServerImageModule{key: "almalinux10", setupBootVolumeFn: util.SetupAlmaLinux}
 	// Debian 12/13 は Ubuntu と同じ方式(netplan)でブートボリュームを初期化するため、
 	// setupBootVolumeFn は指定せず util.SetupLinux にフォールバックさせる。
 	serverImageModuleDebian12 = commonServerImageModule{key: "debian12"}
@@ -119,6 +121,8 @@ func resolveServerImageModuleFromOS(osName, osVersion string) (serverImageModule
 			return serverImageModuleRocky8, nil
 		case "9":
 			return serverImageModuleRocky9, nil
+		case "10":
+			return serverImageModuleRocky10, nil
 		default:
 			return nil, fmt.Errorf("unsupported rocky version: %s", version)
 		}
@@ -128,6 +132,8 @@ func resolveServerImageModuleFromOS(osName, osVersion string) (serverImageModule
 			return serverImageModuleAlmaLinux8, nil
 		case "9":
 			return serverImageModuleAlmaLinux9, nil
+		case "10":
+			return serverImageModuleAlmaLinux10, nil
 		default:
 			return nil, fmt.Errorf("unsupported almalinux version: %s", version)
 		}
@@ -162,10 +168,14 @@ func deriveOSFromVariant(osVariant string) (string, string) {
 	case strings.HasPrefix(v, "rocky9"), strings.HasPrefix(v, "rockey9"):
 		// rockey9 は rocky9 の旧表記(互換維持のため受け付ける)。
 		return "rocky", "9"
+	case strings.HasPrefix(v, "rocky10"):
+		return "rocky", "10"
 	case strings.HasPrefix(v, "almalinux8"):
 		return "almalinux", "8"
 	case strings.HasPrefix(v, "almalinux9"):
 		return "almalinux", "9"
+	case strings.HasPrefix(v, "almalinux10"):
+		return "almalinux", "10"
 	case strings.HasPrefix(v, "debian12"):
 		return "debian", "12"
 	case strings.HasPrefix(v, "debian13"):
