@@ -8,7 +8,28 @@ Rocky Linux、AlmaLinux などの RHEL 互換ディストリビューション�
 
 クラウドイメージの URL を登録できるだけでは対応完了としない。OS の識別、ダウンロード後のイメージ加工、起動時のボリューム設定、cloud-init のユーザー設定、VM 起動後の接続までを一連の動作として確認する。
 
-## 現状
+## 実装状況（更新）
+
+初回対応（Rocky Linux 9）および AlmaLinux 9、Debian 12/13、Rocky Linux 8、AlmaLinux 8 は既に実装済み。以下の経路がすべて対応している。
+
+- `validateImageOSSpec`: `rocky`（`8`/`9`）、`rockey`（`rocky` の旧表記、互換維持のため許可）、`almalinux`（`8`/`9`）、`debian`（`12`/`13`）
+- `resolveImageOSModuleFromSpec` / `resolveServerImageModuleFromOS`: `rocky8`、`rocky9`、`almalinux8`、`almalinux9`、`debian12`、`debian13` の各モジュールへ解決
+- `deriveOSFromVariant`: variant 文字列（`rocky8`/`rockey8`、`rocky9`/`rockey9`、`almalinux8`、`almalinux9`、`debian12`、`debian13`）からの OS 推定
+
+Rocky Linux 8 については、以下のテスト用 upstream cloud image で実イメージを検証済み。
+
+- `https://dl.rockylinux.org/pub/rocky/8/images/x86_64/Rocky-8-GenericCloud.latest.x86_64.qcow2`
+
+検証の結果、パーティション構成（GPT、LVM 無し、root が最大パーティション）は Rocky 9 と同様で、既存の汎用パーティション検出ロジック（`findRootPartitionNumber`）がそのまま使える。一方で Rocky 9/AlmaLinux 9 には無い固有差分として、Rocky Linux 8 の GenericCloud イメージは ifcfg-rh プラグイン向けの legacy ネットワークスクリプト（`/etc/sysconfig/network-scripts/ifcfg-eth0`、`ifcfg-ens3`）を同梱しており、NetworkManager の ifcfg-rh プラグインが既定で有効なため、marmot が書き込む NetworkManager keyfile 接続と競合しうる。この対策として `CreateNetworkManagerKeyfiles` に legacy ifcfg-\* 削除処理（`removeLegacyIfcfgNetworkScripts`）を追加済み（該当ファイルの無い Rocky 9/AlmaLinux 9 には影響しない）。
+
+AlmaLinux 8 についても対応済み。以下の upstream cloud image で実イメージを検証済み。
+
+- `https://repo.almalinux.org/almalinux/8/cloud/x86_64/images/AlmaLinux-8-GenericCloud-latest.x86_64.qcow2`
+
+検証の結果、パーティション構成（GPT、LVM 無し、root が最大パーティション）、`net.ifnames=0`（eth0/eth1 命名）、legacy ネットワークスクリプト（`/etc/sysconfig/network-scripts/ifcfg-eth0`）の同梱は Rocky Linux 8 と同様。Rocky 8 対応時に追加した `removeLegacyIfcfgNetworkScripts` は `SetupAlmaLinux` でも共通利用されるため、追加のコード変更無しでこの差分にも対応済み。
+
+
+## 現状（初回対応前の記録）
 
 - `os_images` の設定には `name`、`url`、`osName`、`osVersion` を指定できる。起動時の初期イメージ登録もこの情報を利用する。
 - `validateImageOSSpec` は既に `rockey` のバージョン `8` と `9` を許可している。一方、表記が `rockey` であり、一般的な名称 `rocky` とは異なる。既存データとの互換性を確認せずに値を置換しないこと。

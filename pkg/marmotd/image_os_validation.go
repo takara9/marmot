@@ -48,8 +48,8 @@ func validateImageOSSpec(spec *api.ImageSpec) error {
 			"8": {},
 			"9": {},
 		},
-		// 初回対応はバージョン9のみ。他バージョンは別途検証のうえ追加する(issue #622)。
 		"almalinux": {
+			"8": {},
 			"9": {},
 		},
 		"debian": {

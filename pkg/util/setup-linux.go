@@ -763,6 +763,16 @@ func validateNetplanRoute(nic api.NetworkInterface, route Route, ifaceName strin
 func CreateNetworkManagerKeyfiles(requestConfig []api.NetworkInterface, mountPoint string) error {
 	nicName := []string{"enp1s0", "enp2s0", "enp7s0", "enp8s0", "enp9s0", "enp10s0"}
 
+	// Rocky Linux 8 の GenericCloud イメージは ifcfg-rh プラグイン向けの
+	// /etc/sysconfig/network-scripts/ifcfg-eth0 等を同梱しており、NetworkManager の
+	// ifcfg-rh プラグインが既定で有効なため、ここで書き込む keyfile 接続と競合しうる
+	// (Rocky 9/AlmaLinux 9 の GenericCloud イメージにはこれらのファイルは無い)。
+	// keyfile 接続を一意の設定として確実に適用するため、残存する legacy ifcfg-* を
+	// 事前に削除する(issue #622)。
+	if err := removeLegacyIfcfgNetworkScripts(mountPoint); err != nil {
+		return err
+	}
+
 	connDir := filepath.Join(mountPoint, "etc", "NetworkManager", "system-connections")
 	if err := os.MkdirAll(connDir, 0755); err != nil {
 		return fmt.Errorf("failed to create NetworkManager system-connections directory: %w", err)
@@ -816,6 +826,35 @@ func CreateNetworkManagerKeyfiles(requestConfig []api.NetworkInterface, mountPoi
 
 		if err := writeNMConnectionFile(connDir, ifaceName, cfg); err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+// removeLegacyIfcfgNetworkScripts は /etc/sysconfig/network-scripts/ 配下の
+// legacy ifcfg-* ファイル(ifcfg-lo を除く)を削除する。NetworkManager の
+// ifcfg-rh プラグインが既定で有効な EL8 系イメージ(Rocky Linux 8 等)では、
+// これらのファイルが起動時に接続プロファイルとして読み込まれ、ここで書き込む
+// keyfile 接続と競合するため、事前に取り除く(issue #622)。対象ディレクトリや
+// ファイルが無い場合は何もしない(EL9 系イメージ等)。
+func removeLegacyIfcfgNetworkScripts(mountPoint string) error {
+	scriptsDir := filepath.Join(mountPoint, "etc", "sysconfig", "network-scripts")
+	entries, err := os.ReadDir(scriptsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to read legacy network-scripts directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		name := entry.Name()
+		if !strings.HasPrefix(name, "ifcfg-") || name == "ifcfg-lo" {
+			continue
+		}
+		if err := os.Remove(filepath.Join(scriptsDir, name)); err != nil {
+			return fmt.Errorf("failed to remove legacy network script %s: %w", name, err)
 		}
 	}
 

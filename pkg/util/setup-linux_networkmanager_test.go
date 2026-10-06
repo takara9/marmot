@@ -179,6 +179,43 @@ func TestCreateNetworkManagerKeyfilesMatchesByMacWhenAvailable(t *testing.T) {
 	}
 }
 
+func TestCreateNetworkManagerKeyfilesRemovesLegacyIfcfgScripts(t *testing.T) {
+	mountPoint := t.TempDir()
+
+	// Rocky Linux 8 GenericCloud イメージ相当: ifcfg-rh プラグイン向けの legacy
+	// ネットワークスクリプトが同梱されている状態を再現する(issue #622)。
+	scriptsDir := filepath.Join(mountPoint, "etc", "sysconfig", "network-scripts")
+	if err := os.MkdirAll(scriptsDir, 0755); err != nil {
+		t.Fatalf("MkdirAll() unexpected error = %v", err)
+	}
+	for _, name := range []string{"ifcfg-eth0", "ifcfg-ens3", "ifcfg-lo"} {
+		if err := os.WriteFile(filepath.Join(scriptsDir, name), []byte("DEVICE=x\n"), 0644); err != nil {
+			t.Fatalf("WriteFile(%s) unexpected error = %v", name, err)
+		}
+	}
+
+	if err := CreateNetworkManagerKeyfiles(nil, mountPoint); err != nil {
+		t.Fatalf("CreateNetworkManagerKeyfiles() unexpected error = %v", err)
+	}
+
+	for _, name := range []string{"ifcfg-eth0", "ifcfg-ens3"} {
+		if _, err := os.Stat(filepath.Join(scriptsDir, name)); !os.IsNotExist(err) {
+			t.Fatalf("expected legacy network script %s to be removed, stat err = %v", name, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(scriptsDir, "ifcfg-lo")); err != nil {
+		t.Fatalf("expected ifcfg-lo to be preserved, stat err = %v", err)
+	}
+}
+
+func TestRemoveLegacyIfcfgNetworkScriptsNoopWhenDirMissing(t *testing.T) {
+	mountPoint := t.TempDir()
+
+	if err := removeLegacyIfcfgNetworkScripts(mountPoint); err != nil {
+		t.Fatalf("removeLegacyIfcfgNetworkScripts() unexpected error = %v", err)
+	}
+}
+
 func TestCreateNetworkManagerKeyfilesFallsBackToInterfaceNameWithoutMac(t *testing.T) {
 	mountPoint := t.TempDir()
 
