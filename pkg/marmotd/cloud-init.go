@@ -114,6 +114,12 @@ ssh_authorized_keys:
 		builder.WriteString(fmt.Sprintf("  - name: %s\n", username))
 		builder.WriteString("    shell: /bin/bash\n")
 		builder.WriteString("    sudo: ALL=(ALL) NOPASSWD:ALL\n")
+		// lock_passwd を明示的に false にする。cloud-init はパスワード未指定のユーザーを
+		// 既定で lock_passwd:true 相当として扱い、/etc/shadow のパスワード欄が "!"(ロック)に
+		// なる。PAM経由でsshdが動くOS(Ubuntu/Rocky等)では公開鍵ログインに影響しないが、
+		// PAMを使わずビルドされたAlpineのOpenSSHは、ロックされたアカウントを認証方式に
+		// 関わらず拒否する("account is locked")ため、公開鍵ログインが明示的に必要になる。
+		builder.WriteString("    lock_passwd: false\n")
 		builder.WriteString("    ssh_authorized_keys:\n")
 		builder.WriteString(formatSSHKeys(sshKey, "      "))
 		builder.WriteString("\n")

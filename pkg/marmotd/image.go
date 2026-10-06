@@ -694,12 +694,11 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 
 	resizeTarget := nbdDev
 	usingPartitionTarget := false
-	// リサイズ対象は「ディスク上の最終パーティション」とする。Ubuntu/Alpineの単一パーティション
-	// 構成ではp1がそのまま最終パーティションになるが、Rocky 9のようにGPTで複数パーティション
-	// (bios_grub/ESP/boot/root等)を持つ構成では、qemu-img resizeで追加された空き領域は
-	// 物理的に最後のパーティションに隣接するため、常に"1"ではなく最終パーティション番号を
-	// 対象にする必要がある(issue #622)。
-	if partNum, err := waitForLastPartitionNumber(ctx, nbdDev, 5*time.Second); err == nil {
+	// リサイズ対象は「ディスク上で物理的に最後に位置するパーティション」とする。GPTの
+	// パーティション番号は物理的な並び順と一致するとは限らない(例: Ubuntu の cloud image は
+	// ルートパーティションの番号が1、bios_grub/ESP/bootが14/15/16だが、物理的にはルートが
+	// 最後に配置されている)ため、番号ではなく終了オフセットで判定する必要がある(issue #622)。
+	if partNum, err := waitForLastPhysicalPartitionNumber(ctx, nbdDev, 5*time.Second); err == nil {
 		partDev = fmt.Sprintf("%sp%d", nbdDev, partNum)
 		if err := runCmd(ctx, "parted", nbdDev, "--fix", "--script", "resizepart", strconv.Itoa(partNum), "100%"); err != nil {
 			return err
@@ -719,7 +718,7 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 			if err := refreshPartitionDevices(ctx, nbdDev); err != nil {
 				return err
 			}
-			partNum, err := waitForLastPartitionNumber(ctx, nbdDev, 30*time.Second)
+			partNum, err := waitForLastPhysicalPartitionNumber(ctx, nbdDev, 30*time.Second)
 			if err != nil {
 				return err
 			}
@@ -863,60 +862,77 @@ func findFreeNbdDeviceByIndex(i int) (string, error) {
 	return "", fmt.Errorf("device %s is busy", devicePath)
 }
 
-// findLastPartitionNumber は nbdDev (例: /dev/nbd0) に現在接続されているイメージの
-// パーティションテーブルを parted で直接読み取り、最大のパーティション番号
-// (= ディスク上最後のパーティション)を求める。qemu-img resize で追加された空き領域は
-// 物理的に最後のパーティションに隣接するため、単一パーティション構成(Ubuntu/Alpine)でも
-// GPTで複数パーティションを持つ構成(Rocky 9等)でも、常にこの最終パーティションがリサイズ対象になる。
+// findLastPhysicalPartitionNumber は nbdDev (例: /dev/nbd0) に現在接続されているイメージの
+// パーティションテーブルを parted で直接読み取り、ディスク上で物理的に最後に位置する
+// (終了オフセットが最大の)パーティション番号を求める。qemu-img resize で追加された空き領域は
+// 物理的にこのパーティションの直後に隣接するため、resizepart の対象として安全に100%まで
+// 拡張できるのはこのパーティションだけである。
+//
+// 当初は「最大のパーティション番号」を対象にしていたが、これは誤りだった。GPTの
+// パーティション番号は物理的な並び順とは無関係に採番される。例えば Ubuntu の
+// cloud image はルートパーティションを番号「1」とし、bios_grub/ESP/boot には
+// 14/15/16 という番号より大きい番号を割り当てている(ただし物理的な配置としては
+// ルートパーティションが最後に置かれている)。そのため「最大番号」を基準にすると、
+// Ubuntuでは /boot (番号16、物理的には先頭寄り)を誤ってリサイズ対象に選んでしまい、
+// 既存パーティションと重なって resizepart が失敗していた(issue #622, #737)。
 //
 // sysfs のパーティションデバイスノード(/sys/block/<dev>/<dev>pN)やカーネルの
 // パーティションスキャン状態には依存しない。NBDデバイス番号は使い回されるため、
 // udevd が無い/弱いCI環境では前回接続されていた別イメージのパーティション情報が
-// カーネル側に残留することがあり、sysfs を参照する方式では誤ったパーティション番号
-// (例: 1パーティションのUbuntuイメージに対し存在しない16番)を拾ってしまっていた
-// (issue #622, #737)。parted でオンディスクのパーティションテーブルを直接読むことで、
+// カーネル側に残留することがあり、sysfs を参照する方式では誤ったパーティション番号を
+// 拾ってしまう場合がある。parted でオンディスクのパーティションテーブルを直接読むことで、
 // この種の残留状態の影響を受けないようにしている。
-func findLastPartitionNumber(ctx context.Context, nbdDev string) (int, error) {
+func findLastPhysicalPartitionNumber(ctx context.Context, nbdDev string) (int, error) {
 	cmd := exec.CommandContext(ctx, "parted", "-m", "-s", nbdDev, "unit", "s", "print")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return 0, fmt.Errorf("parted -m -s %s unit s print failed: %w, output=%s", nbdDev, err, strings.TrimSpace(string(out)))
 	}
-	return parseLastPartitionNumberFromPartedOutput(string(out))
+	return parseLastPhysicalPartitionNumberFromPartedOutput(string(out))
 }
 
-// parseLastPartitionNumberFromPartedOutput は `parted -m -s <dev> unit s print` の出力から
-// 最大のパーティション番号を求める。ヘッダ行("BYT;")、ディスク概要行、qemu-img resize 直後に
-// 表示されるGPT不整合の警告メッセージなどは、いずれも先頭フィールドが数値にならないため
-// 自然に無視される。
-func parseLastPartitionNumberFromPartedOutput(output string) (int, error) {
-	maxNum := 0
+// parseLastPhysicalPartitionNumberFromPartedOutput は `parted -m -s <dev> unit s print` の
+// 出力から、終了オフセット(END)が最大のパーティション番号を求める。ヘッダ行("BYT;")、
+// ディスク概要行、qemu-img resize 直後に表示されるGPT不整合の警告メッセージなどは、
+// いずれも先頭フィールドが数値にならないため自然に無視される。
+func parseLastPhysicalPartitionNumberFromPartedOutput(output string) (int, error) {
+	bestNum := 0
+	bestEnd := int64(-1)
 	for _, line := range strings.Split(output, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		field, _, _ := strings.Cut(line, ":")
-		n, err := strconv.Atoi(field)
+		fields := strings.Split(line, ":")
+		if len(fields) < 3 {
+			continue
+		}
+		num, err := strconv.Atoi(fields[0])
 		if err != nil {
 			continue
 		}
-		if n > maxNum {
-			maxNum = n
+		end, err := strconv.ParseInt(strings.TrimSuffix(fields[2], "s"), 10, 64)
+		if err != nil {
+			continue
+		}
+		if end > bestEnd {
+			bestEnd = end
+			bestNum = num
 		}
 	}
-	if maxNum == 0 {
+	if bestNum == 0 {
 		return 0, fmt.Errorf("no partitions found in parted output")
 	}
-	return maxNum, nil
+	return bestNum, nil
 }
 
-// waitForLastPartitionNumber は findLastPartitionNumber が成功するまでポーリングする。
-// qemu-nbd 接続直後は一時的にI/Oが安定しないことがあるため、短時間のリトライを行う。
-func waitForLastPartitionNumber(ctx context.Context, nbdDev string, timeout time.Duration) (int, error) {
+// waitForLastPhysicalPartitionNumber は findLastPhysicalPartitionNumber が成功するまで
+// ポーリングする。qemu-nbd 接続直後は一時的にI/Oが安定しないことがあるため、短時間の
+// リトライを行う。
+func waitForLastPhysicalPartitionNumber(ctx context.Context, nbdDev string, timeout time.Duration) (int, error) {
 	deadline := time.Now().Add(timeout)
 	for {
-		if n, err := findLastPartitionNumber(ctx, nbdDev); err == nil {
+		if n, err := findLastPhysicalPartitionNumber(ctx, nbdDev); err == nil {
 			return n, nil
 		}
 		if err := ctx.Err(); err != nil {

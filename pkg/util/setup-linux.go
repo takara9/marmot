@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -392,6 +393,13 @@ func MountVolume(v api.Volume) (string, string, error) {
 		time.Sleep(1 * time.Second) // デバイス作成を待機
 
 		mountCandidates := []string{fmt.Sprintf("%sp1", nbdDevice), nbdDevice}
+		// Rocky 9 の GenericCloud イメージのように、GPTで複数パーティション
+		// (bios_grub/ESP/boot/root等)を持ち、ルートファイルシステムがパーティション1ではない
+		// 構成に対応するため、検出できた場合はルートパーティション(最大サイズのパーティション)を
+		// 最優先のマウント候補にする(issue #622)。検出できない場合は従来通りp1→ディスク全体の順で試す。
+		if rootPartNum, err := findRootPartitionNumber(nbdDevice); err == nil && rootPartNum != 1 {
+			mountCandidates = append([]string{fmt.Sprintf("%sp%d", nbdDevice, rootPartNum)}, mountCandidates...)
+		}
 		mounted := false
 		for _, dev := range mountCandidates {
 			debugPrintln("Mounting", "mount", "-t", "ext4", dev, mountPoint)
@@ -402,7 +410,7 @@ func MountVolume(v api.Volume) (string, string, error) {
 				break
 			}
 
-			// filesystem type を固定しない再試行（alpine cloud image 互換）
+			// filesystem type を固定しない再試行（alpine cloud image、xfs(Rocky)互換）
 			cmd = exec.Command("mount", dev, mountPoint)
 			err = cmd.Run()
 			if err == nil {
@@ -709,6 +717,13 @@ func validateNetplanRoute(nic api.NetworkInterface, route Route, ifaceName strin
 // CreateNetworkManagerKeyfiles は Rocky Linux (NetworkManager) 向けの NIC 設定を
 // keyfile 形式(/etc/NetworkManager/system-connections/*.nmconnection)で書き出す。
 // NIC名の割り当てや静的アドレス指定時の挙動は CreateNetplanInterfaces と揃える。
+//
+// Rocky Linux の GenericCloud イメージは net.ifnames=0 (従来の eth0/eth1 命名)が既定であり、
+// Ubuntu の cloud image が前提とする PCIスロットベースの命名(enp1s0 等)にはならない
+// (enp1s0 等は udev の altname としてのみ残る)。そのため接続プロファイルを interface-name
+// でマッチさせると実デバイスに一致せず適用されない。MACアドレスが分かっている場合は
+// interface-name の代わりに mac-address でマッチさせることで、実際のカーネル命名に
+// 依存せず正しいNICへ適用されるようにする(issue #622)。
 func CreateNetworkManagerKeyfiles(requestConfig []api.NetworkInterface, mountPoint string) error {
 	nicName := []string{"enp1s0", "enp2s0", "enp7s0", "enp8s0", "enp9s0", "enp10s0"}
 
@@ -725,6 +740,12 @@ func CreateNetworkManagerKeyfiles(requestConfig []api.NetworkInterface, mountPoi
 	for idx, nic := range requestConfig {
 		ifaceName := nicName[idx]
 		cfg := nmConnectionConfig{}
+
+		if nic.Mac != nil {
+			if mac := strings.TrimSpace(*nic.Mac); mac != "" {
+				cfg.mac = mac
+			}
+		}
 
 		// IPアドレスとネットマスク長があれば、DHCPは無効にする(CreateNetplanInterfacesと同様)
 		if nic.Address != nil && nic.Netmasklen != nil {
@@ -767,6 +788,7 @@ func CreateNetworkManagerKeyfiles(requestConfig []api.NetworkInterface, mountPoi
 
 // nmConnectionConfig は1つの NetworkManager keyfile 接続プロファイルを組み立てるための中間表現。
 type nmConnectionConfig struct {
+	mac           string
 	address       string
 	addressIsIPv6 bool
 	dhcp4         bool
@@ -786,10 +808,19 @@ func writeNMConnectionFile(connDir, ifaceName string, cfg nmConnectionConfig) er
 	fmt.Fprintf(&b, "id=%s\n", ifaceName)
 	fmt.Fprintf(&b, "uuid=%s\n", uuid.NewString())
 	b.WriteString("type=ethernet\n")
-	fmt.Fprintf(&b, "interface-name=%s\n", ifaceName)
+	if cfg.mac == "" {
+		// MACアドレスが分からない場合のみ、従来通りインターフェース名でマッチさせる
+		// (net.ifnames=0 環境では実デバイス名と一致せず適用されないため、可能な限り
+		// mac-address でのマッチを優先する)。
+		fmt.Fprintf(&b, "interface-name=%s\n", ifaceName)
+	}
 	b.WriteString("autoconnect=true\n\n")
 
-	b.WriteString("[ethernet]\n\n")
+	b.WriteString("[ethernet]\n")
+	if cfg.mac != "" {
+		fmt.Fprintf(&b, "mac-address=%s\n", cfg.mac)
+	}
+	b.WriteString("\n")
 
 	ipv4Routes, ipv6Routes := splitRoutesByFamily(cfg.routes)
 	ipv4DNS, ipv6DNS := splitAddressesByFamily(cfg.dnsAddresses)
@@ -946,6 +977,68 @@ func findFreeNbdDevice() (string, error) {
 		}
 	}
 	return "", fmt.Errorf("no free nbd device found")
+}
+
+// findRootPartitionNumber は、nbdDevice (例: /dev/nbd0) に接続されているイメージの
+// パーティションテーブルを parted で直接読み取り、ルートファイルシステムが入っている
+// パーティション番号を求める。マウント対象の決定に使用する(issue #622)。
+//
+// 当初は「最大のパーティション番号」を対象にしていたが、これは誤りだった。GPTの
+// パーティション番号は物理的な並び順やサイズとは無関係に採番される。例えば Ubuntu の
+// cloud image はルートパーティションを番号「1」とし、bios_grub/ESP/boot には
+// 14/15/16 という番号より大きい番号を割り当てている(ルートは最大番号ではない)。
+// そのため「最大番号」を基準にすると、Ubuntuでは /boot (番号16)を誤ってルートとして
+// マウントしてしまい、/etc 等が存在せず以降のセットアップが失敗していた。
+//
+// ルートファイルシステムはディスク上で最も大きいパーティションになるという前提は
+// Ubuntu・Rocky 9 のどちらの実イメージでも成立するため、パーティション番号ではなく
+// 「最大サイズのパーティション」を選ぶ方式にしている。
+//
+// sysfsのパーティションデバイスノードはNBDデバイス番号の使い回しで古い情報が残ることがあるため
+// 参照せず、オンディスクのパーティションテーブルを直接読む。pkg/marmotd にも同種のロジックが
+// あるが、pkg/marmotd は pkg/util に依存しており循環参照になるため、ここに複製している
+// (managementNetworkAptCacherAddress/Port と同じ理由。値を変更する場合は両方を同期すること)。
+func findRootPartitionNumber(nbdDevice string) (int, error) {
+	out, err := exec.Command("parted", "-m", "-s", nbdDevice, "unit", "s", "print").CombinedOutput()
+	if err != nil {
+		return 0, fmt.Errorf("parted -m -s %s unit s print failed: %w, output=%s", nbdDevice, err, strings.TrimSpace(string(out)))
+	}
+	return parseRootPartitionNumberFromPartedOutput(string(out))
+}
+
+// parseRootPartitionNumberFromPartedOutput は `parted -m -s <dev> unit s print` の出力から、
+// 最もサイズの大きいパーティションの番号を求める。ヘッダ行("BYT;")、ディスク概要行、
+// qemu-img resize 直後に表示されるGPT不整合の警告メッセージなどは、いずれも先頭フィールドが
+// 数値にならないため自然に無視される。
+func parseRootPartitionNumberFromPartedOutput(output string) (int, error) {
+	bestNum := 0
+	bestSize := int64(-1)
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		fields := strings.Split(line, ":")
+		if len(fields) < 4 {
+			continue
+		}
+		num, err := strconv.Atoi(fields[0])
+		if err != nil {
+			continue
+		}
+		size, err := strconv.ParseInt(strings.TrimSuffix(fields[3], "s"), 10, 64)
+		if err != nil {
+			continue
+		}
+		if size > bestSize {
+			bestSize = size
+			bestNum = num
+		}
+	}
+	if bestNum == 0 {
+		return 0, fmt.Errorf("no partitions found in parted output")
+	}
+	return bestNum, nil
 }
 
 func findTargertPartition(lvPath string) (string, error) {

@@ -146,3 +146,60 @@ func TestCreateNetworkManagerKeyfilesHonorsDhcpFlags(t *testing.T) {
 		t.Fatalf("nmconnection missing ipv6 method=disabled, got:\n%s", got)
 	}
 }
+
+func TestCreateNetworkManagerKeyfilesMatchesByMacWhenAvailable(t *testing.T) {
+	mountPoint := t.TempDir()
+
+	requestConfig := []api.NetworkInterface{
+		{
+			Networkname: "host-bridge",
+			Mac:         StringPtr("b6:f1:70:c3:c2:83"),
+			Address:     StringPtr("192.168.1.176"),
+			Netmasklen:  IntPtrInt(24),
+		},
+	}
+
+	if err := CreateNetworkManagerKeyfiles(requestConfig, mountPoint); err != nil {
+		t.Fatalf("CreateNetworkManagerKeyfiles() unexpected error = %v", err)
+	}
+
+	data, err := os.ReadFile(connFilePath(mountPoint, "enp1s0"))
+	if err != nil {
+		t.Fatalf("ReadFile() unexpected error = %v", err)
+	}
+	got := string(data)
+	// Rocky Linuxのcloud imageはnet.ifnames=0でeth0/eth1になり、enp1s0はaltnameにしか
+	// 残らないため、interface-nameでのマッチは使わずMACアドレスでマッチさせる必要がある
+	// (issue #622)。
+	if strings.Contains(got, "interface-name=") {
+		t.Fatalf("nmconnection should not match by interface-name when MAC is known, got:\n%s", got)
+	}
+	if !strings.Contains(got, "[ethernet]\nmac-address=b6:f1:70:c3:c2:83") {
+		t.Fatalf("nmconnection missing mac-address match, got:\n%s", got)
+	}
+}
+
+func TestCreateNetworkManagerKeyfilesFallsBackToInterfaceNameWithoutMac(t *testing.T) {
+	mountPoint := t.TempDir()
+
+	requestConfig := []api.NetworkInterface{
+		{
+			Networkname: "host-bridge",
+			Address:     StringPtr("192.168.1.176"),
+			Netmasklen:  IntPtrInt(24),
+		},
+	}
+
+	if err := CreateNetworkManagerKeyfiles(requestConfig, mountPoint); err != nil {
+		t.Fatalf("CreateNetworkManagerKeyfiles() unexpected error = %v", err)
+	}
+
+	data, err := os.ReadFile(connFilePath(mountPoint, "enp1s0"))
+	if err != nil {
+		t.Fatalf("ReadFile() unexpected error = %v", err)
+	}
+	got := string(data)
+	if !strings.Contains(got, "interface-name=enp1s0") {
+		t.Fatalf("nmconnection should fall back to interface-name when MAC is unknown, got:\n%s", got)
+	}
+}
