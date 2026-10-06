@@ -75,6 +75,8 @@ var (
 	imageOSModuleAlpine323  = commonImageOSModule{moduleKey: "alpine3.23", customizeHandler: customizeAlpineQcowImageWithContext}
 	imageOSModuleRocky9     = commonImageOSModule{moduleKey: "rocky9", customizeHandler: customizeRockyQcowImageWithContext}
 	imageOSModuleAlmaLinux9 = commonImageOSModule{moduleKey: "almalinux9", customizeHandler: customizeAlmaLinuxQcowImageWithContext}
+	imageOSModuleDebian12   = commonImageOSModule{moduleKey: "debian12", customizeHandler: customizeDebianQcowImageWithContext}
+	imageOSModuleDebian13   = commonImageOSModule{moduleKey: "debian13", customizeHandler: customizeDebianQcowImageWithContext}
 )
 
 func resolveImageOSModuleFromImage(img api.Image) (imageOSModule, error) {
@@ -117,6 +119,15 @@ func resolveImageOSModuleFromSpec(osName, osVersion string) (imageOSModule, erro
 			return imageOSModuleAlmaLinux9, nil
 		}
 		return nil, fmt.Errorf("unsupported almalinux image module version: %s", version)
+	case "debian":
+		switch version {
+		case "12":
+			return imageOSModuleDebian12, nil
+		case "13":
+			return imageOSModuleDebian13, nil
+		default:
+			return nil, fmt.Errorf("unsupported debian image module version: %s", version)
+		}
 	case "":
 		return imageOSModuleUbuntu2204, nil
 	default:

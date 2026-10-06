@@ -29,7 +29,10 @@ func TestResolveImageOSModuleFromSpec(t *testing.T) {
 		{name: "rockyUnsupportedVersion", osName: "rocky", osVersion: "8", wantErr: true},
 		{name: "almalinux9", osName: "almalinux", osVersion: "9", wantKey: "almalinux9"},
 		{name: "almalinuxUnsupportedVersion", osName: "almalinux", osVersion: "8", wantErr: true},
-		{name: "unknown", osName: "debian", osVersion: "12", wantErr: true},
+		{name: "debian12", osName: "debian", osVersion: "12", wantKey: "debian12"},
+		{name: "debian13", osName: "debian", osVersion: "13", wantKey: "debian13"},
+		{name: "debianUnsupportedVersion", osName: "debian", osVersion: "11", wantErr: true},
+		{name: "unknown", osName: "oracle", osVersion: "9", wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -132,6 +135,38 @@ func TestAlmaLinux9ImageModuleUsesAlmaLinuxCustomizeHandler(t *testing.T) {
 		t.Fatalf("mod.key() = %q, want %q", got, "almalinux9")
 	}
 	// Empty path should fail in customizeAlmaLinuxQcowImageWithContext, proving delegation works.
+	if err := mod.customizeDownloadedImage(context.Background(), ""); err == nil {
+		t.Fatalf("expected customizeDownloadedImage to return error for empty path")
+	}
+}
+
+func TestDebian13ImageModuleUsesDebianCustomizeHandler(t *testing.T) {
+	t.Parallel()
+
+	mod, err := resolveImageOSModuleFromSpec("debian", "13")
+	if err != nil {
+		t.Fatalf("resolveImageOSModuleFromSpec() error = %v", err)
+	}
+	if got := mod.key(); got != "debian13" {
+		t.Fatalf("mod.key() = %q, want %q", got, "debian13")
+	}
+	// Empty path should fail in customizeDebianQcowImageWithContext, proving delegation works.
+	if err := mod.customizeDownloadedImage(context.Background(), ""); err == nil {
+		t.Fatalf("expected customizeDownloadedImage to return error for empty path")
+	}
+}
+
+func TestDebian12ImageModuleUsesDebianCustomizeHandler(t *testing.T) {
+	t.Parallel()
+
+	mod, err := resolveImageOSModuleFromSpec("debian", "12")
+	if err != nil {
+		t.Fatalf("resolveImageOSModuleFromSpec() error = %v", err)
+	}
+	if got := mod.key(); got != "debian12" {
+		t.Fatalf("mod.key() = %q, want %q", got, "debian12")
+	}
+	// Empty path should fail in customizeDebianQcowImageWithContext, proving delegation works.
 	if err := mod.customizeDownloadedImage(context.Background(), ""); err == nil {
 		t.Fatalf("expected customizeDownloadedImage to return error for empty path")
 	}

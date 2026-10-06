@@ -53,6 +53,7 @@ func validateImageOSSpec(spec *api.ImageSpec) error {
 			"9": {},
 		},
 		"debian": {
+			"12": {},
 			"13": {},
 		},
 	}

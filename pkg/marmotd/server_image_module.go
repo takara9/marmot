@@ -41,6 +41,10 @@ var (
 	serverImageModuleAlpine323  = commonServerImageModule{key: "alpine3.23", setupBootVolumeFn: util.SetupAlpineLinux}
 	serverImageModuleRocky9     = commonServerImageModule{key: "rocky9", setupBootVolumeFn: util.SetupRockyLinux}
 	serverImageModuleAlmaLinux9 = commonServerImageModule{key: "almalinux9", setupBootVolumeFn: util.SetupAlmaLinux}
+	// Debian 12/13 は Ubuntu と同じ方式(netplan)でブートボリュームを初期化するため、
+	// setupBootVolumeFn は指定せず util.SetupLinux にフォールバックさせる。
+	serverImageModuleDebian12 = commonServerImageModule{key: "debian12"}
+	serverImageModuleDebian13 = commonServerImageModule{key: "debian13"}
 )
 
 func normalizeServerImageDefault(server *api.Server) {
@@ -117,6 +121,15 @@ func resolveServerImageModuleFromOS(osName, osVersion string) (serverImageModule
 			return serverImageModuleAlmaLinux9, nil
 		}
 		return nil, fmt.Errorf("unsupported almalinux version: %s", version)
+	case "debian":
+		switch version {
+		case "12":
+			return serverImageModuleDebian12, nil
+		case "13":
+			return serverImageModuleDebian13, nil
+		default:
+			return nil, fmt.Errorf("unsupported debian version: %s", version)
+		}
 	case "":
 		return serverImageModuleUbuntu2204, nil
 	default:
@@ -138,6 +151,10 @@ func deriveOSFromVariant(osVariant string) (string, string) {
 		return "rocky", "9"
 	case strings.HasPrefix(v, "almalinux9"):
 		return "almalinux", "9"
+	case strings.HasPrefix(v, "debian12"):
+		return "debian", "12"
+	case strings.HasPrefix(v, "debian13"):
+		return "debian", "13"
 	default:
 		return "", ""
 	}

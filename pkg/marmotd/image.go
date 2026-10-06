@@ -575,6 +575,48 @@ func customizeUbuntuQcowImageWithContext(ctx context.Context, imagePath string) 
 	return nil
 }
 
+// customizeDebianQcowImageWithContext は Ubuntu と同じ方式(netplan、sshサービス名)で
+// Debian cloud image を加工する。root パスワードのみ他OSと同様に OS 名に合わせる(issue #622)。
+func customizeDebianQcowImageWithContext(ctx context.Context, imagePath string) error {
+	timeout := contextTimeoutHint(ctx)
+	netplanConfig := "network:\n" +
+		"  version: 2\n" +
+		"  ethernets:\n" +
+		"    enp1s0:\n" +
+		"      dhcp4: false\n" +
+		"      dhcp6: false\n" +
+		"    enp2s0:\n" +
+		"      dhcp4: false\n" +
+		"      dhcp6: false\n" +
+		"    enp7s0:\n" +
+		"      dhcp4: false\n" +
+		"      dhcp6: false\n" +
+		"    enp8s0:\n" +
+		"      dhcp4: false\n" +
+		"      dhcp6: false\n"
+
+	args := []string{
+		"-a", imagePath,
+		"--root-password", "password:debian",
+		"--edit", "/etc/ssh/sshd_config: s/^#?PermitRootLogin.*/PermitRootLogin yes/",
+		"--edit", "/etc/ssh/sshd_config: s/^#?PasswordAuthentication.*/PasswordAuthentication yes/",
+		"--run-command", "if ls /etc/ssh/sshd_config.d/*cloud*.conf >/dev/null 2>&1; then rm -f /etc/ssh/sshd_config.d/*cloud*.conf; fi",
+		"--run-command", "ssh-keygen -A",
+		"--run-command", "systemctl enable ssh",
+		"--run-command", "systemctl restart ssh",
+		"--write", "/etc/netplan/00-nic.yaml:" + netplanConfig,
+	}
+
+	cmd := exec.CommandContext(ctx, "virt-customize", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return wrapDeadlineExceeded(fmt.Errorf("virt-customize failed: %w, output: %s", err, strings.TrimSpace(string(output))), "QCOW2 イメージ設定", timeout)
+	}
+
+	slog.Debug("virt-customize completed for debian", "imagePath", imagePath, "output", strings.TrimSpace(string(output)))
+	return nil
+}
+
 func customizeRockyQcowImageWithContext(ctx context.Context, imagePath string) error {
 	timeout := contextTimeoutHint(ctx)
 	args := []string{
