@@ -27,6 +27,8 @@ func TestResolveImageOSModuleFromSpec(t *testing.T) {
 		{name: "rocky9", osName: "rocky", osVersion: "9", wantKey: "rocky9"},
 		{name: "rockey9Alias", osName: "rockey", osVersion: "9", wantKey: "rocky9"},
 		{name: "rockyUnsupportedVersion", osName: "rocky", osVersion: "8", wantErr: true},
+		{name: "almalinux9", osName: "almalinux", osVersion: "9", wantKey: "almalinux9"},
+		{name: "almalinuxUnsupportedVersion", osName: "almalinux", osVersion: "8", wantErr: true},
 		{name: "unknown", osName: "debian", osVersion: "12", wantErr: true},
 	}
 
@@ -114,6 +116,22 @@ func TestRocky9ImageModuleUsesRockyCustomizeHandler(t *testing.T) {
 		t.Fatalf("mod.key() = %q, want %q", got, "rocky9")
 	}
 	// Empty path should fail in customizeRockyQcowImageWithContext, proving delegation works.
+	if err := mod.customizeDownloadedImage(context.Background(), ""); err == nil {
+		t.Fatalf("expected customizeDownloadedImage to return error for empty path")
+	}
+}
+
+func TestAlmaLinux9ImageModuleUsesAlmaLinuxCustomizeHandler(t *testing.T) {
+	t.Parallel()
+
+	mod, err := resolveImageOSModuleFromSpec("almalinux", "9")
+	if err != nil {
+		t.Fatalf("resolveImageOSModuleFromSpec() error = %v", err)
+	}
+	if got := mod.key(); got != "almalinux9" {
+		t.Fatalf("mod.key() = %q, want %q", got, "almalinux9")
+	}
+	// Empty path should fail in customizeAlmaLinuxQcowImageWithContext, proving delegation works.
 	if err := mod.customizeDownloadedImage(context.Background(), ""); err == nil {
 		t.Fatalf("expected customizeDownloadedImage to return error for empty path")
 	}

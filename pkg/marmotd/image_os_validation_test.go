@@ -47,6 +47,7 @@ func TestValidateImageOSSpecSupportsRequestedOSMatrix(t *testing.T) {
 		{name: "rockey", osName: "rockey", osVersion: "9"},
 		{name: "rocky8", osName: "rocky", osVersion: "8"},
 		{name: "rocky9", osName: "rocky", osVersion: "9"},
+		{name: "almalinux9", osName: "almalinux", osVersion: "9"},
 		{name: "debian", osName: "debian", osVersion: "13"},
 	}
 
@@ -75,6 +76,14 @@ func TestValidateImageOSSpecRejectsInvalidVersionPerOS(t *testing.T) {
 	err = validateImageOSSpec(&api.ImageSpec{
 		OsName:    util.StringPtr("debian"),
 		OsVersion: util.StringPtr("12"),
+	})
+	if err == nil {
+		t.Fatalf("validateImageOSSpec() expected version validation error")
+	}
+
+	err = validateImageOSSpec(&api.ImageSpec{
+		OsName:    util.StringPtr("almalinux"),
+		OsVersion: util.StringPtr("8"),
 	})
 	if err == nil {
 		t.Fatalf("validateImageOSSpec() expected version validation error")

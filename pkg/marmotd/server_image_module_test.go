@@ -21,8 +21,10 @@ func TestResolveServerImageModuleFromOS(t *testing.T) {
 		{name: "ubuntu fallback", osName: "ubuntu", osVersion: "26.04", wantKey: "ubuntu"},
 		{name: "rocky 9", osName: "rocky", osVersion: "9", wantKey: "rocky9"},
 		{name: "rockey 9 alias", osName: "rockey", osVersion: "9", wantKey: "rocky9"},
+		{name: "almalinux 9", osName: "almalinux", osVersion: "9", wantKey: "almalinux9"},
 		{name: "unsupported alpine", osName: "alpine", osVersion: "3.24", wantErr: true},
 		{name: "unsupported rocky version", osName: "rocky", osVersion: "8", wantErr: true},
+		{name: "unsupported almalinux version", osName: "almalinux", osVersion: "8", wantErr: true},
 		{name: "unsupported os", osName: "debian", osVersion: "13", wantErr: true},
 	}
 
@@ -84,6 +86,7 @@ func TestDeriveOSFromVariant(t *testing.T) {
 		{variant: "alpine3.23", wantName: "alpine", wantVersion: "3.23"},
 		{variant: "rocky9", wantName: "rocky", wantVersion: "9"},
 		{variant: "rockey9", wantName: "rocky", wantVersion: "9"},
+		{variant: "almalinux9", wantName: "almalinux", wantVersion: "9"},
 		{variant: "unknown", wantName: "", wantVersion: ""},
 	}
 

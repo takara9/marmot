@@ -40,6 +40,7 @@ var (
 	serverImageModuleUbuntu     = commonServerImageModule{key: "ubuntu"}
 	serverImageModuleAlpine323  = commonServerImageModule{key: "alpine3.23", setupBootVolumeFn: util.SetupAlpineLinux}
 	serverImageModuleRocky9     = commonServerImageModule{key: "rocky9", setupBootVolumeFn: util.SetupRockyLinux}
+	serverImageModuleAlmaLinux9 = commonServerImageModule{key: "almalinux9", setupBootVolumeFn: util.SetupAlmaLinux}
 )
 
 func normalizeServerImageDefault(server *api.Server) {
@@ -111,6 +112,11 @@ func resolveServerImageModuleFromOS(osName, osVersion string) (serverImageModule
 			return serverImageModuleRocky9, nil
 		}
 		return nil, fmt.Errorf("unsupported rocky version: %s", version)
+	case "almalinux":
+		if version == "9" {
+			return serverImageModuleAlmaLinux9, nil
+		}
+		return nil, fmt.Errorf("unsupported almalinux version: %s", version)
 	case "":
 		return serverImageModuleUbuntu2204, nil
 	default:
@@ -130,6 +136,8 @@ func deriveOSFromVariant(osVariant string) (string, string) {
 	case strings.HasPrefix(v, "rocky9"), strings.HasPrefix(v, "rockey9"):
 		// rockey9 は rocky9 の旧表記(互換維持のため受け付ける)。
 		return "rocky", "9"
+	case strings.HasPrefix(v, "almalinux9"):
+		return "almalinux", "9"
 	default:
 		return "", ""
 	}

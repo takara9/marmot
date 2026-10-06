@@ -112,6 +112,42 @@ func SetupRockyLinux(spec api.Server) error {
 	return nil
 }
 
+// SetupAlmaLinux は AlmaLinux のブートボリュームを初期化する。
+// ネットワーク設定は Rocky Linux と同様に NetworkManager の keyfile 形式で書き込む
+// (AlmaLinux 9 の GenericCloud イメージも NetworkManager が既定のネットワークマネージャ
+// のため)。
+func SetupAlmaLinux(spec api.Server) error {
+	if spec.Spec.BootVolume == nil {
+		return fmt.Errorf("BootVolume is nil")
+	}
+
+	mountPoint, nbdDev, err := MountVolume(*spec.Spec.BootVolume)
+	if err != nil {
+		slog.Error("MountVolume failed", "error", err)
+		return err
+	}
+	defer func() {
+		_ = UnMountVolume(*spec.Spec.BootVolume, mountPoint, nbdDev)
+	}()
+
+	if err := setupMountedIdentity(spec, mountPoint); err != nil {
+		return err
+	}
+
+	// mgmtネットワークが常に強制付与されるため、通常ここでnilになることは無い(issue #696)。
+	// defaultネットワークへの自動フォールバックは廃止したため、念のため空スライスにする。
+	if spec.Spec.NetworkInterface == nil {
+		spec.Spec.NetworkInterface = &[]api.NetworkInterface{}
+	}
+
+	if err := CreateNetworkManagerKeyfiles(*spec.Spec.NetworkInterface, mountPoint); err != nil {
+		slog.Error("CreateNetworkManagerKeyfiles failed", "error", err)
+		return err
+	}
+
+	return nil
+}
+
 func setupLinuxMountedVolume(spec api.Server, mountPoint string) error {
 	if err := setupMountedIdentity(spec, mountPoint); err != nil {
 		return err

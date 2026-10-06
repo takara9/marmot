@@ -74,6 +74,7 @@ var (
 	imageOSModuleUbuntu     = commonImageOSModule{moduleKey: "ubuntu"}
 	imageOSModuleAlpine323  = commonImageOSModule{moduleKey: "alpine3.23", customizeHandler: customizeAlpineQcowImageWithContext}
 	imageOSModuleRocky9     = commonImageOSModule{moduleKey: "rocky9", customizeHandler: customizeRockyQcowImageWithContext}
+	imageOSModuleAlmaLinux9 = commonImageOSModule{moduleKey: "almalinux9", customizeHandler: customizeAlmaLinuxQcowImageWithContext}
 )
 
 func resolveImageOSModuleFromImage(img api.Image) (imageOSModule, error) {
@@ -111,6 +112,11 @@ func resolveImageOSModuleFromSpec(osName, osVersion string) (imageOSModule, erro
 			return imageOSModuleRocky9, nil
 		}
 		return nil, fmt.Errorf("unsupported rocky image module version: %s", version)
+	case "almalinux":
+		if version == "9" {
+			return imageOSModuleAlmaLinux9, nil
+		}
+		return nil, fmt.Errorf("unsupported almalinux image module version: %s", version)
 	case "":
 		return imageOSModuleUbuntu2204, nil
 	default:

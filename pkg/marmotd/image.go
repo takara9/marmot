@@ -598,6 +598,29 @@ func customizeRockyQcowImageWithContext(ctx context.Context, imagePath string) e
 	return nil
 }
 
+func customizeAlmaLinuxQcowImageWithContext(ctx context.Context, imagePath string) error {
+	timeout := contextTimeoutHint(ctx)
+	args := []string{
+		"-a", imagePath,
+		"--root-password", "password:almalinux",
+		"--edit", "/etc/ssh/sshd_config: s/^#?PermitRootLogin.*/PermitRootLogin yes/",
+		"--edit", "/etc/ssh/sshd_config: s/^#?PasswordAuthentication.*/PasswordAuthentication yes/",
+		"--run-command", "if ls /etc/ssh/sshd_config.d/*cloud*.conf >/dev/null 2>&1; then rm -f /etc/ssh/sshd_config.d/*cloud*.conf; fi",
+		"--run-command", "ssh-keygen -A",
+		"--run-command", "systemctl enable sshd",
+		"--run-command", "systemctl restart sshd",
+	}
+
+	cmd := exec.CommandContext(ctx, "virt-customize", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return wrapDeadlineExceeded(fmt.Errorf("virt-customize failed: %w, output: %s", err, strings.TrimSpace(string(output))), "QCOW2 イメージ設定", timeout)
+	}
+
+	slog.Debug("virt-customize completed for almalinux", "imagePath", imagePath, "output", strings.TrimSpace(string(output)))
+	return nil
+}
+
 func customizeAlpineQcowImageWithContext(ctx context.Context, imagePath string) error {
 	timeout := contextTimeoutHint(ctx)
 	args := []string{
