@@ -838,7 +838,7 @@ type ifupdownInterfaceConfig struct {
 func writeIfupdownInterfaceFile(interfacesDir, ifaceName string, cfg ifupdownInterfaceConfig) error {
 	var b strings.Builder
 	b.WriteString("# Managed by marmot. Do not edit manually (issue #622).\n")
-	b.WriteString(fmt.Sprintf("auto %s\n", ifaceName))
+	fmt.Fprintf(&b, "auto %s\n", ifaceName)
 
 	switch {
 	case cfg.address != "":
@@ -846,33 +846,33 @@ func writeIfupdownInterfaceFile(interfacesDir, ifaceName string, cfg ifupdownInt
 		if cfg.addressIsIPv6 {
 			family = "inet6"
 		}
-		b.WriteString(fmt.Sprintf("iface %s %s static\n", ifaceName, family))
-		b.WriteString(fmt.Sprintf("    address %s\n", cfg.address))
+		fmt.Fprintf(&b, "iface %s %s static\n", ifaceName, family)
+		fmt.Fprintf(&b, "    address %s\n", cfg.address)
 
 		var upCommands []string
 		for _, route := range cfg.routes {
 			if strings.EqualFold(strings.TrimSpace(route.To), "default") {
-				b.WriteString(fmt.Sprintf("    gateway %s\n", route.Via))
+				fmt.Fprintf(&b, "    gateway %s\n", route.Via)
 				continue
 			}
 			upCommands = append(upCommands, fmt.Sprintf("    up ip route add %s via %s dev %s\n", route.To, route.Via, ifaceName))
 		}
 
 		if len(cfg.dnsAddresses) > 0 {
-			b.WriteString(fmt.Sprintf("    dns-nameservers %s\n", strings.Join(cfg.dnsAddresses, " ")))
+			fmt.Fprintf(&b, "    dns-nameservers %s\n", strings.Join(cfg.dnsAddresses, " "))
 		}
 		if len(cfg.dnsSearch) > 0 {
-			b.WriteString(fmt.Sprintf("    dns-search %s\n", strings.Join(cfg.dnsSearch, " ")))
+			fmt.Fprintf(&b, "    dns-search %s\n", strings.Join(cfg.dnsSearch, " "))
 		}
 		for _, up := range upCommands {
 			b.WriteString(up)
 		}
 	default:
 		if cfg.dhcp4 {
-			b.WriteString(fmt.Sprintf("iface %s inet dhcp\n", ifaceName))
+			fmt.Fprintf(&b, "iface %s inet dhcp\n", ifaceName)
 		}
 		if cfg.dhcp6 {
-			b.WriteString(fmt.Sprintf("iface %s inet6 dhcp\n", ifaceName))
+			fmt.Fprintf(&b, "iface %s inet6 dhcp\n", ifaceName)
 		}
 	}
 
