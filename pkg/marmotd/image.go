@@ -992,6 +992,15 @@ func findLastPhysicalPartitionNumber(ctx context.Context, nbdDev string) (int, e
 // 出力から、終了オフセット(END)が最大のパーティション番号を求める。ヘッダ行("BYT;")、
 // ディスク概要行、qemu-img resize 直後に表示されるGPT不整合の警告メッセージなどは、
 // いずれも先頭フィールドが数値にならないため自然に無視される。
+//
+// ディスク概要行(先頭フィールドがデバイスパス、例: "/dev/nbd0:...:loop:...;")の
+// ディスクラベル種別(6番目のフィールド)が "loop" の場合、そのディスクには
+// パーティションテーブルが存在しない(例: Alpine Linux の "metal" 系 cloud image は
+// パーティション分割されていない生の ext4 ファイルシステムイメージである)。この場合でも
+// parted は表示用にディスク全体を覆う疑似パーティション("1:...")を合成して出力するため、
+// ディスクラベルを確認せずにパーティション行だけを見ると、実在しない /dev/nbd0p1 等を
+// 実パーティションと誤認してしまう。そのため、"loop" ラベルを検出した時点で
+// パーティションテーブルが無いものとしてエラーを返す。
 func parseLastPhysicalPartitionNumberFromPartedOutput(output string) (int, error) {
 	bestNum := 0
 	bestEnd := int64(-1)
@@ -1002,6 +1011,14 @@ func parseLastPhysicalPartitionNumberFromPartedOutput(output string) (int, error
 		}
 		fields := strings.Split(line, ":")
 		if len(fields) < 3 {
+			continue
+		}
+		if strings.HasPrefix(fields[0], "/") {
+			// ディスク概要行。ディスクラベル種別(6番目のフィールド)が "loop" なら
+			// パーティションテーブルは存在しない。
+			if len(fields) >= 6 && strings.EqualFold(strings.TrimSpace(fields[5]), "loop") {
+				return 0, fmt.Errorf("no partition table present (disklabel=loop): device is an unpartitioned whole-disk filesystem image")
+			}
 			continue
 		}
 		num, err := strconv.Atoi(fields[0])

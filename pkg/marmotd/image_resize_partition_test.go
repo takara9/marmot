@@ -11,6 +11,16 @@ const partedOutputSinglePartitionGPT = `BYT;
 1:2048s:2095103s:2093056s::p1:;
 `
 
+// Alpine Linux 3.23 の "metal"(bios-cloudinit) cloud image 実機相当。この image は
+// パーティションテーブルを持たず、ディスク全体がそのまま ext4 ファイルシステムである。
+// parted はこれをディスクラベル種別 "loop" として報告し、表示用にディスク全体を覆う
+// 疑似パーティション("1:...")を合成するが、これは実在するパーティションではないため
+// /dev/nbd0p1 のようなデバイスノードは作成されない(issue再現時に実機ダウンロードで確認)。
+const partedOutputLoopDisklabelNoPartitionTable = `BYT;
+/dev/nbd0:33554432s:unknown:512:512:loop:不明:;
+1:0s:33554431s:33554432s:ext4::;
+`
+
 // Ubuntu 24.04 cloud image 実機相当。ルートパーティションの番号は「1」だが、
 // bios_grub/ESP/boot には番号14/15/16(ルートより大きい番号)が割り当てられている。
 // ただし物理的な配置としてはルート(番号1)が最後に置かれている(issue #622, #737)。
@@ -56,7 +66,8 @@ func TestParseLastPhysicalPartitionNumberFromPartedOutput(t *testing.T) {
 		want    int
 		wantErr bool
 	}{
-		{name: "single partition GPT (Alpine相当)", output: partedOutputSinglePartitionGPT, want: 1},
+		{name: "single partition GPT", output: partedOutputSinglePartitionGPT, want: 1},
+		{name: "loop disklabel (パーティションテーブル無し、Alpine 3.23 metal実機相当)", output: partedOutputLoopDisklabelNoPartitionTable, wantErr: true},
 		{name: "Ubuntu 24.04実機相当(ルートは番号1だが物理的に最後)", output: partedOutputUbuntu2404GPT, want: 1},
 		{name: "Rocky 9 GenericCloud実機相当(ルートは番号4で物理的にも最後)", output: partedOutputRocky9GPT, want: 4},
 		{name: "resize warning prefix is ignored", output: partedOutputWithResizeWarning, want: 1},
