@@ -10,11 +10,11 @@ Rocky Linux、AlmaLinux などの RHEL 互換ディストリビューション�
 
 ## 実装状況（更新）
 
-初回対応（Rocky Linux 9）および AlmaLinux 9、Debian 12/13、Rocky Linux 8、AlmaLinux 8、Rocky Linux 10、AlmaLinux 10 は既に実装済み。以下の経路がすべて対応している。
+初回対応（Rocky Linux 9）および AlmaLinux 9、Debian 12/13、Rocky Linux 8、AlmaLinux 8、Rocky Linux 10、AlmaLinux 10、Debian 11 は既に実装済み。以下の経路がすべて対応している。
 
-- `validateImageOSSpec`: `rocky`（`8`/`9`/`10`）、`rockey`（`rocky` の旧表記、互換維持のため許可）、`almalinux`（`8`/`9`/`10`）、`debian`（`12`/`13`）
-- `resolveImageOSModuleFromSpec` / `resolveServerImageModuleFromOS`: `rocky8`、`rocky9`、`rocky10`、`almalinux8`、`almalinux9`、`almalinux10`、`debian12`、`debian13` の各モジュールへ解決
-- `deriveOSFromVariant`: variant 文字列（`rocky8`/`rockey8`、`rocky9`/`rockey9`、`rocky10`、`almalinux8`、`almalinux9`、`almalinux10`、`debian12`、`debian13`）からの OS 推定
+- `validateImageOSSpec`: `rocky`（`8`/`9`/`10`）、`rockey`（`rocky` の旧表記、互換維持のため許可）、`almalinux`（`8`/`9`/`10`）、`debian`（`11`/`12`/`13`）
+- `resolveImageOSModuleFromSpec` / `resolveServerImageModuleFromOS`: `rocky8`、`rocky9`、`rocky10`、`almalinux8`、`almalinux9`、`almalinux10`、`debian11`、`debian12`、`debian13` の各モジュールへ解決
+- `deriveOSFromVariant`: variant 文字列（`rocky8`/`rockey8`、`rocky9`/`rockey9`、`rocky10`、`almalinux8`、`almalinux9`、`almalinux10`、`debian11`、`debian12`、`debian13`）からの OS 推定
 
 Rocky Linux 8 については、以下のテスト用 upstream cloud image で実イメージを検証済み。
 
@@ -39,6 +39,17 @@ AlmaLinux 10 についても対応済み。以下の upstream cloud image で実
 - `https://repo.almalinux.org/almalinux/10/cloud/x86_64/images/AlmaLinux-10-GenericCloud-latest.x86_64.qcow2`
 
 検証の結果、パーティション構成（GPT、LVM 無し、root が最大パーティション、bios_grub/ESP/boot/root の4パーティション構成）、デフォルトユーザー（`almalinux`）、sshd のサービス名、legacy ネットワークスクリプトが無い点は AlmaLinux 9 と同様で、既存の `customizeAlmaLinuxQcowImageWithContext`・`util.SetupAlmaLinux` がそのまま使える。Rocky Linux 10 とは異なり、AlmaLinux 10 は引き続き `net.ifnames=0`（eth0/eth1 命名）を設定しており、この点は AlmaLinux 8 と同様(MACアドレスでマッチする既存ロジックで対応済み)のため、追加のコード変更は不要。
+
+Debian 11（bullseye）についても対応済み。以下の upstream cloud image で実イメージを検証済み。
+
+- `http://cloud.debian.org/images/cloud/bullseye/latest/debian-11-generic-amd64.qcow2`
+
+パーティション構成（GPT、LVM 無し、root が最大パーティション）、デフォルトユーザー（`debian`）、sshサービス名（`ssh`）、NIC命名規則（`enp1s0` 等、`net.ifnames=0` 指定無し）は Debian 12/13 と同様だが、重要な差分として **Debian 11 の GenericCloud イメージには netplan が含まれておらず**、`ifupdown`（`/etc/network/interfaces` + `interfaces.d`、`resolvconf` 併用）でネットワークを管理している。既存の `customizeDebianQcowImageWithContext`・`util.SetupLinux`(netplan経由)をそのまま適用すると、静的IP/ルート/DNS設定が反映されない(ベースイメージの udev フックによる DHCP フォールバックのみが効く)不具合になるため、Debian 11 専用に以下を追加した。
+
+- `customizeDebian11QcowImageWithContext`（`pkg/marmotd/image.go`）: `customizeDebianQcowImageWithContext` から netplan 書き込みを除いたもの
+- `util.CreateIfupdownInterfaces` / `util.SetupDebian11`（`pkg/util/setup-linux.go`）: `/etc/network/interfaces.d/<interface名>`(拡張子無し)に ifupdown 形式でNIC設定(DHCP/静的アドレス/ルート/DNS)を書き込む。ベースイメージの `/etc/network/interfaces` は `source-directory /etc/network/interfaces.d` 済みのため追加設定として反映される。`resolvconf` がインストール済みのため `dns-nameservers`/`dns-search` ディレクティブで `/etc/resolv.conf` が自動生成される。
+
+**不具合修正（初回実装時）**: 初回実装では生成するファイル名に `.cfg` 拡張子を付けていたため(`enp1s0.cfg` 等)、起動後に静的IPが適用されず、ベースイメージの udev フックによる DHCP フォールバックだけが効く不具合が発生した。ifupdown の `source-directory` は、ファイル名が英数字・アンダースコア・ハイフンのみで構成されるものに限り読み込み、ドットを含むファイル名は黙って無視する仕様のため(interfaces(5))。拡張子を外す修正(`enp1s0` 等)を行い、実機VM(host-bridge/mgmt の2NIC構成)を起動して `ip a` でそれぞれ指定した静的アドレスが正しく適用されることを確認済み。回帰防止のため `TestCreateIfupdownInterfacesFileNamesContainNoDot` を追加した。
 
 ## 現状（初回対応前の記録）
 

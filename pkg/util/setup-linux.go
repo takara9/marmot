@@ -148,6 +148,42 @@ func SetupAlmaLinux(spec api.Server) error {
 	return nil
 }
 
+// SetupDebian11 は Debian 11(bullseye)のブートボリュームを初期化する。
+// Debian 11 の GenericCloud イメージには netplan が含まれておらず ifupdown で
+// ネットワークを管理するため、Debian 12/13(netplan、util.SetupLinux 経由)とは別に
+// ifupdown 形式(CreateIfupdownInterfaces)でネットワーク設定を書き込む(issue #622)。
+func SetupDebian11(spec api.Server) error {
+	if spec.Spec.BootVolume == nil {
+		return fmt.Errorf("BootVolume is nil")
+	}
+
+	mountPoint, nbdDev, err := MountVolume(*spec.Spec.BootVolume)
+	if err != nil {
+		slog.Error("MountVolume failed", "error", err)
+		return err
+	}
+	defer func() {
+		_ = UnMountVolume(*spec.Spec.BootVolume, mountPoint, nbdDev)
+	}()
+
+	if err := setupMountedIdentity(spec, mountPoint); err != nil {
+		return err
+	}
+
+	// mgmtネットワークが常に強制付与されるため、通常ここでnilになることは無い(issue #696)。
+	// defaultネットワークへの自動フォールバックは廃止したため、念のため空スライスにする。
+	if spec.Spec.NetworkInterface == nil {
+		spec.Spec.NetworkInterface = &[]api.NetworkInterface{}
+	}
+
+	if err := CreateIfupdownInterfaces(*spec.Spec.NetworkInterface, mountPoint); err != nil {
+		slog.Error("CreateIfupdownInterfaces failed", "error", err)
+		return err
+	}
+
+	return nil
+}
+
 func setupLinuxMountedVolume(spec api.Server, mountPoint string) error {
 	if err := setupMountedIdentity(spec, mountPoint); err != nil {
 		return err
@@ -469,18 +505,18 @@ func MountVolume(v api.Volume) (string, string, error) {
 		lvdev, err := findTargertPartition(lvPath)
 		if err != nil {
 			slog.Error("FindTargertPartition failed", "error", err)
-						_ = os.RemoveAll(mountPoint)
+			_ = os.RemoveAll(mountPoint)
 			return "", "", err
 		}
 		cmd := exec.Command("mount", "-t", "ext4", lvdev, mountPoint)
 		err = cmd.Run()
 		if err != nil {
 			err := errors.New("mount failed to setup OS-Disk")
-						_ = os.RemoveAll(mountPoint)
+			_ = os.RemoveAll(mountPoint)
 			return "", "", err
 		}
 	default:
-				_ = os.RemoveAll(mountPoint)
+		_ = os.RemoveAll(mountPoint)
 		return "", "", fmt.Errorf("unsupported volume type: %s", *v.Spec.Type)
 	}
 
@@ -717,6 +753,139 @@ func CreateNetplanInterfaces(requestConfig []api.NetworkInterface, mountPoint st
 	}
 
 	debugPrintln(fmt.Sprintf("Generated %s successfully:\n\n%s", filePath, string(data)))
+
+	return nil
+}
+
+// CreateIfupdownInterfaces は Debian 11(bullseye)向けの NIC 設定を ifupdown 形式
+// (/etc/network/interfaces.d/<interface名>、拡張子無し)で書き出す。Debian 11 の
+// GenericCloud イメージには netplan が含まれておらず、ifupdown(resolvconf 併用)で
+// ネットワークを管理するため、CreateNetplanInterfaces は適用されない(issue #622)。
+// NIC名の割り当てや静的アドレス指定時の挙動は CreateNetplanInterfaces と揃える。
+//
+// ベースイメージの /etc/network/interfaces は source-directory で
+// /etc/network/interfaces.d を読み込む設定になっているため、ここで書き込んだファイルは
+// 追加設定として反映される。source-directory はファイル名が英数字・アンダースコア・
+// ハイフンのみのものに限り読み込む仕様のため、ファイル名に拡張子(ドット)を付けてはならない
+// (付けると無視されて設定が適用されない、issue #622)。また resolvconf がインストール済みの
+// ため、dns-nameservers/dns-search ディレクティブで /etc/resolv.conf が自動生成される。
+func CreateIfupdownInterfaces(requestConfig []api.NetworkInterface, mountPoint string) error {
+	nicName := []string{"enp1s0", "enp2s0", "enp7s0", "enp8s0", "enp9s0", "enp10s0"}
+
+	interfacesDir := filepath.Join(mountPoint, "etc", "network", "interfaces.d")
+	if err := os.MkdirAll(interfacesDir, 0755); err != nil {
+		return fmt.Errorf("failed to create interfaces.d directory: %w", err)
+	}
+
+	// ネットワーク設定がない場合は、デフォルトネットワークにつないで、DHCPでIPアドレスを取得する設定にする
+	if len(requestConfig) == 0 {
+		return writeIfupdownInterfaceFile(interfacesDir, nicName[0], ifupdownInterfaceConfig{dhcp4: true, dhcp6: true})
+	}
+
+	for idx, nic := range requestConfig {
+		ifaceName := nicName[idx]
+		cfg := ifupdownInterfaceConfig{}
+
+		// IPアドレスとネットマスク長があれば、DHCPは無効にする(CreateNetplanInterfacesと同様)
+		if nic.Address != nil && nic.Netmasklen != nil {
+			cfg.address = fmt.Sprintf("%s/%d", *nic.Address, *nic.Netmasklen)
+			cfg.addressIsIPv6 = checkIPVersion(strings.TrimSpace(*nic.Address)) == "IPv6"
+		} else {
+			cfg.dhcp4 = OrDefault(nic.Dhcp4, true)
+			cfg.dhcp6 = OrDefault(nic.Dhcp6, true)
+		}
+
+		if nic.Routes != nil {
+			for _, r := range *nic.Routes {
+				if r.To == nil || r.Via == nil {
+					return fmt.Errorf("route requires both to and via on interface %s", ifaceName)
+				}
+				route := Route{To: *r.To, Via: *r.Via}
+				if err := validateNetplanRoute(nic, route, ifaceName); err != nil {
+					return err
+				}
+				cfg.routes = append(cfg.routes, route)
+			}
+		}
+
+		if nic.Nameservers != nil {
+			if nic.Nameservers.Addresses != nil {
+				cfg.dnsAddresses = append(cfg.dnsAddresses, (*nic.Nameservers.Addresses)...)
+			}
+			if nic.Nameservers.Search != nil {
+				cfg.dnsSearch = append(cfg.dnsSearch, (*nic.Nameservers.Search)...)
+			}
+		}
+
+		if err := writeIfupdownInterfaceFile(interfacesDir, ifaceName, cfg); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+type ifupdownInterfaceConfig struct {
+	address       string
+	addressIsIPv6 bool
+	dhcp4         bool
+	dhcp6         bool
+	routes        []Route
+	dnsAddresses  []string
+	dnsSearch     []string
+}
+
+func writeIfupdownInterfaceFile(interfacesDir, ifaceName string, cfg ifupdownInterfaceConfig) error {
+	var b strings.Builder
+	b.WriteString("# Managed by marmot. Do not edit manually (issue #622).\n")
+	b.WriteString(fmt.Sprintf("auto %s\n", ifaceName))
+
+	switch {
+	case cfg.address != "":
+		family := "inet"
+		if cfg.addressIsIPv6 {
+			family = "inet6"
+		}
+		b.WriteString(fmt.Sprintf("iface %s %s static\n", ifaceName, family))
+		b.WriteString(fmt.Sprintf("    address %s\n", cfg.address))
+
+		var upCommands []string
+		for _, route := range cfg.routes {
+			if strings.EqualFold(strings.TrimSpace(route.To), "default") {
+				b.WriteString(fmt.Sprintf("    gateway %s\n", route.Via))
+				continue
+			}
+			upCommands = append(upCommands, fmt.Sprintf("    up ip route add %s via %s dev %s\n", route.To, route.Via, ifaceName))
+		}
+
+		if len(cfg.dnsAddresses) > 0 {
+			b.WriteString(fmt.Sprintf("    dns-nameservers %s\n", strings.Join(cfg.dnsAddresses, " ")))
+		}
+		if len(cfg.dnsSearch) > 0 {
+			b.WriteString(fmt.Sprintf("    dns-search %s\n", strings.Join(cfg.dnsSearch, " ")))
+		}
+		for _, up := range upCommands {
+			b.WriteString(up)
+		}
+	default:
+		if cfg.dhcp4 {
+			b.WriteString(fmt.Sprintf("iface %s inet dhcp\n", ifaceName))
+		}
+		if cfg.dhcp6 {
+			b.WriteString(fmt.Sprintf("iface %s inet6 dhcp\n", ifaceName))
+		}
+	}
+
+	// ifupdown の source-directory は、ファイル名が英数字・アンダースコア・ハイフンのみで
+	// 構成されるものに限り読み込む仕様のため、ドットを含むファイル名(例: "enp1s0.cfg")は
+	// 無視され、設定が適用されない(issue #622)。そのため拡張子を付けずインターフェース名を
+	// そのままファイル名にする。
+	filePath := filepath.Join(interfacesDir, ifaceName)
+	if err := os.WriteFile(filePath, []byte(b.String()), 0644); err != nil {
+		return fmt.Errorf("failed to write ifupdown interface file %s: %w", filePath, err)
+	}
+
+	debugPrintln(fmt.Sprintf("Generated %s successfully:\n\n%s", filePath, b.String()))
 
 	return nil
 }

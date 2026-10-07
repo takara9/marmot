@@ -617,6 +617,34 @@ func customizeDebianQcowImageWithContext(ctx context.Context, imagePath string) 
 	return nil
 }
 
+// customizeDebian11QcowImageWithContext は Debian 11(bullseye)向けのカスタマイズ処理。
+// Debian 11 の GenericCloud イメージには netplan が含まれておらず ifupdown でネットワークを
+// 管理するため、customizeDebianQcowImageWithContext と異なり netplan 設定は書き込まない
+// (ネットワーク設定は起動時に util.SetupDebian11/CreateIfupdownInterfaces が担う、issue #622)。
+// root パスワード・sshサービス名(ssh)は Debian 12/13 と同じ。
+func customizeDebian11QcowImageWithContext(ctx context.Context, imagePath string) error {
+	timeout := contextTimeoutHint(ctx)
+	args := []string{
+		"-a", imagePath,
+		"--root-password", "password:debian",
+		"--edit", "/etc/ssh/sshd_config: s/^#?PermitRootLogin.*/PermitRootLogin yes/",
+		"--edit", "/etc/ssh/sshd_config: s/^#?PasswordAuthentication.*/PasswordAuthentication yes/",
+		"--run-command", "if ls /etc/ssh/sshd_config.d/*cloud*.conf >/dev/null 2>&1; then rm -f /etc/ssh/sshd_config.d/*cloud*.conf; fi",
+		"--run-command", "ssh-keygen -A",
+		"--run-command", "systemctl enable ssh",
+		"--run-command", "systemctl restart ssh",
+	}
+
+	cmd := exec.CommandContext(ctx, "virt-customize", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return wrapDeadlineExceeded(fmt.Errorf("virt-customize failed: %w, output: %s", err, strings.TrimSpace(string(output))), "QCOW2 イメージ設定", timeout)
+	}
+
+	slog.Debug("virt-customize completed for debian11", "imagePath", imagePath, "output", strings.TrimSpace(string(output)))
+	return nil
+}
+
 func customizeRockyQcowImageWithContext(ctx context.Context, imagePath string) error {
 	timeout := contextTimeoutHint(ctx)
 	args := []string{

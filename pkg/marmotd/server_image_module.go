@@ -49,6 +49,9 @@ var (
 	// setupBootVolumeFn は指定せず util.SetupLinux にフォールバックさせる。
 	serverImageModuleDebian12 = commonServerImageModule{key: "debian12"}
 	serverImageModuleDebian13 = commonServerImageModule{key: "debian13"}
+	// Debian 11 は netplan を含まず ifupdown でネットワークを管理するため、専用の
+	// setupBootVolumeFn(util.SetupDebian11)を指定する(issue #622)。
+	serverImageModuleDebian11 = commonServerImageModule{key: "debian11", setupBootVolumeFn: util.SetupDebian11}
 )
 
 func normalizeServerImageDefault(server *api.Server) {
@@ -139,6 +142,8 @@ func resolveServerImageModuleFromOS(osName, osVersion string) (serverImageModule
 		}
 	case "debian":
 		switch version {
+		case "11":
+			return serverImageModuleDebian11, nil
 		case "12":
 			return serverImageModuleDebian12, nil
 		case "13":
@@ -176,6 +181,8 @@ func deriveOSFromVariant(osVariant string) (string, string) {
 		return "almalinux", "9"
 	case strings.HasPrefix(v, "almalinux10"):
 		return "almalinux", "10"
+	case strings.HasPrefix(v, "debian11"):
+		return "debian", "11"
 	case strings.HasPrefix(v, "debian12"):
 		return "debian", "12"
 	case strings.HasPrefix(v, "debian13"):

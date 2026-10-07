@@ -27,12 +27,13 @@ func TestResolveServerImageModuleFromOS(t *testing.T) {
 		{name: "almalinux 8", osName: "almalinux", osVersion: "8", wantKey: "almalinux8"},
 		{name: "almalinux 9", osName: "almalinux", osVersion: "9", wantKey: "almalinux9"},
 		{name: "almalinux 10", osName: "almalinux", osVersion: "10", wantKey: "almalinux10"},
+		{name: "debian 11", osName: "debian", osVersion: "11", wantKey: "debian11"},
 		{name: "debian 12", osName: "debian", osVersion: "12", wantKey: "debian12"},
 		{name: "debian 13", osName: "debian", osVersion: "13", wantKey: "debian13"},
 		{name: "unsupported alpine", osName: "alpine", osVersion: "3.24", wantErr: true},
 		{name: "unsupported rocky version", osName: "rocky", osVersion: "7", wantErr: true},
 		{name: "unsupported almalinux version", osName: "almalinux", osVersion: "7", wantErr: true},
-		{name: "unsupported debian version", osName: "debian", osVersion: "11", wantErr: true},
+		{name: "unsupported debian version", osName: "debian", osVersion: "10", wantErr: true},
 		{name: "unsupported os", osName: "oracle", osVersion: "9", wantErr: true},
 	}
 
@@ -100,6 +101,7 @@ func TestDeriveOSFromVariant(t *testing.T) {
 		{variant: "almalinux8", wantName: "almalinux", wantVersion: "8"},
 		{variant: "almalinux9", wantName: "almalinux", wantVersion: "9"},
 		{variant: "almalinux10", wantName: "almalinux", wantVersion: "10"},
+		{variant: "debian11", wantName: "debian", wantVersion: "11"},
 		{variant: "debian12", wantName: "debian", wantVersion: "12"},
 		{variant: "debian13", wantName: "debian", wantVersion: "13"},
 		{variant: "unknown", wantName: "", wantVersion: ""},

@@ -79,6 +79,7 @@ var (
 	imageOSModuleAlmaLinux8  = commonImageOSModule{moduleKey: "almalinux8", customizeHandler: customizeAlmaLinuxQcowImageWithContext}
 	imageOSModuleAlmaLinux9  = commonImageOSModule{moduleKey: "almalinux9", customizeHandler: customizeAlmaLinuxQcowImageWithContext}
 	imageOSModuleAlmaLinux10 = commonImageOSModule{moduleKey: "almalinux10", customizeHandler: customizeAlmaLinuxQcowImageWithContext}
+	imageOSModuleDebian11    = commonImageOSModule{moduleKey: "debian11", customizeHandler: customizeDebian11QcowImageWithContext}
 	imageOSModuleDebian12    = commonImageOSModule{moduleKey: "debian12", customizeHandler: customizeDebianQcowImageWithContext}
 	imageOSModuleDebian13    = commonImageOSModule{moduleKey: "debian13", customizeHandler: customizeDebianQcowImageWithContext}
 )
@@ -137,6 +138,8 @@ func resolveImageOSModuleFromSpec(osName, osVersion string) (imageOSModule, erro
 		}
 	case "debian":
 		switch version {
+		case "11":
+			return imageOSModuleDebian11, nil
 		case "12":
 			return imageOSModuleDebian12, nil
 		case "13":
