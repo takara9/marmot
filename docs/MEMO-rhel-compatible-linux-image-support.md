@@ -8,7 +8,50 @@ Rocky Linux、AlmaLinux などの RHEL 互換ディストリビューション�
 
 クラウドイメージの URL を登録できるだけでは対応完了としない。OS の識別、ダウンロード後のイメージ加工、起動時のボリューム設定、cloud-init のユーザー設定、VM 起動後の接続までを一連の動作として確認する。
 
-## 現状
+## 実装状況（更新）
+
+初回対応（Rocky Linux 9）および AlmaLinux 9、Debian 12/13、Rocky Linux 8、AlmaLinux 8、Rocky Linux 10、AlmaLinux 10、Debian 11 は既に実装済み。以下の経路がすべて対応している。
+
+- `validateImageOSSpec`: `rocky`（`8`/`9`/`10`）、`rockey`（`rocky` の旧表記、互換維持のため許可）、`almalinux`（`8`/`9`/`10`）、`debian`（`11`/`12`/`13`）
+- `resolveImageOSModuleFromSpec` / `resolveServerImageModuleFromOS`: `rocky8`、`rocky9`、`rocky10`、`almalinux8`、`almalinux9`、`almalinux10`、`debian11`、`debian12`、`debian13` の各モジュールへ解決
+- `deriveOSFromVariant`: variant 文字列（`rocky8`/`rockey8`、`rocky9`/`rockey9`、`rocky10`、`almalinux8`、`almalinux9`、`almalinux10`、`debian11`、`debian12`、`debian13`）からの OS 推定
+
+Rocky Linux 8 については、以下のテスト用 upstream cloud image で実イメージを検証済み。
+
+- `https://dl.rockylinux.org/pub/rocky/8/images/x86_64/Rocky-8-GenericCloud.latest.x86_64.qcow2`
+
+検証の結果、パーティション構成（GPT、LVM 無し、root が最大パーティション）は Rocky 9 と同様で、既存の汎用パーティション検出ロジック（`findRootPartitionNumber`）がそのまま使える。一方で Rocky 9/AlmaLinux 9 には無い固有差分として、Rocky Linux 8 の GenericCloud イメージは ifcfg-rh プラグイン向けの legacy ネットワークスクリプト（`/etc/sysconfig/network-scripts/ifcfg-eth0`、`ifcfg-ens3`）を同梱しており、NetworkManager の ifcfg-rh プラグインが既定で有効なため、marmot が書き込む NetworkManager keyfile 接続と競合しうる。この対策として `CreateNetworkManagerKeyfiles` に legacy ifcfg-\* 削除処理（`removeLegacyIfcfgNetworkScripts`）を追加済み（該当ファイルの無い Rocky 9/AlmaLinux 9 には影響しない）。
+
+AlmaLinux 8 についても対応済み。以下の upstream cloud image で実イメージを検証済み。
+
+- `https://repo.almalinux.org/almalinux/8/cloud/x86_64/images/AlmaLinux-8-GenericCloud-latest.x86_64.qcow2`
+
+検証の結果、パーティション構成（GPT、LVM 無し、root が最大パーティション）、`net.ifnames=0`（eth0/eth1 命名）、legacy ネットワークスクリプト（`/etc/sysconfig/network-scripts/ifcfg-eth0`）の同梱は Rocky Linux 8 と同様。Rocky 8 対応時に追加した `removeLegacyIfcfgNetworkScripts` は `SetupAlmaLinux` でも共通利用されるため、追加のコード変更無しでこの差分にも対応済み。
+
+Rocky Linux 10 についても対応済み。以下の upstream cloud image で実イメージを検証済み。
+
+- `https://dl.rockylinux.org/pub/rocky/10/images/x86_64/Rocky-10-GenericCloud.latest.x86_64.qcow2`
+
+検証の結果、パーティション構成（GPT、LVM 無し、root が最大パーティション、bios_grub/ESP/bls_boot/root の4パーティション構成）、デフォルトユーザー（`rocky`）、sshd のサービス名、legacy ネットワークスクリプトが無い点は Rocky Linux 9 と同様で、既存の `customizeRockyQcowImageWithContext`・`util.SetupRockyLinux` がそのまま使える。唯一の違いとして、Rocky Linux 10 は `net.ifnames=0` を設定しておらず、NIC は systemd の予測可能命名（`enp1s0` 等）になる。これは `CreateNetworkManagerKeyfiles` の `nicName`（`enp1s0` 等）がもともと想定する命名方式と一致するため、追加のコード変更は不要。
+
+AlmaLinux 10 についても対応済み。以下の upstream cloud image で実イメージを検証済み。
+
+- `https://repo.almalinux.org/almalinux/10/cloud/x86_64/images/AlmaLinux-10-GenericCloud-latest.x86_64.qcow2`
+
+検証の結果、パーティション構成（GPT、LVM 無し、root が最大パーティション、bios_grub/ESP/boot/root の4パーティション構成）、デフォルトユーザー（`almalinux`）、sshd のサービス名、legacy ネットワークスクリプトが無い点は AlmaLinux 9 と同様で、既存の `customizeAlmaLinuxQcowImageWithContext`・`util.SetupAlmaLinux` がそのまま使える。Rocky Linux 10 とは異なり、AlmaLinux 10 は引き続き `net.ifnames=0`（eth0/eth1 命名）を設定しており、この点は AlmaLinux 8 と同様(MACアドレスでマッチする既存ロジックで対応済み)のため、追加のコード変更は不要。
+
+Debian 11（bullseye）についても対応済み。以下の upstream cloud image で実イメージを検証済み。
+
+- `http://cloud.debian.org/images/cloud/bullseye/latest/debian-11-generic-amd64.qcow2`
+
+パーティション構成（GPT、LVM 無し、root が最大パーティション）、デフォルトユーザー（`debian`）、sshサービス名（`ssh`）、NIC命名規則（`enp1s0` 等、`net.ifnames=0` 指定無し）は Debian 12/13 と同様だが、重要な差分として **Debian 11 の GenericCloud イメージには netplan が含まれておらず**、`ifupdown`（`/etc/network/interfaces` + `interfaces.d`、`resolvconf` 併用）でネットワークを管理している。既存の `customizeDebianQcowImageWithContext`・`util.SetupLinux`(netplan経由)をそのまま適用すると、静的IP/ルート/DNS設定が反映されない(ベースイメージの udev フックによる DHCP フォールバックのみが効く)不具合になるため、Debian 11 専用に以下を追加した。
+
+- `customizeDebian11QcowImageWithContext`（`pkg/marmotd/image.go`）: `customizeDebianQcowImageWithContext` から netplan 書き込みを除いたもの
+- `util.CreateIfupdownInterfaces` / `util.SetupDebian11`（`pkg/util/setup-linux.go`）: `/etc/network/interfaces.d/<interface名>`(拡張子無し)に ifupdown 形式でNIC設定(DHCP/静的アドレス/ルート/DNS)を書き込む。ベースイメージの `/etc/network/interfaces` は `source-directory /etc/network/interfaces.d` 済みのため追加設定として反映される。`resolvconf` がインストール済みのため `dns-nameservers`/`dns-search` ディレクティブで `/etc/resolv.conf` が自動生成される。
+
+**不具合修正（初回実装時）**: 初回実装では生成するファイル名に `.cfg` 拡張子を付けていたため(`enp1s0.cfg` 等)、起動後に静的IPが適用されず、ベースイメージの udev フックによる DHCP フォールバックだけが効く不具合が発生した。ifupdown の `source-directory` は、ファイル名が英数字・アンダースコア・ハイフンのみで構成されるものに限り読み込み、ドットを含むファイル名は黙って無視する仕様のため(interfaces(5))。拡張子を外す修正(`enp1s0` 等)を行い、実機VM(host-bridge/mgmt の2NIC構成)を起動して `ip a` でそれぞれ指定した静的アドレスが正しく適用されることを確認済み。回帰防止のため `TestCreateIfupdownInterfacesFileNamesContainNoDot` を追加した。
+
+## 現状（初回対応前の記録）
 
 - `os_images` の設定には `name`、`url`、`osName`、`osVersion` を指定できる。起動時の初期イメージ登録もこの情報を利用する。
 - `validateImageOSSpec` は既に `rockey` のバージョン `8` と `9` を許可している。一方、表記が `rockey` であり、一般的な名称 `rocky` とは異なる。既存データとの互換性を確認せずに値を置換しないこと。

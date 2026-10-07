@@ -16,6 +16,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -574,6 +575,122 @@ func customizeUbuntuQcowImageWithContext(ctx context.Context, imagePath string) 
 	return nil
 }
 
+// customizeDebianQcowImageWithContext は Ubuntu と同じ方式(netplan、sshサービス名)で
+// Debian cloud image を加工する。root パスワードのみ他OSと同様に OS 名に合わせる(issue #622)。
+func customizeDebianQcowImageWithContext(ctx context.Context, imagePath string) error {
+	timeout := contextTimeoutHint(ctx)
+	netplanConfig := "network:\n" +
+		"  version: 2\n" +
+		"  ethernets:\n" +
+		"    enp1s0:\n" +
+		"      dhcp4: false\n" +
+		"      dhcp6: false\n" +
+		"    enp2s0:\n" +
+		"      dhcp4: false\n" +
+		"      dhcp6: false\n" +
+		"    enp7s0:\n" +
+		"      dhcp4: false\n" +
+		"      dhcp6: false\n" +
+		"    enp8s0:\n" +
+		"      dhcp4: false\n" +
+		"      dhcp6: false\n"
+
+	args := []string{
+		"-a", imagePath,
+		"--root-password", "password:debian",
+		"--edit", "/etc/ssh/sshd_config: s/^#?PermitRootLogin.*/PermitRootLogin yes/",
+		"--edit", "/etc/ssh/sshd_config: s/^#?PasswordAuthentication.*/PasswordAuthentication yes/",
+		"--run-command", "if ls /etc/ssh/sshd_config.d/*cloud*.conf >/dev/null 2>&1; then rm -f /etc/ssh/sshd_config.d/*cloud*.conf; fi",
+		"--run-command", "ssh-keygen -A",
+		"--run-command", "systemctl enable ssh",
+		"--run-command", "systemctl restart ssh",
+		"--write", "/etc/netplan/00-nic.yaml:" + netplanConfig,
+	}
+
+	cmd := exec.CommandContext(ctx, "virt-customize", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return wrapDeadlineExceeded(fmt.Errorf("virt-customize failed: %w, output: %s", err, strings.TrimSpace(string(output))), "QCOW2 イメージ設定", timeout)
+	}
+
+	slog.Debug("virt-customize completed for debian", "imagePath", imagePath, "output", strings.TrimSpace(string(output)))
+	return nil
+}
+
+// customizeDebian11QcowImageWithContext は Debian 11(bullseye)向けのカスタマイズ処理。
+// Debian 11 の GenericCloud イメージには netplan が含まれておらず ifupdown でネットワークを
+// 管理するため、customizeDebianQcowImageWithContext と異なり netplan 設定は書き込まない
+// (ネットワーク設定は起動時に util.SetupDebian11/CreateIfupdownInterfaces が担う、issue #622)。
+// root パスワード・sshサービス名(ssh)は Debian 12/13 と同じ。
+func customizeDebian11QcowImageWithContext(ctx context.Context, imagePath string) error {
+	timeout := contextTimeoutHint(ctx)
+	args := []string{
+		"-a", imagePath,
+		"--root-password", "password:debian",
+		"--edit", "/etc/ssh/sshd_config: s/^#?PermitRootLogin.*/PermitRootLogin yes/",
+		"--edit", "/etc/ssh/sshd_config: s/^#?PasswordAuthentication.*/PasswordAuthentication yes/",
+		"--run-command", "if ls /etc/ssh/sshd_config.d/*cloud*.conf >/dev/null 2>&1; then rm -f /etc/ssh/sshd_config.d/*cloud*.conf; fi",
+		"--run-command", "ssh-keygen -A",
+		"--run-command", "systemctl enable ssh",
+		"--run-command", "systemctl restart ssh",
+	}
+
+	cmd := exec.CommandContext(ctx, "virt-customize", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return wrapDeadlineExceeded(fmt.Errorf("virt-customize failed: %w, output: %s", err, strings.TrimSpace(string(output))), "QCOW2 イメージ設定", timeout)
+	}
+
+	slog.Debug("virt-customize completed for debian11", "imagePath", imagePath, "output", strings.TrimSpace(string(output)))
+	return nil
+}
+
+func customizeRockyQcowImageWithContext(ctx context.Context, imagePath string) error {
+	timeout := contextTimeoutHint(ctx)
+	args := []string{
+		"-a", imagePath,
+		"--root-password", "password:rocky",
+		"--edit", "/etc/ssh/sshd_config: s/^#?PermitRootLogin.*/PermitRootLogin yes/",
+		"--edit", "/etc/ssh/sshd_config: s/^#?PasswordAuthentication.*/PasswordAuthentication yes/",
+		"--run-command", "if ls /etc/ssh/sshd_config.d/*cloud*.conf >/dev/null 2>&1; then rm -f /etc/ssh/sshd_config.d/*cloud*.conf; fi",
+		"--run-command", "ssh-keygen -A",
+		"--run-command", "systemctl enable sshd",
+		"--run-command", "systemctl restart sshd",
+	}
+
+	cmd := exec.CommandContext(ctx, "virt-customize", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return wrapDeadlineExceeded(fmt.Errorf("virt-customize failed: %w, output: %s", err, strings.TrimSpace(string(output))), "QCOW2 イメージ設定", timeout)
+	}
+
+	slog.Debug("virt-customize completed for rocky", "imagePath", imagePath, "output", strings.TrimSpace(string(output)))
+	return nil
+}
+
+func customizeAlmaLinuxQcowImageWithContext(ctx context.Context, imagePath string) error {
+	timeout := contextTimeoutHint(ctx)
+	args := []string{
+		"-a", imagePath,
+		"--root-password", "password:almalinux",
+		"--edit", "/etc/ssh/sshd_config: s/^#?PermitRootLogin.*/PermitRootLogin yes/",
+		"--edit", "/etc/ssh/sshd_config: s/^#?PasswordAuthentication.*/PasswordAuthentication yes/",
+		"--run-command", "if ls /etc/ssh/sshd_config.d/*cloud*.conf >/dev/null 2>&1; then rm -f /etc/ssh/sshd_config.d/*cloud*.conf; fi",
+		"--run-command", "ssh-keygen -A",
+		"--run-command", "systemctl enable sshd",
+		"--run-command", "systemctl restart sshd",
+	}
+
+	cmd := exec.CommandContext(ctx, "virt-customize", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return wrapDeadlineExceeded(fmt.Errorf("virt-customize failed: %w, output: %s", err, strings.TrimSpace(string(output))), "QCOW2 イメージ設定", timeout)
+	}
+
+	slog.Debug("virt-customize completed for almalinux", "imagePath", imagePath, "output", strings.TrimSpace(string(output)))
+	return nil
+}
+
 func customizeAlpineQcowImageWithContext(ctx context.Context, imagePath string) error {
 	timeout := contextTimeoutHint(ctx)
 	args := []string{
@@ -632,10 +749,15 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 			continue
 		}
 		nbdDev = candidate
-		partDev = nbdDev + "p1"
 
 		// 念のため stale 接続を切る（未接続なら失敗しても無視）
 		_ = runCmd(ctx, "qemu-nbd", "-d", nbdDev)
+		// NBDデバイス番号は使い回されるため、前回この番号に接続されていたイメージの
+		// パーティション情報がカーネル側に残っている場合がある(CI環境などudevdが
+		// 動作していない場合は、qemu-nbd切断後も自動的に消えない)。新しいイメージの
+		// パーティション数を誤認しないよう、接続前に明示的に消去しておく
+		// (issue #622, 失敗例: 1パーティションのUbuntuイメージに対し resizepart 16 が実行される)。
+		_ = runCmd(ctx, "partx", "-d", nbdDev)
 		if err := runCmd(ctx, "qemu-nbd", "-c", nbdDev, imageTemplatePath); err != nil {
 			attachErrs = append(attachErrs, fmt.Sprintf("%s: %v", nbdDev, err))
 			continue
@@ -665,8 +787,13 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 
 	resizeTarget := nbdDev
 	usingPartitionTarget := false
-	if err := waitForBlockDevice(ctx, partDev, 5*time.Second); err == nil {
-		if err := runCmd(ctx, "parted", nbdDev, "--fix", "--script", "resizepart", "1", "100%"); err != nil {
+	// リサイズ対象は「ディスク上で物理的に最後に位置するパーティション」とする。GPTの
+	// パーティション番号は物理的な並び順と一致するとは限らない(例: Ubuntu の cloud image は
+	// ルートパーティションの番号が1、bios_grub/ESP/bootが14/15/16だが、物理的にはルートが
+	// 最後に配置されている)ため、番号ではなく終了オフセットで判定する必要がある(issue #622)。
+	if partNum, err := waitForLastPhysicalPartitionNumber(ctx, nbdDev, 5*time.Second); err == nil {
+		partDev = fmt.Sprintf("%sp%d", nbdDev, partNum)
+		if err := runCmd(ctx, "parted", nbdDev, "--fix", "--script", "resizepart", strconv.Itoa(partNum), "100%"); err != nil {
 			return err
 		}
 
@@ -680,17 +807,19 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 		usingPartitionTarget = true
 	} else {
 		if hasPartitionTable {
-			slog.Warn("Partition table detected; extend wait for partition device instead of falling back to whole disk", "nbdDevice", nbdDev, "partition", partDev, "ptType", partitionTableType, "err", err)
+			slog.Warn("Partition table detected; extend wait for partition device instead of falling back to whole disk", "nbdDevice", nbdDev, "ptType", partitionTableType, "err", err)
 			if err := refreshPartitionDevices(ctx, nbdDev); err != nil {
 				return err
 			}
-			if err := waitForBlockDevice(ctx, partDev, 30*time.Second); err != nil {
+			partNum, err := waitForLastPhysicalPartitionNumber(ctx, nbdDev, 30*time.Second)
+			if err != nil {
 				return err
 			}
+			partDev = fmt.Sprintf("%sp%d", nbdDev, partNum)
 			resizeTarget = partDev
 			usingPartitionTarget = true
 		} else {
-			slog.Warn("Partition table was not detected; fallback to whole-disk filesystem resize", "nbdDevice", nbdDev, "partition", partDev, "err", err)
+			slog.Warn("Partition table was not detected; fallback to whole-disk filesystem resize", "nbdDevice", nbdDev, "err", err)
 		}
 	}
 
@@ -713,6 +842,44 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 		}
 	}
 
+	if err := growFilesystem(ctx, resizeTarget, nbdDev, partDev, usingPartitionTarget, hasPartitionTable, partitionTableType); err != nil {
+		return err
+	}
+
+	if err := runCmd(ctx, "qemu-nbd", "-d", nbdDev); err != nil {
+		return err
+	}
+	connected = false
+
+	if err := runQemuImgInfoWithRetry(ctx, imageTemplatePath, 10, 300*time.Millisecond); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// growFilesystem は resizeTarget 上のファイルシステムを、リサイズ済みのパーティション/ディスク
+// サイズまで拡張する。ファイルシステム種別により手順が異なる(ext系はオフラインでresize2fs可能だが、
+// xfsはオフラインリサイズに対応していないためマウントしてxfs_growfsする必要がある)。
+// Rocky 9 の GenericCloud イメージは /boot・/ ともに xfs のため、xfs 分岐が必要になる(issue #622)。
+func growFilesystem(ctx context.Context, resizeTarget, nbdDev, partDev string, usingPartitionTarget, hasPartitionTable bool, partitionTableType string) error {
+	fsType, err := detectFilesystemType(ctx, resizeTarget)
+	if err != nil {
+		slog.Warn("Failed to detect filesystem type; falling back to ext* resize path", "device", resizeTarget, "err", err)
+	}
+
+	switch fsType {
+	case "xfs":
+		return growXFSFilesystem(ctx, resizeTarget)
+	case "ext2", "ext3", "ext4", "":
+		return growExtFilesystem(ctx, resizeTarget, nbdDev, partDev, usingPartitionTarget, hasPartitionTable, partitionTableType)
+	default:
+		return fmt.Errorf("unsupported filesystem type for resize: %q (device=%s)", fsType, resizeTarget)
+	}
+}
+
+// growExtFilesystem は ext2/ext3/ext4 ファイルシステムを resize2fs で拡張する(Ubuntu/Alpineの既定経路)。
+func growExtFilesystem(ctx context.Context, resizeTarget, nbdDev, partDev string, usingPartitionTarget, hasPartitionTable bool, partitionTableType string) error {
 	if err := runCmd(ctx, "e2fsck", "-f", resizeTarget, "-y"); err != nil {
 		if usingPartitionTarget && isMissingBlockDeviceError(err) {
 			if hasPartitionTable {
@@ -738,20 +905,45 @@ func resizeCustomizedImage(ctx context.Context, imageTemplatePath string, volSiz
 			return err
 		}
 	}
-	if err := runCmd(ctx, "resize2fs", resizeTarget); err != nil {
+	return runCmd(ctx, "resize2fs", resizeTarget)
+}
+
+// growXFSFilesystem は xfs ファイルシステムを拡張する。xfs_growfs はマウント済みのファイルシステム
+// に対してのみ動作する(ext系のresize2fsと異なりオフラインリサイズ不可)ため、一時ディレクトリに
+// マウントしてから実行する。
+func growXFSFilesystem(ctx context.Context, resizeTarget string) error {
+	mountPoint, err := os.MkdirTemp("", "marmot-xfs-grow-")
+	if err != nil {
+		return fmt.Errorf("create temp mount point for xfs_growfs failed: %w", err)
+	}
+	defer func() {
+		if err := os.Remove(mountPoint); err != nil {
+			slog.Error("remove temporary xfs mount point failed", "mountPoint", mountPoint, "err", err)
+		}
+	}()
+
+	if err := runCmd(ctx, "mount", resizeTarget, mountPoint); err != nil {
 		return err
 	}
+	defer func() {
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := runCmd(cleanupCtx, "umount", mountPoint); err != nil {
+			slog.Error("umount failed after xfs_growfs", "mountPoint", mountPoint, "device", resizeTarget, "err", err)
+		}
+	}()
 
-	if err := runCmd(ctx, "qemu-nbd", "-d", nbdDev); err != nil {
-		return err
+	return runCmd(ctx, "xfs_growfs", mountPoint)
+}
+
+// detectFilesystemType は devicePath 上のファイルシステム種別を取得する。
+func detectFilesystemType(ctx context.Context, devicePath string) (string, error) {
+	cmd := exec.CommandContext(ctx, "lsblk", "-n", "-o", "FSTYPE", devicePath)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("lsblk -n -o FSTYPE %s failed: %w, output=%s", devicePath, err, strings.TrimSpace(string(out)))
 	}
-	connected = false
-
-	if err := runQemuImgInfoWithRetry(ctx, imageTemplatePath, 10, 300*time.Millisecond); err != nil {
-		return err
-	}
-
-	return nil
+	return strings.ToLower(strings.TrimSpace(string(out))), nil
 }
 
 func findFreeNbdDeviceByIndex(i int) (string, error) {
@@ -765,6 +957,89 @@ func findFreeNbdDeviceByIndex(i int) (string, error) {
 		return devicePath, nil
 	}
 	return "", fmt.Errorf("device %s is busy", devicePath)
+}
+
+// findLastPhysicalPartitionNumber は nbdDev (例: /dev/nbd0) に現在接続されているイメージの
+// パーティションテーブルを parted で直接読み取り、ディスク上で物理的に最後に位置する
+// (終了オフセットが最大の)パーティション番号を求める。qemu-img resize で追加された空き領域は
+// 物理的にこのパーティションの直後に隣接するため、resizepart の対象として安全に100%まで
+// 拡張できるのはこのパーティションだけである。
+//
+// 当初は「最大のパーティション番号」を対象にしていたが、これは誤りだった。GPTの
+// パーティション番号は物理的な並び順とは無関係に採番される。例えば Ubuntu の
+// cloud image はルートパーティションを番号「1」とし、bios_grub/ESP/boot には
+// 14/15/16 という番号より大きい番号を割り当てている(ただし物理的な配置としては
+// ルートパーティションが最後に置かれている)。そのため「最大番号」を基準にすると、
+// Ubuntuでは /boot (番号16、物理的には先頭寄り)を誤ってリサイズ対象に選んでしまい、
+// 既存パーティションと重なって resizepart が失敗していた(issue #622, #737)。
+//
+// sysfs のパーティションデバイスノード(/sys/block/<dev>/<dev>pN)やカーネルの
+// パーティションスキャン状態には依存しない。NBDデバイス番号は使い回されるため、
+// udevd が無い/弱いCI環境では前回接続されていた別イメージのパーティション情報が
+// カーネル側に残留することがあり、sysfs を参照する方式では誤ったパーティション番号を
+// 拾ってしまう場合がある。parted でオンディスクのパーティションテーブルを直接読むことで、
+// この種の残留状態の影響を受けないようにしている。
+func findLastPhysicalPartitionNumber(ctx context.Context, nbdDev string) (int, error) {
+	cmd := exec.CommandContext(ctx, "parted", "-m", "-s", nbdDev, "unit", "s", "print")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return 0, fmt.Errorf("parted -m -s %s unit s print failed: %w, output=%s", nbdDev, err, strings.TrimSpace(string(out)))
+	}
+	return parseLastPhysicalPartitionNumberFromPartedOutput(string(out))
+}
+
+// parseLastPhysicalPartitionNumberFromPartedOutput は `parted -m -s <dev> unit s print` の
+// 出力から、終了オフセット(END)が最大のパーティション番号を求める。ヘッダ行("BYT;")、
+// ディスク概要行、qemu-img resize 直後に表示されるGPT不整合の警告メッセージなどは、
+// いずれも先頭フィールドが数値にならないため自然に無視される。
+func parseLastPhysicalPartitionNumberFromPartedOutput(output string) (int, error) {
+	bestNum := 0
+	bestEnd := int64(-1)
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		fields := strings.Split(line, ":")
+		if len(fields) < 3 {
+			continue
+		}
+		num, err := strconv.Atoi(fields[0])
+		if err != nil {
+			continue
+		}
+		end, err := strconv.ParseInt(strings.TrimSuffix(fields[2], "s"), 10, 64)
+		if err != nil {
+			continue
+		}
+		if end > bestEnd {
+			bestEnd = end
+			bestNum = num
+		}
+	}
+	if bestNum == 0 {
+		return 0, fmt.Errorf("no partitions found in parted output")
+	}
+	return bestNum, nil
+}
+
+// waitForLastPhysicalPartitionNumber は findLastPhysicalPartitionNumber が成功するまで
+// ポーリングする。qemu-nbd 接続直後は一時的にI/Oが安定しないことがあるため、短時間の
+// リトライを行う。
+func waitForLastPhysicalPartitionNumber(ctx context.Context, nbdDev string, timeout time.Duration) (int, error) {
+	deadline := time.Now().Add(timeout)
+	for {
+		if n, err := findLastPhysicalPartitionNumber(ctx, nbdDev); err == nil {
+			return n, nil
+		}
+		if err := ctx.Err(); err != nil {
+			return 0, err
+		}
+		if time.Now().After(deadline) {
+			return 0, fmt.Errorf("no partition devices found for %s within %s", nbdDev, timeout)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
 }
 
 func waitForBlockDevice(ctx context.Context, devicePath string, timeout time.Duration) error {

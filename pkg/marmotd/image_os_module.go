@@ -69,10 +69,19 @@ func (m commonImageOSModule) applyFollowerSpec(follower *api.Image, head api.Ima
 }
 
 var (
-	imageOSModuleUbuntu2204 = commonImageOSModule{moduleKey: "ubuntu22.04"}
-	imageOSModuleUbuntu2404 = commonImageOSModule{moduleKey: "ubuntu24.04"}
-	imageOSModuleUbuntu     = commonImageOSModule{moduleKey: "ubuntu"}
-	imageOSModuleAlpine323  = commonImageOSModule{moduleKey: "alpine3.23", customizeHandler: customizeAlpineQcowImageWithContext}
+	imageOSModuleUbuntu2204  = commonImageOSModule{moduleKey: "ubuntu22.04"}
+	imageOSModuleUbuntu2404  = commonImageOSModule{moduleKey: "ubuntu24.04"}
+	imageOSModuleUbuntu      = commonImageOSModule{moduleKey: "ubuntu"}
+	imageOSModuleAlpine323   = commonImageOSModule{moduleKey: "alpine3.23", customizeHandler: customizeAlpineQcowImageWithContext}
+	imageOSModuleRocky8      = commonImageOSModule{moduleKey: "rocky8", customizeHandler: customizeRockyQcowImageWithContext}
+	imageOSModuleRocky9      = commonImageOSModule{moduleKey: "rocky9", customizeHandler: customizeRockyQcowImageWithContext}
+	imageOSModuleRocky10     = commonImageOSModule{moduleKey: "rocky10", customizeHandler: customizeRockyQcowImageWithContext}
+	imageOSModuleAlmaLinux8  = commonImageOSModule{moduleKey: "almalinux8", customizeHandler: customizeAlmaLinuxQcowImageWithContext}
+	imageOSModuleAlmaLinux9  = commonImageOSModule{moduleKey: "almalinux9", customizeHandler: customizeAlmaLinuxQcowImageWithContext}
+	imageOSModuleAlmaLinux10 = commonImageOSModule{moduleKey: "almalinux10", customizeHandler: customizeAlmaLinuxQcowImageWithContext}
+	imageOSModuleDebian11    = commonImageOSModule{moduleKey: "debian11", customizeHandler: customizeDebian11QcowImageWithContext}
+	imageOSModuleDebian12    = commonImageOSModule{moduleKey: "debian12", customizeHandler: customizeDebianQcowImageWithContext}
+	imageOSModuleDebian13    = commonImageOSModule{moduleKey: "debian13", customizeHandler: customizeDebianQcowImageWithContext}
 )
 
 func resolveImageOSModuleFromImage(img api.Image) (imageOSModule, error) {
@@ -84,6 +93,11 @@ func resolveImageOSModuleFromImage(img api.Image) (imageOSModule, error) {
 func resolveImageOSModuleFromSpec(osName, osVersion string) (imageOSModule, error) {
 	name := strings.ToLower(strings.TrimSpace(osName))
 	version := strings.TrimSpace(osVersion)
+
+	// rockey は rocky の旧表記。既存データとの互換のためエイリアスとして扱う。
+	if name == "rockey" {
+		name = "rocky"
+	}
 
 	switch name {
 	case "ubuntu":
@@ -100,6 +114,39 @@ func resolveImageOSModuleFromSpec(osName, osVersion string) (imageOSModule, erro
 			return imageOSModuleAlpine323, nil
 		}
 		return nil, fmt.Errorf("unsupported alpine image module version: %s", version)
+	case "rocky":
+		switch version {
+		case "8":
+			return imageOSModuleRocky8, nil
+		case "9":
+			return imageOSModuleRocky9, nil
+		case "10":
+			return imageOSModuleRocky10, nil
+		default:
+			return nil, fmt.Errorf("unsupported rocky image module version: %s", version)
+		}
+	case "almalinux":
+		switch version {
+		case "8":
+			return imageOSModuleAlmaLinux8, nil
+		case "9":
+			return imageOSModuleAlmaLinux9, nil
+		case "10":
+			return imageOSModuleAlmaLinux10, nil
+		default:
+			return nil, fmt.Errorf("unsupported almalinux image module version: %s", version)
+		}
+	case "debian":
+		switch version {
+		case "11":
+			return imageOSModuleDebian11, nil
+		case "12":
+			return imageOSModuleDebian12, nil
+		case "13":
+			return imageOSModuleDebian13, nil
+		default:
+			return nil, fmt.Errorf("unsupported debian image module version: %s", version)
+		}
 	case "":
 		return imageOSModuleUbuntu2204, nil
 	default:

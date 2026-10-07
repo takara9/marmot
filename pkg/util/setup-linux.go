@@ -16,10 +16,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/takara9/marmot/api"
 	"go.yaml.in/yaml/v3"
 )
@@ -68,6 +70,114 @@ func SetupAlpineLinux(spec api.Server) error {
 
 	if err := CreateAlpineInterfaces(*spec.Spec.NetworkInterface, mountPoint); err != nil {
 		slog.Error("CreateAlpineInterfaces failed", "error", err)
+		return err
+	}
+
+	return nil
+}
+
+// SetupRockyLinux は Rocky Linux のブートボリュームを初期化する。
+// ネットワーク設定は NetworkManager の keyfile 形式で書き込む(Rocky 9 は
+// NetworkManager が既定のネットワークマネージャのため、Ubuntu の netplan、
+// Alpine の /etc/network/interfaces に相当する)。
+func SetupRockyLinux(spec api.Server) error {
+	if spec.Spec.BootVolume == nil {
+		return fmt.Errorf("BootVolume is nil")
+	}
+
+	mountPoint, nbdDev, err := MountVolume(*spec.Spec.BootVolume)
+	if err != nil {
+		slog.Error("MountVolume failed", "error", err)
+		return err
+	}
+	defer func() {
+		_ = UnMountVolume(*spec.Spec.BootVolume, mountPoint, nbdDev)
+	}()
+
+	if err := setupMountedIdentity(spec, mountPoint); err != nil {
+		return err
+	}
+
+	// mgmtネットワークが常に強制付与されるため、通常ここでnilになることは無い(issue #696)。
+	// defaultネットワークへの自動フォールバックは廃止したため、念のため空スライスにする。
+	if spec.Spec.NetworkInterface == nil {
+		spec.Spec.NetworkInterface = &[]api.NetworkInterface{}
+	}
+
+	if err := CreateNetworkManagerKeyfiles(*spec.Spec.NetworkInterface, mountPoint); err != nil {
+		slog.Error("CreateNetworkManagerKeyfiles failed", "error", err)
+		return err
+	}
+
+	return nil
+}
+
+// SetupAlmaLinux は AlmaLinux のブートボリュームを初期化する。
+// ネットワーク設定は Rocky Linux と同様に NetworkManager の keyfile 形式で書き込む
+// (AlmaLinux 9 の GenericCloud イメージも NetworkManager が既定のネットワークマネージャ
+// のため)。
+func SetupAlmaLinux(spec api.Server) error {
+	if spec.Spec.BootVolume == nil {
+		return fmt.Errorf("BootVolume is nil")
+	}
+
+	mountPoint, nbdDev, err := MountVolume(*spec.Spec.BootVolume)
+	if err != nil {
+		slog.Error("MountVolume failed", "error", err)
+		return err
+	}
+	defer func() {
+		_ = UnMountVolume(*spec.Spec.BootVolume, mountPoint, nbdDev)
+	}()
+
+	if err := setupMountedIdentity(spec, mountPoint); err != nil {
+		return err
+	}
+
+	// mgmtネットワークが常に強制付与されるため、通常ここでnilになることは無い(issue #696)。
+	// defaultネットワークへの自動フォールバックは廃止したため、念のため空スライスにする。
+	if spec.Spec.NetworkInterface == nil {
+		spec.Spec.NetworkInterface = &[]api.NetworkInterface{}
+	}
+
+	if err := CreateNetworkManagerKeyfiles(*spec.Spec.NetworkInterface, mountPoint); err != nil {
+		slog.Error("CreateNetworkManagerKeyfiles failed", "error", err)
+		return err
+	}
+
+	return nil
+}
+
+// SetupDebian11 は Debian 11(bullseye)のブートボリュームを初期化する。
+// Debian 11 の GenericCloud イメージには netplan が含まれておらず ifupdown で
+// ネットワークを管理するため、Debian 12/13(netplan、util.SetupLinux 経由)とは別に
+// ifupdown 形式(CreateIfupdownInterfaces)でネットワーク設定を書き込む(issue #622)。
+func SetupDebian11(spec api.Server) error {
+	if spec.Spec.BootVolume == nil {
+		return fmt.Errorf("BootVolume is nil")
+	}
+
+	mountPoint, nbdDev, err := MountVolume(*spec.Spec.BootVolume)
+	if err != nil {
+		slog.Error("MountVolume failed", "error", err)
+		return err
+	}
+	defer func() {
+		_ = UnMountVolume(*spec.Spec.BootVolume, mountPoint, nbdDev)
+	}()
+
+	if err := setupMountedIdentity(spec, mountPoint); err != nil {
+		return err
+	}
+
+	// mgmtネットワークが常に強制付与されるため、通常ここでnilになることは無い(issue #696)。
+	// defaultネットワークへの自動フォールバックは廃止したため、念のため空スライスにする。
+	if spec.Spec.NetworkInterface == nil {
+		spec.Spec.NetworkInterface = &[]api.NetworkInterface{}
+	}
+
+	if err := CreateIfupdownInterfaces(*spec.Spec.NetworkInterface, mountPoint); err != nil {
+		slog.Error("CreateIfupdownInterfaces failed", "error", err)
 		return err
 	}
 
@@ -355,6 +465,13 @@ func MountVolume(v api.Volume) (string, string, error) {
 		time.Sleep(1 * time.Second) // デバイス作成を待機
 
 		mountCandidates := []string{fmt.Sprintf("%sp1", nbdDevice), nbdDevice}
+		// Rocky 9 の GenericCloud イメージのように、GPTで複数パーティション
+		// (bios_grub/ESP/boot/root等)を持ち、ルートファイルシステムがパーティション1ではない
+		// 構成に対応するため、検出できた場合はルートパーティション(最大サイズのパーティション)を
+		// 最優先のマウント候補にする(issue #622)。検出できない場合は従来通りp1→ディスク全体の順で試す。
+		if rootPartNum, err := findRootPartitionNumber(nbdDevice); err == nil && rootPartNum != 1 {
+			mountCandidates = append([]string{fmt.Sprintf("%sp%d", nbdDevice, rootPartNum)}, mountCandidates...)
+		}
 		mounted := false
 		for _, dev := range mountCandidates {
 			debugPrintln("Mounting", "mount", "-t", "ext4", dev, mountPoint)
@@ -365,7 +482,7 @@ func MountVolume(v api.Volume) (string, string, error) {
 				break
 			}
 
-			// filesystem type を固定しない再試行（alpine cloud image 互換）
+			// filesystem type を固定しない再試行（alpine cloud image、xfs(Rocky)互換）
 			cmd = exec.Command("mount", dev, mountPoint)
 			err = cmd.Run()
 			if err == nil {
@@ -388,18 +505,18 @@ func MountVolume(v api.Volume) (string, string, error) {
 		lvdev, err := findTargertPartition(lvPath)
 		if err != nil {
 			slog.Error("FindTargertPartition failed", "error", err)
-						_ = os.RemoveAll(mountPoint)
+			_ = os.RemoveAll(mountPoint)
 			return "", "", err
 		}
 		cmd := exec.Command("mount", "-t", "ext4", lvdev, mountPoint)
 		err = cmd.Run()
 		if err != nil {
 			err := errors.New("mount failed to setup OS-Disk")
-						_ = os.RemoveAll(mountPoint)
+			_ = os.RemoveAll(mountPoint)
 			return "", "", err
 		}
 	default:
-				_ = os.RemoveAll(mountPoint)
+		_ = os.RemoveAll(mountPoint)
 		return "", "", fmt.Errorf("unsupported volume type: %s", *v.Spec.Type)
 	}
 
@@ -640,6 +757,139 @@ func CreateNetplanInterfaces(requestConfig []api.NetworkInterface, mountPoint st
 	return nil
 }
 
+// CreateIfupdownInterfaces は Debian 11(bullseye)向けの NIC 設定を ifupdown 形式
+// (/etc/network/interfaces.d/<interface名>、拡張子無し)で書き出す。Debian 11 の
+// GenericCloud イメージには netplan が含まれておらず、ifupdown(resolvconf 併用)で
+// ネットワークを管理するため、CreateNetplanInterfaces は適用されない(issue #622)。
+// NIC名の割り当てや静的アドレス指定時の挙動は CreateNetplanInterfaces と揃える。
+//
+// ベースイメージの /etc/network/interfaces は source-directory で
+// /etc/network/interfaces.d を読み込む設定になっているため、ここで書き込んだファイルは
+// 追加設定として反映される。source-directory はファイル名が英数字・アンダースコア・
+// ハイフンのみのものに限り読み込む仕様のため、ファイル名に拡張子(ドット)を付けてはならない
+// (付けると無視されて設定が適用されない、issue #622)。また resolvconf がインストール済みの
+// ため、dns-nameservers/dns-search ディレクティブで /etc/resolv.conf が自動生成される。
+func CreateIfupdownInterfaces(requestConfig []api.NetworkInterface, mountPoint string) error {
+	nicName := []string{"enp1s0", "enp2s0", "enp7s0", "enp8s0", "enp9s0", "enp10s0"}
+
+	interfacesDir := filepath.Join(mountPoint, "etc", "network", "interfaces.d")
+	if err := os.MkdirAll(interfacesDir, 0755); err != nil {
+		return fmt.Errorf("failed to create interfaces.d directory: %w", err)
+	}
+
+	// ネットワーク設定がない場合は、デフォルトネットワークにつないで、DHCPでIPアドレスを取得する設定にする
+	if len(requestConfig) == 0 {
+		return writeIfupdownInterfaceFile(interfacesDir, nicName[0], ifupdownInterfaceConfig{dhcp4: true, dhcp6: true})
+	}
+
+	for idx, nic := range requestConfig {
+		ifaceName := nicName[idx]
+		cfg := ifupdownInterfaceConfig{}
+
+		// IPアドレスとネットマスク長があれば、DHCPは無効にする(CreateNetplanInterfacesと同様)
+		if nic.Address != nil && nic.Netmasklen != nil {
+			cfg.address = fmt.Sprintf("%s/%d", *nic.Address, *nic.Netmasklen)
+			cfg.addressIsIPv6 = checkIPVersion(strings.TrimSpace(*nic.Address)) == "IPv6"
+		} else {
+			cfg.dhcp4 = OrDefault(nic.Dhcp4, true)
+			cfg.dhcp6 = OrDefault(nic.Dhcp6, true)
+		}
+
+		if nic.Routes != nil {
+			for _, r := range *nic.Routes {
+				if r.To == nil || r.Via == nil {
+					return fmt.Errorf("route requires both to and via on interface %s", ifaceName)
+				}
+				route := Route{To: *r.To, Via: *r.Via}
+				if err := validateNetplanRoute(nic, route, ifaceName); err != nil {
+					return err
+				}
+				cfg.routes = append(cfg.routes, route)
+			}
+		}
+
+		if nic.Nameservers != nil {
+			if nic.Nameservers.Addresses != nil {
+				cfg.dnsAddresses = append(cfg.dnsAddresses, (*nic.Nameservers.Addresses)...)
+			}
+			if nic.Nameservers.Search != nil {
+				cfg.dnsSearch = append(cfg.dnsSearch, (*nic.Nameservers.Search)...)
+			}
+		}
+
+		if err := writeIfupdownInterfaceFile(interfacesDir, ifaceName, cfg); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+type ifupdownInterfaceConfig struct {
+	address       string
+	addressIsIPv6 bool
+	dhcp4         bool
+	dhcp6         bool
+	routes        []Route
+	dnsAddresses  []string
+	dnsSearch     []string
+}
+
+func writeIfupdownInterfaceFile(interfacesDir, ifaceName string, cfg ifupdownInterfaceConfig) error {
+	var b strings.Builder
+	b.WriteString("# Managed by marmot. Do not edit manually (issue #622).\n")
+	fmt.Fprintf(&b, "auto %s\n", ifaceName)
+
+	switch {
+	case cfg.address != "":
+		family := "inet"
+		if cfg.addressIsIPv6 {
+			family = "inet6"
+		}
+		fmt.Fprintf(&b, "iface %s %s static\n", ifaceName, family)
+		fmt.Fprintf(&b, "    address %s\n", cfg.address)
+
+		var upCommands []string
+		for _, route := range cfg.routes {
+			if strings.EqualFold(strings.TrimSpace(route.To), "default") {
+				fmt.Fprintf(&b, "    gateway %s\n", route.Via)
+				continue
+			}
+			upCommands = append(upCommands, fmt.Sprintf("    up ip route add %s via %s dev %s\n", route.To, route.Via, ifaceName))
+		}
+
+		if len(cfg.dnsAddresses) > 0 {
+			fmt.Fprintf(&b, "    dns-nameservers %s\n", strings.Join(cfg.dnsAddresses, " "))
+		}
+		if len(cfg.dnsSearch) > 0 {
+			fmt.Fprintf(&b, "    dns-search %s\n", strings.Join(cfg.dnsSearch, " "))
+		}
+		for _, up := range upCommands {
+			b.WriteString(up)
+		}
+	default:
+		if cfg.dhcp4 {
+			fmt.Fprintf(&b, "iface %s inet dhcp\n", ifaceName)
+		}
+		if cfg.dhcp6 {
+			fmt.Fprintf(&b, "iface %s inet6 dhcp\n", ifaceName)
+		}
+	}
+
+	// ifupdown の source-directory は、ファイル名が英数字・アンダースコア・ハイフンのみで
+	// 構成されるものに限り読み込む仕様のため、ドットを含むファイル名(例: "enp1s0.cfg")は
+	// 無視され、設定が適用されない(issue #622)。そのため拡張子を付けずインターフェース名を
+	// そのままファイル名にする。
+	filePath := filepath.Join(interfacesDir, ifaceName)
+	if err := os.WriteFile(filePath, []byte(b.String()), 0644); err != nil {
+		return fmt.Errorf("failed to write ifupdown interface file %s: %w", filePath, err)
+	}
+
+	debugPrintln(fmt.Sprintf("Generated %s successfully:\n\n%s", filePath, b.String()))
+
+	return nil
+}
+
 func validateNetplanRoute(nic api.NetworkInterface, route Route, ifaceName string) error {
 	to := strings.TrimSpace(route.To)
 	via := strings.TrimSpace(route.Via)
@@ -667,6 +917,254 @@ func validateNetplanRoute(nic api.NetworkInterface, route Route, ifaceName strin
 	}
 
 	return nil
+}
+
+// CreateNetworkManagerKeyfiles は Rocky Linux (NetworkManager) 向けの NIC 設定を
+// keyfile 形式(/etc/NetworkManager/system-connections/*.nmconnection)で書き出す。
+// NIC名の割り当てや静的アドレス指定時の挙動は CreateNetplanInterfaces と揃える。
+//
+// Rocky Linux の GenericCloud イメージは net.ifnames=0 (従来の eth0/eth1 命名)が既定であり、
+// Ubuntu の cloud image が前提とする PCIスロットベースの命名(enp1s0 等)にはならない
+// (enp1s0 等は udev の altname としてのみ残る)。そのため接続プロファイルを interface-name
+// でマッチさせると実デバイスに一致せず適用されない。MACアドレスが分かっている場合は
+// interface-name の代わりに mac-address でマッチさせることで、実際のカーネル命名に
+// 依存せず正しいNICへ適用されるようにする(issue #622)。
+func CreateNetworkManagerKeyfiles(requestConfig []api.NetworkInterface, mountPoint string) error {
+	nicName := []string{"enp1s0", "enp2s0", "enp7s0", "enp8s0", "enp9s0", "enp10s0"}
+
+	// Rocky Linux 8 の GenericCloud イメージは ifcfg-rh プラグイン向けの
+	// /etc/sysconfig/network-scripts/ifcfg-eth0 等を同梱しており、NetworkManager の
+	// ifcfg-rh プラグインが既定で有効なため、ここで書き込む keyfile 接続と競合しうる
+	// (Rocky 9/AlmaLinux 9 の GenericCloud イメージにはこれらのファイルは無い)。
+	// keyfile 接続を一意の設定として確実に適用するため、残存する legacy ifcfg-* を
+	// 事前に削除する(issue #622)。
+	if err := removeLegacyIfcfgNetworkScripts(mountPoint); err != nil {
+		return err
+	}
+
+	connDir := filepath.Join(mountPoint, "etc", "NetworkManager", "system-connections")
+	if err := os.MkdirAll(connDir, 0755); err != nil {
+		return fmt.Errorf("failed to create NetworkManager system-connections directory: %w", err)
+	}
+
+	// ネットワーク設定がない場合は、デフォルトネットワークにつないで、DHCPでIPアドレスを取得する設定にする
+	if len(requestConfig) == 0 {
+		return writeNMConnectionFile(connDir, nicName[0], nmConnectionConfig{dhcp4: true, dhcp6: true})
+	}
+
+	for idx, nic := range requestConfig {
+		ifaceName := nicName[idx]
+		cfg := nmConnectionConfig{}
+
+		if nic.Mac != nil {
+			if mac := strings.TrimSpace(*nic.Mac); mac != "" {
+				cfg.mac = mac
+			}
+		}
+
+		// IPアドレスとネットマスク長があれば、DHCPは無効にする(CreateNetplanInterfacesと同様)
+		if nic.Address != nil && nic.Netmasklen != nil {
+			cfg.address = fmt.Sprintf("%s/%d", *nic.Address, *nic.Netmasklen)
+			cfg.addressIsIPv6 = checkIPVersion(strings.TrimSpace(*nic.Address)) == "IPv6"
+		} else {
+			cfg.dhcp4 = OrDefault(nic.Dhcp4, true)
+			cfg.dhcp6 = OrDefault(nic.Dhcp6, true)
+		}
+
+		if nic.Routes != nil {
+			for _, r := range *nic.Routes {
+				if r.To == nil || r.Via == nil {
+					return fmt.Errorf("route requires both to and via on interface %s", ifaceName)
+				}
+				route := Route{To: *r.To, Via: *r.Via}
+				if err := validateNetplanRoute(nic, route, ifaceName); err != nil {
+					return err
+				}
+				cfg.routes = append(cfg.routes, route)
+			}
+		}
+
+		if nic.Nameservers != nil {
+			if nic.Nameservers.Addresses != nil {
+				cfg.dnsAddresses = append(cfg.dnsAddresses, (*nic.Nameservers.Addresses)...)
+			}
+			if nic.Nameservers.Search != nil {
+				cfg.dnsSearch = append(cfg.dnsSearch, (*nic.Nameservers.Search)...)
+			}
+		}
+
+		if err := writeNMConnectionFile(connDir, ifaceName, cfg); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// removeLegacyIfcfgNetworkScripts は /etc/sysconfig/network-scripts/ 配下の
+// legacy ifcfg-* ファイル(ifcfg-lo を除く)を削除する。NetworkManager の
+// ifcfg-rh プラグインが既定で有効な EL8 系イメージ(Rocky Linux 8 等)では、
+// これらのファイルが起動時に接続プロファイルとして読み込まれ、ここで書き込む
+// keyfile 接続と競合するため、事前に取り除く(issue #622)。対象ディレクトリや
+// ファイルが無い場合は何もしない(EL9 系イメージ等)。
+func removeLegacyIfcfgNetworkScripts(mountPoint string) error {
+	scriptsDir := filepath.Join(mountPoint, "etc", "sysconfig", "network-scripts")
+	entries, err := os.ReadDir(scriptsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to read legacy network-scripts directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		name := entry.Name()
+		if !strings.HasPrefix(name, "ifcfg-") || name == "ifcfg-lo" {
+			continue
+		}
+		if err := os.Remove(filepath.Join(scriptsDir, name)); err != nil {
+			return fmt.Errorf("failed to remove legacy network script %s: %w", name, err)
+		}
+	}
+
+	return nil
+}
+
+// nmConnectionConfig は1つの NetworkManager keyfile 接続プロファイルを組み立てるための中間表現。
+type nmConnectionConfig struct {
+	mac           string
+	address       string
+	addressIsIPv6 bool
+	dhcp4         bool
+	dhcp6         bool
+	routes        []Route
+	dnsAddresses  []string
+	dnsSearch     []string
+}
+
+// writeNMConnectionFile は nmConnectionConfig から NetworkManager keyfile を生成し、
+// mountPoint配下の connDir に書き込む。NetworkManagerはパーミッションに厳しいため
+// 0600 (所有者のみ読み書き) で保存する。
+func writeNMConnectionFile(connDir, ifaceName string, cfg nmConnectionConfig) error {
+	var b strings.Builder
+
+	b.WriteString("[connection]\n")
+	fmt.Fprintf(&b, "id=%s\n", ifaceName)
+	fmt.Fprintf(&b, "uuid=%s\n", uuid.NewString())
+	b.WriteString("type=ethernet\n")
+	if cfg.mac == "" {
+		// MACアドレスが分からない場合のみ、従来通りインターフェース名でマッチさせる
+		// (net.ifnames=0 環境では実デバイス名と一致せず適用されないため、可能な限り
+		// mac-address でのマッチを優先する)。
+		fmt.Fprintf(&b, "interface-name=%s\n", ifaceName)
+	}
+	b.WriteString("autoconnect=true\n\n")
+
+	b.WriteString("[ethernet]\n")
+	if cfg.mac != "" {
+		fmt.Fprintf(&b, "mac-address=%s\n", cfg.mac)
+	}
+	b.WriteString("\n")
+
+	ipv4Routes, ipv6Routes := splitRoutesByFamily(cfg.routes)
+	ipv4DNS, ipv6DNS := splitAddressesByFamily(cfg.dnsAddresses)
+
+	b.WriteString("[ipv4]\n")
+	switch {
+	case cfg.address != "" && !cfg.addressIsIPv6:
+		b.WriteString("method=manual\n")
+		fmt.Fprintf(&b, "address1=%s\n", cfg.address)
+	case cfg.address != "" && cfg.addressIsIPv6:
+		b.WriteString("method=disabled\n")
+	case cfg.dhcp4:
+		b.WriteString("method=auto\n")
+	default:
+		b.WriteString("method=disabled\n")
+	}
+	writeNMRoutes(&b, ipv4Routes)
+	writeNMDNS(&b, ipv4DNS, cfg.dnsSearch)
+	b.WriteString("\n")
+
+	b.WriteString("[ipv6]\n")
+	switch {
+	case cfg.address != "" && cfg.addressIsIPv6:
+		b.WriteString("method=manual\n")
+		fmt.Fprintf(&b, "address1=%s\n", cfg.address)
+	case cfg.address != "" && !cfg.addressIsIPv6:
+		b.WriteString("method=disabled\n")
+	case cfg.dhcp6:
+		b.WriteString("method=auto\n")
+	default:
+		b.WriteString("method=disabled\n")
+	}
+	writeNMRoutes(&b, ipv6Routes)
+	writeNMDNS(&b, ipv6DNS, nil)
+	b.WriteString("\n")
+
+	filePath := filepath.Join(connDir, ifaceName+".nmconnection")
+	if err := os.WriteFile(filePath, []byte(b.String()), 0600); err != nil {
+		return fmt.Errorf("write NetworkManager connection file failed: %w", err)
+	}
+
+	debugPrintln(fmt.Sprintf("Generated %s successfully:\n\n%s", filePath, b.String()))
+
+	return nil
+}
+
+// splitRoutesByFamily はゲートウェイ(via)のアドレス種別でルートをIPv4/IPv6に分類する。
+// "default" の宛先は NetworkManager keyfile 形式の表記(0.0.0.0/0 または ::/0)に変換する。
+func splitRoutesByFamily(routes []Route) ([]Route, []Route) {
+	var ipv4, ipv6 []Route
+	for _, r := range routes {
+		isIPv6 := checkIPVersion(strings.TrimSpace(r.Via)) == "IPv6"
+		to := strings.TrimSpace(r.To)
+		if strings.EqualFold(to, "default") {
+			if isIPv6 {
+				to = "::/0"
+			} else {
+				to = "0.0.0.0/0"
+			}
+		}
+		route := Route{To: to, Via: r.Via}
+		if isIPv6 {
+			ipv6 = append(ipv6, route)
+		} else {
+			ipv4 = append(ipv4, route)
+		}
+	}
+	return ipv4, ipv6
+}
+
+// splitAddressesByFamily はネームサーバのアドレスをIPv4/IPv6に分類する。
+func splitAddressesByFamily(addresses []string) ([]string, []string) {
+	var ipv4, ipv6 []string
+	for _, addr := range addresses {
+		addr = strings.TrimSpace(addr)
+		if addr == "" {
+			continue
+		}
+		if checkIPVersion(addr) == "IPv6" {
+			ipv6 = append(ipv6, addr)
+		} else {
+			ipv4 = append(ipv4, addr)
+		}
+	}
+	return ipv4, ipv6
+}
+
+func writeNMRoutes(b *strings.Builder, routes []Route) {
+	for i, r := range routes {
+		fmt.Fprintf(b, "route%d=%s,%s\n", i+1, r.To, r.Via)
+	}
+}
+
+func writeNMDNS(b *strings.Builder, dnsAddresses []string, dnsSearch []string) {
+	if len(dnsAddresses) > 0 {
+		fmt.Fprintf(b, "dns=%s;\n", strings.Join(dnsAddresses, ";"))
+	}
+	if len(dnsSearch) > 0 {
+		fmt.Fprintf(b, "dns-search=%s;\n", strings.Join(dnsSearch, ";"))
+	}
 }
 
 // LOOP_CTL_GET_FREE は新しい空きループデバイスを取得するための定数
@@ -723,6 +1221,68 @@ func findFreeNbdDevice() (string, error) {
 		}
 	}
 	return "", fmt.Errorf("no free nbd device found")
+}
+
+// findRootPartitionNumber は、nbdDevice (例: /dev/nbd0) に接続されているイメージの
+// パーティションテーブルを parted で直接読み取り、ルートファイルシステムが入っている
+// パーティション番号を求める。マウント対象の決定に使用する(issue #622)。
+//
+// 当初は「最大のパーティション番号」を対象にしていたが、これは誤りだった。GPTの
+// パーティション番号は物理的な並び順やサイズとは無関係に採番される。例えば Ubuntu の
+// cloud image はルートパーティションを番号「1」とし、bios_grub/ESP/boot には
+// 14/15/16 という番号より大きい番号を割り当てている(ルートは最大番号ではない)。
+// そのため「最大番号」を基準にすると、Ubuntuでは /boot (番号16)を誤ってルートとして
+// マウントしてしまい、/etc 等が存在せず以降のセットアップが失敗していた。
+//
+// ルートファイルシステムはディスク上で最も大きいパーティションになるという前提は
+// Ubuntu・Rocky 9 のどちらの実イメージでも成立するため、パーティション番号ではなく
+// 「最大サイズのパーティション」を選ぶ方式にしている。
+//
+// sysfsのパーティションデバイスノードはNBDデバイス番号の使い回しで古い情報が残ることがあるため
+// 参照せず、オンディスクのパーティションテーブルを直接読む。pkg/marmotd にも同種のロジックが
+// あるが、pkg/marmotd は pkg/util に依存しており循環参照になるため、ここに複製している
+// (managementNetworkAptCacherAddress/Port と同じ理由。値を変更する場合は両方を同期すること)。
+func findRootPartitionNumber(nbdDevice string) (int, error) {
+	out, err := exec.Command("parted", "-m", "-s", nbdDevice, "unit", "s", "print").CombinedOutput()
+	if err != nil {
+		return 0, fmt.Errorf("parted -m -s %s unit s print failed: %w, output=%s", nbdDevice, err, strings.TrimSpace(string(out)))
+	}
+	return parseRootPartitionNumberFromPartedOutput(string(out))
+}
+
+// parseRootPartitionNumberFromPartedOutput は `parted -m -s <dev> unit s print` の出力から、
+// 最もサイズの大きいパーティションの番号を求める。ヘッダ行("BYT;")、ディスク概要行、
+// qemu-img resize 直後に表示されるGPT不整合の警告メッセージなどは、いずれも先頭フィールドが
+// 数値にならないため自然に無視される。
+func parseRootPartitionNumberFromPartedOutput(output string) (int, error) {
+	bestNum := 0
+	bestSize := int64(-1)
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		fields := strings.Split(line, ":")
+		if len(fields) < 4 {
+			continue
+		}
+		num, err := strconv.Atoi(fields[0])
+		if err != nil {
+			continue
+		}
+		size, err := strconv.ParseInt(strings.TrimSuffix(fields[3], "s"), 10, 64)
+		if err != nil {
+			continue
+		}
+		if size > bestSize {
+			bestSize = size
+			bestNum = num
+		}
+	}
+	if bestNum == 0 {
+		return 0, fmt.Errorf("no partitions found in parted output")
+	}
+	return bestNum, nil
 }
 
 func findTargertPartition(lvPath string) (string, error) {

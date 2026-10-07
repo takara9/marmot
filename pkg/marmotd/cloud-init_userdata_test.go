@@ -17,12 +17,14 @@ users:
   - name: root
     shell: /bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: false
     ssh_authorized_keys:
       - ssh-rsa AAAA
       - ssh-ed25519 BBBB
   - name: ubuntu
     shell: /bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: false
     ssh_authorized_keys:
       - ssh-rsa AAAA
       - ssh-ed25519 BBBB
