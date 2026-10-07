@@ -917,14 +917,18 @@ func growXFSFilesystem(ctx context.Context, resizeTarget string) error {
 		return fmt.Errorf("create temp mount point for xfs_growfs failed: %w", err)
 	}
 	defer func() {
-		_ = os.RemoveAll(mountPoint)
+		if err := os.Remove(mountPoint); err != nil {
+			slog.Error("remove temporary xfs mount point failed", "mountPoint", mountPoint, "err", err)
+		}
 	}()
 
 	if err := runCmd(ctx, "mount", resizeTarget, mountPoint); err != nil {
 		return err
 	}
 	defer func() {
-		if err := runCmd(ctx, "umount", mountPoint); err != nil {
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := runCmd(cleanupCtx, "umount", mountPoint); err != nil {
 			slog.Error("umount failed after xfs_growfs", "mountPoint", mountPoint, "device", resizeTarget, "err", err)
 		}
 	}()
