@@ -45,8 +45,31 @@ func (c *Client) CreateVolume(ctx context.Context, req VolumeRequest) error {
 		return fmt.Errorf("size must be at least 1GB")
 	}
 
-	_, err := c.runCommand(ctx, "rbd", "create", req.ProviderVolumeID(), "--size", fmt.Sprintf("%dG", req.SizeGB))
+	out, err := c.runCommand(ctx, "rbd", "create", req.ProviderVolumeID(), "--size", fmt.Sprintf("%dG", req.SizeGB))
+	if err != nil && isRBDAlreadyExistsError(out, err) {
+		// サーバー作成が別ステップの一時的エラーでリトライされた場合、既に作成済みの
+		// RBDイメージに対して rbd create が再度呼ばれることがある(リトライは
+		// CreateVolume 呼び出し単位ではなくサーバー作成全体に対して行われるため)。
+		// イメージが既に存在するなら目的の状態は達成済みのため、エラーにせず
+		// 成功として扱う(冪等化)。pkg/marmotd/volumes.go の runTargetcliAllowExists と
+		// 同じ方針。
+		return nil
+	}
 	return err
+}
+
+// isRBDAlreadyExistsError は、rbd create の失敗が「イメージが既に存在する」ことによる
+// ものかどうかを判定する。出力が空の場合はエラーメッセージ自体を確認する
+// (CommandError.Error() は Output を含むため)。
+func isRBDAlreadyExistsError(output []byte, err error) bool {
+	if err == nil {
+		return false
+	}
+	text := strings.ToLower(strings.TrimSpace(string(output)))
+	if text == "" {
+		text = strings.ToLower(err.Error())
+	}
+	return strings.Contains(text, "already exists")
 }
 
 func (c *Client) DeleteVolume(ctx context.Context, pool, image string) error {
