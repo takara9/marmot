@@ -4,7 +4,9 @@
 package util
 
 import (
+	"os"
 	"testing"
+	"time"
 )
 
 // 実機で取得した `parted -m -s <dev> unit s print` の出力例。
@@ -87,5 +89,48 @@ func TestFindRootPartitionNumberInvalidDevice(t *testing.T) {
 	// 存在しないデバイスを指定した場合、parted がエラーになることを確認する。
 	if _, err := findRootPartitionNumber("/dev/marmot-test-nonexistent"); err == nil {
 		t.Fatalf("expected error for nonexistent device")
+	}
+}
+
+// waitForAnyDeviceFile は、パーティションデバイスノードの作成が遅延する環境
+// (CI等)で mount 失敗(exit status 32)を誤って確定させないためのポーリング処理。
+// candidates のいずれかが遅れて出現しても検知できることを確認する。
+func TestWaitForAnyDeviceFileDetectsDelayedAppearance(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	target := dir + "/nbd0p1"
+	missing := dir + "/nbd0"
+
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		if f, err := os.Create(target); err == nil {
+			_ = f.Close()
+		}
+	}()
+
+	start := time.Now()
+	waitForAnyDeviceFile([]string{missing, target}, 5*time.Second)
+	elapsed := time.Since(start)
+
+	if _, err := os.Stat(target); err != nil {
+		t.Fatalf("expected target file to exist after wait, err=%v", err)
+	}
+	if elapsed >= 5*time.Second {
+		t.Fatalf("waitForAnyDeviceFile did not return promptly after file appeared, elapsed=%s", elapsed)
+	}
+}
+
+// 候補のいずれも出現しない場合は、timeout 経過後に（エラーにせず）復帰することを確認する。
+func TestWaitForAnyDeviceFileTimesOutWhenNoneAppear(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	start := time.Now()
+	waitForAnyDeviceFile([]string{dir + "/never-appears"}, 300*time.Millisecond)
+	elapsed := time.Since(start)
+
+	if elapsed < 300*time.Millisecond {
+		t.Fatalf("waitForAnyDeviceFile returned before timeout elapsed, elapsed=%s", elapsed)
 	}
 }
