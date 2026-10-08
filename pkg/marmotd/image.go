@@ -455,6 +455,18 @@ func isTransientDownloadError(err error) bool {
 }
 
 func downloadImageWithContext(ctx context.Context, sourceURL, destPath string) error {
+	u, parseErr := url.Parse(sourceURL)
+	if parseErr != nil {
+		return fmt.Errorf("invalid sourceUrl: %w", parseErr)
+	}
+	if strings.EqualFold(u.Scheme, "file") {
+		// ローカルに用意されたインストールISO等を sourceUrl: file:///path/to/xxx.iso で
+		// 指定するケース(Windows インストールISOの受け渡し方式として決定済み)。
+		// net/http.Client は file:// スキームに対応していないため、ここでローカルファイル
+		// コピーに分岐する。
+		return copyLocalImageFile(ctx, u, destPath)
+	}
+
 	timeout := contextTimeoutHint(ctx)
 	client := &http.Client{Timeout: CurrentConfig().ImageDownloadTimeout()}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURL, nil)
@@ -499,6 +511,80 @@ func downloadImageWithContext(ctx context.Context, sourceURL, destPath string) e
 		return fmt.Errorf("rename temp file failed: %w", err)
 	}
 	return nil
+}
+
+// copyLocalImageFile は、sourceUrl が file:// スキームの場合に、ローカルファイルシステム上の
+// パスから destPath へコピーする。HTTP経路と同様に、一時ファイル(.part)へ書き込んでから
+// rename することで、コピー途中の不完全なファイルが destPath に現れないようにする。
+func copyLocalImageFile(ctx context.Context, srcURL *url.URL, destPath string) error {
+	if srcURL.Host != "" {
+		return fmt.Errorf("file scheme with host is not supported (local path only): %s", srcURL.String())
+	}
+	srcPath := srcURL.Path
+	if strings.TrimSpace(srcPath) == "" {
+		return fmt.Errorf("file scheme requires an absolute local path: %s", srcURL.String())
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	srcInfo, err := os.Stat(srcPath)
+	if err != nil {
+		return fmt.Errorf("stat local image file failed: %w", err)
+	}
+	if srcInfo.IsDir() {
+		return fmt.Errorf("source path is a directory, not a file: %s", srcPath)
+	}
+
+	srcFile, err := os.Open(srcPath)
+	if err != nil {
+		return fmt.Errorf("open local image file failed: %w", err)
+	}
+	defer func() {
+		_ = srcFile.Close()
+	}()
+
+	tmpPath := destPath + ".part"
+	dstFile, err := os.Create(tmpPath)
+	if err != nil {
+		return fmt.Errorf("create temp file failed: %w", err)
+	}
+
+	if _, err := io.Copy(dstFile, &contextReader{ctx: ctx, r: srcFile}); err != nil {
+		_ = dstFile.Close()
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("copy local image file failed: %w", err)
+	}
+	if err := dstFile.Sync(); err != nil {
+		_ = dstFile.Close()
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("sync temp file failed: %w", err)
+	}
+	if err := dstFile.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("close temp file failed: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, destPath); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("rename temp file failed: %w", err)
+	}
+	return nil
+}
+
+// contextReader は、Read のたびに ctx のキャンセル/タイムアウトを確認する io.Reader ラッパー。
+// 大容量ISOのローカルコピー中でもキャンセルに応答できるようにするために使用する。
+type contextReader struct {
+	ctx context.Context
+	r   io.Reader
+}
+
+func (cr *contextReader) Read(p []byte) (int, error) {
+	if err := cr.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return cr.r.Read(p)
 }
 
 func validateQcowV2Image(path string) error {

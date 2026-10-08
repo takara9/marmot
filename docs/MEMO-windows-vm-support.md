@@ -70,26 +70,33 @@ marmot の VM 起動パイプラインは Linux を前提に作られており�
     - `clock` を `localtime` に変更
     - QXL ビデオデバイス追加
     - SPICE の `Listen` をノードのアドレスに変更 + `Passwd` を VM 生成時にランダム生成して設定
+  **（実装済み）**
 - `pkg/marmotd/image_os_module.go`
   - `resolveImageOSModuleFromSpec` に `"windows"` ケース追加（`customizeHandler` なし = virt-customize を実行せず素通し）
 - `api/marmot-api-v1.yaml` + コード生成（`api/marmot-api-v1.go` は直接編集しない）
   - サーバーのグラフィカルコンソール接続情報を返すエンドポイント追加
-    （例: `GET /server/{id}/console/graphical` → host, port, passwd）
+    （`GET /server/{id}/console/graphical` → host, port, passwd）**（実装済み）**
   - Windows サーバー専用の RDP アクセス情報を返すエンドポイント追加
     （例: `GET /server/{id}/console/rdp` → host（ノードの host-bridge アドレス）, port（払い出し済みの
     待受ポート）。接続許可元 CIDR はサーバー作成時に指定できる API スキーマ項目として追加する。
     ポート番号は marmot 側が空きポートから自動採番する値であり、利用者が指定するものではない。
     Server リソース専用とし、Internet Gateway / Network LB の `bindPublicIpAddress`/`remoteCIDR`
-    とは別フィールドとして、既存リソースとの重複・流用はしない）
+    とは別フィールドとして、既存リソースとの重複・流用はしない）**（未実装）**
 - `pkg/marmotd/console.go`
-  - 上記エンドポイントのハンドラ追加（稼働中ドメインの SPICE 設定を XML から取得）
+  - 上記エンドポイントのハンドラ追加（稼働中ドメインの SPICE 設定を XML から取得）**（実装済み）**
+  - `pkg/marmotd/server.go` で、Windows 系サーバー生成時に `SpiceListenAddress`（ノードの LAN アドレス、
+    `util.NameserverForDNSListenAddr(CurrentConfig().DNSListenAddr)` で解決）と `SpicePasswd`
+    （`crypto/rand` による都度ランダム生成）を `virt.ServerSpec` へ設定する配線を追加
+    （`pkg/marmotd/spice_password.go`）**（実装済み）**
 - `cmd/mactl/cmd/console.go`
   - `mactl console --graphical` / `mactl console --rdp` 等で接続情報を表示するサブコマンド/オプション追加
+    （`--graphical` は実装済み。host/port/passwd と `remote-viewer spice://host:port` のヒントを表示する。
+    `--rdp` は RDP 転送機能の実装待ち）
 - ノードの host-bridge アドレス（`dns_listen_addr` 等で使われる、ノード自身の host-bridge 側 IP）上に
   VM ごとに空きポートを自動採番して TCP 待受を開始し、受けた RDP 接続を `mgmt` ネットワーク経由で
   対象 VM の `mgmt` IP アドレス（`10.245.0.0/16` 内）の 3389/tcp へ転送する仕組みの実装。
   接続元は指定された CIDR のみ許可する（VM 自体が host-bridge 未接続でも動作する、
-  Windows サーバー専用の仕組み。ポートの採番・解放・多重割当防止を含む）。
+  Windows サーバー専用の仕組み。ポートの採番・解放・多重割当防止を含む）。**（未実装）**
 
 ### 完了条件（案）
 - `go build ./...` 成功
@@ -133,13 +140,12 @@ marmot で利用するバージョン別ベースイメージを再現可能な�
         osVersion: "2022"
     ```
 
-  - **要対応（コード変更が必要・確認済み）**: 現状の `downloadImageWithContext`
+  - **（実装済み）**: 現状の `downloadImageWithContext`
     （[pkg/marmotd/image.go](../pkg/marmotd/image.go)）は `net/http.Client` で直接
     `http.NewRequestWithContext` → `client.Do` を行っており、`file://` スキームには非対応
     （Go 標準の `http.Transport` に `file://` 用 RoundTripper が登録されていないため
-    `unsupported protocol scheme "file"` エラーになる）。
-    `sourceUrl` が `file://` の場合はローカルファイルコピー（またはシンボリックリンク/直接参照）を行う分岐を
-    `downloadImageWithContext` 呼び出し元に追加する対応が Phase 2 の変更範囲に含まれる。
+    `unsupported protocol scheme "file"` エラーになる）という課題があったため、`sourceUrl` が
+    `file://` の場合はローカルファイルコピーに分岐する `copyLocalImageFile` を追加した。
   - `autounattend.xml` を使った無人インストール手順を用意する。
   - 対象バージョンごとに virtio-win ドライバおよび cloudbase-init の対応状況を確認し、イメージに組み込む。
     初期設定と VM ごとの設定値の適用は Phase 3 で扱う。

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/takara9/marmot/api"
 )
@@ -97,6 +98,28 @@ func (m *MarmotEndpoint) GetServers() ([]byte, *url.URL, error) {
 		return nil, nil, err
 	}
 	slog.Debug("GetServers", "reqURL", reqURL)
+
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	return m.httpRequest2(req)
+}
+
+// グラフィカルコンソール(SPICE)接続情報を取得する。
+// hostPort はサーバーが稼働するノードのAPIエンドポイント(空の場合は m.HostPort を使用する)。
+// サーバーのドメインは稼働ノード上の libvirt が保持するため、マルチノード構成では
+// 呼び出し元が事前にノードを解決して hostPort を渡す必要がある(mactl console と同様の方式)。
+func (m *MarmotEndpoint) GetServerConsoleGraphicalAt(hostPort, id string) ([]byte, *url.URL, error) {
+	slog.Debug("===", "GetServerConsoleGraphicalAt is called", "===")
+	if strings.TrimSpace(hostPort) == "" {
+		hostPort = m.HostPort
+	}
+	reqURL, err := url.JoinPath(m.Scheme+"://"+hostPort, m.BasePath, "/server/"+id+"/console/graphical")
+	if err != nil {
+		return nil, nil, err
+	}
+	slog.Debug("GetServerConsoleGraphicalAt", "reqURL", reqURL)
 
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {

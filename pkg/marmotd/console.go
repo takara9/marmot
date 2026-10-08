@@ -88,6 +88,61 @@ func resolveConsolePathFallback(server api.Server) string {
 	return path
 }
 
+// ApiConsoleGraphicalServerById returns the live SPICE graphical console connection info
+// (host/port/passwd) for the given server, read directly from the running libvirt domain.
+func (s *Server) ApiConsoleGraphicalServerById(ctx echo.Context, id string) error {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return ctx.JSON(http.StatusBadRequest, api.Error{Code: 1, Message: "server id is required"})
+	}
+
+	server, err := s.Ma.GetServerManage(id)
+	if err != nil {
+		slog.Error("ApiConsoleGraphicalServerById() failed to get server", "id", id, "err", err)
+		if err == db.ErrNotFound {
+			return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "IDが存在しません"})
+		}
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	if server.Metadata.InstanceName == nil || strings.TrimSpace(*server.Metadata.InstanceName) == "" {
+		return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "server instance is not available"})
+	}
+
+	info, err := resolveGraphicalConsoleInfo(*server.Metadata.InstanceName)
+	if err != nil {
+		slog.Error("ApiConsoleGraphicalServerById() failed to resolve graphical console info", "id", id, "err", err)
+		return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "graphical console is not available"})
+	}
+
+	reply := api.GraphicalConsoleInfo{
+		Host: info.Host,
+		Port: int32(info.Port),
+	}
+	if strings.TrimSpace(info.Passwd) != "" {
+		reply.Passwd = &info.Passwd
+	}
+	return ctx.JSON(http.StatusOK, reply)
+}
+
+func resolveGraphicalConsoleInfo(instanceName string) (virt.GraphicalConsoleInfo, error) {
+	l, err := virt.NewLibVirtEp("qemu:///system")
+	if err != nil {
+		return virt.GraphicalConsoleInfo{}, err
+	}
+	defer l.Close()
+
+	dom, err := l.Com.LookupDomainByName(strings.TrimSpace(instanceName))
+	if err != nil {
+		return virt.GraphicalConsoleInfo{}, err
+	}
+	defer func() {
+		_ = dom.Free()
+	}()
+
+	return virt.GetDomainGraphicalConsoleInfo(dom)
+}
+
 func relayConsole(conn net.Conn, consolePath string) error {
 	defer func() {
 		_ = conn.Close()

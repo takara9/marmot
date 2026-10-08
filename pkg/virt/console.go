@@ -40,6 +40,53 @@ func ExtractDomainConsolePath(xmlDesc string) (string, error) {
 	return "", fmt.Errorf("console path not found in domain xml")
 }
 
+// GraphicalConsoleInfo holds the SPICE graphical console connection details
+// extracted from a domain's live XML.
+type GraphicalConsoleInfo struct {
+	Host   string
+	Port   int
+	Passwd string
+}
+
+// GetDomainGraphicalConsoleInfo reads the active libvirt XML (including security
+// sensitive fields such as the SPICE password) and returns the graphical console
+// connection info. Requires a privileged libvirt connection (e.g. qemu:///system
+// as the marmotd service account) to receive the password in the XML.
+func GetDomainGraphicalConsoleInfo(dom *libvirt.Domain) (GraphicalConsoleInfo, error) {
+	if dom == nil {
+		return GraphicalConsoleInfo{}, fmt.Errorf("domain is nil")
+	}
+	xmlDesc, err := dom.GetXMLDesc(libvirt.DOMAIN_XML_SECURE)
+	if err != nil {
+		return GraphicalConsoleInfo{}, err
+	}
+	return ExtractDomainGraphicalConsoleInfo(xmlDesc)
+}
+
+// ExtractDomainGraphicalConsoleInfo parses domain XML and returns the SPICE
+// graphical console connection info (host/port/passwd).
+func ExtractDomainGraphicalConsoleInfo(xmlDesc string) (GraphicalConsoleInfo, error) {
+	var dom libvirtxml.Domain
+	if err := dom.Unmarshal(xmlDesc); err != nil {
+		return GraphicalConsoleInfo{}, err
+	}
+	if dom.Devices == nil || len(dom.Devices.Graphics) == 0 || dom.Devices.Graphics[0].Spice == nil {
+		return GraphicalConsoleInfo{}, fmt.Errorf("graphical console (SPICE) not found in domain xml")
+	}
+	spice := dom.Devices.Graphics[0].Spice
+
+	host := strings.TrimSpace(spice.Listen)
+	if host == "" {
+		host = "127.0.0.1"
+	}
+
+	return GraphicalConsoleInfo{
+		Host:   host,
+		Port:   spice.Port,
+		Passwd: spice.Passwd,
+	}, nil
+}
+
 func firstSerialPath(items []libvirtxml.DomainSerial) string {
 	for _, item := range items {
 		if path := chardevSourcePath(item.Source); path != "" {
