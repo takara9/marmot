@@ -139,6 +139,27 @@ var _ = Describe("Ceph", func() {
 			Expect(runner.commands).To(ContainElement(expectedRBDCommand("create", "marmot-ssd/vol-abcde", "--size", "20G")))
 		})
 
+		It("treats an already-existing rbd image as success (idempotent retry)", func() {
+			command := expectedRBDCommand("create", "marmot-ssd/vol-abcde", "--size", "20G")
+			runner.errors[command] = fmt.Errorf("exit status 17")
+			runner.outputs[command] = []byte("rbd: create error: (17) File exists\nrbd image vol-abcde already exists")
+
+			err := client.CreateVolume(context.Background(), ceph.VolumeRequest{Pool: "marmot-ssd", Image: "vol-abcde", SizeGB: 20})
+
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("still reports non-'already exists' rbd create failures", func() {
+			command := expectedRBDCommand("create", "marmot-ssd/vol-abcde", "--size", "20G")
+			runner.errors[command] = fmt.Errorf("exit status 1")
+			runner.outputs[command] = []byte("rbd: error connecting to the cluster")
+
+			err := client.CreateVolume(context.Background(), ceph.VolumeRequest{Pool: "marmot-ssd", Image: "vol-abcde", SizeGB: 20})
+
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("error connecting to the cluster"))
+		})
+
 		It("parses rbd info JSON", func() {
 			command := expectedRBDCommand("info", "marmot-ssd/vol-abcde", "--format", "json")
 			runner.outputs[command] = []byte(`{"name":"vol-abcde","size":21474836480,"pool":"marmot-ssd"}`)

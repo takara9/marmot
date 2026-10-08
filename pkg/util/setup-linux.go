@@ -462,7 +462,12 @@ func MountVolume(v api.Volume) (string, string, error) {
 			err := errors.New("qemu-nbd failed to setup OS-Disk")
 			return "", "", err
 		}
-		time.Sleep(1 * time.Second) // デバイス作成を待機
+		// カーネルによる非同期のパーティションスキャンを明示的に要求し、完了を待つ。
+		// 固定スリープ(旧:1秒)では高負荷環境(CI等)でパーティションデバイスノード
+		// (例: /dev/nbd0p1)の作成が間に合わず、mount が失敗することがあったため、
+		// pkg/marmotd/image.go の refreshPartitionDevices/waitForBlockDevice と
+		// 同様のリトライ・ポーリング方式に変更する(循環参照のため同等ロジックを複製)。
+		refreshNbdPartitions(nbdDevice)
 
 		mountCandidates := []string{fmt.Sprintf("%sp1", nbdDevice), nbdDevice}
 		// Rocky 9 の GenericCloud イメージのように、GPTで複数パーティション
@@ -472,6 +477,9 @@ func MountVolume(v api.Volume) (string, string, error) {
 		if rootPartNum, err := findRootPartitionNumber(nbdDevice); err == nil && rootPartNum != 1 {
 			mountCandidates = append([]string{fmt.Sprintf("%sp%d", nbdDevice, rootPartNum)}, mountCandidates...)
 		}
+		// マウント候補のデバイスファイルが出現するまで待つ(パーティションデバイスノードの
+		// 作成が遅延していても、タイムアウトまでは mount 失敗と確定しない)。
+		waitForAnyDeviceFile(mountCandidates, 10*time.Second)
 		mounted := false
 		for _, dev := range mountCandidates {
 			debugPrintln("Mounting", "mount", "-t", "ext4", dev, mountPoint)
@@ -1221,6 +1229,58 @@ func findFreeNbdDevice() (string, error) {
 		}
 	}
 	return "", fmt.Errorf("no free nbd device found")
+}
+
+// refreshNbdPartitions は、qemu-nbd 接続直後にカーネルのパーティションスキャンを
+// 明示的に要求する。接続直後は一過性の busy で partprobe が失敗することがあるため
+// 短時間リトライする。partx/udevadm は補助的な処理のため失敗してもエラーにはしない
+// (pkg/marmotd/image.go の refreshPartitionDevices と同様の方式。循環参照のため複製)。
+func refreshNbdPartitions(nbdDevice string) {
+	const attempts = 5
+	const retryDelay = 200 * time.Millisecond
+
+	var lastErr error
+	for i := 0; i < attempts; i++ {
+		if err := exec.Command("partprobe", nbdDevice).Run(); err == nil {
+			lastErr = nil
+			break
+		} else {
+			lastErr = err
+			if i < attempts-1 {
+				slog.Warn("partprobe transient failure; retrying", "nbdDevice", nbdDevice, "attempt", i+1, "err", err)
+				time.Sleep(retryDelay)
+			}
+		}
+	}
+	if lastErr != nil {
+		slog.Warn("partprobe failed after retries", "nbdDevice", nbdDevice, "err", lastErr)
+	}
+
+	if err := exec.Command("partx", "-u", nbdDevice).Run(); err != nil {
+		slog.Warn("partx refresh failed", "nbdDevice", nbdDevice, "err", err)
+	}
+	if err := exec.Command("udevadm", "settle").Run(); err != nil {
+		slog.Warn("udevadm settle failed", "err", err)
+	}
+}
+
+// waitForAnyDeviceFile は、candidates のいずれかのデバイスファイルが出現するまで
+// timeout を上限にポーリングする。カーネルの非同期パーティションスキャンが
+// refreshNbdPartitions の完了後も遅延する場合への保険であり、タイムアウトしても
+// エラーにはせず、呼び出し元の既存のマウント試行ループ（失敗時のログ出力）に委ねる。
+func waitForAnyDeviceFile(candidates []string, timeout time.Duration) {
+	deadline := time.Now().Add(timeout)
+	for {
+		for _, c := range candidates {
+			if _, err := os.Stat(c); err == nil {
+				return
+			}
+		}
+		if time.Now().After(deadline) {
+			return
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
 }
 
 // findRootPartitionNumber は、nbdDevice (例: /dev/nbd0) に接続されているイメージの
