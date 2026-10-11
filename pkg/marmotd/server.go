@@ -1859,9 +1859,11 @@ func (m *Marmot) CreateNewVolumeWithWait(volReq api.Volume) (api.Volume, error) 
 		}
 	}
 
-	vol, err := m.Db.CreateVolumeOnDB2(volReq)
+	// この関数が直接 CreateNewVolume を実行するため、PENDING のままだと
+	// ボリュームコントローラーが同じボリュームを並行して作成してしまう。
+	vol, err := m.Db.CreateVolumeOnDB2Provisioning(volReq)
 	if err != nil {
-		slog.Error("CreateVolumeOnDB2()", "err", err)
+		slog.Error("CreateVolumeOnDB2Provisioning()", "err", err)
 		// サーバーとボリュームのステータスをエラーに更新する処理を追加するべき
 
 		return api.Volume{}, err

@@ -41,8 +41,9 @@ func ResizeQcow(path string, size int) error {
 	cmd := exec.Command("qemu-img", "resize", path, fmt.Sprintf("%dG", size))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		slog.Error("qemu-img resize failed", "output", string(output))
-		return fmt.Errorf("failed to resize QCOW2 volume at path: %s, error: %v", path, err)
+		trimmed := strings.TrimSpace(string(output))
+		slog.Error("qemu-img resize failed", "output", trimmed)
+		return fmt.Errorf("failed to resize QCOW2 volume at path: %s, error: %v, output: %s", path, err, trimmed)
 	}
 	return nil
 }

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -25,6 +26,7 @@ import (
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/lvm"
+	"github.com/takara9/marmot/pkg/qcow"
 	"github.com/takara9/marmot/pkg/util"
 )
 
@@ -145,18 +147,37 @@ func (m *Marmot) CreateNewImageManageWithContext(ctx context.Context, id string)
 		return markFailed(err)
 	}
 
-	// イメージを16GBに拡張する
-	resizeCtx, resizeCancel := newTimeoutContext(ctx, CurrentConfig().ImageResizeTimeout())
-	defer resizeCancel()
-	bootVolumeSizeGB := 16
-	if err := resizeCustomizedImage(resizeCtx, downloadPath, bootVolumeSizeGB); err != nil {
-		return markFailed(wrapDeadlineExceeded(err, "QCOW2 イメージ拡張", CurrentConfig().ImageResizeTimeout()))
-	}
+	osName := strings.ToLower(strings.TrimSpace(util.OrDefault(image.Spec.OsName, "")))
+	if osName == "windows" {
+		// Windows(NTFS)イメージは、resizeCustomizedImage の ext2/3/4・xfs 前提の
+		// パーティション/ファイルシステム拡張処理には対応していない
+		// (サポート外の fsType としてエラーになる)。Phase 2 の手順で既に意図した
+		// サイズでベースイメージが作成済みであることを前提とし、ここでの一律 16GB への
+		// 強制リサイズは行わない。実際の仮想ディスクサイズを qemu-img info から取得し、
+		// Spec.Size に正しく反映する(サーバー作成時のサイズ検証で使用される)。
+		sizeGB, sizeErr := qcowVirtualSizeGB(downloadPath)
+		if sizeErr != nil {
+			slog.Error("Failed to determine qcow2 virtual size", "imgId", id, "path", downloadPath, "err", sizeErr)
+			return markFailed(sizeErr)
+		}
+		image.Spec.Kind = util.StringPtr("os")
+		image.Spec.Type = util.StringPtr("qcow2")
+		image.Spec.Qcow2Path = util.StringPtr(downloadPath)
+		image.Spec.Size = util.IntPtrInt(sizeGB)
+	} else {
+		// イメージを16GBに拡張する
+		resizeCtx, resizeCancel := newTimeoutContext(ctx, CurrentConfig().ImageResizeTimeout())
+		defer resizeCancel()
+		bootVolumeSizeGB := 16
+		if err := resizeCustomizedImage(resizeCtx, downloadPath, bootVolumeSizeGB); err != nil {
+			return markFailed(wrapDeadlineExceeded(err, "QCOW2 イメージ拡張", CurrentConfig().ImageResizeTimeout()))
+		}
 
-	image.Spec.Kind = util.StringPtr("os")
-	image.Spec.Type = util.StringPtr("qcow2")
-	image.Spec.Qcow2Path = util.StringPtr(downloadPath)
-	image.Spec.Size = util.IntPtrInt(bootVolumeSizeGB)
+		image.Spec.Kind = util.StringPtr("os")
+		image.Spec.Type = util.StringPtr("qcow2")
+		image.Spec.Qcow2Path = util.StringPtr(downloadPath)
+		image.Spec.Size = util.IntPtrInt(bootVolumeSizeGB)
+	}
 
 	volumeGroup := strings.TrimSpace(CurrentConfig().OSVolumeGroup)
 	if err := ensureImageVolumeGroupAvailable(volumeGroup); err != nil {
@@ -611,6 +632,30 @@ func validateQcowV2Image(path string) error {
 	}
 
 	return nil
+}
+
+// qcowVirtualSizeGB は qemu-img info から qcow2 イメージの仮想ディスクサイズ(バイト)を取得し、
+// GB 単位(端数切り上げ)で返す。Windows イメージのように、resizeCustomizedImage による
+// 16GB への強制リサイズを行わない場合に、実サイズを Image.Spec.Size へ正しく反映するために使う。
+func qcowVirtualSizeGB(path string) (int, error) {
+	info, err := qcow.GetQcowInfo(path)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get qcow2 info: %w", err)
+	}
+	rawSize, ok := info["virtual-size"]
+	if !ok {
+		return 0, fmt.Errorf("qcow2 info has no virtual-size field: %s", path)
+	}
+	sizeBytes, ok := rawSize.(float64)
+	if !ok || sizeBytes <= 0 {
+		return 0, fmt.Errorf("qcow2 info has invalid virtual-size value: %v", rawSize)
+	}
+	const bytesPerGB = 1024 * 1024 * 1024
+	sizeGB := int(math.Ceil(sizeBytes / bytesPerGB))
+	if sizeGB < 1 {
+		sizeGB = 1
+	}
+	return sizeGB, nil
 }
 
 func customizeQcowImage(imagePath string) error {
