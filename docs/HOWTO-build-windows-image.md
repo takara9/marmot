@@ -203,12 +203,25 @@ Windows Setup を無人実行し、仕上げに cloudbase-init の導入と `sys
           <CommandLine>cmd /c mountvol S: /S &amp;&amp; mkdir S:\EFI\Boot &amp;&amp; copy /Y S:\EFI\Microsoft\Boot\bootmgfw.efi S:\EFI\Boot\bootx64.efi &amp;&amp; mountvol S: /D</CommandLine>
           <Description>Copy UEFI boot manager to the firmware fallback path for NVRAM-independent boot</Description>
         </SynchronousCommand>
-        <!-- 4. イメージの汎用化(sysprep /generalize)。これが最後のコマンドになること。
+        <!-- 4. リモートデスクトップ(RDP)の接続受け入れを有効にする。
+             レジストリとファイアウォールの設定は sysprep /generalize 後も残るため、ベースイメージに
+             RDP 有効の状態が入る(autounattend.xml は初回インストール時にしか適用されないため、
+             specialize パスのコンポーネントではなく、sysprep より前のこのコマンドで設定する)。
+             ファイアウォールのルールグループは、表示名がロケールで変わる(日本語では
+             「リモート デスクトップ」)ため、ロケールに依存しないリソース参照で指定する。
+             NLA(ネットワークレベル認証)は Windows Server の既定(有効)のままにする。
+             なお、marmot はサーバー作成時にも同等の設定を行うため、二重設定になるが冪等で問題ない。 -->
+        <SynchronousCommand wcm:action="add">
+          <Order>4</Order>
+          <CommandLine>cmd /c reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v fDenyTSConnections /t REG_DWORD /d 0 /f &amp;&amp; netsh advfirewall firewall set rule group="@FirewallAPI.dll,-28752" new enable=Yes</CommandLine>
+          <Description>Enable Remote Desktop</Description>
+        </SynchronousCommand>
+        <!-- 5. イメージの汎用化(sysprep /generalize)。これが最後のコマンドになること。
              cloudbase-init は、この sysprep によって汎用化されたイメージが次回起動時に
              通る specialize/OOBE パスにフックして動作する設計のため、
              このコマンド以降に他の処理を追加しないこと。 -->
         <SynchronousCommand wcm:action="add">
-          <Order>4</Order>
+          <Order>5</Order>
           <CommandLine>C:\Windows\System32\Sysprep\sysprep.exe /generalize /oobe /shutdown /quiet</CommandLine>
           <Description>Generalize image with sysprep and shut down</Description>
         </SynchronousCommand>
@@ -294,7 +307,7 @@ $ virt-install \
   UEFI/TPM/virtio-scsi/QXL 自体は明示的に指定しているため必須ではありません）。
 
 インストールが進行すると、`autounattend.xml` の `FirstLogonCommands` が自動実行され、
-cloudbase-init 導入 → `sysprep /generalize /oobe /shutdown` の順に実行されて VM が
+cloudbase-init 導入 → RDP 有効化 → `sysprep /generalize /oobe /shutdown` の順に実行されて VM が
 自動的にシャットダウンします。`virsh list --all` で `shut off` になったことを確認してください。
 
 ```console

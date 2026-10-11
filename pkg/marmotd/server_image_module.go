@@ -11,12 +11,13 @@ import (
 type serverImageModule interface {
 	Key() string
 	SetupBootVolume(spec api.Server) error
-	GenerateCloudInitISO(path, password, sshKey string, usernames []string, ansible *api.ServerAnsible, instanceID string) (string, error)
+	GenerateCloudInitISO(path, password, sshKey string, usernames []string, ansible *api.ServerAnsible, instanceID, hostname string, nics []api.NetworkInterface) (string, error)
 }
 
 type commonServerImageModule struct {
 	key               string
 	setupBootVolumeFn func(spec api.Server) error
+	generateISOFn     func(path, password, sshKey string, usernames []string, ansible *api.ServerAnsible, instanceID, hostname string, nics []api.NetworkInterface) (string, error)
 }
 
 func (m commonServerImageModule) Key() string {
@@ -30,7 +31,10 @@ func (m commonServerImageModule) SetupBootVolume(spec api.Server) error {
 	return util.SetupLinux(spec)
 }
 
-func (m commonServerImageModule) GenerateCloudInitISO(path, password, sshKey string, usernames []string, ansible *api.ServerAnsible, instanceID string) (string, error) {
+func (m commonServerImageModule) GenerateCloudInitISO(path, password, sshKey string, usernames []string, ansible *api.ServerAnsible, instanceID, hostname string, nics []api.NetworkInterface) (string, error) {
+	if m.generateISOFn != nil {
+		return m.generateISOFn(path, password, sshKey, usernames, ansible, instanceID, hostname, nics)
+	}
 	return GenerateCloudInitISO(path, password, sshKey, usernames, ansible, instanceID)
 }
 
@@ -52,14 +56,10 @@ var (
 	// Debian 11 は netplan を含まず ifupdown でネットワークを管理するため、専用の
 	// setupBootVolumeFn(util.SetupDebian11)を指定する(issue #622)。
 	serverImageModuleDebian11 = commonServerImageModule{key: "debian11", setupBootVolumeFn: util.SetupDebian11}
-	// Windows は Phase 3 で cloudbase-init 向けプロビジョニング(GenerateCloudbaseInitISO)に
-	// 置き換える予定だが、現時点では未実装。Phase 1(libvirt ドメイン生成)の動作確認を
-	// ブロックしないよう、最小限のプレースホルダとして以下を暫定実装する:
-	//   - SetupBootVolume: setupBootVolumeNoOpWindows(NTFS に netplan/ifupdown を書き込まない)
-	//   - GenerateCloudInitISO: 既定の cloud-init ISO 生成をそのまま使う(Windows には無意味だが、
-	//     CD-ROM として必ずアタッチされるため、有効な ISO ファイルが存在する状態を保つ目的)
-	serverImageModuleWindows2022 = commonServerImageModule{key: "windows2022", setupBootVolumeFn: setupBootVolumeNoOpWindows}
-	serverImageModuleWindows2025 = commonServerImageModule{key: "windows2025", setupBootVolumeFn: setupBootVolumeNoOpWindows}
+	// Windows は NTFS に netplan/ifupdown を書き込まず(SetupBootVolume は no-op)、
+	// cloudbase-init 向けの ConfigDrive ISO でプロビジョニングする。
+	serverImageModuleWindows2022 = commonServerImageModule{key: "windows2022", setupBootVolumeFn: setupBootVolumeNoOpWindows, generateISOFn: generateCloudbaseInitISOForServer}
+	serverImageModuleWindows2025 = commonServerImageModule{key: "windows2025", setupBootVolumeFn: setupBootVolumeNoOpWindows, generateISOFn: generateCloudbaseInitISOForServer}
 )
 
 // setupBootVolumeNoOpWindows は Windows ブートボリュームに対して何も行わない。
@@ -67,6 +67,12 @@ var (
 // 意味を持たず、実行すべきではないため明示的な no-op とする。
 func setupBootVolumeNoOpWindows(spec api.Server) error {
 	return nil
+}
+
+// generateCloudbaseInitISOForServer は、Linux 向け cloud-init の引数のうち Windows では
+// 意味を持たない ansible(Linux 上の実行前提)を除いて GenerateCloudbaseInitISO を呼ぶ。
+func generateCloudbaseInitISOForServer(path, password, sshKey string, usernames []string, _ *api.ServerAnsible, instanceID, hostname string, nics []api.NetworkInterface) (string, error) {
+	return GenerateCloudbaseInitISO(path, password, sshKey, usernames, instanceID, hostname, nics)
 }
 
 func normalizeServerImageDefault(server *api.Server) {

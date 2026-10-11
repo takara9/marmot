@@ -878,7 +878,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		return "", err
 	}
 
-	isoPath, err := imageModule.GenerateCloudInitISO(path, password, sshKey, usernames, serverConfig.Spec.Ansible, api.ServerID(serverConfig))
+	isoPath, err := imageModule.GenerateCloudInitISO(path, password, sshKey, usernames, serverConfig.Spec.Ansible, api.ServerID(serverConfig), serverConfig.Metadata.Name, serverNetworkInterfaces(serverConfig))
 	if err != nil {
 		slog.Error("GenerateCloudInitISO()", "module", imageModule.Key(), "err", err)
 		return "", err
@@ -1132,6 +1132,13 @@ func validateServerAuthSpec(auth *api.Auth) error {
 		}
 	}
 	return nil
+}
+
+func serverNetworkInterfaces(server api.Server) []api.NetworkInterface {
+	if server.Spec.NetworkInterface == nil {
+		return nil
+	}
+	return *server.Spec.NetworkInterface
 }
 
 func cloudInitAuthInputs(auth *api.Auth) (string, string, []string, error) {

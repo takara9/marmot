@@ -41,7 +41,7 @@ marmot の VM 起動パイプラインは Linux を前提に作られており�
 |---|---|---|
 | Phase 1 | libvirt ドメイン生成の Windows 対応 + グラフィカルコンソール（SPICE）取得機能 + RDP 接続対応（ノードの host-bridge アドレス上の空きポート経由で `mgmt` ネットワークへ転送、VM 自体の host-bridge 接続有無に依存しない Windows サーバー専用機能） | libvirt ドメイン生成・グラフィカルコンソールは実装済み・**実機確認済み（2026-10-09）**。RDP 接続対応は未着手 |
 | Phase 2 | Windows Server 2022 のベースイメージのビルド手順整備（autounattend.xml によるインストール自動化 + virtio-win ドライバ組込 + cloudbase-init 事前導入 + `sysprep /generalize` によるイメージ汎用化）と marmot イメージ登録（`sourceUrl: file://` 対応含む）への取り込み | **完了（Windows Server 2022、実機確認済み・2026-10-11）**（[HOWTO-build-windows-image.md](./HOWTO-build-windows-image.md)）。Windows Server 2025 のイメージ作成・起動確認はスコープ外 |
-| Phase 3 | sysprep 済みイメージの specialize/OOBE パスで cloudbase-init によるプロビジョニング ISO 生成（config-drive 形式）を実行し、ユーザー/SSH キー/ホスト名を自動設定 | 未着手 |
+| Phase 3 | sysprep 済みイメージの specialize/OOBE パスで cloudbase-init によるプロビジョニング ISO 生成（config-drive 形式）を実行し、ユーザー/SSH キー/ホスト名/静的 IP を自動設定 | ISO 生成（ホスト名・静的 IP）は実装・実機確認済み（2026-10-11）。Administrator パスワードの API 化は未着手 |
 
 対象 Windows バージョン: **Windows Server 2022 および Windows Server 2025**
 
@@ -235,7 +235,7 @@ marmot で利用するバージョン別ベースイメージを再現可能な�
 - Phase 1 の起動・コンソール対応、および Phase 3 の VM ごとのプロビジョニングとの境界が明記されている。
   **（文書化済み）**
 
-## Phase 3 詳細スコープ（詳細論点は決定済み・Phase 全体の着手承認は未取得）
+## Phase 3 詳細スコープ（ConfigDrive ISO 生成は実装済み。Administrator パスワードの API 化は未着手）
 
 ### 目的
 Windows VM 起動時に、Linux の cloud-init 相当の処理を cloudbase-init で実現し、
@@ -252,35 +252,45 @@ Windows VM 起動時に、Linux の cloud-init 相当の処理を cloudbase-init
 ### 変更範囲（案）
 - `pkg/marmotd/cloudbase-init.go`（新規）
   - `GenerateCloudbaseInitISO` 関数を新設。OpenStack ConfigDrive 互換形式
-    （`openstack/latest/meta_data.json` + `user_data`）で ISO を生成する。
+    （ボリュームラベル `config-2`、`openstack/latest/meta_data.json` + `user_data` + `network_data.json`）で
+    ISO を生成する。**（実装済み）**
+  - `meta_data.json` はホスト名（VM 名を英数字とハイフン、15 文字以内に変換）・`admin_pass`・SSH 公開鍵、
+    `user_data`（cloud-config）は追加ユーザー（`Administrators` グループ。Windows に存在しない `root` は除外）、
+    `network_data.json` は MAC アドレスで照合する静的 IPv4（アドレス、ネットマスク、ルート、DNS）を扱う。
+    静的 IP を持たない NIC は出力せず、Windows 既定の DHCP のままにする。host-bridge と mgmt の両方を対象とする。
+    なお、Linux では SetupBootVolume がブートボリュームへ書き込んでいたネットワーク設定を、Windows では
+    この ConfigDrive で渡す（Windows の SetupBootVolume は no-op）。
   - `user_data` は cloudbase-init が解釈可能な形式（cloud-config サブセット or PowerShell スクリプト）で
     ユーザー作成・パスワード設定・SSH 公開鍵登録・ホスト名設定を記述する。
   - ホスト名設定は、Phase 2 で `sysprep /generalize` 済みのイメージが初回起動時に specialize パスへ入り、
     その中で cloudbase-init が実行されることで反映される（Phase 3 では sysprep を呼び出さない。
     前提として Phase 2 で汎用化されたイメージを使用していることが必須）。
 - `pkg/marmotd/server_image_module.go`
-  - **（実機テスト対応として先行実装済み・本項目は置き換えが必要）**: `serverImageModuleWindows2022`/
-    `serverImageModuleWindows2025`、および `resolveServerImageModuleFromOS` の `osName == "windows"`
-    分岐は、Phase 1 の動作確認をブロックしないための暫定措置として先行実装済み（`SetupBootVolume` は
-    no-op、`GenerateCloudInitISO` は既定の cloud-init ISO 生成のまま）。
-  - 各実装の `GenerateCloudInitISO` を `GenerateCloudbaseInitISO` 呼び出しに差し替える。
-    **（本 Phase 3 で対応。上記の暫定実装から正式実装へ置き換える）**
+  - `serverImageModuleWindows2022`/`serverImageModuleWindows2025` の `GenerateCloudInitISO` を
+    `GenerateCloudbaseInitISO` 呼び出しに差し替えた。**（実装済み。Phase 1 の暫定実装から置き換え）**
+    インターフェースにホスト名と NIC 情報の引数を追加したが、Linux 系の ISO 生成処理は変更していない
+    （Windows では ansible の設定を使用しない）。
 - `pkg/marmotd/server.go`
-  - ISO 生成・CD-ROM アタッチ処理は Linux/Windows 共通のインターフェース経由のため変更は最小限
-    （OS 別の分岐はモジュール側に閉じる想定）。
+  - ISO 生成の呼び出しでホスト名（`Metadata.Name`）と NIC 情報を渡す。**（実装済み）**
+    ISO 生成・CD-ROM アタッチ処理は Linux/Windows 共通のインターフェース経由で、OS 別の分岐はモジュール側に閉じる。
 - `api/marmot-api-v1.yaml` + コード生成（`api/marmot-api-v1.go` は直接編集しない）
   - Administrator パスワード等 Windows 固有の認証パラメータを API スキーマに追加する
     （SPICE パスワードと同様に API 経由でランダム生成して返す方式、決定済み）。
 
 ### 完了条件（案）
-- `go build ./...` 成功。
-- `go test ./pkg/marmotd/...` 成功。
+- `go build ./...` 成功。**（確認済み）**
+- `go test ./pkg/marmotd/...` 成功。**（追加した単体テストは成功。`TestMarmotdCeph` 等は Ceph・OVS・libguestfs の
+  実行環境に依存するため、環境依存の失敗として対象外）**
 - `osVariant=windows2022` / `windows2025` のサーバー作成時に ConfigDrive 形式 ISO が生成されることを
-  ユニットテストで確認する。
-- Linux 系 VM の既存 cloud-init 生成処理に差分がないことを確認する。
+  ユニットテストで確認する。**（確認済み。ラベル `config-2` と `meta_data.json`/`user_data`/`network_data.json` を検証）**
+- Linux 系 VM の既存 cloud-init 生成処理に差分がないことを確認する。**（確認済み。Ubuntu のラベルが従来の
+  `cidata` であることをテストで確認）**
 - Phase 2 で `sysprep /generalize` 済みのベースイメージを用いて実際に Windows VM を起動し、
   specialize/OOBE パス経由で cloudbase-init が実行され、ユーザー名/SSH キー/ホスト名が
   反映されることを手動確認する（sysprep はこの確認の前提条件であり、Phase 3 側で実行するものではない）。
+  **（実機確認済み・2026-10-11: ホスト名、および host-bridge・mgmt の静的 IP の反映を確認。
+  ユーザー作成・SSH 公開鍵・パスワード（`admin_pass`）の反映は未確認。Administrator パスワードの
+  API 化（ランダム生成して返す方式）は未着手）**
 
 ## セキュリティ上の考慮事項
 

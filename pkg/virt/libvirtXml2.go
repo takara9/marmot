@@ -1,6 +1,7 @@
 package virt
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -747,13 +748,30 @@ func (l *LibVirtEp) DeleteDomain(vmname string) error {
 	}
 
 	// ドメインの削除
-	err = domain.Undefine()
-	if err != nil {
+	if err = undefineDomainWithState(domain); err != nil {
 		slog.Error("Undefine()", "err", err)
 		return err
 	}
 
 	return nil
+}
+
+type domainUndefiner interface {
+	UndefineFlags(flags libvirt.DomainUndefineFlagsValues) error
+}
+
+// undefineDomainWithState は、UEFI(NVRAM)と TPM の状態ファイルを含めてドメイン定義を削除する。
+// NVRAM を持つドメイン(Windows 等)は、フラグ指定なしの Undefine では libvirt に拒否される。
+// TPM 状態の削除フラグは libvirt 8.9 以降のみ対応のため、未対応の場合は NVRAM のみで再試行する。
+func undefineDomainWithState(domain domainUndefiner) error {
+	err := domain.UndefineFlags(libvirt.DOMAIN_UNDEFINE_NVRAM | libvirt.DOMAIN_UNDEFINE_TPM)
+	var lerr libvirt.Error
+	if err != nil && errors.As(err, &lerr) &&
+		(lerr.Code == libvirt.ERR_INVALID_ARG || lerr.Code == libvirt.ERR_NO_SUPPORT) {
+		slog.Warn("TPM状態の削除フラグ未対応のため、NVRAMのみ削除", "err", err)
+		return domain.UndefineFlags(libvirt.DOMAIN_UNDEFINE_NVRAM)
+	}
+	return err
 }
 
 // 仮想マシンの一時停止
