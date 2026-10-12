@@ -147,6 +147,7 @@ func (m *Marmot) CreateNewImageManageWithContext(ctx context.Context, id string)
 		return markFailed(err)
 	}
 
+	var bootVolumeSizeGB int
 	osName := strings.ToLower(strings.TrimSpace(util.OrDefault(image.Spec.OsName, "")))
 	if osName == "windows" {
 		// Windows(NTFS)イメージは、resizeCustomizedImage の ext2/3/4・xfs 前提の
@@ -160,6 +161,7 @@ func (m *Marmot) CreateNewImageManageWithContext(ctx context.Context, id string)
 			slog.Error("Failed to determine qcow2 virtual size", "imgId", id, "path", downloadPath, "err", sizeErr)
 			return markFailed(sizeErr)
 		}
+		bootVolumeSizeGB = sizeGB
 		image.Spec.Kind = util.StringPtr("os")
 		image.Spec.Type = util.StringPtr("qcow2")
 		image.Spec.Qcow2Path = util.StringPtr(downloadPath)
@@ -168,7 +170,7 @@ func (m *Marmot) CreateNewImageManageWithContext(ctx context.Context, id string)
 		// イメージを16GBに拡張する
 		resizeCtx, resizeCancel := newTimeoutContext(ctx, CurrentConfig().ImageResizeTimeout())
 		defer resizeCancel()
-		bootVolumeSizeGB := 16
+		bootVolumeSizeGB = 16
 		if err := resizeCustomizedImage(resizeCtx, downloadPath, bootVolumeSizeGB); err != nil {
 			return markFailed(wrapDeadlineExceeded(err, "QCOW2 イメージ拡張", CurrentConfig().ImageResizeTimeout()))
 		}
@@ -187,7 +189,7 @@ func (m *Marmot) CreateNewImageManageWithContext(ctx context.Context, id string)
 			return nil, err
 		}
 
-		lvPath, lvName, err := createBootableLVFromQCOW2(ctx, id, downloadPath, volumeGroup)
+		lvPath, lvName, err := createBootableLVFromQCOW2(ctx, id, downloadPath, volumeGroup, bootVolumeSizeGB)
 		if err != nil {
 			slog.Error("Failed to create bootable LV from QCOW2", "imgId", id, "path", downloadPath, "volumeGroup", volumeGroup, "err", err)
 			return markFailed(err)
@@ -1337,11 +1339,14 @@ func runCmd(ctx context.Context, name string, args ...string) error {
 	return nil
 }
 
-// CreateBootableLVFromQCOW2 creates /dev/<volume-group>/<imageID> (16G) and writes qcow2 image into it.
-func createBootableLVFromQCOW2(ctx context.Context, imageID, qcow2Path, vgName string) (string, string, error) {
-	const (
-		lvSize = "16G"
-	)
+// CreateBootableLVFromQCOW2 creates /dev/<volume-group>/<imageID> (sizeGB) and writes qcow2 image into it.
+// sizeGB は qcow2 イメージの仮想ディスクサイズ以上である必要がある(qemu-img convert は
+// 変換先がブロックデバイスの場合に拡張できないため)。
+func createBootableLVFromQCOW2(ctx context.Context, imageID, qcow2Path, vgName string, sizeGB int) (string, string, error) {
+	if sizeGB <= 0 {
+		return "", "", fmt.Errorf("invalid logical volume size: %dGB", sizeGB)
+	}
+	lvSize := fmt.Sprintf("%dG", sizeGB)
 	bootVolName := "boot-" + imageID
 
 	lvName, err := normalizeLVName(bootVolName)
