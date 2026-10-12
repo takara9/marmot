@@ -22,6 +22,8 @@ import (
 
 var errConsoleDetach = errors.New("console detached")
 
+var consoleGraphicalFlag bool
+
 var consoleCmd = &cobra.Command{
 	Use:   "console SERVER-NAME",
 	Short: "Connect to a server console",
@@ -67,6 +69,11 @@ var consoleCmd = &cobra.Command{
 		if hostPort == "" {
 			return fmt.Errorf("API host is required")
 		}
+
+		if consoleGraphicalFlag {
+			return printGraphicalConsoleInfo(m, hostPort, api.ServerID(*server))
+		}
+
 		consolePath := strings.TrimSpace(m.BasePath)
 		if consolePath == "" {
 			consolePath = "/api/v1"
@@ -285,6 +292,30 @@ func setConsoleAuthorizationHeader(req *http.Request, accessToken string) {
 	req.Header.Set("Authorization", "Bearer "+token)
 }
 
+// printGraphicalConsoleInfo は、グラフィカルコンソール(SPICE)の接続情報(host/port/passwd)を
+// 取得して標準出力に表示する。画面そのものへの接続は、利用者が remote-viewer 等で
+// 別途行う想定(docs/MEMO-windows-vm-support.md Phase1 決定事項)。
+func printGraphicalConsoleInfo(m *client.MarmotEndpoint, hostPort, serverID string) error {
+	body, _, err := m.GetServerConsoleGraphicalAt(hostPort, serverID)
+	if err != nil {
+		return fmt.Errorf("failed to get graphical console info: %w", err)
+	}
+
+	var info api.GraphicalConsoleInfo
+	if err := json.Unmarshal(body, &info); err != nil {
+		return fmt.Errorf("failed to parse graphical console info: %w", err)
+	}
+
+	fmt.Printf("host: %s\n", info.Host)
+	fmt.Printf("port: %d\n", info.Port)
+	if info.Passwd != nil && strings.TrimSpace(*info.Passwd) != "" {
+		fmt.Printf("passwd: %s\n", *info.Passwd)
+	}
+	fmt.Printf("\nremote-viewer spice://%s:%d\n", info.Host, info.Port)
+	return nil
+}
+
 func init() {
+	consoleCmd.Flags().BoolVar(&consoleGraphicalFlag, "graphical", false, "Show graphical console (SPICE) connection info instead of connecting to the serial console")
 	rootCmd.AddCommand(consoleCmd)
 }

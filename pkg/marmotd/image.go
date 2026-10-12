@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -25,6 +26,7 @@ import (
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/lvm"
+	"github.com/takara9/marmot/pkg/qcow"
 	"github.com/takara9/marmot/pkg/util"
 )
 
@@ -145,18 +147,39 @@ func (m *Marmot) CreateNewImageManageWithContext(ctx context.Context, id string)
 		return markFailed(err)
 	}
 
-	// イメージを16GBに拡張する
-	resizeCtx, resizeCancel := newTimeoutContext(ctx, CurrentConfig().ImageResizeTimeout())
-	defer resizeCancel()
-	bootVolumeSizeGB := 16
-	if err := resizeCustomizedImage(resizeCtx, downloadPath, bootVolumeSizeGB); err != nil {
-		return markFailed(wrapDeadlineExceeded(err, "QCOW2 イメージ拡張", CurrentConfig().ImageResizeTimeout()))
-	}
+	var bootVolumeSizeGB int
+	osName := strings.ToLower(strings.TrimSpace(util.OrDefault(image.Spec.OsName, "")))
+	if osName == "windows" {
+		// Windows(NTFS)イメージは、resizeCustomizedImage の ext2/3/4・xfs 前提の
+		// パーティション/ファイルシステム拡張処理には対応していない
+		// (サポート外の fsType としてエラーになる)。Phase 2 の手順で既に意図した
+		// サイズでベースイメージが作成済みであることを前提とし、ここでの一律 16GB への
+		// 強制リサイズは行わない。実際の仮想ディスクサイズを qemu-img info から取得し、
+		// Spec.Size に正しく反映する(サーバー作成時のサイズ検証で使用される)。
+		sizeGB, sizeErr := qcowVirtualSizeGB(downloadPath)
+		if sizeErr != nil {
+			slog.Error("Failed to determine qcow2 virtual size", "imgId", id, "path", downloadPath, "err", sizeErr)
+			return markFailed(sizeErr)
+		}
+		bootVolumeSizeGB = sizeGB
+		image.Spec.Kind = util.StringPtr("os")
+		image.Spec.Type = util.StringPtr("qcow2")
+		image.Spec.Qcow2Path = util.StringPtr(downloadPath)
+		image.Spec.Size = util.IntPtrInt(sizeGB)
+	} else {
+		// イメージを16GBに拡張する
+		resizeCtx, resizeCancel := newTimeoutContext(ctx, CurrentConfig().ImageResizeTimeout())
+		defer resizeCancel()
+		bootVolumeSizeGB = 16
+		if err := resizeCustomizedImage(resizeCtx, downloadPath, bootVolumeSizeGB); err != nil {
+			return markFailed(wrapDeadlineExceeded(err, "QCOW2 イメージ拡張", CurrentConfig().ImageResizeTimeout()))
+		}
 
-	image.Spec.Kind = util.StringPtr("os")
-	image.Spec.Type = util.StringPtr("qcow2")
-	image.Spec.Qcow2Path = util.StringPtr(downloadPath)
-	image.Spec.Size = util.IntPtrInt(bootVolumeSizeGB)
+		image.Spec.Kind = util.StringPtr("os")
+		image.Spec.Type = util.StringPtr("qcow2")
+		image.Spec.Qcow2Path = util.StringPtr(downloadPath)
+		image.Spec.Size = util.IntPtrInt(bootVolumeSizeGB)
+	}
 
 	volumeGroup := strings.TrimSpace(CurrentConfig().OSVolumeGroup)
 	if err := ensureImageVolumeGroupAvailable(volumeGroup); err != nil {
@@ -166,7 +189,7 @@ func (m *Marmot) CreateNewImageManageWithContext(ctx context.Context, id string)
 			return nil, err
 		}
 
-		lvPath, lvName, err := createBootableLVFromQCOW2(ctx, id, downloadPath, volumeGroup)
+		lvPath, lvName, err := createBootableLVFromQCOW2(ctx, id, downloadPath, volumeGroup, bootVolumeSizeGB)
 		if err != nil {
 			slog.Error("Failed to create bootable LV from QCOW2", "imgId", id, "path", downloadPath, "volumeGroup", volumeGroup, "err", err)
 			return markFailed(err)
@@ -455,6 +478,18 @@ func isTransientDownloadError(err error) bool {
 }
 
 func downloadImageWithContext(ctx context.Context, sourceURL, destPath string) error {
+	u, parseErr := url.Parse(sourceURL)
+	if parseErr != nil {
+		return fmt.Errorf("invalid sourceUrl: %w", parseErr)
+	}
+	if strings.EqualFold(u.Scheme, "file") {
+		// ローカルに用意されたインストールISO等を sourceUrl: file:///path/to/xxx.iso で
+		// 指定するケース(Windows インストールISOの受け渡し方式として決定済み)。
+		// net/http.Client は file:// スキームに対応していないため、ここでローカルファイル
+		// コピーに分岐する。
+		return copyLocalImageFile(ctx, u, destPath)
+	}
+
 	timeout := contextTimeoutHint(ctx)
 	client := &http.Client{Timeout: CurrentConfig().ImageDownloadTimeout()}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURL, nil)
@@ -501,6 +536,80 @@ func downloadImageWithContext(ctx context.Context, sourceURL, destPath string) e
 	return nil
 }
 
+// copyLocalImageFile は、sourceUrl が file:// スキームの場合に、ローカルファイルシステム上の
+// パスから destPath へコピーする。HTTP経路と同様に、一時ファイル(.part)へ書き込んでから
+// rename することで、コピー途中の不完全なファイルが destPath に現れないようにする。
+func copyLocalImageFile(ctx context.Context, srcURL *url.URL, destPath string) error {
+	if srcURL.Host != "" {
+		return fmt.Errorf("file scheme with host is not supported (local path only): %s", srcURL.String())
+	}
+	srcPath := srcURL.Path
+	if strings.TrimSpace(srcPath) == "" {
+		return fmt.Errorf("file scheme requires an absolute local path: %s", srcURL.String())
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	srcInfo, err := os.Stat(srcPath)
+	if err != nil {
+		return fmt.Errorf("stat local image file failed: %w", err)
+	}
+	if srcInfo.IsDir() {
+		return fmt.Errorf("source path is a directory, not a file: %s", srcPath)
+	}
+
+	srcFile, err := os.Open(srcPath)
+	if err != nil {
+		return fmt.Errorf("open local image file failed: %w", err)
+	}
+	defer func() {
+		_ = srcFile.Close()
+	}()
+
+	tmpPath := destPath + ".part"
+	dstFile, err := os.Create(tmpPath)
+	if err != nil {
+		return fmt.Errorf("create temp file failed: %w", err)
+	}
+
+	if _, err := io.Copy(dstFile, &contextReader{ctx: ctx, r: srcFile}); err != nil {
+		_ = dstFile.Close()
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("copy local image file failed: %w", err)
+	}
+	if err := dstFile.Sync(); err != nil {
+		_ = dstFile.Close()
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("sync temp file failed: %w", err)
+	}
+	if err := dstFile.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("close temp file failed: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, destPath); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("rename temp file failed: %w", err)
+	}
+	return nil
+}
+
+// contextReader は、Read のたびに ctx のキャンセル/タイムアウトを確認する io.Reader ラッパー。
+// 大容量ISOのローカルコピー中でもキャンセルに応答できるようにするために使用する。
+type contextReader struct {
+	ctx context.Context
+	r   io.Reader
+}
+
+func (cr *contextReader) Read(p []byte) (int, error) {
+	if err := cr.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return cr.r.Read(p)
+}
+
 func validateQcowV2Image(path string) error {
 	f, err := os.Open(path)
 	if err != nil {
@@ -525,6 +634,30 @@ func validateQcowV2Image(path string) error {
 	}
 
 	return nil
+}
+
+// qcowVirtualSizeGB は qemu-img info から qcow2 イメージの仮想ディスクサイズ(バイト)を取得し、
+// GB 単位(端数切り上げ)で返す。Windows イメージのように、resizeCustomizedImage による
+// 16GB への強制リサイズを行わない場合に、実サイズを Image.Spec.Size へ正しく反映するために使う。
+func qcowVirtualSizeGB(path string) (int, error) {
+	info, err := qcow.GetQcowInfo(path)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get qcow2 info: %w", err)
+	}
+	rawSize, ok := info["virtual-size"]
+	if !ok {
+		return 0, fmt.Errorf("qcow2 info has no virtual-size field: %s", path)
+	}
+	sizeBytes, ok := rawSize.(float64)
+	if !ok || sizeBytes <= 0 {
+		return 0, fmt.Errorf("qcow2 info has invalid virtual-size value: %v", rawSize)
+	}
+	const bytesPerGB = 1024 * 1024 * 1024
+	sizeGB := int(math.Ceil(sizeBytes / bytesPerGB))
+	if sizeGB < 1 {
+		sizeGB = 1
+	}
+	return sizeGB, nil
 }
 
 func customizeQcowImage(imagePath string) error {
@@ -1206,11 +1339,14 @@ func runCmd(ctx context.Context, name string, args ...string) error {
 	return nil
 }
 
-// CreateBootableLVFromQCOW2 creates /dev/<volume-group>/<imageID> (16G) and writes qcow2 image into it.
-func createBootableLVFromQCOW2(ctx context.Context, imageID, qcow2Path, vgName string) (string, string, error) {
-	const (
-		lvSize = "16G"
-	)
+// CreateBootableLVFromQCOW2 creates /dev/<volume-group>/<imageID> (sizeGB) and writes qcow2 image into it.
+// sizeGB は qcow2 イメージの仮想ディスクサイズ以上である必要がある(qemu-img convert は
+// 変換先がブロックデバイスの場合に拡張できないため)。
+func createBootableLVFromQCOW2(ctx context.Context, imageID, qcow2Path, vgName string, sizeGB int) (string, string, error) {
+	if sizeGB <= 0 {
+		return "", "", fmt.Errorf("invalid logical volume size: %dGB", sizeGB)
+	}
+	lvSize := fmt.Sprintf("%dG", sizeGB)
 	bootVolName := "boot-" + imageID
 
 	lvName, err := normalizeLVName(bootVolName)

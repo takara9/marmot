@@ -868,6 +868,32 @@ paths:
               application/json:
                 schema:
                   $ref: "#/components/schemas/Error"
+  /server/{id}/console/graphical:
+      get:
+        summary: "Get Graphical Console (SPICE) Connection Info by Server Id"
+        operationId: apiConsoleGraphicalServerById
+        tags:
+          - server
+        parameters:
+          - name: id
+            in: path
+            required: true
+            description: The id of the server to get graphical console connection info
+            schema:
+              type: string
+        responses:
+          "200":
+            description: Graphical console (SPICE) connection info
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/GraphicalConsoleInfo"
+          default:
+            description: unexpected error
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Error"
   /server/{id}/start:
       post:
         summary: "Start Server by Id"
@@ -2056,6 +2082,22 @@ components:
           example: "ok"
       required:
         - message
+    GraphicalConsoleInfo:
+      type: object
+      required:
+        - host
+        - port
+      properties:
+        host:
+          type: string
+          description: グラフィカルコンソール(SPICE)接続先のノードアドレス。
+        port:
+          type: integer
+          format: int32
+          description: グラフィカルコンソール(SPICE)接続先のポート番号。
+        passwd:
+          type: string
+          description: グラフィカルコンソール(SPICE)接続用のパスワード。VM生成時にランダム生成される。未設定の場合は省略される。
     Volume:
       type: object
       required:

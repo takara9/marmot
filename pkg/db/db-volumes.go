@@ -36,6 +36,17 @@ var VolStatus = map[int]string{
 // 仮想マシンを生成する時にボリュームを生成して、アタッチする
 // OS or DATA ボリュームの作成
 func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
+	return d.createVolumeOnDB2(inputVol, VOLUME_PENDING)
+}
+
+// CreateVolumeOnDB2Provisioning は、呼び出し元が直接ボリューム実体を作成する場合に使う。
+// 初期状態を PROVISIONING で登録し、ボリュームコントローラーが PENDING として拾って
+// 同じ実体を二重に作成することを防ぐ。
+func (d *Database) CreateVolumeOnDB2Provisioning(inputVol api.Volume) (*api.Volume, error) {
+	return d.createVolumeOnDB2(inputVol, VOLUME_PROVISIONING)
+}
+
+func (d *Database) createVolumeOnDB2(inputVol api.Volume, initialStatus int) (*api.Volume, error) {
 	slog.Debug("CreateVolume2()", "vol", inputVol)
 
 	// ボリュームに名前があれば、その名前でロックする
@@ -84,7 +95,7 @@ func (d *Database) CreateVolumeOnDB2(inputVol api.Volume) (*api.Volume, error) {
 	volume.Metadata.Uuid = util.StringPtr(uuidString)
 	volume.Status.CreationTimeStamp = util.TimePtr(time.Now())
 	volume.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
-	volume.Status.StatusCode = VOLUME_PENDING
+	volume.Status.StatusCode = initialStatus
 	volume.Status.Status = util.StringPtr(VolStatus[volume.Status.StatusCode])
 
 	// 指定が無い項目についてデフォルト値を設定する
