@@ -11,6 +11,10 @@ Marmot（マーモット）は、シンプルなYAMLで仮想サーバー、ネ�
 
 ![マーモットのイメージキャラ](docs/marmot-logo-quarter.png)
 
+## 紹介動画
+
+[5分で作れる自分専用プライベートクラウド OSS Marmot の紹介](https://www.youtube.com/watch?v=_Tw939fc54M&t=956s)
+
 ## コンセプト
 
 利用者は、Kubernetesのマニフェストを書く感覚で仮想マシンを管理できます。しかし、Kubernetesのような複雑な概念や高い学習コストは、必要ありません。シンプルで理解しやすいYAMLを記述するだけで、仮想サーバー、ネットワーク、ストレージを宣言的に管理できます。[Marmotマニフェスト集](https://github.com/takara9/marmot-manifests)を参考にすれば、Linuxをインストールした1台のマシンから始めて、プライベートネットワークの構築、仮想ストレージの確保、仮想サーバーの展開までを数分で実現できます。複雑な設定作業に悩まされることなく、学習、検証、実験に集中できます。
@@ -48,9 +52,8 @@ Marmotは、プライベートクラウド運用をよりシンプルにし、In
 - **OpenTelemetry メトリクス** — Prometheus エクスポーターによる可観測性を標準提供, Loki へのログ転送も標準装備
 - **RBAC によるアクセス制御** — Administrator / Compute-Operator / Viewer などのロールベースで API 操作を制限
 - **MKE (Marmot Kubernetes Engine)** — 抽象化されたYAMLからKubernetesクラスタを構築・運用できる専用コントローラー
-- **ゲストOS Ubuntu Linux 22.04/24.04, Alpine Linux 3.23 サポート**
+- **ゲストOS Ubuntu Linux 22.04/24.04/26.04, Alpine Linux 3.23, Rocky Linux 8/9/10, AlmaLinux 8/9/10, Debian Linux 11/12/13 サポート**, Windows Server 2022/2025対応予定
 - **ホストOS Ubuntu 24.04 サポート**
-
 
 
 ## クイックスタート
