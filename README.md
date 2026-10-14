@@ -13,7 +13,7 @@ Marmot（マーモット）は、シンプルなYAMLで仮想サーバー、ネ�
 
 ## 紹介動画
 
-[5分で作れる自分専用プライベートクラウド OSS Marmot の紹介](https://www.youtube.com/watch?v=_Tw939fc54M&t=956s)
+[5分で作れる自分専用プライベートクラウド OSS Marmot の紹介](https://www.youtube.com/watch?v=_Tw939fc54M)
 
 ## コンセプト
 
