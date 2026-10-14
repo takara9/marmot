@@ -52,7 +52,22 @@ var (
 	// Debian 11 は netplan を含まず ifupdown でネットワークを管理するため、専用の
 	// setupBootVolumeFn(util.SetupDebian11)を指定する(issue #622)。
 	serverImageModuleDebian11 = commonServerImageModule{key: "debian11", setupBootVolumeFn: util.SetupDebian11}
+	// Windows は Phase 3 で cloudbase-init 向けプロビジョニング(GenerateCloudbaseInitISO)に
+	// 置き換える予定だが、現時点では未実装。Phase 1(libvirt ドメイン生成)の動作確認を
+	// ブロックしないよう、最小限のプレースホルダとして以下を暫定実装する:
+	//   - SetupBootVolume: setupBootVolumeNoOpWindows(NTFS に netplan/ifupdown を書き込まない)
+	//   - GenerateCloudInitISO: 既定の cloud-init ISO 生成をそのまま使う(Windows には無意味だが、
+	//     CD-ROM として必ずアタッチされるため、有効な ISO ファイルが存在する状態を保つ目的)
+	serverImageModuleWindows2022 = commonServerImageModule{key: "windows2022", setupBootVolumeFn: setupBootVolumeNoOpWindows}
+	serverImageModuleWindows2025 = commonServerImageModule{key: "windows2025", setupBootVolumeFn: setupBootVolumeNoOpWindows}
 )
+
+// setupBootVolumeNoOpWindows は Windows ブートボリュームに対して何も行わない。
+// util.SetupLinux 等の Linux 前提の netplan/ifupdown 書き込み処理は NTFS に対して
+// 意味を持たず、実行すべきではないため明示的な no-op とする。
+func setupBootVolumeNoOpWindows(spec api.Server) error {
+	return nil
+}
 
 func normalizeServerImageDefault(server *api.Server) {
 	server.NormalizeMMImageAlias()
@@ -150,6 +165,15 @@ func resolveServerImageModuleFromOS(osName, osVersion string) (serverImageModule
 			return serverImageModuleDebian13, nil
 		default:
 			return nil, fmt.Errorf("unsupported debian version: %s", version)
+		}
+	case "windows":
+		switch version {
+		case "2022":
+			return serverImageModuleWindows2022, nil
+		case "2025":
+			return serverImageModuleWindows2025, nil
+		default:
+			return nil, fmt.Errorf("unsupported windows version: %s", version)
 		}
 	case "":
 		return serverImageModuleUbuntu2204, nil

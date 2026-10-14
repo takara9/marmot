@@ -77,6 +77,13 @@ type ServerSpec struct {
 	Clocks       []ClockSpec
 	OsName       string
 	OsVersion    string
+	// SpiceListenAddress は OsName=="windows" の場合にのみ使用される。
+	// 指定された場合、SPICE の Listen/Listeners アドレスをこの値に上書きする（既定の 127.0.0.1 固定を解除する）。
+	// ノードの実アドレス解決・呼び出し元での設定は本フィールドの範囲外（呼び出し元で設定する）。
+	SpiceListenAddress string
+	// SpicePasswd は OsName=="windows" の場合にのみ使用される。
+	// 指定された場合、SPICE にパスワードを設定する。ランダム生成は呼び出し元の責務とする。
+	SpicePasswd string
 }
 
 type LibVirtEp struct {
@@ -102,7 +109,10 @@ func (lve *LibVirtEp) Close() {
 
 // libvirt XMLを生成する関数
 func CreateDomainXML(vs ServerSpec) *libvirtxml.Domain {
-	// This function is intentionally left blank.
+	// Windows ゲスト専用の分岐要否（UEFI/TPM/virtio-scsi/QXL/SPICEパスワード化）。
+	// Linux系VMの既存動作には影響しない。
+	isWindows := vs.OsName == "windows"
+
 	dom := &libvirtxml.Domain{
 		Type: "kvm", ID: intPtr(1), Name: vs.Name, UUID: vs.UUID,
 		Memory:        &libvirtxml.DomainMemory{Value: vs.RAM, Unit: "KiB"},
@@ -142,16 +152,37 @@ func CreateDomainXML(vs ServerSpec) *libvirtxml.Domain {
 		},
 	}
 
+	if isWindows {
+		// UEFI ファームウェア（libvirt の firmware descriptor による自動選択）
+		dom.OS.Firmware = "efi"
+	}
+
 	// --- ディスクの生成 ---
 	for i, d := range vs.DiskSpecs {
+		diskBus := "virtio"
+		diskAlias := fmt.Sprintf("virtio-disk%d", i)
+		var diskAddress *libvirtxml.DomainAddress
+		if isWindows {
+			// Windows は標準で virtio ドライバを持たないため、ドライバ組込済みイメージを前提に
+			// virtio-scsi コントローラ経由のディスクとして構成する。
+			diskBus = "scsi"
+			diskAlias = fmt.Sprintf("scsi-disk%d", i)
+			diskAddress = &libvirtxml.DomainAddress{
+				Drive: &libvirtxml.DomainAddressDrive{
+					Controller: uintPtr(0), Bus: uintPtr(0), Target: uintPtr(uint(i)), Unit: uintPtr(0),
+				},
+			}
+		} else {
+			diskAddress = pciAddr(d.Bus, 0, 0)
+		}
 		disk := libvirtxml.DomainDisk{
 			Device: "disk",
 			Driver: &libvirtxml.DomainDiskDriver{
 				Name: "qemu", Type: d.Type, Cache: "none", IO: "native",
 			},
-			Target:  &libvirtxml.DomainDiskTarget{Dev: d.Dev, Bus: "virtio"},
-			Alias:   &libvirtxml.DomainAlias{Name: fmt.Sprintf("virtio-disk%d", i)},
-			Address: pciAddr(d.Bus, 0, 0),
+			Target:  &libvirtxml.DomainDiskTarget{Dev: d.Dev, Bus: diskBus},
+			Alias:   &libvirtxml.DomainAlias{Name: diskAlias},
+			Address: diskAddress,
 		}
 
 		cdrom := libvirtxml.DomainDisk{
@@ -255,6 +286,14 @@ func CreateDomainXML(vs ServerSpec) *libvirtxml.Domain {
 			Type: "pci", Index: uintPtr(i), Model: "pcie-root-port",
 			Alias:   &libvirtxml.DomainAlias{Name: fmt.Sprintf("pci.%d", i)},
 			Address: &libvirtxml.DomainAddress{PCI: &libvirtxml.DomainAddressPCI{Domain: uintPtr(0), Bus: uintPtr(0), Slot: uintPtr(slot), Function: uintPtr(function), MultiFunction: mf}},
+		})
+	}
+
+	if isWindows {
+		// virtio-scsi コントローラー（Windows ディスクの Bus: scsi はこのコントローラーに接続する）
+		dom.Devices.Controllers = append(dom.Devices.Controllers, libvirtxml.DomainController{
+			Type: "scsi", Index: uintPtr(0), Model: "virtio-scsi",
+			Alias: &libvirtxml.DomainAlias{Name: "scsi0"},
 		})
 	}
 
@@ -383,6 +422,36 @@ func CreateDomainXML(vs ServerSpec) *libvirtxml.Domain {
 		},
 	}
 
+	if isWindows {
+		spice := dom.Devices.Graphics[0].Spice
+		if vs.SpiceListenAddress != "" {
+			spice.Listen = vs.SpiceListenAddress
+			spice.Listeners = []libvirtxml.DomainGraphicListener{
+				{
+					Address: &libvirtxml.DomainGraphicListenerAddress{
+						Address: vs.SpiceListenAddress,
+					},
+				},
+			}
+		}
+		if vs.SpicePasswd != "" {
+			spice.Passwd = vs.SpicePasswd
+		}
+
+		// TPM 2.0 デバイス（swtpm エミュレータバックエンド）
+		dom.Devices.TPMs = append(dom.Devices.TPMs, libvirtxml.DomainTPM{
+			Model: "tpm-crb",
+			Backend: &libvirtxml.DomainTPMBackend{
+				Emulator: &libvirtxml.DomainTPMBackendEmulator{Version: "2.0"},
+			},
+		})
+
+		// QXL ビデオデバイス
+		dom.Devices.Videos = append(dom.Devices.Videos, libvirtxml.DomainVideo{
+			Model: libvirtxml.DomainVideoModel{Type: "qxl"},
+		})
+	}
+
 	// -その他の固定デバイス
 	dom.Devices.Serials = []libvirtxml.DomainSerial{{Target: &libvirtxml.DomainSerialTarget{Type: "isa-serial", Port: uintPtr(0)}}}
 	dom.Devices.MemBalloon = &libvirtxml.DomainMemBalloon{Model: "virtio", Address: pciAddr(4, 0, 0)}
@@ -390,8 +459,13 @@ func CreateDomainXML(vs ServerSpec) *libvirtxml.Domain {
 	// タイマーの生成
 	// 1. まず dom.Clock が nil でないことを保証し、Offset を設定
 	if dom.Clock == nil {
+		clockOffset := "utc" // 一般的なデフォルト値
+		if isWindows {
+			// Windows は RTC をローカルタイムとして扱う前提のため localtime に変更する
+			clockOffset = "localtime"
+		}
 		dom.Clock = &libvirtxml.DomainClock{
-			Offset: "utc", // 一般的なデフォルト値
+			Offset: clockOffset,
 		}
 	}
 

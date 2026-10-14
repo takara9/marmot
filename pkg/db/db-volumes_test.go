@@ -168,6 +168,38 @@ var _ = Describe("Volumes", Ordered, func() {
 					fmt.Println(string(jsonData))
 				}
 			})
+
+			It("PROVISIONING 初期状態でボリュームを作成", func() {
+				vol := api.Volume{
+					Metadata: api.Metadata{Name: "prov01"},
+					Spec: api.VolSpec{
+						Type: util.StringPtr("qcow2"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1),
+					},
+				}
+				created, err := v.CreateVolumeOnDB2Provisioning(vol)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(created.Status.StatusCode).To(Equal(db.VOLUME_PROVISIONING))
+
+				got, err := v.GetVolumeById(api.VolumeID(*created))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(got.Status.StatusCode).To(Equal(db.VOLUME_PROVISIONING))
+			})
+
+			It("通常の作成は PENDING のまま", func() {
+				vol := api.Volume{
+					Metadata: api.Metadata{Name: "pend01"},
+					Spec: api.VolSpec{
+						Type: util.StringPtr("qcow2"),
+						Kind: util.StringPtr("data"),
+						Size: util.IntPtrInt(1),
+					},
+				}
+				created, err := v.CreateVolumeOnDB2(vol)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(created.Status.StatusCode).To(Equal(db.VOLUME_PENDING))
+			})
 		})
 	})
 })
