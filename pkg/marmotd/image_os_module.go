@@ -82,7 +82,20 @@ var (
 	imageOSModuleDebian11    = commonImageOSModule{moduleKey: "debian11", customizeHandler: customizeDebian11QcowImageWithContext}
 	imageOSModuleDebian12    = commonImageOSModule{moduleKey: "debian12", customizeHandler: customizeDebianQcowImageWithContext}
 	imageOSModuleDebian13    = commonImageOSModule{moduleKey: "debian13", customizeHandler: customizeDebianQcowImageWithContext}
+	imageOSModuleWindows2022 = commonImageOSModule{moduleKey: "windows2022", customizeHandler: customizeWindowsQcowImageWithContext}
+	imageOSModuleWindows2025 = commonImageOSModule{moduleKey: "windows2025", customizeHandler: customizeWindowsQcowImageWithContext}
 )
+
+// customizeWindowsQcowImageWithContext は Windows イメージに対しては意図的に何も行わない(no-op)。
+// virt-customize(libguestfs)は Linux ファイルシステム前提(/etc/ssh/sshd_config 等への直接編集)の
+// コマンド列であり、NTFS を持つ Windows イメージに適用すると失敗ないし想定外の変更を招く。
+// Windows イメージの初期設定(virtio-win ドライバ・cloudbase-init 組込み・sysprep)は、
+// Phase 2 のベースイメージ作成手順(docs/MEMO-windows-vm-support.md)側で完結させるため、
+// ダウンロード/コピー後のこの段階では何も行わない。
+func customizeWindowsQcowImageWithContext(ctx context.Context, qcowPath string) error {
+	return nil
+}
+
 
 func resolveImageOSModuleFromImage(img api.Image) (imageOSModule, error) {
 	osName := strings.TrimSpace(util.OrDefault(img.Spec.OsName, ""))
@@ -146,6 +159,15 @@ func resolveImageOSModuleFromSpec(osName, osVersion string) (imageOSModule, erro
 			return imageOSModuleDebian13, nil
 		default:
 			return nil, fmt.Errorf("unsupported debian image module version: %s", version)
+		}
+	case "windows":
+		switch version {
+		case "2022":
+			return imageOSModuleWindows2022, nil
+		case "2025":
+			return imageOSModuleWindows2025, nil
+		default:
+			return nil, fmt.Errorf("unsupported windows image module version: %s", version)
 		}
 	case "":
 		return imageOSModuleUbuntu2204, nil

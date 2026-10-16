@@ -878,7 +878,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		return "", err
 	}
 
-	isoPath, err := imageModule.GenerateCloudInitISO(path, password, sshKey, usernames, serverConfig.Spec.Ansible, api.ServerID(serverConfig))
+	isoPath, err := imageModule.GenerateCloudInitISO(path, password, sshKey, usernames, serverConfig.Spec.Ansible, api.ServerID(serverConfig), serverConfig.Metadata.Name, serverNetworkInterfaces(serverConfig))
 	if err != nil {
 		slog.Error("GenerateCloudInitISO()", "module", imageModule.Key(), "err", err)
 		return "", err
@@ -1009,6 +1009,18 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		}
 	}
 
+	// Windows系VMの場合、SPICEのListenアドレスをノードの実アドレスに変更し、
+	// 接続用パスワードをVM生成の都度ランダム生成して設定する(docs/MEMO-windows-vm-support.md Phase1決定事項)。
+	if virtSpec.OsName == "windows" {
+		virtSpec.SpiceListenAddress = util.NameserverForDNSListenAddr(CurrentConfig().DNSListenAddr)
+		spicePasswd, passwdErr := generateSpicePasswd()
+		if passwdErr != nil {
+			slog.Error("generateSpicePasswd()", "err", passwdErr)
+			return "", passwdErr
+		}
+		virtSpec.SpicePasswd = spicePasswd
+	}
+
 	// VM 起動直前に、依存ネットワーク実体とオーバーレイブリッジを再確認する。
 	// ネットワークコントローラーとのタイミング競合や host 再起動後の実体欠落に備える。
 	if err := m.ensureServerNetworkDependencies(serverConfig); err != nil {
@@ -1120,6 +1132,13 @@ func validateServerAuthSpec(auth *api.Auth) error {
 		}
 	}
 	return nil
+}
+
+func serverNetworkInterfaces(server api.Server) []api.NetworkInterface {
+	if server.Spec.NetworkInterface == nil {
+		return nil
+	}
+	return *server.Spec.NetworkInterface
 }
 
 func cloudInitAuthInputs(auth *api.Auth) (string, string, []string, error) {
@@ -1847,9 +1866,11 @@ func (m *Marmot) CreateNewVolumeWithWait(volReq api.Volume) (api.Volume, error) 
 		}
 	}
 
-	vol, err := m.Db.CreateVolumeOnDB2(volReq)
+	// この関数が直接 CreateNewVolume を実行するため、PENDING のままだと
+	// ボリュームコントローラーが同じボリュームを並行して作成してしまう。
+	vol, err := m.Db.CreateVolumeOnDB2Provisioning(volReq)
 	if err != nil {
-		slog.Error("CreateVolumeOnDB2()", "err", err)
+		slog.Error("CreateVolumeOnDB2Provisioning()", "err", err)
 		// サーバーとボリュームのステータスをエラーに更新する処理を追加するべき
 
 		return api.Volume{}, err

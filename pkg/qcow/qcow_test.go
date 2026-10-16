@@ -70,3 +70,15 @@ var _ = Describe("QCOW2 Volume", Ordered, func() {
 		})
 	})
 })
+
+var _ = Describe("ResizeQcow のエラー内容", func() {
+	It("qemu-img の出力をエラーに含める", func() {
+		dir := GinkgoT().TempDir()
+		path := dir + "/shrink.qcow2"
+		Expect(qcow.CreateQcow(path, 2)).To(Succeed())
+
+		err := qcow.ResizeQcow(path, 1)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("--shrink"))
+	})
+})

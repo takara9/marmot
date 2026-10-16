@@ -211,6 +211,18 @@ type GatewaySpec struct {
 	ServerPorts []string  `json:"serverPorts" yaml:"serverPorts"`
 }
 
+// GraphicalConsoleInfo defines model for GraphicalConsoleInfo.
+type GraphicalConsoleInfo struct {
+	// Host グラフィカルコンソール(SPICE)接続先のノードアドレス。
+	Host string `json:"host" yaml:"host"`
+
+	// Passwd グラフィカルコンソール(SPICE)接続用のパスワード。VM生成時にランダム生成される。未設定の場合は省略される。
+	Passwd *string `json:"passwd,omitempty" yaml:"passwd,omitempty"`
+
+	// Port グラフィカルコンソール(SPICE)接続先のポート番号。
+	Port int32 `json:"port" yaml:"port"`
+}
+
 // HostAllocation defines model for HostAllocation.
 type HostAllocation struct {
 	AllocatedCpuCores *int `json:"allocatedCpuCores,omitempty" yaml:"allocatedCpuCores,omitempty"`
@@ -965,6 +977,9 @@ type ServerInterface interface {
 	// ApiConsoleServerById Connect to Server Console by Id
 	// (GET /server/{id}/console)
 	ApiConsoleServerById(ctx echo.Context, id string) error
+	// ApiConsoleGraphicalServerById Get Graphical Console (SPICE) Connection Info by Server Id
+	// (GET /server/{id}/console/graphical)
+	ApiConsoleGraphicalServerById(ctx echo.Context, id string) error
 	// ApiStartServerById Start Server by Id
 	// (POST /server/{id}/start)
 	ApiStartServerById(ctx echo.Context, id string) error
@@ -1759,6 +1774,22 @@ func (w *ServerInterfaceWrapper) ApiConsoleServerById(ctx echo.Context) error {
 	return err
 }
 
+// ApiConsoleGraphicalServerById converts echo context to params.
+func (w *ServerInterfaceWrapper) ApiConsoleGraphicalServerById(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: ctx.Request().URL.RawPath == ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApiConsoleGraphicalServerById(ctx, id)
+	return err
+}
+
 // ApiStartServerById converts echo context to params.
 func (w *ServerInterfaceWrapper) ApiStartServerById(ctx echo.Context) error {
 	var err error
@@ -2256,6 +2287,7 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.PUT(options.BaseURL+"/server/:id", wrapper.ApiUpdateServerById, options.OperationMiddlewares["apiUpdateServerById"]...)
 	router.POST(options.BaseURL+"/server/:id/stop", wrapper.ApiStopServerById, options.OperationMiddlewares["apiStopServerById"]...)
 	router.GET(options.BaseURL+"/server/:id/console", wrapper.ApiConsoleServerById, options.OperationMiddlewares["apiConsoleServerById"]...)
+	router.GET(options.BaseURL+"/server/:id/console/graphical", wrapper.ApiConsoleGraphicalServerById, options.OperationMiddlewares["apiConsoleGraphicalServerById"]...)
 	router.POST(options.BaseURL+"/server/:id/start", wrapper.ApiStartServerById, options.OperationMiddlewares["apiStartServerById"]...)
 	router.GET(options.BaseURL+"/network", wrapper.ApiGetNetworks, options.OperationMiddlewares["apiGetNetworks"]...)
 	router.POST(options.BaseURL+"/network", wrapper.ApiCreateNetwork, options.OperationMiddlewares["apiCreateNetwork"]...)

@@ -30,6 +30,9 @@ func TestResolveServerImageModuleFromOS(t *testing.T) {
 		{name: "debian 11", osName: "debian", osVersion: "11", wantKey: "debian11"},
 		{name: "debian 12", osName: "debian", osVersion: "12", wantKey: "debian12"},
 		{name: "debian 13", osName: "debian", osVersion: "13", wantKey: "debian13"},
+		{name: "windows 2022", osName: "windows", osVersion: "2022", wantKey: "windows2022"},
+		{name: "windows 2025", osName: "windows", osVersion: "2025", wantKey: "windows2025"},
+		{name: "unsupported windows version", osName: "windows", osVersion: "2019", wantErr: true},
 		{name: "unsupported alpine", osName: "alpine", osVersion: "3.24", wantErr: true},
 		{name: "unsupported rocky version", osName: "rocky", osVersion: "7", wantErr: true},
 		{name: "unsupported almalinux version", osName: "almalinux", osVersion: "7", wantErr: true},
@@ -54,6 +57,26 @@ func TestResolveServerImageModuleFromOS(t *testing.T) {
 			}
 			if got := mod.Key(); got != tt.wantKey {
 				t.Fatalf("module key = %q, want %q", got, tt.wantKey)
+			}
+		})
+	}
+}
+
+// Windows サーバーの SetupBootVolume は no-op であり、Linux 向けの
+// netplan/ifupdown 書き込み(util.SetupLinux 等)を一切実行しないことを確認する。
+func TestWindowsServerImageModuleSetupBootVolumeIsNoOp(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		mod  commonServerImageModule
+	}{
+		{name: "windows2022", mod: serverImageModuleWindows2022},
+		{name: "windows2025", mod: serverImageModuleWindows2025},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			// BootVolume 等を一切指定しない空の Server を渡しても、
+			// Linux 向け処理(ファイルシステムマウント等)を試みずに成功すること。
+			if err := tt.mod.SetupBootVolume(api.Server{}); err != nil {
+				t.Fatalf("SetupBootVolume() error = %v, want nil (no-op)", err)
 			}
 		})
 	}
