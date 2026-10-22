@@ -21,12 +21,20 @@ const netbiosHostNameMaxLen = 15
 // cloudbase-init の runcmd は cmd.exe で実行される。
 //   - ファイアウォールのルールグループは、表示名がロケールで変わる(日本語では「リモート デスクトップ」)ため、
 //     ロケールに依存しないリソース参照(@FirewallAPI.dll,-28752)で指定する。
+//   - ただし実機(Windows Server 2025)では、このグループ指定による有効化が定義済みルールに
+//     反映されず Enabled=False のまま残ることを確認した。そのため、グループ指定のルールが
+//     有効化できない場合でも接続できるよう、ロケールや既存ルール定義に依存しない TCP 3389 への
+//     明示的な受信許可ルールを追加で作成する(delete は初回実行時に対象が無く失敗するが、
+//     runcmd の各エントリは1行ずつのバッチスクリプトとして実行され前行の失敗で後続が
+//     止まることはないため、そのままで問題ない)。
 //   - NLA(ネットワークレベル認証)は Windows Server の既定(有効)のまま変更しない。
 //   - TermService が既に起動している場合の net start のエラーでスクリプトが失敗扱いにならないよう、
 //     最後に必ず終了コード 0 で終える。
 var enableRDPCommands = []string{
 	`reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v fDenyTSConnections /t REG_DWORD /d 0 /f`,
 	`netsh advfirewall firewall set rule group="@FirewallAPI.dll,-28752" new enable=Yes`,
+	`netsh advfirewall firewall delete rule name="marmot-RDP-3389"`,
+	`netsh advfirewall firewall add rule name="marmot-RDP-3389" dir=in action=allow protocol=TCP localport=3389 profile=any`,
 	`sc config TermService start= auto`,
 	`net start TermService & exit /b 0`,
 }

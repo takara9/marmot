@@ -58,7 +58,13 @@ Windows Setup を無人実行し、仕上げに cloudbase-init の導入と `sys
       <SetupUILanguage>
         <UILanguage>en-US</UILanguage>
       </SetupUILanguage>
+      <!-- Windows ServerのOOBE(msoobe.exe)は、oobeSystemパスのInternational-Core設定だけでは
+           「Localization」(国/地域・言語・キーボード)ページの表示を抑止できないため、
+           ディスクイメージ展開前のこの時点でロケールを確定させておく必要がある。 -->
+      <InputLocale>en-US</InputLocale>
+      <SystemLocale>en-US</SystemLocale>
       <UILanguage>en-US</UILanguage>
+      <UserLocale>en-US</UserLocale>
     </component>
     <component name="Microsoft-Windows-Setup"
                 processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35"
@@ -142,8 +148,19 @@ Windows Setup を無人実行し、仕上げに cloudbase-init の導入と `sys
     </component>
   </settings>
 
-  <!-- oobeSystem: Administrator初期パスワード + cloudbase-init導入 + sysprep -->
+  <!-- oobeSystem: ロケール(国/地域・言語・キーボード) + Administrator初期パスワード + cloudbase-init導入 + sysprep -->
   <settings pass="oobeSystem">
+    <component name="Microsoft-Windows-International-Core"
+                processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35"
+                language="neutral" versionScope="nonSxS">
+      <!-- OOBEの「こんにちは」(国/地域・言語・キーボード選択)画面を省略するための既定ロケール。
+           Microsoft公式ドキュメント(Automate OOBE)により、この設定は specialize ではなく
+           oobeSystem パスに置く必要がある。 -->
+      <InputLocale>ja-JP</InputLocale>
+      <SystemLocale>ja-JP</SystemLocale>
+      <UILanguage>ja-JP</UILanguage>
+      <UserLocale>ja-JP</UserLocale>
+    </component>
     <component name="Microsoft-Windows-Shell-Setup"
                 processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35"
                 language="neutral" versionScope="nonSxS"
@@ -175,17 +192,25 @@ Windows Setup を無人実行し、仕上げに cloudbase-init の導入と `sys
         <LogonCount>1</LogonCount>
       </AutoLogon>
       <FirstLogonCommands>
-        <!-- 1. virtio-win の残りドライバ(NetKVM/Balloon/qxldod/vioserial等)を一括導入 -->
+        <!-- 1. virtio-win の残りドライバ(NetKVM/Balloon/qxldod/vioserial等)を一括導入。
+             pnputil は、ワイルドカードで一括指定した inf の一部が適用対象外の場合に
+             0 以外の終了コードを返すことがある。SynchronousCommand は 0 以外の
+             終了コードを返すと、それ以降の FirstLogonCommands を一切実行せずに
+             無言でユーザーのデスクトップへ制御を渡してしまうため(実機で確認済み)、
+             終了コードを必ず 0 にする。 -->
         <SynchronousCommand wcm:action="add">
           <Order>1</Order>
-          <CommandLine>pnputil /add-driver D:\*\2k22\amd64\*.inf /subdirs /install</CommandLine>
+          <CommandLine>cmd /c pnputil /add-driver D:\*\2k22\amd64\*.inf /subdirs /install &amp; exit /b 0</CommandLine>
           <Description>Install remaining virtio-win drivers</Description>
         </SynchronousCommand>
         <!-- 2. cloudbase-init のサイレントインストール
-             (E: はインストーラISO/フロッピーのドライブレター。環境に合わせて変更) -->
+             (E: はインストーラISO/フロッピーのドライブレター。環境に合わせて変更)。
+             msiexec は /norestart 指定時でも、再起動が必要な場合は
+             ERROR_SUCCESS_REBOOT_REQUIRED(終了コード 3010、実質成功)を返す
+             ことがあり、Order 1 と同じ理由で終了コードを必ず 0 にする。 -->
         <SynchronousCommand wcm:action="add">
           <Order>2</Order>
-          <CommandLine>msiexec /i E:\CloudbaseInitSetup_Stable_x64.msi /qn /norestart LOGGING_SERIAL_PORT_NAME=COM1 RUN_SERVICE_AS_LOCAL_SYSTEM=1</CommandLine>
+          <CommandLine>cmd /c msiexec /i E:\CloudbaseInitSetup_Stable_x64.msi /qn /norestart LOGGING_SERIAL_PORT_NAME=COM1 RUN_SERVICE_AS_LOCAL_SYSTEM=1 &amp; exit /b 0</CommandLine>
           <Description>Install cloudbase-init</Description>
         </SynchronousCommand>
         <!-- 3. UEFI ブートマネージャーをフォールバックパス(\EFI\Boot\bootx64.efi)にも複製する。
@@ -216,12 +241,35 @@ Windows Setup を無人実行し、仕上げに cloudbase-init の導入と `sys
           <CommandLine>cmd /c reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v fDenyTSConnections /t REG_DWORD /d 0 /f &amp;&amp; netsh advfirewall firewall set rule group="@FirewallAPI.dll,-28752" new enable=Yes</CommandLine>
           <Description>Enable Remote Desktop</Description>
         </SynchronousCommand>
-        <!-- 5. イメージの汎用化(sysprep /generalize)。これが最後のコマンドになること。
+        <!-- 5. sysprep 前に、残存する answer file を削除する。
+             Windows Setup は、インストール時に使った autounattend.xml を
+             C:\Windows\Panther\unattend.xml 等にコピーして保持する。このファイルを
+             削除せずに sysprep /generalize すると、ベースイメージから作成した
+             本番 VM の初回起動(specialize パス)でも同じ answer file が
+             再度見つかり、再適用されてしまう(実機のログで
+             「UnattendSearchExplicitPath: Found usable unattend file for pass
+             [specialize] at [C:\Windows\Panther\unattend.xml]」として確認済み)。
+             本番 VM にはビルド専用の virtio ドライバ ISO や cloudbase-init MSI の
+             ドライブがアタッチされていないため、再適用された FirstLogonCommands
+             (ドライバ導入・MSI インストール・2 回目の sysprep 呼び出し等)が
+             正常に完了できず、specialize/OOBE パスの完了(GeneralizationState=7
+             への遷移)が妨げられる場合がある。cloudbase-init はこの
+             GeneralizationState=7 をタイムアウト無しで待ち続けるため、
+             ホスト名・NIC 設定などのプロビジョニングがいつまでも実行されない
+             原因になる。そのため、sysprep /generalize の直前で明示的に
+             削除しておく(未存在の場合の削除失敗は無視してよいため 2>nul で
+             抑制し、最後に終了コード 0 で終える)。 -->
+        <SynchronousCommand wcm:action="add">
+          <Order>5</Order>
+          <CommandLine>cmd /c del /f /q "C:\Windows\Panther\unattend.xml" 2>nul &amp; del /f /q "C:\unattend.xml" 2>nul &amp; del /f /q "C:\Windows\System32\Sysprep\unattend.xml" 2>nul &amp; exit /b 0</CommandLine>
+          <Description>Remove residual answer files before sysprep to prevent reapplication on deployed VMs</Description>
+        </SynchronousCommand>
+        <!-- 6. イメージの汎用化(sysprep /generalize)。これが最後のコマンドになること。
              cloudbase-init は、この sysprep によって汎用化されたイメージが次回起動時に
              通る specialize/OOBE パスにフックして動作する設計のため、
              このコマンド以降に他の処理を追加しないこと。 -->
         <SynchronousCommand wcm:action="add">
-          <Order>5</Order>
+          <Order>6</Order>
           <CommandLine>C:\Windows\System32\Sysprep\sysprep.exe /generalize /oobe /shutdown /quiet</CommandLine>
           <Description>Generalize image with sysprep and shut down</Description>
         </SynchronousCommand>
@@ -247,6 +295,32 @@ Windows Setup を無人実行し、仕上げに cloudbase-init の導入と `sys
   一時的なパスワード**です。`sysprep /generalize` によってイメージが汎用化されるため、
   この平文パスワードはイメージに残りません。Phase 3 で cloudbase-init により実運用の
   Administrator パスワードがランダム生成・設定されます。
+- **【重要】sysprep 前に残存 answer file(`C:\Windows\Panther\unattend.xml` 等)を削除すること**:
+  Windows Setup はインストールに使った `autounattend.xml` を `C:\Windows\Panther\unattend.xml`
+  等にコピーして保持します。これを削除せずに `sysprep /generalize` すると、ベースイメージから
+  作成した本番 VM の初回起動(specialize パス)でも同じ answer file が再度見つかり、再適用されて
+  しまいます。本番 VM にはビルド専用の virtio ドライバ ISO や cloudbase-init MSI のドライブが
+  アタッチされていないため、再適用された `FirstLogonCommands`(ドライバ導入・MSI インストール・
+  2 回目の `sysprep` 呼び出し等)が正常に完了できず、specialize/OOBE パスの完了
+  (`GeneralizationState=7` への遷移)が妨げられ、cloudbase-init がホスト名・NIC 設定などの
+  プロビジョニングを永久に実行できなくなる場合があります(タイムアウト無しで待ち続けるため)。
+  上記 `autounattend.xml` の `FirstLogonCommands` の Order 5 はこの対策で、`sysprep` の直前に
+  残存 answer file を削除します。**この手順を含めずに作成したイメージでホスト名・NIC 設定が
+  反映されない場合は、ゲスト内で `C:\Windows\Panther\unattend.xml` の有無と
+  `cloudbase-init.log` の `Waiting for sysprep completion. GeneralizationState: 4` の
+  繰り返しを確認してください。**
+- **【重要】`FirstLogonCommands` の各コマンドは終了コードを必ず 0 にすること**:
+  `<SynchronousCommand>` は 0 以外の終了コードを返すと、Windows Setup が**それ以降の
+  `FirstLogonCommands` を一切実行せずに、無言でユーザーのデスクトップへ制御を渡してしまう**
+  (エラーダイアログ等は出ないことが多い)。実機で、Order 1(`pnputil /add-driver` の
+  ワイルドカード一括導入は、一部ドライバが適用対象外の場合に 0 以外を返すことがある)や
+  Order 2(`msiexec /i ... /norestart` は、再起動が必要な場合に `ERROR_SUCCESS_REBOOT_REQUIRED`
+  (終了コード `3010`、実質成功)を返すことがある)が原因で、それ以降の再起動・cloudbase-init
+  の仕上げ処理・`sysprep` が一切実行されず、cloudbase-init サービス自体は起動しているのに
+  `GeneralizationState` が `4` のまま進まなくなる事象を確認した。そのため、上記
+  `autounattend.xml` の Order 1・Order 2 は `cmd /c <コマンド> & exit /b 0` の形で
+  終了コードを強制的に `0` にしている。新たに `FirstLogonCommands` を追加する場合も、
+  必ずこのパターンを踏襲すること。
 - **【重要】UEFI 起動エントリ（NVRAM）は新しいドメインに引き継がれません**:
   Windows Setup は通常、UEFI ブートマネージャーを ESP 上の `\EFI\Microsoft\Boot\bootmgfw.efi`
   にのみ書き込み、そこを指す起動エントリを「インストールに使ったビルド用 VM 専用の」
@@ -307,7 +381,8 @@ $ virt-install \
   UEFI/TPM/virtio-scsi/QXL 自体は明示的に指定しているため必須ではありません）。
 
 インストールが進行すると、`autounattend.xml` の `FirstLogonCommands` が自動実行され、
-cloudbase-init 導入 → RDP 有効化 → `sysprep /generalize /oobe /shutdown` の順に実行されて VM が
+cloudbase-init 導入 → RDP 有効化 → 残存 answer file の削除 →
+`sysprep /generalize /oobe /shutdown` の順に実行されて VM が
 自動的にシャットダウンします。`virsh list --all` で `shut off` になったことを確認してください。
 
 ```console

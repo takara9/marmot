@@ -284,7 +284,7 @@ func TestBuildCloudbaseInitNetworkDataSkipsUnconfiguredNICs(t *testing.T) {
 func TestEnableRDPCommands(t *testing.T) {
 	t.Parallel()
 	joined := strings.Join(enableRDPCommands, "\n")
-	for _, want := range []string{"fDenyTSConnections /t REG_DWORD /d 0", `group="@FirewallAPI.dll,-28752"`, "TermService"} {
+	for _, want := range []string{"fDenyTSConnections /t REG_DWORD /d 0", `group="@FirewallAPI.dll,-28752"`, "TermService", `name="marmot-RDP-3389"`, "localport=3389"} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("%q not found in %q", want, joined)
 		}
