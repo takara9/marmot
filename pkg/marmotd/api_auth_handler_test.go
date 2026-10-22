@@ -326,6 +326,43 @@ var _ = Describe("Auth API handlers", Ordered, func() {
 		Expect(cleanupRec.Code).To(Equal(http.StatusNoContent), cleanupRec.Body.String())
 	})
 
+	It("requires authentication and Server/read permission for graphical console routes", func() {
+		router := echo.New()
+		marmotd.RegisterRoutes(router, s, "/api/v1")
+
+		unauthenticatedReq := httptest.NewRequest(http.MethodGet, "/api/v1/server/test/console/graphical", nil)
+		unauthenticatedRec := httptest.NewRecorder()
+		router.ServeHTTP(unauthenticatedRec, unauthenticatedReq)
+		Expect(unauthenticatedRec.Code).To(Equal(http.StatusUnauthorized), unauthenticatedRec.Body.String())
+
+		hash, err := bcrypt.GenerateFromPassword([]byte("noaccesspass1"), bcrypt.DefaultCost)
+		Expect(err).NotTo(HaveOccurred())
+		_, err = d.CreateUser(api.User{
+			ApiVersion: "v1",
+			Kind:       "User",
+			Metadata:   api.Metadata{Id: "no-server-reader", Name: "no-server-reader"},
+			Spec: api.UserSpec{
+				Enabled:      true,
+				PasswordHash: util.StringPtr(string(hash)),
+			},
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		token := login("no-server-reader", "noaccesspass1").AccessToken
+		forbiddenReq := httptest.NewRequest(http.MethodGet, "/api/v1/server/test/console/graphical", nil)
+		forbiddenReq.Header.Set("Authorization", "Bearer "+token)
+		forbiddenRec := httptest.NewRecorder()
+		router.ServeHTTP(forbiddenRec, forbiddenReq)
+		Expect(forbiddenRec.Code).To(Equal(http.StatusForbidden), forbiddenRec.Body.String())
+
+		adminToken := login("admin", "passw0rd").AccessToken
+		cleanupReq := httptest.NewRequest(http.MethodDelete, "/api/v1/users/no-server-reader", nil)
+		cleanupReq.Header.Set("Authorization", "Bearer "+adminToken)
+		cleanupRec := httptest.NewRecorder()
+		router.ServeHTTP(cleanupRec, cleanupReq)
+		Expect(cleanupRec.Code).To(Equal(http.StatusNoContent), cleanupRec.Body.String())
+	})
+
 	It("restricts authz check target to self or administrator", func() {
 		adminToken := login("admin", "passw0rd").AccessToken
 
