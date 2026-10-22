@@ -424,6 +424,13 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		bootVol.Spec.OsVariant = serverConfig.Spec.OsVariant
 	}
 
+	// サイズ未指定のqcow2ブートボリュームは、DBの既定値(16GB)で補完される前にイメージサイズを下限として設定する
+	if bootVol.Spec.Type != nil && *bootVol.Spec.Type == "qcow2" && bootVol.Spec.Size != nil && *bootVol.Spec.Size <= 0 {
+		if img, imgErr := resolveImageTemplateByVolumeNode(m, bootVol); imgErr == nil {
+			bootVol.Spec.Size = util.IntPtrInt(defaultOSVolumeSizeGB(img))
+		}
+	}
+
 	slog.Debug("サーバーのネットワークインターフェースの設定")
 
 	// ネットワークの設定
