@@ -1019,7 +1019,12 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	// Windows系VMの場合、SPICEのListenアドレスをノードの実アドレスに変更し、
 	// 接続用パスワードをVM生成の都度ランダム生成して設定する(docs/MEMO-windows-vm-support.md Phase1決定事項)。
 	if virtSpec.OsName == "windows" {
-		virtSpec.SpiceListenAddress = util.NameserverForDNSListenAddr(CurrentConfig().DNSListenAddr)
+		spiceAddr, addrErr := resolveSpiceListenAddress(CurrentConfig())
+		if addrErr != nil {
+			slog.Error("resolveSpiceListenAddress()", "err", addrErr)
+			return "", addrErr
+		}
+		virtSpec.SpiceListenAddress = spiceAddr
 		spicePasswd, passwdErr := generateSpicePasswd()
 		if passwdErr != nil {
 			slog.Error("generateSpicePasswd()", "err", passwdErr)
@@ -2009,4 +2014,22 @@ func (m *Marmot) MakeImageEntryFromRunningVMWithContext(ctx context.Context, ser
 	}
 
 	return imageID, nil
+}
+
+// resolveSpiceListenAddress は、Windows VM の SPICE が待ち受ける具体的なノードアドレスを返す。
+// api-advertise-host-bridge-address を優先し、未設定の場合は dns_listen_addr が具体的な
+// IP アドレスであるときのみそれを使う。ワイルドカードやループバックへのフォールバックはしない。
+func resolveSpiceListenAddress(cfg *MarmotdConfig) (string, error) {
+	if host := strings.TrimSpace(cfg.APIAdvertiseHostBridgeAddress); host != "" {
+		if ip := net.ParseIP(host); ip != nil && !ip.IsUnspecified() {
+			return ip.String(), nil
+		}
+		return "", fmt.Errorf("marmotd.json api-advertise-host-bridge-address %q is not a valid IP address", host)
+	}
+	if host, _, err := net.SplitHostPort(strings.TrimSpace(cfg.DNSListenAddr)); err == nil {
+		if ip := net.ParseIP(strings.Trim(strings.TrimSpace(host), "[]")); ip != nil && !ip.IsUnspecified() && !ip.IsLoopback() {
+			return ip.String(), nil
+		}
+	}
+	return "", fmt.Errorf("SPICE listen address is not configured: set marmotd.json api-advertise-host-bridge-address")
 }
