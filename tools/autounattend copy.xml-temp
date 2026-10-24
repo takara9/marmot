@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="utf-8"?>
+<unattend xmlns="urn:schemas-microsoft-com:unattend">
+
+  <!-- Windows PE: ディスクパーティション作成 + virtio-scsi ドライバの注入 -->
+  <settings pass="windowsPE">
+    <component name="Microsoft-Windows-PnpCustomizationsWinPE"
+                processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35"
+                language="neutral" versionScope="nonSxS"
+                xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+      <DriverPaths>
+        <!-- virtio-win ISO 内のドライバパス。実際のドライブレターは環境により異なるため、
+             ビルド用VM起動後に Shift+F10 でコマンドプロンプトを開き、
+             各CD-ROMの内容を確認してから書き換えてください。 -->
+        <PathAndCredentials wcm:action="add" wcm:keyValue="1">
+          <Path>E:\vioscsi\2k22\amd64</Path>
+        </PathAndCredentials>
+        <PathAndCredentials wcm:action="add" wcm:keyValue="2">
+          <Path>E:\NetKVM\2k22\amd64</Path>
+        </PathAndCredentials>
+      </DriverPaths>
+    </component>
+    <component name="Microsoft-Windows-International-Core-WinPE"
+                processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35"
+                language="neutral" versionScope="nonSxS">
+      <SetupUILanguage>
+        <UILanguage>ja-JP</UILanguage>
+      </SetupUILanguage>
+      <!-- Windows ServerのOOBE(msoobe.exe)は、oobeSystemパスのInternational-Core設定だけでは
+           「Localization」(国/地域・言語・キーボード)ページの表示を抑止できないため、
+           ディスクイメージ展開前のこの時点でロケールを確定させておく必要がある。 -->
+      <InputLocale>ja-JP</InputLocale>
+      <SystemLocale>ja-JP</SystemLocale>
+      <UILanguage>ja-JP</UILanguage>
+      <UserLocale>ja-JP</UserLocale>
+    </component>
+    <component name="Microsoft-Windows-Setup"
+                processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35"
+                language="neutral" versionScope="nonSxS"
+                xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+      <DiskConfiguration>
+        <Disk wcm:action="add">
+          <DiskID>0</DiskID>
+          <WillWipeDisk>true</WillWipeDisk>
+          <CreatePartitions>
+            <!-- EFI システムパーティション -->
+            <CreatePartition wcm:action="add">
+              <Order>1</Order>
+              <Type>EFI</Type>
+              <Size>100</Size>
+            </CreatePartition>
+            <!-- MSR -->
+            <CreatePartition wcm:action="add">
+              <Order>2</Order>
+              <Type>MSR</Type>
+              <Size>16</Size>
+            </CreatePartition>
+            <!-- Windows 本体(残り全領域) -->
+            <CreatePartition wcm:action="add">
+              <Order>3</Order>
+              <Type>Primary</Type>
+              <Extend>true</Extend>
+            </CreatePartition>
+          </CreatePartitions>
+          <ModifyPartitions>
+            <ModifyPartition wcm:action="add">
+              <Order>1</Order>
+              <PartitionID>1</PartitionID>
+              <Format>FAT32</Format>
+              <Label>System</Label>
+            </ModifyPartition>
+            <ModifyPartition wcm:action="add">
+              <Order>2</Order>
+              <PartitionID>2</PartitionID>
+            </ModifyPartition>
+            <ModifyPartition wcm:action="add">
+              <Order>3</Order>
+              <PartitionID>3</PartitionID>
+              <Format>NTFS</Format>
+              <Label>Windows</Label>
+              <Letter>C</Letter>
+            </ModifyPartition>
+          </ModifyPartitions>
+        </Disk>
+      </DiskConfiguration>
+      <ImageInstall>
+        <OSImage>
+          <InstallFrom>
+            <MetaData wcm:action="add">
+              <Key>/IMAGE/INDEX</Key>
+              <!-- ISO内のエディション(Index)。dism /Get-WimInfo /WimFile:install.wim で確認 -->
+              <Value>4</Value>
+            </MetaData>
+          </InstallFrom>
+          <InstallTo>
+            <DiskID>0</DiskID>
+            <PartitionID>3</PartitionID>
+          </InstallTo>
+        </OSImage>
+      </ImageInstall>
+      <UserData>
+        <AcceptEula>true</AcceptEula>
+        <!-- 評価版以外は正規のプロダクトキーを指定してください -->
+        <!-- <ProductKey><Key>XXXXX-XXXXX-XXXXX-XXXXX-XXXXX</Key></ProductKey> -->
+      </UserData>
+    </component>
+  </settings>
+
+  <!-- specialize: コンピュータ名・タイムゾーン -->
+  <settings pass="specialize">
+    <component name="Microsoft-Windows-Shell-Setup"
+                processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35"
+                language="neutral" versionScope="nonSxS">
+      <ComputerName>*</ComputerName>
+      <TimeZone>UTC</TimeZone>
+    </component>
+  </settings>
+
+  <!-- oobeSystem: ロケール(国/地域・言語・キーボード) + Administrator初期パスワード + cloudbase-init導入 + sysprep -->
+  <settings pass="oobeSystem">
+    <component name="Microsoft-Windows-International-Core"
+                processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35"
+                language="neutral" versionScope="nonSxS">
+      <!-- OOBEの「こんにちは」(国/地域・言語・キーボード選択)画面を省略するための既定ロケール。
+           Microsoft公式ドキュメント(Automate OOBE)により、この設定は specialize ではなく
+           oobeSystem パスに置く必要がある。 -->
+      <InputLocale>ja-JP</InputLocale>
+      <SystemLocale>ja-JP</SystemLocale>
+      <UILanguage>ja-JP</UILanguage>
+      <UserLocale>ja-JP</UserLocale>
+    </component>
+    <component name="Microsoft-Windows-Shell-Setup"
+                processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35"
+                language="neutral" versionScope="nonSxS"
+                xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+      <UserAccounts>
+        <AdministratorPassword>
+          <!-- ベースイメージ作成作業中のみ使用する一時パスワード。
+               sysprepで汎用化されるため、本番運用の実パスワードではない。 -->
+          <Value>ChangeMe-Build-Only!</Value>
+          <PlainText>true</PlainText>
+        </AdministratorPassword>
+      </UserAccounts>
+      <OOBE>
+        <HideEULAPage>true</HideEULAPage>
+        <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
+        <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
+        <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
+        <NetworkLocation>Work</NetworkLocation>
+        <SkipMachineOOBE>true</SkipMachineOOBE>
+        <SkipUserOOBE>true</SkipUserOOBE>
+      </OOBE>
+      <AutoLogon>
+        <Enabled>true</Enabled>
+        <Username>Administrator</Username>
+        <Password>
+          <Value>ChangeMe-Build-Only!</Value>
+          <PlainText>true</PlainText>
+        </Password>
+        <!-- FirstLogonCommands の途中(cloudbase-init インストール直後)に明示的な再起動を
+             挟んでいるため、再起動後に自動ログオンして残りのコマンドを実行できるよう
+             LogonCount を 2 にしている(1回目: 初回ログオン〜再起動コマンドまで、
+             2回目: 再起動後〜sysprepまで)。 -->
+        <LogonCount>2</LogonCount>
+      </AutoLogon>
+      <FirstLogonCommands>
+        <!-- 1. virtio-win の残りドライバ(NetKVM/Balloon/qxldod/vioserial等)を一括導入 -->
+        <SynchronousCommand wcm:action="add">
+          <Order>1</Order>
+          <CommandLine>pnputil /add-driver E:\*\2k22\amd64\*.inf /subdirs /install</CommandLine>
+          <Description>Install remaining virtio-win drivers</Description>
+        </SynchronousCommand>
+        <!-- 2. cloudbase-init のサイレントインストール
+             (E: はインストーラISO/フロッピーのドライブレター。環境に合わせて変更) -->
+        <SynchronousCommand wcm:action="add">
+          <Order>2</Order>
+          <CommandLine>msiexec /i F:\CloudbaseInitSetup_1_1_8_x64.msi /qn /norestart LOGGING_SERIAL_PORT_NAME=COM1 RUN_SERVICE_AS_LOCAL_SYSTEM=1</CommandLine>
+          <Description>Install cloudbase-init</Description>
+        </SynchronousCommand>
+        <!-- 3. cloudbase-init インストール直後に再起動する。
+             /norestart 指定のため、Windows Installer がサービス登録等の一部処理を
+             保留中の操作として次回起動時まで遅延させている場合がある。この保留処理が
+             完了する前に sysprep /generalize でイメージを汎用化すると、Cloudbase-Init の
+             プログラムファイルは存在するのに Windows サービスが登録されない状態の
+             まま固定されてしまい、以降起動するすべての VM で cloudbase-init が一切
+             動作しなくなる(ホスト名・パスワード・静的IP等が未反映のままになる)。
+             そのため、sysprep の前に明示的に再起動し、保留中の処理を完了させる。
+             Windows Setup は FirstLogonCommands 実行中の再起動を検知し、再起動後に
+             残りのコマンドを自動的に継続実行する。 -->
+        <SynchronousCommand wcm:action="add">
+          <Order>3</Order>
+          <CommandLine>shutdown /r /t 5 /c "Restart to complete Cloudbase-Init installation"</CommandLine>
+          <Description>Restart to complete Cloudbase-Init service registration before sysprep</Description>
+        </SynchronousCommand>
+        <!-- 4. UEFI ブートマネージャーをフォールバックパス(\EFI\Boot\bootx64.efi)にも複製する。
+             Windows Setup は通常 \EFI\Microsoft\Boot\bootmgfw.efi のみを書き込み、
+             そこを指す起動エントリを「このビルド用VM専用の」NVRAM(OVMF_VARS)に登録する。
+             marmot はベースイメージ(qcow2)を新しいドメインとして登録・起動するため、
+             ドメインごとに別の空のNVRAMが自動生成され、ビルド用VMのNVRAM起動エントリは
+             一切引き継がれない。これにより「ディスクは正しいがどこから起動すべきか
+             ファームウェアが分からない」状態（BIOS/UEFI画面で停止）になる。
+             ファームウェアの標準フォールバックパス(\EFI\Boot\bootx64.efi、通常はリムーバブル
+             メディア/USBインストール時のみ使われる)にも複製しておくことで、NVRAMに起動
+             エントリが無い新規ドメインでも自動検出・起動できるようにする。 -->
+        <SynchronousCommand wcm:action="add">
+          <Order>4</Order>
+          <CommandLine>cmd /c mountvol S: /S &amp;&amp; mkdir S:\EFI\Boot &amp;&amp; copy /Y S:\EFI\Microsoft\Boot\bootmgfw.efi S:\EFI\Boot\bootx64.efi &amp;&amp; mountvol S: /D</CommandLine>
+          <Description>Copy UEFI boot manager to the firmware fallback path for NVRAM-independent boot</Description>
+        </SynchronousCommand>
+        <!-- 5. リモートデスクトップ(RDP)の接続受け入れを有効にする。
+             レジストリとファイアウォールの設定は sysprep /generalize 後も残るため、ベースイメージに
+             RDP 有効の状態が入る(autounattend.xml は初回インストール時にしか適用されないため、
+             specialize パスのコンポーネントではなく、sysprep より前のこのコマンドで設定する)。
+             ファイアウォールのルールグループは、表示名がロケールで変わる(日本語では
+             「リモート デスクトップ」)ため、ロケールに依存しないリソース参照で指定する。
+             ただし実機(Windows Server 2025)では、このグループ指定による
+             `netsh ... set rule group=... new enable=Yes` が定義済みルールを
+             有効化できず、Enabled=False のまま残ることを確認した。そのため、
+             グループ指定のルールが有効化できない場合でも接続できるよう、
+             ロケールや既存ルール定義に依存しない TCP 3389 への明示的な受信許可
+             ルールを追加で作成する(冪等のため同名ルールが既にあれば削除してから追加)。
+             NLA(ネットワークレベル認証)は Windows Server の既定(有効)のままにする。
+             なお、marmot はサーバー作成時にも同等の設定を行うため、二重設定になるが冪等で問題ない。 -->
+        <SynchronousCommand wcm:action="add">
+          <Order>5</Order>
+          <CommandLine>cmd /c reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v fDenyTSConnections /t REG_DWORD /d 0 /f &amp;&amp; netsh advfirewall firewall set rule group="@FirewallAPI.dll,-28752" new enable=Yes &amp; netsh advfirewall firewall delete rule name="marmot-RDP-3389" &amp; netsh advfirewall firewall add rule name="marmot-RDP-3389" dir=in action=allow protocol=TCP localport=3389 profile=any</CommandLine>
+          <Description>Enable Remote Desktop</Description>
+        </SynchronousCommand>
+        <!-- 6. cloudbase-init サービスのスタートアップ種類を「手動」に変更する。
+            既定の「自動」のままだと、起動時に1回だけ実行して自ら停止する仕様のため、
+            Windows の「サーバー マネージャー」ダッシュボードで「サービスが実行されていない」
+            という警告が常時表示されてしまう。実害はないが、運用上の誤検知を避けるため変更する。
+            sysprep /generalize より前に実行すること（汎用化後のイメージにこの設定を含めるため）。 -->
+        <SynchronousCommand wcm:action="add">
+          <Order>6</Order>
+          <CommandLine>sc config cloudbase-init start= demand</CommandLine>
+          <Description>Set Cloudbase-Init service startup type to Manual</Description>
+        </SynchronousCommand>
+        <!-- 7. イメージの汎用化(sysprep /generalize)。これが最後のコマンドになること。
+             cloudbase-init は、この sysprep によって汎用化されたイメージが次回起動時に
+             通る specialize/OOBE パスにフックして動作する設計のため、
+             このコマンド以降に他の処理を追加しないこと。 -->
+        <SynchronousCommand wcm:action="add">
+          <Order>7</Order>
+          <CommandLine>C:\Windows\System32\Sysprep\sysprep.exe /generalize /oobe /shutdown /quiet</CommandLine>
+          <Description>Generalize image with sysprep and shut down</Description>
+        </SynchronousCommand>
+      </FirstLogonCommands>
+    </component>
+  </settings>
+</unattend>

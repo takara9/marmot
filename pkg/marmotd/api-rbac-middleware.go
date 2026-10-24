@@ -37,6 +37,7 @@ func rbacOperationMiddlewares(s *Server) map[string][]echo.MiddlewareFunc {
 		"apiStopServerById":                  {Resource: "Server", Verb: "update"},
 		"apiMakeImageEntryFromRunningVMById": {Resource: "Server", Verb: "update"},
 		"apiConsoleServerById":               {Resource: "Server", Verb: "read"},
+		"apiConsoleGraphicalServerById":      {Resource: "Server", Verb: "read"},
 
 		"apiListVolumes":      {Resource: "Volume", Verb: "read"},
 		"apiCreateVolume":     {Resource: "Volume", Verb: "create"},

@@ -31,7 +31,7 @@ func validateImageOSSpec(spec *api.ImageSpec) error {
 
 	canonical := canonicalOSName(osName)
 	if canonical == "" {
-		return fmt.Errorf("invalid spec.osName: %q (allowed: alpine, ubuntu, rocky, rockey, almalinux, debian)", osName)
+		return fmt.Errorf("invalid spec.osName: %q (allowed: alpine, ubuntu, rocky, rockey, almalinux, debian, windows)", osName)
 	}
 
 	allowedVersions := map[string]map[string]struct{}{
@@ -59,6 +59,10 @@ func validateImageOSSpec(spec *api.ImageSpec) error {
 			"12": {},
 			"13": {},
 		},
+		"windows": {
+			"2022": {},
+			"2025": {},
+		},
 	}
 
 	if _, ok := allowedVersions[canonical][osVersion]; !ok {
@@ -81,6 +85,8 @@ func canonicalOSName(name string) string {
 		return "almalinux"
 	case "debian":
 		return "debian"
+	case "windows":
+		return "windows"
 	default:
 		return ""
 	}

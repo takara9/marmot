@@ -252,6 +252,16 @@ func resolveImageLVPath(img api.Image) (string, error) {
 	return "", errors.New("lvm image path is not defined")
 }
 
+// defaultOSVolumeSizeGB は、サイズ未指定のOSボリュームに使うサイズ(GB)を返す。
+// 既定値16GBとイメージサイズのうち大きい方を採用する。
+func defaultOSVolumeSizeGB(img api.Image) int {
+	const defaultOSSizeGB = 16
+	if img.Spec.Size != nil && *img.Spec.Size > defaultOSSizeGB {
+		return *img.Spec.Size
+	}
+	return defaultOSSizeGB
+}
+
 func requestedOSVolumeSizeGB(volSpec api.Volume, img api.Image) (int, error) {
 	const defaultOSSizeGB = 16
 	const maxOSSizeGB = 100

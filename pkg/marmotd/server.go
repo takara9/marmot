@@ -424,6 +424,13 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		bootVol.Spec.OsVariant = serverConfig.Spec.OsVariant
 	}
 
+	// サイズ未指定のqcow2ブートボリュームは、DBの既定値(16GB)で補完される前にイメージサイズを下限として設定する
+	if bootVol.Spec.Type != nil && *bootVol.Spec.Type == "qcow2" && bootVol.Spec.Size != nil && *bootVol.Spec.Size <= 0 {
+		if img, imgErr := resolveImageTemplateByVolumeNode(m, bootVol); imgErr == nil {
+			bootVol.Spec.Size = util.IntPtrInt(defaultOSVolumeSizeGB(img))
+		}
+	}
+
 	slog.Debug("サーバーのネットワークインターフェースの設定")
 
 	// ネットワークの設定
@@ -878,7 +885,7 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		return "", err
 	}
 
-	isoPath, err := imageModule.GenerateCloudInitISO(path, password, sshKey, usernames, serverConfig.Spec.Ansible, api.ServerID(serverConfig))
+	isoPath, err := imageModule.GenerateCloudInitISO(path, password, sshKey, usernames, serverConfig.Spec.Ansible, api.ServerID(serverConfig), serverConfig.Metadata.Name, serverNetworkInterfaces(serverConfig))
 	if err != nil {
 		slog.Error("GenerateCloudInitISO()", "module", imageModule.Key(), "err", err)
 		return "", err
@@ -1009,6 +1016,23 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		}
 	}
 
+	// Windows系VMの場合、SPICEのListenアドレスをノードの実アドレスに変更し、
+	// 接続用パスワードをVM生成の都度ランダム生成して設定する(docs/MEMO-windows-vm-support.md Phase1決定事項)。
+	if virtSpec.OsName == "windows" {
+		spiceAddr, addrErr := resolveSpiceListenAddress(CurrentConfig())
+		if addrErr != nil {
+			slog.Error("resolveSpiceListenAddress()", "err", addrErr)
+			return "", addrErr
+		}
+		virtSpec.SpiceListenAddress = spiceAddr
+		spicePasswd, passwdErr := generateSpicePasswd()
+		if passwdErr != nil {
+			slog.Error("generateSpicePasswd()", "err", passwdErr)
+			return "", passwdErr
+		}
+		virtSpec.SpicePasswd = spicePasswd
+	}
+
 	// VM 起動直前に、依存ネットワーク実体とオーバーレイブリッジを再確認する。
 	// ネットワークコントローラーとのタイミング競合や host 再起動後の実体欠落に備える。
 	if err := m.ensureServerNetworkDependencies(serverConfig); err != nil {
@@ -1120,6 +1144,13 @@ func validateServerAuthSpec(auth *api.Auth) error {
 		}
 	}
 	return nil
+}
+
+func serverNetworkInterfaces(server api.Server) []api.NetworkInterface {
+	if server.Spec.NetworkInterface == nil {
+		return nil
+	}
+	return *server.Spec.NetworkInterface
 }
 
 func cloudInitAuthInputs(auth *api.Auth) (string, string, []string, error) {
@@ -1847,9 +1878,11 @@ func (m *Marmot) CreateNewVolumeWithWait(volReq api.Volume) (api.Volume, error) 
 		}
 	}
 
-	vol, err := m.Db.CreateVolumeOnDB2(volReq)
+	// この関数が直接 CreateNewVolume を実行するため、PENDING のままだと
+	// ボリュームコントローラーが同じボリュームを並行して作成してしまう。
+	vol, err := m.Db.CreateVolumeOnDB2Provisioning(volReq)
 	if err != nil {
-		slog.Error("CreateVolumeOnDB2()", "err", err)
+		slog.Error("CreateVolumeOnDB2Provisioning()", "err", err)
 		// サーバーとボリュームのステータスをエラーに更新する処理を追加するべき
 
 		return api.Volume{}, err
@@ -1981,4 +2014,22 @@ func (m *Marmot) MakeImageEntryFromRunningVMWithContext(ctx context.Context, ser
 	}
 
 	return imageID, nil
+}
+
+// resolveSpiceListenAddress は、Windows VM の SPICE が待ち受ける具体的なノードアドレスを返す。
+// api-advertise-host-bridge-address を優先し、未設定の場合は dns_listen_addr が具体的な
+// IP アドレスであるときのみそれを使う。ワイルドカードやループバックへのフォールバックはしない。
+func resolveSpiceListenAddress(cfg *MarmotdConfig) (string, error) {
+	if host := strings.TrimSpace(cfg.APIAdvertiseHostBridgeAddress); host != "" {
+		if ip := net.ParseIP(host); ip != nil && !ip.IsUnspecified() {
+			return ip.String(), nil
+		}
+		return "", fmt.Errorf("marmotd.json api-advertise-host-bridge-address %q is not a valid IP address", host)
+	}
+	if host, _, err := net.SplitHostPort(strings.TrimSpace(cfg.DNSListenAddr)); err == nil {
+		if ip := net.ParseIP(strings.Trim(strings.TrimSpace(host), "[]")); ip != nil && !ip.IsUnspecified() && !ip.IsLoopback() {
+			return ip.String(), nil
+		}
+	}
+	return "", fmt.Errorf("SPICE listen address is not configured: set marmotd.json api-advertise-host-bridge-address")
 }

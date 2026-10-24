@@ -38,6 +38,9 @@ func TestResolveImageOSModuleFromSpec(t *testing.T) {
 		{name: "debian12", osName: "debian", osVersion: "12", wantKey: "debian12"},
 		{name: "debian13", osName: "debian", osVersion: "13", wantKey: "debian13"},
 		{name: "debianUnsupportedVersion", osName: "debian", osVersion: "10", wantErr: true},
+		{name: "windows2022", osName: "windows", osVersion: "2022", wantKey: "windows2022"},
+		{name: "windows2025", osName: "windows", osVersion: "2025", wantKey: "windows2025"},
+		{name: "windowsUnsupportedVersion", osName: "windows", osVersion: "2019", wantErr: true},
 		{name: "unknown", osName: "oracle", osVersion: "9", wantErr: true},
 	}
 
@@ -255,6 +258,39 @@ func TestDebian11ImageModuleUsesDebian11CustomizeHandler(t *testing.T) {
 	// Empty path should fail in customizeDebian11QcowImageWithContext, proving delegation works.
 	if err := mod.customizeDownloadedImage(context.Background(), ""); err == nil {
 		t.Fatalf("expected customizeDownloadedImage to return error for empty path")
+	}
+}
+
+// Windows イメージは virt-customize(Linux ファイルシステム前提)を実行しない no-op である
+// ことを確認する。他 OS のテストとは逆に、空パスでも「エラーにならない」ことが
+// no-op であることの証拠になる。
+func TestWindows2022ImageModuleIsNoOpCustomize(t *testing.T) {
+	t.Parallel()
+
+	mod, err := resolveImageOSModuleFromSpec("windows", "2022")
+	if err != nil {
+		t.Fatalf("resolveImageOSModuleFromSpec() error = %v", err)
+	}
+	if got := mod.key(); got != "windows2022" {
+		t.Fatalf("mod.key() = %q, want %q", got, "windows2022")
+	}
+	if err := mod.customizeDownloadedImage(context.Background(), ""); err != nil {
+		t.Fatalf("expected customizeDownloadedImage to be a no-op (no error), got %v", err)
+	}
+}
+
+func TestWindows2025ImageModuleIsNoOpCustomize(t *testing.T) {
+	t.Parallel()
+
+	mod, err := resolveImageOSModuleFromSpec("windows", "2025")
+	if err != nil {
+		t.Fatalf("resolveImageOSModuleFromSpec() error = %v", err)
+	}
+	if got := mod.key(); got != "windows2025" {
+		t.Fatalf("mod.key() = %q, want %q", got, "windows2025")
+	}
+	if err := mod.customizeDownloadedImage(context.Background(), ""); err != nil {
+		t.Fatalf("expected customizeDownloadedImage to be a no-op (no error), got %v", err)
 	}
 }
 
