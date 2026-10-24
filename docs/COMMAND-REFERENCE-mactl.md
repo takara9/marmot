@@ -114,7 +114,9 @@ API キー:
 - mactl del [RESOURCE NAME]
   - 例: `mactl delete server biz,rest1,rest2,rest3,db`
   - `server`/`srv` 指定時は NAME をカンマ区切りで複数指定可能
-- mactl console SERVER-NAME
+- mactl console [--graphical|-g] SERVER-NAME
+  - 既定ではシリアルコンソールに接続
+  - `--graphical` / `-g` 指定時は接続せず、グラフィカルコンソール（SPICE）の接続情報を表示（`remote-viewer spice://HOST:PORT`）
 - mactl [mactlのフラグ] ssh [USER@]SERVER-NAME -- [SSH引数...]
   - Marmot が管理する SERVER-NAME の host-bridge IP を解決し、USER 指定時は USER@IP で ssh 接続
   - host-bridge 未接続、または host-bridge address 未設定の場合はエラー

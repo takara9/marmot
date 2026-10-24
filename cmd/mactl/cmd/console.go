@@ -316,6 +316,6 @@ func printGraphicalConsoleInfo(m *client.MarmotEndpoint, hostPort, serverID stri
 }
 
 func init() {
-	consoleCmd.Flags().BoolVar(&consoleGraphicalFlag, "graphical", false, "Show graphical console (SPICE) connection info instead of connecting to the serial console")
+	consoleCmd.Flags().BoolVarP(&consoleGraphicalFlag, "graphical", "g", false, "Show graphical console (SPICE) connection info instead of connecting to the serial console")
 	rootCmd.AddCommand(consoleCmd)
 }
