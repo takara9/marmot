@@ -191,14 +191,87 @@ Windows Setup を無人実行し、仕上げに cloudbase-init の導入と `sys
         </Password>
         <LogonCount>1</LogonCount>
       </AutoLogon>
-      <!-- Windows 10/Windows Server 2016 以降、複数の SynchronousCommand は並行して
-           起動され Order は完了順を保証しない。準備処理を単一コマンドにまとめ、
-           Sysprep を最後に実行する。標準の設定例は tools/autounattend.xml-temp を参照。 -->
       <FirstLogonCommands>
+        <!-- 1. virtio-win の残りドライバ(NetKVM/Balloon/qxldod/vioserial等)を一括導入。
+             pnputil は、ワイルドカードで一括指定した inf の一部が適用対象外の場合に
+             0 以外の終了コードを返すことがある。SynchronousCommand は 0 以外の
+             終了コードを返すと、それ以降の FirstLogonCommands を一切実行せずに
+             無言でユーザーのデスクトップへ制御を渡してしまうため(実機で確認済み)、
+             終了コードを必ず 0 にする。 -->
         <SynchronousCommand wcm:action="add">
           <Order>1</Order>
-          <CommandLine>cmd /c pnputil /add-driver D:\*\2k22\amd64\*.inf /subdirs /install &amp; msiexec /i E:\CloudbaseInitSetup_Stable_x64.msi /qn /norestart LOGGING_SERIAL_PORT_NAME=COM1 RUN_SERVICE_AS_LOCAL_SYSTEM=1 &amp; mountvol S: /S &amp;&amp; mkdir S:\EFI\Boot &amp;&amp; copy /Y S:\EFI\Microsoft\Boot\bootmgfw.efi S:\EFI\Boot\bootx64.efi &amp;&amp; mountvol S: /D &amp; reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v fDenyTSConnections /t REG_DWORD /d 0 /f &amp;&amp; netsh advfirewall firewall set rule group="@FirewallAPI.dll,-28752" new enable=Yes &amp; del /f /q "C:\Windows\Panther\unattend.xml" 2&gt;nul &amp; del /f /q "C:\unattend.xml" 2&gt;nul &amp; del /f /q "C:\Windows\System32\Sysprep\unattend.xml" 2&gt;nul &amp; C:\Windows\System32\Sysprep\sysprep.exe /generalize /oobe /shutdown /quiet</CommandLine>
-          <Description>Install and configure the image sequentially, then generalize with sysprep</Description>
+          <CommandLine>cmd /c pnputil /add-driver D:\*\2k22\amd64\*.inf /subdirs /install &amp; exit /b 0</CommandLine>
+          <Description>Install remaining virtio-win drivers</Description>
+        </SynchronousCommand>
+        <!-- 2. cloudbase-init のサイレントインストール
+             (E: はインストーラISO/フロッピーのドライブレター。環境に合わせて変更)。
+             msiexec は /norestart 指定時でも、再起動が必要な場合は
+             ERROR_SUCCESS_REBOOT_REQUIRED(終了コード 3010、実質成功)を返す
+             ことがあり、Order 1 と同じ理由で終了コードを必ず 0 にする。 -->
+        <SynchronousCommand wcm:action="add">
+          <Order>2</Order>
+          <CommandLine>cmd /c msiexec /i E:\CloudbaseInitSetup_Stable_x64.msi /qn /norestart LOGGING_SERIAL_PORT_NAME=COM1 RUN_SERVICE_AS_LOCAL_SYSTEM=1 &amp; exit /b 0</CommandLine>
+          <Description>Install cloudbase-init</Description>
+        </SynchronousCommand>
+        <!-- 3. UEFI ブートマネージャーをフォールバックパス(\EFI\Boot\bootx64.efi)にも複製する。
+             Windows Setup は通常 \EFI\Microsoft\Boot\bootmgfw.efi のみを書き込み、
+             そこを指す起動エントリを「このビルド用VM専用の」NVRAM(OVMF_VARS)に登録する。
+             marmot はベースイメージ(qcow2)を新しいドメインとして登録・起動するため、
+             ドメインごとに別の空のNVRAMが自動生成され、ビルド用VMのNVRAM起動エントリは
+             一切引き継がれない。これにより「ディスクは正しいがどこから起動すべきか
+             ファームウェアが分からない」状態（BIOS/UEFI画面で停止）になる。
+             ファームウェアの標準フォールバックパス(\EFI\Boot\bootx64.efi、通常はリムーバブル
+             メディア/USBインストール時のみ使われる)にも複製しておくことで、NVRAMに起動
+             エントリが無い新規ドメインでも自動検出・起動できるようにする。 -->
+        <SynchronousCommand wcm:action="add">
+          <Order>3</Order>
+          <CommandLine>cmd /c mountvol S: /S &amp;&amp; mkdir S:\EFI\Boot &amp;&amp; copy /Y S:\EFI\Microsoft\Boot\bootmgfw.efi S:\EFI\Boot\bootx64.efi &amp;&amp; mountvol S: /D</CommandLine>
+          <Description>Copy UEFI boot manager to the firmware fallback path for NVRAM-independent boot</Description>
+        </SynchronousCommand>
+        <!-- 4. リモートデスクトップ(RDP)の接続受け入れを有効にする。
+             レジストリとファイアウォールの設定は sysprep /generalize 後も残るため、ベースイメージに
+             RDP 有効の状態が入る(autounattend.xml は初回インストール時にしか適用されないため、
+             specialize パスのコンポーネントではなく、sysprep より前のこのコマンドで設定する)。
+             ファイアウォールのルールグループは、表示名がロケールで変わる(日本語では
+             「リモート デスクトップ」)ため、ロケールに依存しないリソース参照で指定する。
+             NLA(ネットワークレベル認証)は Windows Server の既定(有効)のままにする。
+             なお、marmot はサーバー作成時にも同等の設定を行うため、二重設定になるが冪等で問題ない。 -->
+        <SynchronousCommand wcm:action="add">
+          <Order>4</Order>
+          <CommandLine>cmd /c reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v fDenyTSConnections /t REG_DWORD /d 0 /f &amp;&amp; netsh advfirewall firewall set rule group="@FirewallAPI.dll,-28752" new enable=Yes</CommandLine>
+          <Description>Enable Remote Desktop</Description>
+        </SynchronousCommand>
+        <!-- 5. sysprep 前に、残存する answer file を削除する。
+             Windows Setup は、インストール時に使った autounattend.xml を
+             C:\Windows\Panther\unattend.xml 等にコピーして保持する。このファイルを
+             削除せずに sysprep /generalize すると、ベースイメージから作成した
+             本番 VM の初回起動(specialize パス)でも同じ answer file が
+             再度見つかり、再適用されてしまう(実機のログで
+             「UnattendSearchExplicitPath: Found usable unattend file for pass
+             [specialize] at [C:\Windows\Panther\unattend.xml]」として確認済み)。
+             本番 VM にはビルド専用の virtio ドライバ ISO や cloudbase-init MSI の
+             ドライブがアタッチされていないため、再適用された FirstLogonCommands
+             (ドライバ導入・MSI インストール・2 回目の sysprep 呼び出し等)が
+             正常に完了できず、specialize/OOBE パスの完了(GeneralizationState=7
+             への遷移)が妨げられる場合がある。cloudbase-init はこの
+             GeneralizationState=7 をタイムアウト無しで待ち続けるため、
+             ホスト名・NIC 設定などのプロビジョニングがいつまでも実行されない
+             原因になる。そのため、sysprep /generalize の直前で明示的に
+             削除しておく(未存在の場合の削除失敗は無視してよいため 2>nul で
+             抑制し、最後に終了コード 0 で終える)。 -->
+        <SynchronousCommand wcm:action="add">
+          <Order>5</Order>
+          <CommandLine>cmd /c del /f /q "C:\Windows\Panther\unattend.xml" 2>nul &amp; del /f /q "C:\unattend.xml" 2>nul &amp; del /f /q "C:\Windows\System32\Sysprep\unattend.xml" 2>nul &amp; exit /b 0</CommandLine>
+          <Description>Remove residual answer files before sysprep to prevent reapplication on deployed VMs</Description>
+        </SynchronousCommand>
+        <!-- 6. イメージの汎用化(sysprep /generalize)。これが最後のコマンドになること。
+             cloudbase-init は、この sysprep によって汎用化されたイメージが次回起動時に
+             通る specialize/OOBE パスにフックして動作する設計のため、
+             このコマンド以降に他の処理を追加しないこと。 -->
+        <SynchronousCommand wcm:action="add">
+          <Order>6</Order>
+          <CommandLine>C:\Windows\System32\Sysprep\sysprep.exe /generalize /oobe /shutdown /quiet</CommandLine>
+          <Description>Generalize image with sysprep and shut down</Description>
         </SynchronousCommand>
       </FirstLogonCommands>
     </component>
@@ -231,16 +304,23 @@ Windows Setup を無人実行し、仕上げに cloudbase-init の導入と `sys
   2 回目の `sysprep` 呼び出し等)が正常に完了できず、specialize/OOBE パスの完了
   (`GeneralizationState=7` への遷移)が妨げられ、cloudbase-init がホスト名・NIC 設定などの
   プロビジョニングを永久に実行できなくなる場合があります(タイムアウト無しで待ち続けるため)。
-  上記 `autounattend.xml` の `FirstLogonCommands` はこの対策として、`sysprep` の直前に
+  上記 `autounattend.xml` の `FirstLogonCommands` の Order 5 はこの対策で、`sysprep` の直前に
   残存 answer file を削除します。**この手順を含めずに作成したイメージでホスト名・NIC 設定が
   反映されない場合は、ゲスト内で `C:\Windows\Panther\unattend.xml` の有無と
   `cloudbase-init.log` の `Waiting for sysprep completion. GeneralizationState: 4` の
   繰り返しを確認してください。**
-- **【重要】`FirstLogonCommands` の準備処理は単一コマンド内で逐次実行すること**:
-  Windows 10/Windows Server 2016 以降、複数の `<SynchronousCommand>` は並行して起動され、
-  `Order` は前のコマンドの完了を待ちません。上記の例では準備処理を1つの `cmd /c` にまとめ、
-  `&` で順番に実行した後、`sysprep` を最後に呼び出します。工程を追加する場合も別の
-  `<SynchronousCommand>` に分けず、この単一コマンド内に追加してください。
+- **【重要】`FirstLogonCommands` の各コマンドは終了コードを必ず 0 にすること**:
+  `<SynchronousCommand>` は 0 以外の終了コードを返すと、Windows Setup が**それ以降の
+  `FirstLogonCommands` を一切実行せずに、無言でユーザーのデスクトップへ制御を渡してしまう**
+  (エラーダイアログ等は出ないことが多い)。実機で、Order 1(`pnputil /add-driver` の
+  ワイルドカード一括導入は、一部ドライバが適用対象外の場合に 0 以外を返すことがある)や
+  Order 2(`msiexec /i ... /norestart` は、再起動が必要な場合に `ERROR_SUCCESS_REBOOT_REQUIRED`
+  (終了コード `3010`、実質成功)を返すことがある)が原因で、それ以降の再起動・cloudbase-init
+  の仕上げ処理・`sysprep` が一切実行されず、cloudbase-init サービス自体は起動しているのに
+  `GeneralizationState` が `4` のまま進まなくなる事象を確認した。そのため、上記
+  `autounattend.xml` の Order 1・Order 2 は `cmd /c <コマンド> & exit /b 0` の形で
+  終了コードを強制的に `0` にしている。新たに `FirstLogonCommands` を追加する場合も、
+  必ずこのパターンを踏襲すること。
 - **【重要】UEFI 起動エントリ（NVRAM）は新しいドメインに引き継がれません**:
   Windows Setup は通常、UEFI ブートマネージャーを ESP 上の `\EFI\Microsoft\Boot\bootmgfw.efi`
   にのみ書き込み、そこを指す起動エントリを「インストールに使ったビルド用 VM 専用の」
@@ -250,13 +330,13 @@ Windows Setup を無人実行し、仕上げに cloudbase-init の導入と `sys
   一切引き継がれません。この状態で起動すると、ディスクには正しく Windows がインストール
   されているにもかかわらず、ファームウェアがどこから起動すべきか分からず
   **BIOS/UEFI 画面（起動デバイス未検出）で停止します**。
-  上記 `autounattend.xml` の `FirstLogonCommands` 内の `mountvol` + `copy` は、
+  上記 `autounattend.xml` の `FirstLogonCommands` の Order 3（`mountvol` + `copy`）は、
   ファームウェアの標準フォールバックパス（`\EFI\Boot\bootx64.efi`、通常はリムーバブル
   メディア/USB インストール時のみ使われる場所）にもブートマネージャーを複製することで、
   NVRAM に起動エントリが無い新規ドメインでも自動検出・起動できるようにする対策です。
   **この手順を含めずに作成したイメージは起動しません。** 既にこの対策を含めずに
   作成済みのイメージがある場合は、以下のいずれかで復旧してください。
-  - ベースイメージ作成をやり直す（`autounattend.xml` にこの処理を含めて再実行）。
+  - ベースイメージ作成をやり直す（`autounattend.xml` に Order 3 を含めて再実行）。
   - 既存の qcow2 を一時的に Linux VM（または `guestfish`/`virt-customize` 等）で
     マウントし、ESP パーティション内で `EFI/Microsoft/Boot/bootmgfw.efi` を
     `EFI/Boot/bootx64.efi` としてコピーする。
