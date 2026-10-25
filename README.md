@@ -52,7 +52,7 @@ Marmotは、プライベートクラウド運用をよりシンプルにし、In
 - **OpenTelemetry メトリクス** — Prometheus エクスポーターによる可観測性を標準提供, Loki へのログ転送も標準装備
 - **RBAC によるアクセス制御** — Administrator / Compute-Operator / Viewer などのロールベースで API 操作を制限
 - **MKE (Marmot Kubernetes Engine)** — 抽象化されたYAMLからKubernetesクラスタを構築・運用できる専用コントローラー
-- **ゲストOS Ubuntu Linux 22.04/24.04/26.04, Alpine Linux 3.23, Rocky Linux 8/9/10, AlmaLinux 8/9/10, Debian Linux 11/12/13 サポート**, Windows Server 2022/2025対応予定
+- **ゲストOS Ubuntu Linux 22.04/24.04/26.04, Alpine Linux 3.23, Rocky Linux 8/9/10, AlmaLinux 8/9/10, Debian Linux 11/12/13, Windows Server 2022/2025 サポート**
 - **ホストOS Ubuntu 24.04 サポート**
 
 
