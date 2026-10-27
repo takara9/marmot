@@ -1,6 +1,7 @@
 package marmotd
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -9,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"unicode/utf16"
 
 	"github.com/takara9/marmot/api"
 	"gopkg.in/yaml.v3"
@@ -25,18 +27,43 @@ const netbiosHostNameMaxLen = 15
 //     反映されず Enabled=False のまま残ることを確認した。そのため、グループ指定のルールが
 //     有効化できない場合でも接続できるよう、ロケールや既存ルール定義に依存しない TCP 3389 への
 //     明示的な受信許可ルールを追加で作成する(delete は初回実行時に対象が無く失敗するが、
-//     runcmd の各エントリは1行ずつのバッチスクリプトとして実行され前行の失敗で後続が
-//     止まることはないため、そのままで問題ない)。
+//     前行の失敗で後続が止まることはないため、そのままで問題ない)。
 //   - NLA(ネットワークレベル認証)は Windows Server の既定(有効)のまま変更しない。
-//   - TermService が既に起動している場合の net start のエラーでスクリプトが失敗扱いにならないよう、
-//     最後に必ず終了コード 0 で終える。
+//   - cloudbase-init は、runcmd の全エントリを1つのバッチファイルにまとめて実行する。
+//     そのため、エントリの途中で exit を実行すると、以降のエントリが実行されなくなる。
+//     終了コードを 0 にする exit /b 0 は、全エントリの最後に1回だけ置く(runcmdExitCommand)。
 var enableRDPCommands = []string{
 	`reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v fDenyTSConnections /t REG_DWORD /d 0 /f`,
 	`netsh advfirewall firewall set rule group="@FirewallAPI.dll,-28752" new enable=Yes`,
 	`netsh advfirewall firewall delete rule name="marmot-RDP-3389"`,
 	`netsh advfirewall firewall add rule name="marmot-RDP-3389" dir=in action=allow protocol=TCP localport=3389 profile=any`,
 	`sc config TermService start= auto`,
-	`net start TermService & exit /b 0`,
+	`net start TermService`,
+}
+
+// runcmdExitCommand は runcmd の最後に置くコマンド。net start は対象が既に起動していると
+// エラーを返すため、スクリプト全体が失敗扱いにならないよう終了コード 0 で終える。
+const runcmdExitCommand = `exit /b 0`
+
+// cmdLineMaxLen は cmd.exe の1コマンド行の最大長(8191 文字)に対する、runcmd の1エントリの上限。
+const cmdLineMaxLen = 8000
+
+// administratorsAuthorizedKeysPath は、Administrators グループのユーザー用の sshd 公開鍵ファイル。
+const administratorsAuthorizedKeysPath = `C:\ProgramData\ssh\administrators_authorized_keys`
+
+// sshdFinishCommands は、公開鍵の配置後に実行する sshd 向けのコマンド列。
+// OpenSSH Server のインストール・自動起動設定・既定シェルの設定はベースイメージ作成時に行われている前提で、
+// ここでは鍵ファイルの権限設定、ファイアウォール開放、sshd の起動のみを行う。
+//   - administrators_authorized_keys は SYSTEM と Administrators 以外に権限があると sshd に無視されるため、
+//     継承を無効化して両者のみに権限を残す。ロケールに依存しないよう、アカウント名ではなく既知 SID
+//     (SYSTEM は *S-1-5-18、Administrators は *S-1-5-32-544)で指定する。
+//   - runcmd の全エントリは1つのバッチファイルになるため、ここでは exit を実行しない(runcmdExitCommand 参照)。
+var sshdFinishCommands = []string{
+	`icacls.exe ` + administratorsAuthorizedKeysPath + ` /inheritance:r /grant:r "*S-1-5-18:F" /grant:r "*S-1-5-32-544:F"`,
+	`netsh advfirewall firewall delete rule name="marmot-SSH-22"`,
+	`netsh advfirewall firewall add rule name="marmot-SSH-22" dir=in action=allow protocol=TCP localport=22 profile=any`,
+	`sc config sshd start= auto`,
+	`net start sshd`,
 }
 
 // cloudbaseInitMetaData は OpenStack ConfigDrive の openstack/latest/meta_data.json の内容。
@@ -169,14 +196,49 @@ func buildCloudbaseInitMetaData(password, sshKey, instanceID, hostname string) (
 	return data, nil
 }
 
+// sshdAuthorizedKeysCommands は、公開鍵を administrators_authorized_keys に書き込む runcmd のコマンド列を返す。
+// runcmd は cmd.exe で実行されるため、鍵は base64 で埋め込んだ PowerShell スクリプトを -EncodedCommand で渡す。
+// cmd.exe の行長制限を避けるため、1行につき1つの鍵を書き込む(最初の1行が上書き、以降は追記)。
+func sshdAuthorizedKeysCommands(keys []string) ([]string, error) {
+	cmds := make([]string, 0, len(keys)+len(sshdFinishCommands))
+	for i, key := range keys {
+		write := "AppendAllText"
+		if i == 0 {
+			write = "WriteAllText"
+		}
+		keyB64 := base64.StdEncoding.EncodeToString([]byte(key + "\n"))
+		script := fmt.Sprintf(
+			"$d='C:\\ProgramData\\ssh'; New-Item -ItemType Directory -Force -Path $d | Out-Null; "+
+				"$k=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s')); "+
+				"[IO.File]::%s(\"$d\\administrators_authorized_keys\", $k)", keyB64, write)
+		cmd := "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + encodePowerShellCommand(script)
+		if len(cmd) > cmdLineMaxLen {
+			return nil, fmt.Errorf("公開鍵 %d 番目が長すぎて Windows のコマンド行に収まりません", i+1)
+		}
+		cmds = append(cmds, cmd)
+	}
+	return append(cmds, sshdFinishCommands...), nil
+}
+
+// encodePowerShellCommand は PowerShell の -EncodedCommand 用に、スクリプトを UTF-16LE の base64 にする。
+func encodePowerShellCommand(script string) string {
+	u16 := utf16.Encode([]rune(script))
+	buf := make([]byte, 0, len(u16)*2)
+	for _, c := range u16 {
+		buf = append(buf, byte(c), byte(c>>8))
+	}
+	return base64.StdEncoding.EncodeToString(buf)
+}
+
 // buildCloudbaseInitUserData は cloud-config を返す。追加ユーザーの作成(対象があれば)と、
 // RDP の有効化(runcmd)を含む。"root" は Windows に存在しないため、ユーザーから除外する。
+// 公開鍵が指定された場合は、Administrator 用の sshd の公開鍵設定(runcmd)も含む。
+// 公開鍵とユーザー("root" 以外)が両方指定された場合は、未実装としてエラーにする。
 func buildCloudbaseInitUserData(password, sshKey string, usernames []string) (string, error) {
 	type cloudConfigUser struct {
-		Name              string   `yaml:"name"`
-		Groups            string   `yaml:"groups"`
-		Passwd            string   `yaml:"passwd,omitempty"`
-		SSHAuthorizedKeys []string `yaml:"ssh_authorized_keys,omitempty"`
+		Name   string `yaml:"name"`
+		Groups string `yaml:"groups"`
+		Passwd string `yaml:"passwd,omitempty"`
 	}
 	type cloudConfig struct {
 		Users  []cloudConfigUser `yaml:"users,omitempty"`
@@ -184,18 +246,28 @@ func buildCloudbaseInitUserData(password, sshKey string, usernames []string) (st
 	}
 
 	keys := splitSSHKeys(sshKey)
-	cfg := cloudConfig{RunCmd: enableRDPCommands}
+	cfg := cloudConfig{RunCmd: append([]string{}, enableRDPCommands...)}
 	for _, username := range normalizeUsernames(usernames) {
 		if strings.EqualFold(username, "root") {
 			continue
 		}
+		if len(keys) > 0 {
+			return "", fmt.Errorf("Windows でのユーザー指定付き公開鍵設定は未実装です (spec.auth の user/users と公開鍵は同時に指定できません): %s", username)
+		}
 		cfg.Users = append(cfg.Users, cloudConfigUser{
-			Name:              username,
-			Groups:            "Administrators",
-			Passwd:            password,
-			SSHAuthorizedKeys: keys,
+			Name:   username,
+			Groups: "Administrators",
+			Passwd: password,
 		})
 	}
+	if len(keys) > 0 {
+		sshdCmds, err := sshdAuthorizedKeysCommands(keys)
+		if err != nil {
+			return "", err
+		}
+		cfg.RunCmd = append(cfg.RunCmd, sshdCmds...)
+	}
+	cfg.RunCmd = append(cfg.RunCmd, runcmdExitCommand)
 
 	out, err := yaml.Marshal(cfg)
 	if err != nil {

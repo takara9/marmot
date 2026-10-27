@@ -1,12 +1,14 @@
 package marmotd
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf16"
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/util"
@@ -69,50 +71,131 @@ func TestBuildCloudbaseInitMetaDataOmitsEmptyValues(t *testing.T) {
 func TestBuildCloudbaseInitUserData(t *testing.T) {
 	t.Parallel()
 
-	// 追加ユーザーがなくても、RDP を有効にする runcmd は常に含まれる("root" は除外される)。
-	noUsers, err := buildCloudbaseInitUserData("pw", "ssh-rsa AAA", []string{"root", " "})
-	if err != nil {
-		t.Fatal(err)
-	}
-	var noUsersCfg struct {
-		Users  []map[string]any `yaml:"users"`
-		RunCmd []string         `yaml:"runcmd"`
-	}
-	if err := yaml.Unmarshal([]byte(noUsers), &noUsersCfg); err != nil {
-		t.Fatalf("invalid yaml: %v", err)
-	}
-	if len(noUsersCfg.Users) != 0 || len(noUsersCfg.RunCmd) != len(enableRDPCommands) {
-		t.Fatalf("unexpected user_data: %q", noUsers)
-	}
-
-	out, err := buildCloudbaseInitUserData("p: w #1", "ssh-rsa AAA", []string{"root", "alice"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.HasPrefix(out, "#cloud-config\n") {
-		t.Fatalf("missing #cloud-config header: %q", out)
-	}
-	var parsed struct {
+	type parsedConfig struct {
 		Users []struct {
-			Name   string   `yaml:"name"`
-			Groups string   `yaml:"groups"`
-			Passwd string   `yaml:"passwd"`
-			Keys   []string `yaml:"ssh_authorized_keys"`
+			Name   string `yaml:"name"`
+			Groups string `yaml:"groups"`
+			Passwd string `yaml:"passwd"`
 		} `yaml:"users"`
 		RunCmd []string `yaml:"runcmd"`
 	}
-	if err := yaml.Unmarshal([]byte(out), &parsed); err != nil {
-		t.Fatalf("invalid yaml: %v", err)
+	parse := func(t *testing.T, out string) parsedConfig {
+		t.Helper()
+		if !strings.HasPrefix(out, "#cloud-config\n") {
+			t.Fatalf("missing #cloud-config header: %q", out)
+		}
+		var cfg parsedConfig
+		if err := yaml.Unmarshal([]byte(out), &cfg); err != nil {
+			t.Fatalf("invalid yaml: %v", err)
+		}
+		return cfg
 	}
-	if len(parsed.Users) != 1 {
-		t.Fatalf("root must be excluded, got %+v", parsed.Users)
+
+	// 鍵なし・ユーザーなし("root" は除外される): RDP の runcmd のみ。
+	out, err := buildCloudbaseInitUserData("pw", "", []string{"root", " "})
+	if err != nil {
+		t.Fatal(err)
 	}
-	u := parsed.Users[0]
-	if len(parsed.RunCmd) != len(enableRDPCommands) || parsed.RunCmd[0] != enableRDPCommands[0] {
-		t.Fatalf("runcmd must round-trip unchanged: %v", parsed.RunCmd)
+	cfg := parse(t, out)
+	if len(cfg.Users) != 0 || len(cfg.RunCmd) != len(enableRDPCommands)+1 {
+		t.Fatalf("unexpected user_data: %q", out)
 	}
-	if u.Name != "alice" || u.Groups != "Administrators" || u.Passwd != "p: w #1" || len(u.Keys) != 1 || u.Keys[0] != "ssh-rsa AAA" {
+	assertRunCmdExitsOnlyAtEnd(t, cfg.RunCmd)
+
+	// 鍵なし・ユーザーあり: 既存動作どおり Administrators のユーザーを作成し、sshd の設定は含まない。
+	out, err = buildCloudbaseInitUserData("p: w #1", "", []string{"root", "alice"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg = parse(t, out)
+	if len(cfg.Users) != 1 {
+		t.Fatalf("root must be excluded, got %+v", cfg.Users)
+	}
+	if u := cfg.Users[0]; u.Name != "alice" || u.Groups != "Administrators" || u.Passwd != "p: w #1" {
 		t.Fatalf("unexpected user: %+v", u)
+	}
+	if len(cfg.RunCmd) != len(enableRDPCommands)+1 || cfg.RunCmd[0] != enableRDPCommands[0] {
+		t.Fatalf("runcmd must round-trip unchanged: %v", cfg.RunCmd)
+	}
+	assertRunCmdExitsOnlyAtEnd(t, cfg.RunCmd)
+
+	// 鍵あり・ユーザーなし("root" のみは未指定扱い): RDP に続けて sshd の設定が入る。
+	out, err = buildCloudbaseInitUserData("pw", "ssh-rsa AAA one\nssh-ed25519 BBB two\n", []string{"root"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg = parse(t, out)
+	if len(cfg.Users) != 0 {
+		t.Fatalf("unexpected users: %+v", cfg.Users)
+	}
+	wantLen := len(enableRDPCommands) + 2 + len(sshdFinishCommands) + 1
+	if len(cfg.RunCmd) != wantLen || cfg.RunCmd[0] != enableRDPCommands[0] {
+		t.Fatalf("unexpected runcmd (len=%d, want %d): %v", len(cfg.RunCmd), wantLen, cfg.RunCmd)
+	}
+	if got, want := cfg.RunCmd[len(cfg.RunCmd)-2], sshdFinishCommands[len(sshdFinishCommands)-1]; got != want {
+		t.Fatalf("sshd commands must come last before exit: %v", cfg.RunCmd)
+	}
+	assertRunCmdExitsOnlyAtEnd(t, cfg.RunCmd)
+
+	// 鍵あり・ユーザーあり: 未実装エラー。
+	if _, err := buildCloudbaseInitUserData("pw", "ssh-rsa AAA", []string{"alice"}); err == nil || !strings.Contains(err.Error(), "未実装") {
+		t.Fatalf("expected not-implemented error, got %v", err)
+	}
+}
+
+func decodePowerShellCommand(t *testing.T, cmd string) string {
+	t.Helper()
+	const prefix = "-EncodedCommand "
+	i := strings.Index(cmd, prefix)
+	if i < 0 {
+		t.Fatalf("not an encoded powershell command: %q", cmd)
+	}
+	raw, err := base64.StdEncoding.DecodeString(cmd[i+len(prefix):])
+	if err != nil || len(raw)%2 != 0 {
+		t.Fatalf("invalid base64 UTF-16LE: %v", err)
+	}
+	u16 := make([]uint16, len(raw)/2)
+	for j := range u16 {
+		u16[j] = uint16(raw[2*j]) | uint16(raw[2*j+1])<<8
+	}
+	return string(utf16.Decode(u16))
+}
+
+func TestSSHDAuthorizedKeysCommands(t *testing.T) {
+	t.Parallel()
+	cmds, err := sshdAuthorizedKeysCommands([]string{"ssh-rsa AAA one", "ssh-ed25519 BBB two"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cmds) != 2+len(sshdFinishCommands) {
+		t.Fatalf("unexpected commands: %v", cmds)
+	}
+
+	// 最初の鍵は上書き、2つ目以降は追記。鍵は base64 で埋め込まれ、元の鍵に復元できる。
+	for i, tc := range []struct{ method, key string }{
+		{"WriteAllText", "ssh-rsa AAA one"},
+		{"AppendAllText", "ssh-ed25519 BBB two"},
+	} {
+		script := decodePowerShellCommand(t, cmds[i])
+		if !strings.Contains(script, "[IO.File]::"+tc.method+"(") || !strings.Contains(script, `administrators_authorized_keys`) {
+			t.Fatalf("unexpected script[%d]: %s", i, script)
+		}
+		keyB64 := base64.StdEncoding.EncodeToString([]byte(tc.key + "\n"))
+		if !strings.Contains(script, "'"+keyB64+"'") {
+			t.Fatalf("key not embedded in script[%d]: %s", i, script)
+		}
+	}
+
+	joined := strings.Join(sshdFinishCommands, "\n")
+	for _, want := range []string{`/inheritance:r`, `"*S-1-5-18:F"`, `"*S-1-5-32-544:F"`, `localport=22`, `net start sshd`} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("%q not found in %q", want, joined)
+		}
+	}
+	assertRunCmdExitsOnlyAtEnd(t, append(cmds, runcmdExitCommand))
+
+	if _, err := sshdAuthorizedKeysCommands([]string{strings.Repeat("A", 4000)}); err == nil {
+		t.Fatal("expected error for too long key")
 	}
 }
 
@@ -144,7 +227,7 @@ func TestGenerateCloudbaseInitISO(t *testing.T) {
 		t.Skip("genisoimage not available")
 	}
 	path := filepath.Join(t.TempDir(), "isos", "srv")
-	iso, err := GenerateCloudbaseInitISO(path, "pw", "ssh-rsa AAA", []string{"alice"}, "srv-1", "win-vm", testNICs())
+	iso, err := GenerateCloudbaseInitISO(path, "pw", "", []string{"alice"}, "srv-1", "win-vm", testNICs())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,6 +242,24 @@ func TestGenerateCloudbaseInitISO(t *testing.T) {
 		if !strings.Contains(files, want) {
 			t.Fatalf("%s not found in ISO:\n%s", want, files)
 		}
+	}
+}
+
+// 公開鍵のみ(ユーザー未指定)なら ISO を生成でき、公開鍵とユーザーの同時指定は ISO 生成前にエラーになる。
+func TestGenerateCloudbaseInitISOWithSSHKey(t *testing.T) {
+	if _, err := exec.LookPath("genisoimage"); err != nil {
+		t.Skip("genisoimage not available")
+	}
+	path := filepath.Join(t.TempDir(), "iso")
+	if _, err := GenerateCloudbaseInitISO(path, "", "ssh-rsa AAA", nil, "srv-1", "win-vm", nil); err != nil {
+		t.Fatalf("key only must succeed: %v", err)
+	}
+	path = filepath.Join(t.TempDir(), "iso2")
+	if _, err := GenerateCloudbaseInitISO(path, "", "ssh-rsa AAA", []string{"alice"}, "srv-1", "win-vm", nil); err == nil {
+		t.Fatal("key with user must fail")
+	}
+	if _, err := os.Stat(filepath.Join(path, "cloud-init.iso")); err == nil {
+		t.Fatal("ISO must not be created on error")
 	}
 }
 
@@ -180,7 +281,7 @@ func TestServerImageModuleGenerateISOByOS(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "iso")
-			iso, err := tt.mod.GenerateCloudInitISO(path, "pw", "ssh-rsa AAA", []string{"alice"}, (*api.ServerAnsible)(nil), "srv-1", "host1", testNICs())
+			iso, err := tt.mod.GenerateCloudInitISO(path, "pw", "", []string{"alice"}, (*api.ServerAnsible)(nil), "srv-1", "host1", testNICs())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -280,7 +381,7 @@ func TestBuildCloudbaseInitNetworkDataSkipsUnconfiguredNICs(t *testing.T) {
 }
 
 // RDP 有効化は、レジストリ(接続許可)とファイアウォール(ロケール非依存のルールグループ指定)の
-// 両方を含み、最後は終了コード 0 で終わる。
+// 両方を含み、途中で exit しない。
 func TestEnableRDPCommands(t *testing.T) {
 	t.Parallel()
 	joined := strings.Join(enableRDPCommands, "\n")
@@ -289,7 +390,19 @@ func TestEnableRDPCommands(t *testing.T) {
 			t.Fatalf("%q not found in %q", want, joined)
 		}
 	}
-	if last := enableRDPCommands[len(enableRDPCommands)-1]; !strings.HasSuffix(last, "exit /b 0") {
-		t.Fatalf("last command must exit 0: %q", last)
+	assertRunCmdExitsOnlyAtEnd(t, append(append([]string{}, enableRDPCommands...), runcmdExitCommand))
+}
+
+// cloudbase-init は runcmd の全エントリを1つのバッチファイルにして実行するため、
+// 途中のエントリに exit があると以降のエントリが実行されない。exit は最後の1つだけであること。
+func assertRunCmdExitsOnlyAtEnd(t *testing.T, cmds []string) {
+	t.Helper()
+	if len(cmds) == 0 || cmds[len(cmds)-1] != "exit /b 0" {
+		t.Fatalf("last runcmd entry must be 'exit /b 0': %v", cmds)
+	}
+	for i, c := range cmds[:len(cmds)-1] {
+		if !strings.HasPrefix(c, "powershell.exe") && strings.Contains(strings.ToLower(c), "exit") {
+			t.Fatalf("runcmd[%d] must not contain exit (it would skip the following entries): %q", i, c)
+		}
 	}
 }
