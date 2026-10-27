@@ -22,13 +22,16 @@
 #   - tools/autounattend.xml-temp (本スクリプトと同じディレクトリ) が
 #     存在すること。これをテンプレートとして、Windows Server 2022/2025 に
 #     応じてドライバパス(2k22/2k25)を書き換えた autounattend.xml を
-#     ./build_qcow2/unattend/ 配下に生成する。生成した qcow2 は ./build_qcow2/<VM名>.qcow2 に出力される
+#     ./build_qcow2/unattend/ 配下に生成する。あわせて、同じディレクトリの setup-openssh.ps1
+#     (OpenSSH Server 導入スクリプト)も ./build_qcow2/unattend/ へコピーし、assets.iso に同梱する。
+#     生成した qcow2 は ./build_qcow2/<VM名>.qcow2 に出力される
 #     （実行時に ./build_qcow2/ 配下の既存の qcow2 は削除される）。
 #
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE_XML="${SCRIPT_DIR}/autounattend.xml-temp"
+SETUP_OPENSSH_PS1="${SCRIPT_DIR}/setup-openssh.ps1"
 
 usage() {
   cat <<EOF
@@ -180,6 +183,11 @@ if [ ! -f "${TEMPLATE_XML}" ]; then
   exit 1
 fi
 
+if [ ! -f "${SETUP_OPENSSH_PS1}" ]; then
+  echo "${SETUP_OPENSSH_PS1} が見つかりません。" >&2
+  exit 1
+fi
+
 if [ ! -f "${CLOUDBASE_MSI}" ]; then
   echo "${CLOUDBASE_MSI} が見つかりません。" >&2
   echo "https://cloudbase.it/downloads/CloudbaseInitSetup_Stable_x64.msi から自己責任で入手し、CloudbaseInitSetup_1_1_8_x64.msi という名前で配置してください。" >&2
@@ -195,6 +203,8 @@ fi
 echo "2. autounattend.xml をテンプレートから生成する (ドライバパス: ${DRIVER_TAG})"
 mkdir -p "${UNATTEND_DIR}"
 sed "s/2k22/${DRIVER_TAG}/g" "${TEMPLATE_XML}" > "${AUTOUNATTEND}"
+# autounattend.xml から F:\setup-openssh.ps1 として参照される(assets.iso に同梱される)
+cp "${SETUP_OPENSSH_PS1}" "${UNATTEND_DIR}/setup-openssh.ps1"
 
 # 前回実行分が残っていれば削除してから作り直す
 # （VM がインストール中に参照するため、実行後には削除しない）

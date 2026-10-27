@@ -210,6 +210,14 @@
                 ルールを追加で作成する(冪等のため同名ルールが既にあれば削除してから追加)。
                 NLA(ネットワークレベル認証)は Windows Server の既定(有効)のままにする。
                 なお、marmot はサーバー作成時にも同等の設定を行うため、二重設定になるが冪等で問題ない。
+             4b. OpenSSH Server を導入し、sshd の自動起動と規定シェル(PowerShell)を設定する。
+                Add-WindowsCapability はオンライン接続が必要(ビルド用 VM がインターネットに接続できること)。
+                CommandLine は 1024 文字までの制限があり、超えると oobeSystem パスが「値が無効です
+                (0x80220005)」で失敗するため、処理は assets ISO 同梱の setup-openssh.ps1 に切り出している。
+                ここでは sshd を起動しない。起動するとホスト鍵が生成され、sysprep 後のイメージから
+                作成した全 VM で同じホスト鍵を共有してしまうため。ホスト鍵は VM の初回起動時に生成される。
+                公開鍵(administrators_authorized_keys)の配置・権限設定・ファイアウォール(TCP 22)開放・
+                sshd の起動は、サーバー作成時に marmot が cloudbase-init(runcmd)で行う。
              5. sysprep 前に、残存する answer file を削除する。
                 Windows Setup は、インストール時に使った autounattend.xml を
                 C:\Windows\Panther\unattend.xml 等にコピーして保持する。このファイルを
@@ -226,8 +234,8 @@
                 このコマンド以降に他の処理を追加しないこと。 -->
         <SynchronousCommand wcm:action="add">
           <Order>1</Order>
-          <CommandLine>cmd /c pnputil /add-driver E:\*\2k22\amd64\*.inf /subdirs /install &amp; msiexec /i F:\CloudbaseInitSetup_1_1_8_x64.msi /qn /norestart LOGGING_SERIAL_PORT_NAME=COM1 RUN_SERVICE_AS_LOCAL_SYSTEM=1 &amp; mountvol S: /S &amp;&amp; mkdir S:\EFI\Boot &amp;&amp; copy /Y S:\EFI\Microsoft\Boot\bootmgfw.efi S:\EFI\Boot\bootx64.efi &amp;&amp; mountvol S: /D &amp; reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v fDenyTSConnections /t REG_DWORD /d 0 /f &amp;&amp; netsh advfirewall firewall set rule group="@FirewallAPI.dll,-28752" new enable=Yes &amp; netsh advfirewall firewall delete rule name="marmot-RDP-3389" &amp; netsh advfirewall firewall add rule name="marmot-RDP-3389" dir=in action=allow protocol=TCP localport=3389 profile=any &amp; del /f /q "C:\Windows\Panther\unattend.xml" 2>nul &amp; del /f /q "C:\unattend.xml" 2>nul &amp; del /f /q "C:\Windows\System32\Sysprep\unattend.xml" 2>nul &amp; C:\Windows\System32\Sysprep\sysprep.exe /generalize /oobe /shutdown /quiet</CommandLine>
-          <Description>Install drivers/cloudbase-init, configure UEFI fallback and RDP, remove residual answer files, then generalize with sysprep - all sequentially in one process</Description>
+          <CommandLine>cmd /c pnputil /add-driver E:\*\2k22\amd64\*.inf /subdirs /install &amp; msiexec /i F:\CloudbaseInitSetup_1_1_8_x64.msi /qn /norestart LOGGING_SERIAL_PORT_NAME=COM1 RUN_SERVICE_AS_LOCAL_SYSTEM=1 &amp; mountvol S: /S &amp;&amp; mkdir S:\EFI\Boot &amp;&amp; copy /Y S:\EFI\Microsoft\Boot\bootmgfw.efi S:\EFI\Boot\bootx64.efi &amp;&amp; mountvol S: /D &amp; reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v fDenyTSConnections /t REG_DWORD /d 0 /f &amp;&amp; netsh advfirewall firewall set rule group="@FirewallAPI.dll,-28752" new enable=Yes &amp; netsh advfirewall firewall delete rule name="marmot-RDP-3389" &amp; netsh advfirewall firewall add rule name="marmot-RDP-3389" dir=in action=allow protocol=TCP localport=3389 profile=any &amp; powershell -ExecutionPolicy Bypass -File F:\setup-openssh.ps1 &amp; del /f /q "C:\Windows\Panther\unattend.xml" 2>nul &amp; del /f /q "C:\unattend.xml" 2>nul &amp; del /f /q "C:\Windows\System32\Sysprep\unattend.xml" 2>nul &amp; C:\Windows\System32\Sysprep\sysprep.exe /generalize /oobe /shutdown /quiet</CommandLine>
+          <Description>Install drivers/cloudbase-init/OpenSSH Server, configure UEFI fallback and RDP, remove residual answer files, then generalize with sysprep - all sequentially in one process</Description>
         </SynchronousCommand>
       </FirstLogonCommands>
     </component>
