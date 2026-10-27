@@ -252,7 +252,7 @@ func buildCloudbaseInitUserData(password, sshKey string, usernames []string) (st
 			continue
 		}
 		if len(keys) > 0 {
-			return "", fmt.Errorf("Windows でのユーザー指定付き公開鍵設定は未実装です (spec.auth の user/users と公開鍵は同時に指定できません): %s", username)
+			return "", fmt.Errorf("ユーザー指定付きの公開鍵設定は Windows では未実装です (spec.auth の user/users と公開鍵は同時に指定できません): %s", username)
 		}
 		cfg.Users = append(cfg.Users, cloudConfigUser{
 			Name:   username,
