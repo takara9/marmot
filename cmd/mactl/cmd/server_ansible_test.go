@@ -501,7 +501,7 @@ func TestRunServerAnsiblePlaybookWithExtraArgs(t *testing.T) {
 	}
 
 	extraArgs := []string{"flush-cache", `tags "nginx,mysql"`, "", "   ", "--skip-tags=cache"}
-	err := runServerAnsiblePlaybook("/tmp/playbook.yaml", "/tmp/hosts", []string{"/tmp/id_test"}, &extraArgs)
+	err := runServerAnsiblePlaybook("/tmp/playbook.yaml", "/tmp/hosts", []string{"/tmp/id_test"}, "", &extraArgs)
 	if err != nil {
 		t.Fatalf("runServerAnsiblePlaybook() unexpected err: %v", err)
 	}
@@ -537,7 +537,7 @@ func TestRunServerAnsiblePlaybookWithMultipleKeys(t *testing.T) {
 		return exec.Command("true")
 	}
 
-	err := runServerAnsiblePlaybook("/tmp/playbook.yaml", "/tmp/hosts", []string{"/tmp/id_ed25519", "/tmp/id_rsa"}, nil)
+	err := runServerAnsiblePlaybook("/tmp/playbook.yaml", "/tmp/hosts", []string{"/tmp/id_ed25519", "/tmp/id_rsa"}, "", nil)
 	if err != nil {
 		t.Fatalf("runServerAnsiblePlaybook() unexpected err: %v", err)
 	}
@@ -550,7 +550,7 @@ func TestRunServerAnsiblePlaybookWithMultipleKeys(t *testing.T) {
 
 func TestRunServerAnsiblePlaybookWithInvalidExtraArgs(t *testing.T) {
 	extraArgs := []string{`tags "nginx,mysql`}
-	err := runServerAnsiblePlaybook("/tmp/playbook.yaml", "/tmp/hosts", []string{"/tmp/id_test"}, &extraArgs)
+	err := runServerAnsiblePlaybook("/tmp/playbook.yaml", "/tmp/hosts", []string{"/tmp/id_test"}, "", &extraArgs)
 	if err == nil {
 		t.Fatalf("runServerAnsiblePlaybook() expected error for invalid extra args")
 	}
@@ -573,7 +573,7 @@ func TestRunServerAnsiblePingWithoutUserOption(t *testing.T) {
 		return exec.Command("true")
 	}
 
-	err := runServerAnsiblePing("192.168.1.64", []string{"/tmp/id_test"})
+	err := runServerAnsiblePing("192.168.1.64", []string{"/tmp/id_test"}, "")
 	if err != nil {
 		t.Fatalf("runServerAnsiblePing() unexpected err: %v", err)
 	}
@@ -589,5 +589,84 @@ func TestRunServerAnsiblePingWithoutUserOption(t *testing.T) {
 	}
 	if !reflect.DeepEqual(gotArgs, wantArgs) {
 		t.Fatalf("args = %#v, want %#v", gotArgs, wantArgs)
+	}
+}
+
+func TestRunServerAnsiblePingWithRemoteUser(t *testing.T) {
+	original := serverAnsibleExecCommand
+	t.Cleanup(func() {
+		serverAnsibleExecCommand = original
+	})
+
+	var gotArgs []string
+	serverAnsibleExecCommand = func(name string, args ...string) *exec.Cmd {
+		gotArgs = append([]string{}, args...)
+		return exec.Command("true")
+	}
+
+	if err := runServerAnsiblePing("192.168.1.64", []string{"/tmp/id_test"}, "rocky"); err != nil {
+		t.Fatalf("runServerAnsiblePing() unexpected err: %v", err)
+	}
+	wantArgs := []string{
+		"all",
+		"-i", "192.168.1.64,",
+		"-m", "ping",
+		"--private-key", "/tmp/id_test",
+		"-u", "rocky",
+	}
+	if !reflect.DeepEqual(gotArgs, wantArgs) {
+		t.Fatalf("args = %#v, want %#v", gotArgs, wantArgs)
+	}
+}
+
+func TestRunServerAnsiblePlaybookWithRemoteUser(t *testing.T) {
+	original := serverAnsibleExecCommand
+	t.Cleanup(func() {
+		serverAnsibleExecCommand = original
+	})
+
+	var gotArgs []string
+	serverAnsibleExecCommand = func(name string, args ...string) *exec.Cmd {
+		gotArgs = append([]string{}, args...)
+		return exec.Command("true")
+	}
+
+	if err := runServerAnsiblePlaybook("/tmp/playbook.yaml", "/tmp/hosts", []string{"/tmp/id_test"}, "rocky", nil); err != nil {
+		t.Fatalf("runServerAnsiblePlaybook() unexpected err: %v", err)
+	}
+	wantArgs := []string{
+		"-i", "/tmp/hosts",
+		"/tmp/playbook.yaml",
+		"--private-key", "/tmp/id_test",
+		"-u", "rocky",
+	}
+	if !reflect.DeepEqual(gotArgs, wantArgs) {
+		t.Fatalf("args = %#v, want %#v", gotArgs, wantArgs)
+	}
+}
+
+func TestServerAnsibleRemoteUser(t *testing.T) {
+	str := func(s string) *string { return &s }
+	users := func(v ...string) *[]string { return &v }
+
+	tests := []struct {
+		name string
+		auth *api.Auth
+		want string
+	}{
+		{name: "no auth", auth: nil, want: ""},
+		{name: "no user", auth: &api.Auth{}, want: ""},
+		{name: "user", auth: &api.Auth{User: str(" rocky ")}, want: "rocky"},
+		{name: "first of users", auth: &api.Auth{Users: users("rocky", "admin")}, want: "rocky"},
+		{name: "skip blank users", auth: &api.Auth{Users: users(" ", "admin")}, want: "admin"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var server api.Server
+			server.Spec.Auth = tt.auth
+			if got := serverAnsibleRemoteUser(server); got != tt.want {
+				t.Fatalf("serverAnsibleRemoteUser() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
