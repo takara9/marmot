@@ -69,12 +69,13 @@ func maybeApplyServerAnsiblePlaybook(m *client.MarmotEndpoint, server api.Server
 		return err
 	}
 
-	if err := waitServerAnsiblePingReady(targetAddress, privateKeyPaths, serverAnsiblePingTimeout, serverAnsiblePingPollInterval); err != nil {
+	remoteUser := serverAnsibleRemoteUser(server)
+	if err := waitServerAnsiblePingReady(targetAddress, privateKeyPaths, remoteUser, serverAnsiblePingTimeout, serverAnsiblePingPollInterval); err != nil {
 		return err
 	}
 
 	fmt.Fprintln(os.Stderr, "playbook 適用開始.....")
-	if err := runServerAnsiblePlaybook(playbookPath, inventoryPath, privateKeyPaths, server.Spec.Ansible.ExtraArgs); err != nil {
+	if err := runServerAnsiblePlaybook(playbookPath, inventoryPath, privateKeyPaths, remoteUser, server.Spec.Ansible.ExtraArgs); err != nil {
 		return err
 	}
 	return nil
@@ -306,11 +307,11 @@ func resolveServerAnsiblePrivateKeyPaths() ([]string, error) {
 	return found, nil
 }
 
-func waitServerAnsiblePingReady(targetAddress string, privateKeyPaths []string, timeout, interval time.Duration) error {
+func waitServerAnsiblePingReady(targetAddress string, privateKeyPaths []string, remoteUser string, timeout, interval time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	var lastErr error
 	for {
-		if err := runServerAnsiblePing(targetAddress, privateKeyPaths); err == nil {
+		if err := runServerAnsiblePing(targetAddress, privateKeyPaths, remoteUser); err == nil {
 			return nil
 		} else {
 			lastErr = err
@@ -322,13 +323,14 @@ func waitServerAnsiblePingReady(targetAddress string, privateKeyPaths []string, 
 	}
 }
 
-func runServerAnsiblePing(targetAddress string, privateKeyPaths []string) error {
+func runServerAnsiblePing(targetAddress string, privateKeyPaths []string, remoteUser string) error {
 	args := []string{
 		"all",
 		"-i", targetAddress + ",",
 		"-m", "ping",
 	}
 	args = append(args, serverAnsiblePrivateKeyCLIArgs(privateKeyPaths)...)
+	args = append(args, serverAnsibleRemoteUserCLIArgs(remoteUser)...)
 	cmd := serverAnsibleExecCommand("ansible", args...)
 	cmd.Env = serverAnsibleCommandEnv(privateKeyPaths)
 	output, err := cmd.CombinedOutput()
@@ -342,12 +344,13 @@ func runServerAnsiblePing(targetAddress string, privateKeyPaths []string) error 
 	return nil
 }
 
-func runServerAnsiblePlaybook(playbookPath, inventoryPath string, privateKeyPaths []string, extraArgs *[]string) error {
+func runServerAnsiblePlaybook(playbookPath, inventoryPath string, privateKeyPaths []string, remoteUser string, extraArgs *[]string) error {
 	args := []string{
 		"-i", inventoryPath,
 		playbookPath,
 	}
 	args = append(args, serverAnsiblePrivateKeyCLIArgs(privateKeyPaths)...)
+	args = append(args, serverAnsibleRemoteUserCLIArgs(remoteUser)...)
 	if extraArgs != nil {
 		expandedArgs, err := expandServerAnsibleExtraArgs(*extraArgs)
 		if err != nil {
@@ -363,6 +366,33 @@ func runServerAnsiblePlaybook(playbookPath, inventoryPath string, privateKeyPath
 		return fmt.Errorf("ansible-playbook failed: %w", err)
 	}
 	return nil
+}
+
+// serverAnsibleRemoteUser は、cloud-init が公開鍵を登録する spec.auth のユーザー
+// (user、無ければ users の先頭)を返す。未指定なら空文字を返し、ansible の既定動作に任せる。
+func serverAnsibleRemoteUser(server api.Server) string {
+	auth := server.Spec.Auth
+	if auth == nil {
+		return ""
+	}
+	if user := optionalTrimmedString(auth.User); user != "" {
+		return user
+	}
+	if auth.Users != nil {
+		for _, user := range *auth.Users {
+			if trimmed := strings.TrimSpace(user); trimmed != "" {
+				return trimmed
+			}
+		}
+	}
+	return ""
+}
+
+func serverAnsibleRemoteUserCLIArgs(remoteUser string) []string {
+	if remoteUser == "" {
+		return nil
+	}
+	return []string{"-u", remoteUser}
 }
 
 // serverAnsiblePrivateKeyCLIArgs は、鍵候補が1件のときだけ --private-key を使う。
