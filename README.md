@@ -43,7 +43,7 @@ NAME        NODE      STATUS    CPU  RAM(MB)  IP-ADDRESS     NETWORK       AGE
 ----        ----      ------    ---  -------  ----------     -------       ---
 server-20   marmot3   RUNNING   1    1024     192.168.1.20   host-bridge   5s
 
-$ mactl ssh ubuntu@server-20 -- -i vmkey      # DNS 設定なしで、サーバー名のまま SSH
+$ mactl ssh -i vmkey ubuntu@server-20       # DNS 設定なしで、サーバー名のまま SSH
 ubuntu@server-20:~$
 ```
 
@@ -95,7 +95,7 @@ Kubernetes のコンテナ基盤は画期的ですが、導入や運用は複雑
 | **宣言的な運用** | YAML 宣言（サーバー・ネットワーク・ボリュームを1ファイルで定義） / リソースコントローラーによる自動実行（「あるべき姿」を書くだけ） / OpenAPI v3 REST API で完全制御 |
 | **仮想マシン** | Cloud Image で OS インストール不要・即時作成 / マルチホーム（1 VM に複数ネットワーク） / ノードセレクターによるクラスタ内の配置制御 |
 | **ストレージ** | ローカル（LVM / QCOW2） / iSCSI ネットワークブロック（LVM を iSCSI ターゲット化） / Ceph RBD（`hdd` / `ssd` / `nvme` クラス別プール） |
-| **ネットワーク** | ホストブリッジ / OVN・OVS・Geneve オーバーレイ / 内部 DNS（VM 名の自動解決） / OpenVPN ゲートウェイ（PC ⇔ VM 用プライベートネットワーク） |
+| **ネットワーク** | ホストブリッジ / OVN・OVS・Geneve オーバーレイ / 内部 DNS（VM 名の自動解決） / OpenVPN ゲートウェイ（PC ⇔ VM 用プライベートネットワーク）/ NATゲートウェイ |
 | **ロードバランサー** | Application LB（HAProxy ベース L7、VM として自動デプロイ） / Network LB（iptables ベース L4） |
 | **Kubernetes** | **MKE (Marmot Kubernetes Engine)**：ノード数・CPU/メモリ・CNI（Cilium 選択可）・外部接続ネットワークを宣言するだけで、コントロールプレーン、ワーカー、専用 LB、Ceph ストレージ連携まで自動構築 |
 | **運用・セキュリティ** | etcd によるクラスター状態管理 / RBAC（Administrator・Compute-Operator・Viewer など） / OpenTelemetry メトリクス（Prometheus エクスポーター）と Loki へのログ転送 |
