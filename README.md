@@ -4,65 +4,173 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/takara9/marmot.svg)](https://pkg.go.dev/github.com/takara9/marmot)
 [![GitHub stars](https://img.shields.io/github/stars/takara9/marmot?style=social)](https://github.com/takara9/marmot/stargazers)
 
-
 # Marmot — 1台のサーバーから始められる、Kubernetes対応のシンプルなプライベートクラウド
 
-Marmot（マーモット）は、シンプルなYAMLで仮想サーバー、ネットワーク、ストレージを管理できるプライベートクラウド基盤です。Kubernetesライクな宣言型APIを採用し、学習・検証環境から実運用まで、迅速かつ再現性の高いインフラ構築を実現します。
+**YAML を書いて `mactl create -f` するだけで** 「仮想サーバー」、「仮想ネットワーク」、「ストレージ」、そして 「Kubernetes クラスタ」、「NLB/ALB」までが、数分で手元の Linux サーバー 1台上で手に入ります。
 
-![マーモットのイメージキャラ](docs/marmot-logo-quarter.png)
+*English: Marmot is a simple, declarative private cloud built on KVM. Define VMs, networks, volumes and even Kubernetes clusters in YAML, and run them from a single Ubuntu server.*
 
-## 紹介動画
+[![5分で作れる自分専用プライベートクラウド OSS Marmot の紹介](https://img.youtube.com/vi/_Tw939fc54M/hqdefault.jpg)](https://www.youtube.com/watch?v=_Tw939fc54M)
 
-[5分で作れる自分専用プライベートクラウド OSS Marmot の紹介](https://www.youtube.com/watch?v=_Tw939fc54M)
+---
 
-## コンセプト
+## 30秒でわかる Marmot
 
-利用者は、Kubernetesのマニフェストを書く感覚で仮想マシンを管理できます。しかし、Kubernetesのような複雑な概念や高い学習コストは、必要ありません。シンプルで理解しやすいYAMLを記述するだけで、仮想サーバー、ネットワーク、ストレージを宣言的に管理できます。[Marmotマニフェスト集](https://github.com/takara9/marmot-manifests)を参考にすれば、Linuxをインストールした1台のマシンから始めて、プライベートネットワークの構築、仮想ストレージの確保、仮想サーバーの展開までを数分で実現できます。複雑な設定作業に悩まされることなく、学習、検証、実験に集中できます。
-
+Kubernetes のマニフェストを書く感覚で、仮想マシンを作ります。
 
 ```yaml
-apiVersion:
-kind:
+# server-20.yaml
+apiVersion: v1
+kind: Server
+metadata:
+    name: server-20
 spec:
+    cpu: 1
+    memory: 1024
+    mmImage: ubuntu24.04
+    auth:
+        publicKey: "ssh-ed25519 AAAA... For marmot VMs"   # 自分の公開鍵
+        users:
+         - ubuntu
+    networkInterface:
+        - networkname: host-bridge
 ```
 
-Marmotは、複雑化し続けるインフラ運用をシンプルにするためのプライベートクラウド基盤です。パブリッククラウドのコスト増大、高額なVMwareライセンス、GUI依存の運用、そしてOpenStackの重厚なアーキテクチャに代わり、シンプルなYAMLによるIaCを中心とした運用モデルを提供します。Ansibleによる自動構成管理やコンテナとの連携を標準化し、小規模なチームでも効率的にクラウド基盤を構築・運用できる世界を目指します。
+```console
+$ mactl create -f server-20.yaml
+$ mactl get server
+NAME        NODE      STATUS    CPU  RAM(MB)  IP-ADDRESS     NETWORK       AGE
+----        ----      ------    ---  -------  ----------     -------       ---
+server-20   marmot3   RUNNING   1    1024     192.168.1.20   host-bridge   5s
 
-Marmotは、プライベートクラウド運用をよりシンプルにし、Infrastructure as Codeを誰もが実践できる環境を目指しています。
+$ mactl ssh ubuntu@server-20 -- -i vmkey      # DNS 設定なしで、サーバー名のまま SSH
+ubuntu@server-20:~$
+```
 
+さらに、Kubernetes クラスタも YAML 1枚です。
 
-## 技術的特徴
-**marmot**に実装した魅力的な特徴を以下に列挙します。この複合的で統合された環境を**marmot**をインストールすることで手に入れることができます。
+```console
+$ mactl create -f mke0.yaml                    # 3ノードの Kubernetes クラスタを自動構築
+$ mactl get mke mke0 --download                # kubeconfig を取得
+$ kubectl get node
+NAME              STATUS   ROLES    AGE     VERSION
+mke-mke0-node-1   Ready    <none>   2m43s   v1.36.4
+mke-mke0-node-2   Ready    <none>   113s    v1.36.4
+mke-mke0-node-3   Ready    <none>   65s     v1.36.4
+```
 
-- **YAML ベースの宣言的構成** — サーバー・ネットワーク・ボリュームをファイル一枚で定義
-- **OpenAPI v3 REST API** — `marmotd` サーバーを API で完全制御
-* **リソースコントローラーによる自動化** — 利用者は「どうなっていてほしいか」をYAMLで記述するだけ。Marmotが仮想マシンやネットワークの作成・変更を自動的に実行します。
-- **Cloud Image による仮想マシン** — Ubuntuなどが提供するCloud Imageを利用して、OSインストールの手間なく仮想マシンを即座に作成できます。
-- **iSCSI ネットワークブロックストレージ** — LVM ボリュームを iSCSI ターゲットとして VM にアタッチ可能
-- **ローカルブロックストレージ** — LVM / QCOW2 を利用した高速にアクセスできるストレージをVM にアタッチ可能
-- **Ceph RBD ブロックストレージ** — Ceph プールをバックエンドにした Volume を作成し、VM にアタッチ可能
-- **仮想ネットワーク管理** — ホストブリッジ、OVN/OVS/Geneve オーバーレイ・ネットワークをサポート
-- **マルチホーム対応** — 1 台の VM に複数の仮想ネットワークを割り当て可能
-- **ノードセレクター** — marmotクラスタ環境では、複数のMarmotノードから指定ノードへVMを 配置制御可能
-- **etcd による状態管理** — Kubernetesで実績のあるetcdを利用し、クラスター全体の状態を安全かつ一貫性のある形で管理します。
-- **内部 DNS** — VM に対する名前解決を自動提供
-- **OpenVPN ゲートウェイ** — VPN Gateway リソースで、PCとVM用プライベートネットワーク間を暗号化接続
-- **Application Load Balancer** — HAProxy ベースの L7 ロードバランサーを VM として自動デプロイ
-- **Network Load Balancer** — iptables ベースの L4 ロードバランサーで仮想ネットワーク内トラフィックを分散
-- **OpenTelemetry メトリクス** — Prometheus エクスポーターによる可観測性を標準提供, Loki へのログ転送も標準装備
-- **RBAC によるアクセス制御** — Administrator / Compute-Operator / Viewer などのロールベースで API 操作を制限
-- **MKE (Marmot Kubernetes Engine)** — 抽象化されたYAMLからKubernetesクラスタを構築・運用できる専用コントローラー
-- **ゲストOS Ubuntu Linux 22.04/24.04/26.04, Alpine Linux 3.23, Rocky Linux 8/9/10, AlmaLinux 8/9/10, Debian Linux 11/12/13, Windows Server 2022/2025 サポート**
-- **ホストOS Ubuntu 24.04 サポート**
+> `kubectl` の `create` / `get` / `delete` に慣れた方なら、`mactl` はほぼ説明不要です。
 
+---
+
+## こんな方におすすめ
+
+| あなたの状況 | Marmot でできること |
+|---|---|
+| 自宅ラボ・検証用に、複数の VM を手軽に立ち上げ直したい | YAML で定義し、作成・削除を何度でも再現できる |
+| Kubernetes を学習・検証したいが、環境構築に時間を取られたくない | **MKE** で、YAML 1枚から Kubernetes クラスタを構築 |
+| パブリッククラウドのコストや VMware ライセンスを見直したい | 手元のサーバーで動く OSS（GPL-3.0）のプライベートクラウド |
+| OpenStack は重い、GUI 中心の運用は避けたい | 少数のコンポーネントと CLI / REST API による IaC 運用 |
+| 小規模チームで、Ansible と組み合わせた構成管理をしたい | `mactl` が Ansible と連携して起動後の VM をセットアップ |
+
+## なぜ Marmot？
+
+インフラ運用は複雑になり続けています。Marmot は、その課題に対する次の答えです。
+
+| 課題 | Marmot のアプローチ |
+|---|---|
+| パブリッククラウドのコスト増大 | 手元の **Linux 1台** から始められる |
+| 高額な VMware ライセンス | **OSS (GPL-3.0)**。KVM / libvirt / OVN など実績ある OSS の組み合わせ |
+| GUI 依存の運用 | **YAML による IaC**。変更履歴を Git で管理できる |
+| OpenStack の重厚なアーキテクチャ | 本当に必要な機能に集中し、**学習コストを最小化** |
+
+Kubernetes のコンテナ基盤は画期的ですが、導入や運用は複雑になりがちです。Marmot は **宣言型運用の良さだけを取り入れ**、「プライベートクラウドをもっとシンプルに」を目指しています。
+
+---
+
+## 主な機能
+
+| 分野 | 機能 |
+|---|---|
+| **宣言的な運用** | YAML 宣言（サーバー・ネットワーク・ボリュームを1ファイルで定義） / リソースコントローラーによる自動実行（「あるべき姿」を書くだけ） / OpenAPI v3 REST API で完全制御 |
+| **仮想マシン** | Cloud Image で OS インストール不要・即時作成 / マルチホーム（1 VM に複数ネットワーク） / ノードセレクターによるクラスタ内の配置制御 |
+| **ストレージ** | ローカル（LVM / QCOW2） / iSCSI ネットワークブロック（LVM を iSCSI ターゲット化） / Ceph RBD（`hdd` / `ssd` / `nvme` クラス別プール） |
+| **ネットワーク** | ホストブリッジ / OVN・OVS・Geneve オーバーレイ / 内部 DNS（VM 名の自動解決） / OpenVPN ゲートウェイ（PC ⇔ VM 用プライベートネットワーク） |
+| **ロードバランサー** | Application LB（HAProxy ベース L7、VM として自動デプロイ） / Network LB（iptables ベース L4） |
+| **Kubernetes** | **MKE (Marmot Kubernetes Engine)**：ノード数・CPU/メモリ・CNI（Cilium 選択可）・外部接続ネットワークを宣言するだけで、コントロールプレーン、ワーカー、専用 LB、Ceph ストレージ連携まで自動構築 |
+| **運用・セキュリティ** | etcd によるクラスター状態管理 / RBAC（Administrator・Compute-Operator・Viewer など） / OpenTelemetry メトリクス（Prometheus エクスポーター）と Loki へのログ転送 |
+
+**対応OS**
+
+| 区分 | 対応 |
+|---|---|
+| ホスト OS | Ubuntu 24.04 |
+| ゲスト OS | Ubuntu 22.04 / 24.04 / 26.04、Alpine 3.23、Rocky Linux 8 / 9 / 10、AlmaLinux 8 / 9 / 10、Debian 11 / 12 / 13, Windows Server 2022 / 2025  |
+
+## アーキテクチャ
+
+```mermaid
+flowchart LR
+    U["mactl (CLI) / REST API<br/>YAML マニフェスト"] --> D["marmotd<br/>(ハイパーバイザーノード上のデーモン)"]
+    D --> E[("etcd<br/>クラスター状態")]
+    D --> V["libvirt / KVM / QEMU<br/>仮想マシン"]
+    D --> S["LVM / iSCSI / Ceph RBD<br/>ストレージ"]
+    D --> N["OVN / Open vSwitch<br/>仮想ネットワーク"]
+```
+
+| コンポーネント | 説明 |
+|---|---|
+| `marmotd` | ハイパーバイザーノード上で動作するデーモン。libvirt / LVM / OVN(OVS) を操作して VM を管理する |
+| `mactl` | CLI クライアント。YAML ファイルまたは URL を指定して、サーバー・ネットワーク・ボリュームなどを操作する |
+| `maadm` | 管理者向け補助ツール（改修中のため使用は非推奨） |
+
+---
 
 ## クイックスタート
-インストールして利用する前に、このパートで使用体験を感じてみてください。
 
-### ログイン
+Ubuntu 24.04 のサーバーが1台あれば、約4ステップで VM と Kubernetes クラスタまで体験できます。
 
-`marmotd` への接続は認証が必要です。初期管理者アカウント（`admin`）でログインします。
-インストール直後のパスワードは、`passw0rd`ですので、下記の手順で変更してください。
+
+## 0. 動作環境を確認する
+
+- Ubuntu Linux 24.04 がインストールされていること
+- ルート `/` に 3GB 程度の空きがあること（依存モジュール約 1.2GB をインストールします）
+- `/var/lib/marmot` に 30GB 程度の空きがあること（OS イメージ取得に約 2GB、VM 1台の起動に 16GB を消費します）
+- CPU の仮想化支援機能（Intel VT-x / AMD-V）が有効であること
+
+## 1. インストールする
+
+
+[![Marmotのインストール動画](https://img.youtube.com/vi/GoVrP9sq2tI/maxresdefault.jpg)](https://www.youtube.com/watch?v=GoVrP9sq2tI)
+
+文字が潰れて見えない時は、歯車マークをクリックして、画質を高くしてご覧ください。
+
+
+
+[Releases](https://github.com/takara9/marmot/releases) の最新版 `.deb` をインストールします。
+
+```bash
+cd /tmp
+apt-get update
+VERSION=0.37.0    # 最新バージョンは Releases で確認してください
+curl -OL https://github.com/takara9/marmot/releases/download/v${VERSION}/marmot_v${VERSION}_amd64.deb
+sudo apt install -y ./marmot_v${VERSION}_amd64.deb
+```
+
+サーバーと通信できているか確認します。Server と Client の両方のバージョンが表示されれば成功です。
+
+```console
+$ mactl version
+Server version = 0.37.0
+Client version = 0.37.0
+```
+
+設定は `/etc/marmot/marmotd.json-sample` と `/etc/marmot/mke.json-sample` を参考に行ってください。
+詳しい手順： [シングル構成](docs/HOWTO-install-marmot.md) / [クラスタ構成](docs/HOWTO-install-marmot-cluster.md)
+
+## 2. ログインする
+
+初期管理者アカウントは `admin`、初期パスワードは `passw0rd` です。**初回ログイン時にパスワード変更が必要です。**
 
 ```console
 $ mactl login admin
@@ -70,19 +178,11 @@ Password: ＜パスワードを入力＞
 Successfully logged in as admin
 ⚠️  You must change your password before using other commands.
    Run: mactl passwd
-```
 
-初回ログイン時はパスワード変更を求められます。`mactl passwd` で変更してください。
-
-```console
 $ mactl passwd
 Current Password: ＜現在のパスワードを入力＞
 New Password:     ＜新しいパスワードを入力（英数字 8 文字以上）＞
-```
 
-ログイン中のユーザー情報は `mactl whoami` で確認できます。
-
-```console
 $ mactl whoami
 User:  admin
 Roles: [Administrator]
@@ -90,22 +190,14 @@ Roles: [Administrator]
 
 セッションを終了するときは `mactl logout` を実行します。
 
-```console
-$ mactl logout
-Successfully logged out
-```
+## 3. 仮想サーバーを作る
 
-### 仮想サーバーの作成
+SSH 鍵ペアを作成し、公開鍵を埋め込んだマニフェストを生成します。そのままコピー＆ペーストで動きます。
 
-sshの鍵ペアを準備して、公開鍵を表示します。
-```console
-$ ssh-keygen -t ed25519 -f ./vmkey -C "For marmot VMs" -N ""
-$ cat ./vmkey.pub 
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGAAL3eo+VgR6pj9eGuz62rBp/wbs4dSp3XljqBBymnW For marmot VMs
-```
-仮想サーバーを起動するため、上記で作成した公開鍵をspec.auth.publicKeyに貼り付けたマニフェストを準備します。
+```bash
+ssh-keygen -t ed25519 -f ./vmkey -C "For marmot VMs" -N ""
 
-```yaml
+cat > server-20.yaml <<EOF
 apiVersion: v1
 kind: Server
 metadata:
@@ -116,93 +208,51 @@ spec:
     memory: 1024
     mmImage: ubuntu24.04
     auth:
-        publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGAAL3eo+VgR6pj9eGuz62rBp/wbs4dSp3XljqBBymnW For marmot VMs"
+        publicKey: "$(cat ./vmkey.pub)"
         users:
-         - ubuntu       
+         - ubuntu
     networkInterface:
         - networkname: host-bridge  # marmot のサーバーが接続されるネットワーク
+EOF
 ```
 
-注) `networkname=host-bridge` の時に設定するデフォルト値は、/etc/marmot/marmotd.josn に設定しておく必要があります。
+> `networkname: host-bridge` を使う場合、デフォルト値を `/etc/marmot/marmotd.json` に設定しておく必要があります。
 
-
-### 仮想サーバーの作成
-
-次のKubernetesライクなコマンドで、仮想サーバーを起動できます。
-環境により、しばらく時間が必要なことがあります。
+作成・確認・ログイン・削除は、次のとおりです。初回は OS イメージの取得のため、少し時間がかかることがあります。
 
 ```console
-# サーバーの作成
-$ mactl create -f server-20.yaml 
+$ mactl create -f server-20.yaml                  # 作成
 
-# 起動の確認
-$ mactl get server
-NAME             NODE          STATUS        CPU  RAM(MB)  IP-ADDRESS       NETWORK          AGE
-----             ----          ------        ---  -------  ----------       -------          ---
-server-20        marmot3       RUNNING       1    1024     192.168.1.20     host-bridge      5s
+$ mactl get server                                # 確認
+NAME        NODE      STATUS    CPU  RAM(MB)  IP-ADDRESS     NETWORK       AGE
+----        ----      ------    ---  -------  ----------     -------       ---
+server-20   marmot3   RUNNING   1    1024     192.168.1.20   host-bridge   5s
 
-# sshでのログイン
-$ mactl ssh ubuntu@server-20 -- -i vmkey 
-ubuntu@server-20:~$ # ログイン後に、コマンドを実行してみて、お楽しみください。
+$ mactl ssh ubuntu@server-20 -- -i vmkey          # ログイン
 ubuntu@server-20:~$ exit
 
-# サーバーの削除
-$ mactl delete server server-20
-
-# サーバー名をカンマ区切って複数の仮想サーバーの削除も可能です
-$ mactl delete server server-20
+$ mactl delete server server-20                   # 削除（server-20,server-21 のようにカンマ区切りで複数指定も可能）
 ```
 
-`mactl ssh` を使うと、DNSを設定することなく、サーバー名で、sshログインできます。
+**`mactl ssh` について**：DNS を設定せずに、サーバー名で SSH ログインできます。
 
+```
 mactl [mactlのフラグ] ssh [USER@]SERVER-NAME -- [SSH-ARGS...]
+```
 
-内部DNSは `server-name.network-name` 形式に加えて、`marmotd` ごとのサブドメイン付きFQDNにも対応しています。
+内部 DNS は `サーバー名.ネットワーク名` に加え、`marmotd` ごとのサブドメイン付き FQDN にも対応しています。
 
 - 例1: `server1.host-bridge`
 - 例2: `server1.host-bridge.marmot1.labo.local`
 
-
-### Ceph ボリュームの作成（オプション）
-
-事前の準備として、[Cephの仮想サーバー](https://github.com/takara9/marmot-manifests/tree/main/56-ceph-single-node)を起動して、Cephのサーバーを準備しておきます。
-Marmot は `type: ceph` の Volume をサポートしています。`storageClass`（`hdd` / `ssd` / `nvme`）に応じて、`marmotd` が Ceph プールを選択します。
-
-```yaml
-apiVersion: v1
-kind: Volume
-metadata:
-    name: data-ceph-01
-spec:
-    kind: data
-    type: ceph
-    size: 20
-    storageClass: ssd
-```
-
-```console
-# 作成
-$ mactl create -f volume-ceph.yaml
-
-# 確認
-$ mactl get volume
-
-# 削除
-$ mactl delete volume data-ceph-01
-```
-
-注: `type: ceph` を利用する場合、`marmotd` 側で `ceph_enabled` と `ceph_pool_by_class` の設定が必要です（後述）。
-
-
-### Kubernetesクラスタの作成（MKE）
-
-MKE (Marmot Kubernetes Engine) を使うと、Kubernetesの詳細な知識がなくても、シンプルなYAML一枚でKubernetesクラスタを構築できます。ノード数やCPU/メモリなどのリソース、CNIプラグイン（Cilium選択可）、外部接続用ネットワークを宣言するだけで、コントロールプレーンからワーカーノード、専用ロードバランサー、Cephストレージ連携まで、`marmotd` が自動的に構築します。
+## 4. Kubernetes クラスタを作る（MKE）
 
 [![MKEのデモ動画](https://img.youtube.com/vi/Ozy6E7W0pHA/hqdefault.jpg)](https://www.youtube.com/watch?v=Ozy6E7W0pHA)
 
-文字が潰れて見えない時は、歯車マークをクリックして、画質を高くしてご覧ください。
+MKE (Marmot Kubernetes Engine) なら、Kubernetes の詳しい知識がなくても、YAML 1枚でクラスタが手に入ります。
 
-```yaml
+```bash
+cat > mke0.yaml <<EOF
 apiVersion: v1
 kind: KubernetesEngine
 metadata:
@@ -215,58 +265,44 @@ spec:
         cpu: 2
         memory: 4192
         auth:
-            publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGAAL3eo+VgR6pj9eGuz62rBp/wbs4dSp3XljqBBymnW For marmot VMs"
+            publicKey: "$(cat ./vmkey.pub)"
+EOF
 ```
 
-以下は、デプロイから kubectl コマンドの実行までの操作例です。
-
 ```console
-# クラスタの作成
-$ mactl create -f mke0.yaml
+$ mactl create -f mke0.yaml                       # クラスタの作成
 
-# 状態の確認
-$ mactl get mke
-NAME              VERSION   NODES   STATUS        AGE     
-----              -------   -----   ------        ---     
-mke0              1.36      3       RUNNING       3m   
+$ mactl get mke                                   # 状態の確認
+NAME   VERSION   NODES   STATUS    AGE
+----   -------   -----   ------    ---
+mke0   1.36      3       RUNNING   3m
 
-# KUBECONFIGのダウンロード
-$ mactl get mke mke0 --download
+$ mactl get mke mke0 --download                   # kubeconfig のダウンロード
 kubeconfig downloaded: /home/ubuntu/.kube/config
 
-# kubectl コマンドの実行
-$ kubectl get node
+$ kubectl get node                                # kubectl で操作
 NAME              STATUS   ROLES    AGE     VERSION
 mke-mke0-node-1   Ready    <none>   2m43s   v1.36.4
 mke-mke0-node-2   Ready    <none>   113s    v1.36.4
 mke-mke0-node-3   Ready    <none>   65s     v1.36.4
 
-# クラスタの削除
-$ mactl delete mke mke0
+$ mactl delete mke mke0                           # クラスタの削除
 ```
 
-Ceph CSIによるストレージ連携やロードバランサー連携など、詳細な設計は [docs/MEMO-marmot-kubernetes-engine.md](docs/MEMO-marmot-kubernetes-engine.md) を参照してください。
+Ceph CSI によるストレージ連携やロードバランサー連携など、詳細な設計は [docs/MEMO-marmot-kubernetes-engine.md](docs/MEMO-marmot-kubernetes-engine.md) を参照してください。
 
+## （オプション）Ceph ボリュームを使う
 
-## インストール
+`type: ceph` の Volume を VM にアタッチできます。`storageClass`（`hdd` / `ssd` / `nvme`）に応じて、`marmotd` が Ceph プールを選択します。
 
-[![Marmotのインストール動画](https://img.youtube.com/vi/GoVrP9sq2tI/maxresdefault.jpg)](https://www.youtube.com/watch?v=GoVrP9sq2tI)
+**事前準備**
 
-文字が潰れて見えない時は、歯車マークをクリックして、画質を高くしてご覧ください。
+- [Ceph の仮想サーバー](https://github.com/takara9/marmot-manifests/tree/main/56-ceph-single-node)を Marmot 上に起動しておく（Ceph サーバーの準備）
+- `marmotd` を実行するホストに `ceph-common` をインストールし、`ceph` / `rbd` コマンドが使えること
+- `/etc/ceph/ceph.conf` と `/etc/ceph/ceph.client.admin.keyring` が配置済みで、`marmotd` の実行ユーザーから読み取れること
+- Ceph 側で利用する pool を事前に作成しておくこと
 
-### 必要最小条件
-- Ubuntu Linux 24.04 がインストールされていること。
-- ルート`/`ファイルシステムが、3G程度空いていること。 marmotが依存モジュール 1.2GBほどが、インストールされます。
-- `/var/lib/marmot` が、30GB程度の空きがあること。（OSイメージ取得で約2GB、１台の仮想マシン起動で16GBを消費します。
-- `/etc/marmot/marmotd.json-sample`, `/etc/marmot/mke.json-sample` を参考にして、設定を実施してください。
-
-
-### Ceph 連携を使う場合の追加要件（オプション）
-- `marmotd` を実行するホストに `ceph-common` がインストールされ、`ceph` / `rbd` コマンドが利用可能であること。
-- `/etc/ceph/ceph.conf` と `/etc/ceph/ceph.client.admin.keyring` が配置済みで、`marmotd` 実行ユーザーから読み取り可能であること。
-- Ceph 側に利用する pool を事前作成しておくこと。
-
-`/etc/marmot/marmotd.json` の設定例:
+**`/etc/marmot/marmotd.json` の設定例**
 
 ```json
 {
@@ -279,101 +315,82 @@ Ceph CSIによるストレージ連携やロードバランサー連携など、
 }
 ```
 
-`ceph_pool_by_class` は配列形式で指定します。`storageClass` と pool の対応が未設定の場合、Ceph Volume 作成は失敗します。
+`ceph_pool_by_class` は配列形式で指定します。`storageClass` と pool の対応が未設定の場合、Ceph Volume の作成は失敗します。
 
+**Volume の作成**
 
-### deb パッケージのインストール
-
-[Releases](https://github.com/takara9/marmot/releases) から最新の `.deb` ファイルをダウンロードしてインストールします。
-
-```console
-cd /tmp
-apt-get update
-VERSION=0.30.0
-curl -OL https://github.com/takara9/marmot/releases/download/v${VERSION}/marmot_v${VERSION}_amd64.deb
-sudo apt install -y ./marmot_v${VERSION}_amd64.deb
+```yaml
+# volume-ceph.yaml
+apiVersion: v1
+kind: Volume
+metadata:
+    name: data-ceph-01
+spec:
+    kind: data
+    type: ceph
+    size: 20
+    storageClass: ssd
 ```
 
-実行結果に、Serverのバージョンが表示されれば、サーバーと正しく通信できていることになります。
-
 ```console
-$ mactl vesion
-Server version = 0.30.0
-Client version = 0.30.0
+$ mactl create -f volume-ceph.yaml     # 作成
+$ mactl get volume                     # 確認
+$ mactl delete volume data-ceph-01     # 削除
 ```
 
-詳しいインストール手順は、以下のドキュメントを参照してください。
-- [marmotd シングル構成](docs/HOWTO-install-marmot.md)
-- [marmotd クラスタ構成](docs/HOWTO-install-marmot-cluster.md)
+---
 
-## チュートリアル
-はじめて **marmot** を利用する方は、チュートリアルから始めるのがお勧めです。
-基本操作を把握できる 30分コースと、じっくり楽しめる2時間コースを用意しています。
+## 次のステップ
 
-- [Marmot Tutorial](https://github.com/takara9/marmot-manifests/blob/main/TUTORIAL.md)
-
-
-## 活用例
-**marmot** の利用法を確認できるマニフェスト集もあります。このマニフェスト集から、順番を選んでチュートリアルを作成しました。
-
-- [marmotマニフェスト集](https://github.com/takara9/marmot-manifests)
-
-
-## リファレンスマニュアル
-コマンドとサブコマンド、オプションについての知りたい時は、リファレンスマニュアルをお勧めします。
-
-- [Command Reference](https://github.com/takara9/marmot-manifests/blob/main/COMMAND_REFERENCE.md)
-
-
-## コンポーネント
-
-| コンポーネント | 説明 |
+| やりたいこと | リンク |
 |---|---|
-| `marmotd` | ハイパーバイザーノード上で動作するデーモン。LibVirt / LVM / OVN(OVS) を操作して VM を管理する |
-| `mactl` | CLI クライアント。YAML ファイルまたは URL を指定してサーバー・ネットワーク・ボリュームを操作する |
-| `maadm` | 管理者向け補助ツール（改修中のため使用は非推奨） |
+| まず手を動かして学びたい（30分コース / 2時間コース） | [Marmot Tutorial](https://github.com/takara9/marmot-manifests/blob/main/TUTORIAL.md) |
+| 実用的なマニフェストを眺めて真似したい | [Marmot マニフェスト集](https://github.com/takara9/marmot-manifests) |
+| コマンド・サブコマンド・オプションを調べたい | [Command Reference](https://github.com/takara9/marmot-manifests/blob/main/COMMAND_REFERENCE.md) |
+| クラスタ構成で運用したい | [marmotd クラスタ構成](docs/HOWTO-install-marmot-cluster.md) |
+| Kubernetes（MKE）の設計を知りたい | [MKE 設計メモ](docs/MEMO-marmot-kubernetes-engine.md) |
+| 質問・相談・アイデアを共有したい | [GitHub Discussions](https://github.com/takara9/marmot/discussions) |
 
+## プロジェクトの状況
+
+- バージョンは **v0.x（開発中）** です。機能追加と改善を継続しています。
+- ホスト OS は現在 **Ubuntu 24.04** に対応しています。
+- `maadm` は改修中のため、使用は推奨しません。
+
+不具合の報告や機能要望は [Issues](https://github.com/takara9/marmot/issues) へお寄せください。
 
 ## 主な利用技術
-**marmot**は、複数のOSS技術を利用して構成されています。現在、使用しているOSS技術を以下に列挙します。
 
-- [KVM / QEMU](https://www.linux-kvm.org/) — 仮想化
-- [LibVirt](https://libvirt.org/) — VM ライフサイクル管理
-- [OVN](https://www.ovn.org/) / [Open vSwitch](https://www.openvswitch.org/) — 仮想ネットワーク制御プレーン/データプレーン
-- [etcd](https://etcd.io/) — 分散 KV ストア（クラスター状態管理）
-- [LVM](https://sourceware.org/lvm2/) — 論理ボリューム管理
-- [open-iscsi / targetcli](https://github.com/open-iscsi/open-iscsi) — iSCSI ネットワークブロックストレージ
-- [Ceph](https://ceph.io/) — RBD を利用した分散ブロックストレージ
-- [OpenTelemetry](https://opentelemetry.io/ja/) — 可観測性のためのメトリックス公開、ログ送信のために使用
-- [Geneve protocl](https://www.redhat.com/ja/blog/what-geneve) — marmotdをクラスタ構成に使用するオーバーレイ・ネットワークに使用します。
-- [OpenVPN](https://openvpn.net/) — marmotd が管理するプライベートネットワークにセキュアに接続するために使用します。 
-- [Go言語](https://go.dev/) — **marmot**は、Go言語で書かれています。
-- [Ansible](https://docs.ansible.com/) — **mactl**コマンドは、Ansibleと連携して、起動した仮想サーバーをセットアップします。
+Marmot は、実績ある OSS の組み合わせで構成されています。
+
+| 技術 | 用途 |
+|---|---|
+| [KVM / QEMU](https://www.linux-kvm.org/) | 仮想化 |
+| [libvirt](https://libvirt.org/) | VM ライフサイクル管理 |
+| [OVN](https://www.ovn.org/) / [Open vSwitch](https://www.openvswitch.org/) | 仮想ネットワークの制御プレーン / データプレーン |
+| [Geneve](https://www.redhat.com/ja/blog/what-geneve) | クラスタ構成時のオーバーレイ・ネットワーク |
+| [etcd](https://etcd.io/) | 分散 KV ストア（クラスター状態管理） |
+| [LVM](https://sourceware.org/lvm2/) | 論理ボリューム管理 |
+| [open-iscsi / targetcli](https://github.com/open-iscsi/open-iscsi) | iSCSI ネットワークブロックストレージ |
+| [Ceph](https://ceph.io/) | RBD による分散ブロックストレージ |
+| [OpenTelemetry](https://opentelemetry.io/ja/) | メトリクス公開・ログ送信による可観測性 |
+| [OpenVPN](https://openvpn.net/) | プライベートネットワークへのセキュアな接続 |
+| [Ansible](https://docs.ansible.com/) | `mactl` と連携した、起動後の仮想サーバーのセットアップ |
+| [Go](https://go.dev/) | Marmot の実装言語 |
+
+## 貢献
+
+貢献を歓迎します。ガイドラインは [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
+Star ⭐ やフィードバックも、開発の大きな励みになります。
 
 ## ライセンス
 
 GNU General Public License v3.0 — 詳細は [LICENSE](LICENSE) を参照してください。
 
-## 貢献
+## 開発者について
 
-貢献を歓迎します。ガイドラインは [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
+Marmot は、30年以上にわたりエンタープライズシステム、仮想化基盤、クラウド技術に携わってきたインフラエンジニアが開発しています。大規模システムの構築・運用を経験した後、クラウド基盤を利用した開発とテクニカルセールスに従事する中で、Kubernetes とコンテナが画期的である反面、導入や運用が複雑化し、多くの利用者にとって扱いにくくなっていると感じてきました。Marmot は、その課題に対する一つの答えとして生まれました。
 
-## 開発者の経歴について
+> **「プライベートクラウドをもっとシンプルに。」**
 
-Marmotは、30年以上にわたりエンタープライズシステム、仮想化基盤、クラウド技術に携わってきたインフラエンジニアによって開発されています。
-
-長年にわたり、大規模システムの構築・運用を経験した後、クラウド基盤を利用した開発とテクニカルセールスに従事する中で、Kuberntesとコンテナは画期的な技術革新である反面、導入や運用が複雑化し、多くの利用者にとって扱いにくいものになっていると感じてきました。
-
-Marmotは、その課題に対する一つの答えとして生まれました。
-
-「プライベートクラウドをもっとシンプルに。」
-
-この理念のもと、Kubernetesの宣言型運用の良さを取り入れながら、より少ない学習コストで利用できるクラウド基盤を目指しています。
-
-Marmotは、複雑な仕組みを増やすのではなく、本当に必要な機能に集中し、学習・検証・実験から実運用まで幅広く活用できるプラットフォームとして進化を続けています。
-
-
-## 連絡先
-
-メンテナー: [takara9](https://github.com/takara9)  
-ご質問・議論は [GitHub Discussions](https://github.com/takara9/marmot/discussions) へ。
+メンテナー： [takara9](https://github.com/takara9)
