@@ -6,9 +6,11 @@
 
 # Marmot — 1台のサーバーから始められる、Kubernetes対応のシンプルなプライベートクラウド
 
-**YAML を書いて `mactl create -f` するだけで** 「仮想サーバー」、「仮想ネットワーク」、「ストレージ」、そして 「Kubernetes クラスタ」、「NLB/ALB」までが、数分で手元の Linux サーバー 1台上で手に入ります。
+**YAML を書いて `mactl create -f` するだけで** 「仮想サーバー」、「仮想ネットワーク」、「ストレージ」、そして 「Kubernetes クラスタ」、「NLB/ALB」までが、数分で手元の Linux サーバー 上で手に入ります。
 
-*English: Marmot is a simple, declarative private cloud built on KVM. Define VMs, networks, volumes and even Kubernetes clusters in YAML, and run them from a single Ubuntu server.*
+**Just write a YAML file and run `mactl create -f`** — and within minutes, you get "virtual servers," "virtual networks," "storage," and even "Kubernetes clusters" and "NLB/ALB," all running on your own Linux server.
+
+**只需编写 YAML 并执行 `mactl create -f`**，「虚拟服务器」、「虚拟网络」、「存储」，乃至「Kubernetes 集群」、「NLB/ALB」，数分钟内即可在您自己的 Linux 服务器上就绪。
 
 [![5分で作れる自分専用プライベートクラウド OSS Marmot の紹介](https://img.youtube.com/vi/_Tw939fc54M/hqdefault.jpg)](https://www.youtube.com/watch?v=_Tw939fc54M)
 
@@ -59,7 +61,7 @@ mke-mke0-node-2   Ready    <none>   113s    v1.36.4
 mke-mke0-node-3   Ready    <none>   65s     v1.36.4
 ```
 
-> `kubectl` の `create` / `get` / `delete` に慣れた方なら、`mactl` はほぼ説明不要です。
+`kubectl` の `create` / `get` / `delete` に慣れた方なら、`mactl` はほぼ説明不要です。
 
 ---
 
@@ -95,7 +97,7 @@ Kubernetes のコンテナ基盤は画期的ですが、導入や運用は複雑
 | **宣言的な運用** | YAML 宣言（サーバー・ネットワーク・ボリュームを1ファイルで定義） / リソースコントローラーによる自動実行（「あるべき姿」を書くだけ） / OpenAPI v3 REST API で完全制御 |
 | **仮想マシン** | Cloud Image で OS インストール不要・即時作成 / マルチホーム（1 VM に複数ネットワーク） / ノードセレクターによるクラスタ内の配置制御 |
 | **ストレージ** | ローカル（LVM / QCOW2） / iSCSI ネットワークブロック（LVM を iSCSI ターゲット化） / Ceph RBD（`hdd` / `ssd` / `nvme` クラス別プール） |
-| **ネットワーク** | ホストブリッジ / OVN・OVS・Geneve オーバーレイ / 内部 DNS（VM 名の自動解決） / OpenVPN ゲートウェイ（PC ⇔ VM 用プライベートネットワーク）/ NATゲートウェイ |
+| **ネットワーク** | ホストブリッジ / OVN・OVS・Geneve オーバーレイ / 内部 DNS（VM 名の自動解決） / OpenVPN ゲートウェイ（PC ⇔ VM 用プライベートネットワーク）/ GW (NATゲートウェイ) |
 | **ロードバランサー** | Application LB（HAProxy ベース L7、VM として自動デプロイ） / Network LB（iptables ベース L4） |
 | **Kubernetes** | **MKE (Marmot Kubernetes Engine)**：ノード数・CPU/メモリ・CNI（Cilium 選択可）・外部接続ネットワークを宣言するだけで、コントロールプレーン、ワーカー、専用 LB、Ceph ストレージ連携まで自動構築 |
 | **運用・セキュリティ** | etcd によるクラスター状態管理 / RBAC（Administrator・Compute-Operator・Viewer など） / OpenTelemetry メトリクス（Prometheus エクスポーター）と Loki へのログ転送 |
@@ -120,7 +122,7 @@ flowchart LR
 
 | コンポーネント | 説明 |
 |---|---|
-| `marmotd` | ハイパーバイザーノード上で動作するデーモン。libvirt / LVM / OVN(OVS) を操作して VM を管理する |
+| `marmotd` | Linuxサーバーで動作するデーモン。libvirt / LVM / OVN(OVS) を操作して 仮想サーバーなど を管理する |
 | `mactl` | CLI クライアント。YAML ファイルまたは URL を指定して、サーバー・ネットワーク・ボリュームなどを操作する |
 | `maadm` | 管理者向け補助ツール（改修中のため使用は非推奨） |
 
@@ -137,6 +139,8 @@ Ubuntu 24.04 のサーバーが1台あれば、約4ステップで VM と Kubern
 - ルート `/` に 3GB 程度の空きがあること（依存モジュール約 1.2GB をインストールします）
 - `/var/lib/marmot` に 30GB 程度の空きがあること（OS イメージ取得に約 2GB、VM 1台の起動に 16GB を消費します）
 - CPU の仮想化支援機能（Intel VT-x / AMD-V）が有効であること
+
+※ Marmotは、仮想化環境を制御するソフトウェアのため、Hyper-V, VirtualBoxなどの仮想環境上での利用は想定していません。
 
 ## 1. インストールする
 
@@ -292,6 +296,8 @@ $ mactl delete mke mke0                           # クラスタの削除
 Ceph CSI によるストレージ連携やロードバランサー連携など、詳細な設計は [docs/MEMO-marmot-kubernetes-engine.md](docs/MEMO-marmot-kubernetes-engine.md) を参照してください。
 
 ## （オプション）Ceph ボリュームを使う
+
+Marmotの仮想サーバーとして シングル構成の Ceph サーバーを簡単に自動セットアップできます。詳しくは[こちら](https://github.com/takara9/marmot-manifests/tree/main/56-ceph-single-node) をご覧ください。
 
 `type: ceph` の Volume を VM にアタッチできます。`storageClass`（`hdd` / `ssd` / `nvme`）に応じて、`marmotd` が Ceph プールを選択します。
 
