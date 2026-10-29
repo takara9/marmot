@@ -198,6 +198,10 @@ $ mactl delete volume data-ceph-01
 
 MKE (Marmot Kubernetes Engine) を使うと、Kubernetesの詳細な知識がなくても、シンプルなYAML一枚でKubernetesクラスタを構築できます。ノード数やCPU/メモリなどのリソース、CNIプラグイン（Cilium選択可）、外部接続用ネットワークを宣言するだけで、コントロールプレーンからワーカーノード、専用ロードバランサー、Cephストレージ連携まで、`marmotd` が自動的に構築します。
 
+[![MKEのデモ動画](https://img.youtube.com/vi/Ozy6E7W0pHA/hqdefault.jpg)](https://www.youtube.com/watch?v=Ozy6E7W0pHA)
+
+文字が潰れて見えない時は、歯車マークをクリックして、画質を高くしてご覧ください。
+
 ```yaml
 apiVersion: v1
 kind: KubernetesEngine
