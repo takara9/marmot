@@ -246,6 +246,10 @@ Ceph CSIによるストレージ連携やロードバランサー連携など、
 
 ## インストール
 
+[![Marmotのインストール動画](https://img.youtube.com/vi/GoVrP9sq2tI/maxresdefault.jpg)](https://www.youtube.com/watch?v=GoVrP9sq2tI)
+
+文字が潰れて見えない時は、歯車マークをクリックして、画質を高くしてご覧ください。
+
 ### 必要最小条件
 - Ubuntu Linux 24.04 がインストールされていること。
 - ルート`/`ファイルシステムが、3G程度空いていること。 marmotが依存モジュール 1.2GBほどが、インストールされます。
