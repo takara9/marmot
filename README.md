@@ -8,9 +8,9 @@
 
 **YAML を書いて `mactl create -f` するだけで** 「仮想サーバー」、「仮想ネットワーク」、「ストレージ」、そして 「Kubernetes クラスタ」、「NLB/ALB」までが、数分で手元の Linux サーバー 上で手に入ります。
 
-**Just write a YAML file and run `mactl create -f`** — and within minutes, you get "virtual servers," "virtual networks," "storage," and even "Kubernetes clusters" and "NLB/ALB," all running on your own Linux server.
+English: **Just write a YAML file and run `mactl create -f`** — and within minutes, you get "virtual servers," "virtual networks," "storage," and even "Kubernetes clusters" and "NLB/ALB," all running on your own Linux server.
 
-**只需编写 YAML 并执行 `mactl create -f`**，「虚拟服务器」、「虚拟网络」、「存储」，乃至「Kubernetes 集群」、「NLB/ALB」，数分钟内即可在您自己的 Linux 服务器上就绪。
+Chinese: **只需编写 YAML 并执行 `mactl create -f`**，「虚拟服务器」、「虚拟网络」、「存储」，乃至「Kubernetes 集群」、「NLB/ALB」，数分钟内即可在您自己的 Linux 服务器上就绪。
 
 [![5分で作れる自分専用プライベートクラウド OSS Marmot の紹介](https://img.youtube.com/vi/_Tw939fc54M/hqdefault.jpg)](https://www.youtube.com/watch?v=_Tw939fc54M)
 
@@ -113,7 +113,7 @@ Kubernetes のコンテナ基盤は画期的ですが、導入や運用は複雑
 
 ```mermaid
 flowchart LR
-    U["mactl (CLI) / REST API<br/>YAML マニフェスト"] --> D["marmotd<br/>(ハイパーバイザーノード上のデーモン)"]
+    U["mactl (CLI) / REST API<br/>YAML マニフェスト"] --> D["marmotd<br/>(Linuxサーバーのデーモン)"]
     D --> E[("etcd<br/>クラスター状態")]
     D --> V["libvirt / KVM / QEMU<br/>仮想マシン"]
     D --> S["LVM / iSCSI / Ceph RBD<br/>ストレージ"]
