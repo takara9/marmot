@@ -27,6 +27,7 @@ type controller struct {
 	client               *dns.Client
 	Upstream             string // 外部DNSサーバーのアドレス (例: "
 	allowedUpstreamCIDRs []netip.Prefix
+	domain               string // 自己ドメイン (例: "labo.local")
 }
 
 // StartInternalDNSServer はサーバーを非同期で開始し、制御構造体を返します。
@@ -56,6 +57,7 @@ func StartInternalDNSServer(ctx context.Context, node string, etcdUrl string, cf
 		db:                   m.Db,
 		etcdUrl:              etcdUrl,
 		Upstream:             cfg.DNSUpstream,
+		domain:               cfg.Domain,
 		client:               &dns.Client{Timeout: 5 * time.Second},
 		allowedUpstreamCIDRs: allowedUpstreamCIDRs,
 	}
@@ -190,6 +192,16 @@ func (c *controller) handleRequest(w dns.ResponseWriter, r *dns.Msg) {
 		return
 	}
 
+	// 自己ドメイン配下で etcd に無い名前は、上位DNSがこのドメインを marmot へ
+	// 転送し返す構成で転送ループになるため、転送せず NXDOMAIN で即答する
+	if isInOwnDomain(q.Name, c.domain) {
+		m := new(dns.Msg)
+		m.SetReply(r)
+		m.Rcode = dns.RcodeNameError
+		_ = w.WriteMsg(m)
+		return
+	}
+
 	// etcd にない場合は外部へ転送
 	if !shouldForwardUpstream(w.RemoteAddr(), c.allowedUpstreamCIDRs) {
 		m := new(dns.Msg)
@@ -206,6 +218,17 @@ func (c *controller) handleRequest(w dns.ResponseWriter, r *dns.Msg) {
 		return
 	}
 	_ = w.WriteMsg(reply)
+}
+
+// isInOwnDomain は qname が自己ドメイン(domain)自身またはその配下かを返す。
+// domain が空の場合は常に false。
+func isInOwnDomain(qname, domain string) bool {
+	domain = strings.ToLower(strings.Trim(strings.TrimSpace(domain), "."))
+	if domain == "" {
+		return false
+	}
+	name := strings.ToLower(strings.TrimSuffix(qname, "."))
+	return name == domain || strings.HasSuffix(name, "."+domain)
 }
 
 func decodeDNSRecordIP(raw []byte) (net.IP, string, error) {
