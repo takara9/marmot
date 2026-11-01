@@ -11,6 +11,8 @@ import (
 func (d *Database) PutDnsEntry(hostname, subdomain, ipAddress string) error {
 	slog.Debug("Putting DNS entry", "hostname", hostname, "ipAddress", ipAddress)
 
+	hostname = strings.ToLower(hostname)
+	subdomain = strings.ToLower(subdomain)
 	lockKey := "/lock/dns/" + subdomain + "/" + hostname
 	mutex, err := d.LockKey(lockKey)
 	if err != nil {
@@ -32,6 +34,8 @@ func (d *Database) GetDnsEntry(hostname, subdomain string) (string, error) {
 	slog.Debug("Getting DNS entry", "hostname", hostname, "subdomain", subdomain)
 
 	var ipAddress string
+	hostname = strings.ToLower(hostname)
+	subdomain = strings.ToLower(subdomain)
 	key := InternalDNSPrefix + "/" + subdomain + "/" + hostname
 	if _, err := d.GetJSON(key, &ipAddress); err != nil {
 		return "", err
@@ -42,6 +46,8 @@ func (d *Database) GetDnsEntry(hostname, subdomain string) (string, error) {
 // ホスト名とドメイン名で、エントリーを削除する。
 func (d *Database) DeleteDnsEntryByName(hostname, subdomain string) error {
 	slog.Debug("Deleting DNS entry by name", "hostname", hostname)
+	hostname = strings.ToLower(hostname)
+	subdomain = strings.ToLower(subdomain)
 	lockKey := "/lock/dns/" + subdomain + "/" + hostname
 	mutex, err := d.LockKey(lockKey)
 	if err != nil {
@@ -68,7 +74,7 @@ func (d *Database) UpdateDnsEntry(hostname string, ipAddress string) error {
 // fqdnToInternalDNSKey は完全修飾ドメイン名(FQDN)を、pkg/internal-dns の
 // DomainToMarmotPath と整合する階層キー(ラベルを逆順にして"/"で結合)に変換する。
 func fqdnToInternalDNSKey(fqdn string) string {
-	trimmed := strings.TrimSuffix(strings.TrimSpace(fqdn), ".")
+	trimmed := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(fqdn), "."))
 	labels := strings.Split(trimmed, ".")
 	for i, j := 0, len(labels)-1; i < j; i, j = i+1, j-1 {
 		labels[i], labels[j] = labels[j], labels[i]
