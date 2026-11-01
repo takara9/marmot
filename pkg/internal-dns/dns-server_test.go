@@ -277,6 +277,30 @@ func TestParseAllowedUpstreamCIDRs(t *testing.T) {
 	}
 }
 
+func TestIsInOwnDomain(t *testing.T) {
+	tests := []struct {
+		name   string
+		qname  string
+		domain string
+		want   bool
+	}{
+		{name: "subdomain host", qname: "vm1.labo.local.", domain: "labo.local", want: true},
+		{name: "multi level", qname: "svc.ns.cluster.hv0.labo.local.", domain: "labo.local", want: true},
+		{name: "domain itself", qname: "labo.local.", domain: "labo.local", want: true},
+		{name: "case insensitive", qname: "VM1.Labo.Local.", domain: "labo.local.", want: true},
+		{name: "other domain", qname: "www.example.com.", domain: "labo.local", want: false},
+		{name: "suffix without label boundary", qname: "xlabo.local.", domain: "labo.local", want: false},
+		{name: "domain unset", qname: "vm1.labo.local.", domain: "", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isInOwnDomain(tt.qname, tt.domain); got != tt.want {
+				t.Fatalf("isInOwnDomain(%q, %q) = %v, want %v", tt.qname, tt.domain, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseDNSUpstreamAllowCIDRs(t *testing.T) {
 	tests := []struct {
 		name        string

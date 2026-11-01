@@ -85,6 +85,11 @@ type MarmotdConfig struct {
 	// 例: "hv1"
 	NodeName string `json:"node_name"`
 
+	// marmot が管理する自己ドメイン。内部DNSはこの配下で etcd に無い名前を
+	// 上位DNSへ転送せず NXDOMAIN で応答する。空の場合は従来どおり転送する。
+	// 例: "labo.local"
+	Domain string `json:"domain"`
+
 	// etcd のエンドポイント URL
 	// 例: "http://127.0.0.1:2379"
 	EtcdURL string `json:"etcd_url"`
