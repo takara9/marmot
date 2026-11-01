@@ -28,6 +28,7 @@ type controller struct {
 	Upstream             string // 外部DNSサーバーのアドレス (例: "
 	allowedUpstreamCIDRs []netip.Prefix
 	domain               string // 自己ドメイン (例: "labo.local")
+	lookupDNSRecord      func(context.Context, string) ([]byte, bool, error)
 }
 
 // StartInternalDNSServer はサーバーを非同期で開始し、制御構造体を返します。
@@ -149,19 +150,32 @@ func (c *controller) handleRequest(w dns.ResponseWriter, r *dns.Msg) {
 	defer cancel()
 
 	foundInEtcd := false
+	lookupDNSRecord := c.lookupDNSRecord
+	if lookupDNSRecord == nil {
+		lookupDNSRecord = func(ctx context.Context, key string) ([]byte, bool, error) {
+			resp, err := c.db.Cli.Get(ctx, key)
+			if err != nil {
+				return nil, false, err
+			}
+			if len(resp.Kvs) == 0 {
+				return nil, false, nil
+			}
+			return resp.Kvs[0].Value, true, nil
+		}
+	}
 	for _, etcdKey := range lookupKeys {
-		resp, err := c.db.Cli.Get(ctx, etcdKey)
+		value, found, err := lookupDNSRecord(ctx, etcdKey)
 		if err != nil {
 			slog.Error("検索の失敗 Failed to query etcd", "err", err)
 			dns.HandleFailed(w, r)
 			return
 		}
 
-		if len(resp.Kvs) == 0 {
+		if !found {
 			continue
 		}
 
-		ip, ipStr, err := decodeDNSRecordIP(resp.Kvs[0].Value)
+		ip, ipStr, err := decodeDNSRecordIP(value)
 		if err != nil {
 			slog.Error("Failed to decode DNS record", "err", err, "key", etcdKey)
 			dns.HandleFailed(w, r)
@@ -291,7 +305,14 @@ func shouldForwardUpstream(remoteAddr net.Addr, allowedCIDRs []netip.Prefix) boo
 // DomainToMarmotPath はドメイン名を /marmot/dns/ 形式のパスに変換します
 func DomainToMarmotPath(domain string) string {
 	parts := splitDomainLabels(domain)
+	for i := range parts {
+		parts[i] = strings.ToLower(parts[i])
+	}
+	return domainLabelsToMarmotPath(parts)
+}
 
+func domainLabelsToMarmotPath(parts []string) string {
+	parts = append([]string(nil), parts...)
 	// スライスの要素を逆順に入れ替え
 	for i, j := 0, len(parts)-1; i < j; i, j = i+1, j-1 {
 		parts[i], parts[j] = parts[j], parts[i]
@@ -305,15 +326,28 @@ func DomainToMarmotPath(domain string) string {
 // 1) 完全修飾名を逆順化したキー
 // 2) host.network 形式へのフォールバックキー
 func DomainToMarmotPaths(domain string) []string {
-	full := DomainToMarmotPath(domain)
 	parts := splitDomainLabels(domain)
+	normalizedParts := append([]string(nil), parts...)
+	for i := range normalizedParts {
+		normalizedParts[i] = strings.ToLower(normalizedParts[i])
+	}
 
-	paths := []string{full}
-	if len(parts) >= 2 {
-		fallback := db.InternalDNSPrefix + "/" + parts[1] + "/" + parts[0]
-		if fallback != full {
-			paths = append(paths, fallback)
+	paths := make([]string, 0, 4)
+	appendUnique := func(path string) {
+		for _, existing := range paths {
+			if existing == path {
+				return
+			}
 		}
+		paths = append(paths, path)
+	}
+	appendUnique(domainLabelsToMarmotPath(normalizedParts))
+	appendUnique(domainLabelsToMarmotPath(parts))
+	if len(normalizedParts) >= 2 {
+		appendUnique(db.InternalDNSPrefix + "/" + normalizedParts[1] + "/" + normalizedParts[0])
+	}
+	if len(parts) >= 2 {
+		appendUnique(db.InternalDNSPrefix + "/" + parts[1] + "/" + parts[0])
 	}
 
 	return paths

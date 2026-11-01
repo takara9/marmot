@@ -1,13 +1,30 @@
 package internaldns
 
 import (
+	"context"
 	"errors"
 	"net"
 	"net/netip"
 	"testing"
 
+	"github.com/miekg/dns"
 	"github.com/takara9/marmot/pkg/marmotd"
 )
+
+type testDNSResponseWriter struct {
+	msg *dns.Msg
+}
+
+func (w *testDNSResponseWriter) LocalAddr() net.Addr { return &net.UDPAddr{} }
+func (w *testDNSResponseWriter) RemoteAddr() net.Addr {
+	return &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)}
+}
+func (w *testDNSResponseWriter) WriteMsg(msg *dns.Msg) error   { w.msg = msg; return nil }
+func (w *testDNSResponseWriter) Write(buf []byte) (int, error) { return len(buf), nil }
+func (w *testDNSResponseWriter) Close() error                  { return nil }
+func (w *testDNSResponseWriter) TsigStatus() error             { return nil }
+func (w *testDNSResponseWriter) TsigTimersOnly(bool)           {}
+func (w *testDNSResponseWriter) Hijack()                       {}
 
 type stubAddr struct {
 	network string
@@ -122,6 +139,15 @@ func TestDomainToMarmotPaths(t *testing.T) {
 				"/marmot/dns/host-bridge/server1",
 			},
 		},
+		{
+			domain: "SeRvEr1.HoSt-BrIdGe.HV1.LaBo.LoCaL.",
+			want: []string{
+				"/marmot/dns/local/labo/hv1/host-bridge/server1",
+				"/marmot/dns/LoCaL/LaBo/HV1/HoSt-BrIdGe/SeRvEr1",
+				"/marmot/dns/host-bridge/server1",
+				"/marmot/dns/HoSt-BrIdGe/SeRvEr1",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -136,6 +162,43 @@ func TestDomainToMarmotPaths(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestHandleRequestMixedCaseRegisteredName(t *testing.T) {
+	const qname = "SeRvEr1.HoSt-BrIdGe.HV1.LaBo.LoCaL."
+	const expectedKey = "/marmot/dns/local/labo/hv1/host-bridge/server1"
+
+	c := &controller{
+		domain: "labo.local",
+		lookupDNSRecord: func(_ context.Context, key string) ([]byte, bool, error) {
+			if key == expectedKey {
+				return []byte(`"192.0.2.10"`), true, nil
+			}
+			return nil, false, nil
+		},
+	}
+	request := new(dns.Msg)
+	request.SetQuestion(qname, dns.TypeA)
+	writer := &testDNSResponseWriter{}
+
+	c.handleRequest(writer, request)
+
+	if writer.msg == nil {
+		t.Fatal("expected a DNS response")
+	}
+	if writer.msg.Rcode != dns.RcodeSuccess {
+		t.Fatalf("response code = %d, want %d", writer.msg.Rcode, dns.RcodeSuccess)
+	}
+	if len(writer.msg.Answer) != 1 {
+		t.Fatalf("answer count = %d, want 1", len(writer.msg.Answer))
+	}
+	if got := writer.msg.Answer[0].Header().Name; got != qname {
+		t.Fatalf("answer name = %q, want original query name %q", got, qname)
+	}
+	a, ok := writer.msg.Answer[0].(*dns.A)
+	if !ok || !a.A.Equal(net.ParseIP("192.0.2.10")) {
+		t.Fatalf("answer = %v, want A 192.0.2.10", writer.msg.Answer[0])
 	}
 }
 
