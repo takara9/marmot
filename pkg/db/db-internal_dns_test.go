@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -111,9 +112,10 @@ var _ = Describe("InternalDNS", Ordered, func() {
 				entries, err := d.ListDnsEntriesByFQDNSuffix(suffix)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(entries).To(HaveLen(2))
-				Expect(entries).To(HaveKeyWithValue(fqdnA, "192.168.100.10"))
-				Expect(entries).To(HaveKeyWithValue(fqdnB, "192.168.100.11"))
-				Expect(entries).NotTo(HaveKey(otherFqdn))
+				// DNS名は小文字に正規化して保存されるため、取得結果も小文字になる
+				Expect(entries).To(HaveKeyWithValue(strings.ToLower(fqdnA), "192.168.100.10"))
+				Expect(entries).To(HaveKeyWithValue(strings.ToLower(fqdnB), "192.168.100.11"))
+				Expect(entries).NotTo(HaveKey(strings.ToLower(otherFqdn)))
 			})
 
 			It("該当エントリーが無い場合は空のmapを返す", func() {
