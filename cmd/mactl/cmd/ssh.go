@@ -129,8 +129,60 @@ func rewriteSSHArgsForMarmot(servers []api.Server, sshArgs []string) ([]string, 
 		return nil, fmt.Errorf("server %q %w", serverName, err)
 	}
 
+	// ユーザー名の省略時は spec.auth のユーザーを使う。ただし -l / -o User= で
+	// 明示されている場合は、USER@ が -l より優先されてしまうため付与しない。
+	if sshUser == "" && !sshArgsSpecifyUser(sshArgs, connectIdx) {
+		sshUser = serverAnsibleRemoteUser(*server)
+	}
+
 	sshArgs[connectIdx] = buildSSHTargetAddress(sshUser, targetAddress)
 	return normalizeSSHArgsForExecution(sshArgs, connectIdx), nil
+}
+
+// sshArgsSpecifyUser は、接続先より前、および "--" 使用時の接続先直後のオプション列に
+// -l USER または -o User=USER が含まれるかを返す。接続先以降のリモートコマンドは対象外。
+func sshArgsSpecifyUser(sshArgs []string, targetIdx int) bool {
+	opts := append([]string{}, sshArgs[:targetIdx]...)
+	for _, arg := range sshArgs {
+		if arg == "--" {
+			tail, _ := splitSSHOptionPrefix(sshArgs[targetIdx+1:])
+			opts = append(opts, tail...)
+			break
+		}
+	}
+
+	withValue := map[string]bool{
+		"-b": true, "-c": true, "-D": true, "-E": true, "-F": true, "-I": true,
+		"-i": true, "-J": true, "-L": true, "-m": true, "-O": true, "-p": true,
+		"-Q": true, "-R": true, "-S": true, "-W": true, "-w": true,
+	}
+	for i := 0; i < len(opts); i++ {
+		arg := opts[i]
+		switch {
+		case arg == "-l" || (strings.HasPrefix(arg, "-l") && len(arg) > 2):
+			return true
+		case arg == "-o":
+			if i+1 < len(opts) && isSSHUserOption(opts[i+1]) {
+				return true
+			}
+			i++
+		case strings.HasPrefix(arg, "-o") && len(arg) > 2:
+			if isSSHUserOption(arg[2:]) {
+				return true
+			}
+		case withValue[arg]:
+			i++
+		}
+	}
+	return false
+}
+
+func isSSHUserOption(value string) bool {
+	v := strings.TrimSpace(value)
+	if len(v) < 5 || !strings.EqualFold(v[:4], "user") {
+		return false
+	}
+	return v[4] == '=' || v[4] == ' ' || v[4] == '\t'
 }
 
 func normalizeSSHArgsForExecution(sshArgs []string, targetIdx int) []string {

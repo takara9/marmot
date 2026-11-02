@@ -188,6 +188,80 @@ var _ = Describe("ssh helper functions", func() {
 		})
 	})
 
+	Describe("rewriteSSHArgsForMarmot with spec.auth default user", func() {
+		newServer := func(auth *api.Auth) []api.Server {
+			return []api.Server{{
+				Metadata: api.Metadata{Name: "vault-single"},
+				Spec: api.ServerSpec{
+					Auth: auth,
+					NetworkInterface: &[]api.NetworkInterface{{
+						Networkname: "host-bridge",
+						Address:     util.StringPtr("192.168.10.50"),
+					}},
+				},
+			}}
+		}
+		usersAuth := &api.Auth{Users: &[]string{"ubuntu", "vault"}}
+
+		It("uses the first of spec.auth.users when the user is omitted", func() {
+			args, err := rewriteSSHArgsForMarmot(newServer(usersAuth), []string{"vault-single"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(args).To(Equal([]string{"ubuntu@192.168.10.50"}))
+		})
+
+		It("uses spec.auth.user when set", func() {
+			args, err := rewriteSSHArgsForMarmot(newServer(&api.Auth{User: util.StringPtr("admin")}), []string{"vault-single"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(args).To(Equal([]string{"admin@192.168.10.50"}))
+		})
+
+		It("keeps the default user while preserving options and remote command", func() {
+			args, err := rewriteSSHArgsForMarmot(newServer(usersAuth), []string{"-i", "vmkey", "vault-single", "hostname", "-l"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(args).To(Equal([]string{"-i", "vmkey", "ubuntu@192.168.10.50", "hostname", "-l"}))
+		})
+
+		It("applies the default user with the -- syntax", func() {
+			args, err := rewriteSSHArgsForMarmot(newServer(usersAuth), []string{"vault-single", "--", "-i", "vmkey"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(args).To(Equal([]string{"-i", "vmkey", "ubuntu@192.168.10.50"}))
+		})
+
+		It("prefers the explicitly specified user", func() {
+			args, err := rewriteSSHArgsForMarmot(newServer(usersAuth), []string{"takara@vault-single"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(args).To(Equal([]string{"takara@192.168.10.50"}))
+		})
+
+		It("does not add a user when -l is specified", func() {
+			args, err := rewriteSSHArgsForMarmot(newServer(usersAuth), []string{"-l", "vault", "vault-single"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(args).To(Equal([]string{"-l", "vault", "192.168.10.50"}))
+		})
+
+		It("does not add a user when -o User= is specified", func() {
+			args, err := rewriteSSHArgsForMarmot(newServer(usersAuth), []string{"-o", "User=vault", "vault-single"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(args).To(Equal([]string{"-o", "User=vault", "192.168.10.50"}))
+		})
+
+		It("does not add a user when -oUser= is specified after --", func() {
+			args, err := rewriteSSHArgsForMarmot(newServer(usersAuth), []string{"vault-single", "--", "-oUser=vault"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(args).To(Equal([]string{"-oUser=vault", "192.168.10.50"}))
+		})
+
+		It("keeps the IP only when spec.auth is unset or has no usable user", func() {
+			args, err := rewriteSSHArgsForMarmot(newServer(nil), []string{"vault-single"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(args).To(Equal([]string{"192.168.10.50"}))
+
+			args, err = rewriteSSHArgsForMarmot(newServer(&api.Auth{Users: &[]string{" "}}), []string{"vault-single"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(args).To(Equal([]string{"192.168.10.50"}))
+		})
+	})
+
 	Describe("ssh command configuration", func() {
 		It("disables cobra flag parsing for ssh passthrough", func() {
 			Expect(sshCmd.DisableFlagParsing).To(BeTrue())
