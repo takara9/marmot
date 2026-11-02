@@ -133,6 +133,9 @@ func rewriteSSHArgsForMarmot(servers []api.Server, sshArgs []string) ([]string, 
 	// 明示されている場合は、USER@ が -l より優先されてしまうため付与しない。
 	if sshUser == "" && !sshArgsSpecifyUser(sshArgs, connectIdx) {
 		sshUser = serverAnsibleRemoteUser(*server)
+		if strings.HasPrefix(sshUser, "-") {
+			return nil, fmt.Errorf("server %q has an invalid SSH user in spec.auth", serverName)
+		}
 	}
 
 	sshArgs[connectIdx] = buildSSHTargetAddress(sshUser, targetAddress)
