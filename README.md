@@ -244,6 +244,13 @@ $ mactl delete server server-20                   # 削除（server-20,server-21
 mactl [mactlのフラグ] ssh [USER@]SERVER-NAME -- [SSH-ARGS...]
 ```
 
+`USER@` を省略すると、サーバーの `spec.auth.user`（無ければ `spec.auth.users` の先頭）のユーザーでログインします。`USER@` を指定した場合はそのユーザーが優先されます。
+
+```
+$ mactl ssh server-20            # spec.auth.users[0] でログイン
+$ mactl ssh takara@server-20     # takara でログイン
+```
+
 内部 DNS は `サーバー名.ネットワーク名` に加え、`marmotd` ごとのサブドメイン付き FQDN にも対応しています。
 
 - 例1: `server1.host-bridge`

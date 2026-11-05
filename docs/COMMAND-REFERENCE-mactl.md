@@ -118,7 +118,9 @@ API キー:
   - 既定ではシリアルコンソールに接続
   - `--graphical` / `-g` 指定時は接続せず、グラフィカルコンソール（SPICE）の接続情報を表示（`remote-viewer spice://HOST:PORT`）
 - mactl [mactlのフラグ] ssh [USER@]SERVER-NAME -- [SSH引数...]
-  - Marmot が管理する SERVER-NAME の host-bridge IP を解決し、USER 指定時は USER@IP で ssh 接続
+  - Marmot が管理する SERVER-NAME の host-bridge IP を解決し、USER@IP で ssh 接続
+  - USER を省略した場合は、サーバーの `spec.auth.user`（無ければ `spec.auth.users` の先頭）のユーザーで接続。`-l` / `-o User=` を指定した場合、または `spec.auth` にユーザーが無い場合は、ユーザーを補わない
+  - USER を指定した場合は、そのユーザーを使用
   - host-bridge 未接続、または host-bridge address 未設定の場合はエラー
 - mactl version
 
