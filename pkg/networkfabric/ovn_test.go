@@ -338,6 +338,48 @@ func TestEnsureHostPresencePort_RequiresOVNCommands(t *testing.T) {
 	}
 }
 
+func TestRemoveHostPresencePort_DeletesOnlyLocalOVSPort(t *testing.T) {
+	var ovsCalls [][]string
+	withOVSVSRunner(t, func(args ...string) (string, error) {
+		ovsCalls = append(ovsCalls, append([]string{}, args...))
+		return "", nil
+	})
+	var nbCalls int
+	withOVNRunner(t, func(args ...string) (string, error) {
+		nbCalls++
+		return "", nil
+	})
+
+	if err := NewOVNFabric().RemoveHostPresencePort(testGeneveVNet()); err != nil {
+		t.Fatalf("RemoveHostPresencePort() error = %v", err)
+	}
+
+	want := [][]string{{"--if-exists", "del-port", "br-test", HostPresencePortName}}
+	if !reflect.DeepEqual(ovsCalls, want) {
+		t.Fatalf("ovs-vsctl calls = %v, want %v", ovsCalls, want)
+	}
+	if nbCalls != 0 {
+		t.Fatalf("ovn-nbctl must not be called (NB DB is shared with the head node), got %d calls", nbCalls)
+	}
+}
+
+func TestRemoveHostPresencePort_RequiresBridgeName(t *testing.T) {
+	vnet := testGeneveVNet()
+	vnet.Spec.BridgeName = nil
+	if err := NewOVNFabric().RemoveHostPresencePort(vnet); err == nil {
+		t.Fatalf("expected error when bridge name is unknown")
+	}
+}
+
+func TestRemoveHostPresencePort_PropagatesOVSError(t *testing.T) {
+	withOVSVSRunner(t, func(args ...string) (string, error) {
+		return "", fmt.Errorf("ovs-vsctl failed")
+	})
+	if err := NewOVNFabric().RemoveHostPresencePort(testGeneveVNet()); err == nil {
+		t.Fatalf("expected error when ovs-vsctl fails")
+	}
+}
+
 func TestEnsureGuestLogicalPort_AddsPortAndAddresses(t *testing.T) {
 	withOVNLookPath(t, true, true)
 	calls := []ovnRunnerCall{}

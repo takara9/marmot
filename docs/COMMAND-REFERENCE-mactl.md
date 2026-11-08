@@ -104,6 +104,11 @@ API キー:
 
 - mactl status
 - mactl cluster
+  - CLUSTER-ID（`ID:`）とクラスタメンバーを表示
+  - `LEADER` 列にスケジューラーリーダーのノードを `*` で表示（アクティブなノードのうち HostId が最小のノード）
+  - クラスタが有効でない場合（`maadm cluster init` 未実行）はエラー
+  - `-o json` / `-o yaml` 指定時は、メンバーの一覧だけを出力
+  - クラスタの構成は `maadm cluster init` / `join` / `leave` で行う（[HOWTO-install-marmot-cluster.md](HOWTO-install-marmot-cluster.md) を参照）
 
 ## 汎用操作
 

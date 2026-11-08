@@ -27,8 +27,6 @@ type controller struct {
 	client               *dns.Client
 	Upstream             string // 外部DNSサーバーのアドレス (例: "
 	allowedUpstreamCIDRs []netip.Prefix
-	domain               string // 自己ドメイン (例: "labo.local")
-	lookupDNSRecord      func(context.Context, string) ([]byte, bool, error)
 }
 
 // StartInternalDNSServer はサーバーを非同期で開始し、制御構造体を返します。
@@ -58,7 +56,6 @@ func StartInternalDNSServer(ctx context.Context, node string, etcdUrl string, cf
 		db:                   m.Db,
 		etcdUrl:              etcdUrl,
 		Upstream:             cfg.DNSUpstream,
-		domain:               cfg.Domain,
 		client:               &dns.Client{Timeout: 5 * time.Second},
 		allowedUpstreamCIDRs: allowedUpstreamCIDRs,
 	}
@@ -150,32 +147,19 @@ func (c *controller) handleRequest(w dns.ResponseWriter, r *dns.Msg) {
 	defer cancel()
 
 	foundInEtcd := false
-	lookupDNSRecord := c.lookupDNSRecord
-	if lookupDNSRecord == nil {
-		lookupDNSRecord = func(ctx context.Context, key string) ([]byte, bool, error) {
-			resp, err := c.db.Cli.Get(ctx, key)
-			if err != nil {
-				return nil, false, err
-			}
-			if len(resp.Kvs) == 0 {
-				return nil, false, nil
-			}
-			return resp.Kvs[0].Value, true, nil
-		}
-	}
 	for _, etcdKey := range lookupKeys {
-		value, found, err := lookupDNSRecord(ctx, etcdKey)
+		resp, err := c.db.Cli.Get(ctx, etcdKey)
 		if err != nil {
 			slog.Error("検索の失敗 Failed to query etcd", "err", err)
 			dns.HandleFailed(w, r)
 			return
 		}
 
-		if !found {
+		if len(resp.Kvs) == 0 {
 			continue
 		}
 
-		ip, ipStr, err := decodeDNSRecordIP(value)
+		ip, ipStr, err := decodeDNSRecordIP(resp.Kvs[0].Value)
 		if err != nil {
 			slog.Error("Failed to decode DNS record", "err", err, "key", etcdKey)
 			dns.HandleFailed(w, r)
@@ -206,16 +190,6 @@ func (c *controller) handleRequest(w dns.ResponseWriter, r *dns.Msg) {
 		return
 	}
 
-	// 自己ドメイン配下で etcd に無い名前は、上位DNSがこのドメインを marmot へ
-	// 転送し返す構成で転送ループになるため、転送せず NXDOMAIN で即答する
-	if isInOwnDomain(q.Name, c.domain) {
-		m := new(dns.Msg)
-		m.SetReply(r)
-		m.Rcode = dns.RcodeNameError
-		_ = w.WriteMsg(m)
-		return
-	}
-
 	// etcd にない場合は外部へ転送
 	if !shouldForwardUpstream(w.RemoteAddr(), c.allowedUpstreamCIDRs) {
 		m := new(dns.Msg)
@@ -232,17 +206,6 @@ func (c *controller) handleRequest(w dns.ResponseWriter, r *dns.Msg) {
 		return
 	}
 	_ = w.WriteMsg(reply)
-}
-
-// isInOwnDomain は qname が自己ドメイン(domain)自身またはその配下かを返す。
-// domain が空の場合は常に false。
-func isInOwnDomain(qname, domain string) bool {
-	domain = strings.ToLower(strings.Trim(strings.TrimSpace(domain), "."))
-	if domain == "" {
-		return false
-	}
-	name := strings.ToLower(strings.TrimSuffix(qname, "."))
-	return name == domain || strings.HasSuffix(name, "."+domain)
 }
 
 func decodeDNSRecordIP(raw []byte) (net.IP, string, error) {
@@ -305,14 +268,7 @@ func shouldForwardUpstream(remoteAddr net.Addr, allowedCIDRs []netip.Prefix) boo
 // DomainToMarmotPath はドメイン名を /marmot/dns/ 形式のパスに変換します
 func DomainToMarmotPath(domain string) string {
 	parts := splitDomainLabels(domain)
-	for i := range parts {
-		parts[i] = strings.ToLower(parts[i])
-	}
-	return domainLabelsToMarmotPath(parts)
-}
 
-func domainLabelsToMarmotPath(parts []string) string {
-	parts = append([]string(nil), parts...)
 	// スライスの要素を逆順に入れ替え
 	for i, j := 0, len(parts)-1; i < j; i, j = i+1, j-1 {
 		parts[i], parts[j] = parts[j], parts[i]
@@ -326,28 +282,15 @@ func domainLabelsToMarmotPath(parts []string) string {
 // 1) 完全修飾名を逆順化したキー
 // 2) host.network 形式へのフォールバックキー
 func DomainToMarmotPaths(domain string) []string {
+	full := DomainToMarmotPath(domain)
 	parts := splitDomainLabels(domain)
-	normalizedParts := append([]string(nil), parts...)
-	for i := range normalizedParts {
-		normalizedParts[i] = strings.ToLower(normalizedParts[i])
-	}
 
-	paths := make([]string, 0, 4)
-	appendUnique := func(path string) {
-		for _, existing := range paths {
-			if existing == path {
-				return
-			}
-		}
-		paths = append(paths, path)
-	}
-	appendUnique(domainLabelsToMarmotPath(normalizedParts))
-	appendUnique(domainLabelsToMarmotPath(parts))
-	if len(normalizedParts) >= 2 {
-		appendUnique(db.InternalDNSPrefix + "/" + normalizedParts[1] + "/" + normalizedParts[0])
-	}
+	paths := []string{full}
 	if len(parts) >= 2 {
-		appendUnique(db.InternalDNSPrefix + "/" + parts[1] + "/" + parts[0])
+		fallback := db.InternalDNSPrefix + "/" + parts[1] + "/" + parts[0]
+		if fallback != full {
+			paths = append(paths, fallback)
+		}
 	}
 
 	return paths
