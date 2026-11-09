@@ -38,6 +38,7 @@ type fakeStore struct {
 	stuckDelete  bool
 	managed      []string
 	deletedHosts []string
+	volumes      map[string]bool
 }
 
 func (s *fakeStore) GetClusterInfo() (*api.ClusterInfo, error) {
@@ -90,6 +91,16 @@ func (s *fakeStore) DeleteServer(id string) error {
 		}
 	}
 	return nil
+}
+
+func (s *fakeStore) ExistingVolumeIDs(ids []string) ([]string, error) {
+	var existing []string
+	for _, id := range ids {
+		if s.volumes[id] {
+			existing = append(existing, id)
+		}
+	}
+	return existing, nil
 }
 
 func (s *fakeStore) DeleteHostStatus(name string) error {

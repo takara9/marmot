@@ -47,6 +47,8 @@ type ClusterStore interface {
 	StopServer(id string) error
 	// 削除日時をセットして、ノードのコントローラーに削除を依頼する
 	DeleteServer(id string) error
+	// 指定したボリュームのうち、etcd にまだ残っているものの ID を返す
+	ExistingVolumeIDs(ids []string) ([]string, error)
 	Close() error
 }
 
@@ -55,6 +57,8 @@ type ServerRef struct {
 	ID         string
 	Name       string
 	StatusCode int
+	// サーバーの削除と共に削除されるボリューム（ブート／非永続データ）の ID
+	VolumeIDs []string
 }
 
 // Env は OS への副作用をまとめたもので、テストで差し替える。
@@ -228,6 +232,17 @@ func (s *dbStore) ListServersOnNode(nodeName string) ([]ServerRef, error) {
 		if sv.Status != nil {
 			ref.StatusCode = sv.Status.StatusCode
 		}
+		if sv.Spec.BootVolume != nil && api.VolumeID(*sv.Spec.BootVolume) != "" {
+			ref.VolumeIDs = append(ref.VolumeIDs, api.VolumeID(*sv.Spec.BootVolume))
+		}
+		if sv.Spec.Storage != nil {
+			for _, vol := range *sv.Spec.Storage {
+				if (vol.Spec.Persistent != nil && *vol.Spec.Persistent) || api.VolumeID(vol) == "" {
+					continue
+				}
+				ref.VolumeIDs = append(ref.VolumeIDs, api.VolumeID(vol))
+			}
+		}
 		refs = append(refs, ref)
 	}
 	return refs, nil
@@ -238,6 +253,22 @@ func (s *dbStore) StopServer(id string) error {
 }
 
 func (s *dbStore) DeleteServer(id string) error { return s.d.SetDeleteTimestamp(id) }
+
+func (s *dbStore) ExistingVolumeIDs(ids []string) ([]string, error) {
+	var existing []string
+	for _, id := range ids {
+		ctx, cancel := context.WithTimeout(s.d.Ctx, 5*time.Second)
+		resp, err := s.d.Cli.Get(ctx, db.VolumePrefix+"/"+id, etcd.WithCountOnly())
+		cancel()
+		if err != nil {
+			return nil, err
+		}
+		if resp.Count > 0 {
+			existing = append(existing, id)
+		}
+	}
+	return existing, nil
+}
 
 // marmotd が自動作成する予約ネットワーク。管理対象としては数えない
 // host-bridge は libvirt 上の実体が etcd へ自動インポートされるため、同様に除外する

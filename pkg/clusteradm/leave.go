@@ -48,7 +48,9 @@ func (e *Env) removeServers(ctx context.Context, store ClusterStore, nodeName st
 		return err
 	}
 	var running []ServerRef
+	var volumeIDs []string
 	for _, sv := range servers {
+		volumeIDs = append(volumeIDs, sv.VolumeIDs...)
 		if sv.StatusCode == db.SERVER_RUNNING {
 			running = append(running, sv)
 		}
@@ -89,6 +91,7 @@ func (e *Env) removeServers(ctx context.Context, store ClusterStore, nodeName st
 	}
 	_, _ = fmt.Fprintf(out, "VM %d 台を削除します。\n", len(current))
 	for _, sv := range current {
+		volumeIDs = append(volumeIDs, sv.VolumeIDs...)
 		if sv.StatusCode == db.SERVER_DELETING {
 			continue
 		}
@@ -108,6 +111,19 @@ func (e *Env) removeServers(ctx context.Context, store ClusterStore, nodeName st
 	})
 	if err != nil {
 		return fmt.Errorf("VM の削除に失敗しました。クラスタのメンバーのままです。再実行すると、残りの VM から続行します: %w", err)
+	}
+	err = e.waitForTimeout(ctx, e.DeleteTimeout, "ボリュームの削除", func() error {
+		remaining, err := store.ExistingVolumeIDs(volumeIDs)
+		if err != nil {
+			return err
+		}
+		if len(remaining) > 0 {
+			return fmt.Errorf("%d 個が残っています: %s", len(remaining), strings.Join(remaining, ", "))
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("ボリュームの削除に失敗しました。クラスタのメンバーのままです。残りのボリュームの削除が完了してから、再実行してください: %w", err)
 	}
 	return nil
 }

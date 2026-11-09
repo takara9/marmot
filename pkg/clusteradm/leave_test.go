@@ -152,6 +152,18 @@ func TestLeaveAbortsWhenServerDeletionFails(t *testing.T) {
 	}
 }
 
+func TestLeaveAbortsWhenVolumeDeletionIsPending(t *testing.T) {
+	f := newLeaveFixture(t)
+	f.master.volumes = map[string]bool{"v1": true}
+	f.master.servers = []ServerRef{{ID: "a1", Name: "vm-stop", StatusCode: db.SERVER_STOPPED, VolumeIDs: []string{"v1"}}}
+	if err := Leave(context.Background(), f.env, f.opts(), &bytes.Buffer{}); err == nil {
+		t.Fatal("expected error")
+	}
+	if f.config(t) != memberConfig || len(f.calls) != 0 || len(f.master.deletedHosts) != 0 {
+		t.Fatalf("must stay a member: calls=%v hosts=%v", f.calls, f.master.deletedHosts)
+	}
+}
+
 func TestLeavePrecheckErrorsChangeNothing(t *testing.T) {
 	tests := []struct {
 		name string
