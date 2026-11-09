@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/takara9/marmot/api"
 )
@@ -33,9 +34,10 @@ func newJoinFixture(t *testing.T) *joinFixture {
 	t.Helper()
 	f := &joinFixture{fixture: newFixture(t)}
 	f.registerOnStart = true
+	lastUpdated := time.Now()
 	f.master = &fakeStore{
 		info:  &api.ClusterInfo{ClusterId: testClusterID, MasterNode: testMasterNode},
-		hosts: []api.HostStatus{{NodeName: strp(testMasterNode), HostId: strp("11111111"), IpAddress: strp(testMasterIP)}},
+		hosts: []api.HostStatus{{NodeName: strp(testMasterNode), HostId: strp("11111111"), IpAddress: strp(testMasterIP), LastUpdated: &lastUpdated}},
 	}
 	f.env.OpenStore = func(url string) (ClusterStore, error) {
 		switch url {
@@ -156,6 +158,30 @@ func TestJoinPrecheckErrorsChangeNothing(t *testing.T) {
 				t.Fatalf(".bak must not be created")
 			}
 		})
+	}
+}
+
+func TestJoinRejectsNodeThatWouldChangeOVNLeader(t *testing.T) {
+	f := newJoinFixture(t)
+	f.env.HostID = func() (string, error) { return "00000001", nil }
+	var out bytes.Buffer
+	if err := Join(context.Background(), f.env, f.opts(), &out); err == nil {
+		t.Fatal("expected join to be rejected")
+	}
+	if f.config(t) != testConfig || len(f.calls) != 0 {
+		t.Fatalf("state changed: calls=%v", f.calls)
+	}
+}
+
+func TestJoinRejectsWhenNoActiveHostCanAnchorOVNEndpoint(t *testing.T) {
+	f := newJoinFixture(t)
+	stale := time.Now().Add(-time.Minute)
+	f.master.hosts[0].LastUpdated = &stale
+	if err := Join(context.Background(), f.env, f.opts(), &bytes.Buffer{}); err == nil {
+		t.Fatal("expected join to be rejected")
+	}
+	if f.config(t) != testConfig || len(f.calls) != 0 {
+		t.Fatalf("state changed: calls=%v", f.calls)
 	}
 }
 

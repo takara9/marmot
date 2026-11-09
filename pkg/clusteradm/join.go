@@ -6,7 +6,9 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/takara9/marmot/api"
 )
@@ -124,6 +126,9 @@ func Join(ctx context.Context, env *Env, opts JoinOptions, out io.Writer) error 
 			return fmt.Errorf("HOSTID %s は、クラスタ内のノード %q と重複しています（/etc/hostid を変更してください）", hostID, derefString(m.NodeName))
 		}
 	}
+	if joiningNodeWouldBecomeSchedulerLeader(cfg.NodeName, hostID, members, time.Now()) {
+		return fmt.Errorf("HOSTID %s のノード %q では既存の OVN central 接続先を安全に維持できないため、クラスタへ参加できません。OVN DB とゲスト論理ポートを移行してから実行してください", hostID, cfg.NodeName)
+	}
 
 	summary := fmt.Sprintf(`以下の変更を行います。
   %s と %s を停止し、ローカルの %s を無効化（disable --now）
@@ -137,6 +142,7 @@ func Join(ctx context.Context, env *Env, opts JoinOptions, out io.Writer) error 
 		_, _ = fmt.Fprintln(out, "--dry-run が指定されたため、何も変更しません。")
 		return nil
 	}
+
 	if opts.Confirm != nil && !opts.Confirm(summary) {
 		return fmt.Errorf("中止しました")
 	}
@@ -234,4 +240,42 @@ func Join(ctx context.Context, env *Env, opts JoinOptions, out io.Writer) error 
 	_, _ = fmt.Fprintf(out, "クラスタに編入しました。\nCLUSTER-ID: %s\n", masterInfo.ClusterId)
 	printNodes(out, statuses)
 	return nil
+}
+
+func joiningNodeWouldBecomeSchedulerLeader(nodeName, hostID string, members []api.HostStatus, now time.Time) bool {
+	joiningID, err := parseClusterHostID(hostID)
+	if err != nil {
+		return false
+	}
+
+	var leaderID uint64
+	leaderName := ""
+	for _, member := range members {
+		if member.NodeName == nil || strings.TrimSpace(*member.NodeName) == "" ||
+			member.HostId == nil || member.LastUpdated == nil ||
+			!member.LastUpdated.After(now.Add(-30*time.Second)) {
+			continue
+		}
+		memberID, err := parseClusterHostID(*member.HostId)
+		if err != nil {
+			continue
+		}
+		memberName := strings.TrimSpace(*member.NodeName)
+		if leaderName == "" || memberID < leaderID || (memberID == leaderID && memberName < leaderName) {
+			leaderID = memberID
+			leaderName = memberName
+		}
+	}
+
+	return leaderName == "" ||
+		joiningID < leaderID || (joiningID == leaderID && strings.TrimSpace(nodeName) < leaderName)
+}
+
+func parseClusterHostID(hostID string) (uint64, error) {
+	value := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(hostID)), "0x")
+	id, err := strconv.ParseUint(value, 16, 32)
+	if err != nil || id == 0 {
+		return 0, fmt.Errorf("invalid HOSTID %q", hostID)
+	}
+	return id, nil
 }
