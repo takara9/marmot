@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/takara9/marmot/pkg/db"
 )
@@ -124,6 +125,23 @@ func (e *Env) removeServers(ctx context.Context, store ClusterStore, nodeName st
 	})
 	if err != nil {
 		return fmt.Errorf("ボリュームの削除に失敗しました。クラスタのメンバーのままです。残りのボリュームの削除が完了してから、再実行してください: %w", err)
+	}
+	return nil
+}
+
+// waitSettled は、配置禁止の前に割り当てられた VM が、残っていないことを確認する。
+func (e *Env) waitSettled(ctx context.Context, store ClusterStore, nodeName string, out io.Writer) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(e.PollInterval):
+	}
+	remaining, err := store.ListServersOnNode(nodeName)
+	if err != nil {
+		return err
+	}
+	if len(remaining) > 0 {
+		return fmt.Errorf("配置禁止の前に割り当てられた VM が残っています。クラスタのメンバーのままです。再実行すると、残りの VM から続行します: %s", serverNames(remaining))
 	}
 	return nil
 }
@@ -251,8 +269,15 @@ func Leave(ctx context.Context, env *Env, opts LeaveOptions, out io.Writer) erro
 			return fmt.Errorf("中止しました")
 		}
 
-		// 2. VM の停止と削除
+		// 2. 配置禁止にしてから、VM の停止と削除
+		if err := store.CordonNode(cfg.NodeName); err != nil {
+			return fmt.Errorf("ノードを配置禁止にできません。クラスタのメンバーのままです: %w", err)
+		}
 		if err := env.removeServers(ctx, store, cfg.NodeName, out); err != nil {
+			return err
+		}
+		// 配置禁止の前に割り当てられた VM が残っていないことを、スケジューラーの1周期後に再確認する
+		if err := env.waitSettled(ctx, store, cfg.NodeName, out); err != nil {
 			return err
 		}
 

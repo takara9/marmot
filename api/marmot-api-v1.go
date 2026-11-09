@@ -268,6 +268,9 @@ type HostStatus struct {
 
 	// SchedulerLeader True when this node is the current scheduler leader (computed by the server).
 	SchedulerLeader *bool `json:"schedulerLeader,omitempty" yaml:"schedulerLeader,omitempty"`
+
+	// Unschedulable True when the scheduler must not place new servers on this node (e.g. while leaving the cluster).
+	Unschedulable *bool `json:"unschedulable,omitempty" yaml:"unschedulable,omitempty"`
 }
 
 // IPAddress defines model for IPAddress.

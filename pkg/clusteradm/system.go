@@ -39,6 +39,8 @@ type ClusterStore interface {
 	DeleteClusterInfo() error
 	ListHostStatus() ([]api.HostStatus, error)
 	DeleteHostStatus(nodeName string) error
+	// スケジューラーが、ノードへ新しい VM を配置しないようにする
+	CordonNode(nodeName string) error
 	// VM やネットワークなど、クラスタへ引き継がれない管理対象のキーを返す
 	ListManagedObjects() ([]string, error)
 	// 指定ノードに割り当てられた VM を返す
@@ -210,6 +212,10 @@ func (s *dbStore) DeleteClusterInfo() error {
 }
 
 func (s *dbStore) ListHostStatus() ([]api.HostStatus, error) { return s.d.GetAllHostStatus() }
+
+func (s *dbStore) CordonNode(nodeName string) error {
+	return s.d.SetHostUnschedulable(nodeName, true)
+}
 
 func (s *dbStore) DeleteHostStatus(nodeName string) error {
 	ctx, cancel := context.WithTimeout(s.d.Ctx, 5*time.Second)

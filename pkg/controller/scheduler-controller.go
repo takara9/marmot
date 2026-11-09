@@ -152,6 +152,9 @@ func activeNodeNames(statuses []api.HostStatus) []string {
 		if st.NodeName == nil {
 			continue
 		}
+		if st.Unschedulable != nil && *st.Unschedulable {
+			continue
+		}
 		nodeName := strings.TrimSpace(*st.NodeName)
 		if nodeName == "" {
 			continue

@@ -42,8 +42,22 @@ func (d *Database) PutHostStatus(status api.HostStatus) error {
 	}
 	now := time.Now()
 	status.CreationTimeStamp = resolveHostStatusCreationTimestamp(status, existing, now)
+	// 定期更新が、クラスタ離脱中の配置禁止を上書きしないよう引き継ぐ
+	if status.Unschedulable == nil && existing != nil {
+		status.Unschedulable = existing.Unschedulable
+	}
 	key := HostStatusPrefix + "/" + *status.NodeName
 	return d.PutJSON(key, status)
+}
+
+// ノードを新規サーバーの配置対象から外す（または戻す）
+func (d *Database) SetHostUnschedulable(nodeName string, unschedulable bool) error {
+	status, err := d.GetHostStatus(nodeName)
+	if err != nil {
+		return err
+	}
+	status.Unschedulable = &unschedulable
+	return d.PutJSON(HostStatusPrefix+"/"+nodeName, status)
 }
 
 // HostStatusをetcdから取得する

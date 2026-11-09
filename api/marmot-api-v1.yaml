@@ -3252,6 +3252,9 @@ components:
         schedulerLeader:
           type: boolean
           description: True when this node is the current scheduler leader (computed by the server).
+        unschedulable:
+          type: boolean
+          description: True when the scheduler must not place new servers on this node (e.g. while leaving the cluster).
         capacity:
           $ref: "#/components/schemas/HostCapacity"
         allocation:

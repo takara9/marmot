@@ -38,6 +38,7 @@ type fakeStore struct {
 	stuckDelete  bool
 	managed      []string
 	deletedHosts []string
+	cordoned     []string
 	volumes      map[string]bool
 }
 
@@ -101,6 +102,11 @@ func (s *fakeStore) ExistingVolumeIDs(ids []string) ([]string, error) {
 		}
 	}
 	return existing, nil
+}
+
+func (s *fakeStore) CordonNode(name string) error {
+	s.cordoned = append(s.cordoned, name)
+	return nil
 }
 
 func (s *fakeStore) DeleteHostStatus(name string) error {
