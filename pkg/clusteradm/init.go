@@ -130,7 +130,7 @@ func Init(ctx context.Context, env *Env, opts InitOptions, out io.Writer) error 
 	info, err := store.GetClusterInfo()
 	_ = store.Close()
 	if err == nil {
-		fmt.Fprintf(out, "クラスタは既に有効です。変更しません。\nCLUSTER-ID: %s\n", info.ClusterId)
+		_, _ = fmt.Fprintf(out, "クラスタは既に有効です。変更しません。\nCLUSTER-ID: %s\n", info.ClusterId)
 		return nil
 	} else if !isNotFound(err) {
 		return fmt.Errorf("クラスタ情報を取得できません: %w", err)
@@ -168,10 +168,10 @@ func Init(ctx context.Context, env *Env, opts InitOptions, out io.Writer) error 
   etcd のフラグと競合して起動できなくなるため、drop-in の UnsetEnvironment で無効化します（待ち受けアドレスは上記の drop-in の指定に置き換わります）。
 `, EtcdUnit, strings.Join(conflicts, "\n  "))
 	}
-	fmt.Fprint(out, summary)
+	_, _ = fmt.Fprint(out, summary)
 
 	if opts.DryRun {
-		fmt.Fprintln(out, "--dry-run が指定されたため、何も変更しません。")
+		_, _ = fmt.Fprintln(out, "--dry-run が指定されたため、何も変更しません。")
 		return nil
 	}
 	if opts.Confirm != nil && !opts.Confirm(summary) {
@@ -182,25 +182,25 @@ func Init(ctx context.Context, env *Env, opts InitOptions, out io.Writer) error 
 	var undos []func() error
 	etcdTouched, marmotTouched := false, false
 	rollback := func(cause error) error {
-		fmt.Fprintf(out, "エラー: %v\n元のシングルノード構成へ戻します。\n", cause)
+		_, _ = fmt.Fprintf(out, "エラー: %v\n元のシングルノード構成へ戻します。\n", cause)
 		for i := len(undos) - 1; i >= 0; i-- {
 			if err := undos[i](); err != nil {
-				fmt.Fprintf(out, "ロールバック失敗: %v\n", err)
+				_, _ = fmt.Fprintf(out, "ロールバック失敗: %v\n", err)
 			}
 		}
 		if etcdTouched {
 			if err := env.Systemctl("daemon-reload"); err != nil {
-				fmt.Fprintf(out, "ロールバック失敗: %v\n", err)
+				_, _ = fmt.Fprintf(out, "ロールバック失敗: %v\n", err)
 			}
 			if err := env.Systemctl("restart", EtcdUnit); err != nil {
-				fmt.Fprintf(out, "ロールバック失敗: %v\n", err)
+				_, _ = fmt.Fprintf(out, "ロールバック失敗: %v\n", err)
 			} else if err := env.waitEtcd(ctx, currentURL); err != nil {
-				fmt.Fprintf(out, "ロールバック失敗: %v\n", err)
+				_, _ = fmt.Fprintf(out, "ロールバック失敗: %v\n", err)
 			}
 		}
 		if marmotTouched {
 			if err := env.Systemctl("restart", MarmotUnit); err != nil {
-				fmt.Fprintf(out, "ロールバック失敗: %v\n", err)
+				_, _ = fmt.Fprintf(out, "ロールバック失敗: %v\n", err)
 			}
 		}
 		return fmt.Errorf("cluster init に失敗しました（元の構成へ戻しました）: %w", cause)
@@ -278,7 +278,7 @@ func Init(ctx context.Context, env *Env, opts InitOptions, out io.Writer) error 
 	}
 
 	// 6. 結果表示
-	fmt.Fprintf(out, "CLUSTER-ID: %s\netcd: %s\n他のノードで次のコマンドを実行してください:\n  maadm cluster join %s --master-node %s\n",
+	_, _ = fmt.Fprintf(out, "CLUSTER-ID: %s\netcd: %s\n他のノードで次のコマンドを実行してください:\n  maadm cluster join %s --master-node %s\n",
 		clusterID, newURL, clusterID, etcdIP)
 	return nil
 }

@@ -13,8 +13,8 @@ import (
 )
 
 var _ = Describe("ClusterInfo", Ordered, func() {
-	var port string = "12380"
-	var url string = fmt.Sprintf("http://127.0.0.1:%s", port)
+	port := "12380"
+	url := fmt.Sprintf("http://127.0.0.1:%s", port)
 	var containerID string
 	var d *db.Database
 

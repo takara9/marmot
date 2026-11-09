@@ -55,7 +55,7 @@ func (e *Env) removeServers(ctx context.Context, store ClusterStore, nodeName st
 	}
 
 	if len(running) > 0 {
-		fmt.Fprintf(out, "VM %d 台をシャットダウンします（最大 %s）。\n", len(running), e.ShutdownTimeout)
+		_, _ = fmt.Fprintf(out, "VM %d 台をシャットダウンします（最大 %s）。\n", len(running), e.ShutdownTimeout)
 		for _, sv := range running {
 			if err := store.StopServer(sv.ID); err != nil {
 				return fmt.Errorf("VM %s のシャットダウン要求に失敗: %w", sv.Name, err)
@@ -76,7 +76,7 @@ func (e *Env) removeServers(ctx context.Context, store ClusterStore, nodeName st
 			return nil
 		})
 		if err != nil {
-			fmt.Fprintf(out, "シャットダウンが完了しない VM があります。強制停止して削除します。(%v)\n", err)
+			_, _ = fmt.Fprintf(out, "シャットダウンが完了しない VM があります。強制停止して削除します。(%v)\n", err)
 		}
 	}
 
@@ -87,7 +87,7 @@ func (e *Env) removeServers(ctx context.Context, store ClusterStore, nodeName st
 	if len(current) == 0 {
 		return nil
 	}
-	fmt.Fprintf(out, "VM %d 台を削除します。\n", len(current))
+	_, _ = fmt.Fprintf(out, "VM %d 台を削除します。\n", len(current))
 	for _, sv := range current {
 		if sv.StatusCode == db.SERVER_DELETING {
 			continue
@@ -120,12 +120,12 @@ func unquote(s string) string {
 // 失敗しても離脱の完了を妨げないため、警告を表示して続行する。
 func (e *Env) cleanupOVN(out io.Writer) {
 	warn := func(format string, args ...any) {
-		fmt.Fprintf(out, "警告: "+format+"\n", args...)
+		_, _ = fmt.Fprintf(out, "警告: "+format+"\n", args...)
 	}
 
 	remote, err := e.Run("ovs-vsctl", "get", "open", ".", "external_ids:ovn-remote")
 	if errors.Is(err, exec.ErrNotFound) {
-		fmt.Fprintln(out, "ovs-vsctl が無いため、OVN のクリーンアップを省略します。")
+		_, _ = fmt.Fprintln(out, "ovs-vsctl が無いため、OVN のクリーンアップを省略します。")
 		return
 	}
 	remote = unquote(remote)
@@ -177,9 +177,9 @@ func Leave(ctx context.Context, env *Env, opts LeaveOptions, out io.Writer) erro
 	}
 
 	if resume {
-		fmt.Fprintln(out, "前回の離脱が途中で中断されています。ローカル構成の復元から続行します。")
+		_, _ = fmt.Fprintln(out, "前回の離脱が途中で中断されています。ローカル構成の復元から続行します。")
 		if opts.DryRun {
-			fmt.Fprintln(out, "--dry-run が指定されたため、何も変更しません。")
+			_, _ = fmt.Fprintln(out, "--dry-run が指定されたため、何も変更しません。")
 			return nil
 		}
 	} else {
@@ -225,10 +225,10 @@ func Leave(ctx context.Context, env *Env, opts LeaveOptions, out io.Writer) erro
   OVN: ovn-remote を削除し、SB DB から chassis を削除
   %s を起動（シングルノード）
 `, info.ClusterId, cfg.NodeName, MarmotUnit, env.ConfigPath, localURL, EtcdUnit, MarmotUnit)
-		fmt.Fprint(out, summary)
+		_, _ = fmt.Fprint(out, summary)
 
 		if opts.DryRun {
-			fmt.Fprintln(out, "--dry-run が指定されたため、何も変更しません。")
+			_, _ = fmt.Fprintln(out, "--dry-run が指定されたため、何も変更しません。")
 			return nil
 		}
 		if opts.Confirm != nil && !opts.Confirm(summary) {
@@ -296,6 +296,6 @@ func Leave(ctx context.Context, env *Env, opts LeaveOptions, out io.Writer) erro
 	if err := env.waitUnitActive(ctx, MarmotUnit); err != nil {
 		return incomplete("手順6（marmot の起動確認）", err)
 	}
-	fmt.Fprintln(out, "クラスタから離脱しました。シングルノードとして起動しました。")
+	_, _ = fmt.Fprintln(out, "クラスタから離脱しました。シングルノードとして起動しました。")
 	return nil
 }

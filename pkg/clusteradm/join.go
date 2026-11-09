@@ -31,9 +31,9 @@ func printNodes(out io.Writer, statuses []api.HostStatus) {
 	sort.Slice(statuses, func(i, j int) bool {
 		return derefString(statuses[i].NodeName) < derefString(statuses[j].NodeName)
 	})
-	fmt.Fprintf(out, "%-16s %-10s %s\n", "NODE", "HOSTID", "IP")
+	_, _ = fmt.Fprintf(out, "%-16s %-10s %s\n", "NODE", "HOSTID", "IP")
 	for _, st := range statuses {
-		fmt.Fprintf(out, "%-16s %-10s %s\n", derefString(st.NodeName), derefString(st.HostId), derefString(st.IpAddress))
+		_, _ = fmt.Fprintf(out, "%-16s %-10s %s\n", derefString(st.NodeName), derefString(st.HostId), derefString(st.IpAddress))
 	}
 }
 
@@ -131,10 +131,10 @@ func Join(ctx context.Context, env *Env, opts JoinOptions, out io.Writer) error 
   %s を起動し、マスターの etcd へノード %s が登録されることを確認
   このノード上の既存の管理対象は引き継がれません（0 件であることを確認済み）
 `, MarmotUnit, EtcdUnit, EtcdUnit, env.ConfigPath, masterURL, iface, MarmotUnit, cfg.NodeName)
-	fmt.Fprint(out, summary)
+	_, _ = fmt.Fprint(out, summary)
 
 	if opts.DryRun {
-		fmt.Fprintln(out, "--dry-run が指定されたため、何も変更しません。")
+		_, _ = fmt.Fprintln(out, "--dry-run が指定されたため、何も変更しません。")
 		return nil
 	}
 	if opts.Confirm != nil && !opts.Confirm(summary) {
@@ -146,10 +146,10 @@ func Join(ctx context.Context, env *Env, opts JoinOptions, out io.Writer) error 
 	marmotTouched, etcdDisabled := false, false
 	var cfgBackup *fileBackup
 	rollback := func(cause error) error {
-		fmt.Fprintf(out, "エラー: %v\n元のシングルノード構成へ戻します。\n", cause)
+		_, _ = fmt.Fprintf(out, "エラー: %v\n元のシングルノード構成へ戻します。\n", cause)
 		report := func(err error) {
 			if err != nil {
-				fmt.Fprintf(out, "ロールバック失敗: %v\n", err)
+				_, _ = fmt.Fprintf(out, "ロールバック失敗: %v\n", err)
 			}
 		}
 		if marmotTouched {
@@ -231,7 +231,7 @@ func Join(ctx context.Context, env *Env, opts JoinOptions, out io.Writer) error 
 		return rollback(err)
 	}
 
-	fmt.Fprintf(out, "クラスタに編入しました。\nCLUSTER-ID: %s\n", masterInfo.ClusterId)
+	_, _ = fmt.Fprintf(out, "クラスタに編入しました。\nCLUSTER-ID: %s\n", masterInfo.ClusterId)
 	printNodes(out, statuses)
 	return nil
 }
