@@ -281,7 +281,10 @@ func Leave(ctx context.Context, env *Env, opts LeaveOptions, out io.Writer) erro
 			return err
 		}
 
-		// 3. クラスタ上の自ノード情報の削除
+		// ホスト情報の定期更新を止めてから、クラスタ上の自ノード情報を削除する。
+		if err := env.Systemctl("stop", MarmotUnit); err != nil {
+			return fmt.Errorf("ノード情報を削除する前の marmot 停止に失敗しました: %w", err)
+		}
 		if err := store.DeleteHostStatus(cfg.NodeName); err != nil {
 			return fmt.Errorf("クラスタ上のノード情報の削除に失敗しました。VM は削除済みです。再実行すると、この手順から続行します: %w", err)
 		}
