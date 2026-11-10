@@ -30,16 +30,17 @@ type fakeStore struct {
 	getErr    error
 	openCount int
 
-	hosts        []api.HostStatus
-	servers      []ServerRef
-	stopped      []string
-	deletedSrv   []string
-	neverStop    bool
-	stuckDelete  bool
-	managed      []string
-	deletedHosts []string
-	cordoned     []string
-	volumes      map[string]bool
+	hosts            []api.HostStatus
+	servers          []ServerRef
+	stopped          []string
+	deletedSrv       []string
+	neverStop        bool
+	stuckDelete      bool
+	managed          []string
+	deletedHosts     []string
+	deletedFollowers []string
+	cordoned         []string
+	volumes          map[string]bool
 }
 
 func (s *fakeStore) GetClusterInfo() (*api.ClusterInfo, error) {
@@ -111,6 +112,11 @@ func (s *fakeStore) CordonNode(name string) error {
 
 func (s *fakeStore) DeleteHostStatus(name string) error {
 	s.deletedHosts = append(s.deletedHosts, name)
+	return nil
+}
+
+func (s *fakeStore) DeleteFollowerNetworks(name string) error {
+	s.deletedFollowers = append(s.deletedFollowers, name)
 	return nil
 }
 

@@ -273,6 +273,9 @@ func Leave(ctx context.Context, env *Env, opts LeaveOptions, out io.Writer) erro
 				return fmt.Errorf("etcd (%s) へ接続できません。クラスタの情報を削除できないため、離脱しません: %w", cfg.EtcdURL, err)
 			}
 			defer func() { _ = store.Close() }()
+			if err := store.DeleteFollowerNetworks(cfg.NodeName); err != nil {
+				return fmt.Errorf("クラスタ上のノードの follower ネットワークの削除に失敗しました: %w", err)
+			}
 			if err := store.DeleteHostStatus(cfg.NodeName); err != nil {
 				return fmt.Errorf("クラスタ上のノード情報の削除に失敗しました: %w", err)
 			}
@@ -348,6 +351,9 @@ func Leave(ctx context.Context, env *Env, opts LeaveOptions, out io.Writer) erro
 		}
 		if err := env.Systemctl("stop", MarmotUnit); err != nil {
 			return fmt.Errorf("ノード情報を削除する前の marmot 停止に失敗しました: %w", err)
+		}
+		if err := store.DeleteFollowerNetworks(cfg.NodeName); err != nil {
+			return fmt.Errorf("クラスタ上のノードの follower ネットワークの削除に失敗しました。VM は削除済みです。再実行すると、この手順から続行します: %w", err)
 		}
 		if err := store.DeleteHostStatus(cfg.NodeName); err != nil {
 			return fmt.Errorf("クラスタ上のノード情報の削除に失敗しました。VM は削除済みです。再実行すると、この手順から続行します: %w", err)
