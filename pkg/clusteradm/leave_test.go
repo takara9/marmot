@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
@@ -196,6 +197,13 @@ func TestLeavePrecheckErrorsChangeNothing(t *testing.T) {
 		{"not a member", func(f *leaveFixture, o *LeaveOptions) { f.master.info = nil }},
 		{"this node is the master", func(f *leaveFixture, o *LeaveOptions) {
 			f.master.info.MasterNode = testNodeName
+		}},
+		{"this node is the OVN central node", func(f *leaveFixture, o *LeaveOptions) {
+			now := time.Now()
+			f.master.hosts = []api.HostStatus{
+				{NodeName: strp(testMasterNode), HostId: strp("00000002"), LastUpdated: &now},
+				{NodeName: strp(testNodeName), HostId: strp("00000001"), LastUpdated: &now},
+			}
 		}},
 		{"master unreachable", func(f *leaveFixture, o *LeaveOptions) {
 			f.env.OpenStore = func(string) (ClusterStore, error) { return nil, errors.New("refused") }

@@ -306,6 +306,13 @@ func Leave(ctx context.Context, env *Env, opts LeaveOptions, out io.Writer) erro
 		if info.MasterNode == cfg.NodeName {
 			return fmt.Errorf("マスターノード（%s）は離脱できません。先に他のノードを離脱させてください", cfg.NodeName)
 		}
+		members, err := store.ListHostStatus()
+		if err != nil {
+			return fmt.Errorf("クラスタのノード一覧を取得できません: %w", err)
+		}
+		if leaderName, _ := schedulerLeader(members, time.Now()); leaderName == strings.TrimSpace(cfg.NodeName) {
+			return fmt.Errorf("ノード %s は OVN central の接続先（最小の HOSTID）のため、離脱できません。OVN DB とゲスト論理ポートを移行してから実行してください", cfg.NodeName)
+		}
 
 		servers, err := store.ListServersOnNode(cfg.NodeName)
 		if err != nil {

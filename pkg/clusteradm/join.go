@@ -256,6 +256,13 @@ func joiningNodeWouldBecomeSchedulerLeader(nodeName, hostID string, members []ap
 		return false
 	}
 
+	leaderName, leaderID := schedulerLeader(members, now)
+	return leaderName == "" ||
+		joiningID < leaderID || (joiningID == leaderID && strings.TrimSpace(nodeName) < leaderName)
+}
+
+// schedulerLeader は、稼働中のノードのうち最小の HOSTID を持つノード（OVN central の接続先）を返す。
+func schedulerLeader(members []api.HostStatus, now time.Time) (string, uint64) {
 	var leaderID uint64
 	leaderName := ""
 	for _, member := range members {
@@ -274,9 +281,7 @@ func joiningNodeWouldBecomeSchedulerLeader(nodeName, hostID string, members []ap
 			leaderName = memberName
 		}
 	}
-
-	return leaderName == "" ||
-		joiningID < leaderID || (joiningID == leaderID && strings.TrimSpace(nodeName) < leaderName)
+	return leaderName, leaderID
 }
 
 func parseClusterHostID(hostID string) (uint64, error) {
