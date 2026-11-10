@@ -159,9 +159,17 @@ func Join(ctx context.Context, env *Env, opts JoinOptions, out io.Writer) error 
 			}
 		}
 		if marmotTouched {
-			report(env.Systemctl("stop", MarmotUnit))
-			// 停止後に、マスターへ登録された自ノードの情報を削除する
-			report(master.DeleteHostStatus(cfg.NodeName))
+			// 停止後に、マスターへ残った自ノードの follower と情報を削除する。
+			// いずれかが失敗したら構成を復元せず中断し、再試行できるようにする
+			if err := env.Systemctl("stop", MarmotUnit); err != nil {
+				return fmt.Errorf("cluster join のロールバックに失敗しました（%s を停止できないため構成を復元していません。解消後に再実行してください）: %w", MarmotUnit, err)
+			}
+			if err := master.DeleteFollowerNetworks(cfg.NodeName); err != nil {
+				return fmt.Errorf("cluster join のロールバックに失敗しました（follower ネットワークを削除できないため構成を復元していません。解消後に再実行してください）: %w", err)
+			}
+			if err := master.DeleteHostStatus(cfg.NodeName); err != nil {
+				return fmt.Errorf("cluster join のロールバックに失敗しました（HostStatus を削除できないため構成を復元していません。解消後に再実行してください）: %w", err)
+			}
 		}
 		if cfgBackup != nil {
 			report(cfgBackup.restore())
