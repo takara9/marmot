@@ -100,7 +100,8 @@ fi
 
 # /etc/hostid が無いと、hostid コマンドは全ノードで同じ値(007f0101)を返し、クラスタ参加時に
 # HOSTID の重複で拒否される。machine-id の CRC32 (little-endian 4バイト) で生成する。既存ファイルは上書きしない。
-if [ ! -s /etc/hostid ]; then
+# アップグレード時($2 に旧バージョンが入る)は、既存クラスタの実効 HOSTID(OVN 接続先の決定に使用)を維持するため生成しない。
+if [ -z "${2:-}" ] && [ ! -s /etc/hostid ]; then
     python3 - /etc/hostid /etc/machine-id <<'PY' || echo "warning: failed to generate /etc/hostid" >&2
 import os
 import struct
