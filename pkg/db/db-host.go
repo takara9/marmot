@@ -28,36 +28,64 @@ func resolveHostStatusCreationTimestamp(incoming api.HostStatus, existing *api.H
 	return &now
 }
 
+const hostStatusCASRetries = 10
+
+// HostStatusを現在のリビジョンと共に取得する。存在しない場合は existing=nil、rev=0
+func (d *Database) getHostStatusWithRevision(key string) (*api.HostStatus, int64, error) {
+	var stored api.HostStatus
+	resp, err := d.GetJSON(key, &stored)
+	if err == ErrNotFound {
+		return nil, 0, nil
+	} else if err != nil {
+		return nil, 0, err
+	}
+	return &stored, resp.Kvs[0].ModRevision, nil
+}
+
 // HostStatusをetcdに保存する
 func (d *Database) PutHostStatus(status api.HostStatus) error {
 	if status.NodeName == nil {
 		return nil
 	}
-	var existing *api.HostStatus
-	stored, err := d.GetHostStatus(*status.NodeName)
-	if err == nil {
-		existing = &stored
-	} else if err != ErrNotFound {
-		return err
-	}
-	now := time.Now()
-	status.CreationTimeStamp = resolveHostStatusCreationTimestamp(status, existing, now)
-	// 定期更新が、クラスタ離脱中の配置禁止を上書きしないよう引き継ぐ
-	if status.Unschedulable == nil && existing != nil {
-		status.Unschedulable = existing.Unschedulable
-	}
 	key := HostStatusPrefix + "/" + *status.NodeName
-	return d.PutJSON(key, status)
+	incoming := status
+	for i := 0; i < hostStatusCASRetries; i++ {
+		existing, rev, err := d.getHostStatusWithRevision(key)
+		if err != nil {
+			return err
+		}
+		status = incoming
+		status.CreationTimeStamp = resolveHostStatusCreationTimestamp(status, existing, time.Now())
+		// 定期更新が、クラスタ離脱中の配置禁止を上書きしないよう引き継ぐ
+		if status.Unschedulable == nil && existing != nil {
+			status.Unschedulable = existing.Unschedulable
+		}
+		err = d.PutJSONCAS(key, rev, status)
+		if err != ErrUpdateConflict {
+			return err
+		}
+	}
+	return ErrUpdateConflict
 }
 
 // ノードを新規サーバーの配置対象から外す（または戻す）
 func (d *Database) SetHostUnschedulable(nodeName string, unschedulable bool) error {
-	status, err := d.GetHostStatus(nodeName)
-	if err != nil {
-		return err
+	key := HostStatusPrefix + "/" + nodeName
+	for i := 0; i < hostStatusCASRetries; i++ {
+		status, rev, err := d.getHostStatusWithRevision(key)
+		if err != nil {
+			return err
+		}
+		if status == nil {
+			return ErrNotFound
+		}
+		status.Unschedulable = &unschedulable
+		err = d.PutJSONCAS(key, rev, *status)
+		if err != ErrUpdateConflict {
+			return err
+		}
 	}
-	status.Unschedulable = &unschedulable
-	return d.PutJSON(HostStatusPrefix+"/"+nodeName, status)
+	return ErrUpdateConflict
 }
 
 // HostStatusをetcdから取得する
