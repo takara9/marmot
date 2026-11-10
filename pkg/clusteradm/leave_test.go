@@ -256,6 +256,9 @@ func TestLeaveResumesAfterInterruptedRun(t *testing.T) {
 	if err := os.WriteFile(f.env.ConfigPath, []byte(local), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(f.env.ConfigPath+".leave", []byte(testClusterID+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	f.env.OpenStore = func(string) (ClusterStore, error) {
 		t.Fatal("resume must not connect to etcd")
 		return nil, nil
@@ -304,5 +307,23 @@ func TestLeaveReportsIncompleteStep(t *testing.T) {
 	}
 	if len(f.master.deletedHosts) != 1 {
 		t.Fatalf("step 3 must be done before step 4")
+	}
+}
+
+func TestLeaveResumesBeforeConfigChange(t *testing.T) {
+	f := newLeaveFixture(t)
+	// 前回: HostStatus の削除後、設定の変更前に中断された状態
+	if err := os.WriteFile(f.env.ConfigPath+".leave", []byte(testClusterID+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := Leave(context.Background(), f.env, f.opts(), &out); err != nil {
+		t.Fatalf("Leave() error = %v\n%s", err, out.String())
+	}
+	if len(f.master.deletedHosts) != 1 {
+		t.Fatalf("deletedHosts = %v", f.master.deletedHosts)
+	}
+	if _, err := os.Stat(f.env.ConfigPath + ".leave"); !os.IsNotExist(err) {
+		t.Fatalf("state file must be removed: %v", err)
 	}
 }

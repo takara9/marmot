@@ -201,13 +201,17 @@ func Leave(ctx context.Context, env *Env, opts LeaveOptions, out io.Writer) erro
 	}
 	localURL := etcdURL("127.0.0.1")
 
-	// etcd_url が既にローカルで、ローカル etcd が止まっており、退避した設定（*.bak）の etcd_url が
-	// ローカルではない場合は、前回の離脱が手順4以降で中断された状態なので、残りの手順から続行する
+	// HostStatus の削除前に、クラスタ ID を記録する。記録が残っている場合は、前回の離脱が
+	// 手順3以降で中断された状態なので、サービスの稼働状態に依存せず、残りの手順から続行する
+	statePath := env.ConfigPath + ".leave"
 	resume := false
-	if isLocalURL(cfg.EtcdURL) && !env.UnitActive(EtcdUnit) {
-		if prev, err := readNodeConfig(env.ConfigPath + ".bak"); err == nil && prev.EtcdURL != "" && !isLocalURL(prev.EtcdURL) {
-			resume = true
+	if data, err := os.ReadFile(statePath); err == nil {
+		if recorded := strings.TrimSpace(string(data)); recorded != opts.ClusterID {
+			return fmt.Errorf("CLUSTER-ID が一致しません（指定: %s, 中断中の離脱のクラスタ: %s）", opts.ClusterID, recorded)
 		}
+		resume = true
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("離脱の状態ファイル %s を読み込めません: %w", statePath, err)
 	}
 
 	if resume {
@@ -215,6 +219,17 @@ func Leave(ctx context.Context, env *Env, opts LeaveOptions, out io.Writer) erro
 		if opts.DryRun {
 			_, _ = fmt.Fprintln(out, "--dry-run が指定されたため、何も変更しません。")
 			return nil
+		}
+		// 設定の変更前に中断された場合は、クラスタ上のノード情報を削除し直す（削除済みでも成功する）
+		if !isLocalURL(cfg.EtcdURL) {
+			store, err := env.OpenStore(cfg.EtcdURL)
+			if err != nil {
+				return fmt.Errorf("etcd (%s) へ接続できません。クラスタの情報を削除できないため、離脱しません: %w", cfg.EtcdURL, err)
+			}
+			defer func() { _ = store.Close() }()
+			if err := store.DeleteHostStatus(cfg.NodeName); err != nil {
+				return fmt.Errorf("クラスタ上のノード情報の削除に失敗しました: %w", err)
+			}
 		}
 	} else {
 		currentURL := cfg.EtcdURL
@@ -282,6 +297,9 @@ func Leave(ctx context.Context, env *Env, opts LeaveOptions, out io.Writer) erro
 		}
 
 		// ホスト情報の定期更新を止めてから、クラスタ上の自ノード情報を削除する。
+		if err := writeFileAtomic(statePath, []byte(info.ClusterId+"\n"), 0o600); err != nil {
+			return fmt.Errorf("離脱の状態ファイルを書き込めません。クラスタのメンバーのままです: %w", err)
+		}
 		if err := env.Systemctl("stop", MarmotUnit); err != nil {
 			return fmt.Errorf("ノード情報を削除する前の marmot 停止に失敗しました: %w", err)
 		}
@@ -301,7 +319,7 @@ func Leave(ctx context.Context, env *Env, opts LeaveOptions, out io.Writer) erro
 	}
 	// 再実行時は、最初の実行で退避した *.bak を上書きしない
 	cfgMode := os.FileMode(0o644)
-	if resume {
+	if resume && isLocalURL(cfg.EtcdURL) {
 		if fi, err := os.Stat(env.ConfigPath); err == nil {
 			cfgMode = fi.Mode().Perm()
 		}
@@ -339,6 +357,9 @@ func Leave(ctx context.Context, env *Env, opts LeaveOptions, out io.Writer) erro
 	}
 	if err := env.waitUnitActive(ctx, MarmotUnit); err != nil {
 		return incomplete("手順6（marmot の起動確認）", err)
+	}
+	if err := os.Remove(statePath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return incomplete("離脱の状態ファイルの削除", err)
 	}
 	_, _ = fmt.Fprintln(out, "クラスタから離脱しました。シングルノードとして起動しました。")
 	return nil
