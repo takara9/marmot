@@ -132,15 +132,16 @@ flowchart LR
 
 Ubuntu 24.04 のサーバーが1台あれば、約4ステップで VM と Kubernetes クラスタまで体験できます。
 
+専用の物理サーバーを用意するのは、お金も勇気もいります。まずは手元の Ubuntu Desktop 上の仮想マシン（ネステッドVM）で試して、必要性を確認してから物理サーバーを用意する、という進め方もできます。手順は [docs/HOWTO-install-nested-vm.md](docs/HOWTO-install-nested-vm.md) を参照してください。
 
 ## 0. 動作環境を確認する
 
 - Ubuntu Linux 24.04 がインストールされていること
 - ルート `/` に 3GB 程度の空きがあること（依存モジュール約 1.2GB をインストールします）
 - `/var/lib/marmot` に 30GB 程度の空きがあること（OS イメージ取得に約 2GB、VM 1台の起動に 16GB を消費します）
-- CPU の仮想化支援機能（Intel VT-x / AMD-V）が有効であること
+- CPU の仮想化支援機能（Intel VT-x / AMD-V）が有効であること（ネステッドVMで試す場合は、ホスト側でネステッド仮想化の有効化が必要です）
 
-※ Marmotは、仮想化環境を制御するソフトウェアのため、Hyper-V, VirtualBoxなどの仮想環境上での利用は想定していません。
+※ Marmotは、仮想化環境を制御するソフトウェアです。QEMU/KVM 上のネステッドVM（Ubuntu Desktop の仮想マシンマネージャーなど）での動作は確認済みです（[手順](docs/HOWTO-install-nested-vm.md)）。Hyper-V や VirtualBox など、QEMU/KVM 以外の仮想化環境上での動作は未検証です。
 
 ## 1. インストールする
 
@@ -357,6 +358,7 @@ $ mactl delete volume data-ceph-01     # 削除
 
 | やりたいこと | リンク |
 |---|---|
+| 専用サーバーを用意せず、手元の仮想マシン上でまず評価したい | [仮想マシンへのインストール手順](docs/HOWTO-install-nested-vm.md) |
 | まず手を動かして学びたい（30分コース / 2時間コース） | [Marmot Tutorial](https://github.com/takara9/marmot-manifests/blob/main/TUTORIAL.md) |
 | 実用的なマニフェストを眺めて真似したい | [Marmot マニフェスト集](https://github.com/takara9/marmot-manifests) |
 | コマンド・サブコマンド・オプションを調べたい | [Command Reference](https://github.com/takara9/marmot-manifests/blob/main/COMMAND_REFERENCE.md) |
