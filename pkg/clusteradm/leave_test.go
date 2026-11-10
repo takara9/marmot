@@ -81,7 +81,7 @@ func TestLeaveWithoutServers(t *testing.T) {
 		t.Fatalf("Leave() error = %v\n%s", err, out.String())
 	}
 
-	wantCalls := "stop marmot.service,enable --now etcd.service,start marmot.service"
+	wantCalls := "stop marmot.service,stop marmot.service,enable --now etcd.service,start marmot.service"
 	if strings.Join(f.calls, ",") != wantCalls {
 		t.Fatalf("systemctl calls = %v, want %s", f.calls, wantCalls)
 	}
