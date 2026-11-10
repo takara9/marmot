@@ -164,6 +164,28 @@ func TestLeaveAbortsWhenVolumeDeletionIsPending(t *testing.T) {
 	}
 }
 
+func TestLeaveRerunKeepsWaitingForPendingVolumes(t *testing.T) {
+	f := newLeaveFixture(t)
+	f.master.volumes = map[string]bool{"v1": true}
+	f.master.servers = []ServerRef{{ID: "a1", Name: "vm-stop", StatusCode: db.SERVER_STOPPED, VolumeIDs: []string{"v1"}}}
+	if err := Leave(context.Background(), f.env, f.opts(), &bytes.Buffer{}); err == nil {
+		t.Fatal("expected error")
+	}
+	if len(f.master.servers) != 0 {
+		t.Fatalf("servers must be gone: %v", f.master.servers)
+	}
+	if err := Leave(context.Background(), f.env, f.opts(), &bytes.Buffer{}); err == nil {
+		t.Fatal("rerun must still wait for the pending volume")
+	}
+	if f.config(t) != memberConfig || len(f.master.deletedHosts) != 0 {
+		t.Fatalf("must stay a member: hosts=%v", f.master.deletedHosts)
+	}
+	f.master.volumes = map[string]bool{}
+	if err := Leave(context.Background(), f.env, f.opts(), &bytes.Buffer{}); err != nil {
+		t.Fatalf("rerun after volumes are gone: %v", err)
+	}
+}
+
 func TestLeavePrecheckErrorsChangeNothing(t *testing.T) {
 	tests := []struct {
 		name string

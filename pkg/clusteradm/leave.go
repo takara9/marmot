@@ -48,8 +48,13 @@ func (e *Env) removeServers(ctx context.Context, store ClusterStore, nodeName st
 	if err != nil {
 		return err
 	}
+	// 前回の実行で、ボリュームの削除待ちが中断された場合に備え、記録済みの ID を引き継ぐ
+	volumesPath := e.ConfigPath + ".leave-volumes"
+	volumeIDs, err := readVolumeIDs(volumesPath)
+	if err != nil {
+		return err
+	}
 	var running []ServerRef
-	var volumeIDs []string
 	for _, sv := range servers {
 		volumeIDs = append(volumeIDs, sv.VolumeIDs...)
 		if sv.StatusCode == db.SERVER_RUNNING {
@@ -87,31 +92,36 @@ func (e *Env) removeServers(ctx context.Context, store ClusterStore, nodeName st
 	if err != nil {
 		return err
 	}
-	if len(current) == 0 {
-		return nil
-	}
-	_, _ = fmt.Fprintf(out, "VM %d 台を削除します。\n", len(current))
-	for _, sv := range current {
-		volumeIDs = append(volumeIDs, sv.VolumeIDs...)
-		if sv.StatusCode == db.SERVER_DELETING {
-			continue
+	if len(current) > 0 {
+		for _, sv := range current {
+			volumeIDs = append(volumeIDs, sv.VolumeIDs...)
 		}
-		if err := store.DeleteServer(sv.ID); err != nil {
-			return fmt.Errorf("VM %s の削除要求に失敗: %w", sv.Name, err)
+		// Server の削除後に再実行しても、ボリュームの削除完了を確認できるよう、削除の前に記録する
+		if err := writeVolumeIDs(volumesPath, volumeIDs); err != nil {
+			return fmt.Errorf("削除対象のボリュームを記録できません。クラスタのメンバーのままです: %w", err)
 		}
-	}
-	err = e.waitForTimeout(ctx, e.DeleteTimeout, "VM の削除", func() error {
-		remaining, err := store.ListServersOnNode(nodeName)
+		_, _ = fmt.Fprintf(out, "VM %d 台を削除します。\n", len(current))
+		for _, sv := range current {
+			if sv.StatusCode == db.SERVER_DELETING {
+				continue
+			}
+			if err := store.DeleteServer(sv.ID); err != nil {
+				return fmt.Errorf("VM %s の削除要求に失敗: %w", sv.Name, err)
+			}
+		}
+		err = e.waitForTimeout(ctx, e.DeleteTimeout, "VM の削除", func() error {
+			remaining, err := store.ListServersOnNode(nodeName)
+			if err != nil {
+				return err
+			}
+			if len(remaining) > 0 {
+				return fmt.Errorf("%d 台が残っています: %s", len(remaining), serverNames(remaining))
+			}
+			return nil
+		})
 		if err != nil {
-			return err
+			return fmt.Errorf("VM の削除に失敗しました。クラスタのメンバーのままです。再実行すると、残りの VM から続行します: %w", err)
 		}
-		if len(remaining) > 0 {
-			return fmt.Errorf("%d 台が残っています: %s", len(remaining), serverNames(remaining))
-		}
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("VM の削除に失敗しました。クラスタのメンバーのままです。再実行すると、残りの VM から続行します: %w", err)
 	}
 	err = e.waitForTimeout(ctx, e.DeleteTimeout, "ボリュームの削除", func() error {
 		remaining, err := store.ExistingVolumeIDs(volumeIDs)
@@ -126,7 +136,43 @@ func (e *Env) removeServers(ctx context.Context, store ClusterStore, nodeName st
 	if err != nil {
 		return fmt.Errorf("ボリュームの削除に失敗しました。クラスタのメンバーのままです。残りのボリュームの削除が完了してから、再実行してください: %w", err)
 	}
+	if err := os.Remove(volumesPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("削除対象のボリューム記録 %s を削除できません: %w", volumesPath, err)
+	}
 	return nil
+}
+
+// readVolumeIDs は、前回の実行で記録した、削除待ちのボリューム ID を返す。記録が無ければ空を返す。
+func readVolumeIDs(path string) ([]string, error) {
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("削除対象のボリューム記録 %s を読み込めません: %w", path, err)
+	}
+	var ids []string
+	for _, line := range strings.Split(string(data), "\n") {
+		if id := strings.TrimSpace(line); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return ids, nil
+}
+
+func writeVolumeIDs(path string, ids []string) error {
+	seen := map[string]bool{}
+	var uniq []string
+	for _, id := range ids {
+		if id != "" && !seen[id] {
+			seen[id] = true
+			uniq = append(uniq, id)
+		}
+	}
+	if len(uniq) == 0 {
+		return nil
+	}
+	return writeFileAtomic(path, []byte(strings.Join(uniq, "\n")+"\n"), 0o600)
 }
 
 // waitSettled は、配置禁止の前に割り当てられた VM が、残っていないことを確認する。
