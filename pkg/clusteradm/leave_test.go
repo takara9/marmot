@@ -97,8 +97,9 @@ func TestLeaveWithoutServers(t *testing.T) {
 		t.Fatalf("host status deleted = %v", f.master.deletedHosts)
 	}
 	wantRuns := []string{
-		"ovs-vsctl get open . external_ids:ovn-remote",
 		"ovs-vsctl --if-exists del-port mgmt-host",
+		"ovs-vsctl --if-exists get port mgmt-host _uuid",
+		"ovs-vsctl get open . external_ids:ovn-remote",
 		"ovs-vsctl get open . external_ids:system-id",
 		"ovs-vsctl remove open . external_ids ovn-remote",
 		"ovn-sbctl --db=tcp:10.1.0.13:6642 chassis-del sys-hv3",
