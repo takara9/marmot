@@ -232,6 +232,38 @@ func (e *Env) cleanupOVN(out io.Writer) {
 	}
 }
 
+// removeLocalNetworks は、離脱前に記録した follower ネットワークの libvirt 定義を、ローカルから除去する。
+// 残すと単独構成の起動時にローカル etcd へ再取り込みされ、次の join が拒否される。
+// 共有 OVN 論理スイッチは、他ノードが使うため削除しない。
+func (e *Env) removeLocalNetworks(names []string, out io.Writer) {
+	for _, name := range names {
+		if _, err := e.Run("virsh", "net-info", name); err != nil {
+			if errors.Is(err, exec.ErrNotFound) {
+				_, _ = fmt.Fprintln(out, "virsh が無いため、libvirt ネットワークのクリーンアップを省略します。")
+				return
+			}
+			continue // 定義が無い
+		}
+		// 非アクティブの場合は失敗するため、無視して undefine へ進む
+		_, _ = e.Run("virsh", "net-destroy", name)
+		if _, err := e.Run("virsh", "net-undefine", name); err != nil {
+			_, _ = fmt.Fprintf(out, "警告: libvirt ネットワーク %s を削除できませんでした: %v（手動: virsh net-destroy %s; virsh net-undefine %s）\n", name, err, name, name)
+		}
+	}
+}
+
+// parseLeaveState は、離脱の状態ファイルから、クラスタ ID と follower ネットワーク名を取り出す。
+func parseLeaveState(data string) (string, []string) {
+	lines := strings.Split(strings.TrimSpace(data), "\n")
+	var names []string
+	for _, l := range lines[1:] {
+		if l = strings.TrimSpace(l); l != "" {
+			names = append(names, l)
+		}
+	}
+	return strings.TrimSpace(lines[0]), names
+}
+
 // Leave は、クラスタのメンバーであるノードを、元のシングルノード構成へ戻す。
 func Leave(ctx context.Context, env *Env, opts LeaveOptions, out io.Writer) error {
 	// 1. 事前チェック
@@ -251,8 +283,11 @@ func Leave(ctx context.Context, env *Env, opts LeaveOptions, out io.Writer) erro
 	// 手順3以降で中断された状態なので、サービスの稼働状態に依存せず、残りの手順から続行する
 	statePath := env.ConfigPath + ".leave"
 	resume := false
+	var localNetworks []string
 	if data, err := os.ReadFile(statePath); err == nil {
-		if recorded := strings.TrimSpace(string(data)); recorded != opts.ClusterID {
+		recorded, names := parseLeaveState(string(data))
+		localNetworks = names
+		if recorded != opts.ClusterID {
 			return fmt.Errorf("CLUSTER-ID が一致しません（指定: %s, 中断中の離脱のクラスタ: %s）", opts.ClusterID, recorded)
 		}
 		resume = true
@@ -356,7 +391,12 @@ func Leave(ctx context.Context, env *Env, opts LeaveOptions, out io.Writer) erro
 		}
 
 		// ホスト情報の定期更新を止めてから、クラスタ上の自ノード情報を削除する。
-		if err := writeFileAtomic(statePath, []byte(info.ClusterId+"\n"), 0o600); err != nil {
+		localNetworks, err = store.ListFollowerNetworkNames(cfg.NodeName)
+		if err != nil {
+			return fmt.Errorf("ノードの follower ネットワークを取得できません。クラスタのメンバーのままです: %w", err)
+		}
+		state := info.ClusterId + "\n" + strings.Join(localNetworks, "\n")
+		if err := writeFileAtomic(statePath, []byte(strings.TrimSpace(state)+"\n"), 0o600); err != nil {
 			return fmt.Errorf("離脱の状態ファイルを書き込めません。クラスタのメンバーのままです: %w", err)
 		}
 		if err := env.Systemctl("stop", MarmotUnit); err != nil {
@@ -412,6 +452,7 @@ func Leave(ctx context.Context, env *Env, opts LeaveOptions, out io.Writer) erro
 
 	// 5. OVS/OVN のクリーンアップ
 	env.cleanupOVN(out)
+	env.removeLocalNetworks(localNetworks, out)
 
 	// 6. marmotd の起動
 	if err := env.Systemctl("start", MarmotUnit); err != nil {

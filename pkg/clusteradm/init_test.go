@@ -39,6 +39,7 @@ type fakeStore struct {
 	managed          []string
 	deletedHosts     []string
 	deletedFollowers []string
+	followerNetworks []string
 	cordoned         []string
 	volumes          map[string]bool
 }
@@ -113,6 +114,10 @@ func (s *fakeStore) CordonNode(name string) error {
 func (s *fakeStore) DeleteHostStatus(name string) error {
 	s.deletedHosts = append(s.deletedHosts, name)
 	return nil
+}
+
+func (s *fakeStore) ListFollowerNetworkNames(name string) ([]string, error) {
+	return s.followerNetworks, nil
 }
 
 func (s *fakeStore) DeleteFollowerNetworks(name string) error {

@@ -42,6 +42,8 @@ type ClusterStore interface {
 	// 離脱ノードの follower ネットワークを削除する。残すと、再参加時のメンバー同期で削除日時が設定され、
 	// 同名ネットワークへの削除伝播により head の mgmt 等が削除対象になる
 	DeleteFollowerNetworks(nodeName string) error
+	// 離脱ノードの follower ネットワークに対応する、ローカルの libvirt ネットワーク名を返す
+	ListFollowerNetworkNames(nodeName string) ([]string, error)
 	// スケジューラーが、ノードへ新しい VM を配置しないようにする
 	CordonNode(nodeName string) error
 	// VM やネットワークなど、クラスタへ引き継がれない管理対象のキーを返す
@@ -225,6 +227,26 @@ func (s *dbStore) DeleteHostStatus(nodeName string) error {
 	defer cancel()
 	_, err := s.d.Cli.Delete(ctx, db.HostStatusPrefix+"/"+nodeName)
 	return err
+}
+
+func (s *dbStore) ListFollowerNetworkNames(nodeName string) ([]string, error) {
+	networks, err := s.d.GetVirtualNetworks()
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, n := range networks {
+		if n.Metadata.NodeName == nil || strings.TrimSpace(*n.Metadata.NodeName) != nodeName {
+			continue
+		}
+		if n.Metadata.Labels == nil || db.GetNetworkSyncRole(*n.Metadata.Labels) != "follower" {
+			continue
+		}
+		if name := strings.TrimSpace(n.Metadata.Name); name != "" {
+			names = append(names, name)
+		}
+	}
+	return names, nil
 }
 
 func (s *dbStore) DeleteFollowerNetworks(nodeName string) error {

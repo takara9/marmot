@@ -357,3 +357,24 @@ func TestLeaveResumesBeforeConfigChange(t *testing.T) {
 		t.Fatalf("state file must be removed: %v", err)
 	}
 }
+
+func TestLeaveRemovesLocalFollowerNetworks(t *testing.T) {
+	f := newLeaveFixture(t)
+	f.master.followerNetworks = []string{"net-a", "net-b"}
+	var out bytes.Buffer
+	if err := Leave(context.Background(), f.env, f.opts(), &out); err != nil {
+		t.Fatalf("Leave() error = %v\n%s", err, out.String())
+	}
+	runs := strings.Join(f.runs, "|")
+	for _, want := range []string{
+		"virsh net-destroy net-a", "virsh net-undefine net-a",
+		"virsh net-destroy net-b", "virsh net-undefine net-b",
+	} {
+		if !strings.Contains(runs, want) {
+			t.Fatalf("runs = %v, missing %q", f.runs, want)
+		}
+	}
+	if strings.Contains(runs, "ovn-nbctl") {
+		t.Fatalf("shared OVN logical switch must not be deleted: %v", f.runs)
+	}
+}
