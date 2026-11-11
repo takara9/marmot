@@ -45,6 +45,8 @@ type ClusterStore interface {
 	// 離脱ノードの follower ネットワークを削除する。残すと、再参加時のメンバー同期で削除日時が設定され、
 	// 同名ネットワークへの削除伝播により head の mgmt 等が削除対象になる
 	DeleteFollowerNetworks(nodeName string) error
+	// 離脱ノードの follower ネットワークに対応する、ローカルの libvirt ネットワーク名を返す
+	ListFollowerNetworkNames(nodeName string) ([]string, error)
 	// スケジューラーが、ノードへ新しい VM を配置しないようにする
 	CordonNode(nodeName string) error
 	// VM やネットワークなど、クラスタへ引き継がれない管理対象のキーを返す

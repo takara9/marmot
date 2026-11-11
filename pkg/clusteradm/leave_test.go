@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
@@ -216,6 +217,13 @@ func TestLeavePrecheckErrorsChangeNothing(t *testing.T) {
 		{"this node is the master", func(f *leaveFixture, o *LeaveOptions) {
 			f.master.info.MasterNode = testNodeName
 		}},
+		{"this node is the OVN central node", func(f *leaveFixture, o *LeaveOptions) {
+			now := time.Now()
+			f.master.hosts = []api.HostStatus{
+				{NodeName: strp(testMasterNode), HostId: strp("00000002"), LastUpdated: &now},
+				{NodeName: strp(testNodeName), HostId: strp("00000001"), LastUpdated: &now},
+			}
+		}},
 		{"master unreachable", func(f *leaveFixture, o *LeaveOptions) {
 			f.env.OpenStore = func(string) (ClusterStore, error) { return nil, errors.New("refused") }
 		}},
@@ -366,5 +374,26 @@ func TestLeaveResumesBeforeConfigChange(t *testing.T) {
 	}
 	if _, err := os.Stat(f.env.ConfigPath + ".leave"); !os.IsNotExist(err) {
 		t.Fatalf("state file must be removed: %v", err)
+	}
+}
+
+func TestLeaveRemovesLocalFollowerNetworks(t *testing.T) {
+	f := newLeaveFixture(t)
+	f.master.followerNetworks = []string{"net-a", "net-b"}
+	var out bytes.Buffer
+	if err := Leave(context.Background(), f.env, f.opts(), &out); err != nil {
+		t.Fatalf("Leave() error = %v\n%s", err, out.String())
+	}
+	runs := strings.Join(f.runs, "|")
+	for _, want := range []string{
+		"virsh net-destroy net-a", "virsh net-undefine net-a",
+		"virsh net-destroy net-b", "virsh net-undefine net-b",
+	} {
+		if !strings.Contains(runs, want) {
+			t.Fatalf("runs = %v, missing %q", f.runs, want)
+		}
+	}
+	if strings.Contains(runs, "ovn-nbctl") {
+		t.Fatalf("shared OVN logical switch must not be deleted: %v", f.runs)
 	}
 }
