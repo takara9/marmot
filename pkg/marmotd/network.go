@@ -24,6 +24,13 @@ func shouldPreserveSystemNetworkCreationTimestamp(name string) bool {
 	}
 }
 
+// libvirtからの取り込み対象外とする予約名か判定する。
+// mgmt は EnsureManagementNetwork とフォロワー同期だけが管理する。取り込むと、IPアドレス未設定・
+// ラベルなしの別オブジェクトがヘッド扱いで登録され、CIDRが自動採番されてしまう(issue #696)。
+func isImportExcludedNetworkName(name string) bool {
+	return strings.TrimSpace(name) == ManagementNetworkName
+}
+
 func mergeImportedNetworkPreservingCreation(existing api.VirtualNetwork, imported api.VirtualNetwork, nodeName string, now time.Time) api.VirtualNetwork {
 	merged := existing
 	merged.ApiVersion = imported.ApiVersion
@@ -108,6 +115,10 @@ func (m *Marmot) GetVirtualNetworksAndPutDB() ([]api.VirtualNetwork, error) {
 			continue
 		}
 		net.Metadata.Name = name
+		if isImportExcludedNetworkName(name) {
+			slog.Debug("Skipping libvirt network import for reserved network", "networkName", name)
+			continue
+		}
 
 		// uuid
 		uuid, err := n.GetUUIDString()
@@ -236,6 +247,13 @@ func (m *Marmot) GetVirtualNetworksAndPutDB() ([]api.VirtualNetwork, error) {
 func (m *Marmot) DeployVirtualNetwork(vnet api.VirtualNetwork) error {
 	vnetID := api.VirtualNetworkID(vnet)
 	slog.Debug("DeployVirtualNetwork called", "vnet", vnetID)
+
+	// mgmt は固定CIDRのみ許可する。自動採番すると別CIDRの mgmt が生じるため拒否する(issue #696)。
+	if vnet.Spec.IPNetworkAddress == nil && isImportExcludedNetworkName(vnet.Metadata.Name) {
+		err := fmt.Errorf("network %q requires ipNetworkAddress %s; automatic CIDR allocation is not allowed", ManagementNetworkName, ManagementNetworkCIDR)
+		slog.Error("DeployVirtualNetwork() rejected", "vnetId", vnetID, "err", err)
+		return err
+	}
 
 	// 仮想ネットワークの状態をPROVISIONINGに更新
 	m.Db.UpdateVirtualNetworkStatus(vnetID, db.NETWORK_PROVISIONING)
@@ -429,6 +447,10 @@ func (m *Marmot) CheckVirtualNetworks() error {
 		vnet, err := convertLibvirtNetworkToAPINetwork(n)
 		if err != nil {
 			slog.Error("Failed to convert libvirt network to API network", "err", err)
+			continue
+		}
+		if isImportExcludedNetworkName(vnet.Metadata.Name) {
+			slog.Debug("Skipping libvirt network import for reserved network", "networkName", vnet.Metadata.Name)
 			continue
 		}
 

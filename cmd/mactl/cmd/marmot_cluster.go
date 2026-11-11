@@ -23,6 +23,16 @@ var marmotClusterCmd = &cobra.Command{
 				os.Exit(1)
 			}
 
+			infoBody, _, err := m.GetMarmotClusterInfo()
+			if err != nil {
+				return fmt.Errorf("クラスタが有効ではありません: %w", err)
+			}
+			var info api.ClusterInfo
+			if err := json.Unmarshal(infoBody, &info); err != nil {
+				fmt.Fprintln(os.Stderr, "Failed to Unmarshal", err)
+				return err
+			}
+
 			byteBody, _, err := m.GetMarmotCluster()
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "エラー応答が返されました。", err)
@@ -36,6 +46,7 @@ var marmotClusterCmd = &cobra.Command{
 					fmt.Fprintln(os.Stderr, "Failed to Unmarshal", err)
 					return err
 				}
+				fmt.Printf("ID: %s\n", info.ClusterId)
 				printHostCluster(statuses)
 				return nil
 
@@ -84,15 +95,20 @@ func printHostCluster(statuses []api.HostStatus) {
 		return stringVal(statuses[i].NodeName) < stringVal(statuses[j].NodeName)
 	})
 
-	fmt.Printf("%-16s %-10s %-15s %7s %10s %6s %7s %7s %8s %8s %8s %s\n",
-		"NODE", "HOSTID", "IP", "CAP_CPU", "CAP_MEM(MB)", "TOTAL", "RUNNING", "STOPPED", "VCPU", "MEM(MB)", "VNETS", "AGE")
+	fmt.Printf("%-16s %-10s %-15s %-6s %7s %10s %6s %7s %7s %8s %8s %8s %s\n",
+		"NODE", "HOSTID", "IP", "LEADER", "CAP_CPU", "CAP_MEM(MB)", "TOTAL", "RUNNING", "STOPPED", "VCPU", "MEM(MB)", "VNETS", "AGE")
 	for _, s := range statuses {
 		a := s.Allocation
 		c := s.Capacity
-		fmt.Printf("%-16s %-10s %-15s %7d %10d %6d %7d %7d %8d %8d %8d %s\n",
+		leader := ""
+		if s.SchedulerLeader != nil && *s.SchedulerLeader {
+			leader = "*"
+		}
+		fmt.Printf("%-16s %-10s %-15s %-6s %7d %10d %6d %7d %7d %8d %8d %8d %s\n",
 			stringVal(s.NodeName),
 			stringVal(s.HostId),
 			stringVal(s.IpAddress),
+			leader,
 			capacityIntVal(c, func(x *api.HostCapacity) *int { return x.CpuCores }),
 			capacityIntVal(c, func(x *api.HostCapacity) *int { return x.MemoryMB }),
 			intVal(a, func(x *api.HostAllocation) *int { return x.TotalVMs }),

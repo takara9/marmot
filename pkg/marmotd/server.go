@@ -241,6 +241,16 @@ func (m *Marmot) ResolveAndAssignServerNodeByStorage(serverID string) (string, e
 		return "", err
 	}
 
+	currentNode := ""
+	if serverConfig.Metadata.NodeName != nil {
+		currentNode = strings.TrimSpace(*serverConfig.Metadata.NodeName)
+	}
+	// ストレージ制約も nodeName 指定もない場合、配置はスケジューラーに任せる。
+	// 自ノードを既定値として割り当てると、スケジューラーによる均等配置を妨げる。
+	if currentNode == "" && strings.TrimSpace(storageNodeName) == "" {
+		return "", nil
+	}
+
 	assignedNodeName, err := chooseAssignedNodeName(m.NodeName, serverConfig.Metadata.NodeName, storageNodeName)
 	if err != nil {
 		return "", err
@@ -249,10 +259,6 @@ func (m *Marmot) ResolveAndAssignServerNodeByStorage(serverID string) (string, e
 		return "", nil
 	}
 
-	currentNode := ""
-	if serverConfig.Metadata.NodeName != nil {
-		currentNode = strings.TrimSpace(*serverConfig.Metadata.NodeName)
-	}
 	if currentNode == assignedNodeName {
 		return assignedNodeName, nil
 	}

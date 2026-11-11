@@ -18,6 +18,108 @@ etcdの可用性は、etcdクラスタを構成することで対応を計画し
 
 
 
+## maadm cluster でクラスタを構成する（推奨）
+
+`maadm cluster` コマンドで、ノードをクラスタへ編入、離脱させることができます。
+`maadm` は、marmot デーモンを介さずに、etcd の設定、`/etc/marmot/marmotd.json`、クラスタ情報を変更する管理者用のコマンドで、root 権限が必要です。
+いずれのサブコマンドも、`--dry-run` で変更内容の表示だけを行い、`--force` で確認プロンプトを省略できます。
+変更するファイルは `*.bak` に退避し、途中で失敗した場合は、`init` と `join` は元のシングルノード構成へ戻します。
+
+### 事前準備
+
+- 全ノードで、deb パッケージのインストールが終わり、シングルノードとして marmot と etcd が動作していること。
+- 全ノードで、一意な HOSTID を設定すること（後述の「ベアメタル導入時のユニークな hostid 設定」を参照）。
+- 全ノードで、`node_name`（`/etc/marmot/marmotd.json`）が重複していないこと。
+- ノード間で、次のポートが通ること。etcd は TCP 2379、OVN SB DB は TCP 6642、Geneve は UDP 6081 です。
+
+### マスターノードで init を実行する
+
+クラスタのコントロールノードにするノードで、`maadm cluster init` を実行します。
+
+```console
+root@marmot1:~# maadm cluster init --etcd-ip 172.16.0.201 --underlay-interface enp2s0
+以下の変更を行います。
+  /etc/systemd/system/etcd.service.d/marmot-cluster.conf: DAEMON_ARGS で etcd を http://172.16.0.201:2379 へ公開
+  /etc/marmot/marmotd.json: etcd_url=http://172.16.0.201:2379, default_underlay_interface=enp2s0
+  etcd 内: クラスタ情報（CLUSTER-ID, マスター=marmot1）を保存
+  etcd.service と marmot.service を再起動します（API が一時的に利用できなくなります。稼働中の VM は停止しません）
+続行しますか? [y/N]: y
+CLUSTER-ID: 6f1c0c0e-....
+etcd: http://172.16.0.201:2379
+他のノードで次のコマンドを実行してください:
+  maadm cluster join 6f1c0c0e-.... --master-node 172.16.0.201
+```
+
+| オプション | 説明 | 既定値 |
+|---|---|---|
+| `--etcd-ip` | etcd が待ち受け、他ノードへ公開する IPv4 アドレス | `--underlay-interface` の IPv4 アドレス |
+| `--underlay-interface` | ノード間のオーバーレイ（Geneve）に使うインターフェース。`default_underlay_interface` に設定する | 現在の `default_underlay_interface`、未設定なら `br0` |
+
+`init` は、次の変更を行います。
+
+- `etcd.service` 本体は変更せず、drop-in（`/etc/systemd/system/etcd.service.d/marmot-cluster.conf`）で `DAEMON_ARGS` を上書きして、etcd を `127.0.0.1` と `--etcd-ip` で待ち受けさせる。
+  `etcd.service` や `/etc/default/etcd` で独自の引数を指定している場合は、その引数が上書きされるので、drop-in に含めてください。
+  また、`ETCD_LISTEN_CLIENT_URLS` と `ETCD_ADVERTISE_CLIENT_URLS` の環境変数（`override.conf` など）が設定されていると、etcd はフラグと競合して起動できないため、drop-in の `UnsetEnvironment=` で無効化する。該当する変数がある場合は、実行前の確認画面に表示される。
+- `marmotd.json` の `etcd_url` と `default_underlay_interface` だけを更新する。他の項目は変更しない。
+- CLUSTER-ID（UUID v4）とマスターノード名を etcd に保存する。
+- `etcd.service` と `marmot.service` を再起動する。OVN の設定（`ovn-encap-type`、`ovn-encap-ip`、`ovn-remote`）は、起動時に marmotd が自動で行う。
+
+すでにクラスタが有効なノードで再実行しても、何も変更せず、CLUSTER-ID を表示して正常終了します。
+
+### 他のノードで join を実行する
+
+クラスタへ編入するノードで、`init` が表示した CLUSTER-ID と、マスターの IP アドレスを指定して、`maadm cluster join` を実行します。
+
+```console
+root@marmot2:~# maadm cluster join 6f1c0c0e-.... --master-node 172.16.0.201 --underlay-interface enp2s0
+```
+
+| オプション | 説明 | 既定値 |
+|---|---|---|
+| `--master-node` | マスターノードの IP アドレス（必須）。etcd のポートは 2379 | なし |
+| `--underlay-interface` | ノード間のオーバーレイ（Geneve）に使うインターフェース | `br0` |
+
+`join` は、次の場合に、何も変更せずにエラーで終了します。
+
+- すでにクラスタのメンバーである。
+- ローカルの etcd に、VM やネットワークなどの管理対象がある（クラスタへ引き継がれないため。marmotd が自動作成する `mgmt` ネットワークは対象外）。
+- マスターへ接続できない、マスターでクラスタが有効になっていない、または CLUSTER-ID が一致しない。
+- `node_name` または HOSTID が、すでに登録されているノードと重複している。
+
+事前チェックを通ると、marmot を停止して、ローカルの etcd を無効化（`systemctl disable --now etcd`）し、`marmotd.json` の `etcd_url` をマスターの etcd へ変更してから marmot を起動します。
+マスターの etcd にこのノードが登録されたことを確認して、CLUSTER-ID とノード一覧を表示します。登録を確認できない場合は、元のシングルノード構成へ戻します。
+
+### ノードをクラスタから離脱させる
+
+離脱するノードで、`maadm cluster leave` を実行します。
+
+```console
+root@marmot2:~# maadm cluster leave 6f1c0c0e-....
+```
+
+**このノード上の VM は、シャットダウンして削除され、復元できません。**
+必要なデータは、事前にバックアップしてください。実行すると、削除される VM の一覧が表示されます。`--dry-run` で、変更せずに確認できます。
+
+- マスターノードは離脱できません。マスターを外す場合は、先に他のノードを離脱させてください。
+- VM の削除には、離脱するノードの `marmot.service` が稼働している必要があります。VM のシャットダウンが 120 秒で完了しない場合は、強制停止して削除します。
+- VM を削除できなかった場合は、メンバーのまま中断します。再実行すると、残りの VM から続行します。
+- クラスタから自ノードの情報を削除した後、ローカルの etcd を有効にして、`etcd_url` を `http://127.0.0.1:2379` に戻し、OVN の `ovn-remote` と SB DB 上の chassis を削除して、marmot をシングルノードとして起動します。
+  OVN のクリーンアップに失敗した場合は、警告と手動コマンドを表示して、離脱は完了します。
+- ローカル構成の復元で失敗した場合は、原因を解消して再実行すると、その手順から続行します。
+- 再びクラスタへ参加する場合は、`maadm cluster join` を実行します。
+
+### 手動構成のクラスタを maadm の管理へ移行する
+
+以前の手順（次の「手動での構成手順」）で構成したクラスタは、クラスタ情報が etcd にないため、`mactl cluster` がエラーになります。
+マスターで `maadm cluster init` を実行すると、クラスタ情報が登録されます（etcd と marmot が再起動されます。稼働中の VM は停止しません）。
+
+## 手動での構成手順（maadm を使わない場合）
+
+以降の手順は、`maadm cluster` を使わずに、手作業でクラスタを構成する場合の手順です。
+「ベアメタル導入時のユニークな hostid 設定」は、maadm を使う場合も必要です。
+「/etc/resolve.confの編集」「イメージの再ロード」「クラスタ構成の確認」は、どちらの場合も共通です。
+手動で構成した場合、`mactl cluster` を使うには、マスターで `maadm cluster init` の実行が必要です。
+
 ## インストール後の操作
 
 それぞれのサーバーで、パッケージのインストールが終わったら、marmot と etcd を停止させる。
@@ -143,12 +245,17 @@ $ sudo systemctl restart marmot
 
 ## クラスタ構成の確認
 
-`mactl cluster` コマンドで、クラスタメンバーを表示することができます。
+`mactl cluster` コマンドで、CLUSTER-ID とクラスタメンバーを表示することができます。
+クラスタが有効でない場合（`maadm cluster init` を実行していない場合）は、エラーになります。
 
 ```console
 ubuntu@ws1:~$ mactl cluster
-NODE             HOSTID     IP              CAP_CPU CAP_MEM(MB)  TOTAL RUNNING STOPPED     VCPU  MEM(MB)    VNETS UPDATED
-marmot1          61e3eba0   172.16.0.201          8      15991      0       0       0        0        0        6 2026-06-30 11:06:31
-marmot2          9bffb5e3   172.16.0.202          8      15991      0       0       0        0        0        6 2026-06-30 11:06:31
-marmot3          67aa9474   172.16.0.203          8      15991      0       0       0        0        0        6 2026-06-30 11:06:33
+ID: 6f1c0c0e-....
+NODE             HOSTID     IP              CAP_CPU CAP_MEM(MB)  TOTAL RUNNING STOPPED     VCPU  MEM(MB)    VNETS AGE
+marmot1          61e3eba0   172.16.0.201          8      15991      0       0       0        0        0        6 56d
+marmot2          9bffb5e3   172.16.0.202          8      15991      0       0       0        0        0        6 56d
+marmot3          67aa9474   172.16.0.203          8      15991      0       0       0        0        0        6 56d
 ```
+
+`-o json` と `-o yaml` では、メンバーの一覧だけが出力されます。
+Geneve トンネルの状態は、[HOWTO-trableshort-geneve](HOWTO-trableshort-geneve) の手順で確認します。

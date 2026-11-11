@@ -905,8 +905,19 @@ func (c *networkController) ensureOverlayMeshForNetwork(fabric networkfabric.Net
 		}
 
 		// ヘッドネットワークのみ、Marmotホスト自身の固定IPプレゼンスを1つだけ用意する(issue #696)。
-		// フォロワー(他ノード)側で複製すると、同一L2ドメイン内でIPが重複するため対象外とする。
-		if vnet.Metadata.Labels == nil || db.GetNetworkSyncRole(*vnet.Metadata.Labels) != "follower" {
+		// フォロワー(他ノード)側で複製すると、同一L2ドメイン内でIPが重複するため対象外とし、
+		// 単独構成時代やhead交代で残ったmgmt-hostポートとDNSフォワーダーは撤去する。
+		if vnet.Metadata.Labels != nil && db.GetNetworkSyncRole(*vnet.Metadata.Labels) == "follower" {
+			marmotd.StopManagementDNSForwarder()
+			if ovnFabric, ok := fabric.(*networkfabric.OVNFabric); ok {
+				if err := ovnFabric.RemoveHostPresencePort(&vnet); err != nil {
+					slog.Warn("failed to remove management network host presence port on follower; will retry next loop", "err", err)
+				}
+			}
+			if err := marmotd.EnsureManagementAptCacher(marmotd.CurrentConfig(), false); err != nil {
+				slog.Warn("failed to stop apt-cacher-ng on follower; will retry next loop", "err", err)
+			}
+		} else {
 			if ovnFabric, ok := fabric.(*networkfabric.OVNFabric); ok {
 				if err := ovnFabric.EnsureHostPresencePort(&vnet, marmotd.ManagementNetworkHostAddress); err != nil {
 					return fmt.Errorf("ensure management network host presence failed: %w", err)
@@ -915,6 +926,9 @@ func (c *networkController) ensureOverlayMeshForNetwork(fabric networkfabric.Net
 				// bind失敗時は次回の定期ループで再試行するため、ここではログのみで継続する。
 				if err := marmotd.EnsureManagementDNSForwarder(marmotd.CurrentConfig()); err != nil {
 					slog.Warn("failed to start management network dns forwarder; will retry next loop", "err", err)
+				}
+				if err := marmotd.EnsureManagementAptCacher(marmotd.CurrentConfig(), true); err != nil {
+					slog.Warn("failed to start apt-cacher-ng on head; will retry next loop", "err", err)
 				}
 			}
 		}

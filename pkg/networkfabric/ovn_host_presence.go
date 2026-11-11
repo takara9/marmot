@@ -60,6 +60,19 @@ func (o *OVNFabric) EnsureHostPresencePort(vnet *api.VirtualNetwork, ipCIDR stri
 	return nil
 }
 
+// RemoveHostPresencePort は、ローカルノードのOVS上のmgmt-hostポートを削除して固定IPを外す(冪等, issue #696)。
+// OVN NB DBはクラスタで共有され論理ポートは現headのものなので、論理ポートは削除しない。
+func (o *OVNFabric) RemoveHostPresencePort(vnet *api.VirtualNetwork) error {
+	bridge := bridgeName(vnet)
+	if bridge == "" {
+		return fmt.Errorf("unable to determine bridge name")
+	}
+	if _, err := runOVSVSCTLCommand("--if-exists", "del-port", bridge, HostPresencePortName); err != nil {
+		return fmt.Errorf("failed to remove host presence OVS port %s from %s: %w", HostPresencePortName, bridge, err)
+	}
+	return nil
+}
+
 // ensureLinkAddress はlinkに指定CIDRのIPアドレスが無ければ追加する(冪等)。
 func ensureLinkAddress(link netlink.Link, ipCIDR string) error {
 	desired, err := netlink.ParseAddr(ipCIDR)

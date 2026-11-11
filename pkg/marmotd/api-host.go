@@ -1,12 +1,14 @@
 package marmotd
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/takara9/marmot/api"
+	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/util"
 )
 
@@ -23,6 +25,24 @@ func annotateIscsiServerStatuses(statuses []api.HostStatus) []api.HostStatus {
 			continue
 		}
 		annotated[i].IscsiServer = util.BoolPtr(IsIscsiServer(nodeName, annotated))
+	}
+
+	return annotated
+}
+
+func annotateSchedulerLeaderStatuses(statuses []api.HostStatus) []api.HostStatus {
+	annotated := make([]api.HostStatus, len(statuses))
+	copy(annotated, statuses)
+
+	for i := range annotated {
+		if annotated[i].NodeName == nil {
+			continue
+		}
+		nodeName := strings.TrimSpace(*annotated[i].NodeName)
+		if nodeName == "" {
+			continue
+		}
+		annotated[i].SchedulerLeader = util.BoolPtr(IsSchedulerLeader(nodeName, annotated))
 	}
 
 	return annotated
@@ -64,5 +84,20 @@ func (s *Server) ApiGetMarmotCluster(ctx echo.Context) error {
 		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
 	}
 
-	return ctx.JSON(http.StatusOK, annotateIscsiServerStatuses(statuses))
+	return ctx.JSON(http.StatusOK, annotateSchedulerLeaderStatuses(annotateIscsiServerStatuses(statuses)))
+}
+
+// クラスタ情報（CLUSTER-ID とマスターノード）を取得するAPIハンドラー
+func (s *Server) ApiGetMarmotClusterInfo(ctx echo.Context) error {
+	slog.Debug("===", "ApiGetMarmotClusterInfo() is called", "===")
+
+	info, err := s.Ma.Db.GetClusterInfo()
+	if errors.Is(err, db.ErrNotFound) {
+		return ctx.JSON(http.StatusNotFound, api.Error{Code: 1, Message: "cluster is not enabled"})
+	} else if err != nil {
+		slog.Error("ApiGetMarmotClusterInfo() GetClusterInfo() failed", "err", err)
+		return ctx.JSON(http.StatusInternalServerError, api.Error{Code: 1, Message: err.Error()})
+	}
+
+	return ctx.JSON(http.StatusOK, info)
 }

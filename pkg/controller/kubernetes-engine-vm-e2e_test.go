@@ -34,6 +34,7 @@ var _ = Describe("KubernetesEngine VM E2E", Ordered, func() {
 		volumeController  *volumeController
 		vmController      *serverController
 		mkeController     *kubernetesEngineController
+		schedulerCtl      *schedulerController
 		mkeConfigPath     string
 		stopHostStatus    context.CancelFunc
 		hostStatusDone    chan struct{}
@@ -69,6 +70,9 @@ var _ = Describe("KubernetesEngine VM E2E", Ordered, func() {
 		if mkeController != nil {
 			mkeController.Stop()
 		}
+		if schedulerCtl != nil {
+			schedulerCtl.Stop()
+		}
 		if stopHostStatus != nil {
 			stopHostStatus()
 			<-hostStatusDone
@@ -98,6 +102,9 @@ var _ = Describe("KubernetesEngine VM E2E", Ordered, func() {
 		vmController, err = StartVmController(nodeName, endpoint, 1)
 		Expect(err).NotTo(HaveOccurred())
 		mkeController, err = StartKubernetesEngineController(nodeName, endpoint, mkeConfigPath)
+		Expect(err).NotTo(HaveOccurred())
+		// ノードVMは nodeName 未指定で作られるため、スケジューラーが割り当てないとVMが作成されない。
+		schedulerCtl, err = StartSchedulerController(nodeName, endpoint)
 		Expect(err).NotTo(HaveOccurred())
 
 		hostStatusContext, cancelHostStatus := context.WithCancel(context.Background())

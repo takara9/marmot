@@ -97,6 +97,41 @@ func TestIsWildcardDNSListenAddr(t *testing.T) {
 	}
 }
 
+func TestStopManagementDNSForwarder_ClosesListenerAndIsIdempotent(t *testing.T) {
+	conn, err := startUDPDNSForwarder("127.0.0.1:0", "127.0.0.1:9")
+	if err != nil {
+		t.Fatalf("startUDPDNSForwarder() error = %v", err)
+	}
+	listenAddr := conn.LocalAddr().String()
+
+	managementDNSForwarderMu.Lock()
+	orig := managementDNSForwarderConn
+	managementDNSForwarderConn = conn
+	managementDNSForwarderMu.Unlock()
+	t.Cleanup(func() {
+		managementDNSForwarderMu.Lock()
+		managementDNSForwarderConn = orig
+		managementDNSForwarderMu.Unlock()
+	})
+
+	StopManagementDNSForwarder()
+
+	managementDNSForwarderMu.Lock()
+	stopped := managementDNSForwarderConn == nil
+	managementDNSForwarderMu.Unlock()
+	if !stopped {
+		t.Fatal("managementDNSForwarderConn is not nil after StopManagementDNSForwarder()")
+	}
+
+	rebound, err := net.ListenPacket("udp", listenAddr)
+	if err != nil {
+		t.Fatalf("listen address %s was not released: %v", listenAddr, err)
+	}
+	_ = rebound.Close()
+
+	StopManagementDNSForwarder()
+}
+
 func TestManagementNetworkNameserversFromConfig_ReturnsMgmtHostAddress(t *testing.T) {
 	ns := managementNetworkNameserversFromConfig()
 	if ns == nil || ns.Addresses == nil {

@@ -69,6 +69,22 @@ func EnsureManagementDNSForwarder(cfg *MarmotdConfig) error {
 	return nil
 }
 
+// StopManagementDNSForwarder は、mgmtのfollowerになったノードで稼働中のフォワーダーを停止する(冪等, issue #696)。
+// 10.245.0.1は現headだけが持つため、follower側で待受を残さない。
+func StopManagementDNSForwarder() {
+	managementDNSForwarderMu.Lock()
+	defer managementDNSForwarderMu.Unlock()
+
+	if managementDNSForwarderConn == nil {
+		return
+	}
+	if err := managementDNSForwarderConn.Close(); err != nil {
+		slog.Warn("failed to close management network dns forwarder", "err", err)
+	}
+	managementDNSForwarderConn = nil
+	slog.Debug("management network dns forwarder stopped")
+}
+
 func isWildcardDNSListenAddr(addr string) bool {
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {

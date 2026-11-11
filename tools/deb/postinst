@@ -91,9 +91,39 @@ PY
         echo "warning: failed to detect host IP address; api-advertise-host-bridge-address/dns_listen_addr were not updated" >&2
     fi
 
-    sed -i -E "s#\"host-bridge-ip-net-addr\": *\"[^\"]*\"#\"host-bridge-ip-net-addr\": \"192.168.1.0/24\"#" "${CONFIG_FILE}"
-    sed -i -E "s#\"host-bridge-ip-addr-start\": *\"[^\"]*\"#\"host-bridge-ip-addr-start\": \"192.168.1.200\"#" "${CONFIG_FILE}"
-    sed -i -E "s#\"host-bridge-ip-addr-end\": *\"[^\"]*\"#\"host-bridge-ip-addr-end\": \"192.168.1.250\"#" "${CONFIG_FILE}"
+    # 同梱 marmotd.json のプレースホルダ値のままの項目だけを既定値へ置換する。
+    # 利用者が設定した値はアップグレード時も上書きしない。同梱値を変更する場合は、ここの置換元も同期すること。
+    sed -i -E "s#(\"host-bridge-ip-net-addr\": *)\"192\.168\.1\.0/16\"#\1\"192.168.1.0/24\"#" "${CONFIG_FILE}"
+    sed -i -E "s#(\"host-bridge-ip-addr-start\": *)\"192\.168\.1\.220\"#\1\"192.168.1.200\"#" "${CONFIG_FILE}"
+    sed -i -E "s#(\"host-bridge-ip-addr-end\": *)\"192\.168\.1\.254\"#\1\"192.168.1.250\"#" "${CONFIG_FILE}"
+fi
+
+# /etc/hostid が無いと、hostid コマンドは全ノードで同じ値(007f0101)を返し、クラスタ参加時に
+# HOSTID の重複で拒否される。machine-id の CRC32 (little-endian 4バイト) で生成する。既存ファイルは上書きしない。
+# アップグレード時($2 に旧バージョンが入る)は、既存クラスタの実効 HOSTID(OVN 接続先の決定に使用)を維持するため生成しない。
+if [ -z "${2:-}" ] && [ ! -s /etc/hostid ]; then
+    python3 - /etc/hostid /etc/machine-id <<'PY' || echo "warning: failed to generate /etc/hostid" >&2
+import os
+import struct
+import sys
+import zlib
+
+hostid_path, machine_id_path = sys.argv[1:3]
+try:
+    with open(machine_id_path, encoding="utf-8") as f:
+        seed = f.read().strip().encode()
+except OSError:
+    seed = b""
+
+value = zlib.crc32(seed) if seed else struct.unpack("<I", os.urandom(4))[0]
+value = value or 1
+
+temp_path = hostid_path + ".tmp"
+with open(temp_path, "wb") as f:
+    f.write(struct.pack("<I", value))
+os.chmod(temp_path, 0o644)
+os.replace(temp_path, hostid_path)
+PY
 fi
 
 mkdir -p "${KEY_DIR}"
@@ -185,11 +215,19 @@ fi
 # apt-cacher-ng の設定(issue #696: マネジメント専用ネットワーク経由でゲストVMからアクセス可能にする)
 # 実際のアクセス制御はOVN ACL(management_network_acl_allow)側で行うため、ここでは
 # パッケージ既定のBindAddress(127.0.0.1)制限のみ解除して全インターフェースで待ち受けさせる。
+# 起動と停止は、10.245.0.1 を持つ mgmt の head ノードだけで稼働させるよう marmotd が制御する。
+# ここで一旦停止しておくことで、marmotd が起動する際に変更後の設定が反映される。
+# ホストの IPv6 経路が不完全だと、IPv6 を優先する既定(v6 v4)では上流への接続が
+# 503 No route to host で失敗するため、上流への接続は IPv4 に固定する。
 ACNG_CONF="/etc/apt-cacher-ng/acng.conf"
 if [ -f "${ACNG_CONF}" ]; then
     sed -i 's/^BindAddress:.*/# BindAddress disabled by marmot (issue #696): listen on all interfaces, restrict via OVN ACL/' "${ACNG_CONF}"
-    systemctl enable apt-cacher-ng.service || true
-    systemctl restart apt-cacher-ng.service || true
+    if grep -q '^ConnectProto:' "${ACNG_CONF}"; then
+        sed -i 's/^ConnectProto:.*/ConnectProto: v4/' "${ACNG_CONF}"
+    else
+        printf '\nConnectProto: v4\n' >> "${ACNG_CONF}"
+    fi
+    systemctl disable --now apt-cacher-ng.service || true
 fi
 
 systemctl daemon-reload

@@ -25,8 +25,9 @@ func rbacOperationMiddlewares(s *Server) map[string][]echo.MiddlewareFunc {
 		"apiListRoles":     {Resource: "", Verb: ""},
 		"apiGetRoleByName": {Resource: "", Verb: ""},
 
-		"apiGetMarmotStatus":  {Resource: "Cluster", Verb: "read"},
-		"apiGetMarmotCluster": {Resource: "Cluster", Verb: "read"},
+		"apiGetMarmotStatus":      {Resource: "Cluster", Verb: "read"},
+		"apiGetMarmotCluster":     {Resource: "Cluster", Verb: "read"},
+		"apiGetMarmotClusterInfo": {Resource: "Cluster", Verb: "read"},
 
 		"apiGetServers":                      {Resource: "Server", Verb: "read"},
 		"apiCreateServer":                    {Resource: "Server", Verb: "create"},
