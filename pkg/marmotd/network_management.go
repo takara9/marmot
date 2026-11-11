@@ -15,7 +15,7 @@ import (
 )
 
 // ManagementNetworkName はマネジメント専用ネットワークの予約名(issue #696)。
-const ManagementNetworkName = "mgmt"
+const ManagementNetworkName = db.ManagementNetworkName
 
 // ManagementNetworkCIDR はマネジメント専用ネットワークの固定IPネット(issue #696)。
 const ManagementNetworkCIDR = "10.245.0.0/16"

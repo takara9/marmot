@@ -1,7 +1,9 @@
 package db
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -27,7 +29,13 @@ const (
 	NetworkLabelSyncRole      = "syncRole"
 	NetworkLabelHeadNetworkID = "headNetworkId"
 	NetworkLabelHeadNodeName  = "headNodeName"
+
+	// ManagementNetworkName はマネジメント専用ネットワークの予約名(issue #696)。
+	ManagementNetworkName = "mgmt"
 )
+
+// ErrNoHeadCandidate は、head の所有を引き継げる follower ネットワークが無いことを示す。
+var ErrNoHeadCandidate = errors.New("no follower network can take over the head role")
 
 var NetworkStatus = map[int]string{
 	0: "PENDING",
@@ -615,4 +623,134 @@ func (d *Database) MakeFollowerVirtualNetworkEntry(headNetwork api.VirtualNetwor
 	}
 
 	return id, nil
+}
+
+type networkRecord struct {
+	key string
+	rev int64
+	net api.VirtualNetwork
+}
+
+// HandOverNetworkHead は headID の head ネットワークの所有ノードを、candidateNodes のうち
+// follower ネットワークを持つノード(優先順)へ移し、そのノードを返す。
+// head オブジェクトとその IPAM は保持したまま nodeName だけを付け替え、引き継ぐノードの follower は削除する。
+// これらは1つの etcd トランザクションで反映するため、head が重複したり不在になったりする中間状態は生じない。
+// 引き継げるノードが無ければ ErrNoHeadCandidate を返す。
+func (d *Database) HandOverNetworkHead(headID string, candidateNodes []string) (string, error) {
+	for attempt := 0; attempt < 3; attempt++ {
+		node, err := d.handOverNetworkHeadOnce(headID, candidateNodes)
+		if !errors.Is(err, ErrUpdateConflict) {
+			return node, err
+		}
+	}
+	return "", ErrUpdateConflict
+}
+
+func (d *Database) handOverNetworkHeadOnce(headID string, candidateNodes []string) (string, error) {
+	headKey := NetworkPrefix + "/" + headID
+	var head api.VirtualNetwork
+	headResp, err := d.GetJSON(headKey, &head)
+	if err != nil {
+		return "", err
+	}
+	normalizeVirtualNetworkID(&head, headKey)
+	if head.Metadata.Labels != nil && GetNetworkSyncRole(*head.Metadata.Labels) == "follower" {
+		return "", fmt.Errorf("network %s is not a head network", headID)
+	}
+
+	resp, err := d.GetByPrefix(NetworkPrefix + "/")
+	if err != nil {
+		return "", err
+	}
+	followers := map[string]networkRecord{}
+	for _, kv := range resp.Kvs {
+		key := string(kv.Key)
+		if key == headKey || strings.Contains(key, "/ip_network/") {
+			continue
+		}
+		var n api.VirtualNetwork
+		if json.Unmarshal(kv.Value, &n) != nil {
+			continue
+		}
+		normalizeVirtualNetworkID(&n, key)
+		if n.Metadata.Labels == nil || n.Metadata.NodeName == nil {
+			continue
+		}
+		if GetNetworkSyncRole(*n.Metadata.Labels) != "follower" || GetHeadNetworkID(*n.Metadata.Labels) != headID {
+			continue
+		}
+		followers[strings.TrimSpace(*n.Metadata.NodeName)] = networkRecord{key: key, rev: kv.ModRevision, net: n}
+	}
+
+	// 構築済み(ACTIVE)の follower を優先し、無ければ削除中でない follower から選ぶ。
+	var chosen *networkRecord
+	for _, onlyActive := range []bool{true, false} {
+		for _, node := range candidateNodes {
+			rec, ok := followers[strings.TrimSpace(node)]
+			if !ok || (rec.net.Status != nil && rec.net.Status.DeletionTimeStamp != nil) {
+				continue
+			}
+			if onlyActive && (rec.net.Status == nil || rec.net.Status.StatusCode != NETWORK_ACTIVE) {
+				continue
+			}
+			chosen = &rec
+			break
+		}
+		if chosen != nil {
+			break
+		}
+	}
+	if chosen == nil {
+		return "", ErrNoHeadCandidate
+	}
+	newHeadNode := strings.TrimSpace(*chosen.net.Metadata.NodeName)
+
+	newHead, err := util.DeepCopy(head)
+	if err != nil {
+		return "", err
+	}
+	newHead.Metadata.NodeName = util.StringPtr(newHeadNode)
+	if newHead.Metadata.Labels == nil {
+		newHead.Metadata.Labels = &map[string]interface{}{}
+	}
+	(*newHead.Metadata.Labels)[NetworkLabelHeadNodeName] = newHeadNode
+	if newHead.Status != nil {
+		newHead.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+	}
+	headJSON, err := json.Marshal(newHead)
+	if err != nil {
+		return "", fmt.Errorf("json marshal failed: %w", err)
+	}
+
+	cmps := []etcd.Cmp{etcd.Compare(etcd.ModRevision(headKey), "=", headResp.Kvs[0].ModRevision)}
+	ops := []etcd.Op{etcd.OpPut(headKey, string(headJSON)), etcd.OpDelete(chosen.key)}
+	cmps = append(cmps, etcd.Compare(etcd.ModRevision(chosen.key), "=", chosen.rev))
+	for _, rec := range followers {
+		if rec.key == chosen.key {
+			continue
+		}
+		updated, err := util.DeepCopy(rec.net)
+		if err != nil {
+			return "", err
+		}
+		(*updated.Metadata.Labels)[NetworkLabelHeadNodeName] = newHeadNode
+		b, err := json.Marshal(updated)
+		if err != nil {
+			return "", fmt.Errorf("json marshal failed: %w", err)
+		}
+		cmps = append(cmps, etcd.Compare(etcd.ModRevision(rec.key), "=", rec.rev))
+		ops = append(ops, etcd.OpPut(rec.key, string(b)))
+	}
+
+	ctx, cancel := context.WithTimeout(d.Ctx, 5*time.Second)
+	defer cancel()
+	txnResp, err := d.Cli.Txn(ctx).If(cmps...).Then(ops...).Commit()
+	if err != nil {
+		return "", fmt.Errorf("etcd txn failed: %w", err)
+	}
+	if !txnResp.Succeeded {
+		return "", ErrUpdateConflict
+	}
+	slog.Info("network head handed over", "networkId", headID, "name", head.Metadata.Name, "newHeadNode", newHeadNode)
+	return newHeadNode, nil
 }

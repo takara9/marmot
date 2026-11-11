@@ -39,6 +39,8 @@ type fakeStore struct {
 	managed          []string
 	deletedHosts     []string
 	deletedFollowers []string
+	handedOver       []string
+	handOverErr      error
 	cordoned         []string
 	volumes          map[string]bool
 }
@@ -113,6 +115,11 @@ func (s *fakeStore) CordonNode(name string) error {
 func (s *fakeStore) DeleteHostStatus(name string) error {
 	s.deletedHosts = append(s.deletedHosts, name)
 	return nil
+}
+
+func (s *fakeStore) HandOverManagementHead(name string, remaining []string) error {
+	s.handedOver = append(s.handedOver, name+"->"+strings.Join(remaining, ","))
+	return s.handOverErr
 }
 
 func (s *fakeStore) DeleteFollowerNetworks(name string) error {

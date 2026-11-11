@@ -97,6 +97,7 @@ func TestLeaveWithoutServers(t *testing.T) {
 	}
 	wantRuns := []string{
 		"ovs-vsctl get open . external_ids:ovn-remote",
+		"ovs-vsctl --if-exists del-port mgmt-host",
 		"ovs-vsctl get open . external_ids:system-id",
 		"ovs-vsctl remove open . external_ids ovn-remote",
 		"ovn-sbctl --db=tcp:10.1.0.13:6642 chassis-del sys-hv3",
@@ -104,8 +105,26 @@ func TestLeaveWithoutServers(t *testing.T) {
 	if strings.Join(f.runs, "|") != strings.Join(wantRuns, "|") {
 		t.Fatalf("runs = %v\nwant %v", f.runs, wantRuns)
 	}
+	if len(f.master.handedOver) != 1 || f.master.handedOver[0] != testNodeName+"->"+testMasterNode {
+		t.Fatalf("management head hand-over = %v", f.master.handedOver)
+	}
+	if len(f.master.deletedFollowers) != 1 || f.master.deletedFollowers[0] != testNodeName {
+		t.Fatalf("follower networks deleted = %v", f.master.deletedFollowers)
+	}
 	if !strings.Contains(out.String(), "シングルノードとして起動しました") {
 		t.Fatalf("output = %s", out.String())
+	}
+}
+
+func TestLeaveAbortsWhenManagementHeadHandOverFails(t *testing.T) {
+	f := newLeaveFixture(t)
+	f.master.handOverErr = errors.New("no follower")
+	err := Leave(context.Background(), f.env, f.opts(), &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "head") {
+		t.Fatalf("expected hand-over error, got %v", err)
+	}
+	if len(f.master.deletedFollowers) != 0 || len(f.master.deletedHosts) != 0 {
+		t.Fatalf("must not delete cluster objects: followers=%v hosts=%v", f.master.deletedFollowers, f.master.deletedHosts)
 	}
 }
 
