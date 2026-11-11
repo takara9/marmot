@@ -332,6 +332,9 @@ func Leave(ctx context.Context, env *Env, opts LeaveOptions, out io.Writer) erro
 				return fmt.Errorf("etcd (%s) へ接続できません。クラスタの情報を削除できないため、離脱しません: %w", cfg.EtcdURL, err)
 			}
 			defer func() { _ = store.Close() }()
+			if err := env.Systemctl("stop", MarmotUnit); err != nil {
+				return fmt.Errorf("ノード情報を削除する前の marmot 停止に失敗しました: %w", err)
+			}
 			if err := handOverManagementHead(store, cfg.NodeName); err != nil {
 				return err
 			}

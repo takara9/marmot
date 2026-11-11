@@ -39,6 +39,7 @@ type fakeStore struct {
 	managed          []string
 	deletedHosts     []string
 	deletedFollowers []string
+	followerNetworks []string
 	handedOver       []string
 	handOverErr      error
 	cordoned         []string
@@ -120,6 +121,10 @@ func (s *fakeStore) DeleteHostStatus(name string) error {
 func (s *fakeStore) HandOverManagementHead(name string, remaining []string) error {
 	s.handedOver = append(s.handedOver, name+"->"+strings.Join(remaining, ","))
 	return s.handOverErr
+}
+
+func (s *fakeStore) ListFollowerNetworkNames(name string) ([]string, error) {
+	return s.followerNetworks, nil
 }
 
 func (s *fakeStore) DeleteFollowerNetworks(name string) error {

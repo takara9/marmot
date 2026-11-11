@@ -254,6 +254,26 @@ func (s *dbStore) HandOverManagementHead(nodeName string, remainingNodes []strin
 	return nil
 }
 
+func (s *dbStore) ListFollowerNetworkNames(nodeName string) ([]string, error) {
+	networks, err := s.d.GetVirtualNetworks()
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, n := range networks {
+		if n.Metadata.NodeName == nil || strings.TrimSpace(*n.Metadata.NodeName) != nodeName {
+			continue
+		}
+		if n.Metadata.Labels == nil || db.GetNetworkSyncRole(*n.Metadata.Labels) != "follower" {
+			continue
+		}
+		if name := strings.TrimSpace(n.Metadata.Name); name != "" {
+			names = append(names, name)
+		}
+	}
+	return names, nil
+}
+
 func (s *dbStore) DeleteFollowerNetworks(nodeName string) error {
 	networks, err := s.d.GetVirtualNetworks()
 	if err != nil {
