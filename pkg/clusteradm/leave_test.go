@@ -291,8 +291,20 @@ func TestLeaveSkipsOVNWhenOvsIsMissing(t *testing.T) {
 	if err := Leave(context.Background(), f.env, f.opts(), &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	if len(f.runs) != 1 {
+	if len(f.runs) != 2 {
 		t.Fatalf("runs = %v", f.runs)
+	}
+}
+
+func TestLeaveAbortsBeforeHandOverWhenMgmtHostPortRemains(t *testing.T) {
+	f := newLeaveFixture(t)
+	f.runErr["ovs-vsctl"] = errors.New("ovsdb busy")
+	err := Leave(context.Background(), f.env, f.opts(), &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "mgmt-host") {
+		t.Fatalf("expected mgmt-host error, got %v", err)
+	}
+	if len(f.master.handedOver) != 0 {
+		t.Fatalf("head must not be handed over: %v", f.master.handedOver)
 	}
 }
 
