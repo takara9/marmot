@@ -384,7 +384,7 @@ func Leave(ctx context.Context, env *Env, opts LeaveOptions, out io.Writer) erro
 			return fmt.Errorf("CLUSTER-ID が一致しません（指定: %s, このノードのクラスタ: %s）", opts.ClusterID, info.ClusterId)
 		}
 		if info.MasterNode == cfg.NodeName {
-			return fmt.Errorf("マスターノード（%s）は離脱できません。先に他のノードを離脱させてください", cfg.NodeName)
+			return fmt.Errorf("ノード %s は etcd を稼働させているマスターノードのため、離脱できません（mactl cluster の LEADER 列とは別の概念です）。先に他のノードを離脱させてください", cfg.NodeName)
 		}
 		members, err := store.ListHostStatus()
 		if err != nil {
