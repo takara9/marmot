@@ -39,6 +39,9 @@ type ClusterStore interface {
 	DeleteClusterInfo() error
 	ListHostStatus() ([]api.HostStatus, error)
 	DeleteHostStatus(nodeName string) error
+	// 離脱ノードが mgmt ネットワークの head なら、remainingNodes のいずれかへ head を引き継ぐ。
+	// 引き継がないと、残りのノードに 10.245.0.1 (DNS/apt-cacher) を提供する head が不在になる
+	HandOverManagementHead(nodeName string, remainingNodes []string) error
 	// 離脱ノードの follower ネットワークを削除する。残すと、再参加時のメンバー同期で削除日時が設定され、
 	// 同名ネットワークへの削除伝播により head の mgmt 等が削除対象になる
 	DeleteFollowerNetworks(nodeName string) error
@@ -227,6 +230,28 @@ func (s *dbStore) DeleteHostStatus(nodeName string) error {
 	defer cancel()
 	_, err := s.d.Cli.Delete(ctx, db.HostStatusPrefix+"/"+nodeName)
 	return err
+}
+
+func (s *dbStore) HandOverManagementHead(nodeName string, remainingNodes []string) error {
+	if len(remainingNodes) == 0 {
+		return nil
+	}
+	networks, err := s.d.GetVirtualNetworks()
+	if err != nil {
+		return err
+	}
+	for _, n := range networks {
+		if n.Metadata.Name != db.ManagementNetworkName || n.Metadata.NodeName == nil || strings.TrimSpace(*n.Metadata.NodeName) != nodeName {
+			continue
+		}
+		if n.Metadata.Labels != nil && db.GetNetworkSyncRole(*n.Metadata.Labels) == "follower" {
+			continue
+		}
+		if _, err := s.d.HandOverNetworkHead(api.VirtualNetworkID(n), remainingNodes); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *dbStore) ListFollowerNetworkNames(nodeName string) ([]string, error) {

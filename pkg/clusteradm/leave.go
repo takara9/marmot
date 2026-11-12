@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"time"
 
@@ -196,6 +197,44 @@ func unquote(s string) string {
 	return strings.Trim(strings.TrimSpace(s), `"`)
 }
 
+// handOverManagementHead は、離脱ノードが mgmt ネットワークの head なら、残りのノードへ引き継ぐ。
+func handOverManagementHead(store ClusterStore, nodeName string) error {
+	hosts, err := store.ListHostStatus()
+	if err != nil {
+		return fmt.Errorf("mgmt ネットワークの head を引き継ぐノードを調べるためのノード一覧を取得できません: %w", err)
+	}
+	var remaining []string
+	for _, h := range hosts {
+		if name := derefString(h.NodeName); name != "" && name != nodeName {
+			remaining = append(remaining, name)
+		}
+	}
+	sort.Strings(remaining)
+	if err := store.HandOverManagementHead(nodeName, remaining); err != nil {
+		return fmt.Errorf("mgmt ネットワークの head を残りのノードへ引き継げませんでした。他のノードの follower ネットワークが作成されるのを待って、再実行してください: %w", err)
+	}
+	return nil
+}
+
+// removeMgmtHostPort は、head だったノードの mgmt-host ポートを撤去し、撤去を確認する。
+// 残ると、引き継いだ新 head が同じ IP／iface-id のポートを作成した際に競合する。
+func (e *Env) removeMgmtHostPort() error {
+	if _, err := e.Run("ovs-vsctl", "--if-exists", "del-port", "mgmt-host"); err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			return nil
+		}
+		return fmt.Errorf("mgmt-host ポートを削除できません（手動: ovs-vsctl --if-exists del-port mgmt-host）: %w", err)
+	}
+	out, err := e.Run("ovs-vsctl", "--if-exists", "get", "port", "mgmt-host", "_uuid")
+	if err != nil {
+		return fmt.Errorf("mgmt-host ポートの撤去を確認できません: %w", err)
+	}
+	if strings.TrimSpace(out) != "" {
+		return fmt.Errorf("mgmt-host ポートが残っています（手動: ovs-vsctl --if-exists del-port mgmt-host）")
+	}
+	return nil
+}
+
 // cleanupOVN は、OVS/OVN の設定から、クラスタの情報を取り除く。
 // 失敗しても離脱の完了を妨げないため、警告を表示して続行する。
 func (e *Env) cleanupOVN(out io.Writer) {
@@ -311,6 +350,12 @@ func Leave(ctx context.Context, env *Env, opts LeaveOptions, out io.Writer) erro
 			if err := env.Systemctl("stop", MarmotUnit); err != nil {
 				return fmt.Errorf("ノード情報を削除する前の marmot 停止に失敗しました: %w", err)
 			}
+			if err := env.removeMgmtHostPort(); err != nil {
+				return fmt.Errorf("mgmt-host ポートを撤去できないため、head を引き継ぎません: %w", err)
+			}
+			if err := handOverManagementHead(store, cfg.NodeName); err != nil {
+				return err
+			}
 			if err := store.DeleteFollowerNetworks(cfg.NodeName); err != nil {
 				return fmt.Errorf("クラスタ上のノードの follower ネットワークの削除に失敗しました: %w", err)
 			}
@@ -401,6 +446,12 @@ func Leave(ctx context.Context, env *Env, opts LeaveOptions, out io.Writer) erro
 		}
 		if err := env.Systemctl("stop", MarmotUnit); err != nil {
 			return fmt.Errorf("ノード情報を削除する前の marmot 停止に失敗しました: %w", err)
+		}
+		if err := env.removeMgmtHostPort(); err != nil {
+			return fmt.Errorf("mgmt-host ポートを撤去できないため、head を引き継ぎません: %w", err)
+		}
+		if err := handOverManagementHead(store, cfg.NodeName); err != nil {
+			return err
 		}
 		if err := store.DeleteFollowerNetworks(cfg.NodeName); err != nil {
 			return fmt.Errorf("クラスタ上のノードの follower ネットワークの削除に失敗しました。VM は削除済みです。再実行すると、この手順から続行します: %w", err)

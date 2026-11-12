@@ -146,6 +146,21 @@ func (c *networkController) networkControllerLoop(fabric networkfabric.NetworkFa
 				}
 			}
 		}
+
+		// head がクラスタから消えた mgmt は、リーダーが follower の1つへ引き継ぐ。
+		// 放置すると 10.245.0.1 (DNS/apt-cacher) を提供するノードが無くなる。
+		if isLeader {
+			if headID, members, ok := managementHeadToHandOver(vnets, statuses); ok {
+				if node, handOverErr := c.marmot.Db.HandOverNetworkHead(headID, members); handOverErr != nil {
+					slog.Warn("failed to hand over management network head; will retry next loop", "headNetworkId", headID, "err", handOverErr)
+				} else {
+					slog.Info("management network head handed over to a surviving node", "headNetworkId", headID, "newHeadNode", node)
+					if refreshed, refreshErr := c.marmot.GetVirtualNetwork(); refreshErr == nil {
+						vnets = refreshed
+					}
+				}
+			}
+		}
 	}
 
 	for _, vnet := range vnets {
@@ -994,6 +1009,39 @@ func (c *networkController) resolveGenevePeerIPs(vnet api.VirtualNetwork) ([]str
 	}
 	sort.Strings(peers)
 	return peers, nil
+}
+
+// managementHeadToHandOver は、所有ノードが HostStatus に存在しない mgmt の head があれば、
+// その ID と引き継ぎ候補(メンバーのノード名、昇順)を返す。
+func managementHeadToHandOver(vnets []api.VirtualNetwork, statuses []api.HostStatus) (string, []string, bool) {
+	members := collectClusterMemberNodes(statuses)
+	if len(members) == 0 {
+		return "", nil, false
+	}
+	memberSet := make(map[string]struct{}, len(members))
+	for _, node := range members {
+		memberSet[node] = struct{}{}
+	}
+	for _, vnet := range vnets {
+		if strings.TrimSpace(vnet.Metadata.Name) != marmotd.ManagementNetworkName || networkSyncRole(&vnet.Metadata) == "follower" {
+			continue
+		}
+		if vnet.Status != nil && vnet.Status.DeletionTimeStamp != nil {
+			continue
+		}
+		headNode := ""
+		if vnet.Metadata.NodeName != nil {
+			headNode = strings.TrimSpace(*vnet.Metadata.NodeName)
+		}
+		if headNode == "" {
+			continue
+		}
+		if _, ok := memberSet[headNode]; ok {
+			continue
+		}
+		return api.VirtualNetworkID(vnet), members, true
+	}
+	return "", nil, false
 }
 
 func collectClusterMemberNodes(statuses []api.HostStatus) []string {
