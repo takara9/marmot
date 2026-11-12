@@ -444,8 +444,10 @@ func (d *Database) putVirtualNetworkByID(rec api.VirtualNetwork) error {
 		return err
 	}
 
-	api.SetVirtualNetworkID(&rec, id)
-	return d.PutJSONCAS(key, resp.Kvs[0].ModRevision, &rec)
+	// 最新オブジェクトのステータスだけを書き換え、head 移譲などの並行更新を巻き戻さない
+	current.Status = rec.Status
+	api.SetVirtualNetworkID(&current, id)
+	return d.PutJSONCAS(key, resp.Kvs[0].ModRevision, &current)
 }
 
 // defaultMessageForStatus はステータスコードに対するデフォルトメッセージを返す。

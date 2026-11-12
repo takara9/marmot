@@ -104,4 +104,25 @@ var _ = Describe("ネットワーク head の引き継ぎ", Ordered, func() {
 		_, err := v.HandOverNetworkHead(followerB, []string{"node-b"})
 		Expect(err).To(HaveOccurred())
 	})
+
+	It("古いオブジェクトでのステータス保存が引き継ぎ結果を巻き戻さない", func() {
+		id := api.VirtualNetworkID(head)
+		stale, err := v.GetVirtualNetworkById(id)
+		Expect(err).NotTo(HaveOccurred())
+
+		latest, err := v.GetVirtualNetworkById(id)
+		Expect(err).NotTo(HaveOccurred())
+		latest.Metadata.NodeName = util.StringPtr("node-z")
+		(*latest.Metadata.Labels)[db.NetworkLabelHeadNodeName] = "node-z"
+		Expect(v.UpdateVirtualNetworkById(id, latest)).To(Succeed())
+
+		stale.Status.StatusCode = db.NETWORK_ERROR
+		Expect(v.PutVirtualNetworkByIDForTest(stale)).To(Succeed())
+
+		got, err := v.GetVirtualNetworkById(id)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(got.Status.StatusCode).To(Equal(db.NETWORK_ERROR))
+		Expect(*got.Metadata.NodeName).To(Equal("node-z"))
+		Expect(db.GetHeadNetworkNodeName(*got.Metadata.Labels)).To(Equal("node-z"))
+	})
 })
