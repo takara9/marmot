@@ -216,25 +216,6 @@ func handOverManagementHead(store ClusterStore, nodeName string) error {
 	return nil
 }
 
-// removeMgmtHostPort は、head だったノードの mgmt-host ポートを撤去し、撤去を確認する。
-// 残ると、引き継いだ新 head が同じ IP／iface-id のポートを作成した際に競合する。
-func (e *Env) removeMgmtHostPort() error {
-	if _, err := e.Run("ovs-vsctl", "--if-exists", "del-port", "mgmt-host"); err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			return nil
-		}
-		return fmt.Errorf("mgmt-host ポートを削除できません（手動: ovs-vsctl --if-exists del-port mgmt-host）: %w", err)
-	}
-	out, err := e.Run("ovs-vsctl", "--if-exists", "get", "port", "mgmt-host", "_uuid")
-	if err != nil {
-		return fmt.Errorf("mgmt-host ポートの撤去を確認できません: %w", err)
-	}
-	if strings.TrimSpace(out) != "" {
-		return fmt.Errorf("mgmt-host ポートが残っています（手動: ovs-vsctl --if-exists del-port mgmt-host）")
-	}
-	return nil
-}
-
 // cleanupOVN は、OVS/OVN の設定から、クラスタの情報を取り除く。
 // 失敗しても離脱の完了を妨げないため、警告を表示して続行する。
 func (e *Env) cleanupOVN(out io.Writer) {
@@ -250,6 +231,10 @@ func (e *Env) cleanupOVN(out io.Writer) {
 	remote = unquote(remote)
 	if err != nil {
 		remote = "" // 未設定
+	}
+	// head だったノードの mgmt-host ポートが残ると、引き継いだ新 head の 10.245.0.1 と重複する
+	if _, err := e.Run("ovs-vsctl", "--if-exists", "del-port", "mgmt-host"); err != nil {
+		warn("mgmt-host ポートを削除できませんでした: %v（手動: ovs-vsctl --if-exists del-port mgmt-host）", err)
 	}
 	systemID, err := e.Run("ovs-vsctl", "get", "open", ".", "external_ids:system-id")
 	if err != nil {
@@ -350,9 +335,6 @@ func Leave(ctx context.Context, env *Env, opts LeaveOptions, out io.Writer) erro
 			if err := env.Systemctl("stop", MarmotUnit); err != nil {
 				return fmt.Errorf("ノード情報を削除する前の marmot 停止に失敗しました: %w", err)
 			}
-			if err := env.removeMgmtHostPort(); err != nil {
-				return fmt.Errorf("mgmt-host ポートを撤去できないため、head を引き継ぎません: %w", err)
-			}
 			if err := handOverManagementHead(store, cfg.NodeName); err != nil {
 				return err
 			}
@@ -384,7 +366,7 @@ func Leave(ctx context.Context, env *Env, opts LeaveOptions, out io.Writer) erro
 			return fmt.Errorf("CLUSTER-ID が一致しません（指定: %s, このノードのクラスタ: %s）", opts.ClusterID, info.ClusterId)
 		}
 		if info.MasterNode == cfg.NodeName {
-			return fmt.Errorf("マスターノード（%s）は離脱できません。先に他のノードを離脱させてください", cfg.NodeName)
+			return fmt.Errorf("ノード %s は etcd を稼働させているマスターノードのため、離脱できません（mactl cluster の LEADER 列とは別の概念です）。先に他のノードを離脱させてください", cfg.NodeName)
 		}
 		members, err := store.ListHostStatus()
 		if err != nil {
@@ -446,9 +428,6 @@ func Leave(ctx context.Context, env *Env, opts LeaveOptions, out io.Writer) erro
 		}
 		if err := env.Systemctl("stop", MarmotUnit); err != nil {
 			return fmt.Errorf("ノード情報を削除する前の marmot 停止に失敗しました: %w", err)
-		}
-		if err := env.removeMgmtHostPort(); err != nil {
-			return fmt.Errorf("mgmt-host ポートを撤去できないため、head を引き継ぎません: %w", err)
 		}
 		if err := handOverManagementHead(store, cfg.NodeName); err != nil {
 			return err
