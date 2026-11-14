@@ -303,6 +303,35 @@ $ mactl delete mke mke0                           # クラスタの削除
 
 Ceph CSI によるストレージ連携やロードバランサー連携など、詳細な設計は [docs/MEMO-marmot-kubernetes-engine.md](docs/MEMO-marmot-kubernetes-engine.md) を参照してください。
 
+## （実験中）複数ノードでクラスタ構成にする
+
+シングル構成の Marmot ノードを複数台つなげて、1 つのクラスタとして運用できます。`maadm cluster` コマンドで、ノードの編入（`init` / `join`）と離脱（`leave`）を行います。すべて root 権限で実行します。
+
+```console
+# マスターにするノードで実行（CLUSTER-ID が発行される）
+$ sudo maadm cluster init --etcd-ip 10.1.0.13 --underlay-interface br0
+
+# 追加するノードで実行（init が表示したコマンド）
+$ sudo maadm cluster join <CLUSTER-ID> --master-node 10.1.0.13 --underlay-interface br0
+
+# クラスタの確認
+$ mactl cluster
+
+# ノードの離脱（そのノード上の VM とボリュームは削除されます）
+$ sudo maadm cluster leave <CLUSTER-ID>
+```
+
+`--dry-run` で変更内容だけを確認できます。`maadm` は改修中のため、最初に `--dry-run` で確認してから実行してください。
+
+主な制限事項:
+
+- etcd は単一構成で、マスターノードが単一障害点です。通信は平文 HTTP で認証もないため、信頼できる管理ネットワークで利用してください。
+- マスターノードは離脱できません。
+- `join` するノードには、VM などの管理対象が無いことが必要です。
+- `/etc/hostid` が最小のノードは OVN central の接続先となるため、後から加えるノードには、既存ノードより大きい HOSTID を設定してください。
+
+詳しい手順と現状の問題点は [docs/HOWTO-marmot-cluster.md](docs/HOWTO-marmot-cluster.md) を参照してください。
+
 ## （オプション）Ceph ボリュームを使う
 
 Marmotの仮想サーバーとして シングル構成の Ceph サーバーを簡単に自動セットアップできます。詳しくは[こちら](https://github.com/takara9/marmot-manifests/tree/main/56-ceph-single-node) をご覧ください。
@@ -362,7 +391,7 @@ $ mactl delete volume data-ceph-01     # 削除
 | まず手を動かして学びたい（30分コース / 2時間コース） | [Marmot Tutorial](https://github.com/takara9/marmot-manifests/blob/main/TUTORIAL.md) |
 | 実用的なマニフェストを眺めて真似したい | [Marmot マニフェスト集](https://github.com/takara9/marmot-manifests) |
 | コマンド・サブコマンド・オプションを調べたい | [Command Reference](https://github.com/takara9/marmot-manifests/blob/main/COMMAND_REFERENCE.md) |
-| クラスタ構成で運用したい | [marmotd クラスタ構成](docs/HOWTO-install-marmot-cluster.md) |
+| クラスタ構成で運用したい | [marmotd クラスタ構成](docs/HOWTO-install-marmot-cluster.md) / [maadm cluster の使い方](docs/HOWTO-marmot-cluster.md) |
 | Kubernetes（MKE）の設計を知りたい | [MKE 設計メモ](docs/MEMO-marmot-kubernetes-engine.md) |
 | 質問・相談・アイデアを共有したい | [GitHub Discussions](https://github.com/takara9/marmot/discussions) |
 
