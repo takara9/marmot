@@ -157,7 +157,7 @@ Ubuntu 24.04 のサーバーが1台あれば、約4ステップで VM と Kubern
 ```bash
 cd /tmp
 apt-get update
-VERSION=0.37.0    # 最新バージョンは Releases で確認してください
+VERSION=0.39.0    # 最新バージョンは Releases で確認してください
 curl -OL https://github.com/takara9/marmot/releases/download/v${VERSION}/marmot_v${VERSION}_amd64.deb
 sudo apt install -y ./marmot_v${VERSION}_amd64.deb
 ```
@@ -166,12 +166,14 @@ sudo apt install -y ./marmot_v${VERSION}_amd64.deb
 
 ```console
 $ mactl version
-Server version = 0.37.0
-Client version = 0.37.0
+Server version = 0.39.0
+Client version = 0.39.0
 ```
 
 設定は `/etc/marmot/marmotd.json-sample` と `/etc/marmot/mke.json-sample` を参考に行ってください。
 詳しい手順： [シングル構成](docs/HOWTO-install-marmot.md) / [クラスタ構成](docs/HOWTO-install-marmot-cluster.md)
+
+**クライアント（`mactl`）の対応 OS**: Linux、macOS、Windows に対応しています。`marmotd` を動かすサーバーは Linux（Ubuntu 24.04）ですが、`mactl` は手元の macOS や Windows のパソコンからも、サーバーの API へ接続して操作できます。Releases の `.deb` は Linux 用です。macOS と Windows では、ソースからビルドしてください（Windows 用のビルドは `cmd/mactl/Makefile.windows` を使用します）。
 
 ## 2. ログインする
 
