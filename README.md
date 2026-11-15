@@ -4,7 +4,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/takara9/marmot.svg)](https://pkg.go.dev/github.com/takara9/marmot)
 [![GitHub stars](https://img.shields.io/github/stars/takara9/marmot?style=social)](https://github.com/takara9/marmot/stargazers)
 
-# Marmot — 1台のサーバーから始められる、Kubernetes対応のシンプルなプライベートクラウド
+# Marmot （1台のサーバーから始められ、Kubernetes対応のシンプルなプライベートクラウド）
 
 **YAML を書いて `mactl create -f` するだけで** 「仮想サーバー」、「仮想ネットワーク」、「ストレージ」、そして 「Kubernetes クラスタ」、「NLB/ALB」までが、数分で手元の Linux サーバー 上で手に入ります。
 
