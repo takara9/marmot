@@ -6,7 +6,7 @@ https://go.dev/dl/
 
 
 ```console
-GOVER=1.26.2
+GOVER=1.27.4
 curl -OL https://go.dev/dl/go${GOVER}.linux-amd64.tar.gz
 sudo tar xzvf go${GOVER}.linux-amd64.tar.gz -C /usr/local
 ```

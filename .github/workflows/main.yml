@@ -20,7 +20,7 @@ jobs:
         fetch-depth: 0
     #- uses: actions/setup-go@v6
     #  with:
-    #    go-version: '1.26.2'
+    #    go-version: '1.27.4'
     - uses: golangci/golangci-lint-action@v9
       with:
         args: --new-from-rev=origin/main
@@ -56,7 +56,7 @@ jobs:
     - uses: actions/checkout@v5
     #- uses: actions/setup-go@v6
     #  with:
-    #    go-version: '1.26.2'
+    #    go-version: '1.27.4'
     - name: コンフィグパッケージ
       run: | 
         cd pkg/config
@@ -72,7 +72,7 @@ jobs:
     - uses: actions/checkout@v5
     #- uses: actions/setup-go@v6
     #  with:
-    #    go-version: '1.26.2'
+    #    go-version: '1.27.4'
     - name: ETCDのデータアクセス パッケージ
       run: | 
         cd pkg/db
@@ -88,7 +88,7 @@ jobs:
     - uses: actions/checkout@v5
     #- uses: actions/setup-go@v6
     #  with:
-    #    go-version: '1.26.2'
+    #    go-version: '1.27.4'
     - name: QCOW2操作 パッケージ
       run: | 
         cd pkg/qcow
@@ -104,7 +104,7 @@ jobs:
     - uses: actions/checkout@v5
     #- uses: actions/setup-go@v6
     #  with:
-    #    go-version: '1.26.2'
+    #    go-version: '1.27.4'
     - name: ランナーのセットアップ
       run: |
         sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/setup.sh
@@ -126,7 +126,7 @@ jobs:
     - uses: actions/checkout@v5
     #- uses: actions/setup-go@v6
     #  with:
-    #    go-version: '1.26.2'
+    #    go-version: '1.27.4'
     - name: mactl コマンド テスト
       run: |
         cd cmd/mactl
@@ -142,7 +142,7 @@ jobs:
     - uses: actions/checkout@v5
     #- uses: actions/setup-go@v6
     #  with:
-    #    go-version: '1.26.2'
+    #    go-version: '1.27.4'
     - name: ロジカルボリューム マネージャー 操作パッケージ
       run: | 
         cd pkg/lvm
@@ -160,7 +160,7 @@ jobs:
     - uses: actions/checkout@v5
     #- uses: actions/setup-go@v6
     #  with:
-    #    go-version: '1.26.2'
+    #    go-version: '1.27.4'
     - name: Cephブロックストレージ操作パッケージ
       run: | 
         cd pkg/ceph
@@ -176,7 +176,7 @@ jobs:
     - uses: actions/checkout@v5
     #- uses: actions/setup-go@v6
     #  with:
-    #    go-version: '1.26.2'
+    #    go-version: '1.27.4'
     - name: ランナーのセットアップ
       run: |
         sudo env PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ./tools/setup.sh
@@ -206,7 +206,7 @@ jobs:
     - uses: actions/checkout@v5
     #- uses: actions/setup-go@v6
     #  with:
-    #    go-version: '1.26.2'
+    #    go-version: '1.27.4'
     - name: Test pkg/marmotd ボリューム機能テスト
       run: |
         cd pkg/marmotd
@@ -223,7 +223,7 @@ jobs:
     - uses: actions/checkout@v5
     #- uses: actions/setup-go@v6
     #  with:
-    #    go-version: '1.26.2'
+    #    go-version: '1.27.4'
     - name: OVNパッケージのインストール確認(mgmtネットワーク用, issue #696)
       run: |
         sudo apt-get update || true
@@ -250,7 +250,7 @@ jobs:
     - uses: actions/checkout@v5
     #- uses: actions/setup-go@v6
     #  with:
-    #    go-version: '1.26.2'
+    #    go-version: '1.27.4'
     - name: 仮想ネットワーク削除
       if: always()
       run: |
@@ -280,7 +280,7 @@ jobs:
     - uses: actions/checkout@v5
     #- uses: actions/setup-go@v6
     #  with:
-    #    go-version: '1.26.2'
+    #    go-version: '1.27.4'
     - name: OVNパッケージのインストール確認(mgmtネットワーク用, issue #696)
       run: |
         sudo apt-get update || true
@@ -307,7 +307,7 @@ jobs:
     - uses: actions/checkout@v5
     #- uses: actions/setup-go@v6
     #  with:
-    #    go-version: '1.26.2'
+    #    go-version: '1.27.4'
     - name: Test pkg/marmotd OSイメージ機能テスト
       run: |
         cd pkg/marmotd
@@ -325,7 +325,7 @@ jobs:
     - uses: actions/checkout@v5
     #- uses: actions/setup-go@v6
     #  with:
-    #    go-version: '1.26.2'
+    #    go-version: '1.27.4'
     - name: OVNパッケージのインストール確認(mgmtネットワーク用, issue #696)
       run: |
         sudo apt-get update || true
@@ -360,7 +360,7 @@ jobs:
     - uses: actions/checkout@v5
     #- uses: actions/setup-go@v6
     #  with:
-    #    go-version: '1.26.2'
+    #    go-version: '1.27.4'
     - name: OVNパッケージのインストール確認(mgmtネットワーク用, issue #696)
       run: |
         sudo apt-get update || true
@@ -395,7 +395,7 @@ jobs:
     - uses: actions/checkout@v5
     #- uses: actions/setup-go@v6
     #  with:
-    #    go-version: '1.26.2'
+    #    go-version: '1.27.4'
     - name: OVNパッケージのインストール確認(mgmtネットワーク用, issue #696)
       run: |
         sudo apt-get update || true
@@ -431,7 +431,7 @@ jobs:
     - uses: actions/checkout@v5
     #- uses: actions/setup-go@v6
     #  with:
-    #    go-version: '1.26.2'
+    #    go-version: '1.27.4'
     - name: OVNパッケージのインストール確認(mgmtネットワーク用, issue #696)
       run: |
         sudo apt-get update || true
