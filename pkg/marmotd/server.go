@@ -1962,13 +1962,13 @@ func (m *Marmot) updateServerStatusIfObserved(id string, observedStatus int, ins
 
 // reconcileRunningDomainState は、RUNNING の Server の libvirt 実状態を照合する。
 // 外部操作で停止していた場合は STOPPED、定義が消えていた場合は ERROR に更新する。
-// 状態を更新した場合に true を返し、呼び出し元は以降の処理を行わない。
+// 状態を更新した場合、または実状態を取得できない場合に true を返し、呼び出し元は以降の処理を行わない。
 // 実状態を取得できない場合は状態を変えず、次の周期で再確認する。
 func (m *Marmot) reconcileRunningDomainState(id, instanceName string) bool {
 	verdict, err := judgeRunningDomain(queryLibvirtDomainState, instanceName)
 	if err != nil {
 		slog.Warn("libvirt ドメインの実状態を取得できないため、RUNNING の照合をスキップ", "serverId", id, "instanceName", instanceName, "err", err)
-		return false
+		return true
 	}
 
 	switch verdict {
