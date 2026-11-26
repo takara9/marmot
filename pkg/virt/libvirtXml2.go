@@ -512,6 +512,9 @@ func buildLibosInfoXML(osName, osVersion string) string {
 	)
 }
 
+// ErrVMStarted は、VM の起動自体は成功したが、起動後の処理で失敗したことを示す。
+var ErrVMStarted = errors.New("vm started but post-start processing failed")
+
 // 構造体で渡すのが良い
 func (l *LibVirtEp) DefineAndStartVM(domain libvirtxml.Domain) (string, error) {
 	xmlString, err := domain.Marshal()
@@ -542,13 +545,13 @@ func (l *LibVirtEp) DefineAndStartVM(domain libvirtxml.Domain) (string, error) {
 
 	consolePath, err := GetDomainConsolePath(dom)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("%w: %w", ErrVMStarted, err)
 	}
 
 	//オートスタートを設定しないと、HVの再起動からの復帰時、停止している。
 	err = dom.SetAutostart(true)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("%w: %w", ErrVMStarted, err)
 	}
 
 	return consolePath, nil

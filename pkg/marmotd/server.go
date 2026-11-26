@@ -1120,6 +1120,12 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		}
 	}
 	if err != nil {
+		if errors.Is(err, virt.ErrVMStarted) {
+			// VM は稼働中のため、接続済みの cloud-init ISO は削除しない。
+			keepCloudInitISO = true
+			slog.Error("DefineAndStartVM() post-start processing", "err", err)
+			return "", err
+		}
 		if cephSecretPrepared {
 			if cleanupErr := removeCephSecretForServer(l, api.ServerID(serverConfig)); cleanupErr != nil {
 				slog.Warn("removeCephSecretForServer() after failed DefineAndStartVM", "err", cleanupErr)
