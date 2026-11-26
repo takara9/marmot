@@ -25,6 +25,9 @@ import (
 	"github.com/takara9/marmot/pkg/virt"
 )
 
+// ErrDomainDeletionUnconfirmed は、ドメインの削除成功または不存在を確認できなかったことを示す。
+var ErrDomainDeletionUnconfirmed = errors.New("domain deletion not confirmed")
+
 func findHostStatusByNodeName(statuses []api.HostStatus, nodeName string) *api.HostStatus {
 	node := strings.TrimSpace(nodeName)
 	if node == "" {
@@ -885,6 +888,17 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 
 	path := "/var/lib/marmot/isos/" + api.ServerID(serverConfig)
 
+	// VM 起動に成功するまでの失敗では、生成済みの cloud-init ISO を残さない。
+	keepCloudInitISO := false
+	defer func() {
+		if keepCloudInitISO {
+			return
+		}
+		if cleanupErr := RemoveServerCloudInitISO(api.ServerID(serverConfig)); cleanupErr != nil {
+			slog.Warn("RemoveServerCloudInitISO() after failed server creation", "serverId", api.ServerID(serverConfig), "err", cleanupErr)
+		}
+	}()
+
 	password, sshKey, usernames, err := cloudInitAuthInputs(serverConfig.Spec.Auth)
 	if err != nil {
 		slog.Error("公開鍵の取得に失敗", "err", err)
@@ -1109,6 +1123,12 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		}
 	}
 	if err != nil {
+		if errors.Is(err, virt.ErrVMStarted) {
+			// VM は稼働中のため、接続済みの cloud-init ISO は削除しない。
+			keepCloudInitISO = true
+			slog.Error("DefineAndStartVM() post-start processing", "err", err)
+			return "", err
+		}
 		if cephSecretPrepared {
 			if cleanupErr := removeCephSecretForServer(l, api.ServerID(serverConfig)); cleanupErr != nil {
 				slog.Warn("removeCephSecretForServer() after failed DefineAndStartVM", "err", cleanupErr)
@@ -1117,6 +1137,8 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 		slog.Error("DefineAndStartVM()", "err", err) // ここで No such file or directory エラーになる
 		return "", err
 	}
+
+	keepCloudInitISO = true
 
 	// ステータスを利用可能に更新、更新日時もセット
 	serverConfig.Status.StatusCode = db.SERVER_RUNNING
@@ -1697,8 +1719,34 @@ func (m *Marmot) StartServerManage(id string) error {
 	return nil
 }
 
+const cloudInitISOBaseDir = "/var/lib/marmot/isos"
+
+// RemoveServerCloudInitISO は、サーバーの cloud-init ISO と、空になったディレクトリを削除する。
+// 既に存在しない場合は成功として扱うため、失敗時は繰り返し呼び出して再試行できる。
+func RemoveServerCloudInitISO(serverID string) error {
+	return removeServerCloudInitISO(cloudInitISOBaseDir, serverID)
+}
+
+func removeServerCloudInitISO(baseDir, serverID string) error {
+	id := strings.TrimSpace(serverID)
+	if id == "" || id == "." || id == ".." || strings.ContainsAny(id, `/\`) {
+		return fmt.Errorf("invalid server id for cloud-init iso cleanup: %q", serverID)
+	}
+
+	dir := filepath.Join(baseDir, id)
+	if err := os.Remove(filepath.Join(dir, "cloud-init.iso")); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("failed to remove cloud-init iso: %w", err)
+	}
+	// 想定外のファイルが残るディレクトリは削除せず、空の場合のみ削除する。
+	if err := os.Remove(dir); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("failed to remove cloud-init iso directory: %w", err)
+	}
+	return nil
+}
+
 // サーバーの削除 コントローラーから呼び出される
 func (m *Marmot) DeleteServerByIdManage(id string) error {
+	var domainDeleteErr error
 	slog.Debug("===DeleteServerById is called===", "id", id)
 	sv, err := m.Db.GetServerById(id)
 	if err != nil {
@@ -1721,6 +1769,9 @@ func (m *Marmot) DeleteServerByIdManage(id string) error {
 		slog.Debug("DeleteServerById()", "deleting domain", *sv.Metadata.InstanceName)
 
 		if err = l.DeleteDomain(*sv.Metadata.InstanceName); err != nil {
+			if !errors.Is(err, virt.ErrDomainNotFound) {
+				domainDeleteErr = fmt.Errorf("%w: %w", ErrDomainDeletionUnconfirmed, err)
+			}
 			// ドメインが存在しない場合はスキップしたいが、区別が難しいので意図的にスキップする
 			//if *sv.Status != db.SERVER_PROVISIONING {
 			//	slog.Error("DeleteDomain()", "err", err)
@@ -1761,7 +1812,7 @@ func (m *Marmot) DeleteServerByIdManage(id string) error {
 		}
 	}
 
-	return nil
+	return domainDeleteErr
 }
 
 // サーバーのリストを取得 ラップ関数  コントローラーから呼び出される
