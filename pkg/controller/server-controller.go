@@ -253,6 +253,15 @@ func (c *serverController) serverControllerLoop() {
 				isoCleanupErr = marmotd.RemoveServerCloudInitISO(api.ServerID(spec))
 			}
 
+			if isoCleanupErr != nil {
+				slog.Error("RemoveServerCloudInitISO()", "serverId", api.ServerID(spec), "err", isoCleanupErr)
+				msg := fmt.Sprintf("cloud-init ISO の削除に失敗したため、再試行します: %v", isoCleanupErr)
+				if dbErr := c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_DELETING, msg); dbErr != nil {
+					slog.Error("UpdateServerStatus() failed", "serverId", api.ServerID(spec), "err", dbErr)
+				}
+				continue
+			}
+
 			// IPアドレス開放処理の実行
 			if spec.Spec.NetworkInterface != nil {
 				for _, nic := range *spec.Spec.NetworkInterface {
@@ -293,15 +302,6 @@ func (c *serverController) serverControllerLoop() {
 				if err := c.marmot.Db.ReleaseIPsByHostID(spec.Metadata.Name); err != nil {
 					slog.Error("ReleaseIPsByHostID()", "err", err, "serverId", api.ServerID(spec), "serverName", spec.Metadata.Name)
 				}
-			}
-
-			if isoCleanupErr != nil {
-				slog.Error("RemoveServerCloudInitISO()", "serverId", api.ServerID(spec), "err", isoCleanupErr)
-				msg := fmt.Sprintf("cloud-init ISO の削除に失敗したため、再試行します: %v", isoCleanupErr)
-				if dbErr := c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_DELETING, msg); dbErr != nil {
-					slog.Error("UpdateServerStatus() failed", "serverId", api.ServerID(spec), "err", dbErr)
-				}
-				continue
 			}
 
 			// データベースから削除する
