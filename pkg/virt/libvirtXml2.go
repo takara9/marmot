@@ -712,6 +712,48 @@ func restartDomainForOVSReattach(dom *libvirt.Domain) error {
 	return nil
 }
 
+// DomainState は、libvirt ドメインの実行状態を Marmot の判定に必要な粒度に分類したもの。
+type DomainState int
+
+const (
+	// DomainStateOther は、一時停止・クラッシュ・シャットダウン中など、停止とは断定できない状態。
+	DomainStateOther DomainState = iota
+	DomainStateRunning
+	DomainStateStopped
+	DomainStateNotFound
+)
+
+func domainStateFromLibvirt(state libvirt.DomainState) DomainState {
+	switch state {
+	case libvirt.DOMAIN_RUNNING, libvirt.DOMAIN_BLOCKED:
+		return DomainStateRunning
+	case libvirt.DOMAIN_SHUTOFF:
+		return DomainStateStopped
+	default:
+		return DomainStateOther
+	}
+}
+
+// GetDomainState は、libvirt 上のドメインの実行状態を返す。
+// ドメイン定義が存在しない場合は DomainStateNotFound を返し、エラーにはしない。
+func (l *LibVirtEp) GetDomainState(vmname string) (DomainState, error) {
+	domain, err := l.Com.LookupDomainByName(vmname)
+	if err != nil {
+		var lerr libvirt.Error
+		if errors.As(err, &lerr) && lerr.Code == libvirt.ERR_NO_DOMAIN {
+			return DomainStateNotFound, nil
+		}
+		return DomainStateOther, err
+	}
+	defer func() { _ = domain.Free() }()
+
+	state, _, err := domain.GetState()
+	if err != nil {
+		return DomainStateOther, err
+	}
+	return domainStateFromLibvirt(state), nil
+}
+
 func (l *LibVirtEp) ListDomains() ([]string, error) {
 	var nameList []string
 
