@@ -1862,6 +1862,10 @@ func (m *Marmot) SyncServerResourcesManage(id string) error {
 		return fmt.Errorf("server %s has no instance name", id)
 	}
 
+	if sv.Status != nil && sv.Status.StatusCode == db.SERVER_RUNNING && m.reconcileRunningDomainState(id, *sv.Metadata.InstanceName) {
+		return nil
+	}
+
 	if sv.Spec.Cpu == nil && sv.Spec.Memory == nil {
 		return nil
 	}
@@ -1905,6 +1909,128 @@ func (m *Marmot) SyncServerResourcesManage(id string) error {
 		slog.Info("server resource settings reconciled with downtime workflow", "serverId", id, "instanceName", *sv.Metadata.InstanceName)
 	}
 
+	return nil
+}
+
+func queryLibvirtDomainState(name string) (virt.DomainState, error) {
+	l, err := virt.NewLibVirtEp("qemu:///system")
+	if err != nil {
+		return virt.DomainStateOther, err
+	}
+	defer l.Close()
+	return l.GetDomainState(name)
+}
+
+// runningDomainVerdict は、RUNNING の Server に対する libvirt 実状態の判定結果。
+type runningDomainVerdict int
+
+const (
+	runningDomainConsistent runningDomainVerdict = iota
+	runningDomainStoppedExternally
+	runningDomainMissing
+	runningDomainUnknown
+)
+
+// judgeRunningDomain は、RUNNING と記録された Server の libvirt 実状態から、状態の食い違いを判定する。
+func judgeRunningDomain(getState func(name string) (virt.DomainState, error), instanceName string) (runningDomainVerdict, error) {
+	state, err := getState(instanceName)
+	if err != nil {
+		return runningDomainUnknown, err
+	}
+	switch state {
+	case virt.DomainStateStopped:
+		return runningDomainStoppedExternally, nil
+	case virt.DomainStateNotFound:
+		return runningDomainMissing, nil
+	default:
+		return runningDomainConsistent, nil
+	}
+}
+
+// reconcileRunningDomainState は、RUNNING の Server の libvirt 実状態を照合する。
+// 外部操作で停止していた場合は STOPPED、定義が消えていた場合は ERROR に更新する。
+// 状態を更新した場合に true を返し、呼び出し元は以降の処理を行わない。
+// 実状態を取得できない場合は状態を変えず、次の周期で再確認する。
+func (m *Marmot) reconcileRunningDomainState(id, instanceName string) bool {
+	verdict, err := judgeRunningDomain(queryLibvirtDomainState, instanceName)
+	if err != nil {
+		slog.Warn("libvirt ドメインの実状態を取得できないため、RUNNING の照合をスキップ", "serverId", id, "instanceName", instanceName, "err", err)
+		return false
+	}
+
+	switch verdict {
+	case runningDomainStoppedExternally:
+		slog.Warn("RUNNING のサーバーが外部操作で停止されたことを検知。STOPPED に更新", "serverId", id, "instanceName", instanceName)
+		msg := "VM が Marmot の API 以外の操作で停止されたため STOPPED に更新"
+		if err := m.Db.UpdateServerStatus(id, db.SERVER_STOPPED, msg); err != nil {
+			slog.Error("UpdateServerStatus() failed", "serverId", id, "err", err)
+		}
+		return true
+	case runningDomainMissing:
+		slog.Error("RUNNING のサーバーの libvirt ドメイン定義が存在しない。ERROR に更新", "serverId", id, "instanceName", instanceName)
+		msg := "libvirt 上に VM の定義が見つかりません"
+		if err := m.Db.UpdateServerStatus(id, db.SERVER_ERROR, msg); err != nil {
+			slog.Error("UpdateServerStatus() failed", "serverId", id, "err", err)
+		}
+		return true
+	default:
+		return false
+	}
+}
+
+// stoppedDomainVerdict は、STOPPED の Server に対する libvirt 実状態の判定結果。
+type stoppedDomainVerdict int
+
+const (
+	stoppedDomainConsistent stoppedDomainVerdict = iota
+	stoppedDomainStartedExternally
+	stoppedDomainUnknown
+)
+
+// judgeStoppedDomain は、STOPPED と記録された Server の libvirt 実状態から、状態の食い違いを判定する。
+func judgeStoppedDomain(getState func(name string) (virt.DomainState, error), instanceName string) (stoppedDomainVerdict, error) {
+	state, err := getState(instanceName)
+	if err != nil {
+		return stoppedDomainUnknown, err
+	}
+	if state == virt.DomainStateRunning {
+		return stoppedDomainStartedExternally, nil
+	}
+	return stoppedDomainConsistent, nil
+}
+
+// ReconcileStoppedServerManage は、STOPPED の Server の libvirt 実状態を照合する。
+// 外部操作（virsh start など）で起動していた場合は RUNNING に更新する。
+// 実状態を取得できない場合は状態を変えず、次の周期で再確認する。
+func (m *Marmot) ReconcileStoppedServerManage(id string) error {
+	sv, err := m.Db.GetServerById(id)
+	if err != nil {
+		slog.Error("GetServerById()", "err", err)
+		return err
+	}
+	if sv.Status == nil || sv.Status.StatusCode != db.SERVER_STOPPED {
+		return nil
+	}
+	if sv.Metadata.InstanceName == nil || strings.TrimSpace(*sv.Metadata.InstanceName) == "" {
+		return nil
+	}
+	instanceName := *sv.Metadata.InstanceName
+
+	verdict, err := judgeStoppedDomain(queryLibvirtDomainState, instanceName)
+	if err != nil {
+		slog.Warn("libvirt ドメインの実状態を取得できないため、STOPPED の照合をスキップ", "serverId", id, "instanceName", instanceName, "err", err)
+		return nil
+	}
+	if verdict != stoppedDomainStartedExternally {
+		return nil
+	}
+
+	slog.Warn("STOPPED のサーバーが外部操作で起動されたことを検知。RUNNING に更新", "serverId", id, "instanceName", instanceName)
+	msg := "VM が Marmot の API 以外の操作で起動されたため RUNNING に更新"
+	if err := m.Db.UpdateServerStatus(id, db.SERVER_RUNNING, msg); err != nil {
+		slog.Error("UpdateServerStatus() failed", "serverId", id, "err", err)
+		return err
+	}
 	return nil
 }
 

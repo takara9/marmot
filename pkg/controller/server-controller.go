@@ -210,6 +210,9 @@ func (c *serverController) serverControllerLoop() {
 			}
 		case db.SERVER_STOPPED:
 			slog.Debug("停止中のサーバー検出", "SERVER", api.ServerID(spec))
+			if err := c.marmot.ReconcileStoppedServerManage(api.ServerID(spec)); err != nil {
+				slog.Error("ReconcileStoppedServerManage()", "serverId", api.ServerID(spec), "err", err)
+			}
 		case db.SERVER_STARTING:
 			slog.Debug("起動要求のサーバー検出", "SERVER", api.ServerID(spec))
 			if err := c.marmot.StartServerManage(api.ServerID(spec)); err != nil {
