@@ -25,6 +25,9 @@ import (
 	"github.com/takara9/marmot/pkg/virt"
 )
 
+// ErrDomainDeletionUnconfirmed は、ドメインの削除成功または不存在を確認できなかったことを示す。
+var ErrDomainDeletionUnconfirmed = errors.New("domain deletion not confirmed")
+
 func findHostStatusByNodeName(statuses []api.HostStatus, nodeName string) *api.HostStatus {
 	node := strings.TrimSpace(nodeName)
 	if node == "" {
@@ -1743,6 +1746,7 @@ func removeServerCloudInitISO(baseDir, serverID string) error {
 
 // サーバーの削除 コントローラーから呼び出される
 func (m *Marmot) DeleteServerByIdManage(id string) error {
+	var domainDeleteErr error
 	slog.Debug("===DeleteServerById is called===", "id", id)
 	sv, err := m.Db.GetServerById(id)
 	if err != nil {
@@ -1765,6 +1769,9 @@ func (m *Marmot) DeleteServerByIdManage(id string) error {
 		slog.Debug("DeleteServerById()", "deleting domain", *sv.Metadata.InstanceName)
 
 		if err = l.DeleteDomain(*sv.Metadata.InstanceName); err != nil {
+			if !errors.Is(err, virt.ErrDomainNotFound) {
+				domainDeleteErr = fmt.Errorf("%w: %w", ErrDomainDeletionUnconfirmed, err)
+			}
 			// ドメインが存在しない場合はスキップしたいが、区別が難しいので意図的にスキップする
 			//if *sv.Status != db.SERVER_PROVISIONING {
 			//	slog.Error("DeleteDomain()", "err", err)
@@ -1805,7 +1812,7 @@ func (m *Marmot) DeleteServerByIdManage(id string) error {
 		}
 	}
 
-	return nil
+	return domainDeleteErr
 }
 
 // サーバーのリストを取得 ラップ関数  コントローラーから呼び出される

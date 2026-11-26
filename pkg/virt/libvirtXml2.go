@@ -515,6 +515,9 @@ func buildLibosInfoXML(osName, osVersion string) string {
 // ErrVMStarted は、VM の起動自体は成功したが、起動後の処理で失敗したことを示す。
 var ErrVMStarted = errors.New("vm started but post-start processing failed")
 
+// ErrDomainNotFound は、削除対象のドメインが libvirt に存在しないことを示す。
+var ErrDomainNotFound = errors.New("domain not found")
+
 // 構造体で渡すのが良い
 func (l *LibVirtEp) DefineAndStartVM(domain libvirtxml.Domain) (string, error) {
 	xmlString, err := domain.Marshal()
@@ -731,6 +734,10 @@ func (l *LibVirtEp) DeleteDomain(vmname string) error {
 	domain, err := l.Com.LookupDomainByName(vmname)
 	if err != nil {
 		slog.Error("LookupDomainByName()", "err", err)
+		var lerr libvirt.Error
+		if errors.As(err, &lerr) && lerr.Code == libvirt.ERR_NO_DOMAIN {
+			return fmt.Errorf("%w: %w", ErrDomainNotFound, err)
+		}
 		return err
 	}
 

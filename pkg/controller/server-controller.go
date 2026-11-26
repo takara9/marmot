@@ -2,6 +2,7 @@ package controller
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -242,15 +243,22 @@ func (c *serverController) serverControllerLoop() {
 				slog.Warn("クラスタノード不在のため VM 実体削除をスキップし、サーバー定義削除を継続", "serverId", api.ServerID(spec))
 			} else {
 				// 仮想マシンの削除処理の実行
+				domainDeletionConfirmed := true
 				if err := c.marmot.DeleteServerByIdManage(api.ServerID(spec)); err != nil {
+					if errors.Is(err, marmotd.ErrDomainDeletionUnconfirmed) {
+						domainDeletionConfirmed = false
+					}
 					slog.Error("DeleteServerById()", "err", err)
 					msg := fmt.Sprintf("サーバーの削除に失敗: %v", err)
 					if dbErr := c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_ERROR, msg); dbErr != nil {
 						slog.Error("UpdateServerStatus() failed", "serverId", api.ServerID(spec), "err", dbErr)
 					}
 				}
-				// cloud-init ISO を削除する。失敗時はサーバー定義を残し、次の制御ループで再試行する
-				isoCleanupErr = marmotd.RemoveServerCloudInitISO(api.ServerID(spec))
+				// ドメインの削除成功または不存在を確認できた場合のみ、cloud-init ISO を削除する。
+				// 失敗時はサーバー定義を残し、次の制御ループで再試行する
+				if domainDeletionConfirmed {
+					isoCleanupErr = marmotd.RemoveServerCloudInitISO(api.ServerID(spec))
+				}
 			}
 
 			if isoCleanupErr != nil {
