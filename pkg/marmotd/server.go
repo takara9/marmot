@@ -1947,6 +1947,19 @@ func judgeRunningDomain(getState func(name string) (virt.DomainState, error), in
 	}
 }
 
+// updateServerStatusIfObserved は、観測時の状態・インスタンスが現在も一致する場合だけ状態を更新する。
+// API が STARTING / STOPPING などを記録していた場合は、受理済みの要求を上書きしない。
+func (m *Marmot) updateServerStatusIfObserved(id string, observedStatus int, instanceName string, status int, msg string) {
+	applied, err := m.Db.UpdateServerStatusIfCurrent(id, observedStatus, instanceName, status, msg)
+	if err != nil {
+		slog.Error("UpdateServerStatusIfCurrent() failed", "serverId", id, "err", err)
+		return
+	}
+	if !applied {
+		slog.Info("サーバーの状態が照合中に変更されたため、更新をスキップ", "serverId", id)
+	}
+}
+
 // reconcileRunningDomainState は、RUNNING の Server の libvirt 実状態を照合する。
 // 外部操作で停止していた場合は STOPPED、定義が消えていた場合は ERROR に更新する。
 // 状態を更新した場合に true を返し、呼び出し元は以降の処理を行わない。
@@ -1962,16 +1975,12 @@ func (m *Marmot) reconcileRunningDomainState(id, instanceName string) bool {
 	case runningDomainStoppedExternally:
 		slog.Warn("RUNNING のサーバーが外部操作で停止されたことを検知。STOPPED に更新", "serverId", id, "instanceName", instanceName)
 		msg := "VM が Marmot の API 以外の操作で停止されたため STOPPED に更新"
-		if err := m.Db.UpdateServerStatus(id, db.SERVER_STOPPED, msg); err != nil {
-			slog.Error("UpdateServerStatus() failed", "serverId", id, "err", err)
-		}
+		m.updateServerStatusIfObserved(id, db.SERVER_RUNNING, instanceName, db.SERVER_STOPPED, msg)
 		return true
 	case runningDomainMissing:
 		slog.Error("RUNNING のサーバーの libvirt ドメイン定義が存在しない。ERROR に更新", "serverId", id, "instanceName", instanceName)
 		msg := "libvirt 上に VM の定義が見つかりません"
-		if err := m.Db.UpdateServerStatus(id, db.SERVER_ERROR, msg); err != nil {
-			slog.Error("UpdateServerStatus() failed", "serverId", id, "err", err)
-		}
+		m.updateServerStatusIfObserved(id, db.SERVER_RUNNING, instanceName, db.SERVER_ERROR, msg)
 		return true
 	default:
 		return false
@@ -2027,8 +2036,8 @@ func (m *Marmot) ReconcileStoppedServerManage(id string) error {
 
 	slog.Warn("STOPPED のサーバーが外部操作で起動されたことを検知。RUNNING に更新", "serverId", id, "instanceName", instanceName)
 	msg := "VM が Marmot の API 以外の操作で起動されたため RUNNING に更新"
-	if err := m.Db.UpdateServerStatus(id, db.SERVER_RUNNING, msg); err != nil {
-		slog.Error("UpdateServerStatus() failed", "serverId", id, "err", err)
+	if _, err := m.Db.UpdateServerStatusIfCurrent(id, db.SERVER_STOPPED, instanceName, db.SERVER_RUNNING, msg); err != nil {
+		slog.Error("UpdateServerStatusIfCurrent() failed", "serverId", id, "err", err)
 		return err
 	}
 	return nil

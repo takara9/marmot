@@ -251,6 +251,64 @@ func (d *Database) updateServerStatus(id string, status int, message string) err
 	return nil
 }
 
+// UpdateServerStatusIfCurrent は、更新時に読み直したレコードの状態コードとインスタンス名が
+// 観測時の値と一致する場合だけステータスを更新する。一致しなければ更新せず false を返す。
+func (d *Database) UpdateServerStatusIfCurrent(id string, expectedStatus int, expectedInstanceName string, status int, message string) (bool, error) {
+	for {
+		applied, err := d.updateServerStatusIfCurrent(id, expectedStatus, expectedInstanceName, status, message)
+		if err == ErrUpdateConflict {
+			slog.Warn("UpdateServerStatusIfCurrent() retrying due to update conflict", "serverId", id)
+			continue
+		} else if err != nil {
+			slog.Error("UpdateServerStatusIfCurrent() failed", "err", err, "serverId", id)
+			return false, err
+		}
+		return applied, nil
+	}
+}
+
+func (d *Database) updateServerStatusIfCurrent(id string, expectedStatus int, expectedInstanceName string, status int, message string) (bool, error) {
+	lockKey := "/lock/server/" + id
+	mutex, err := d.LockKey(lockKey)
+	if err != nil {
+		slog.Error("failed to lock", "err", err, "lockKey", lockKey)
+		return false, err
+	}
+	defer d.UnlockKey(mutex)
+
+	var rec api.Server
+	key := ServerPrefix + "/" + id
+	resp, err := d.GetJSON(key, &rec)
+	if err != nil {
+		slog.Error("GetJSON() failed", "err", err, "key", key)
+		return false, err
+	}
+
+	if rec.Status == nil || rec.Status.StatusCode != expectedStatus {
+		return false, nil
+	}
+	if rec.Metadata.InstanceName == nil || *rec.Metadata.InstanceName != expectedInstanceName {
+		return false, nil
+	}
+
+	rec.Status.StatusCode = status
+	rec.Status.Status = util.StringPtr(ServerStatus[status])
+	if len(message) > 0 {
+		rec.Status.Message = util.StringPtr(message)
+	} else {
+		rec.Status.Message = nil
+	}
+	rec.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
+
+	api.SetServerID(&rec, id)
+	expected := resp.Kvs[0].ModRevision
+	if err := d.PutJSONCAS(key, expected, &rec); err != nil {
+		slog.Error("PutJSONCAS() failed", "err", err, "key", key, "expected", expected)
+		return false, err
+	}
+	return true, nil
+}
+
 // AssignNodeToServer は NodeName 未設定のサーバーに対して nodeName を割り当てる。
 // 既に割り当て済みの場合は何もしない。
 // etcd の CAS を利用して競合を防ぐ。
