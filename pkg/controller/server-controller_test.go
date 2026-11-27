@@ -1,14 +1,231 @@
 package controller
 
 import (
+	"context"
 	"errors"
+	"net"
+	"os/exec"
+	"sync/atomic"
+	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/util"
+	etcd "go.etcd.io/etcd/client/v3"
 )
+
+func waitServerSignal(t *testing.T, ch <-chan struct{}, timeout time.Duration) {
+	t.Helper()
+	select {
+	case <-ch:
+	case <-time.After(timeout):
+		t.Fatal("timed out waiting for signal")
+	}
+}
+
+func TestServerControllerWatchScheduling(t *testing.T) {
+	stop := make(chan struct{})
+	notifications := make(chan struct{}, 1)
+	started := make(chan struct{}, 10)
+	release := make(chan struct{})
+	done := make(chan struct{})
+	var calls atomic.Int32
+	go func() {
+		defer close(done)
+		runServerController(stop, notifications, 500*time.Millisecond, 150*time.Millisecond, func() {
+			started <- struct{}{}
+			if calls.Add(1) == 1 {
+				<-release
+			}
+		})
+	}()
+	defer func() {
+		close(stop)
+		waitServerSignal(t, done, time.Second)
+	}()
+
+	notifications <- struct{}{}
+	waitServerSignal(t, started, 400*time.Millisecond)
+	notifications <- struct{}{}
+	select {
+	case notifications <- struct{}{}:
+	default:
+	}
+	close(release)
+	select {
+	case <-started:
+		t.Fatal("watch notification was not rate limited")
+	case <-time.After(75 * time.Millisecond):
+	}
+	waitServerSignal(t, started, 400*time.Millisecond)
+	select {
+	case <-started:
+		t.Fatal("duplicate notifications triggered another reconcile")
+	case <-time.After(200 * time.Millisecond):
+	}
+	waitServerSignal(t, started, 400*time.Millisecond)
+}
+
+func TestServerWatchRecovery(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	notifications := make(chan struct{}, 1)
+	attempts := make(chan int, 3)
+	var count int
+	watch := func(ctx context.Context, key string, opts ...etcd.OpOption) etcd.WatchChan {
+		count++
+		attempts <- count
+		ch := make(chan etcd.WatchResponse, 1)
+		if count == 1 {
+			ch <- etcd.WatchResponse{Canceled: true, CompactRevision: 10}
+			close(ch)
+		} else {
+			ch <- etcd.WatchResponse{Created: true}
+			go func() {
+				<-ctx.Done()
+				close(ch)
+			}()
+		}
+		return ch
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		watchServerChanges(ctx, watch, notifications, 10*time.Millisecond)
+	}()
+	defer func() {
+		cancel()
+		waitServerSignal(t, done, time.Second)
+	}()
+
+	select {
+	case <-attempts:
+	case <-time.After(time.Second):
+		t.Fatal("watch did not start")
+	}
+	select {
+	case n := <-attempts:
+		if n != 2 {
+			t.Fatalf("unexpected watch attempt %d", n)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("watch did not restart after compaction")
+	}
+	waitServerSignal(t, notifications, time.Second)
+}
+
+func TestServerWatchEtcd(t *testing.T) {
+	binary, err := exec.LookPath("etcd")
+	if err != nil {
+		t.Skip("etcd binary not available")
+	}
+	freeAddress := func() string {
+		listener, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		address := listener.Addr().String()
+		if err := listener.Close(); err != nil {
+			t.Fatal(err)
+		}
+		return "http://" + address
+	}
+	clientURL, peerURL := freeAddress(), freeAddress()
+	dataDir := t.TempDir()
+	startEtcd := func() (context.CancelFunc, *exec.Cmd) {
+		processCtx, stop := context.WithCancel(context.Background())
+		cmd := exec.CommandContext(processCtx, binary,
+			"--name", "server-watch-test",
+			"--data-dir", dataDir,
+			"--listen-client-urls", clientURL,
+			"--advertise-client-urls", clientURL,
+			"--listen-peer-urls", peerURL,
+			"--initial-advertise-peer-urls", peerURL,
+			"--initial-cluster", "server-watch-test="+peerURL,
+			"--logger", "zap", "--log-level", "error")
+		if err := cmd.Start(); err != nil {
+			stop()
+			t.Fatal(err)
+		}
+		return stop, cmd
+	}
+	stopProcess, cmd := startEtcd()
+	t.Cleanup(func() {
+		stopProcess()
+		_ = cmd.Wait()
+	})
+	cli, err := etcd.New(etcd.Config{Endpoints: []string{clientURL}, DialTimeout: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = cli.Close() })
+	waitReady := func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		for {
+			getCtx, getCancel := context.WithTimeout(ctx, 250*time.Millisecond)
+			_, err = cli.Get(getCtx, "ready")
+			getCancel()
+			if err == nil {
+				return
+			}
+			if ctx.Err() != nil {
+				t.Fatalf("etcd did not start: %v", err)
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+	}
+	waitReady()
+
+	watchCtx, stopWatch := context.WithCancel(context.Background())
+	notifications := make(chan struct{}, 1)
+	done := make(chan struct{})
+	controllerStop := make(chan struct{})
+	controllerDone := make(chan struct{})
+	reconciled := make(chan struct{}, 2)
+	go func() {
+		defer close(done)
+		watchServerChanges(watchCtx, cli.Watch, notifications, 10*time.Millisecond)
+	}()
+	go func() {
+		defer close(controllerDone)
+		runServerController(controllerStop, notifications, 5*time.Second, 100*time.Millisecond, func() {
+			reconciled <- struct{}{}
+		})
+	}()
+	defer func() {
+		close(controllerStop)
+		stopWatch()
+		waitServerSignal(t, done, time.Second)
+		waitServerSignal(t, controllerDone, time.Second)
+	}()
+	waitServerSignal(t, reconciled, 3*time.Second)
+	putCtx, cancelPut := context.WithTimeout(context.Background(), 3*time.Second)
+	_, err = cli.Put(putCtx, db.ServerPrefix+"/watch-test", "before-restart")
+	cancelPut()
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitServerSignal(t, reconciled, 2*time.Second)
+
+	stopProcess()
+	_ = cmd.Wait()
+	stopProcess, cmd = startEtcd()
+	waitReady()
+	select {
+	case <-reconciled:
+	default:
+	}
+	putCtx, cancelPut = context.WithTimeout(context.Background(), 3*time.Second)
+	_, err = cli.Put(putCtx, db.ServerPrefix+"/watch-test", "after-restart")
+	cancelPut()
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitServerSignal(t, reconciled, 2*time.Second)
+}
 
 var _ = Describe("server controller helpers", func() {
 	Describe("clusterHasAnyNode", func() {
