@@ -1787,6 +1787,11 @@ func (m *Marmot) DeleteServerByIdManage(id string) error {
 		}
 	}
 
+	// VM が残っている可能性があるため、ボリュームを削除対象にせず、呼び出し元の再試行に委ねる。
+	if domainDeleteErr != nil {
+		return domainDeleteErr
+	}
+
 	// ブートボリュームの削除タイムスタンプのセット
 	if sv.Spec.BootVolume != nil && strings.TrimSpace(api.VolumeID(*sv.Spec.BootVolume)) != "" {
 		m.Db.SetVolumeDeletionTimestamp(api.VolumeID(*sv.Spec.BootVolume))
@@ -1812,7 +1817,7 @@ func (m *Marmot) DeleteServerByIdManage(id string) error {
 		}
 	}
 
-	return domainDeleteErr
+	return nil
 }
 
 // サーバーのリストを取得 ラップ関数  コントローラーから呼び出される

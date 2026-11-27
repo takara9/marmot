@@ -784,8 +784,7 @@ func (l *LibVirtEp) DeleteDomain(vmname string) error {
 	}
 
 	// ドメインの停止
-	err = domain.Destroy()
-	if err != nil {
+	if err = destroyDomainIfActive(domain); err != nil {
 		slog.Error("Destroy()", "err", err)
 		return err
 	}
@@ -806,6 +805,24 @@ func (l *LibVirtEp) DeleteDomain(vmname string) error {
 	}
 
 	return nil
+}
+
+type domainDestroyer interface {
+	GetState() (libvirt.DomainState, int, error)
+	Destroy() error
+}
+
+// destroyDomainIfActive は、停止していないドメインだけを強制停止する。
+// 停止中のドメインに Destroy を呼ぶと失敗し、後続の定義削除に進めなくなるため呼ばない。
+func destroyDomainIfActive(domain domainDestroyer) error {
+	state, _, err := domain.GetState()
+	if err != nil {
+		return err
+	}
+	if state == libvirt.DOMAIN_SHUTOFF {
+		return nil
+	}
+	return domain.Destroy()
 }
 
 type domainUndefiner interface {
