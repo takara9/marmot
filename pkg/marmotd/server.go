@@ -1780,16 +1780,15 @@ func (m *Marmot) DeleteServerByIdManage(id string) error {
 			slog.Debug("DeleteServerById()", "server is in PROVISIONING state, skipping domain deletion", serverName)
 			// return nil 戻さず、削除処理を続行する
 		}
+		// VM が残っている可能性があるため、Ceph secret とボリュームを保持し、呼び出し元の再試行に委ねる。
+		if domainDeleteErr != nil {
+			return domainDeleteErr
+		}
 		if hasCephStorage(sv.Spec.Storage) {
 			if err := removeCephSecretForServer(l, id); err != nil {
 				slog.Warn("removeCephSecretForServer()", "err", err, "serverId", id)
 			}
 		}
-	}
-
-	// VM が残っている可能性があるため、ボリュームを削除対象にせず、呼び出し元の再試行に委ねる。
-	if domainDeleteErr != nil {
-		return domainDeleteErr
 	}
 
 	// ブートボリュームの削除タイムスタンプのセット
