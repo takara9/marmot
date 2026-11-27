@@ -1,12 +1,14 @@
 package db
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"math/big"
 	"net/netip"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/takara9/marmot/api"
@@ -526,17 +528,46 @@ func (d *Database) ReleaseIPIfOwned(vnetId, ipnetId, ip, hostId string) error {
 	defer d.UnlockKey(mutex)
 
 	key := NetworkPrefix + "/" + vnetId + "/ip_network/" + ipnetId + "/ip_address/" + *net.AddressMaskLen + "/" + ip
-	var rec api.IPAddress
-	if _, err := d.GetJSON(key, &rec); err == ErrNotFound {
-		return nil
-	} else if err != nil {
-		return err
+	return d.releaseIPKeyIfOwned(key, owner, -1)
+}
+
+// releaseIPKeyIfOwned は、割り当て記録の HostId が owner の場合だけ、読み取り時の ModRevision が
+// 一致することを条件に削除する。競合した場合は記録を読み直して所有者を再確認する。
+// knownRev が 0 以上の場合は、呼び出し元が一覧取得で得た ModRevision を初回の条件に使う。
+func (d *Database) releaseIPKeyIfOwned(key, owner string, knownRev int64) error {
+	const maxAttempts = 10
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		rev := knownRev
+		knownRev = -1
+		if rev < 0 {
+			var rec api.IPAddress
+			resp, err := d.GetJSON(key, &rec)
+			if err == ErrNotFound {
+				return nil
+			} else if err != nil {
+				return err
+			}
+			if rec.HostId == nil || strings.TrimSpace(*rec.HostId) != owner {
+				slog.Warn("releaseIPKeyIfOwned() skipped ip allocated to another host", "key", key, "hostId", owner)
+				return nil
+			}
+			rev = resp.Kvs[0].ModRevision
+		}
+
+		ctx, cancel := context.WithTimeout(d.Ctx, 5*time.Second)
+		txnResp, err := d.Cli.Txn(ctx).
+			If(etcd.Compare(etcd.ModRevision(key), "=", rev)).
+			Then(etcd.OpDelete(key)).
+			Commit()
+		cancel()
+		if err != nil {
+			return fmt.Errorf("etcd txn failed: %w", err)
+		}
+		if txnResp.Succeeded {
+			return nil
+		}
 	}
-	if rec.HostId == nil || strings.TrimSpace(*rec.HostId) != owner {
-		slog.Warn("ReleaseIPIfOwned() skipped ip allocated to another host", "ip", ip, "hostId", owner)
-		return nil
-	}
-	return d.DeleteJSON(key)
+	return ErrUpdateConflict
 }
 
 // IPアドレスが存在するかどうかをチェックする
@@ -650,8 +681,8 @@ func (d *Database) ReleaseIPsByHostID(hostID string) error {
 			continue
 		}
 
-		if err := d.DeleteJSON(key); err != nil && err != ErrNotFound {
-			slog.Error("ReleaseIPsByHostID() DeleteJSON() failed", "err", err, "hostId", target, "key", key)
+		if err := d.releaseIPKeyIfOwned(key, target, kv.ModRevision); err != nil {
+			slog.Error("ReleaseIPsByHostID() releaseIPKeyIfOwned() failed", "err", err, "hostId", target, "key", key)
 			return err
 		}
 	}
