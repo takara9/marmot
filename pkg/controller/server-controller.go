@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,10 +15,13 @@ import (
 	"github.com/takara9/marmot/pkg/marmotd"
 	"github.com/takara9/marmot/pkg/networkfabric"
 	"github.com/takara9/marmot/pkg/util"
+	etcd "go.etcd.io/etcd/client/v3"
 )
 
 const (
 	SERVER_CONTROLLER_INTERVAL = 5 * time.Second
+	serverWatchMinInterval     = time.Second
+	serverWatchRetryInterval   = time.Second
 )
 
 // serverController はゲストVM(Server)の状態を管理する専用コントローラー。
@@ -53,25 +57,110 @@ func StartVmController(node string, etcdUrl string, deletionDelaySeconds int) (*
 	c.stopChan = make(chan struct{})
 	c.doneChan = make(chan struct{})
 
-	// 定期実行の開始
-	ticker := time.NewTicker(SERVER_CONTROLLER_INTERVAL)
 	go func() {
-		defer ticker.Stop()
 		defer close(c.doneChan)
-		for {
-			select {
-			case <-ticker.C:
-				c.serverControllerLoop()
-			case <-c.stopChan:
-				slog.Debug("サーバーコントローラー停止")
-				return
-			}
-		}
+		ctx, cancel := context.WithCancel(context.Background())
+		notifications := make(chan struct{}, 1)
+		watchDone := make(chan struct{})
+		go func() {
+			defer close(watchDone)
+			watchServerChanges(ctx, c.db.Cli.Watch, notifications, serverWatchRetryInterval)
+		}()
+		runServerController(c.stopChan, notifications, SERVER_CONTROLLER_INTERVAL, serverWatchMinInterval, c.serverControllerLoop)
+		cancel()
+		<-watchDone
+		slog.Debug("サーバーコントローラー停止")
 	}()
 	return &c, nil
 }
 
-// Stop はコントローラーの定期処理を停止し、終了を待機する。
+func watchServerChanges(ctx context.Context, watch func(context.Context, string, ...etcd.OpOption) etcd.WatchChan, notifications chan<- struct{}, retryInterval time.Duration) {
+	notify := func() {
+		select {
+		case notifications <- struct{}{}:
+		default:
+		}
+	}
+
+	for ctx.Err() == nil {
+		ch := watch(ctx, db.ServerPrefix+"/", etcd.WithPrefix(), etcd.WithCreatedNotify())
+		for response := range ch {
+			if err := response.Err(); err != nil {
+				slog.Warn("Server watch failed; retrying", "err", err)
+				break
+			}
+			if response.Created {
+				slog.Info("Server watch established")
+				notify()
+			}
+			if len(response.Events) > 0 {
+				notify()
+			}
+		}
+		if ctx.Err() != nil {
+			return
+		}
+		slog.Warn("Server watch ended; retrying")
+		timer := time.NewTimer(retryInterval)
+		select {
+		case <-timer.C:
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		}
+	}
+}
+
+func runServerController(stop <-chan struct{}, notifications <-chan struct{}, interval, minInterval time.Duration, reconcile func()) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	var lastRun time.Time
+	var pendingTimer *time.Timer
+	var pending <-chan time.Time
+	defer func() {
+		if pendingTimer != nil {
+			pendingTimer.Stop()
+		}
+	}()
+
+	run := func() {
+		reconcile()
+		lastRun = time.Now()
+		if pendingTimer != nil {
+			pendingTimer.Stop()
+			pendingTimer.Reset(minInterval)
+		}
+	}
+
+	for {
+		select {
+		case <-stop:
+			return
+		default:
+		}
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			run()
+		case <-notifications:
+			if pendingTimer == nil {
+				delay := time.Until(lastRun.Add(minInterval))
+				if delay < 0 {
+					delay = 0
+				}
+				pendingTimer = time.NewTimer(delay)
+				pending = pendingTimer.C
+			}
+		case <-pending:
+			pendingTimer = nil
+			pending = nil
+			run()
+		}
+	}
+}
+
+// Stop はコントローラーの処理を停止し、終了を待機する。
 func (c *serverController) Stop() {
 	if c == nil {
 		return
