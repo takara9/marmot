@@ -1,12 +1,14 @@
 package db
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"math/big"
 	"net/netip"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/takara9/marmot/api"
@@ -498,6 +500,76 @@ func (d *Database) ReleaseIP(vnetId, ipnetId, ip string) error {
 	return d.DeleteJSON(key)
 }
 
+// ReleaseIPIfOwned は、割り当て記録の HostId が hostId と一致する場合だけ IP アドレスを解放する。
+// 解放後に他のホストへ再割り当てされた IP を、再実行で誤って解放しないために使う。
+// IP ネットワークまたは割り当て記録が存在しない場合、および他のホストの割り当ての場合は何もしない。
+func (d *Database) ReleaseIPIfOwned(vnetId, ipnetId, ip, hostId string) error {
+	owner := strings.TrimSpace(hostId)
+	if owner == "" {
+		return fmt.Errorf("hostId is required to release ip %s", ip)
+	}
+
+	net, err := d.GetIpNetworkById(vnetId, ipnetId)
+	if err == ErrNotFound {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	if net.AddressMaskLen == nil {
+		return fmt.Errorf("ip network AddressMaskLen is empty: vnetId=%s ipnetId=%s", vnetId, ipnetId)
+	}
+
+	lockKey := NetworkPrefix + "/" + vnetId + "/ip_network/" + ipnetId + "/ipam_lock"
+	mutex, err := d.LockKey(lockKey)
+	if err != nil {
+		slog.Error("ReleaseIPIfOwned() failed to lock", "err", err, "lockKey", lockKey)
+		return err
+	}
+	defer d.UnlockKey(mutex)
+
+	key := NetworkPrefix + "/" + vnetId + "/ip_network/" + ipnetId + "/ip_address/" + *net.AddressMaskLen + "/" + ip
+	return d.releaseIPKeyIfOwned(key, owner, -1)
+}
+
+// releaseIPKeyIfOwned は、割り当て記録の HostId が owner の場合だけ、読み取り時の ModRevision が
+// 一致することを条件に削除する。競合した場合は記録を読み直して所有者を再確認する。
+// knownRev が 0 以上の場合は、呼び出し元が一覧取得で得た ModRevision を初回の条件に使う。
+func (d *Database) releaseIPKeyIfOwned(key, owner string, knownRev int64) error {
+	const maxAttempts = 10
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		rev := knownRev
+		knownRev = -1
+		if rev < 0 {
+			var rec api.IPAddress
+			resp, err := d.GetJSON(key, &rec)
+			if err == ErrNotFound {
+				return nil
+			} else if err != nil {
+				return err
+			}
+			if rec.HostId == nil || strings.TrimSpace(*rec.HostId) != owner {
+				slog.Warn("releaseIPKeyIfOwned() skipped ip allocated to another host", "key", key, "hostId", owner)
+				return nil
+			}
+			rev = resp.Kvs[0].ModRevision
+		}
+
+		ctx, cancel := context.WithTimeout(d.Ctx, 5*time.Second)
+		txnResp, err := d.Cli.Txn(ctx).
+			If(etcd.Compare(etcd.ModRevision(key), "=", rev)).
+			Then(etcd.OpDelete(key)).
+			Commit()
+		cancel()
+		if err != nil {
+			return fmt.Errorf("etcd txn failed: %w", err)
+		}
+		if txnResp.Succeeded {
+			return nil
+		}
+	}
+	return ErrUpdateConflict
+}
+
 // IPアドレスが存在するかどうかをチェックする
 func (d *Database) CheckIPaddrInUse(vnetId, ipnetId, ip string) (bool, error) {
 	net, err := d.GetIpNetworkById(vnetId, ipnetId)
@@ -609,8 +681,8 @@ func (d *Database) ReleaseIPsByHostID(hostID string) error {
 			continue
 		}
 
-		if err := d.DeleteJSON(key); err != nil && err != ErrNotFound {
-			slog.Error("ReleaseIPsByHostID() DeleteJSON() failed", "err", err, "hostId", target, "key", key)
+		if err := d.releaseIPKeyIfOwned(key, target, kv.ModRevision); err != nil {
+			slog.Error("ReleaseIPsByHostID() releaseIPKeyIfOwned() failed", "err", err, "hostId", target, "key", key)
 			return err
 		}
 	}
