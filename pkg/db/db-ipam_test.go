@@ -334,6 +334,45 @@ var _ = Describe("IPAM", Ordered, func() {
 				}
 			})
 
+			Context("所有者を確認したIPアドレスの解放", func() {
+				allocatedTo := func(ip string) *string {
+					ips, err := v.GetAllocatedIPs(vnetId, idIpv4_2)
+					Expect(err).NotTo(HaveOccurred())
+					for _, rec := range ips {
+						if rec.IpAddress == ip {
+							return rec.HostId
+						}
+					}
+					return nil
+				}
+
+				It("所有者が一致する場合は解放し、繰り返し実行しても成功する", func() {
+					ip, _, err := v.AllocateIP(vnetId, idIpv4_2, "owner-a")
+					Expect(err).NotTo(HaveOccurred())
+
+					Expect(v.ReleaseIPIfOwned(vnetId, idIpv4_2, ip, "owner-a")).To(Succeed())
+					Expect(allocatedTo(ip)).To(BeNil())
+					Expect(v.ReleaseIPIfOwned(vnetId, idIpv4_2, ip, "owner-a")).To(Succeed())
+				})
+
+				It("他のホストへ再割り当てされた IP は解放しない", func() {
+					ip, _, err := v.AllocateIP(vnetId, idIpv4_2, "owner-b")
+					Expect(err).NotTo(HaveOccurred())
+
+					Expect(v.ReleaseIPIfOwned(vnetId, idIpv4_2, ip, "owner-a")).To(Succeed())
+					Expect(allocatedTo(ip)).NotTo(BeNil())
+					Expect(*allocatedTo(ip)).To(Equal("owner-b"))
+				})
+
+				It("IP ネットワークが存在しない場合は成功扱いにする", func() {
+					Expect(v.ReleaseIPIfOwned(vnetId, "no-such-ip-network", "192.168.201.10", "owner-a")).To(Succeed())
+				})
+
+				It("所有者が空の場合はエラーを返す", func() {
+					Expect(v.ReleaseIPIfOwned(vnetId, idIpv4_2, "192.168.201.10", " ")).NotTo(Succeed())
+				})
+			})
+
 			It("IPアドレスの割当リストの取得", func() {
 				ips, err := v.GetAllocatedIPs(vnetId, idIpv4_1)
 				Expect(err).NotTo(HaveOccurred())

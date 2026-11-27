@@ -498,6 +498,47 @@ func (d *Database) ReleaseIP(vnetId, ipnetId, ip string) error {
 	return d.DeleteJSON(key)
 }
 
+// ReleaseIPIfOwned は、割り当て記録の HostId が hostId と一致する場合だけ IP アドレスを解放する。
+// 解放後に他のホストへ再割り当てされた IP を、再実行で誤って解放しないために使う。
+// IP ネットワークまたは割り当て記録が存在しない場合、および他のホストの割り当ての場合は何もしない。
+func (d *Database) ReleaseIPIfOwned(vnetId, ipnetId, ip, hostId string) error {
+	owner := strings.TrimSpace(hostId)
+	if owner == "" {
+		return fmt.Errorf("hostId is required to release ip %s", ip)
+	}
+
+	net, err := d.GetIpNetworkById(vnetId, ipnetId)
+	if err == ErrNotFound {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	if net.AddressMaskLen == nil {
+		return fmt.Errorf("ip network AddressMaskLen is empty: vnetId=%s ipnetId=%s", vnetId, ipnetId)
+	}
+
+	lockKey := NetworkPrefix + "/" + vnetId + "/ip_network/" + ipnetId + "/ipam_lock"
+	mutex, err := d.LockKey(lockKey)
+	if err != nil {
+		slog.Error("ReleaseIPIfOwned() failed to lock", "err", err, "lockKey", lockKey)
+		return err
+	}
+	defer d.UnlockKey(mutex)
+
+	key := NetworkPrefix + "/" + vnetId + "/ip_network/" + ipnetId + "/ip_address/" + *net.AddressMaskLen + "/" + ip
+	var rec api.IPAddress
+	if _, err := d.GetJSON(key, &rec); err == ErrNotFound {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	if rec.HostId == nil || strings.TrimSpace(*rec.HostId) != owner {
+		slog.Warn("ReleaseIPIfOwned() skipped ip allocated to another host", "ip", ip, "hostId", owner)
+		return nil
+	}
+	return d.DeleteJSON(key)
+}
+
 // IPアドレスが存在するかどうかをチェックする
 func (d *Database) CheckIPaddrInUse(vnetId, ipnetId, ip string) (bool, error) {
 	net, err := d.GetIpNetworkById(vnetId, ipnetId)

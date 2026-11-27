@@ -2,6 +2,7 @@ package controller
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -268,46 +269,15 @@ func (c *serverController) serverControllerLoop() {
 				continue
 			}
 
-			// IPアドレス開放処理の実行
-			if spec.Spec.NetworkInterface != nil {
-				for _, nic := range *spec.Spec.NetworkInterface {
-					debugPrintln("NIC=========================================")
-					jsonbyte, err := json.MarshalIndent(nic, "", "  ")
-					if err != nil {
-						slog.Error("json.MarshalIndent()", "err", err)
-						continue
-					}
-					debugPrintln(string(jsonbyte))
-					debugPrintln("=========================================")
-
-					if nic.IpNetworkId != nil && nic.Address != nil {
-						if err := c.marmot.Db.ReleaseIP(nic.Networkid, *nic.IpNetworkId, *nic.Address); err != nil {
-							slog.Error("ReleaseIP()", "err", err)
-						}
-					}
-
-					// OVN論理ポートを削除する(issue #696)
-					if nic.InterfaceId != nil && strings.TrimSpace(*nic.InterfaceId) != "" {
-						if err := networkfabric.NewOVNFabric().DeleteGuestLogicalPort(*nic.InterfaceId); err != nil {
-							slog.Error("DeleteGuestLogicalPort()", "err", err)
-						}
-					}
-
-					// 内部DNSからエントリーを削除する
-					if strings.TrimSpace(spec.Metadata.Name) != "" {
-						if err := c.marmot.Db.DeleteDnsEntryByName(spec.Metadata.Name, nic.Networkname); err != nil {
-							slog.Error("DeleteDnsEntryByName()", "err", err)
-							continue
-						}
-					}
+			// OVN 論理ポート・内部 DNS・IP の後片付け。失敗時は Server 定義を残し、
+			// DELETING のまま次の制御ループで再試行する
+			if err := c.cleanupDeletedServerNetwork(spec); err != nil {
+				slog.Error("cleanupDeletedServerNetwork()", "serverId", api.ServerID(spec), "err", err)
+				msg := fmt.Sprintf("ネットワーク関連の後片付けに失敗したため、再試行します: %v", err)
+				if dbErr := c.marmot.Db.UpdateServerStatus(api.ServerID(spec), db.SERVER_DELETING, msg); dbErr != nil {
+					slog.Error("UpdateServerStatus() failed", "serverId", api.ServerID(spec), "err", dbErr)
 				}
-			}
-
-			// 作成失敗時など NIC 情報だけでは解放しきれない残留 IP を回収する。
-			if strings.TrimSpace(spec.Metadata.Name) != "" {
-				if err := c.marmot.Db.ReleaseIPsByHostID(spec.Metadata.Name); err != nil {
-					slog.Error("ReleaseIPsByHostID()", "err", err, "serverId", api.ServerID(spec), "serverName", spec.Metadata.Name)
-				}
+				continue
 			}
 
 			// データベースから削除する
@@ -349,6 +319,66 @@ func clusterHasAnyNode(statuses []api.HostStatus) bool {
 	}
 
 	return false
+}
+
+// cleanupDeletedServerNetwork は、削除する Server の OVN 論理ポート、内部 DNS エントリー、IP を後片付けする。
+// 各操作は繰り返し実行しても安全で、失敗は集約して返す。
+// 解放後に他のホストへ再割り当てされた IP を再実行で解放しないよう、IP の解放は他の後片付けが
+// すべて成功した後に、割り当て記録の所有者を確認して行う。
+func (c *serverController) cleanupDeletedServerNetwork(spec api.Server) error {
+	serverName := strings.TrimSpace(spec.Metadata.Name)
+	var errs []error
+
+	if spec.Spec.NetworkInterface != nil {
+		for _, nic := range *spec.Spec.NetworkInterface {
+			if jsonbyte, err := json.MarshalIndent(nic, "", "  "); err != nil {
+				slog.Error("json.MarshalIndent()", "err", err)
+			} else {
+				debugPrintln("NIC=========================================")
+				debugPrintln(string(jsonbyte))
+				debugPrintln("=========================================")
+			}
+
+			// OVN論理ポートを削除する(issue #696)
+			if nic.InterfaceId != nil && strings.TrimSpace(*nic.InterfaceId) != "" {
+				if err := networkfabric.NewOVNFabric().DeleteGuestLogicalPort(*nic.InterfaceId); err != nil {
+					errs = append(errs, fmt.Errorf("DeleteGuestLogicalPort(%s): %w", *nic.InterfaceId, err))
+				}
+			}
+
+			// 内部DNSからエントリーを削除する
+			if serverName != "" {
+				if err := c.marmot.Db.DeleteDnsEntryByName(spec.Metadata.Name, nic.Networkname); err != nil {
+					errs = append(errs, fmt.Errorf("DeleteDnsEntryByName(%s, %s): %w", spec.Metadata.Name, nic.Networkname, err))
+				}
+			}
+		}
+	}
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+
+	if serverName == "" {
+		slog.Warn("サーバー名が空のため、所有者を確認できず IP の解放をスキップ", "serverId", api.ServerID(spec))
+		return nil
+	}
+
+	// IPアドレス開放処理の実行
+	if spec.Spec.NetworkInterface != nil {
+		for _, nic := range *spec.Spec.NetworkInterface {
+			if nic.IpNetworkId != nil && nic.Address != nil {
+				if err := c.marmot.Db.ReleaseIPIfOwned(nic.Networkid, *nic.IpNetworkId, *nic.Address, serverName); err != nil {
+					errs = append(errs, fmt.Errorf("ReleaseIPIfOwned(%s): %w", *nic.Address, err))
+				}
+			}
+		}
+	}
+
+	// 作成失敗時など NIC 情報だけでは解放しきれない残留 IP を回収する。
+	if err := c.marmot.Db.ReleaseIPsByHostID(serverName); err != nil {
+		errs = append(errs, fmt.Errorf("ReleaseIPsByHostID(%s): %w", serverName, err))
+	}
+	return errors.Join(errs...)
 }
 
 func shouldBypassNodeGateForDeletingServer(spec api.Server, statuses []api.HostStatus) (bool, string) {
