@@ -419,6 +419,9 @@ func (d *Database) SetVolumeDeletionTimestamp(id string) {
 		slog.Error("SetVolumeDeletionTimestamp() failed to get volume", "err", err, "id", id)
 		return
 	}
+	if vol.Status.DeletionTimeStamp != nil {
+		return
+	}
 	vol.Status.DeletionTimeStamp = util.TimePtr(time.Now())
 	if err = d.UpdateVolume(id, vol); err != nil {
 		slog.Error("SetVolumeDeletionTimestamp() failed to update volume", "err", err, "volId", id)
