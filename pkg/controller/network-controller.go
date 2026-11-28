@@ -30,6 +30,7 @@ type networkController struct {
 	marmot                     *marmotd.Marmot
 	deletionDelay              time.Duration // DeletionTimestamp 検知から削除実行までの待機時間
 	lastNetworkMemberSignature string
+	memberReconcilePending     bool // 再調整が未完了の間は署名が一致してもスキップしない
 	stopChan                   chan struct{}
 	doneChan                   chan struct{}
 	stopOnce                   sync.Once
@@ -424,7 +425,7 @@ func (c *networkController) ensureFollowerNetworksWaiting(headNetwork api.Virtua
 // リーダーの再調整が失敗した場合は署名を確定せず、次の周期で同じ変更を再試行する。
 // 再調整は作成済みのフォロワーや削除予約済みのものを重複して処理しないため、再実行できる。
 func (c *networkController) reconcileMemberChange(signature string, isLeader bool, reconcile func() (bool, error)) bool {
-	if signature == c.lastNetworkMemberSignature {
+	if signature == c.lastNetworkMemberSignature && !(c.memberReconcilePending && isLeader) {
 		return false
 	}
 	slog.Debug("cluster membership changed", "controllerNode", c.marmot.NodeName, "previous", c.lastNetworkMemberSignature, "current", signature)
@@ -435,10 +436,12 @@ func (c *networkController) reconcileMemberChange(signature string, isLeader boo
 
 	changed, err := reconcile()
 	if err != nil {
+		c.memberReconcilePending = true
 		slog.Warn("failed to reconcile overlay membership after cluster change; will retry next loop", "err", err)
 		return changed
 	}
 	c.lastNetworkMemberSignature = signature
+	c.memberReconcilePending = false
 	return changed
 }
 

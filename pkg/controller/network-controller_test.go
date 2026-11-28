@@ -148,6 +148,17 @@ var _ = Describe("network controller overlay membership reconciliation", func() 
 		Expect(calls).To(Equal(1))
 	})
 
+	It("retries after a failed reconciliation even when the membership returns to the committed signature", func() {
+		Expect(c.reconcileMemberChange("hv0", true, reconcileWith(false, nil))).To(BeFalse())
+		Expect(c.reconcileMemberChange("hv0,hv1", true, reconcileWith(true, errors.New("one entry failed")))).To(BeTrue())
+		Expect(c.lastNetworkMemberSignature).To(Equal("hv0"))
+
+		Expect(c.reconcileMemberChange("hv0", true, reconcileWith(true, nil))).To(BeTrue())
+		Expect(calls).To(Equal(3))
+		Expect(c.reconcileMemberChange("hv0", true, reconcileWith(true, nil))).To(BeFalse())
+		Expect(calls).To(Equal(3))
+	})
+
 	It("records the signature without reconciling when this node is not the leader", func() {
 		Expect(c.reconcileMemberChange("hv0,hv1", false, reconcileWith(true, nil))).To(BeFalse())
 		Expect(calls).To(BeZero())
