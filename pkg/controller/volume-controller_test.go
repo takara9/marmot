@@ -1,8 +1,12 @@
 package controller
 
 import (
+	"errors"
 	"testing"
+	"time"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/util"
@@ -157,3 +161,194 @@ func TestDeletingVolumeIsNotSkippedByNodeAssignmentCheck(t *testing.T) {
 		t.Fatalf("shouldDeleteVolumeForMissingAssignedNode() = (%v, %q), want (true, \"assigned_node_not_found\")", shouldDelete, reason)
 	}
 }
+
+var _ = Describe("volume controller status write failures", func() {
+	var (
+		c        *volumeController
+		statuses []int
+		messages []int
+		created  int
+		iscsi    int
+		ops      volumeProvisionOps
+		writeErr error
+		// setStatus の呼び出しごとの結果。空の場合は常に成功する。
+		setStatusResults []error
+	)
+	pendingVolume := api.Volume{
+		Metadata: api.Metadata{Id: "vol01"},
+		Status:   &api.Status{StatusCode: db.VOLUME_PENDING},
+	}
+	iscsiVolume := api.Volume{
+		Metadata: api.Metadata{Id: "vol02"},
+		Spec: api.VolSpec{
+			Type:  util.StringPtr("lvm"),
+			Kind:  util.StringPtr("data"),
+			Iscsi: util.BoolPtr(true),
+		},
+		Status: &api.Status{StatusCode: db.VOLUME_PENDING},
+	}
+
+	BeforeEach(func() {
+		c = &volumeController{unrecordedVolumes: map[string]struct{}{}}
+		statuses, messages = nil, nil
+		created, iscsi = 0, 0
+		writeErr = errors.New("etcd unavailable")
+		setStatusResults = nil
+		ops = volumeProvisionOps{
+			setStatus: func(_ string, status int) error {
+				statuses = append(statuses, status)
+				if len(setStatusResults) >= len(statuses) {
+					return setStatusResults[len(statuses)-1]
+				}
+				return nil
+			},
+			setStatusMessage: func(_ string, status int, _ string) error {
+				messages = append(messages, status)
+				return nil
+			},
+			create:         func(string) error { created++; return nil },
+			configureISCSI: func(string) error { iscsi++; return nil },
+		}
+	})
+
+	Describe("retryVolumeStatusWrite", func() {
+		It("returns nil once the write succeeds", func() {
+			calls := 0
+			err := retryVolumeStatusWrite(3, time.Millisecond, func() error {
+				calls++
+				if calls < 3 {
+					return writeErr
+				}
+				return nil
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(calls).To(Equal(3))
+		})
+
+		It("returns the last error after all attempts fail", func() {
+			calls := 0
+			err := retryVolumeStatusWrite(3, time.Millisecond, func() error {
+				calls++
+				return writeErr
+			})
+			Expect(err).To(MatchError(writeErr))
+			Expect(calls).To(Equal(3))
+		})
+	})
+
+	Describe("provisionPendingVolume", func() {
+		It("records AVAILABLE after creating the volume", func() {
+			c.provisionPendingVolume(pendingVolume, ops)
+			Expect(created).To(Equal(1))
+			Expect(statuses).To(Equal([]int{db.VOLUME_PROVISIONING, db.VOLUME_AVAILABLE}))
+			Expect(c.unrecordedVolumes).To(BeEmpty())
+		})
+
+		It("does not create the volume when PROVISIONING cannot be recorded", func() {
+			setStatusResults = []error{writeErr}
+			c.provisionPendingVolume(pendingVolume, ops)
+			Expect(created).To(Equal(0))
+			Expect(statuses).To(Equal([]int{db.VOLUME_PROVISIONING}))
+			Expect(messages).To(BeEmpty())
+			Expect(c.unrecordedVolumes).To(BeEmpty())
+		})
+
+		It("records ERROR and skips AVAILABLE when creation fails", func() {
+			ops.create = func(string) error { created++; return errors.New("lvcreate failed") }
+			c.provisionPendingVolume(pendingVolume, ops)
+			Expect(created).To(Equal(1))
+			Expect(messages).To(Equal([]int{db.VOLUME_ERROR}))
+			Expect(statuses).To(Equal([]int{db.VOLUME_PROVISIONING}))
+		})
+
+		It("configures iSCSI only for iSCSI volumes", func() {
+			c.provisionPendingVolume(pendingVolume, ops)
+			Expect(iscsi).To(Equal(0))
+			c.provisionPendingVolume(iscsiVolume, ops)
+			Expect(iscsi).To(Equal(1))
+		})
+
+		It("records ERROR and skips AVAILABLE when iSCSI configuration fails", func() {
+			ops.configureISCSI = func(string) error { iscsi++; return errors.New("targetcli failed") }
+			c.provisionPendingVolume(iscsiVolume, ops)
+			Expect(messages).To(Equal([]int{db.VOLUME_ERROR}))
+			Expect(statuses).To(Equal([]int{db.VOLUME_PROVISIONING}))
+		})
+
+		It("keeps the created volume and retries AVAILABLE when it cannot be recorded", func() {
+			setStatusResults = []error{nil, writeErr, writeErr, writeErr}
+			c.provisionPendingVolume(pendingVolume, ops)
+			Expect(created).To(Equal(1))
+			Expect(statuses).To(HaveLen(1 + volumeStatusWriteAttempts))
+			Expect(messages).To(BeEmpty())
+			Expect(c.unrecordedVolumes).To(HaveKey("vol01"))
+		})
+
+		It("does not register the volume when a retry records AVAILABLE", func() {
+			setStatusResults = []error{nil, writeErr, nil}
+			c.provisionPendingVolume(pendingVolume, ops)
+			Expect(statuses).To(Equal([]int{db.VOLUME_PROVISIONING, db.VOLUME_AVAILABLE, db.VOLUME_AVAILABLE}))
+			Expect(c.unrecordedVolumes).To(BeEmpty())
+		})
+	})
+
+	Describe("retryUnrecordedVolume", func() {
+		provisioning := func(deletionTimeStamp *time.Time, lastUpdate time.Time) api.Volume {
+			return api.Volume{
+				Metadata: api.Metadata{Id: "vol01"},
+				Status: &api.Status{
+					StatusCode:          db.VOLUME_PROVISIONING,
+					DeletionTimeStamp:   deletionTimeStamp,
+					LastUpdateTimeStamp: &lastUpdate,
+				},
+			}
+		}
+
+		It("ignores volumes that were not registered", func() {
+			Expect(c.retryUnrecordedVolume(provisioning(nil, time.Now()), ops.setStatus)).To(BeFalse())
+			Expect(statuses).To(BeEmpty())
+		})
+
+		It("records AVAILABLE and unregisters the volume", func() {
+			c.unrecordedVolumes["vol01"] = struct{}{}
+			Expect(c.retryUnrecordedVolume(provisioning(nil, time.Now()), ops.setStatus)).To(BeTrue())
+			Expect(statuses).To(Equal([]int{db.VOLUME_AVAILABLE}))
+			Expect(c.unrecordedVolumes).To(BeEmpty())
+		})
+
+		It("keeps the volume registered and protected from stale deletion while the write keeps failing", func() {
+			c.unrecordedVolumes["vol01"] = struct{}{}
+			setStatusResults = []error{writeErr}
+			staleSince := time.Now().Add(-2 * VOLUME_STALE_TIMEOUT)
+			Expect(c.retryUnrecordedVolume(provisioning(nil, staleSince), ops.setStatus)).To(BeTrue())
+			Expect(c.unrecordedVolumes).To(HaveKey("vol01"))
+		})
+
+		It("does not overwrite the status of a volume requested for deletion", func() {
+			c.unrecordedVolumes["vol01"] = struct{}{}
+			deletion := time.Now()
+			Expect(c.retryUnrecordedVolume(provisioning(&deletion, time.Now()), ops.setStatus)).To(BeFalse())
+			Expect(statuses).To(BeEmpty())
+			Expect(c.unrecordedVolumes).To(BeEmpty())
+		})
+
+		It("does not overwrite a status that is no longer PROVISIONING", func() {
+			c.unrecordedVolumes["vol01"] = struct{}{}
+			vol := provisioning(nil, time.Now())
+			vol.Status.StatusCode = db.VOLUME_DELETING
+			Expect(c.retryUnrecordedVolume(vol, ops.setStatus)).To(BeFalse())
+			Expect(statuses).To(BeEmpty())
+			Expect(c.unrecordedVolumes).To(BeEmpty())
+		})
+	})
+
+	Describe("forgetMissingUnrecordedVolumes", func() {
+		It("drops volumes that no longer exist", func() {
+			c.unrecordedVolumes["vol01"] = struct{}{}
+			c.unrecordedVolumes["gone"] = struct{}{}
+			c.forgetMissingUnrecordedVolumes([]api.Volume{{Metadata: api.Metadata{Id: "vol01"}}})
+			Expect(c.unrecordedVolumes).To(HaveKey("vol01"))
+			Expect(c.unrecordedVolumes).NotTo(HaveKey("gone"))
+		})
+	})
+})
