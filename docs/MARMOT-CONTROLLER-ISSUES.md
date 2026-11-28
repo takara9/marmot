@@ -56,16 +56,19 @@
 
 ### Host コントローラー
 
+- **対応方針 — etcd watch の対象外**: Host コントローラーは etcd のリソースを reconcile せず、自ノードの情報を収集して `hoststatus` へ書き込みます。watch する対象がなく、書き込みが自己通知になるだけなので、10 秒周期のままとします。
 - **中 — ホスト状態の更新失敗で OVN bootstrap の再試行もスキップする**: 定期処理では HostStatus の収集・更新が失敗すると戻り、後続の OVN bootstrap を実行しません（[host-controller.go](../pkg/controller/host-controller.go#L81)）。両処理を独立させ、片方の一時障害で他方の復旧が妨げられないようにします。
 - **低 — 初回 HostStatus の失敗はログのみで起動を継続する**: 初回収集エラーでもサービスは続行します（[host-controller.go](../pkg/controller/host-controller.go#L35)）。起動後、状態が正常に登録されるまでの readiness / health を明示すると、スケジューラーや運用監視が初期化途中のノードを判別しやすくなります。
 
 ### Scheduler コントローラー
 
+- **対応状況 — Server 変更の検知**: `/marmot/server/` の etcd watch を通知に使い、変更時と watch の開始・再作成時に、リーダー判定と未割当 `PENDING` Server の割り当てを含む全件 reconcile を要求します。通知は集約し、watch 起因の実行は前回の処理完了から1秒以上空けます。5秒周期と直列処理は維持し、watch の終了・エラーはログに記録して再試行します。停止時は watch の終了を待ちます。`/marmot/hoststatus/` はハートビートで定期更新されるため watch せず、リーダーの交代は5秒周期で検知します。VM コントローラーによる Server の状態更新や自身の割り当て書き込みでも通知されますが、実行は1秒以上空けるため、非リーダーのノードは `hoststatus` の取得のみ、リーダーは Server の全件取得が増えます。単体テストは [image-scheduler-watch_test.go](../pkg/controller/image-scheduler-watch_test.go) に追加しました。
 - **中 — ノード負荷を Server 台数だけで評価する**: `buildNodeLoads` は削除中でない Server の数を数え、最少台数のノードへ割り当てます（[scheduler-controller.go](../pkg/controller/scheduler-controller.go#L167)、[scheduler-controller.go](../pkg/controller/scheduler-controller.go#L193)）。CPU / メモリ / ストレージ容量や Server 要求量を考慮しないため、ノードごとの容量差が大きい環境では偏りが残ります。まず配置制約と容量の情報源を明文化し、容量を考慮したスコアリングを検討します。
 - **低 — リーダーは HostStatus から毎周期決定される**: リーダー確認はアクティブホスト状態に基づきます（[scheduler-controller.go](../pkg/controller/scheduler-controller.go#L76)、[scheduler.go](../pkg/marmotd/scheduler.go#L35)）。ホスト状態の更新遅延時にも二重実行を防ぎたい場合は、etcd のリース／ロックによるリーダーフェンシングを検討します。
 
 ### Image コントローラー
 
+- **対応状況 — Image 変更の検知**: `/marmot/image/` の etcd watch を通知に使い、変更時と watch の開始・再作成時に全件 reconcile を要求します。`/marmot/osTemplateImage/` のキーは対象外です。通知は集約し、watch 起因の実行は前回の処理完了から1秒以上空けます。5秒周期と直列処理は維持し、watch の終了・エラーはログに記録して再試行します。停止時は watch の終了を待ちます。作成・同期の重い処理は従来どおり goroutine で実行するため、制御ループは短時間で終わります。全件取得は残ります。単体テストは [image-scheduler-watch_test.go](../pkg/controller/image-scheduler-watch_test.go) に追加しました。
 - **中 — 非同期作成中の Image は再起動後に自動再開しない**: `PENDING` から `CREATING` に変更して作成処理を goroutine で起動しますが、後続の `CREATING` 分岐はログのみです（[image-controller.go](../pkg/controller/image-controller.go#L151)、[image-controller.go](../pkg/controller/image-controller.go#L160)、[image-controller.go](../pkg/controller/image-controller.go#L190)）。プロセス終了で goroutine が失われた場合に作成が滞留するため、処理の永続化、起動時の再開判定、またはタイムアウト後の明示的な失敗遷移を設けます。
 - **中 — 作成 goroutine の並列数に上限がない**: 同一ループ内で複数の `PENDING` Image があればそれぞれ goroutine を起動します（[image-controller.go](../pkg/controller/image-controller.go#L133)）。大量同時登録時の帯域・CPU・ディスク負荷を抑えるため、並列数制御とキャンセル可能なワークキューを検討します。
 
