@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -18,6 +19,9 @@ import (
 
 const (
 	NETWORK_CONTROLLER_INTERVAL = 5 * time.Second
+
+	networkWatchMinInterval   = time.Second
+	networkWatchRetryInterval = time.Second
 )
 
 // networkController は仮想ネットワークの状態を管理する専用コントローラー。
@@ -83,20 +87,21 @@ func StartNetController(node string, etcdUrl string, deletionDelaySeconds int) (
 		return nil, err
 	}
 
-	// 定期実行の開始
-	ticker := time.NewTicker(NETWORK_CONTROLLER_INTERVAL)
 	go func() {
-		defer ticker.Stop()
 		defer close(c.doneChan)
-		for {
-			select {
-			case <-ticker.C:
-				c.networkControllerLoop(networkFabric)
-			case <-c.stopChan:
-				slog.Debug("ネットワークコントローラー停止")
-				return
-			}
-		}
+		ctx, cancel := context.WithCancel(context.Background())
+		notifications := make(chan struct{}, 1)
+		watchDone := make(chan struct{})
+		go func() {
+			defer close(watchDone)
+			watchResourceChanges(ctx, c.db.Cli.Watch, db.NetworkPrefix, "Network", notifications, networkWatchRetryInterval)
+		}()
+		runServerController(c.stopChan, notifications, NETWORK_CONTROLLER_INTERVAL, networkWatchMinInterval, func() {
+			c.networkControllerLoop(networkFabric)
+		})
+		cancel()
+		<-watchDone
+		slog.Debug("ネットワークコントローラー停止")
 	}()
 	return &c, nil
 }
@@ -127,23 +132,15 @@ func (c *networkController) networkControllerLoop(fabric networkfabric.NetworkFa
 		slog.Warn("failed to get host statuses; skip overlay membership reconciliation", "err", err)
 	} else {
 		isLeader := marmotd.IsSchedulerLeader(c.marmot.NodeName, statuses)
-		currentMemberSignature := clusterMemberSignature(statuses)
-		membershipChanged := currentMemberSignature != c.lastNetworkMemberSignature
-		if membershipChanged {
-			slog.Debug("cluster membership changed", "controllerNode", c.marmot.NodeName, "previous", c.lastNetworkMemberSignature, "current", currentMemberSignature)
-			c.lastNetworkMemberSignature = currentMemberSignature
-		}
-
-		if isLeader && membershipChanged {
-			if changed, reconcileErr := c.reconcileOverlayMembershipWithCluster(vnets, statuses); reconcileErr != nil {
-				slog.Warn("failed to reconcile overlay membership after cluster change", "err", reconcileErr)
-			} else if changed {
-				refreshed, refreshErr := c.marmot.GetVirtualNetwork()
-				if refreshErr != nil {
-					slog.Warn("failed to refresh virtual networks after membership reconciliation", "err", refreshErr)
-				} else {
-					vnets = refreshed
-				}
+		changed := c.reconcileMemberChange(clusterMemberSignature(statuses), isLeader, func() (bool, error) {
+			return c.reconcileOverlayMembershipWithCluster(vnets, statuses)
+		})
+		if changed {
+			refreshed, refreshErr := c.marmot.GetVirtualNetwork()
+			if refreshErr != nil {
+				slog.Warn("failed to refresh virtual networks after membership reconciliation", "err", refreshErr)
+			} else {
+				vnets = refreshed
 			}
 		}
 
@@ -423,6 +420,28 @@ func (c *networkController) ensureFollowerNetworksWaiting(headNetwork api.Virtua
 	return nil
 }
 
+// reconcileMemberChange は、クラスタメンバーの署名が変わったときにオーバーレイを再調整し、ネットワークを変更したかを返す。
+// リーダーの再調整が失敗した場合は署名を確定せず、次の周期で同じ変更を再試行する。
+// 再調整は作成済みのフォロワーや削除予約済みのものを重複して処理しないため、再実行できる。
+func (c *networkController) reconcileMemberChange(signature string, isLeader bool, reconcile func() (bool, error)) bool {
+	if signature == c.lastNetworkMemberSignature {
+		return false
+	}
+	slog.Debug("cluster membership changed", "controllerNode", c.marmot.NodeName, "previous", c.lastNetworkMemberSignature, "current", signature)
+	if !isLeader {
+		c.lastNetworkMemberSignature = signature
+		return false
+	}
+
+	changed, err := reconcile()
+	if err != nil {
+		slog.Warn("failed to reconcile overlay membership after cluster change; will retry next loop", "err", err)
+		return changed
+	}
+	c.lastNetworkMemberSignature = signature
+	return changed
+}
+
 func (c *networkController) reconcileOverlayMembershipWithCluster(vnets []api.VirtualNetwork, statuses []api.HostStatus) (bool, error) {
 	memberNodes := collectClusterMemberNodes(statuses)
 	if len(memberNodes) == 0 {
@@ -435,6 +454,7 @@ func (c *networkController) reconcileOverlayMembershipWithCluster(vnets []api.Vi
 	}
 
 	changed := false
+	var errs []error
 	for _, vnet := range vnets {
 		if networkSyncRole(&vnet.Metadata) == "follower" {
 			continue
@@ -488,6 +508,7 @@ func (c *networkController) reconcileOverlayMembershipWithCluster(vnets []api.Vi
 			}
 			if _, createErr := c.marmot.Db.MakeFollowerVirtualNetworkEntry(vnet, node, headID); createErr != nil {
 				slog.Error("failed to create follower network entry during membership reconciliation", "headNetworkId", headID, "followerNode", node, "err", createErr)
+				errs = append(errs, fmt.Errorf("create follower network entry (head=%s, node=%s): %w", headID, node, createErr))
 				continue
 			}
 			changed = true
@@ -502,13 +523,14 @@ func (c *networkController) reconcileOverlayMembershipWithCluster(vnets []api.Vi
 			}
 			if err := c.marmot.Db.SetDeleteTimestampVirtualNetwork(api.VirtualNetworkID(follower)); err != nil {
 				slog.Error("failed to set deletion timestamp for stale follower network", "headNetworkId", headID, "followerNetworkId", api.VirtualNetworkID(follower), "followerNode", node, "err", err)
+				errs = append(errs, fmt.Errorf("set deletion timestamp for stale follower network (head=%s, follower=%s): %w", headID, api.VirtualNetworkID(follower), err))
 				continue
 			}
 			changed = true
 		}
 	}
 
-	return changed, nil
+	return changed, errors.Join(errs...)
 }
 
 func (c *networkController) distributeDeleteIntentToFollowerNetworks(headNetwork api.VirtualNetwork) error {

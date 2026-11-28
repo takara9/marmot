@@ -48,7 +48,10 @@
 
 ### Network コントローラー
 
+- **対応状況 — Network 変更の検知**: `/marmot/network/` の etcd watch を通知に使い、変更時と watch の開始・再作成時に全件 reconcile を要求します。`/marmot/network-load-balancer/` のキーは対象外です。通知は集約し、watch 起因の実行は前回の処理完了から1秒以上空けます。5秒周期と直列処理は維持し、watch の終了・エラーはログに記録して再試行します。停止時は watch の終了を待ちます。クラスタメンバーの変更は、`/marmot/hoststatus/` がハートビートで定期更新されるため watch せず、従来どおり5秒周期で検知します。単体テストは [network-controller_test.go](../pkg/controller/network-controller_test.go) に追加しました。**制約**: 全件取得と直列処理は残ります。`ERROR` のネットワークは自動復旧のたびに状態を書き込むため、自己通知により、復旧の再試行が最短1秒間隔になります（従来は5秒）。
+
 - **高 — オーバーレイ再調整失敗後に同じ変更を再試行しない場合がある**: メンバー変更を検出すると、再調整を実行する前に `lastNetworkMemberSignature` を新しい値に更新します。再調整が失敗しても署名は戻されず、次周期では変更なしと判定されて再試行されません（[network-controller.go](../pkg/controller/network-controller.go#L130)、[network-controller.go](../pkg/controller/network-controller.go#L137)）。再調整成功後にのみ署名を確定するか、失敗時に再試行対象として残すようにします。
+  - **対応状況（対応済み）**: リーダーの再調整が成功した場合にだけ署名を確定し、失敗した場合は署名を更新せず、次の周期で同じ変更を再試行します（[network-controller.go](../pkg/controller/network-controller.go#L421)）。従来の再調整関数は、フォロワーの作成や削除予約に失敗してもログに記録するだけで常に成功を返していたため、失敗をエラーとして返すようにしました（[network-controller.go](../pkg/controller/network-controller.go#L440)）。一部だけ成功した場合も、変更済みのネットワークは再取得します。再実行では、作成済みのフォロワーや削除予約済みのものを重複して処理しません。リーダー以外のノードは再調整しないため、従来どおり署名を即時に更新します。単体テストは [network-controller_test.go](../pkg/controller/network-controller_test.go) に追加しました。**制約**: 再試行に回数の上限はなく、恒久的に失敗する場合は毎周期ログを出します。署名の更新後にリーダーが交代した場合、新しいリーダーは再調整しません。この動作は今回の対象外です。
 - **中 — 削除依存関係の検査が全件一覧に依存する**: ネットワーク削除前に Server、ALB、Gateway、VPN Gateway の一覧を取得して依存関係を調べます（[network-controller.go](../pkg/controller/network-controller.go#L790)）。対象数の増加で削除処理が重くなるため、etcd のインデックス／キー設計や依存リソースの逆引き方法を検討します。
 
 ### Host コントローラー
