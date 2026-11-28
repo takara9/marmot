@@ -169,13 +169,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 			By("削除したボリュームの状態を確認")
 			Eventually(func(g Gomega) {
-				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "volume", "detail", volumeID, "--output", "json")
-				stdoutStderr, err := cmd.CombinedOutput()
-				Expect(err).NotTo(HaveOccurred())
-				var volume api.Volume
-				err = json.Unmarshal(stdoutStderr, &volume)
-				Expect(err).NotTo(HaveOccurred())
-				g.Expect(volume.Status.StatusCode).To(Equal(db.VOLUME_DELETING))
+				expectVolumeDeletingOrDeleted(g, volumeID)
 			}, 60*time.Second, 3*time.Second).Should(Succeed())
 		})
 
@@ -216,13 +210,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 			By("削除したボリュームの状態を確認")
 			Eventually(func(g Gomega) {
-				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "volume", "detail", volumeID, "--output", "json")
-				stdoutStderr, err := cmd.CombinedOutput()
-				Expect(err).NotTo(HaveOccurred())
-				var volume api.Volume
-				err = json.Unmarshal(stdoutStderr, &volume)
-				Expect(err).NotTo(HaveOccurred())
-				g.Expect(volume.Status.StatusCode).To(Equal(db.VOLUME_DELETING))
+				expectVolumeDeletingOrDeleted(g, volumeID)
 			}, 120*time.Second, 3*time.Second).Should(Succeed())
 
 			By("削除したボリュームが消えることを確認")
@@ -411,13 +399,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 			By("削除したボリュームの状態を確認")
 			Eventually(func(g Gomega) {
-				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "volume", "detail", volumeID, "--output", "json")
-				stdoutStderr, err := cmd.CombinedOutput()
-				Expect(err).NotTo(HaveOccurred())
-				var volume api.Volume
-				err = json.Unmarshal(stdoutStderr, &volume)
-				Expect(err).NotTo(HaveOccurred())
-				g.Expect(volume.Status.StatusCode).To(Equal(db.VOLUME_DELETING))
+				expectVolumeDeletingOrDeleted(g, volumeID)
 			}, 60*time.Second, 3*time.Second).Should(Succeed())
 
 			By("削除したボリュームがリストから無くなることを確認")
@@ -484,13 +466,7 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 
 			By("削除したボリュームの状態を確認")
 			Eventually(func(g Gomega) {
-				cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "volume", "detail", volumeID, "--output", "json")
-				stdoutStderr, err := cmd.CombinedOutput()
-				Expect(err).NotTo(HaveOccurred())
-				var volume api.Volume
-				err = json.Unmarshal(stdoutStderr, &volume)
-				Expect(err).NotTo(HaveOccurred())
-				g.Expect(volume.Status.StatusCode).To(Equal(db.VOLUME_DELETING))
+				expectVolumeDeletingOrDeleted(g, volumeID)
 			}, 60*time.Second, 3*time.Second).Should(Succeed())
 		})
 
@@ -870,3 +846,17 @@ var _ = Describe("Marmotd Test", Ordered, func() {
 		})
 	})
 })
+
+// 削除要求後のボリュームは、コントローラーの処理が速いと DELETING を経ずに削除済みとして観測される
+func expectVolumeDeletingOrDeleted(g Gomega, volumeID string) {
+	cmd := exec.Command("./bin/mactl-test", "--api", "testdata/.marmot", "volume", "detail", volumeID, "--output", "json")
+	stdoutStderr, err := cmd.CombinedOutput()
+	g.Expect(err).NotTo(HaveOccurred())
+	if strings.Contains(string(stdoutStderr), "IDが存在しません") {
+		return
+	}
+	var volume api.Volume
+	g.Expect(json.Unmarshal(stdoutStderr, &volume)).To(Succeed(), "unexpected volume detail output: %s", string(stdoutStderr))
+	g.Expect(volume.Status).NotTo(BeNil())
+	g.Expect(volume.Status.StatusCode).To(Equal(db.VOLUME_DELETING))
+}
