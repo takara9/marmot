@@ -1,7 +1,10 @@
 package controller
 
 import (
+	"context"
 	"errors"
+	"net"
+	"os/exec"
 	"testing"
 	"time"
 
@@ -10,7 +13,152 @@ import (
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
 	"github.com/takara9/marmot/pkg/util"
+	etcd "go.etcd.io/etcd/client/v3"
 )
+
+var _ = Describe("volume controller watch", func() {
+	It("restarts a compacted watch on the volume prefix and notifies", func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		notifications := make(chan struct{}, 1)
+		keys := make(chan string, 2)
+		attempts := 0
+		watch := func(ctx context.Context, key string, _ ...etcd.OpOption) etcd.WatchChan {
+			keys <- key
+			attempts++
+			ch := make(chan etcd.WatchResponse, 1)
+			if attempts == 1 {
+				ch <- etcd.WatchResponse{Canceled: true, CompactRevision: 10}
+				close(ch)
+			} else {
+				ch <- etcd.WatchResponse{Created: true}
+				go func() {
+					<-ctx.Done()
+					close(ch)
+				}()
+			}
+			return ch
+		}
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			watchResourceChanges(ctx, watch, db.VolumePrefix, "Volume", notifications, 10*time.Millisecond)
+		}()
+		DeferCleanup(func() {
+			cancel()
+			Eventually(done).WithTimeout(time.Second).Should(BeClosed())
+		})
+
+		Eventually(keys).WithTimeout(time.Second).Should(Receive(Equal(db.VolumePrefix + "/")))
+		Eventually(keys).WithTimeout(time.Second).Should(Receive(Equal(db.VolumePrefix + "/")))
+		Eventually(notifications).WithTimeout(time.Second).Should(Receive())
+	})
+
+	It("reconciles volume changes before the periodic tick and recovers after etcd restarts", func() {
+		binary, err := exec.LookPath("etcd")
+		if err != nil {
+			Skip("etcd binary not available")
+		}
+		freeAddress := func() string {
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			Expect(err).NotTo(HaveOccurred())
+			address := listener.Addr().String()
+			Expect(listener.Close()).To(Succeed())
+			return "http://" + address
+		}
+		clientURL, peerURL := freeAddress(), freeAddress()
+		dataDir := GinkgoT().TempDir()
+		startEtcd := func() (context.CancelFunc, *exec.Cmd) {
+			processCtx, stop := context.WithCancel(context.Background())
+			cmd := exec.CommandContext(processCtx, binary,
+				"--name", "volume-watch-test", "--data-dir", dataDir,
+				"--listen-client-urls", clientURL, "--advertise-client-urls", clientURL,
+				"--listen-peer-urls", peerURL, "--initial-advertise-peer-urls", peerURL,
+				"--initial-cluster", "volume-watch-test="+peerURL,
+				"--logger", "zap", "--log-level", "error")
+			Expect(cmd.Start()).To(Succeed())
+			return stop, cmd
+		}
+		stopProcess, cmd := startEtcd()
+		DeferCleanup(func() {
+			stopProcess()
+			_ = cmd.Wait()
+		})
+		cli, err := etcd.New(etcd.Config{Endpoints: []string{clientURL}, DialTimeout: time.Second})
+		Expect(err).NotTo(HaveOccurred())
+		DeferCleanup(func() { _ = cli.Close() })
+		waitReady := func() {
+			Eventually(func() error {
+				ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+				defer cancel()
+				_, err := cli.Get(ctx, "ready")
+				return err
+			}).WithTimeout(10 * time.Second).WithPolling(50 * time.Millisecond).Should(Succeed())
+		}
+		put := func(key, value string) {
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			_, err := cli.Put(ctx, key, value)
+			Expect(err).NotTo(HaveOccurred())
+		}
+		waitReady()
+
+		watchCtx, stopWatch := context.WithCancel(context.Background())
+		notifications := make(chan struct{}, 1)
+		watchDone := make(chan struct{})
+		stop := make(chan struct{})
+		done := make(chan struct{})
+		reconciled := make(chan string, 8)
+		go func() {
+			defer close(watchDone)
+			watchResourceChanges(watchCtx, cli.Watch, db.VolumePrefix, "Volume", notifications, 10*time.Millisecond)
+		}()
+		go func() {
+			defer close(done)
+			runServerController(stop, notifications, 30*time.Second, volumeWatchMinInterval, func() {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+				defer cancel()
+				resp, err := cli.Get(ctx, db.VolumePrefix+"/watch-test")
+				if err != nil {
+					reconciled <- "read error: " + err.Error()
+				} else if len(resp.Kvs) == 0 {
+					reconciled <- ""
+				} else {
+					reconciled <- string(resp.Kvs[0].Value)
+				}
+			})
+		}()
+		DeferCleanup(func() {
+			close(stop)
+			stopWatch()
+			Eventually(watchDone).WithTimeout(time.Second).Should(BeClosed())
+			Eventually(done).WithTimeout(time.Second).Should(BeClosed())
+		})
+
+		By("reconciling when the watch starts")
+		Eventually(reconciled).WithTimeout(3 * time.Second).Should(Receive(Equal("")))
+		By("ignoring changes outside the volume prefix")
+		put(db.ServerPrefix+"/watch-test", "unrelated")
+		Consistently(reconciled).WithTimeout(250 * time.Millisecond).ShouldNot(Receive())
+		By("reconciling a volume update without waiting for the five-second tick")
+		put(db.VolumePrefix+"/watch-test", "before-restart")
+		Eventually(reconciled).WithTimeout(2 * time.Second).Should(Receive(Equal("before-restart")))
+		By("rate limiting another update using the production interval")
+		put(db.VolumePrefix+"/watch-test", "second-update")
+		Consistently(reconciled).WithTimeout(700 * time.Millisecond).ShouldNot(Receive())
+		Eventually(reconciled).WithTimeout(2 * time.Second).Should(Receive(Equal("second-update")))
+		By("recovering after etcd restarts")
+		stopProcess()
+		_ = cmd.Wait()
+		stopProcess, cmd = startEtcd()
+		waitReady()
+		select {
+		case <-reconciled:
+		default:
+		}
+		put(db.VolumePrefix+"/watch-test", "after-restart")
+		Eventually(reconciled).WithTimeout(2 * time.Second).Should(Receive(Equal("after-restart")))
+	})
+})
 
 func TestShouldDeleteVolumeForMissingAssignedNode(t *testing.T) {
 	hvc := util.StringPtr("hvc")

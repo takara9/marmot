@@ -75,6 +75,10 @@ func StartVmController(node string, etcdUrl string, deletionDelaySeconds int) (*
 }
 
 func watchServerChanges(ctx context.Context, watch func(context.Context, string, ...etcd.OpOption) etcd.WatchChan, notifications chan<- struct{}, retryInterval time.Duration) {
+	watchResourceChanges(ctx, watch, db.ServerPrefix, "Server", notifications, retryInterval)
+}
+
+func watchResourceChanges(ctx context.Context, watch func(context.Context, string, ...etcd.OpOption) etcd.WatchChan, prefix, resource string, notifications chan<- struct{}, retryInterval time.Duration) {
 	notify := func() {
 		select {
 		case notifications <- struct{}{}:
@@ -83,14 +87,14 @@ func watchServerChanges(ctx context.Context, watch func(context.Context, string,
 	}
 
 	for ctx.Err() == nil {
-		ch := watch(ctx, db.ServerPrefix+"/", etcd.WithPrefix(), etcd.WithCreatedNotify())
+		ch := watch(ctx, prefix+"/", etcd.WithPrefix(), etcd.WithCreatedNotify())
 		for response := range ch {
 			if err := response.Err(); err != nil {
-				slog.Warn("Server watch failed; retrying", "err", err)
+				slog.Warn(resource+" watch failed; retrying", "err", err)
 				break
 			}
 			if response.Created {
-				slog.Info("Server watch established")
+				slog.Info(resource + " watch established")
 				notify()
 			}
 			if len(response.Events) > 0 {
@@ -100,7 +104,7 @@ func watchServerChanges(ctx context.Context, watch func(context.Context, string,
 		if ctx.Err() != nil {
 			return
 		}
-		slog.Warn("Server watch ended; retrying")
+		slog.Warn(resource + " watch ended; retrying")
 		timer := time.NewTimer(retryInterval)
 		select {
 		case <-timer.C:
