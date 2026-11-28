@@ -15,6 +15,10 @@ import (
 const (
 	VOLUME_CONTROLLER_INTERVAL = 5 * time.Second
 	VOLUME_STALE_TIMEOUT       = 10 * time.Minute
+
+	// 作成済みの実体の状態(AVAILABLE)を記録するための即時の再試行回数と間隔
+	volumeStatusWriteAttempts      = 3
+	volumeStatusWriteRetryInterval = 200 * time.Millisecond
 )
 
 // volumeController はボリュームの状態を管理する専用コントローラー。
@@ -25,6 +29,17 @@ type volumeController struct {
 	stopChan      chan struct{}
 	doneChan      chan struct{}
 	stopOnce      sync.Once
+	// 実体は作成済みだが AVAILABLE を記録できていないボリューム。制御ループからのみ参照する。
+	// 再試行で記録できるまで、古いボリュームの自動削除から除外する。
+	unrecordedVolumes map[string]struct{}
+}
+
+// volumeProvisionOps は PENDING ボリュームの作成で使う操作。単体テストで差し替えられるようにする。
+type volumeProvisionOps struct {
+	setStatus        func(id string, status int) error
+	setStatusMessage func(id string, status int, message string) error
+	create           func(id string) error
+	configureISCSI   func(id string) error
 }
 
 // Stop はコントローラーの定期処理を停止し、終了を待機する。
@@ -60,6 +75,7 @@ func StartVolController(node string, etcdUrl string, deletionDelaySeconds int) (
 		return nil, err
 	}
 	c.db = c.marmot.Db
+	c.unrecordedVolumes = make(map[string]struct{})
 	c.stopChan = make(chan struct{})
 	c.doneChan = make(chan struct{})
 
@@ -97,6 +113,7 @@ func (c *volumeController) volumeControllerLoop() {
 		return
 	}
 	slog.Debug("取得したボリュームの数", "numVolumes", len(vols))
+	c.forgetMissingUnrecordedVolumes(vols)
 	for _, vol := range vols {
 		volID := api.VolumeID(vol)
 		if shouldFail, message := shouldFailVolumeForMissingAssignedNode(vol, statuses); shouldFail {
@@ -105,7 +122,9 @@ func (c *volumeController) volumeControllerLoop() {
 				assignedNode = strings.TrimSpace(*vol.Metadata.NodeName)
 			}
 			slog.Warn("存在しない nodeName 指定のためボリュームを ERROR に更新", "volId", volID, "assignedNode", assignedNode, "message", message)
-			c.db.UpdateVolumeStatusMessage(volID, db.VOLUME_ERROR, message)
+			if err := c.db.UpdateVolumeStatusMessage(volID, db.VOLUME_ERROR, message); err != nil {
+				slog.Error("UpdateVolumeStatusMessage() failed; 次の周期で再試行します", "volId", volID, "status", db.VOLUME_ERROR, "err", err)
+			}
 			continue
 		}
 
@@ -151,7 +170,9 @@ func (c *volumeController) volumeControllerLoop() {
 						slog.Warn("iSCSI公開解除対象が見つからないため処理を継続", "volId", volID, "err", err)
 					} else {
 						slog.Error("CleanupISCSIForVolumeByID()", "err", err, "volId", volID)
-						c.db.UpdateVolumeStatusMessage(volID, db.VOLUME_ERROR, err.Error())
+						if dbErr := c.db.UpdateVolumeStatusMessage(volID, db.VOLUME_ERROR, err.Error()); dbErr != nil {
+							slog.Error("UpdateVolumeStatusMessage() failed; DELETING のまま次の周期で再試行します", "volId", volID, "status", db.VOLUME_ERROR, "err", dbErr)
+						}
 						continue
 					}
 				}
@@ -163,12 +184,15 @@ func (c *volumeController) volumeControllerLoop() {
 					slog.Warn("削除対象の実体が見つからないためオブジェクト削除を継続", "volId", volID, "err", err)
 				} else {
 					slog.Error("RemoveVolume()", "err", err)
-					c.db.UpdateVolumeStatusMessage(volID, db.VOLUME_ERROR, err.Error())
+					if dbErr := c.db.UpdateVolumeStatusMessage(volID, db.VOLUME_ERROR, err.Error()); dbErr != nil {
+						slog.Error("UpdateVolumeStatusMessage() failed; DELETING のまま次の周期で再試行します", "volId", volID, "status", db.VOLUME_ERROR, "err", dbErr)
+					}
 					continue
 				}
 			}
 			if err := c.db.DeleteVolume(volID); err != nil {
-				slog.Error("DeleteVolume()", "err", err, "volId", volID)
+				slog.Error("DeleteVolume() failed; 次の周期で再試行します", "err", err, "volId", volID)
+				continue
 			}
 			slog.Debug("ボリュームの削除成功", "volId", volID)
 			continue
@@ -177,8 +201,17 @@ func (c *volumeController) volumeControllerLoop() {
 			deletionTime := *vol.Status.DeletionTimeStamp
 			if time.Since(deletionTime) > c.deletionDelay {
 				slog.Debug("削除のタイムスタンプが一定時間以上経過しているボリューム検出", "volId", volID)
-				c.marmot.Db.UpdateVolumeStatus(volID, db.VOLUME_DELETING)
+				if err := c.marmot.Db.UpdateVolumeStatus(volID, db.VOLUME_DELETING); err != nil {
+					// 削除予定のボリュームを、古い状態のまま作成・利用する処理へ進めない
+					slog.Error("UpdateVolumeStatus() failed; 次の周期で再試行します", "volId", volID, "status", db.VOLUME_DELETING, "err", err)
+					continue
+				}
 			}
+		}
+
+		// 実体は作成済みだが AVAILABLE を記録できていないボリュームは、記録を再試行し、自動削除しない
+		if c.retryUnrecordedVolume(vol, c.db.UpdateVolumeStatus) {
+			continue
 		}
 
 		// 最終更新から10分以上 ERROR / PROVISIONING が継続している場合は実体ごと自動削除
@@ -188,8 +221,11 @@ func (c *volumeController) volumeControllerLoop() {
 			if isStale && isTargetState {
 				slog.Warn("最終更新から10分以上放置されたボリュームを削除キューへ登録", "volId", volID, "status", vol.Status.StatusCode, "lastUpdate", vol.Status.LastUpdateTimeStamp)
 				if vol.Status.DeletionTimeStamp == nil {
-					c.db.SetVolumeDeletionTimestamp(volID)
-					slog.Debug("放置ボリュームにDeletionTimeStampを設定", "volId", volID)
+					if err := c.db.SetVolumeDeletionTimestamp(volID); err != nil {
+						slog.Error("SetVolumeDeletionTimestamp() failed; 次の周期で再試行します", "volId", volID, "err", err)
+					} else {
+						slog.Debug("放置ボリュームにDeletionTimeStampを設定", "volId", volID)
+					}
 				}
 				continue
 			}
@@ -199,26 +235,15 @@ func (c *volumeController) volumeControllerLoop() {
 		switch vol.Status.StatusCode {
 		case db.VOLUME_PENDING:
 			slog.Debug("待ち状態のボリュームを処理", "volId", volID)
-			// 待ち状態のボリュームを処理するコードをここに追加
-			c.db.UpdateVolumeStatus(volID, db.VOLUME_PROVISIONING)
-			if _, err := c.marmot.CreateNewVolume(volID); err != nil {
-				slog.Error("CreateNewVolume()", "err", err)
-				c.db.UpdateVolumeStatusMessage(volID, db.VOLUME_ERROR, err.Error())
-				continue
-			}
-
-			isISCSIVolume := vol.Spec.Type != nil && *vol.Spec.Type == "lvm" &&
-				vol.Spec.Kind != nil && *vol.Spec.Kind == "data" &&
-				vol.Spec.Iscsi != nil && *vol.Spec.Iscsi
-			if isISCSIVolume {
-				if err := c.marmot.ConfigureISCSIForVolumeByID(volID); err != nil {
-					slog.Error("ConfigureISCSIForVolumeByID()", "err", err, "volId", volID)
-					c.db.UpdateVolumeStatusMessage(volID, db.VOLUME_ERROR, err.Error())
-					continue
-				}
-			}
-
-			c.db.UpdateVolumeStatus(volID, db.VOLUME_AVAILABLE)
+			c.provisionPendingVolume(vol, volumeProvisionOps{
+				setStatus:        c.db.UpdateVolumeStatus,
+				setStatusMessage: c.db.UpdateVolumeStatusMessage,
+				create: func(id string) error {
+					_, err := c.marmot.CreateNewVolume(id)
+					return err
+				},
+				configureISCSI: c.marmot.ConfigureISCSIForVolumeByID,
+			})
 		case db.VOLUME_PROVISIONING:
 			slog.Debug("プロビジョニング中のボリュームを処理", "volId", volID)
 
@@ -231,13 +256,110 @@ func (c *volumeController) volumeControllerLoop() {
 			slog.Debug("利用可能なボリュームを処理", "volId", volID)
 			if err := marmotd.CheckVolumeBackingStore(vol); err != nil {
 				slog.Warn("AVAILABLE ボリュームの実体が見つからないため UNAVAILABLE に更新", "volId", volID, "err", err)
-				c.db.UpdateVolumeStatusMessage(volID, db.VOLUME_UNAVAILABLE, err.Error())
+				if dbErr := c.db.UpdateVolumeStatusMessage(volID, db.VOLUME_UNAVAILABLE, err.Error()); dbErr != nil {
+					slog.Error("UpdateVolumeStatusMessage() failed; 次の周期で再試行します", "volId", volID, "status", db.VOLUME_UNAVAILABLE, "err", dbErr)
+				}
 			}
 		default:
 			slog.Warn("不明なステータスのボリュームをスキップ", "volId", volID, "status", *vol.Status.Status)
 		}
 	}
 	// ワークキューから処理を取り出して、処理を実行する
+}
+
+// provisionPendingVolume は PENDING のボリュームを作成する。
+// PROVISIONING への更新は実体作成の前提であり、失敗した場合は実体を作成せず、次の周期で再試行する。
+// 実体の作成後に AVAILABLE を記録できない場合は、実体を削除せず、記録を再試行する。
+func (c *volumeController) provisionPendingVolume(vol api.Volume, ops volumeProvisionOps) {
+	volID := api.VolumeID(vol)
+
+	if err := ops.setStatus(volID, db.VOLUME_PROVISIONING); err != nil {
+		slog.Error("UpdateVolumeStatus() failed; 実体を作成せず、次の周期で再試行します", "volId", volID, "status", db.VOLUME_PROVISIONING, "err", err)
+		return
+	}
+	if err := ops.create(volID); err != nil {
+		slog.Error("CreateNewVolume()", "err", err)
+		c.recordVolumeError(volID, err, ops)
+		return
+	}
+
+	isISCSIVolume := vol.Spec.Type != nil && *vol.Spec.Type == "lvm" &&
+		vol.Spec.Kind != nil && *vol.Spec.Kind == "data" &&
+		vol.Spec.Iscsi != nil && *vol.Spec.Iscsi
+	if isISCSIVolume {
+		if err := ops.configureISCSI(volID); err != nil {
+			slog.Error("ConfigureISCSIForVolumeByID()", "err", err, "volId", volID)
+			c.recordVolumeError(volID, err, ops)
+			return
+		}
+	}
+
+	if err := retryVolumeStatusWrite(volumeStatusWriteAttempts, volumeStatusWriteRetryInterval, func() error {
+		return ops.setStatus(volID, db.VOLUME_AVAILABLE)
+	}); err != nil {
+		slog.Error("UpdateVolumeStatus() failed; 作成済みの実体は削除せず、AVAILABLE の記録を次の周期以降で再試行します", "volId", volID, "err", err)
+		if c.unrecordedVolumes == nil {
+			c.unrecordedVolumes = make(map[string]struct{})
+		}
+		c.unrecordedVolumes[volID] = struct{}{}
+	}
+}
+
+// recordVolumeError は作成失敗を ERROR として記録する。記録できない場合は PROVISIONING のまま古いボリュームとして回収される。
+func (c *volumeController) recordVolumeError(volID string, cause error, ops volumeProvisionOps) {
+	if err := ops.setStatusMessage(volID, db.VOLUME_ERROR, cause.Error()); err != nil {
+		slog.Error("UpdateVolumeStatusMessage() failed", "volId", volID, "status", db.VOLUME_ERROR, "err", err)
+	}
+}
+
+// retryUnrecordedVolume は、AVAILABLE を記録できていないボリュームの記録を再試行する。
+// true を返した場合、そのボリュームは古いボリュームの自動削除などの以降の処理を行わない。
+func (c *volumeController) retryUnrecordedVolume(vol api.Volume, setStatus func(id string, status int) error) bool {
+	volID := api.VolumeID(vol)
+	if _, ok := c.unrecordedVolumes[volID]; !ok {
+		return false
+	}
+	// 削除が要求された、または他の状態に変わった場合は、状態を上書きしない
+	if vol.Status == nil || vol.Status.StatusCode != db.VOLUME_PROVISIONING || vol.Status.DeletionTimeStamp != nil {
+		delete(c.unrecordedVolumes, volID)
+		return false
+	}
+	if err := setStatus(volID, db.VOLUME_AVAILABLE); err != nil {
+		slog.Error("UpdateVolumeStatus() failed; AVAILABLE の記録を次の周期で再試行します", "volId", volID, "err", err)
+		return true
+	}
+	delete(c.unrecordedVolumes, volID)
+	return true
+}
+
+// forgetMissingUnrecordedVolumes は、すでに存在しないボリュームを再試行の対象から外す。
+func (c *volumeController) forgetMissingUnrecordedVolumes(vols []api.Volume) {
+	if len(c.unrecordedVolumes) == 0 {
+		return
+	}
+	existing := make(map[string]struct{}, len(vols))
+	for _, vol := range vols {
+		existing[api.VolumeID(vol)] = struct{}{}
+	}
+	for volID := range c.unrecordedVolumes {
+		if _, ok := existing[volID]; !ok {
+			delete(c.unrecordedVolumes, volID)
+		}
+	}
+}
+
+// retryVolumeStatusWrite は write が成功するまで、最大 attempts 回、interval の間隔で実行する。
+func retryVolumeStatusWrite(attempts int, interval time.Duration, write func() error) error {
+	var err error
+	for i := 0; i < attempts; i++ {
+		if i > 0 {
+			time.Sleep(interval)
+		}
+		if err = write(); err == nil {
+			return nil
+		}
+	}
+	return err
 }
 
 func shouldDeleteVolumeForMissingAssignedNode(vol api.Volume, statuses []api.HostStatus) (bool, string) {

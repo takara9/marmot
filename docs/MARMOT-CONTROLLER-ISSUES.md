@@ -39,8 +39,11 @@
 
 ### Volume コントローラー
 
-- **高 — `ERROR` / `PROVISIONING` の古い Volume を自動削除する**: 最終更新から 10 分以上経過した対象は `DeletionTimeStamp` が付与され、その後 `DELETING` の処理で実体も削除されます（[volume-controller.go](../pkg/controller/volume-controller.go#L184)、[volume-controller.go](../pkg/controller/volume-controller.go#L176)）。この判定には永続ボリュームの除外条件が見当たらないため、意図的に長期間エラー状態に置いたデータまで削除対象になる可能性があります。自動削除の適用条件、永続性の扱い、猶予時間、管理者による停止・承認方法を明示し、永続データの保持を優先するテストを追加します。
+- **中 — 作成中の Volume を、更新日時だけで失敗と判定して削除する可能性がある**: 最終更新から 10 分以上 `ERROR` / `PROVISIONING` のままの Volume には `DeletionTimeStamp` が付与され、その後 `DELETING` の処理で実体も削除されます（[volume-controller.go](../pkg/controller/volume-controller.go#L184)、[volume-controller.go](../pkg/controller/volume-controller.go#L176)）。作成に失敗した Volume や中断された Volume を自動で回収する動作は妥当であり、維持します。`ERROR` へ遷移するのは作成処理または削除処理の失敗時だけで、`AVAILABLE` から `ERROR` へ遷移する経路は見当たらないため、これらの Volume にユーザーデータは入っていません。そのため `spec.persistent` はこの判定の対象外とします。
+  - **懸念**: `PROVISIONING` は更新日時だけで判定します。大きなイメージのコピーなどで作成が 10 分を超え、その間に更新日時が更新されない場合、作成中の Volume が削除され、作成が失敗する可能性があります（[CreateNewVolumeWithWait](../pkg/marmotd/server.go#L2051) は実体の作成中も `PROVISIONING` のまま登録します）。**未再現**です。
+  - **対応案**: 実際に 10 分を超える作成で、更新日時の更新タイミングと誤削除の有無を確認します。誤削除が確認できた場合は、作成処理の進行中であることを判定に加える（作成中は更新日時を更新する、または猶予時間を調整する）ことを検討します。あわせて、自動削除の適用条件と猶予時間を [MATMOT-CONTROLLERS.md](./MATMOT-CONTROLLERS.md) に明記します。削除と同時に `ERROR` のメッセージも失われるため、削除前にログへ原因を残します。
 - **中 — 状態更新エラーが処理継続を妨げない**: `PROVISIONING`、`AVAILABLE`、削除タイムスタンプなどの更新結果を一部確認していません（[volume-controller.go](../pkg/controller/volume-controller.go#L178)、[volume-controller.go](../pkg/controller/volume-controller.go#L203)、[volume-controller.go](../pkg/controller/volume-controller.go#L221)）。DB 更新が失敗したときに、後続の実体操作を続けるかどうかを明示的に定義します。
+  - **対応状況（対応済み）**: Volume の状態更新と削除タイムスタンプの設定がエラーを返すようにし（[db-volumes.go](../pkg/db/db-volumes.go#L384)、[db-volumes.go](../pkg/db/db-volumes.go#L415)）、コントローラーが失敗に応じて後続の処理を判断します。`PENDING` から `PROVISIONING` への更新は実体作成の前提であり、失敗した場合は実体を作成せず、次の周期で再試行します（[volume-controller.go](../pkg/controller/volume-controller.go#L273)）。実体の作成後に `AVAILABLE` を記録できない場合は、実体を削除せず、最大 3 回の即時の再試行の後、記録できるまで周期ごとに再試行し、その間は古いボリュームの自動削除から除外します（[volume-controller.go](../pkg/controller/volume-controller.go#L317)、[volume-controller.go](../pkg/controller/volume-controller.go#L352)）。削除要求などで状態が変わったボリュームは、状態を上書きしません。`DELETING` への更新に失敗した場合は、古い状態のまま作成などの処理へ進まず、次の周期で再試行します（[volume-controller.go](../pkg/controller/volume-controller.go#L204)）。`UNAVAILABLE` / `ERROR` の更新と削除タイムスタンプの設定は、失敗をエラーログに記録し、次の周期の再実行で収束させます。`DeleteVolume` が失敗した場合に、「削除成功」とログに出さないようにしました。単体テストは [volume-controller_test.go](../pkg/controller/volume-controller_test.go) に追加しました。**制約**: 再試行の対象はコントローラーのメモリ上にあり、再起動すると失われます。その場合、10 分後に従来どおり自動削除されます。`CreateNewVolume` 内部の `AVAILABLE` の書き込みは変更しておらず、[CreateNewVolumeWithWait](../pkg/marmotd/server.go#L2051) 経由の作成では、書き込みに失敗すると `PROVISIONING` のまま残ります。状態の無条件上書き（現在の状態を確認しない更新）と、`DELETING` への更新に成功した後に更新前の状態で処理が続く動作は、今回の対象外です。実際の etcd で書き込みを失敗させる自動テストは整備していません。
 
 ### Network コントローラー
 
@@ -112,7 +115,7 @@
 
 ## 取り組み順の提案
 
-1. Volume の自動削除条件を明確化し、永続データが意図せず削除されないことを確認する。
+1. Volume の作成が 10 分を超える場合に、作成中の Volume が誤って自動削除されないか確認する。
 2. Network のメンバー再調整を失敗時に再試行できるようにする。
 3. mke-lb-controller の入力取得失敗時に最後の正常 HAProxy 設定を維持する。
 4. Image / mke-node-controller のプロセス再起動をまたぐ処理状態を回復可能にする。

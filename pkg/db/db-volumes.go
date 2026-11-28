@@ -2,6 +2,7 @@ package db
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -379,20 +380,20 @@ func (d *Database) FindVolumeByName(name, kind string) ([]api.Volume, error) {
 }
 
 // OSボリュームの状態更新
-// エラー時はログ出力して処理を中断する（panic は発生させない）
-func (d *Database) UpdateVolumeStatus(id string, status int) {
-	d.UpdateVolumeStatusMessage(id, status, "")
+// エラー時はログ出力してエラーを返す（panic は発生させない）。呼び出し元は結果に応じて後続処理を判断する。
+func (d *Database) UpdateVolumeStatus(id string, status int) error {
+	return d.UpdateVolumeStatusMessage(id, status, "")
 }
 
-func (d *Database) UpdateVolumeStatusMessage(id string, status int, message string) {
+func (d *Database) UpdateVolumeStatusMessage(id string, status int, message string) error {
 	if len(id) == 0 {
 		slog.Error("invalid volume id", "id", id)
-		return
+		return errors.New("invalid volume id")
 	}
 	vol, err := d.GetVolumeById(id)
 	if err != nil {
 		slog.Error("UpdateVolumeStatusMessage() failed to get volume", "err", err, "id", id)
-		return
+		return err
 	}
 	vol.Status.LastUpdateTimeStamp = util.TimePtr(time.Now())
 	vol.Status.StatusCode = status
@@ -405,27 +406,31 @@ func (d *Database) UpdateVolumeStatusMessage(id string, status int, message stri
 
 	if err = d.UpdateVolume(id, vol); err != nil {
 		slog.Error("UpdateVolumeStatusMessage() failed to update volume", "err", err, "volId", id)
+		return err
 	}
+	return nil
 }
 
 // 削除タイムスタンプのセット
-func (d *Database) SetVolumeDeletionTimestamp(id string) {
+func (d *Database) SetVolumeDeletionTimestamp(id string) error {
 	if len(id) == 0 {
 		slog.Error("invalid volume id", "id", id)
-		return
+		return errors.New("invalid volume id")
 	}
 	vol, err := d.GetVolumeById(id)
 	if err != nil {
 		slog.Error("SetVolumeDeletionTimestamp() failed to get volume", "err", err, "id", id)
-		return
+		return err
 	}
 	if vol.Status.DeletionTimeStamp != nil {
-		return
+		return nil
 	}
 	vol.Status.DeletionTimeStamp = util.TimePtr(time.Now())
 	if err = d.UpdateVolume(id, vol); err != nil {
 		slog.Error("SetVolumeDeletionTimestamp() failed to update volume", "err", err, "volId", id)
+		return err
 	}
+	return nil
 }
 
 // 以下は未実装
