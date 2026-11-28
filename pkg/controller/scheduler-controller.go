@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"log/slog"
 	"sort"
 	"strings"
@@ -14,6 +15,9 @@ import (
 
 const (
 	SCHEDULER_CONTROLLER_INTERVAL = 5 * time.Second
+
+	schedulerWatchMinInterval   = time.Second
+	schedulerWatchRetryInterval = time.Second
 )
 
 type schedulerController struct {
@@ -37,19 +41,19 @@ func StartSchedulerController(node string, etcdUrl string) (*schedulerController
 		return nil, err
 	}
 
-	ticker := time.NewTicker(SCHEDULER_CONTROLLER_INTERVAL)
 	go func() {
-		defer ticker.Stop()
 		defer close(c.doneChan)
-		for {
-			select {
-			case <-ticker.C:
-				c.schedulerControllerLoop()
-			case <-c.stopChan:
-				slog.Debug("スケジューラーコントローラー停止")
-				return
-			}
-		}
+		ctx, cancel := context.WithCancel(context.Background())
+		notifications := make(chan struct{}, 1)
+		watchDone := make(chan struct{})
+		go func() {
+			defer close(watchDone)
+			watchResourceChanges(ctx, c.marmot.Db.Cli.Watch, db.ServerPrefix, "Scheduler", notifications, schedulerWatchRetryInterval)
+		}()
+		runServerController(c.stopChan, notifications, SCHEDULER_CONTROLLER_INTERVAL, schedulerWatchMinInterval, c.schedulerControllerLoop)
+		cancel()
+		<-watchDone
+		slog.Debug("スケジューラーコントローラー停止")
 	}()
 	return &c, nil
 }

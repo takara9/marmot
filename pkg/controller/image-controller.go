@@ -21,6 +21,9 @@ import (
 
 const (
 	IMAGE_CONTROLLER_INTERVAL = 5 * time.Second
+
+	imageWatchMinInterval   = time.Second
+	imageWatchRetryInterval = time.Second
 )
 
 // imageController はイメージコントローラー専用の構造体。
@@ -73,20 +76,20 @@ func StartImageController(node string, etcdUrl string, deletionDelaySeconds int)
 	c.stopChan = make(chan struct{})
 	c.doneChan = make(chan struct{})
 
-	// 定期実行の開始
-	ticker := time.NewTicker(IMAGE_CONTROLLER_INTERVAL)
+	// 定期実行と etcd watch 通知による実行の開始
 	go func() {
-		defer ticker.Stop()
 		defer close(c.doneChan)
-		for {
-			select {
-			case <-ticker.C:
-				c.imageControllerLoop()
-			case <-c.stopChan:
-				slog.Debug("イメージコントローラー停止")
-				return
-			}
-		}
+		ctx, cancel := context.WithCancel(context.Background())
+		notifications := make(chan struct{}, 1)
+		watchDone := make(chan struct{})
+		go func() {
+			defer close(watchDone)
+			watchResourceChanges(ctx, c.db.Cli.Watch, db.ImagePrefix, "Image", notifications, imageWatchRetryInterval)
+		}()
+		runServerController(c.stopChan, notifications, IMAGE_CONTROLLER_INTERVAL, imageWatchMinInterval, c.imageControllerLoop)
+		cancel()
+		<-watchDone
+		slog.Debug("イメージコントローラー停止")
 	}()
 	return &c, nil
 }

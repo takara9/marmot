@@ -1,6 +1,6 @@
 # Marmot コントローラー一覧
 
-Marmot のコントローラーは、etcd 上のリソース定義（desired state）を定期的にポーリングし、実体（libvirt / LVM / OVS / OVN / VM 内ミドルウェアなど）を望ましい状態へ収束させる reconcile ループである。
+Marmot のコントローラーは、etcd 上のリソース定義（desired state）を定期的にポーリングし、実体（libvirt / LVM / OVS / OVN / VM 内ミドルウェアなど）を望ましい状態へ収束させる reconcile ループである。VM（Server）・Volume・Network・Image・Scheduler コントローラーは、etcd watch の通知でも reconcile を早めに実行する。
 各ノードの `marmotd` が同じコントローラー群を起動し、ノード割り当て（`metadata.nodeName`）で担当を分担する。
 
 ## 1. 全体像
@@ -11,7 +11,7 @@ Marmot のコントローラーは、etcd 上のリソース定義（desired sta
 |---|---|
 | 起動箇所 | [cmd/marmotd/marmotd-main.go](../cmd/marmotd/marmotd-main.go) が API サーバーの起動前後に順次 `Start*Controller` を呼ぶ。1つでも起動に失敗すると `marmotd` は終了する |
 | 実装場所 | [pkg/controller/](../pkg/controller)（内部 DNS のみ [pkg/internal-dns/](../pkg/internal-dns)） |
-| 制御方式 | `time.Ticker` による定期ポーリング（etcd watch は未使用）。`Stop()` で停止できる |
+| 制御方式 | `time.Ticker` による定期ポーリング。VM（Server）・Volume・Network・Image・Scheduler コントローラーは、加えて etcd watch の通知でも全件 reconcile を実行する（[1.4](#14-etcd-watch-による早期-reconcile)）。それ以外のコントローラーは watch 未使用。`Stop()` で停止できる |
 | 状態管理 | 各リソースの `status.statusCode` を状態機械として遷移させる。状態定義は [pkg/db/](../pkg/db) |
 | 削除方式 | API は `status.deletionTimeStamp` を付与するだけで、コントローラーが猶予時間（`deletion_delay_seconds`、既定 10 秒。Gateway 系 / ALB / NLB / MKE は 15 秒固定）経過後に `DELETING` へ遷移させて実体を削除する |
 | ノード分担 | [node-filter.go](../pkg/controller/node-filter.go) の `evaluateNodeAssignment` で、`metadata.nodeName` が自ノードのリソースのみ処理する。未割当のリソースは処理しない |
@@ -21,18 +21,18 @@ Marmot のコントローラーは、etcd 上のリソース定義（desired sta
 
 | # | コントローラー | 対象リソース | 周期 | 実装ファイル |
 |---|---|---|---|---|
-| 1 | VM（Server） | Server | 5 秒 | `server-controller.go` |
-| 2 | Volume | Volume | 5 秒 | `volume-controller.go` |
-| 3 | Network | VirtualNetwork | 5 秒 | `network-controller.go` |
+| 1 | VM（Server） | Server | 5 秒 + etcd watch | `server-controller.go` |
+| 2 | Volume | Volume | 5 秒 + etcd watch | `volume-controller.go` |
+| 3 | Network | VirtualNetwork | 5 秒 + etcd watch | `network-controller.go` |
 | 4 | Gateway | Gateway | 15 秒 | `gateway-controller.go` |
 | 5 | VPN Gateway | VpnGateway | 15 秒 | `vpn-gateway-controller.go` |
 | 6 | Application Load Balancer | ApplicationLoadBalancer | 15 秒（`MARMOT_LB_CONTROLLER_INTERVAL_SECONDS` で変更可） | `application-load-balancer-controller.go` |
 | 7 | Network Load Balancer | NetworkLoadBalancer | 15 秒 | `network-load-balancer-controller.go` |
 | 8 | Kubernetes Engine（MKE） | KubernetesEngine | 10 秒 | `kubernetes-engine-controller.go` ほか |
 | 9 | 内部 DNS サーバー | 内部 DNS エントリー | イベント駆動（DNS 要求） | `pkg/internal-dns/dns-server.go` |
-| 10 | Image | Image | 5 秒 | `image-controller.go` |
+| 10 | Image | Image | 5 秒 + etcd watch | `image-controller.go` |
 | 11 | Host | HostStatus（自ノード） | 10 秒 | `host-controller.go` |
-| 12 | Scheduler | Server（未割当 PENDING） | 5 秒 | `scheduler-controller.go` |
+| 12 | Scheduler | Server（未割当 PENDING） | 5 秒 + etcd watch | `scheduler-controller.go` |
 
 `marmotd` の起動順は 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → (OS イメージ登録) → 10 → 11 → 12。
 
@@ -57,13 +57,34 @@ flowchart TD
 
 Gateway / VPN Gateway / ALB / NLB / MKE は、内部で専用の Server（VM）を作成し、その VM 上へ Ansible 等で設定を投入する。VM の作成自体は VM コントローラーが担当する。
 
+### 1.4 etcd watch による早期 reconcile
+
+VM（Server）・Volume・Network・Image・Scheduler コントローラーは、5 秒周期を維持したまま、対象リソースの etcd キー変更を通知に使い、既存の全件 reconcile を周期より早く実行する。実装は [server-controller.go](../pkg/controller/server-controller.go) の `watchResourceChanges`（監視）と `runServerController`（実行制御）を共用する。
+
+| コントローラー | 監視する etcd キー |
+|---|---|
+| VM（Server） | `/marmot/server/` |
+| Volume | `/marmot/volume/` |
+| Network | `/marmot/network/`（`/marmot/network-load-balancer/` は対象外） |
+| Image | `/marmot/image/`（`/marmot/osTemplateImage/` は対象外） |
+| Scheduler | `/marmot/server/`（`/marmot/hoststatus/` は対象外） |
+
+- **全件 reconcile**: 通知は「再実行の要求」にすぎず、変更されたリソースだけを処理するわけではない。reconcile は従来どおり全件取得して直列に実行する。
+- **集約と頻度制限**: 通知は集約する。reconcile は同時に 1 回だけ実行し、処理中の通知は後続の実行に反映する。watch 起因の実行は、前回の処理完了から 1 秒以上空ける。コントローラー自身の状態更新による自己通知が、連続実行を起こさないための制限である。
+- **周期処理の役割**: 5 秒周期は、削除猶予の経過、依存リソース待ちの再試行、libvirt など外部状態の変化、watch 障害からの回復に必要なため残す。
+- **障害時の挙動**: watch の開始時と再作成時にも reconcile を要求する。watch の終了・エラー（compaction を含む）はログに記録して再試行する。etcd の再起動では同じ watch が透過的に再開されるため、再起動直後の通知はなく、次の変更で検知する。
+- **停止**: `Stop()` は watch をキャンセルし、終了を待つ。
+- **制約**: Network コントローラーでは、`ERROR` のネットワークは自動復旧のたびに状態を書き込むため、自己通知により復旧の再試行が最短 1 秒間隔になる（従来は 5 秒）。クラスタメンバーの変更は、`/marmot/hoststatus/` がハートビートで定期更新されるため watch せず、5 秒周期で検知する。Scheduler も同じ理由で `/marmot/hoststatus/` を watch しないため、リーダーの交代は 5 秒周期で検知する。Scheduler は VM コントローラーなどによる Server の状態更新や自身の割り当て書き込みでも通知されるが、実行は 1 秒以上空けるため、非リーダーのノードは `hoststatus` の取得のみ、リーダーは Server の全件取得が増える。
+
+Host コントローラーは、etcd のリソースを reconcile せず、自ノードの情報を収集して `hoststatus` へ書き込む。watch の対象がなく、書き込みが自己通知になるだけなので、対象外とする。それ以外のコントローラーは、etcd watch を使わず、各節に記載の周期のポーリングだけで動作する。
+
 ---
 
 ## 2. コアコントローラー
 
 ### 2.1 VM（Server）コントローラー
 
-- 開始: `StartVmController`、周期 5 秒
+- 開始: `StartVmController`、周期 5 秒（`/marmot/server/` の etcd watch 通知でも実行）
 - 役割: Server リソースのライフサイクル（作成・起動・停止・削除）を libvirt 上の VM に反映する。
 
 | 状態 | 処理 |
@@ -82,7 +103,7 @@ Gateway / VPN Gateway / ALB / NLB / MKE は、内部で専用の Server（VM）�
 
 ### 2.2 Volume コントローラー
 
-- 開始: `StartVolController`、周期 5 秒
+- 開始: `StartVolController`、周期 5 秒（`/marmot/volume/` の etcd watch 通知でも実行）
 - 役割: LVM / QCOW2 ボリュームの作成・削除と実体の存在確認。
 
 | 状態 | 処理 |
@@ -99,7 +120,7 @@ Gateway / VPN Gateway / ALB / NLB / MKE は、内部で専用の Server（VM）�
 
 ### 2.3 Network コントローラー
 
-- 開始: `StartNetController`、周期 5 秒
+- 開始: `StartNetController`、周期 5 秒（`/marmot/network/` の etcd watch 通知でも実行）
 - 役割: 仮想ネットワーク（libvirt ネットワーク + OVS / OVN ファブリック）の作成・削除・整合性維持。
 
 ループごとの共通処理:
@@ -122,7 +143,7 @@ Gateway / VPN Gateway / ALB / NLB / MKE は、内部で専用の Server（VM）�
 
 ### 2.4 Image コントローラー
 
-- 開始: `StartImageController`、周期 5 秒
+- 開始: `StartImageController`、周期 5 秒（`/marmot/image/` の etcd watch 通知でも実行）
 - 役割: OS イメージの取り込み・作成・クラスタ内配布・削除。
 
 | 状態 | 処理 |
@@ -135,12 +156,12 @@ Gateway / VPN Gateway / ALB / NLB / MKE は、内部で専用の Server（VM）�
 
 ### 2.5 Host コントローラー
 
-- 開始: `StartHostController`、周期 10 秒
+- 開始: `StartHostController`、周期 10 秒（etcd watch は使わない。自ノードの情報を収集して書き込むため）
 - 役割: 自ノードの状態（CPU / メモリ / ストレージ等）を収集して etcd の HostStatus を更新する。これがノード生存判定（アクティブホスト）の根拠になる。あわせて OVN ランタイムの bootstrap を再試行する（`EnsureOVNRuntimeBootstrap`）。
 
 ### 2.6 Scheduler コントローラー
 
-- 開始: `StartSchedulerController`、周期 5 秒
+- 開始: `StartSchedulerController`、周期 5 秒（`/marmot/server/` の etcd watch 通知でも実行）
 - 役割: 未割当の `PENDING` Server に実行ノードを割り当てる。
 - 動作: リーダーノードのみが実行する。アクティブかつスケジュール可能（`unschedulable` でない）なノードのうち、割当済みサーバー数が最少のノードを選ぶ。`metadata.nodeName` が指定済みの場合は割当を変更せず、クラスタに存在しないノード名であれば `ERROR` にする。
 
@@ -265,6 +286,6 @@ Gateway / VPN Gateway / ALB / NLB は同じパターンで動作する。
 
 ## 7. 運用メモ
 
-- ログは `slog` の Debug レベルで「制御ループ実行」が毎周期出力される。状態遷移の追跡は各コントローラーの Debug ログと、リソースの `status.message` を参照する。
+- ログは `slog` の Debug レベルで「制御ループ実行」が毎周期出力される（etcd watch に対応した VM / Volume / Network / Image / Scheduler は、通知による実行時にも出力される）。状態遷移の追跡は各コントローラーの Debug ログと、リソースの `status.message` を参照する。watch の確立・再試行は `Server watch established` / `Volume watch established` / `Network watch established` / `Image watch established`（Scheduler は `Scheduler watch established`） と `... watch failed; retrying` などのログで確認できる。
 - 削除猶予時間は `/etc/marmot/marmotd.json` の `deletion_delay_seconds`（VM / Volume / Network / Image）で変更できる。
 - Gateway 系の Ansible Playbook は `/var/lib/marmot/ansible-playbooks` に生成される。
