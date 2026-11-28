@@ -39,6 +39,7 @@
 
 ### Volume コントローラー
 
+- **対応状況 — Volume 変更の検知**: `/marmot/volume/` の etcd watch を通知に使い、変更時と watch の開始・再作成時に全件 reconcile を要求します。通知は集約し、watch 起因の実行は前回の処理完了から1秒以上空けます。5秒周期と直列処理は維持し、watch の終了・エラーはログに記録して再試行します。停止時は watch の終了を待ちます。全件取得は残り、長い処理中の通知は後続の reconcile まで待機します。
 - **中 — 作成中の Volume を、更新日時だけで失敗と判定して削除する可能性がある**: 最終更新から 10 分以上 `ERROR` / `PROVISIONING` のままの Volume には `DeletionTimeStamp` が付与され、その後 `DELETING` の処理で実体も削除されます（[volume-controller.go](../pkg/controller/volume-controller.go#L184)、[volume-controller.go](../pkg/controller/volume-controller.go#L176)）。作成に失敗した Volume や中断された Volume を自動で回収する動作は妥当であり、維持します。`ERROR` へ遷移するのは作成処理または削除処理の失敗時だけで、`AVAILABLE` から `ERROR` へ遷移する経路は見当たらないため、これらの Volume にユーザーデータは入っていません。そのため `spec.persistent` はこの判定の対象外とします。
   - **懸念**: `PROVISIONING` は更新日時だけで判定します。大きなイメージのコピーなどで作成が 10 分を超え、その間に更新日時が更新されない場合、作成中の Volume が削除され、作成が失敗する可能性があります（[CreateNewVolumeWithWait](../pkg/marmotd/server.go#L2051) は実体の作成中も `PROVISIONING` のまま登録します）。**未再現**です。
   - **対応案**: 実際に 10 分を超える作成で、更新日時の更新タイミングと誤削除の有無を確認します。誤削除が確認できた場合は、作成処理の進行中であることを判定に加える（作成中は更新日時を更新する、または猶予時間を調整する）ことを検討します。あわせて、自動削除の適用条件と猶予時間を [MATMOT-CONTROLLERS.md](./MATMOT-CONTROLLERS.md) に明記します。削除と同時に `ERROR` のメッセージも失われるため、削除前にログへ原因を残します。

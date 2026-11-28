@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -15,6 +16,9 @@ import (
 const (
 	VOLUME_CONTROLLER_INTERVAL = 5 * time.Second
 	VOLUME_STALE_TIMEOUT       = 10 * time.Minute
+
+	volumeWatchMinInterval   = time.Second
+	volumeWatchRetryInterval = time.Second
 
 	// 作成済みの実体の状態(AVAILABLE)を記録するための即時の再試行回数と間隔
 	volumeStatusWriteAttempts      = 3
@@ -42,7 +46,7 @@ type volumeProvisionOps struct {
 	configureISCSI   func(id string) error
 }
 
-// Stop はコントローラーの定期処理を停止し、終了を待機する。
+// Stop はコントローラーの処理を停止し、終了を待機する。
 func (c *volumeController) Stop() {
 	if c == nil {
 		return
@@ -79,20 +83,19 @@ func StartVolController(node string, etcdUrl string, deletionDelaySeconds int) (
 	c.stopChan = make(chan struct{})
 	c.doneChan = make(chan struct{})
 
-	// 定期実行の開始
-	ticker := time.NewTicker(VOLUME_CONTROLLER_INTERVAL)
 	go func() {
-		defer ticker.Stop()
 		defer close(c.doneChan)
-		for {
-			select {
-			case <-ticker.C:
-				c.volumeControllerLoop()
-			case <-c.stopChan:
-				slog.Debug("ボリュームコントローラー停止")
-				return
-			}
-		}
+		ctx, cancel := context.WithCancel(context.Background())
+		notifications := make(chan struct{}, 1)
+		watchDone := make(chan struct{})
+		go func() {
+			defer close(watchDone)
+			watchResourceChanges(ctx, c.db.Cli.Watch, db.VolumePrefix, "Volume", notifications, volumeWatchRetryInterval)
+		}()
+		runServerController(c.stopChan, notifications, VOLUME_CONTROLLER_INTERVAL, volumeWatchMinInterval, c.volumeControllerLoop)
+		cancel()
+		<-watchDone
+		slog.Debug("ボリュームコントローラー停止")
 	}()
 	return &c, nil
 }
