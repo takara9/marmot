@@ -500,6 +500,11 @@ func isRetryableServerProvisionError(err error) bool {
 		return false
 	}
 
+	// 事前に作成された Volume の実体が未作成の場合は、準備完了まで待機して再試行する。
+	if errors.Is(err, marmotd.ErrStorageVolumeNotReady) {
+		return true
+	}
+
 	msg := strings.ToLower(strings.TrimSpace(err.Error()))
 	if msg == "" {
 		return false

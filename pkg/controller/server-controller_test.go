@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"os/exec"
 	"sync"
@@ -13,6 +14,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/takara9/marmot/api"
 	"github.com/takara9/marmot/pkg/db"
+	"github.com/takara9/marmot/pkg/marmotd"
 	"github.com/takara9/marmot/pkg/util"
 	etcd "go.etcd.io/etcd/client/v3"
 )
@@ -253,6 +255,8 @@ var _ = Describe("server controller helpers", func() {
 			Entry("ssh key empty response is retryable", errors.New("no public keys found at https://github.com/foo.keys"), true),
 			Entry("missing qcow2 source file copy is retryable", errors.New("failed to copy QCOW2 volume from /var/lib/marmot/images/x/osimage-x.qcow2 to /var/lib/marmot/volumes/boot-y.qcow2: exit status 1 (output: cp: cannot stat '/var/lib/marmot/images/x/osimage-x.qcow2': No such file or directory)"), true),
 			Entry("other provisioning error is not retryable", errors.New("boot volume path is required for qcow2"), false),
+			Entry("storage volume not ready is retryable", fmt.Errorf("%w: storage[0] volume \"lvm-vol1\" (id=6ba7e) status=PENDING", marmotd.ErrStorageVolumeNotReady), true),
+			Entry("storage volume in error state is not retryable", errors.New("storage[0] volume \"lvm-vol1\" (id=6ba7e) cannot be attached: status=ERROR"), false),
 			Entry("nil error is not retryable", nil, false),
 		)
 	})

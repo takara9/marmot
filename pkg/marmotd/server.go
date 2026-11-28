@@ -171,6 +171,47 @@ func (m *Marmot) findPreCreatedStorageVolume(disk api.Volume) (*api.Volume, erro
 	return selectReusableVolume(volumes)
 }
 
+// ErrStorageVolumeNotReady は、事前に作成された Volume がまだ AVAILABLE ではないことを表す。
+// Volume コントローラーが実体を作成すれば解消するため、呼び出し元は再試行できる。
+var ErrStorageVolumeNotReady = errors.New("storage volume is not ready")
+
+// checkPreCreatedStorageVolumeReady は、事前に作成された Volume を Server に接続できる状態か判定する。
+// 実体の作成前に接続すると、ハイパーバイザーが存在しないデバイスを開けず失敗する。
+func checkPreCreatedStorageVolumeReady(index int, vol *api.Volume) error {
+	if vol == nil || vol.Status == nil {
+		return nil
+	}
+	switch vol.Status.StatusCode {
+	case db.VOLUME_AVAILABLE:
+		return nil
+	case db.VOLUME_PENDING, db.VOLUME_PROVISIONING:
+		return fmt.Errorf("%w: storage[%d] volume %q (id=%s) status=%s", ErrStorageVolumeNotReady, index, vol.Metadata.Name, api.VolumeID(*vol), db.VolStatus[vol.Status.StatusCode])
+	default:
+		return fmt.Errorf("storage[%d] volume %q (id=%s) cannot be attached: status=%s", index, vol.Metadata.Name, api.VolumeID(*vol), db.VolStatus[vol.Status.StatusCode])
+	}
+}
+
+// ensurePreCreatedStorageVolumesReady は、事前に作成された Volume がすべて接続可能か確認する。
+// ブートボリュームの作成などの副作用の前に呼び、未準備の場合は再試行で重複作成を避ける。
+func (m *Marmot) ensurePreCreatedStorageVolumesReady(storage *[]api.Volume) error {
+	if storage == nil {
+		return nil
+	}
+	for i, disk := range *storage {
+		if !shouldResolvePreCreatedStorageVolume(disk) {
+			continue
+		}
+		vol, err := m.findPreCreatedStorageVolume(disk)
+		if err != nil {
+			return fmt.Errorf("storage[%d] volume lookup failed: %w", i, err)
+		}
+		if err := checkPreCreatedStorageVolumeReady(i, vol); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // nodeNameFromResolvedVolumes は解決済みのボリューム一覧からサーバーのノード制約を導出する。
 // spec.iscsiTargetIqn がセットされているボリュームはネットワーク越しにどのノードからも
 // アクセス可能なため、ノード配置制約の対象外とする。
@@ -388,6 +429,12 @@ func (m *Marmot) CreateServerManage(id string) (string, error) {
 	storageNodeName, err := m.resolveStorageBoundNodeName(serverConfig.Spec.Storage)
 	if err != nil {
 		slog.Error("resolveStorageBoundNodeName()", "err", err)
+		return "", err
+	}
+
+	// 事前に作成された Volume は、実体の作成後に接続する。ブートボリュームの作成より前に確認する。
+	if err := m.ensurePreCreatedStorageVolumesReady(serverConfig.Spec.Storage); err != nil {
+		slog.Warn("ensurePreCreatedStorageVolumesReady()", "serverId", id, "err", err)
 		return "", err
 	}
 
