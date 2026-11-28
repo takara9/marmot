@@ -26,6 +26,12 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
+const (
+	// qemu-nbd の接続直後は一過性の失敗でマウントできないことがあるため、マウントを再試行する
+	mountAttempts      = 5
+	mountRetryInterval = time.Second
+)
+
 func SetupLinux(spec api.Server) error {
 	if spec.Spec.BootVolume == nil {
 		return fmt.Errorf("BootVolume is nil")
@@ -480,26 +486,29 @@ func MountVolume(v api.Volume) (string, string, error) {
 		// マウント候補のデバイスファイルが出現するまで待つ(パーティションデバイスノードの
 		// 作成が遅延していても、タイムアウトまでは mount 失敗と確定しない)。
 		waitForAnyDeviceFile(mountCandidates, 10*time.Second)
-		mounted := false
-		for _, dev := range mountCandidates {
-			debugPrintln("Mounting", "mount", "-t", "ext4", dev, mountPoint)
-			cmd = exec.Command("mount", "-t", "ext4", dev, mountPoint)
-			err = cmd.Run()
-			if err == nil {
-				mounted = true
-				break
-			}
+		// 接続直後は一過性の失敗でマウントできないことがあるため、再読込してから再試行する。
+		mounted := retryMountAttempts(mountAttempts, mountRetryInterval, func() {
+			refreshNbdPartitions(nbdDevice)
+			waitForAnyDeviceFile(mountCandidates, 10*time.Second)
+		}, func(attempt int) bool {
+			for _, dev := range mountCandidates {
+				debugPrintln("Mounting", "mount", "-t", "ext4", dev, mountPoint)
+				out, err := exec.Command("mount", "-t", "ext4", dev, mountPoint).CombinedOutput()
+				if err == nil {
+					return true
+				}
 
-			// filesystem type を固定しない再試行（alpine cloud image、xfs(Rocky)互換）
-			cmd = exec.Command("mount", dev, mountPoint)
-			err = cmd.Run()
-			if err == nil {
-				mounted = true
-				break
-			}
+				// filesystem type を固定しない再試行（alpine cloud image、xfs(Rocky)互換）
+				out2, err := exec.Command("mount", dev, mountPoint).CombinedOutput()
+				if err == nil {
+					return true
+				}
 
-			slog.Warn("mount attempt failed", "device", dev, "mountPoint", mountPoint, "error", err)
-		}
+				slog.Warn("mount attempt failed", "device", dev, "mountPoint", mountPoint, "attempt", attempt, "error", err,
+					"ext4Output", strings.TrimSpace(string(out)), "output", strings.TrimSpace(string(out2)))
+			}
+			return false
+		})
 		if !mounted {
 			_ = exec.Command("qemu-nbd", "--disconnect", nbdDevice).Run()
 			_ = os.RemoveAll(mountPoint)
@@ -1262,6 +1271,21 @@ func refreshNbdPartitions(nbdDevice string) {
 	if err := exec.Command("udevadm", "settle").Run(); err != nil {
 		slog.Warn("udevadm settle failed", "err", err)
 	}
+}
+
+// retryMountAttempts は、try が true を返すまで最大 attempts 回、interval 間隔で呼び出す。
+// 2回目以降の試行の前に beforeRetry を実行する。
+func retryMountAttempts(attempts int, interval time.Duration, beforeRetry func(), try func(attempt int) bool) bool {
+	for attempt := 1; attempt <= attempts; attempt++ {
+		if attempt > 1 {
+			time.Sleep(interval)
+			beforeRetry()
+		}
+		if try(attempt) {
+			return true
+		}
+	}
+	return false
 }
 
 // waitForAnyDeviceFile は、candidates のいずれかのデバイスファイルが出現するまで
