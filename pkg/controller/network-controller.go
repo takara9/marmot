@@ -425,7 +425,7 @@ func (c *networkController) ensureFollowerNetworksWaiting(headNetwork api.Virtua
 // リーダーの再調整が失敗した場合は署名を確定せず、次の周期で同じ変更を再試行する。
 // 再調整は作成済みのフォロワーや削除予約済みのものを重複して処理しないため、再実行できる。
 func (c *networkController) reconcileMemberChange(signature string, isLeader bool, reconcile func() (bool, error)) bool {
-	if signature == c.lastNetworkMemberSignature && !(c.memberReconcilePending && isLeader) {
+	if signature == c.lastNetworkMemberSignature && (!c.memberReconcilePending || !isLeader) {
 		return false
 	}
 	slog.Debug("cluster membership changed", "controllerNode", c.marmot.NodeName, "previous", c.lastNetworkMemberSignature, "current", signature)
