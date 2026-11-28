@@ -134,3 +134,33 @@ func TestWaitForAnyDeviceFileTimesOutWhenNoneAppear(t *testing.T) {
 		t.Fatalf("waitForAnyDeviceFile returned before timeout elapsed, elapsed=%s", elapsed)
 	}
 }
+
+// 一過性の失敗の後に成功した場合は再試行して成功し、再試行の前に毎回 beforeRetry が実行されることを確認する。
+func TestRetryMountAttemptsSucceedsAfterTransientFailure(t *testing.T) {
+	t.Parallel()
+
+	tries, refreshes := 0, 0
+	ok := retryMountAttempts(5, time.Millisecond, func() { refreshes++ }, func(attempt int) bool {
+		tries++
+		return attempt == 3
+	})
+
+	if !ok || tries != 3 || refreshes != 2 {
+		t.Fatalf("ok=%v tries=%d refreshes=%d, want ok=true tries=3 refreshes=2", ok, tries, refreshes)
+	}
+}
+
+// 恒久的な失敗は、上限回数で打ち切って失敗を返すことを確認する。
+func TestRetryMountAttemptsGivesUpAtLimit(t *testing.T) {
+	t.Parallel()
+
+	tries := 0
+	ok := retryMountAttempts(3, time.Millisecond, func() {}, func(int) bool {
+		tries++
+		return false
+	})
+
+	if ok || tries != 3 {
+		t.Fatalf("ok=%v tries=%d, want ok=false tries=3", ok, tries)
+	}
+}
